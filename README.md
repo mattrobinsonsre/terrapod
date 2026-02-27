@@ -269,7 +269,7 @@ Terrapod is a single, self-hosted platform covering the full TFE surface (state 
 
 ## License
 
-[Apache 2.0](LICENSE) -- maximally permissive for enterprise adoption.
+[GPLv3](LICENSE) -- strong copyleft ensures Terrapod and all derivative works remain open source.
 
 ---
 
