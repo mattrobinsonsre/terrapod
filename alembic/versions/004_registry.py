@@ -71,7 +71,9 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.func.now(),
         ),
-        sa.UniqueConstraint("org_name", "namespace", "name", "provider", name="uq_registry_modules"),
+        sa.UniqueConstraint(
+            "org_name", "namespace", "name", "provider", name="uq_registry_modules"
+        ),
     )
 
     op.create_table(
@@ -84,7 +86,9 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("version", sa.String(63), nullable=False),
-        sa.Column("upload_status", sa.String(20), nullable=False, server_default="pending"),
+        sa.Column(
+            "upload_status", sa.String(20), nullable=False, server_default="pending"
+        ),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -124,7 +128,9 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.func.now(),
         ),
-        sa.UniqueConstraint("org_name", "namespace", "name", name="uq_registry_providers"),
+        sa.UniqueConstraint(
+            "org_name", "namespace", "name", name="uq_registry_providers"
+        ),
     )
 
     op.create_table(
@@ -150,10 +156,16 @@ def upgrade() -> None:
             server_default=sa.text("'[\"5.0\"]'::jsonb"),
         ),
         sa.Column(
-            "shasums_uploaded", sa.Boolean(), nullable=False, server_default=sa.text("false")
+            "shasums_uploaded",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
         ),
         sa.Column(
-            "shasums_sig_uploaded", sa.Boolean(), nullable=False, server_default=sa.text("false")
+            "shasums_sig_uploaded",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
         ),
         sa.Column(
             "created_at",
@@ -167,7 +179,9 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.func.now(),
         ),
-        sa.UniqueConstraint("provider_id", "version", name="uq_registry_provider_versions"),
+        sa.UniqueConstraint(
+            "provider_id", "version", name="uq_registry_provider_versions"
+        ),
     )
     op.create_index(
         "ix_registry_provider_versions_provider_id",
@@ -188,14 +202,18 @@ def upgrade() -> None:
         sa.Column("arch", sa.String(20), nullable=False),
         sa.Column("shasum", sa.String(64), nullable=False, server_default=""),
         sa.Column("filename", sa.String(255), nullable=False, server_default=""),
-        sa.Column("upload_status", sa.String(20), nullable=False, server_default="pending"),
+        sa.Column(
+            "upload_status", sa.String(20), nullable=False, server_default="pending"
+        ),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
             nullable=False,
             server_default=sa.func.now(),
         ),
-        sa.UniqueConstraint("version_id", "os", "arch", name="uq_registry_provider_platforms"),
+        sa.UniqueConstraint(
+            "version_id", "os", "arch", name="uq_registry_provider_platforms"
+        ),
     )
     op.create_index(
         "ix_registry_provider_platforms_version_id",

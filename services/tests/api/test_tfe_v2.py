@@ -1,8 +1,8 @@
 """Tests for TFE V2 compatibility endpoints — ping, account/details, token CRUD."""
 
+from datetime import UTC
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_app
@@ -41,9 +41,7 @@ class TestPing:
     ):
         app = create_app()
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/api/v2/ping")
 
         assert response.status_code == 200
@@ -54,15 +52,11 @@ class TestPing:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    async def test_ping_no_auth_required(
-        self, mock_init_db, mock_init_redis, mock_init_storage
-    ):
+    async def test_ping_no_auth_required(self, mock_init_db, mock_init_redis, mock_init_storage):
         """Ping endpoint works without any Authorization header."""
         app = create_app()
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/api/v2/ping")
 
         assert response.status_code == 200
@@ -84,9 +78,7 @@ class TestAccountDetails:
         )
         app = _make_app_with_auth(user)
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get(
                 "/api/v2/account/details",
                 headers={"Authorization": "Bearer dummy-token"},
@@ -119,9 +111,7 @@ class TestAccountDetails:
         )
         app = _make_app_with_auth(user)
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get(
                 "/api/v2/account/details",
                 headers={"Authorization": "Bearer dummy-token"},
@@ -140,9 +130,7 @@ class TestAccountDetails:
     ):
         app = create_app()
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/api/v2/account/details")
 
         assert response.status_code in (401, 403)
@@ -160,13 +148,13 @@ class TestTokenCRUD:
         mock_init_redis,
         mock_init_storage,
     ):
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         mock_token = MagicMock()
         mock_token.id = "at-abc123"
         mock_token.description = "my token"
         mock_token.token_type = "user"
-        mock_token.created_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        mock_token.created_at = datetime(2026, 1, 1, tzinfo=UTC)
         mock_token.last_used_at = None
         mock_create.return_value = (mock_token, "raw.tpod.secret")
 
@@ -179,9 +167,7 @@ class TestTokenCRUD:
         )
         app = _make_app_with_auth(user)
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
                 "/api/v2/users/test/authentication-tokens",
                 json={
@@ -211,13 +197,13 @@ class TestTokenCRUD:
         mock_init_redis,
         mock_init_storage,
     ):
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         mock_token = MagicMock()
         mock_token.id = "at-abc123"
         mock_token.description = "test"
         mock_token.token_type = "user"
-        mock_token.created_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        mock_token.created_at = datetime(2026, 1, 1, tzinfo=UTC)
         mock_token.last_used_at = None
         mock_list.return_value = [mock_token]
 
@@ -230,9 +216,7 @@ class TestTokenCRUD:
         )
         app = _make_app_with_auth(user)
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get(
                 "/api/v2/users/test/authentication-tokens",
                 headers={"Authorization": "Bearer dummy"},
@@ -273,9 +257,7 @@ class TestTokenCRUD:
         )
         app = _make_app_with_auth(user)
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.delete(
                 "/api/v2/authentication-tokens/at-abc123",
                 headers={"Authorization": "Bearer dummy"},
@@ -308,9 +290,7 @@ class TestTokenCRUD:
         )
         app = _make_app_with_auth(user)
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.delete(
                 "/api/v2/authentication-tokens/at-abc123",
                 headers={"Authorization": "Bearer dummy"},
@@ -333,9 +313,7 @@ class TestTokenCRUD:
         )
         app = _make_app_with_auth(user)
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
                 "/api/v2/users/other-user/authentication-tokens",
                 json={"data": {"type": "authentication-tokens", "attributes": {}}},

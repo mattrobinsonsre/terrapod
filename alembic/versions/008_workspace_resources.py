@@ -24,7 +24,9 @@ def upgrade() -> None:
     )
     op.add_column(
         "workspaces",
-        sa.Column("resource_memory", sa.String(20), nullable=False, server_default="2Gi"),
+        sa.Column(
+            "resource_memory", sa.String(20), nullable=False, server_default="2Gi"
+        ),
     )
     op.drop_column("workspaces", "runner_definition")
 
@@ -35,7 +37,9 @@ def upgrade() -> None:
     )
     op.add_column(
         "runs",
-        sa.Column("resource_memory", sa.String(20), nullable=False, server_default="2Gi"),
+        sa.Column(
+            "resource_memory", sa.String(20), nullable=False, server_default="2Gi"
+        ),
     )
     op.drop_column("runs", "runner_definition")
 
@@ -44,7 +48,12 @@ def downgrade() -> None:
     # --- Runs: restore runner_definition, drop resource columns ---
     op.add_column(
         "runs",
-        sa.Column("runner_definition", sa.String(63), nullable=False, server_default="standard"),
+        sa.Column(
+            "runner_definition",
+            sa.String(63),
+            nullable=False,
+            server_default="standard",
+        ),
     )
     op.drop_column("runs", "resource_memory")
     op.drop_column("runs", "resource_cpu")
@@ -52,7 +61,12 @@ def downgrade() -> None:
     # --- Workspaces: restore runner_definition, drop resource columns ---
     op.add_column(
         "workspaces",
-        sa.Column("runner_definition", sa.String(63), nullable=False, server_default="standard"),
+        sa.Column(
+            "runner_definition",
+            sa.String(63),
+            nullable=False,
+            server_default="standard",
+        ),
     )
     op.drop_column("workspaces", "resource_memory")
     op.drop_column("workspaces", "resource_cpu")

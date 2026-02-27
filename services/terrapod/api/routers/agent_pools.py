@@ -13,8 +13,9 @@ Endpoints:
 """
 
 import uuid
+from datetime import UTC
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,8 +33,7 @@ DEFAULT_ORG = "default"
 def _rfc3339(dt) -> str:
     if dt is None:
         return ""
-    from datetime import timezone
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _pool_json(pool) -> dict:
@@ -252,6 +252,7 @@ async def delete_pool_token(
     token_uuid = uuid.UUID(token_id.removeprefix("at-"))
 
     from sqlalchemy import select
+
     from terrapod.db.models import AgentPoolToken
 
     result = await db.execute(
@@ -299,9 +300,7 @@ async def join_listener(
     if token.pool_id != pool.id:
         raise HTTPException(status_code=403, detail="Token does not belong to this pool")
 
-    result = await agent_pool_service.join_listener(
-        db, pool, token, name, runner_definitions
-    )
+    result = await agent_pool_service.join_listener(db, pool, token, name, runner_definitions)
     await db.commit()
 
     return JSONResponse(content={"data": result}, status_code=201)
@@ -319,7 +318,7 @@ async def list_pool_listeners(
     """List listeners for an agent pool."""
     pool = await _get_pool(pool_id, db)
     listeners = await agent_pool_service.list_listeners(db, pool.id)
-    return JSONResponse(content={"data": [_listener_json(l) for l in listeners]})
+    return JSONResponse(content={"data": [_listener_json(lis) for lis in listeners]})
 
 
 @router.delete("/listeners/{listener_id}", status_code=204)

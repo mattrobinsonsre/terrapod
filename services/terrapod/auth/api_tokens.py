@@ -86,9 +86,7 @@ async def validate_api_token(db: AsyncSession, raw_token: str) -> APIToken | Non
     """
     token_hash = hash_token(raw_token)
 
-    result = await db.execute(
-        select(APIToken).where(APIToken.token_hash == token_hash)
-    )
+    result = await db.execute(select(APIToken).where(APIToken.token_hash == token_hash))
     api_token = result.scalar_one_or_none()
 
     if api_token is None:
@@ -110,9 +108,7 @@ async def validate_api_token(db: AsyncSession, raw_token: str) -> APIToken | Non
     )
     if should_update:
         await db.execute(
-            update(APIToken)
-            .where(APIToken.id == api_token.id)
-            .values(last_used_at=now)
+            update(APIToken).where(APIToken.id == api_token.id).values(last_used_at=now)
         )
 
     return api_token
@@ -130,9 +126,7 @@ async def list_user_tokens(db: AsyncSession, user_email: str) -> list[APIToken]:
 
 async def get_token_by_id(db: AsyncSession, token_id: str) -> APIToken | None:
     """Get a token by its public ID."""
-    result = await db.execute(
-        select(APIToken).where(APIToken.id == token_id)
-    )
+    result = await db.execute(select(APIToken).where(APIToken.id == token_id))
     return result.scalar_one_or_none()
 
 
@@ -141,9 +135,7 @@ async def revoke_token(db: AsyncSession, token_id: str) -> bool:
 
     Returns True if the token existed, False if not found.
     """
-    result = await db.execute(
-        select(APIToken).where(APIToken.id == token_id)
-    )
+    result = await db.execute(select(APIToken).where(APIToken.id == token_id))
     api_token = result.scalar_one_or_none()
 
     if api_token is None:

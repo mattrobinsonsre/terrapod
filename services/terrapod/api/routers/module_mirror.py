@@ -53,9 +53,7 @@ async def module_versions_mirror(
     return JSONResponse(content=result)
 
 
-@router.get(
-    "/v1/modules/{hostname}/{namespace}/{name}/{provider}/{version}/download"
-)
+@router.get("/v1/modules/{hostname}/{namespace}/{name}/{provider}/{version}/download")
 async def module_download_mirror(
     hostname: str,
     namespace: str,

@@ -159,9 +159,7 @@ async def _get_cached(
     return result.scalars().first()
 
 
-async def _fetch_terraform_binary(
-    version: str, os_: str, arch: str
-) -> tuple[bytes, str]:
+async def _fetch_terraform_binary(version: str, os_: str, arch: str) -> tuple[bytes, str]:
     """Download terraform binary from releases.hashicorp.com."""
     cfg = settings.registry.binary_cache
     filename = f"terraform_{version}_{os_}_{arch}.zip"
@@ -174,9 +172,7 @@ async def _fetch_terraform_binary(
     return resp.content, url
 
 
-async def _fetch_tofu_binary(
-    version: str, os_: str, arch: str
-) -> tuple[bytes, str]:
+async def _fetch_tofu_binary(version: str, os_: str, arch: str) -> tuple[bytes, str]:
     """Download tofu binary from GitHub releases."""
     cfg = settings.registry.binary_cache
     filename = f"tofu_{version}_{os_}_{arch}.zip"

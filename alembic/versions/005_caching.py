@@ -41,7 +41,12 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
         sa.UniqueConstraint(
-            "hostname", "namespace", "type", "version", "os", "arch",
+            "hostname",
+            "namespace",
+            "type",
+            "version",
+            "os",
+            "arch",
             name="uq_cached_provider_packages",
         ),
     )

@@ -93,9 +93,7 @@ async def _establish_remote_identity(name: str) -> ListenerIdentity:
     pool_id = os.environ.get("TERRAPOD_POOL_ID", "")
 
     if not join_token or not pool_id:
-        raise RuntimeError(
-            "Remote mode requires TERRAPOD_JOIN_TOKEN and TERRAPOD_POOL_ID"
-        )
+        raise RuntimeError("Remote mode requires TERRAPOD_JOIN_TOKEN and TERRAPOD_POOL_ID")
 
     runner_config = load_runner_config()
     runner_defs = [d.name for d in runner_config.definitions]

@@ -75,8 +75,6 @@ async def provider_platforms_mirror(
             detail="Provider cache is disabled",
         )
 
-    result = await get_or_fetch_platforms(
-        db, storage, hostname, namespace, type, version
-    )
+    result = await get_or_fetch_platforms(db, storage, hostname, namespace, type, version)
     await db.commit()
     return JSONResponse(content=result)

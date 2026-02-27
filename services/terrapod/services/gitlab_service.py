@@ -40,9 +40,7 @@ def _project_path(owner: str, repo: str) -> str:
     return url_quote(f"{owner}/{repo}", safe="")
 
 
-async def get_branch_sha(
-    conn: VCSConnection, owner: str, repo: str, branch: str
-) -> str | None:
+async def get_branch_sha(conn: VCSConnection, owner: str, repo: str, branch: str) -> str | None:
     """Get HEAD commit SHA for a branch."""
     api = _api_url(conn)
     project = _project_path(owner, repo)
@@ -58,9 +56,7 @@ async def get_branch_sha(
         return resp.json()["commit"]["id"]
 
 
-async def get_default_branch(
-    conn: VCSConnection, owner: str, repo: str
-) -> str | None:
+async def get_default_branch(conn: VCSConnection, owner: str, repo: str) -> str | None:
     """Get the repository's default branch name."""
     api = _api_url(conn)
     project = _project_path(owner, repo)
@@ -76,9 +72,7 @@ async def get_default_branch(
         return resp.json().get("default_branch")
 
 
-async def download_archive(
-    conn: VCSConnection, owner: str, repo: str, ref: str
-) -> bytes:
+async def download_archive(conn: VCSConnection, owner: str, repo: str, ref: str) -> bytes:
     """Download repository tarball at a given ref."""
     api = _api_url(conn)
     project = _project_path(owner, repo)

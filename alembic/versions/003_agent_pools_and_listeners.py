@@ -58,8 +58,12 @@ def upgrade() -> None:
         sa.Column("description", sa.String(255), nullable=False, server_default=""),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("max_uses", sa.Integer(), nullable=True),
-        sa.Column("use_count", sa.Integer(), nullable=False, server_default=sa.text("0")),
-        sa.Column("is_revoked", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column(
+            "use_count", sa.Integer(), nullable=False, server_default=sa.text("0")
+        ),
+        sa.Column(
+            "is_revoked", sa.Boolean(), nullable=False, server_default=sa.text("false")
+        ),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -68,7 +72,9 @@ def upgrade() -> None:
         ),
         sa.Column("created_by", sa.String(255), nullable=False),
     )
-    op.create_index("ix_agent_pool_tokens_token_hash", "agent_pool_tokens", ["token_hash"])
+    op.create_index(
+        "ix_agent_pool_tokens_token_hash", "agent_pool_tokens", ["token_hash"]
+    )
     op.create_index("ix_agent_pool_tokens_pool_id", "agent_pool_tokens", ["pool_id"])
 
     op.create_table(

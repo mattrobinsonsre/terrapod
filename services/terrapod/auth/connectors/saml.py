@@ -146,9 +146,9 @@ class SAMLConnector(SSOConnector):
         )
         display_name = (
             attributes.get("displayName", [None])[0]
-            or attributes.get(
-                "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name", [None]
-            )[0]
+            or attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name", [None])[
+                0
+            ]
         )
         groups = attributes.get("groups", []) or attributes.get(
             "http://schemas.xmlsoap.org/claims/Group", []

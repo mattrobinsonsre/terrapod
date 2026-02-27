@@ -54,27 +54,21 @@ def _parse_repo_url(conn: VCSConnection, repo_url: str) -> tuple[str, str] | Non
     return github_service.parse_repo_url(repo_url)
 
 
-async def _get_branch_sha(
-    conn: VCSConnection, owner: str, repo: str, branch: str
-) -> str | None:
+async def _get_branch_sha(conn: VCSConnection, owner: str, repo: str, branch: str) -> str | None:
     """Get branch HEAD SHA via the appropriate provider."""
     if conn.provider == "gitlab":
         return await gitlab_service.get_branch_sha(conn, owner, repo, branch)
     return await github_service.get_repo_branch_sha(conn, owner, repo, branch)
 
 
-async def _get_default_branch(
-    conn: VCSConnection, owner: str, repo: str
-) -> str | None:
+async def _get_default_branch(conn: VCSConnection, owner: str, repo: str) -> str | None:
     """Get default branch via the appropriate provider."""
     if conn.provider == "gitlab":
         return await gitlab_service.get_default_branch(conn, owner, repo)
     return await github_service.get_repo_default_branch(conn, owner, repo)
 
 
-async def _download_archive(
-    conn: VCSConnection, owner: str, repo: str, ref: str
-) -> bytes:
+async def _download_archive(conn: VCSConnection, owner: str, repo: str, ref: str) -> bytes:
     """Download archive via the appropriate provider."""
     if conn.provider == "gitlab":
         return await gitlab_service.download_archive(conn, owner, repo, ref)
@@ -102,9 +96,7 @@ async def _list_open_prs(
 # --- Shared logic ---
 
 
-async def _resolve_branch(
-    conn: VCSConnection, ws: Workspace, owner: str, repo: str
-) -> str | None:
+async def _resolve_branch(conn: VCSConnection, ws: Workspace, owner: str, repo: str) -> str | None:
     """Resolve the tracked branch for a workspace."""
     if ws.vcs_branch:
         return ws.vcs_branch
@@ -230,7 +222,13 @@ async def _poll_workspace_branch(
     )
 
     run = await _create_vcs_run(
-        db, ws, conn, owner, repo, sha, branch,
+        db,
+        ws,
+        conn,
+        owner,
+        repo,
+        sha,
+        branch,
         message=f"Triggered by commit {sha[:8]} on {branch}",
     )
 
@@ -270,11 +268,13 @@ async def _poll_workspace_prs(
     for pr in prs:
         # Check if we already have any run for this PR + SHA (avoid duplicates)
         existing = await db.execute(
-            select(Run).where(
+            select(Run)
+            .where(
                 Run.workspace_id == ws.id,
                 Run.vcs_pull_request_number == pr.number,
                 Run.vcs_commit_sha == pr.head_sha,
-            ).limit(1)
+            )
+            .limit(1)
         )
         if existing.scalar_one_or_none() is not None:
             continue
@@ -289,7 +289,13 @@ async def _poll_workspace_prs(
         )
 
         run = await _create_vcs_run(
-            db, ws, conn, owner, repo, pr.head_sha, pr.head_ref,
+            db,
+            ws,
+            conn,
+            owner,
+            repo,
+            pr.head_sha,
+            pr.head_ref,
             speculative=True,
             pr_number=pr.number,
             message=f"Speculative plan for PR #{pr.number}: {pr.title}",

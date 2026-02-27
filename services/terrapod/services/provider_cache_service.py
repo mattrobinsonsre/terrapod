@@ -106,9 +106,7 @@ async def get_or_fetch_platforms(
     if hostname not in cfg.upstream_registries:
         return {"archives": {}}
 
-    return await _fetch_and_cache_platforms(
-        db, storage, hostname, namespace, type_, version
-    )
+    return await _fetch_and_cache_platforms(db, storage, hostname, namespace, type_, version)
 
 
 async def get_or_cache_binary(
@@ -147,9 +145,7 @@ async def get_or_cache_binary(
 # --- Internal helpers ---
 
 
-async def _fetch_upstream_versions(
-    hostname: str, namespace: str, type_: str
-) -> list[str]:
+async def _fetch_upstream_versions(hostname: str, namespace: str, type_: str) -> list[str]:
     """Fetch available versions from upstream registry."""
     url = f"https://{hostname}/v1/providers/{namespace}/{type_}/versions"
     async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
@@ -274,10 +270,7 @@ async def _fetch_platform_download(
     arch: str,
 ) -> dict | None:
     """Fetch download info for a specific platform from upstream."""
-    url = (
-        f"https://{hostname}/v1/providers/{namespace}/{type_}/"
-        f"{version}/download/{os_}/{arch}"
-    )
+    url = f"https://{hostname}/v1/providers/{namespace}/{type_}/{version}/download/{os_}/{arch}"
     resp = await client.get(url)
     if resp.status_code != 200:
         return None

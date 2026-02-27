@@ -48,9 +48,7 @@ class TestGetCurrentUser:
 
         # Mock _should_refresh_session to return False
         with patch("terrapod.api.dependencies._should_refresh_session", return_value=False):
-            credentials = HTTPAuthorizationCredentials(
-                scheme="Bearer", credentials="session-token"
-            )
+            credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="session-token")
             mock_db = AsyncMock()
 
             user = await get_current_user(credentials=credentials, db=mock_db)
@@ -66,9 +64,7 @@ class TestGetCurrentUser:
         mock_validate_token.return_value = None
         mock_get_session.return_value = None
 
-        credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer", credentials="invalid-token"
-        )
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid-token")
         mock_db = AsyncMock()
 
         with pytest.raises(HTTPException) as exc_info:
@@ -97,9 +93,7 @@ class TestGetCurrentUser:
         mock_session.provider_name = "oidc"
         mock_get_session.return_value = mock_session
 
-        credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer", credentials="stale-session"
-        )
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="stale-session")
         mock_db = AsyncMock()
 
         await get_current_user(credentials=credentials, db=mock_db)

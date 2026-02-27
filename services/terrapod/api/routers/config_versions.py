@@ -7,6 +7,7 @@ Endpoints:
 """
 
 import uuid
+from datetime import UTC
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response
 from fastapi.responses import JSONResponse
@@ -29,8 +30,7 @@ logger = get_logger(__name__)
 def _rfc3339(dt) -> str:
     if dt is None:
         return ""
-    from datetime import timezone
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _cv_json(cv: ConfigurationVersion) -> dict:

@@ -6,7 +6,9 @@ Endpoints:
     DELETE /api/v2/role-assignments/{provider}/{email}/{role} — remove single assignment
 """
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
+from datetime import UTC
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Path
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,8 +26,7 @@ logger = get_logger(__name__)
 def _rfc3339(dt) -> str:
     if dt is None:
         return ""
-    from datetime import timezone
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _assignment_json(provider: str, email: str, role_name: str, created_at=None) -> dict:
@@ -59,9 +60,7 @@ async def list_role_assignments(
 
     # Custom role assignments
     result = await db.execute(
-        select(RoleAssignment).order_by(
-            RoleAssignment.email, RoleAssignment.role_name
-        )
+        select(RoleAssignment).order_by(RoleAssignment.email, RoleAssignment.role_name)
     )
     for ra in result.scalars().all():
         data.append(_assignment_json(ra.provider_name, ra.email, ra.role_name, ra.created_at))
@@ -122,17 +121,21 @@ async def set_role_assignments(
         if rn == "everyone":
             continue  # everyone is implicit, don't store
         if is_platform_role(rn):
-            db.add(PlatformRoleAssignment(
-                provider_name=provider_name,
-                email=email,
-                role_name=rn,
-            ))
+            db.add(
+                PlatformRoleAssignment(
+                    provider_name=provider_name,
+                    email=email,
+                    role_name=rn,
+                )
+            )
         else:
-            db.add(RoleAssignment(
-                provider_name=provider_name,
-                email=email,
-                role_name=rn,
-            ))
+            db.add(
+                RoleAssignment(
+                    provider_name=provider_name,
+                    email=email,
+                    role_name=rn,
+                )
+            )
 
     await db.commit()
 

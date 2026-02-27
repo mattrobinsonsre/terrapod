@@ -34,7 +34,9 @@ def has_registry_permission(effective: str | None, required: str) -> bool:
     """Check if effective permission meets the required level."""
     if effective is None:
         return False
-    return REGISTRY_PERMISSION_HIERARCHY.get(effective, -1) >= REGISTRY_PERMISSION_HIERARCHY.get(required, 99)
+    return REGISTRY_PERMISSION_HIERARCHY.get(effective, -1) >= REGISTRY_PERMISSION_HIERARCHY.get(
+        required, 99
+    )
 
 
 async def resolve_registry_permission(
@@ -74,9 +76,7 @@ async def resolve_registry_permission(
     # 4. Label-based RBAC from custom roles
     custom_role_names = role_set - BUILTIN_ROLE_NAMES
     if custom_role_names:
-        result = await db.execute(
-            select(Role).where(Role.name.in_(custom_role_names))
-        )
+        result = await db.execute(select(Role).where(Role.name.in_(custom_role_names)))
         roles = list(result.scalars().all())
 
         for role in roles:
@@ -103,7 +103,9 @@ async def resolve_registry_permission(
 
             if matched:
                 registry_perm = _WS_PERM_TO_REGISTRY.get(role.workspace_permission, "read")
-                if best is None or REGISTRY_PERMISSION_HIERARCHY.get(registry_perm, -1) > REGISTRY_PERMISSION_HIERARCHY.get(best, -1):
+                if best is None or REGISTRY_PERMISSION_HIERARCHY.get(
+                    registry_perm, -1
+                ) > REGISTRY_PERMISSION_HIERARCHY.get(best, -1):
                     best = registry_perm
 
     # 5. 'everyone' role: if resource has label access=everyone, grant read

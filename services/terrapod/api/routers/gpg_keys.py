@@ -122,7 +122,7 @@ async def show_gpg_key_endpoint(
     try:
         key_uuid = uuid.UUID(key_id)
     except ValueError:
-        raise HTTPException(status_code=404, detail="GPG key not found")
+        raise HTTPException(status_code=404, detail="GPG key not found") from None
 
     key = await get_gpg_key(db, key_uuid)
     if key is None:
@@ -141,7 +141,7 @@ async def delete_gpg_key_endpoint(
     try:
         key_uuid = uuid.UUID(key_id)
     except ValueError:
-        raise HTTPException(status_code=404, detail="GPG key not found")
+        raise HTTPException(status_code=404, detail="GPG key not found") from None
 
     deleted = await delete_gpg_key(db, key_uuid)
     if not deleted:

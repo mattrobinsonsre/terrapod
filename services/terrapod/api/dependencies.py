@@ -69,18 +69,12 @@ async def _resolve_user_roles(db: AsyncSession, email: str) -> list[str]:
 
     # Query platform roles (admin, audit)
     result = await db.execute(
-        select(PlatformRoleAssignment.role_name).where(
-            PlatformRoleAssignment.email == email
-        )
+        select(PlatformRoleAssignment.role_name).where(PlatformRoleAssignment.email == email)
     )
     roles: set[str] = {row[0] for row in result.all()}
 
     # Query custom role assignments
-    result = await db.execute(
-        select(RoleAssignment.role_name).where(
-            RoleAssignment.email == email
-        )
-    )
+    result = await db.execute(select(RoleAssignment.role_name).where(RoleAssignment.email == email))
     roles.update(row[0] for row in result.all())
 
     # Always include 'everyone'
@@ -230,7 +224,6 @@ async def get_listener_identity(
 
     from cryptography import x509
     from cryptography.exceptions import InvalidSignature
-    from cryptography.hazmat.primitives import hashes
 
     from terrapod.auth.ca import get_ca, get_certificate_fingerprint
     from terrapod.db.models import RunnerListener
@@ -242,7 +235,7 @@ async def get_listener_identity(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid certificate encoding",
-        )
+        ) from None
 
     # Verify CA signature
     ca = get_ca()
@@ -255,7 +248,7 @@ async def get_listener_identity(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Certificate not signed by this CA",
-        )
+        ) from None
 
     # Check expiry
     import datetime as dt
@@ -277,9 +270,7 @@ async def get_listener_identity(
     listener_name = cn[0].value
 
     # Look up listener by name
-    result = await db.execute(
-        select(RunnerListener).where(RunnerListener.name == listener_name)
-    )
+    result = await db.execute(select(RunnerListener).where(RunnerListener.name == listener_name))
     listener = result.scalar_one_or_none()
     if listener is None:
         raise HTTPException(

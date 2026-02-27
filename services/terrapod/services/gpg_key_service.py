@@ -76,9 +76,7 @@ async def get_gpg_key_by_key_id(
     key_id: str,
 ) -> GPGKey | None:
     """Get a GPG key by org + GPG key ID."""
-    result = await db.execute(
-        select(GPGKey).where(GPGKey.org_name == org, GPGKey.key_id == key_id)
-    )
+    result = await db.execute(select(GPGKey).where(GPGKey.org_name == org, GPGKey.key_id == key_id))
     return result.scalars().first()
 
 

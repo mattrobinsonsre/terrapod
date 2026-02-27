@@ -8,13 +8,12 @@ import hashlib
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import (
     Variable,
     VariableSet,
-    VariableSetVariable,
     VariableSetWorkspace,
 )
 from terrapod.logging_config import get_logger
@@ -109,9 +108,7 @@ async def update_variable(
         else:
             var.value = value
             var.encrypted_value = None
-        var.version_id = _version_hash(
-            var.key, value, var.category
-        )
+        var.version_id = _version_hash(var.key, value, var.category)
     elif sensitive is not None and sensitive != var.sensitive:
         # Sensitivity changed but value not provided
         if sensitive and var.value:
@@ -143,14 +140,10 @@ async def get_variable(
     return result.scalar_one_or_none()
 
 
-async def list_variables(
-    db: AsyncSession, workspace_id: uuid.UUID
-) -> list[Variable]:
+async def list_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[Variable]:
     """List all variables for a workspace."""
     result = await db.execute(
-        select(Variable)
-        .where(Variable.workspace_id == workspace_id)
-        .order_by(Variable.key)
+        select(Variable).where(Variable.workspace_id == workspace_id).order_by(Variable.key)
     )
     return list(result.scalars().all())
 
@@ -161,9 +154,7 @@ async def delete_variable(db: AsyncSession, var: Variable) -> None:
     await db.flush()
 
 
-async def resolve_variables(
-    db: AsyncSession, workspace_id: uuid.UUID
-) -> list[ResolvedVariable]:
+async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[ResolvedVariable]:
     """Resolve all variables for a workspace with proper precedence.
 
     Precedence (highest wins):
@@ -216,9 +207,7 @@ async def resolve_variables(
     return list(resolved.values())
 
 
-def _decrypt_var_value(
-    value: str, encrypted_value: str | None, sensitive: bool
-) -> str:
+def _decrypt_var_value(value: str, encrypted_value: str | None, sensitive: bool) -> str:
     """Decrypt a variable value if sensitive."""
     if sensitive and encrypted_value:
         return decrypt_value(encrypted_value)
@@ -230,12 +219,9 @@ async def _get_applicable_varsets(
 ) -> list[VariableSet]:
     """Get variable sets applicable to a workspace."""
     # Global sets
-    global_q = (
-        select(VariableSet)
-        .where(
-            VariableSet.global_set.is_(True),
-            VariableSet.priority.is_(priority),
-        )
+    global_q = select(VariableSet).where(
+        VariableSet.global_set.is_(True),
+        VariableSet.priority.is_(priority),
     )
 
     # Assigned sets

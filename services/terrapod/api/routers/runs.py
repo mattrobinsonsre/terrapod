@@ -14,6 +14,7 @@ Endpoints:
 """
 
 import uuid
+from datetime import UTC
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Response, status
 from fastapi.responses import JSONResponse
@@ -37,15 +38,11 @@ logger = get_logger(__name__)
 def _rfc3339(dt) -> str:
     if dt is None:
         return ""
-    from datetime import timezone
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _run_json(run: Run) -> dict:
     """Serialize a Run to TFE V2 JSON:API format."""
-    from terrapod.config import settings
-
-    base = settings.auth.callback_base_url.rstrip("/")
     run_id = f"run-{run.id}"
 
     return {
@@ -222,9 +219,7 @@ async def list_workspace_runs(
             detail="Requires read permission on workspace",
         )
     runs = await run_service.list_workspace_runs(db, ws.id, page_number, page_size)
-    return JSONResponse(
-        content={"data": [_run_json(r)["data"] for r in runs]}
-    )
+    return JSONResponse(content={"data": [_run_json(r)["data"] for r in runs]})
 
 
 @router.post("/runs/{run_id}/actions/confirm")
@@ -240,7 +235,7 @@ async def confirm_run(
         run = await run_service.confirm_run(db, run)
         await db.commit()
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return JSONResponse(content=_run_json(run))
 
 
@@ -257,7 +252,7 @@ async def discard_run(
         run = await run_service.discard_run(db, run)
         await db.commit()
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return JSONResponse(content=_run_json(run))
 
 
@@ -274,7 +269,7 @@ async def cancel_run(
         run = await run_service.cancel_run(db, run)
         await db.commit()
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return JSONResponse(content=_run_json(run))
 
 
@@ -438,9 +433,7 @@ async def update_run_status(
         raise HTTPException(status_code=422, detail="status is required")
 
     try:
-        run = await run_service.transition_run(
-            db, run, target_status, error_message=error_message
-        )
+        run = await run_service.transition_run(db, run, target_status, error_message=error_message)
 
         # Auto-apply if configured
         if target_status == "planned" and run.auto_apply and not run.plan_only:
@@ -455,7 +448,7 @@ async def update_run_status(
 
         await db.commit()
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from e
 
     return JSONResponse(content=_run_json(run))
 
@@ -469,10 +462,17 @@ async def update_run_status(
 _STX = b"\x02"
 _ETX = b"\x03"
 
-_POST_PLAN_STATES = frozenset({
-    "planned", "confirmed", "applying", "applied",
-    "errored", "discarded", "canceled",
-})
+_POST_PLAN_STATES = frozenset(
+    {
+        "planned",
+        "confirmed",
+        "applying",
+        "applied",
+        "errored",
+        "discarded",
+        "canceled",
+    }
+)
 
 
 @router.get("/plans/{plan_id}/log")

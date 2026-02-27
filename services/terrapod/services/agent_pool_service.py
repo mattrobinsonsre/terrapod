@@ -116,14 +116,10 @@ async def create_pool_token(
     return token, raw_token
 
 
-async def validate_join_token(
-    db: AsyncSession, raw_token: str
-) -> AgentPoolToken | None:
+async def validate_join_token(db: AsyncSession, raw_token: str) -> AgentPoolToken | None:
     """Validate a join token. Returns the token record if valid, None otherwise."""
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-    result = await db.execute(
-        select(AgentPoolToken).where(AgentPoolToken.token_hash == token_hash)
-    )
+    result = await db.execute(select(AgentPoolToken).where(AgentPoolToken.token_hash == token_hash))
     token = result.scalar_one_or_none()
     if token is None:
         return None
@@ -143,9 +139,7 @@ async def validate_join_token(
     return token
 
 
-async def list_pool_tokens(
-    db: AsyncSession, pool_id: uuid.UUID
-) -> list[AgentPoolToken]:
+async def list_pool_tokens(db: AsyncSession, pool_id: uuid.UUID) -> list[AgentPoolToken]:
     """List all tokens for an agent pool."""
     result = await db.execute(
         select(AgentPoolToken)
@@ -235,9 +229,7 @@ async def register_local_listener(
         pool = await create_pool(db, pool_name, description="Default local pool")
 
     # Check if listener already exists
-    result = await db.execute(
-        select(RunnerListener).where(RunnerListener.name == listener_name)
-    )
+    result = await db.execute(select(RunnerListener).where(RunnerListener.name == listener_name))
     listener = result.scalar_one_or_none()
 
     if listener:
@@ -260,23 +252,17 @@ async def register_local_listener(
 
 async def get_listener(db: AsyncSession, listener_id: uuid.UUID) -> RunnerListener | None:
     """Get a listener by ID."""
-    result = await db.execute(
-        select(RunnerListener).where(RunnerListener.id == listener_id)
-    )
+    result = await db.execute(select(RunnerListener).where(RunnerListener.id == listener_id))
     return result.scalar_one_or_none()
 
 
 async def get_listener_by_name(db: AsyncSession, name: str) -> RunnerListener | None:
     """Get a listener by name."""
-    result = await db.execute(
-        select(RunnerListener).where(RunnerListener.name == name)
-    )
+    result = await db.execute(select(RunnerListener).where(RunnerListener.name == name))
     return result.scalar_one_or_none()
 
 
-async def list_listeners(
-    db: AsyncSession, pool_id: uuid.UUID
-) -> list[RunnerListener]:
+async def list_listeners(db: AsyncSession, pool_id: uuid.UUID) -> list[RunnerListener]:
     """List all listeners for an agent pool."""
     result = await db.execute(
         select(RunnerListener)

@@ -296,8 +296,7 @@ async def local_login_submit(
 
     separator = "&" if "?" in auth_state.client_redirect_uri else "?"
     redirect_url = (
-        f"{auth_state.client_redirect_uri}{separator}"
-        f"code={code}&state={auth_state.client_state}"
+        f"{auth_state.client_redirect_uri}{separator}code={code}&state={auth_state.client_state}"
     )
 
     logger.info("Local login: redirecting to client", email=login.email)

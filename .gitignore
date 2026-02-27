@@ -31,6 +31,9 @@ out/
 .DS_Store
 Thumbs.db
 
+# Project instructions (private, not committed)
+CLAUDE.md
+
 # Environment files
 .env
 .env.local

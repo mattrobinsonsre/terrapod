@@ -252,7 +252,7 @@ def parse_san_uris(cert: x509.Certificate) -> dict[str, str]:
     result: dict[str, str] = {}
     for uri in san.value.get_values_for_type(x509.UniformResourceIdentifier):
         if uri.startswith("terrapod://"):
-            parts = uri[len("terrapod://"):].split("/", 1)
+            parts = uri[len("terrapod://") :].split("/", 1)
             if len(parts) == 2:
                 result[parts[0]] = parts[1]
     return result

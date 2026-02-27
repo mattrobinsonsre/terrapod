@@ -3,8 +3,6 @@
 import json
 from unittest.mock import AsyncMock, patch
 
-import pytest
-
 from terrapod.auth.auth_state import (
     AUTH_CODE_PREFIX,
     AUTH_CODE_TTL,

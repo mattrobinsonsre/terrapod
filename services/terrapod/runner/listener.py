@@ -14,7 +14,6 @@ import asyncio
 import json
 import os
 import signal
-import sys
 import time
 import uuid
 from urllib.parse import urlparse, urlunparse
@@ -102,7 +101,7 @@ class RunnerListener:
             try:
                 await asyncio.wait_for(_shutdown.wait(), timeout=self._heartbeat_interval)
                 return  # Shutdown signaled
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
 
     async def _send_heartbeat(self) -> None:
@@ -119,32 +118,25 @@ class RunnerListener:
             await redis.setex(f"{prefix}:status", ttl, "online")
             await redis.setex(f"{prefix}:heartbeat", ttl, str(int(time.time())))
             await redis.setex(f"{prefix}:capacity", ttl, str(self._max_concurrent))
-            await redis.setex(
-                f"{prefix}:active_runs", ttl, str(len(self.active_tasks))
-            )
+            await redis.setex(f"{prefix}:active_runs", ttl, str(len(self.active_tasks)))
             await redis.setex(f"{prefix}:runner_defs", ttl, json.dumps(runner_defs))
         else:
-            import httpx
             import base64
+
+            import httpx
 
             headers = {}
             if self.identity.certificate_pem:
-                cert_b64 = base64.b64encode(
-                    self.identity.certificate_pem.encode()
-                ).decode()
+                cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
                 headers["X-Terrapod-Client-Cert"] = cert_b64
 
-            async with httpx.AsyncClient(
-                base_url=self.identity.api_url, timeout=10
-            ) as client:
+            async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=10) as client:
                 await client.post(
                     f"/api/v2/listeners/listener-{self.identity.listener_id}/heartbeat",
                     json={
                         "capacity": self._max_concurrent,
                         "active_runs": len(self.active_tasks),
-                        "runner_definitions": [
-                            d.name for d in self.runner_config.definitions
-                        ],
+                        "runner_definitions": [d.name for d in self.runner_config.definitions],
                     },
                     headers=headers,
                 )
@@ -159,9 +151,7 @@ class RunnerListener:
                 logger.error("Poll failed", error=str(e))
 
             # Clean up completed tasks
-            completed = [
-                rid for rid, task in self.active_tasks.items() if task.done()
-            ]
+            completed = [rid for rid, task in self.active_tasks.items() if task.done()]
             for rid in completed:
                 task = self.active_tasks.pop(rid)
                 if task.exception():
@@ -174,7 +164,7 @@ class RunnerListener:
             try:
                 await asyncio.wait_for(_shutdown.wait(), timeout=self._poll_interval)
                 return
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
 
     async def _poll_for_run(self) -> None:
@@ -187,9 +177,8 @@ class RunnerListener:
     @property
     def _api_base_url(self) -> str:
         """API base URL for internal HTTP calls (used by local listener)."""
-        return (
-            self.runner_config.server_url
-            or os.environ.get("TERRAPOD_API_URL", "http://localhost:8000")
+        return self.runner_config.server_url or os.environ.get(
+            "TERRAPOD_API_URL", "http://localhost:8000"
         )
 
     async def _fetch_urls_from_api(self, run_id: str, phase: str) -> dict[str, str]:
@@ -204,9 +193,7 @@ class RunnerListener:
         lid = f"listener-{self.identity.listener_id}"
         endpoint = f"/api/v2/listeners/{lid}/runs/run-{run_id}/{phase}-urls"
 
-        async with httpx.AsyncClient(
-            base_url=self._api_base_url, timeout=30
-        ) as client:
+        async with httpx.AsyncClient(base_url=self._api_base_url, timeout=30) as client:
             response = await client.get(endpoint)
             response.raise_for_status()
             urls = response.json()
@@ -220,10 +207,7 @@ class RunnerListener:
         https://terrapod.local) but runner Jobs need to reach the API via
         the internal K8s service URL (e.g. http://terrapod-api:8000).
         """
-        server_url = (
-            self.runner_config.server_url
-            or os.environ.get("TERRAPOD_API_URL", "")
-        )
+        server_url = self.runner_config.server_url or os.environ.get("TERRAPOD_API_URL", "")
         if not server_url:
             return urls
 
@@ -231,10 +215,12 @@ class RunnerListener:
         rewritten = {}
         for key, url in urls.items():
             parsed = urlparse(url)
-            rewritten[key] = urlunparse(parsed._replace(
-                scheme=target.scheme,
-                netloc=target.netloc,
-            ))
+            rewritten[key] = urlunparse(
+                parsed._replace(
+                    scheme=target.scheme,
+                    netloc=target.netloc,
+                )
+            )
         return rewritten
 
     async def _poll_local(self) -> None:
@@ -243,9 +229,7 @@ class RunnerListener:
         from terrapod.services import agent_pool_service, run_service
 
         async with get_db_session() as db:
-            listener = await agent_pool_service.get_listener(
-                db, self.identity.listener_id
-            )
+            listener = await agent_pool_service.get_listener(db, self.identity.listener_id)
             if listener is None:
                 return
 
@@ -295,18 +279,15 @@ class RunnerListener:
     async def _poll_remote(self) -> None:
         """Poll via API (remote listener)."""
         import base64
+
         import httpx
 
         headers = {}
         if self.identity.certificate_pem:
-            cert_b64 = base64.b64encode(
-                self.identity.certificate_pem.encode()
-            ).decode()
+            cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
             headers["X-Terrapod-Client-Cert"] = cert_b64
 
-        async with httpx.AsyncClient(
-            base_url=self.identity.api_url, timeout=30
-        ) as client:
+        async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
             response = await client.get(
                 f"/api/v2/listeners/listener-{self.identity.listener_id}/runs/next",
                 headers=headers,
@@ -405,9 +386,7 @@ class RunnerListener:
         else:
             await self._report_status(run_id, "errored", f"Apply {apply_result}")
 
-    async def _report_status(
-        self, run_id: str, status: str, error_message: str = ""
-    ) -> None:
+    async def _report_status(self, run_id: str, status: str, error_message: str = "") -> None:
         """Report run status back to the API."""
         if self.identity.is_local:
             from terrapod.db.session import get_db_session
@@ -416,9 +395,7 @@ class RunnerListener:
             async with get_db_session() as db:
                 run = await run_service.get_run(db, uuid.UUID(run_id))
                 if run:
-                    await run_service.transition_run(
-                        db, run, status, error_message=error_message
-                    )
+                    await run_service.transition_run(db, run, status, error_message=error_message)
 
                     # Auto-apply if configured
                     if status == "planned" and run.auto_apply and not run.plan_only:
@@ -432,21 +409,17 @@ class RunnerListener:
                             ws.lock_id = None
         else:
             import base64
+
             import httpx
 
             headers = {}
             if self.identity.certificate_pem:
-                cert_b64 = base64.b64encode(
-                    self.identity.certificate_pem.encode()
-                ).decode()
+                cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
                 headers["X-Terrapod-Client-Cert"] = cert_b64
 
-            async with httpx.AsyncClient(
-                base_url=self.identity.api_url, timeout=30
-            ) as client:
+            async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
                 await client.patch(
-                    f"/api/v2/listeners/listener-{self.identity.listener_id}"
-                    f"/runs/run-{run_id}",
+                    f"/api/v2/listeners/listener-{self.identity.listener_id}/runs/run-{run_id}",
                     json={
                         "status": status,
                         "error_message": error_message,
@@ -454,9 +427,7 @@ class RunnerListener:
                     headers=headers,
                 )
 
-    async def _wait_for_confirmation(
-        self, run_id: str, timeout: int = 3600
-    ) -> bool:
+    async def _wait_for_confirmation(self, run_id: str, timeout: int = 3600) -> bool:
         """Wait for a run to reach 'confirmed' status.
 
         Returns True if confirmed, False if discarded/canceled/errored or timeout.
@@ -482,7 +453,7 @@ class RunnerListener:
             try:
                 await asyncio.wait_for(_shutdown.wait(), timeout=5)
                 return False  # Shutdown signaled
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
 
         logger.warning("Timed out waiting for run confirmation", run_id=run_id)
@@ -499,18 +470,15 @@ class RunnerListener:
                 return run.status if run else "errored"
         else:
             import base64
+
             import httpx
 
             headers = {}
             if self.identity.certificate_pem:
-                cert_b64 = base64.b64encode(
-                    self.identity.certificate_pem.encode()
-                ).decode()
+                cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
                 headers["X-Terrapod-Client-Cert"] = cert_b64
 
-            async with httpx.AsyncClient(
-                base_url=self.identity.api_url, timeout=10
-            ) as client:
+            async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=10) as client:
                 response = await client.get(
                     f"/api/v2/runs/run-{run_id}",
                     headers=headers,
@@ -525,18 +493,15 @@ class RunnerListener:
             return await self._fetch_urls_from_api(run_id, "apply")
         else:
             import base64
+
             import httpx
 
             headers = {}
             if self.identity.certificate_pem:
-                cert_b64 = base64.b64encode(
-                    self.identity.certificate_pem.encode()
-                ).decode()
+                cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
                 headers["X-Terrapod-Client-Cert"] = cert_b64
 
-            async with httpx.AsyncClient(
-                base_url=self.identity.api_url, timeout=30
-            ) as client:
+            async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
                 response = await client.get(
                     f"/api/v2/listeners/listener-{self.identity.listener_id}"
                     f"/runs/run-{run_id}/apply-urls",
@@ -555,9 +520,7 @@ class RunnerListener:
         from terrapod.services import run_service
 
         async with get_db_session() as db:
-            orphaned = await run_service.find_orphaned_runs(
-                db, [self.identity.listener_id]
-            )
+            orphaned = await run_service.find_orphaned_runs(db, [self.identity.listener_id])
 
             for run in orphaned:
                 run_id = str(run.id)
@@ -575,18 +538,26 @@ class RunnerListener:
                     task = asyncio.create_task(self._resume_watch(run_id, job_name))
                     self.active_tasks[run_id] = task
                 elif job_status in ("succeeded", "failed"):
-                    target = "planned" if job_status == "succeeded" and phase == "plan" else (
-                        "applied" if job_status == "succeeded" else "errored"
+                    target = (
+                        "planned"
+                        if job_status == "succeeded" and phase == "plan"
+                        else ("applied" if job_status == "succeeded" else "errored")
                     )
                     await run_service.transition_run(
-                        db, run, target,
-                        error_message=f"Recovered from crash: {job_status}" if target == "errored" else "",
+                        db,
+                        run,
+                        target,
+                        error_message=f"Recovered from crash: {job_status}"
+                        if target == "errored"
+                        else "",
                     )
                     logger.info("Recovered orphaned run", run_id=run_id, status=target)
                 else:
                     # Job gone — mark errored
                     await run_service.transition_run(
-                        db, run, "errored",
+                        db,
+                        run,
+                        "errored",
                         error_message="Listener crashed and Job not found",
                     )
                     logger.warning("Orphaned run marked errored", run_id=run_id)
@@ -616,15 +587,9 @@ async def resolve_run_variables(db, run) -> dict:
     from terrapod.services.variable_service import resolve_variables
 
     resolved = await resolve_variables(db, run.workspace_id)
-    env_vars = [
-        {"key": v.key, "value": v.value}
-        for v in resolved
-        if v.category == "env"
-    ]
+    env_vars = [{"key": v.key, "value": v.value} for v in resolved if v.category == "env"]
     terraform_vars = [
-        {"key": v.key, "value": v.value}
-        for v in resolved
-        if v.category == "terraform"
+        {"key": v.key, "value": v.value} for v in resolved if v.category == "terraform"
     ]
     return {"env": env_vars, "terraform": terraform_vars}
 

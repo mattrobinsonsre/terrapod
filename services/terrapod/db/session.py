@@ -6,6 +6,7 @@ Single engine (no read replica for MVP).
 """
 
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -75,9 +76,6 @@ async def get_db() -> AsyncGenerator[AsyncSession]:
         except Exception:
             await session.rollback()
             raise
-
-
-from contextlib import asynccontextmanager
 
 
 @asynccontextmanager

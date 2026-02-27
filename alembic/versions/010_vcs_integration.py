@@ -33,9 +33,15 @@ def upgrade() -> None:
         sa.Column("token_encrypted", sa.Text, nullable=True),
         # GitHub-specific
         sa.Column("github_app_id", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("github_installation_id", sa.Integer, nullable=False, server_default="0"),
-        sa.Column("github_account_login", sa.String(255), nullable=False, server_default=""),
-        sa.Column("github_account_type", sa.String(20), nullable=False, server_default=""),
+        sa.Column(
+            "github_installation_id", sa.Integer, nullable=False, server_default="0"
+        ),
+        sa.Column(
+            "github_account_login", sa.String(255), nullable=False, server_default=""
+        ),
+        sa.Column(
+            "github_account_type", sa.String(20), nullable=False, server_default=""
+        ),
         sa.Column("status", sa.String(20), nullable=False, server_default="active"),
         sa.Column(
             "created_at",
@@ -74,11 +80,15 @@ def upgrade() -> None:
     )
     op.add_column(
         "workspaces",
-        sa.Column("vcs_working_directory", sa.String(500), nullable=False, server_default=""),
+        sa.Column(
+            "vcs_working_directory", sa.String(500), nullable=False, server_default=""
+        ),
     )
     op.add_column(
         "workspaces",
-        sa.Column("vcs_last_commit_sha", sa.String(40), nullable=False, server_default=""),
+        sa.Column(
+            "vcs_last_commit_sha", sa.String(40), nullable=False, server_default=""
+        ),
     )
 
     # --- Run VCS metadata columns ---

@@ -8,7 +8,9 @@ Endpoints:
     DELETE /api/v2/roles/{name}        — delete custom role
 """
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
+from datetime import UTC
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Path
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,8 +30,7 @@ VALID_PERMISSIONS = {"read", "plan", "write", "admin"}
 def _rfc3339(dt) -> str:
     if dt is None:
         return ""
-    from datetime import timezone
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _role_json(role: Role) -> dict:
@@ -98,7 +99,9 @@ async def create_role(
         raise HTTPException(status_code=422, detail="Role name is required")
 
     if is_builtin_role(name):
-        raise HTTPException(status_code=422, detail=f"Cannot create role with built-in name '{name}'")
+        raise HTTPException(
+            status_code=422, detail=f"Cannot create role with built-in name '{name}'"
+        )
 
     # Check for existing
     existing = await db.execute(select(Role).where(Role.name == name))

@@ -118,8 +118,7 @@ def _provider_to_jsonapi(provider) -> dict:  # type: ignore[no-untyped-def]
 
 def _version_to_jsonapi(version, upload_links: dict | None = None) -> dict:  # type: ignore[no-untyped-def]
     platforms = [
-        {"os": p.os, "arch": p.arch, "filename": p.filename}
-        for p in (version.platforms or [])
+        {"os": p.os, "arch": p.arch, "filename": p.filename} for p in (version.platforms or [])
     ]
     result: dict = {
         "id": str(version.id),
@@ -199,15 +198,15 @@ async def list_provider_versions_cli(
     versions = []
     for v in provider.versions:
         platforms = [
-            {"os": p.os, "arch": p.arch}
-            for p in v.platforms
-            if p.upload_status == "uploaded"
+            {"os": p.os, "arch": p.arch} for p in v.platforms if p.upload_status == "uploaded"
         ]
-        versions.append({
-            "version": v.version,
-            "protocols": v.protocols,
-            "platforms": platforms,
-        })
+        versions.append(
+            {
+                "version": v.version,
+                "protocols": v.protocols,
+                "platforms": platforms,
+            }
+        )
 
     return JSONResponse(content={"versions": versions})
 
@@ -503,9 +502,7 @@ async def list_provider_platforms_endpoint(
     )
 
 
-@router.delete(
-    _ORG_PREFIX + "/private/{namespace}/{name}/versions/{version}/platforms/{os}/{arch}"
-)
+@router.delete(_ORG_PREFIX + "/private/{namespace}/{name}/versions/{version}/platforms/{os}/{arch}")
 async def delete_provider_platform_endpoint(
     org: str,
     namespace: str,
@@ -522,9 +519,7 @@ async def delete_provider_platform_endpoint(
     if provider is not None:
         await _require_provider_permission(db, user, provider, "admin")
 
-    deleted = await delete_provider_platform(
-        db, storage, org, namespace, name, version, os, arch
-    )
+    deleted = await delete_provider_platform(db, storage, org, namespace, name, version, os, arch)
     if not deleted:
         raise HTTPException(status_code=404, detail="Provider platform not found")
 

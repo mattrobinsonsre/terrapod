@@ -47,9 +47,7 @@ async def get_or_fetch_versions(
         return {
             "modules": [
                 {
-                    "versions": [
-                        {"version": v} for v in sorted(cached_versions)
-                    ],
+                    "versions": [{"version": v} for v in sorted(cached_versions)],
                 }
             ],
         }
@@ -62,15 +60,11 @@ async def get_or_fetch_versions(
     if hostname not in cfg.upstream_registries:
         return {"modules": [{"versions": []}]}
 
-    upstream_versions = await _fetch_upstream_versions(
-        hostname, namespace, name, provider
-    )
+    upstream_versions = await _fetch_upstream_versions(hostname, namespace, name, provider)
     return {
         "modules": [
             {
-                "versions": [
-                    {"version": v} for v in upstream_versions
-                ],
+                "versions": [{"version": v} for v in upstream_versions],
             }
         ],
     }
@@ -113,9 +107,7 @@ async def get_or_fetch_download_url(
     if hostname not in cfg.upstream_registries:
         return None
 
-    return await _fetch_and_cache_module(
-        db, storage, hostname, namespace, name, provider, version
-    )
+    return await _fetch_and_cache_module(db, storage, hostname, namespace, name, provider, version)
 
 
 # --- Internal helpers ---
@@ -223,10 +215,7 @@ async def _fetch_upstream_download_url(
     The upstream registry returns 204 with X-Terraform-Get header containing
     the download URL, or redirects to the download URL.
     """
-    url = (
-        f"https://{hostname}/v1/modules/{namespace}/{name}/{provider}/"
-        f"{version}/download"
-    )
+    url = f"https://{hostname}/v1/modules/{namespace}/{name}/{provider}/{version}/download"
     # Don't follow redirects — we need the X-Terraform-Get header from 204
     resp = await client.get(url, follow_redirects=False)
 

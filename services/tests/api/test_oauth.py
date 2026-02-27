@@ -8,7 +8,6 @@ import base64
 import hashlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_app
@@ -38,12 +37,12 @@ class TestTerraformServiceDiscovery:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    async def test_well_known_terraform_json(self, mock_init_db, mock_init_redis, mock_init_storage):
+    async def test_well_known_terraform_json(
+        self, mock_init_db, mock_init_redis, mock_init_storage
+    ):
         app = create_app()
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/.well-known/terraform.json")
 
         assert response.status_code == 200
@@ -119,9 +118,7 @@ class TestOAuthAuthorize:
         mock_init_storage,
     ):
         app = create_app()
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get(
                 "/oauth/authorize",
                 params={
@@ -149,9 +146,7 @@ class TestOAuthAuthorize:
         mock_get_connector.return_value = None
 
         app = create_app()
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get(
                 "/oauth/authorize",
                 params={
@@ -246,6 +241,7 @@ class TestOAuthToken:
         app = create_app()
 
         with patch("terrapod.db.session.get_db"):
+
             async def override_get_db():
                 return AsyncMock()
 
@@ -289,6 +285,7 @@ class TestOAuthToken:
         app = create_app()
 
         with patch("terrapod.db.session.get_db"):
+
             async def override_get_db():
                 return AsyncMock()
 
@@ -320,6 +317,7 @@ class TestOAuthToken:
         app = create_app()
 
         with patch("terrapod.db.session.get_db"):
+
             async def override_get_db():
                 return AsyncMock()
 

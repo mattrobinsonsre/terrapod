@@ -46,9 +46,13 @@ def upgrade() -> None:
         sa.Column("value", sa.Text(), nullable=False, server_default=""),
         sa.Column("encrypted_value", sa.Text(), nullable=True),
         sa.Column("description", sa.Text(), nullable=False, server_default=""),
-        sa.Column("category", sa.String(20), nullable=False, server_default="terraform"),
+        sa.Column(
+            "category", sa.String(20), nullable=False, server_default="terraform"
+        ),
         sa.Column("hcl", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("sensitive", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column(
+            "sensitive", sa.Boolean(), nullable=False, server_default=sa.text("false")
+        ),
         sa.Column("version_id", sa.String(64), nullable=False, server_default=""),
         sa.Column(
             "created_at",
@@ -73,8 +77,12 @@ def upgrade() -> None:
         sa.Column("org_name", sa.String(63), nullable=False, server_default="default"),
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("description", sa.Text(), nullable=False, server_default=""),
-        sa.Column("global_set", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("priority", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column(
+            "global_set", sa.Boolean(), nullable=False, server_default=sa.text("false")
+        ),
+        sa.Column(
+            "priority", sa.Boolean(), nullable=False, server_default=sa.text("false")
+        ),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -104,9 +112,13 @@ def upgrade() -> None:
         sa.Column("value", sa.Text(), nullable=False, server_default=""),
         sa.Column("encrypted_value", sa.Text(), nullable=True),
         sa.Column("description", sa.Text(), nullable=False, server_default=""),
-        sa.Column("category", sa.String(20), nullable=False, server_default="terraform"),
+        sa.Column(
+            "category", sa.String(20), nullable=False, server_default="terraform"
+        ),
         sa.Column("hcl", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("sensitive", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column(
+            "sensitive", sa.Boolean(), nullable=False, server_default=sa.text("false")
+        ),
         sa.Column("version_id", sa.String(64), nullable=False, server_default=""),
         sa.Column(
             "created_at",
@@ -123,7 +135,9 @@ def upgrade() -> None:
         sa.UniqueConstraint("variable_set_id", "key", name="uq_variable_set_variables"),
     )
     op.create_index(
-        "ix_variable_set_variables_set_id", "variable_set_variables", ["variable_set_id"]
+        "ix_variable_set_variables_set_id",
+        "variable_set_variables",
+        ["variable_set_id"],
     )
 
     # --- Variable Set Workspaces (junction) ---
@@ -156,7 +170,10 @@ def upgrade() -> None:
         sa.Column("source", sa.String(20), nullable=False, server_default="tfe-api"),
         sa.Column("status", sa.String(20), nullable=False, server_default="pending"),
         sa.Column(
-            "auto_queue_runs", sa.Boolean(), nullable=False, server_default=sa.text("true")
+            "auto_queue_runs",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("true"),
         ),
         sa.Column(
             "speculative", sa.Boolean(), nullable=False, server_default=sa.text("false")
@@ -202,8 +219,15 @@ def upgrade() -> None:
             "plan_only", sa.Boolean(), nullable=False, server_default=sa.text("false")
         ),
         sa.Column("source", sa.String(30), nullable=False, server_default="tfe-api"),
-        sa.Column("terraform_version", sa.String(20), nullable=False, server_default=""),
-        sa.Column("runner_definition", sa.String(63), nullable=False, server_default="standard"),
+        sa.Column(
+            "terraform_version", sa.String(20), nullable=False, server_default=""
+        ),
+        sa.Column(
+            "runner_definition",
+            sa.String(63),
+            nullable=False,
+            server_default="standard",
+        ),
         sa.Column(
             "pool_id",
             postgresql.UUID(as_uuid=True),

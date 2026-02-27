@@ -54,7 +54,7 @@ async def github_webhook(request: Request) -> Response:
     try:
         body = json.loads(payload)
     except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+        raise HTTPException(status_code=400, detail="Invalid JSON payload") from None
 
     repo = body.get("repository", {})
     full_name = repo.get("full_name", "")

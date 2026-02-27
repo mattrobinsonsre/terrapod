@@ -168,9 +168,7 @@ class APIToken(Base):
         DateTime(timezone=True), default=utc_now, nullable=False
     )
 
-    __table_args__ = (
-        Index("ix_api_tokens_user_email", "user_email"),
-    )
+    __table_args__ = (Index("ix_api_tokens_user_email", "user_email"),)
 
 
 class AgentPool(Base):
@@ -230,9 +228,7 @@ class AgentPoolToken(Base):
 
     pool: Mapped["AgentPool"] = relationship(back_populates="tokens")
 
-    __table_args__ = (
-        Index("ix_agent_pool_tokens_pool_id", "pool_id"),
-    )
+    __table_args__ = (Index("ix_agent_pool_tokens_pool_id", "pool_id"),)
 
 
 class RunnerListener(Base):
@@ -255,9 +251,7 @@ class RunnerListener(Base):
     certificate_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    runner_definitions: Mapped[dict[str, Any]] = mapped_column(
-        JSONB, nullable=False, default=list
-    )
+    runner_definitions: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=list)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
@@ -268,9 +262,7 @@ class RunnerListener(Base):
 
     pool: Mapped["AgentPool"] = relationship(back_populates="listeners")
 
-    __table_args__ = (
-        Index("ix_runner_listeners_pool_id", "pool_id"),
-    )
+    __table_args__ = (Index("ix_runner_listeners_pool_id", "pool_id"),)
 
 
 # --- Workspace Models ---
@@ -302,12 +294,8 @@ class Workspace(Base):
         ForeignKey("agent_pools.id", ondelete="SET NULL"),
         nullable=True,
     )
-    resource_cpu: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="1"
-    )
-    resource_memory: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="2Gi"
-    )
+    resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
+    resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
 
     # RBAC
     labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
@@ -341,9 +329,7 @@ class Workspace(Base):
         back_populates="workspace", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (
-        sa.UniqueConstraint("org_name", "name", name="uq_workspaces"),
-    )
+    __table_args__ = (sa.UniqueConstraint("org_name", "name", name="uq_workspaces"),)
 
 
 class StateVersion(Base):
@@ -415,7 +401,9 @@ class RegistryModule(Base):
     )
 
     __table_args__ = (
-        sa.UniqueConstraint("org_name", "namespace", "name", "provider", name="uq_registry_modules"),
+        sa.UniqueConstraint(
+            "org_name", "namespace", "name", "provider", name="uq_registry_modules"
+        ),
     )
 
 
@@ -500,9 +488,7 @@ class GPGKey(Base):
         DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
     )
 
-    __table_args__ = (
-        sa.UniqueConstraint("org_name", "key_id", name="uq_gpg_keys"),
-    )
+    __table_args__ = (sa.UniqueConstraint("org_name", "key_id", name="uq_gpg_keys"),)
 
 
 class RegistryProviderVersion(Base):
@@ -604,7 +590,12 @@ class CachedProviderPackage(Base):
 
     __table_args__ = (
         sa.UniqueConstraint(
-            "hostname", "namespace", "type", "version", "os", "arch",
+            "hostname",
+            "namespace",
+            "type",
+            "version",
+            "os",
+            "arch",
             name="uq_cached_provider_packages",
         ),
         Index("ix_cached_provider_packages_lookup", "hostname", "namespace", "type"),
@@ -631,7 +622,11 @@ class CachedModule(Base):
 
     __table_args__ = (
         sa.UniqueConstraint(
-            "hostname", "namespace", "name", "provider", "version",
+            "hostname",
+            "namespace",
+            "name",
+            "provider",
+            "version",
             name="uq_cached_modules",
         ),
         Index("ix_cached_modules_lookup", "hostname", "namespace", "name", "provider"),
@@ -732,7 +727,9 @@ class VCSConnection(Base):
     )
 
     __table_args__ = (
-        sa.UniqueConstraint("provider", "github_installation_id", name="uq_vcs_connections_install"),
+        sa.UniqueConstraint(
+            "provider", "github_installation_id", name="uq_vcs_connections_install"
+        ),
     )
 
 
@@ -807,9 +804,7 @@ class VariableSet(Base):
         back_populates="variable_set", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (
-        sa.UniqueConstraint("org_name", "name", name="uq_variable_sets"),
-    )
+    __table_args__ = (sa.UniqueConstraint("org_name", "name", name="uq_variable_sets"),)
 
 
 class VariableSetVariable(Base):
@@ -829,9 +824,7 @@ class VariableSetVariable(Base):
     value: Mapped[str] = mapped_column(Text, nullable=False, default="")
     encrypted_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    category: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="terraform"
-    )
+    category: Mapped[str] = mapped_column(String(20), nullable=False, default="terraform")
     hcl: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     sensitive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     version_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
@@ -897,9 +890,7 @@ class ConfigurationVersion(Base):
         DateTime(timezone=True), default=utc_now, nullable=False
     )
 
-    __table_args__ = (
-        Index("ix_configuration_versions_workspace_id", "workspace_id"),
-    )
+    __table_args__ = (Index("ix_configuration_versions_workspace_id", "workspace_id"),)
 
 
 # --- Runs ---
@@ -934,12 +925,8 @@ class Run(Base):
     plan_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     source: Mapped[str] = mapped_column(String(30), nullable=False, default="tfe-api")
     terraform_version: Mapped[str] = mapped_column(String(20), nullable=False, default="")
-    resource_cpu: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="1"
-    )
-    resource_memory: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="2Gi"
-    )
+    resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
+    resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
     pool_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("agent_pools.id", ondelete="SET NULL"),
@@ -957,9 +944,7 @@ class Run(Base):
     vcs_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     vcs_pull_request_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    plan_started_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    plan_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     plan_finished_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

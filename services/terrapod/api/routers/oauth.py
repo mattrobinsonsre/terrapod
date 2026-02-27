@@ -18,20 +18,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.auth.api_tokens import create_api_token
 from terrapod.auth.auth_state import (
-    AuthCode,
     AuthState,
     consume_auth_code,
-    consume_auth_state,
-    generate_code,
     generate_state,
-    store_auth_code,
     store_auth_state,
 )
-from terrapod.auth.connectors import get_connector, get_default_connector
+from terrapod.auth.connectors import get_default_connector
 from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services.sso_service import process_login
 
 router = APIRouter(tags=["oauth"])
 logger = get_logger(__name__)

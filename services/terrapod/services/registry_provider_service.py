@@ -56,9 +56,7 @@ async def list_providers(
         select(RegistryProvider)
         .where(RegistryProvider.org_name == org)
         .options(
-            selectinload(RegistryProvider.versions).selectinload(
-                RegistryProviderVersion.platforms
-            )
+            selectinload(RegistryProvider.versions).selectinload(RegistryProviderVersion.platforms)
         )
         .order_by(RegistryProvider.name)
     )
@@ -80,9 +78,7 @@ async def get_provider(
             RegistryProvider.name == name,
         )
         .options(
-            selectinload(RegistryProvider.versions).selectinload(
-                RegistryProviderVersion.platforms
-            )
+            selectinload(RegistryProvider.versions).selectinload(RegistryProviderVersion.platforms)
         )
     )
     return result.scalars().first()
@@ -121,9 +117,7 @@ async def create_provider_version(
     protocols: list[str] | None = None,
 ) -> tuple[RegistryProviderVersion, PresignedURL, PresignedURL]:
     """Create a provider version and return upload URLs for shasums + sig."""
-    result = await db.execute(
-        select(RegistryProvider).where(RegistryProvider.id == provider_id)
-    )
+    result = await db.execute(select(RegistryProvider).where(RegistryProvider.id == provider_id))
     provider = result.scalars().first()
     if provider is None:
         raise ValueError(f"Provider {provider_id} not found")
@@ -239,8 +233,12 @@ async def create_provider_platform(
     await db.flush()
 
     key = provider_binary_key(
-        provider.org_name, provider.namespace, provider.name,
-        prov_version.version, os_, arch,
+        provider.org_name,
+        provider.namespace,
+        provider.name,
+        prov_version.version,
+        os_,
+        arch,
     )
     upload_url = await storage.presigned_put_url(key, content_type="application/zip")
 
@@ -347,17 +345,17 @@ async def get_provider_download_info(
     # Build signing_keys from GPG key
     signing_keys: list[dict] = []
     if prov_version.gpg_key_id is not None:
-        gpg_result = await db.execute(
-            select(GPGKey).where(GPGKey.id == prov_version.gpg_key_id)
-        )
+        gpg_result = await db.execute(select(GPGKey).where(GPGKey.id == prov_version.gpg_key_id))
         gpg_key = gpg_result.scalars().first()
         if gpg_key is not None:
-            signing_keys.append({
-                "ascii_armor": gpg_key.ascii_armor,
-                "key_id": gpg_key.key_id,
-                "source": gpg_key.source,
-                "source_url": gpg_key.source_url or "",
-            })
+            signing_keys.append(
+                {
+                    "ascii_armor": gpg_key.ascii_armor,
+                    "key_id": gpg_key.key_id,
+                    "source": gpg_key.source,
+                    "source_url": gpg_key.source_url or "",
+                }
+            )
 
     return {
         "protocols": prov_version.protocols,
@@ -393,7 +391,5 @@ async def _delete_version_storage(
 
     # Delete platform binaries
     for platform in version.platforms:
-        key = provider_binary_key(
-            org, namespace, name, version.version, platform.os, platform.arch
-        )
+        key = provider_binary_key(org, namespace, name, version.version, platform.os, platform.arch)
         await storage.delete(key)

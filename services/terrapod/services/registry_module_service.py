@@ -104,9 +104,7 @@ async def create_module_version(
 ) -> tuple[RegistryModuleVersion, PresignedURL]:
     """Create a new module version and return an upload URL for the tarball."""
     # Get the module to build the storage key
-    result = await db.execute(
-        select(RegistryModule).where(RegistryModule.id == module_id)
-    )
+    result = await db.execute(select(RegistryModule).where(RegistryModule.id == module_id))
     module = result.scalars().first()
     if module is None:
         raise ValueError(f"Module {module_id} not found")

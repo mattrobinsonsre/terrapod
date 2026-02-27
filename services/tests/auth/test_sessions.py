@@ -1,7 +1,7 @@
 """Tests for Redis-backed session management."""
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -76,7 +76,7 @@ class TestCreateSession:
         mock_get_redis.return_value = redis
         pipe.execute.return_value = [True, 1, True]
 
-        session = await create_session(
+        await create_session(
             email="test@example.com",
             display_name=None,
             roles=[],

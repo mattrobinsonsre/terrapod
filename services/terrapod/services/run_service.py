@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import (
@@ -69,9 +69,7 @@ async def create_run(
     pool_id = workspace.agent_pool_id
     if pool_id is None:
         default_pool = (
-            await db.execute(
-                select(AgentPool).where(AgentPool.name == "default").limit(1)
-            )
+            await db.execute(select(AgentPool).where(AgentPool.name == "default").limit(1))
         ).scalar_one_or_none()
         if default_pool:
             pool_id = default_pool.id
@@ -112,9 +110,7 @@ async def transition_run(
 ) -> Run:
     """Transition a run to a new status."""
     if not can_transition(run.status, target_status):
-        raise ValueError(
-            f"Invalid transition: {run.status} → {target_status}"
-        )
+        raise ValueError(f"Invalid transition: {run.status} → {target_status}")
 
     now = utc_now()
     old_status = run.status
@@ -126,11 +122,17 @@ async def transition_run(
     # Track phase timestamps
     if target_status == "planning":
         run.plan_started_at = now
-    elif target_status in ("planned", "errored") and run.plan_started_at and not run.plan_finished_at:
+    elif (
+        target_status in ("planned", "errored") and run.plan_started_at and not run.plan_finished_at
+    ):
         run.plan_finished_at = now
     elif target_status == "applying":
         run.apply_started_at = now
-    elif target_status in ("applied", "errored") and run.apply_started_at and not run.apply_finished_at:
+    elif (
+        target_status in ("applied", "errored")
+        and run.apply_started_at
+        and not run.apply_finished_at
+    ):
         run.apply_finished_at = now
 
     await db.flush()
@@ -277,9 +279,7 @@ async def get_run_presigned_urls(
         urls["state_download_url"] = (await storage.presigned_get_url(sk)).url
 
     # Plan log upload
-    urls["plan_log_upload_url"] = (
-        await storage.presigned_put_url(plan_log_key(ws_id, run_id))
-    ).url
+    urls["plan_log_upload_url"] = (await storage.presigned_put_url(plan_log_key(ws_id, run_id))).url
 
     # Plan file upload
     urls["plan_file_upload_url"] = (
@@ -379,9 +379,7 @@ async def get_configuration_version(
     db: AsyncSession, cv_id: uuid.UUID
 ) -> ConfigurationVersion | None:
     """Get a configuration version by ID."""
-    result = await db.execute(
-        select(ConfigurationVersion).where(ConfigurationVersion.id == cv_id)
-    )
+    result = await db.execute(select(ConfigurationVersion).where(ConfigurationVersion.id == cv_id))
     return result.scalar_one_or_none()
 
 

@@ -24,11 +24,21 @@ def upgrade() -> None:
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("org_name", sa.String(63), nullable=False, server_default="default"),
         sa.Column("name", sa.String(90), nullable=False),
-        sa.Column("execution_mode", sa.String(20), nullable=False, server_default="local"),
-        sa.Column("auto_apply", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("terraform_version", sa.String(20), nullable=False, server_default=""),
-        sa.Column("working_directory", sa.String(500), nullable=False, server_default=""),
-        sa.Column("locked", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column(
+            "execution_mode", sa.String(20), nullable=False, server_default="local"
+        ),
+        sa.Column(
+            "auto_apply", sa.Boolean(), nullable=False, server_default=sa.text("false")
+        ),
+        sa.Column(
+            "terraform_version", sa.String(20), nullable=False, server_default=""
+        ),
+        sa.Column(
+            "working_directory", sa.String(500), nullable=False, server_default=""
+        ),
+        sa.Column(
+            "locked", sa.Boolean(), nullable=False, server_default=sa.text("false")
+        ),
         sa.Column("lock_id", sa.String(255), nullable=True),
         sa.Column(
             "created_at",
@@ -57,7 +67,9 @@ def upgrade() -> None:
         sa.Column("serial", sa.Integer(), nullable=False),
         sa.Column("lineage", sa.String(63), nullable=False, server_default=""),
         sa.Column("md5", sa.String(32), nullable=False, server_default=""),
-        sa.Column("state_size", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column(
+            "state_size", sa.Integer(), nullable=False, server_default=sa.text("0")
+        ),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -66,7 +78,9 @@ def upgrade() -> None:
         ),
         sa.UniqueConstraint("workspace_id", "serial", name="uq_state_versions"),
     )
-    op.create_index("ix_state_versions_workspace_id", "state_versions", ["workspace_id"])
+    op.create_index(
+        "ix_state_versions_workspace_id", "state_versions", ["workspace_id"]
+    )
 
 
 def downgrade() -> None:

@@ -12,6 +12,7 @@ Endpoints:
 """
 
 import uuid
+from datetime import UTC
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path
 from fastapi.responses import JSONResponse
@@ -33,9 +34,8 @@ SUPPORTED_PROVIDERS = {"github", "gitlab"}
 def _rfc3339(dt) -> str:
     if dt is None:
         return ""
-    from datetime import timezone
 
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _validate_org(org: str) -> None:
@@ -74,9 +74,7 @@ def _connection_json(conn: VCSConnection) -> dict:
     }
 
 
-async def _list_connections(
-    db: AsyncSession, org_name: str
-) -> list[VCSConnection]:
+async def _list_connections(db: AsyncSession, org_name: str) -> list[VCSConnection]:
     result = await db.execute(
         select(VCSConnection)
         .where(VCSConnection.org_name == org_name)
@@ -85,12 +83,8 @@ async def _list_connections(
     return list(result.scalars().all())
 
 
-async def _get_connection(
-    db: AsyncSession, connection_id: uuid.UUID
-) -> VCSConnection | None:
-    result = await db.execute(
-        select(VCSConnection).where(VCSConnection.id == connection_id)
-    )
+async def _get_connection(db: AsyncSession, connection_id: uuid.UUID) -> VCSConnection | None:
+    result = await db.execute(select(VCSConnection).where(VCSConnection.id == connection_id))
     return result.scalar_one_or_none()
 
 
@@ -172,9 +166,7 @@ async def create_connection(
     elif provider == "gitlab":
         token = attrs.get("token", "")
         if not token:
-            raise HTTPException(
-                status_code=422, detail="token is required for GitLab connections"
-            )
+            raise HTTPException(status_code=422, detail="token is required for GitLab connections")
         # Encrypt the token for storage
         token_encrypted = encrypt_value(token)
 

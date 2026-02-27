@@ -84,9 +84,7 @@ class RunnerConfig(BaseModel):
     service_account_name: str = Field(default="")
     ttl_seconds_after_finished: int = Field(default=600)
     definitions: list[RunnerDefinition] = Field(
-        default_factory=lambda: [
-            RunnerDefinition(name="standard", description="Standard runner")
-        ]
+        default_factory=lambda: [RunnerDefinition(name="standard", description="Standard runner")]
     )
     node_selector: dict[str, str] = Field(default_factory=dict)
     tolerations: list[dict] = Field(default_factory=list)
@@ -304,7 +302,9 @@ class ProviderCacheConfig(BaseModel):
     """Provider binary caching (network mirror) configuration."""
 
     enabled: bool = Field(default=True)
-    upstream_registries: list[str] = Field(default=["registry.terraform.io", "registry.opentofu.org"])
+    upstream_registries: list[str] = Field(
+        default=["registry.terraform.io", "registry.opentofu.org"]
+    )
     warm_on_first_request: bool = Field(default=True)
 
 
@@ -312,12 +312,8 @@ class BinaryCacheConfig(BaseModel):
     """Terraform/tofu CLI binary caching configuration."""
 
     enabled: bool = Field(default=True)
-    terraform_mirror_url: str = Field(
-        default="https://releases.hashicorp.com/terraform"
-    )
-    tofu_mirror_url: str = Field(
-        default="https://github.com/opentofu/opentofu/releases/download"
-    )
+    terraform_mirror_url: str = Field(default="https://releases.hashicorp.com/terraform")
+    tofu_mirror_url: str = Field(default="https://github.com/opentofu/opentofu/releases/download")
 
 
 class ModuleCacheConfig(BaseModel):

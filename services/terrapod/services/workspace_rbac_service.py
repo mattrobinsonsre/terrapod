@@ -62,9 +62,7 @@ async def resolve_workspace_permission(
     # 4. Label-based RBAC from custom roles
     custom_role_names = role_set - BUILTIN_ROLE_NAMES
     if custom_role_names:
-        result = await db.execute(
-            select(Role).where(Role.name.in_(custom_role_names))
-        )
+        result = await db.execute(select(Role).where(Role.name.in_(custom_role_names)))
         roles = list(result.scalars().all())
 
         resource_labels = workspace.labels or {}
@@ -94,7 +92,9 @@ async def resolve_workspace_permission(
 
             if matched:
                 perm = role.workspace_permission
-                if best is None or PERMISSION_HIERARCHY.get(perm, -1) > PERMISSION_HIERARCHY.get(best, -1):
+                if best is None or PERMISSION_HIERARCHY.get(perm, -1) > PERMISSION_HIERARCHY.get(
+                    best, -1
+                ):
                     best = perm
 
     # 5. 'everyone' role: if workspace has label access=everyone, grant read

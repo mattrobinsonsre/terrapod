@@ -100,9 +100,7 @@ def validate_webhook_signature(payload: bytes, signature_header: str) -> bool:
     if not signature_header.startswith("sha256="):
         return False
 
-    expected = hmac.new(
-        secret.encode(), payload, hashlib.sha256
-    ).hexdigest()
+    expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
     received = signature_header.removeprefix("sha256=")
 
     return hmac.compare_digest(expected, received)
@@ -133,9 +131,7 @@ async def get_repo_branch_sha(
         return resp.json()["commit"]["sha"]
 
 
-async def get_repo_default_branch(
-    conn: VCSConnection, owner: str, repo: str
-) -> str | None:
+async def get_repo_default_branch(conn: VCSConnection, owner: str, repo: str) -> str | None:
     """Get the default branch name for a repository.
 
     Returns None if the repo doesn't exist or isn't accessible.
@@ -158,9 +154,7 @@ async def get_repo_default_branch(
         return resp.json()["default_branch"]
 
 
-async def download_repo_archive(
-    conn: VCSConnection, owner: str, repo: str, ref: str
-) -> bytes:
+async def download_repo_archive(conn: VCSConnection, owner: str, repo: str, ref: str) -> bytes:
     """Download a repository tarball for a given ref (branch, tag, or SHA).
 
     Uses GitHub's tarball endpoint which returns a redirect to a CDN URL.

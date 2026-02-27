@@ -26,7 +26,7 @@ Endpoints:
 """
 
 import hashlib
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response, status
 from fastapi.responses import JSONResponse
@@ -38,7 +38,6 @@ from terrapod.db.models import StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.workspace_rbac_service import (
-    PERMISSION_HIERARCHY,
     has_permission,
     resolve_workspace_permission,
 )
@@ -61,8 +60,7 @@ def _rfc3339(dt: datetime | None) -> str:
     """Format a datetime as RFC3339 with trailing Z (what go-tfe expects)."""
     if dt is None:
         return ""
-    from datetime import timezone
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _tfe_headers() -> dict[str, str]:
@@ -394,6 +392,7 @@ async def create_workspace(
         vcs_conn_id_str = vcs_conn_data.get("id", "")
         if vcs_conn_id_str:
             import uuid as _uuid
+
             vcs_connection_id = _uuid.UUID(vcs_conn_id_str.removeprefix("vcs-"))
 
     ws = Workspace(
@@ -513,6 +512,7 @@ async def update_workspace(
             ws.vcs_connection_id = None
         else:
             import uuid as _uuid
+
             vcs_id = vcs_conn_data.get("id", "")
             ws.vcs_connection_id = _uuid.UUID(vcs_id.removeprefix("vcs-")) if vcs_id else None
 
@@ -614,7 +614,7 @@ async def download_state(
     try:
         data = await storage.get(key)
     except Exception:
-        raise HTTPException(status_code=404, detail="State data not yet uploaded")
+        raise HTTPException(status_code=404, detail="State data not yet uploaded") from None
 
     # Decrypt state at rest (Fernet envelope)
     from terrapod.services.encryption_service import decrypt_state
@@ -801,6 +801,7 @@ async def lock_workspace(
 
     # Parse lock info from request body
     import json as json_mod
+
     try:
         raw = await request.body()
         lock_info = json_mod.loads(raw) if raw else {}
@@ -810,7 +811,9 @@ async def lock_workspace(
     lock_id = lock_info.get("ID", f"lock-{user.email}")
 
     if ws.locked:
-        raise HTTPException(status_code=409, detail=f"workspace already locked (lock ID: \"{ws.lock_id}\")")
+        raise HTTPException(
+            status_code=409, detail=f'workspace already locked (lock ID: "{ws.lock_id}")'
+        )
 
     ws.locked = True
     ws.lock_id = lock_id

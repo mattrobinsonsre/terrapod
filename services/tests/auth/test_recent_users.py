@@ -3,8 +3,6 @@
 import json
 from unittest.mock import AsyncMock, patch
 
-import pytest
-
 from terrapod.auth.recent_users import (
     RECENT_USER_PREFIX,
     RECENT_USER_TTL,
@@ -65,18 +63,22 @@ class TestListRecentUsers:
         # Mock get() for each key
         async def mock_get(key):
             if "older" in key:
-                return json.dumps({
+                return json.dumps(
+                    {
+                        "provider_name": "oidc",
+                        "email": "older@example.com",
+                        "display_name": "Older",
+                        "last_seen": "2026-01-01T00:00:00+00:00",
+                    }
+                )
+            return json.dumps(
+                {
                     "provider_name": "oidc",
-                    "email": "older@example.com",
-                    "display_name": "Older",
-                    "last_seen": "2026-01-01T00:00:00+00:00",
-                })
-            return json.dumps({
-                "provider_name": "oidc",
-                "email": "newer@example.com",
-                "display_name": "Newer",
-                "last_seen": "2026-01-02T00:00:00+00:00",
-            })
+                    "email": "newer@example.com",
+                    "display_name": "Newer",
+                    "last_seen": "2026-01-02T00:00:00+00:00",
+                }
+            )
 
         redis.get = mock_get
 

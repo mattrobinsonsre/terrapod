@@ -10,6 +10,7 @@ Endpoints:
 """
 
 import uuid
+from datetime import UTC
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
 from fastapi.responses import JSONResponse
@@ -38,8 +39,7 @@ DEFAULT_ORG = "default"
 def _rfc3339(dt) -> str:
     if dt is None:
         return ""
-    from datetime import timezone
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _var_json(var: Variable) -> dict:
@@ -91,7 +91,9 @@ async def list_workspace_vars(
     ws = await _get_workspace(workspace_id, db)
     perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
     if not has_permission(perm, "read"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires read permission on workspace")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Requires read permission on workspace"
+        )
     variables = await variable_service.list_variables(db, ws.id)
     return JSONResponse(content={"data": [_var_json(v) for v in variables]})
 
@@ -107,7 +109,9 @@ async def create_workspace_var(
     ws = await _get_workspace(workspace_id, db)
     perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
     if not has_permission(perm, "write"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires write permission on workspace")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Requires write permission on workspace"
+        )
 
     attrs = body.get("data", {}).get("attributes", {})
     key = attrs.get("key", "")
@@ -127,7 +131,7 @@ async def create_workspace_var(
         )
         await db.commit()
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
     return JSONResponse(content={"data": _var_json(var)}, status_code=201)
 
@@ -144,7 +148,9 @@ async def update_workspace_var(
     ws = await _get_workspace(workspace_id, db)
     perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
     if not has_permission(perm, "write"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires write permission on workspace")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Requires write permission on workspace"
+        )
     var_uuid = uuid.UUID(var_id.removeprefix("var-"))
 
     var = await variable_service.get_variable(db, ws.id, var_uuid)
@@ -166,7 +172,7 @@ async def update_workspace_var(
         )
         await db.commit()
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
     return JSONResponse(content={"data": _var_json(var)})
 
@@ -182,7 +188,9 @@ async def delete_workspace_var(
     ws = await _get_workspace(workspace_id, db)
     perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
     if not has_permission(perm, "write"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires write permission on workspace")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Requires write permission on workspace"
+        )
     var_uuid = uuid.UUID(var_id.removeprefix("var-"))
 
     var = await variable_service.get_variable(db, ws.id, var_uuid)
@@ -228,9 +236,7 @@ async def list_varsets(
         raise HTTPException(status_code=404, detail="Organization not found")
 
     result = await db.execute(
-        select(VariableSet)
-        .where(VariableSet.org_name == org)
-        .order_by(VariableSet.name)
+        select(VariableSet).where(VariableSet.org_name == org).order_by(VariableSet.name)
     )
     varsets = result.scalars().all()
     return JSONResponse(content={"data": [_varset_json(vs) for vs in varsets]})
@@ -359,9 +365,7 @@ async def list_varset_vars(
     """List variables in a variable set."""
     vs = await _get_varset(varset_id, db)
     await db.refresh(vs, ["variables"])
-    return JSONResponse(
-        content={"data": [_vsvar_json(v, varset_id) for v in vs.variables]}
-    )
+    return JSONResponse(content={"data": [_vsvar_json(v, varset_id) for v in vs.variables]})
 
 
 @router.post("/varsets/{varset_id}/relationships/vars", status_code=201)
@@ -384,6 +388,7 @@ async def create_varset_var(
 
     if sensitive:
         from terrapod.services.encryption_service import encrypt_value, is_encryption_available
+
         if not is_encryption_available():
             raise HTTPException(status_code=422, detail="Encryption not configured")
         encrypted = encrypt_value(value)
@@ -407,9 +412,7 @@ async def create_varset_var(
     await db.commit()
     await db.refresh(vsv)
 
-    return JSONResponse(
-        content={"data": _vsvar_json(vsv, varset_id)}, status_code=201
-    )
+    return JSONResponse(content={"data": _vsvar_json(vsv, varset_id)}, status_code=201)
 
 
 @router.patch("/varsets/{varset_id}/relationships/vars/{var_id}")
@@ -447,6 +450,7 @@ async def update_varset_var(
         new_sensitive = attrs.get("sensitive", vsv.sensitive)
         if new_sensitive:
             from terrapod.services.encryption_service import encrypt_value, is_encryption_available
+
             if not is_encryption_available():
                 raise HTTPException(status_code=422, detail="Encryption not configured")
             vsv.value = ""

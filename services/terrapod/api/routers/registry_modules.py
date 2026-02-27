@@ -26,7 +26,6 @@ from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.registry_module_service import (
-    confirm_module_upload,
     create_module,
     create_module_version,
     delete_module,
@@ -78,10 +77,7 @@ class CreateModuleVersionRequest(BaseModel):
 
 
 def _module_to_jsonapi(module) -> dict:  # type: ignore[no-untyped-def]
-    versions = [
-        {"version": v.version, "status": v.upload_status}
-        for v in (module.versions or [])
-    ]
+    versions = [{"version": v.version, "status": v.upload_status} for v in (module.versions or [])]
     return {
         "id": str(module.id),
         "type": "registry-modules",
@@ -121,11 +117,7 @@ async def list_module_versions_cli(
     if not has_registry_permission(perm, "read"):
         raise HTTPException(status_code=404, detail="Module not found")
 
-    versions = [
-        {"version": v.version}
-        for v in module.versions
-        if v.upload_status == "uploaded"
-    ]
+    versions = [{"version": v.version} for v in module.versions if v.upload_status == "uploaded"]
     return JSONResponse(
         content={
             "modules": [{"versions": versions}],
@@ -296,9 +288,7 @@ async def create_module_version_endpoint(
         )
 
     version_str = body.data.attributes.version
-    mod_version, upload_url = await create_module_version(
-        db, storage, module.id, version_str
-    )
+    mod_version, upload_url = await create_module_version(db, storage, module.id, version_str)
     await db.commit()
 
     logger.info(

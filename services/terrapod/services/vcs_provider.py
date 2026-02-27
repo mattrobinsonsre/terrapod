@@ -34,15 +34,11 @@ class VCSProvider(Protocol):
         """Get HEAD commit SHA for a branch. Returns None if not found."""
         ...
 
-    async def get_default_branch(
-        self, conn: VCSConnection, owner: str, repo: str
-    ) -> str | None:
+    async def get_default_branch(self, conn: VCSConnection, owner: str, repo: str) -> str | None:
         """Get the repository's default branch name."""
         ...
 
-    async def download_archive(
-        self, conn: VCSConnection, owner: str, repo: str, ref: str
-    ) -> bytes:
+    async def download_archive(self, conn: VCSConnection, owner: str, repo: str, ref: str) -> bytes:
         """Download repository tarball at a given ref."""
         ...
 

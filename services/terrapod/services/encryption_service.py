@@ -61,7 +61,7 @@ def decrypt_value(ciphertext: str) -> str:
     try:
         return _fernet.decrypt(ciphertext.encode()).decode()
     except InvalidToken:
-        raise ValueError("Failed to decrypt value — key mismatch or corrupted data")
+        raise ValueError("Failed to decrypt value — key mismatch or corrupted data") from None
 
 
 # --- State file encryption (bytes ↔ bytes) ---
@@ -99,6 +99,6 @@ def decrypt_state(data: bytes) -> bytes:
             "Set TERRAPOD_ENCRYPTION__KEY to decrypt state files."
         )
     try:
-        return _fernet.decrypt(data[len(_STATE_MAGIC):])
+        return _fernet.decrypt(data[len(_STATE_MAGIC) :])
     except InvalidToken:
-        raise ValueError("Failed to decrypt state — key mismatch or corrupted data")
+        raise ValueError("Failed to decrypt state — key mismatch or corrupted data") from None

@@ -82,7 +82,10 @@ def build_job_spec(
     container_env = [
         {"name": "TP_RUN_ID", "value": run_id},
         {"name": "TP_PHASE", "value": phase},
-        {"name": "TP_API_URL", "value": os.environ.get("TERRAPOD_API_URL", "http://terrapod-api:8000")},
+        {
+            "name": "TP_API_URL",
+            "value": os.environ.get("TERRAPOD_API_URL", "http://terrapod-api:8000"),
+        },
     ]
 
     # Setup script (runs before terraform init)
@@ -97,10 +100,12 @@ def build_job_spec(
     container_env.append({"name": "TP_BACKEND", "value": backend})
 
     # Binary cache URL
-    container_env.append({
-        "name": "TP_BINARY_URL",
-        "value": presigned_urls.get("binary_url", ""),
-    })
+    container_env.append(
+        {
+            "name": "TP_BINARY_URL",
+            "value": presigned_urls.get("binary_url", ""),
+        }
+    )
 
     # Presigned URLs for artifacts
     url_mappings = {

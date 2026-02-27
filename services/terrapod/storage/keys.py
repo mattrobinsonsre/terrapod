@@ -49,9 +49,7 @@ def policy_set_key(policy_set_id: str, version_id: str) -> str:
 # --- Module Registry ---
 
 
-def module_tarball_key(
-    org: str, namespace: str, name: str, provider: str, version: str
-) -> str:
+def module_tarball_key(org: str, namespace: str, name: str, provider: str, version: str) -> str:
     """Key for a module version tarball."""
     return f"registry/modules/{org}/{namespace}/{name}/{provider}/{version}.tar.gz"
 
@@ -63,7 +61,9 @@ def provider_binary_key(
     org: str, namespace: str, name: str, version: str, os_: str, arch: str
 ) -> str:
     """Key for a provider binary zip."""
-    return f"registry/providers/{org}/{namespace}/{name}/{version}/{name}_{version}_{os_}_{arch}.zip"
+    return (
+        f"registry/providers/{org}/{namespace}/{name}/{version}/{name}_{version}_{os_}_{arch}.zip"
+    )
 
 
 def provider_shasums_key(org: str, namespace: str, name: str, version: str) -> str:
@@ -79,9 +79,7 @@ def provider_shasums_sig_key(org: str, namespace: str, name: str, version: str) 
 # --- Module Cache ---
 
 
-def module_cache_key(
-    hostname: str, namespace: str, name: str, provider: str, version: str
-) -> str:
+def module_cache_key(hostname: str, namespace: str, name: str, provider: str, version: str) -> str:
     """Key for a cached upstream module tarball."""
     return f"cache/modules/{hostname}/{namespace}/{name}/{provider}/{version}.tar.gz"
 
