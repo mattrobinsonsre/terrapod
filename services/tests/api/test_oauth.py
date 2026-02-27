@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from httpx import ASGITransport, AsyncClient
 
-from terrapod.api.app import create_app
+from terrapod.api.app import create_application as create_app
 from terrapod.api.routers.oauth import _verify_pkce
 
 

@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from httpx import ASGITransport, AsyncClient
 
-from terrapod.api.app import create_app
+from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser
 from terrapod.api.routers.tfe_v2 import TFP_API_VERSION, TFP_APP_NAME, X_TFE_VERSION
 
