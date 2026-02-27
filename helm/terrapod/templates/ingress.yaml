@@ -1,0 +1,36 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "terrapod.fullname" . }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.hostname }}
+      secretName: {{ .Values.tls.existingSecret | default (printf "%s-tls" (include "terrapod.fullname" .)) }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.hostname }}
+      http:
+        paths:
+          # BFF: all traffic enters through the web frontend.
+          # Next.js rewrites proxy /api/* and /.well-known/* to the API
+          # service internally (via API_URL env var).
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "terrapod.fullname" . }}-web
+                port:
+                  name: http
+{{- end }}

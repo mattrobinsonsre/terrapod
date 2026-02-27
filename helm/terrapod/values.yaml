@@ -1,0 +1,303 @@
+# Terrapod Helm Chart Values
+# Default configuration for production deployment
+
+# Global settings
+global:
+  imagePullSecrets: []
+
+# ── API Server (Python/FastAPI) ───────────────────────────────────────────────
+api:
+  replicas: 2
+
+  image:
+    repository: ghcr.io/mattrobinsonsre/terrapod-api
+    tag: ""  # Defaults to appVersion
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+  # Configuration mounted as /etc/terrapod/config.yaml
+  config:
+    log_level: info
+
+    # Storage configuration — exactly one backend must be configured.
+    storage:
+      # Backend: s3 | azure | gcs | filesystem
+      backend: filesystem
+
+      # AWS S3
+      s3:
+        bucket: ""
+        region: us-east-1
+        prefix: ""
+        endpoint_url: ""
+        presigned_url_expiry_seconds: 3600
+
+      # Azure Blob Storage
+      azure:
+        account_name: ""
+        container_name: ""
+        prefix: ""
+        presigned_url_expiry_seconds: 3600
+
+      # Google Cloud Storage
+      gcs:
+        bucket: ""
+        prefix: ""
+        project_id: ""
+        service_account_email: ""
+        presigned_url_expiry_seconds: 3600
+
+      # Local filesystem (default — for dev/CI)
+      filesystem:
+        root_dir: /var/lib/terrapod/storage
+        presigned_url_expiry_seconds: 3600
+        base_url: ""  # Auto-detected from ingress hostname if empty
+
+    # Authentication
+    auth:
+      local_enabled: true
+      callback_base_url: ""  # Must be set to externally-reachable URL
+      session_ttl_hours: 12
+      api_token_max_ttl_hours: 0  # 0 = no limit
+      require_external_sso_for_roles: []
+      sso:
+        default_provider: ""
+        oidc: []
+        # Example:
+        # - name: auth0
+        #   issuer_url: https://myorg.auth0.com/
+        #   client_id: ""
+        #   scopes: ["openid", "profile", "email"]
+        #   groups_claim: groups
+        #   role_prefixes: ["terrapod:", "terrapod-"]
+        saml: []
+
+    # Private Registry & Caching
+    registry:
+      enabled: true
+      module_cache:
+        enabled: true
+        upstream_registries:
+          - registry.terraform.io
+        warm_on_first_request: true
+      provider_cache:
+        enabled: true
+        upstream_registries:
+          - registry.terraform.io
+          - registry.opentofu.org
+        warm_on_first_request: true
+      binary_cache:
+        enabled: true
+        terraform_mirror_url: "https://releases.hashicorp.com/terraform"
+        tofu_mirror_url: "https://github.com/opentofu/opentofu/releases/download"
+
+    # Encryption key for sensitive variables (Fernet key)
+    # Generate with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
+    # In production, inject from K8s Secret via TERRAPOD_ENCRYPTION__KEY env var
+    encryption_key: ""
+
+    # VCS Integration
+    # VCS connections (GitHub App installations, GitLab tokens) are created
+    # dynamically via the API. All credentials are stored encrypted on the
+    # connection itself — no secrets in Helm values.
+    vcs:
+      enabled: false
+      poll_interval_seconds: 60
+      github:
+        # Optional: webhook secret for HMAC signature validation.
+        # Only needed if GitHub webhooks are enabled for faster feedback.
+        # Inject via env var: TERRAPOD_VCS__GITHUB__WEBHOOK_SECRET
+        webhook_secret: ""
+
+    # CORS
+    cors:
+      allow_origins: []
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  serviceAccount:
+    create: true
+    name: ""
+    # Annotations for cloud provider workload identity:
+    #
+    # AWS IRSA:
+    #   eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/terrapod-api
+    #
+    # Azure Workload Identity:
+    #   azure.workload.identity/client-id: <managed-identity-client-id>
+    #
+    # GCP Workload Identity Federation:
+    #   iam.gke.io/gcp-service-account: terrapod@project.iam.gserviceaccount.com
+    annotations: {}
+
+# ── Web UI (Next.js) ──────────────────────────────────────────────────────────
+web:
+  enabled: false
+
+  replicas: 2
+
+  image:
+    repository: ghcr.io/mattrobinsonsre/terrapod-web
+    tag: ""  # Defaults to appVersion
+    pullPolicy: IfNotPresent
+
+  livenessProbe: {}
+  readinessProbe: {}
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# ── Runner Definitions ────────────────────────────────────────────────────────
+runners:
+  # Default runner definition name (must match a name below)
+  default: standard
+
+  # Runner job container image (generic runner — binary fetched at runtime)
+  image:
+    repository: ghcr.io/mattrobinsonsre/terrapod-runner
+    tag: ""  # defaults to appVersion
+    pullPolicy: IfNotPresent
+
+  # Internal API URL for runner Jobs. Runner pods use this to reach the API
+  # for presigned storage URLs. Defaults to http://<release>-api:8000.
+  serverUrl: ""
+
+  # Default terraform/tofu version for runner Jobs (per-workspace override planned)
+  defaultTerraformVersion: "1.9.8"
+  defaultExecutionBackend: terraform  # terraform | tofu
+
+  # Named runner definitions — each defines a K8s Job resource envelope
+  definitions:
+    - name: standard
+      description: "Standard runner for most workspaces"
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+      timeout_minutes: 60
+
+    - name: large
+      description: "Large runner for workspaces with many resources"
+      resources:
+        requests:
+          cpu: "1"
+          memory: "4Gi"
+        limits:
+          cpu: "2"
+          memory: "8Gi"
+      timeout_minutes: 120
+
+    - name: xlarge
+      description: "Extra large runner for very large state files"
+      resources:
+        requests:
+          cpu: "2"
+          memory: "8Gi"
+        limits:
+          cpu: "4"
+          memory: "16Gi"
+      timeout_minutes: 180
+
+  # Shared Job settings (applied to all runner definitions)
+  serviceAccountName: ""  # SA for Jobs (may need cloud credentials)
+  nodeSelector: {}
+  tolerations: []
+  ttlSecondsAfterFinished: 600  # Clean up completed Jobs after 10 min
+
+# ── Runner Listener ──────────────────────────────────────────────────────────
+listener:
+  enabled: true
+  replicas: 1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Namespace where runner Jobs are created (defaults to release namespace)
+  runnerNamespace: ""
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
+# BFF pattern: all traffic enters through the web frontend (Next.js).
+# Next.js rewrites proxy /api/* and /.well-known/* to the API service
+# internally via the API_URL env var on the web deployment.
+ingress:
+  enabled: false
+  className: ""
+  hostname: ""  # Required: e.g., terrapod.example.com
+  tls: true
+  annotations: {}
+
+# ── TLS ───────────────────────────────────────────────────────────────────────
+tls:
+  # Name of an existing TLS Secret. If empty, uses <fullname>-tls.
+  existingSecret: ""
+
+# ── Migrations ────────────────────────────────────────────────────────────────
+migrations:
+  enabled: true
+
+# ── Bootstrap (initial admin user) ───────────────────────────────────────────
+# bootstrap:
+#   adminEmail: admin@example.com
+#   adminPassword: ""  # Required when enabled
+#   existingSecret: ""  # Alternative: reference an existing K8s Secret
+#   emailKey: email
+#   passwordKey: password
+
+# ── Database (PostgreSQL) ─────────────────────────────────────────────────────
+# External PostgreSQL URL. The password should be injected via env var
+# TERRAPOD_DATABASE_URL or a Kubernetes Secret.
+postgresql:
+  # URL for external PostgreSQL (set via env/secret in production)
+  url: ""
+
+# ── Redis ─────────────────────────────────────────────────────────────────
+# External Redis URL. Set via env var TERRAPOD_REDIS_URL or a Secret.
+redis:
+  url: ""
+
+# ── Storage ─────────────────────────────────────────────────────────────────
+# Filesystem PVC — only created when storage.backend=filesystem
+storage:
+  filesystem:
+    persistence:
+      enabled: true
+      size: 50Gi
+      storageClass: ""
+      accessModes:
+        - ReadWriteOnce

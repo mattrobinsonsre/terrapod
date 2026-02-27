@@ -1,0 +1,77 @@
+{{- if .Values.listener.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "terrapod.fullname" . }}-listener
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: listener
+spec:
+  replicas: {{ .Values.listener.replicas }}
+  selector:
+    matchLabels:
+      {{- include "terrapod.listener.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/runner-config: {{ include (print $.Template.BasePath "/configmap-runner.yaml") . | sha256sum }}
+      labels:
+        {{- include "terrapod.listener.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "terrapod.fullname" . }}-listener
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: listener
+          image: {{ include "terrapod.api.image" . }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          command:
+            - python
+            - -m
+            - terrapod.runner.listener
+          env:
+            {{- if .Values.postgresql.url }}
+            - name: TERRAPOD_DATABASE_URL
+              value: {{ .Values.postgresql.url | quote }}
+            {{- end }}
+            {{- if .Values.redis.url }}
+            - name: TERRAPOD_REDIS_URL
+              value: {{ .Values.redis.url | quote }}
+            {{- end }}
+            - name: TERRAPOD_RUNNER_NAMESPACE
+              value: {{ include "terrapod.runnerNamespace" . | quote }}
+            - name: TERRAPOD_LISTENER_MODE
+              value: "local"
+            - name: TERRAPOD_LISTENER_NAME
+              value: "local"
+            - name: TERRAPOD_API_URL
+              value: "http://{{ include "terrapod.fullname" . }}-api:8000"
+            {{- if .Values.api.config.encryption_key }}
+            - name: TERRAPOD_ENCRYPTION__KEY
+              value: {{ .Values.api.config.encryption_key | quote }}
+            {{- end }}
+          volumeMounts:
+            - name: runner-config
+              mountPath: /etc/terrapod
+              readOnly: true
+          resources:
+            {{- toYaml .Values.listener.resources | nindent 12 }}
+      volumes:
+        - name: runner-config
+          configMap:
+            name: {{ include "terrapod.fullname" . }}-runner-config
+      {{- with .Values.listener.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.listener.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.listener.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  background: #0f172a;
+  height: 100%;
+}
+
+body {
+  color: #e2e8f0;
+  background: #0f172a;
+  min-height: 100%;
+}
+
+/*
+ * Smoke glow effect for primary action buttons.
+ *
+ * Two pseudo-elements create layered purple glow halos behind the button.
+ * Outer layer: large soft blur (tendrils) using brand-800.
+ * Inner layer: tighter glow (core) using brand-600.
+ * On hover, both intensify and the outer layer expands.
+ *
+ * CSS-only. Uses will-change for GPU compositing.
+ * Transitions opacity + transform only (compositor-friendly).
+ */
+@layer components {
+  .btn-smoke {
+    position: relative;
+    z-index: 0;
+  }
+
+  .btn-smoke::before,
+  .btn-smoke::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    z-index: -1;
+    pointer-events: none;
+    will-change: opacity, transform;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  /* Outer tendril layer */
+  .btn-smoke::before {
+    inset: -6px;
+    background: radial-gradient(
+      ellipse at center,
+      rgba(91, 33, 182, 0.4) 0%,
+      rgba(91, 33, 182, 0.15) 50%,
+      transparent 70%
+    );
+    filter: blur(10px);
+    opacity: 0.5;
+  }
+
+  /* Inner core glow */
+  .btn-smoke::after {
+    inset: -3px;
+    background: radial-gradient(
+      ellipse at center,
+      rgba(124, 58, 237, 0.5) 0%,
+      rgba(124, 58, 237, 0.2) 40%,
+      transparent 70%
+    );
+    filter: blur(6px);
+    opacity: 0.6;
+  }
+
+  .btn-smoke:hover::before {
+    opacity: 0.8;
+    transform: scale(1.08);
+  }
+
+  .btn-smoke:hover::after {
+    opacity: 0.9;
+    transform: scale(1.04);
+  }
+
+  .btn-smoke:focus-visible::after {
+    opacity: 1;
+  }
+}

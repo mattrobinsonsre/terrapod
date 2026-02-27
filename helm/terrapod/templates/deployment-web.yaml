@@ -1,0 +1,57 @@
+{{- if .Values.web.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "terrapod.fullname" . }}-web
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  replicas: {{ .Values.web.replicas }}
+  selector:
+    matchLabels:
+      {{- include "terrapod.web.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "terrapod.web.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: web
+          image: {{ include "terrapod.web.image" . }}
+          imagePullPolicy: {{ .Values.web.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            - name: API_URL
+              value: "http://{{ include "terrapod.fullname" . }}-api:8000"
+          {{- with .Values.web.startupProbe }}
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: {{ hasKey .Values.web.livenessProbe "initialDelaySeconds" | ternary .Values.web.livenessProbe.initialDelaySeconds 10 }}
+            periodSeconds: {{ hasKey .Values.web.livenessProbe "periodSeconds" | ternary .Values.web.livenessProbe.periodSeconds 10 }}
+            timeoutSeconds: {{ hasKey .Values.web.livenessProbe "timeoutSeconds" | ternary .Values.web.livenessProbe.timeoutSeconds 1 }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: {{ hasKey .Values.web.readinessProbe "initialDelaySeconds" | ternary .Values.web.readinessProbe.initialDelaySeconds 5 }}
+            periodSeconds: {{ hasKey .Values.web.readinessProbe "periodSeconds" | ternary .Values.web.readinessProbe.periodSeconds 5 }}
+            timeoutSeconds: {{ hasKey .Values.web.readinessProbe "timeoutSeconds" | ternary .Values.web.readinessProbe.timeoutSeconds 1 }}
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}
+{{- end }}

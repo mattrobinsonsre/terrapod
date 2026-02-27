@@ -1,0 +1,45 @@
+{{- if .Values.listener.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "terrapod.fullname" . }}-listener
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: listener
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "terrapod.fullname" . }}-listener
+  namespace: {{ include "terrapod.runnerNamespace" . }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: listener
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "terrapod.fullname" . }}-listener
+  namespace: {{ include "terrapod.runnerNamespace" . }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: listener
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "terrapod.fullname" . }}-listener
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "terrapod.fullname" . }}-listener
+    namespace: {{ .Release.Namespace }}
+{{- end }}

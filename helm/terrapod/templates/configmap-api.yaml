@@ -1,0 +1,159 @@
+{{- include "terrapod.validateStorageConfig" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "terrapod.fullname" . }}-api-config
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+data:
+  config.yaml: |
+    log_level: {{ .Values.api.config.log_level | quote }}
+    storage:
+      backend: {{ .Values.api.config.storage.backend | quote }}
+      {{- if eq .Values.api.config.storage.backend "s3" }}
+      s3:
+        bucket: {{ .Values.api.config.storage.s3.bucket | quote }}
+        region: {{ .Values.api.config.storage.s3.region | quote }}
+        {{- if .Values.api.config.storage.s3.prefix }}
+        prefix: {{ .Values.api.config.storage.s3.prefix | quote }}
+        {{- end }}
+        {{- if .Values.api.config.storage.s3.endpoint_url }}
+        endpoint_url: {{ .Values.api.config.storage.s3.endpoint_url | quote }}
+        {{- end }}
+        presigned_url_expiry_seconds: {{ .Values.api.config.storage.s3.presigned_url_expiry_seconds }}
+      {{- end }}
+      {{- if eq .Values.api.config.storage.backend "azure" }}
+      azure:
+        account_name: {{ .Values.api.config.storage.azure.account_name | quote }}
+        container_name: {{ .Values.api.config.storage.azure.container_name | quote }}
+        {{- if .Values.api.config.storage.azure.prefix }}
+        prefix: {{ .Values.api.config.storage.azure.prefix | quote }}
+        {{- end }}
+        presigned_url_expiry_seconds: {{ .Values.api.config.storage.azure.presigned_url_expiry_seconds }}
+      {{- end }}
+      {{- if eq .Values.api.config.storage.backend "gcs" }}
+      gcs:
+        bucket: {{ .Values.api.config.storage.gcs.bucket | quote }}
+        {{- if .Values.api.config.storage.gcs.prefix }}
+        prefix: {{ .Values.api.config.storage.gcs.prefix | quote }}
+        {{- end }}
+        {{- if .Values.api.config.storage.gcs.project_id }}
+        project_id: {{ .Values.api.config.storage.gcs.project_id | quote }}
+        {{- end }}
+        {{- if .Values.api.config.storage.gcs.service_account_email }}
+        service_account_email: {{ .Values.api.config.storage.gcs.service_account_email | quote }}
+        {{- end }}
+        presigned_url_expiry_seconds: {{ .Values.api.config.storage.gcs.presigned_url_expiry_seconds }}
+      {{- end }}
+      {{- if eq .Values.api.config.storage.backend "filesystem" }}
+      filesystem:
+        root_dir: {{ .Values.api.config.storage.filesystem.root_dir | quote }}
+        presigned_url_expiry_seconds: {{ .Values.api.config.storage.filesystem.presigned_url_expiry_seconds }}
+        {{- if .Values.api.config.storage.filesystem.base_url }}
+        base_url: {{ .Values.api.config.storage.filesystem.base_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.storage.filesystem.hmac_secret }}
+        hmac_secret: {{ .Values.api.config.storage.filesystem.hmac_secret | quote }}
+        {{- end }}
+      {{- end }}
+    {{- if .Values.api.config.auth }}
+    auth:
+      local_enabled: {{ .Values.api.config.auth.local_enabled }}
+      {{- if .Values.api.config.auth.callback_base_url }}
+      callback_base_url: {{ .Values.api.config.auth.callback_base_url | quote }}
+      {{- end }}
+      session_ttl_hours: {{ .Values.api.config.auth.session_ttl_hours | default 12 }}
+      api_token_max_ttl_hours: {{ .Values.api.config.auth.api_token_max_ttl_hours | default 0 }}
+      {{- if .Values.api.config.auth.require_external_sso_for_roles }}
+      require_external_sso_for_roles:
+        {{- range .Values.api.config.auth.require_external_sso_for_roles }}
+        - {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.api.config.auth.sso }}
+      sso:
+        default_provider: {{ .Values.api.config.auth.sso.default_provider | default "" | quote }}
+        {{- if .Values.api.config.auth.sso.oidc }}
+        oidc:
+          {{- range .Values.api.config.auth.sso.oidc }}
+          - name: {{ .name | quote }}
+            issuer_url: {{ .issuer_url | quote }}
+            client_id: {{ .client_id | quote }}
+            {{- if .scopes }}
+            scopes:
+              {{- range .scopes }}
+              - {{ . | quote }}
+              {{- end }}
+            {{- end }}
+            {{- if .groups_claim }}
+            groups_claim: {{ .groups_claim | quote }}
+            {{- end }}
+            {{- if .role_prefixes }}
+            role_prefixes:
+              {{- range .role_prefixes }}
+              - {{ . | quote }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+        {{- if .Values.api.config.auth.sso.saml }}
+        saml:
+          {{- range .Values.api.config.auth.sso.saml }}
+          - name: {{ .name | quote }}
+            metadata_url: {{ .metadata_url | quote }}
+            {{- if .entity_id }}
+            entity_id: {{ .entity_id | quote }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.api.config.registry }}
+    registry:
+      enabled: {{ .Values.api.config.registry.enabled }}
+      {{- if .Values.api.config.registry.module_cache }}
+      module_cache:
+        enabled: {{ .Values.api.config.registry.module_cache.enabled }}
+        {{- if .Values.api.config.registry.module_cache.upstream_registries }}
+        upstream_registries:
+          {{- range .Values.api.config.registry.module_cache.upstream_registries }}
+          - {{ . | quote }}
+          {{- end }}
+        {{- end }}
+        warm_on_first_request: {{ .Values.api.config.registry.module_cache.warm_on_first_request }}
+      {{- end }}
+      {{- if .Values.api.config.registry.provider_cache }}
+      provider_cache:
+        enabled: {{ .Values.api.config.registry.provider_cache.enabled }}
+        {{- if .Values.api.config.registry.provider_cache.upstream_registries }}
+        upstream_registries:
+          {{- range .Values.api.config.registry.provider_cache.upstream_registries }}
+          - {{ . | quote }}
+          {{- end }}
+        {{- end }}
+        warm_on_first_request: {{ .Values.api.config.registry.provider_cache.warm_on_first_request }}
+      {{- end }}
+      {{- if .Values.api.config.registry.binary_cache }}
+      binary_cache:
+        enabled: {{ .Values.api.config.registry.binary_cache.enabled }}
+        {{- if .Values.api.config.registry.binary_cache.terraform_mirror_url }}
+        terraform_mirror_url: {{ .Values.api.config.registry.binary_cache.terraform_mirror_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.tofu_mirror_url }}
+        tofu_mirror_url: {{ .Values.api.config.registry.binary_cache.tofu_mirror_url | quote }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.api.config.vcs }}
+    vcs:
+      enabled: {{ .Values.api.config.vcs.enabled }}
+      poll_interval_seconds: {{ .Values.api.config.vcs.poll_interval_seconds | default 60 }}
+    {{- end }}
+    {{- if .Values.api.config.cors.allow_origins }}
+    cors:
+      allow_origins:
+        {{- range .Values.api.config.cors.allow_origins }}
+        - {{ . | quote }}
+        {{- end }}
+    {{- end }}

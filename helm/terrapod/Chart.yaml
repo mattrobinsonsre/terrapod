@@ -1,0 +1,19 @@
+apiVersion: v2
+name: terrapod
+description: Terrapod - Open-source Terraform Enterprise replacement
+type: application
+version: 0.0.0
+appVersion: "0.0.0"
+
+keywords:
+  - terraform
+  - infrastructure-as-code
+  - gitops
+  - state-management
+
+home: https://github.com/mattrobinsonsre/terrapod
+sources:
+  - https://github.com/mattrobinsonsre/terrapod
+
+maintainers:
+  - name: Matt Robinson

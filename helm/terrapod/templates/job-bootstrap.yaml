@@ -1,0 +1,65 @@
+{{- if .Values.bootstrap }}
+{{- if or (and .Values.bootstrap.adminEmail .Values.bootstrap.adminPassword) .Values.bootstrap.existingSecret }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "terrapod.fullname" . }}-bootstrap-{{ .Release.Revision }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "terrapod.labels" . | nindent 8 }}
+        app.kubernetes.io/component: bootstrap
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: {{ include "terrapod.api.image" . }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          command:
+            - python
+            - -m
+            - terrapod.cli.bootstrap
+          env:
+            {{- if .Values.postgresql.url }}
+            - name: DATABASE_URL
+              value: {{ .Values.postgresql.url | quote }}
+            {{- end }}
+            {{- if .Values.bootstrap.existingSecret }}
+            - name: TERRAPOD_BOOTSTRAP_ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bootstrap.existingSecret }}
+                  key: {{ .Values.bootstrap.emailKey | default "email" }}
+            - name: TERRAPOD_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bootstrap.existingSecret }}
+                  key: {{ .Values.bootstrap.passwordKey | default "password" }}
+            {{- else }}
+            - name: TERRAPOD_BOOTSTRAP_ADMIN_EMAIL
+              value: {{ .Values.bootstrap.adminEmail | quote }}
+            - name: TERRAPOD_BOOTSTRAP_ADMIN_PASSWORD
+              value: {{ .Values.bootstrap.adminPassword | quote }}
+            {{- end }}
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+{{- end }}
+{{- end }}

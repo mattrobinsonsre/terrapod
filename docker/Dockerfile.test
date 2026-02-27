@@ -1,0 +1,35 @@
+# Terrapod API test runner
+# Includes all dev dependencies (pytest, ruff, mypy)
+
+FROM python:3.13-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    pkg-config \
+    xmlsec1 \
+    libxmlsec1-dev \
+    libxmlsec1-openssl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir poetry==1.8.4
+
+WORKDIR /app
+
+# Install ALL dependencies (main + dev)
+COPY services/pyproject.toml services/poetry.lock* ./
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-interaction --no-ansi --no-root
+
+# Copy application and test code
+COPY services/terrapod ./terrapod
+COPY services/tests ./tests
+
+# Storage data directory for tests
+RUN mkdir -p /var/lib/terrapod/storage
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Default: run pytest
+CMD ["pytest", "-v", "--tb=short"]

@@ -1,0 +1,101 @@
+# Local development overrides for Tilt
+# This file is used by Tiltfile for local Kubernetes development
+
+api:
+  replicas: 1
+
+  # Hot reload for local dev
+  command: ["uvicorn", "terrapod.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--timeout-graceful-shutdown", "5"]
+
+  autoscaling:
+    enabled: false
+
+  pdb:
+    enabled: false
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  config:
+    log_level: debug
+    storage:
+      backend: filesystem
+      filesystem:
+        root_dir: /var/lib/terrapod/storage
+        base_url: "https://terrapod.local"
+        hmac_secret: "terrapod-local-dev-hmac-secret-do-not-use-in-prod"
+    auth:
+      local_enabled: true
+      callback_base_url: "https://terrapod.local"
+      session_ttl_hours: 12
+
+  serviceAccount:
+    create: true
+
+# Web UI (Next.js dev server in K8s)
+web:
+  enabled: true
+  replicas: 1
+
+  # next dev compiles on first request — startup probe gives it time
+  startupProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 30
+    failureThreshold: 12
+  livenessProbe:
+    initialDelaySeconds: 0
+    periodSeconds: 15
+    timeoutSeconds: 10
+  readinessProbe:
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    timeoutSeconds: 10
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+# Ingress — BFF through web frontend, mkcert TLS
+ingress:
+  enabled: true
+  hostname: terrapod.local
+  tls: true
+
+tls:
+  existingSecret: terrapod-tls-local
+
+# Bootstrap admin user for local dev
+bootstrap:
+  adminEmail: admin
+  adminPassword: admin
+
+# Local PostgreSQL (bundled via Tiltfile)
+postgresql:
+  url: "postgresql+asyncpg://terrapod:terrapod@terrapod-postgresql:5432/terrapod"
+
+# Local Redis (bundled via Tiltfile)
+redis:
+  url: "redis://terrapod-redis:6379"
+
+storage:
+  filesystem:
+    persistence:
+      enabled: true
+      size: 1Gi
+
+# Runner image for local dev (built locally)
+runners:
+  image:
+    repository: terrapod-runner
+    tag: local
+    pullPolicy: Never

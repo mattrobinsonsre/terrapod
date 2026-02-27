@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "terrapod.fullname" . }}-api
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  {{- if not .Values.api.autoscaling.enabled }}
+  replicas: {{ .Values.api.replicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "terrapod.api.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-api.yaml") . | sha256sum }}
+      labels:
+        {{- include "terrapod.api.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "terrapod.serviceAccountName" . }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: api
+          image: {{ include "terrapod.api.image" . }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          {{- if .Values.api.command }}
+          command:
+            {{- toYaml .Values.api.command | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            - name: TERRAPOD_STORAGE__FILESYSTEM__HMAC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "terrapod.fullname" . }}-storage
+                  key: hmac-secret
+                  optional: true
+            {{- if .Values.postgresql.url }}
+            - name: TERRAPOD_DATABASE_URL
+              value: {{ .Values.postgresql.url | quote }}
+            {{- end }}
+            {{- if .Values.redis.url }}
+            - name: TERRAPOD_REDIS_URL
+              value: {{ .Values.redis.url | quote }}
+            {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/terrapod
+              readOnly: true
+            {{- if eq .Values.api.config.storage.backend "filesystem" }}
+            - name: storage
+              mountPath: {{ .Values.api.config.storage.filesystem.root_dir }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "terrapod.fullname" . }}-api-config
+        {{- if eq .Values.api.config.storage.backend "filesystem" }}
+        - name: storage
+          {{- if .Values.storage.filesystem.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "terrapod.fullname" . }}-storage
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- end }}
+      {{- with .Values.api.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

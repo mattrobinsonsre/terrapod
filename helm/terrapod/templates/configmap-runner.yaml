@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "terrapod.fullname" . }}-runner-config
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: runner
+data:
+  runners.yaml: |
+    default: {{ .Values.runners.default | quote }}
+    image:
+      repository: {{ .Values.runners.image.repository | quote }}
+      tag: {{ .Values.runners.image.tag | default .Chart.AppVersion | quote }}
+      pull_policy: {{ .Values.runners.image.pullPolicy | quote }}
+    server_url: {{ .Values.runners.serverUrl | default (printf "http://%s-api:8000" (include "terrapod.fullname" .)) | quote }}
+    default_terraform_version: {{ .Values.runners.defaultTerraformVersion | default "1.9.8" | quote }}
+    default_execution_backend: {{ .Values.runners.defaultExecutionBackend | default "terraform" | quote }}
+    service_account_name: {{ .Values.runners.serviceAccountName | quote }}
+    ttl_seconds_after_finished: {{ .Values.runners.ttlSecondsAfterFinished }}
+    definitions:
+      {{- range .Values.runners.definitions }}
+      - name: {{ .name | quote }}
+        description: {{ .description | default "" | quote }}
+        timeout_minutes: {{ .timeout_minutes | default 60 }}
+        setup_script: {{ .setup_script | default "" | quote }}
+        resources:
+          requests:
+            cpu: {{ .resources.requests.cpu | quote }}
+            memory: {{ .resources.requests.memory | quote }}
+          limits:
+            cpu: {{ .resources.limits.cpu | quote }}
+            memory: {{ .resources.limits.memory | quote }}
+      {{- end }}
+    {{- with .Values.runners.nodeSelector }}
+    node_selector:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.runners.tolerations }}
+    tolerations:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
