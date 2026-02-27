@@ -48,7 +48,7 @@ services:
       S3_TEST_BUCKET: "terrapod-test"
     depends_on:
       localstack:
-        condition: service_healthy
+        condition: service_started
       postgres:
         condition: service_healthy
       redis:
