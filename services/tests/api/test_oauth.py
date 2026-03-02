@@ -12,6 +12,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.routers.oauth import _verify_pkce
+from terrapod.db.session import get_db
 
 
 class TestVerifyPKCE:
@@ -194,31 +195,24 @@ class TestOAuthToken:
         # Mock db dependency
         app = create_app()
 
-        with patch("terrapod.api.routers.oauth.get_db") as mock_get_db:
-            mock_db = AsyncMock()
-            mock_get_db.return_value = mock_db
+        mock_db = AsyncMock()
 
-            # Override the dependency
-            async def override_get_db():
-                return mock_db
+        async def override_get_db():
+            return mock_db
 
-            from terrapod.db.session import get_db as real_get_db
+        app.dependency_overrides[get_db] = override_get_db
 
-            app.dependency_overrides[real_get_db] = override_get_db
-
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                response = await client.post(
-                    "/oauth/token",
-                    data={
-                        "grant_type": "authorization_code",
-                        "code": "test-code",
-                        "code_verifier": code_verifier,
-                        "client_id": "terraform-cli",
-                        "redirect_uri": "http://localhost:10000/login",
-                    },
-                )
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                "/oauth/token",
+                data={
+                    "grant_type": "authorization_code",
+                    "code": "test-code",
+                    "code_verifier": code_verifier,
+                    "client_id": "terraform-cli",
+                    "redirect_uri": "http://localhost:10000/login",
+                },
+            )
 
         assert response.status_code == 200
         data = response.json()
@@ -240,26 +234,20 @@ class TestOAuthToken:
 
         app = create_app()
 
-        with patch("terrapod.db.session.get_db"):
+        async def override_get_db():
+            return AsyncMock()
 
-            async def override_get_db():
-                return AsyncMock()
+        app.dependency_overrides[get_db] = override_get_db
 
-            from terrapod.db.session import get_db as real_get_db
-
-            app.dependency_overrides[real_get_db] = override_get_db
-
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                response = await client.post(
-                    "/oauth/token",
-                    data={
-                        "grant_type": "authorization_code",
-                        "code": "invalid-code",
-                        "code_verifier": "verifier",
-                    },
-                )
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                "/oauth/token",
+                data={
+                    "grant_type": "authorization_code",
+                    "code": "invalid-code",
+                    "code_verifier": "verifier",
+                },
+            )
 
         assert response.status_code == 401
 
@@ -284,26 +272,20 @@ class TestOAuthToken:
 
         app = create_app()
 
-        with patch("terrapod.db.session.get_db"):
+        async def override_get_db():
+            return AsyncMock()
 
-            async def override_get_db():
-                return AsyncMock()
+        app.dependency_overrides[get_db] = override_get_db
 
-            from terrapod.db.session import get_db as real_get_db
-
-            app.dependency_overrides[real_get_db] = override_get_db
-
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                response = await client.post(
-                    "/oauth/token",
-                    data={
-                        "grant_type": "authorization_code",
-                        "code": "test-code",
-                        "code_verifier": "wrong-verifier",
-                    },
-                )
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                "/oauth/token",
+                data={
+                    "grant_type": "authorization_code",
+                    "code": "test-code",
+                    "code_verifier": "wrong-verifier",
+                },
+            )
 
         assert response.status_code == 401
         assert "PKCE" in response.json()["detail"]
@@ -316,25 +298,19 @@ class TestOAuthToken:
     ):
         app = create_app()
 
-        with patch("terrapod.db.session.get_db"):
+        async def override_get_db():
+            return AsyncMock()
 
-            async def override_get_db():
-                return AsyncMock()
+        app.dependency_overrides[get_db] = override_get_db
 
-            from terrapod.db.session import get_db as real_get_db
-
-            app.dependency_overrides[real_get_db] = override_get_db
-
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                response = await client.post(
-                    "/oauth/token",
-                    data={
-                        "grant_type": "client_credentials",
-                        "code": "test-code",
-                        "code_verifier": "verifier",
-                    },
-                )
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                "/oauth/token",
+                data={
+                    "grant_type": "client_credentials",
+                    "code": "test-code",
+                    "code_verifier": "verifier",
+                },
+            )
 
         assert response.status_code == 400

@@ -138,6 +138,16 @@ async def conformance_s3_store() -> AsyncGenerator[None]:
         pytest.skip("LocalStack not available (set LOCALSTACK_ENDPOINT)")
         return
 
+    import urllib.request
+
+    try:
+        req = urllib.request.Request(f"{endpoint}/_localstack/health", method="GET")
+        with urllib.request.urlopen(req, timeout=2):
+            pass
+    except Exception:
+        pytest.skip("LocalStack not reachable")
+        return
+
     from terrapod.storage.s3 import S3Store
 
     bucket = os.environ.get("S3_TEST_BUCKET", "terrapod-conformance")

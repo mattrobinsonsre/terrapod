@@ -46,6 +46,9 @@ services:
       TERRAPOD_REDIS_URL: "redis://redis:6379"
       LOCALSTACK_ENDPOINT: "http://localstack:4566"
       S3_TEST_BUCKET: "terrapod-test"
+      AWS_ACCESS_KEY_ID: "test"
+      AWS_SECRET_ACCESS_KEY: "test"
+      AWS_DEFAULT_REGION: "us-east-1"
     depends_on:
       localstack:
         condition: service_started
