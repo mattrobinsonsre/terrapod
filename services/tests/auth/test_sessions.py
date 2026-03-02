@@ -1,7 +1,7 @@
 """Tests for Redis-backed session management."""
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -23,7 +23,7 @@ def mock_redis():
     pipe = AsyncMock()
     pipe.__aenter__ = AsyncMock(return_value=pipe)
     pipe.__aexit__ = AsyncMock(return_value=False)
-    redis.pipeline.return_value = pipe
+    redis.pipeline = MagicMock(return_value=pipe)
     return redis, pipe
 
 

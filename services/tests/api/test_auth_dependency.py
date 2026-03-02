@@ -15,9 +15,12 @@ from terrapod.api.dependencies import (
 
 
 class TestGetCurrentUser:
+    @patch("terrapod.api.dependencies._resolve_user_roles", return_value=["everyone"])
     @patch("terrapod.api.dependencies.get_session")
     @patch("terrapod.api.dependencies.validate_api_token")
-    async def test_api_token_takes_priority(self, mock_validate_token, mock_get_session):
+    async def test_api_token_takes_priority(
+        self, mock_validate_token, mock_get_session, mock_resolve_roles
+    ):
         """If token matches an API token, session is not checked."""
         mock_token = MagicMock()
         mock_token.user_email = "bot@example.com"
@@ -30,6 +33,7 @@ class TestGetCurrentUser:
 
         assert user.email == "bot@example.com"
         assert user.auth_method == "api_token"
+        assert user.roles == ["everyone"]
         mock_get_session.assert_not_called()
 
     @patch("terrapod.api.dependencies.get_session")

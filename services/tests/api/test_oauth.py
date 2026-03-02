@@ -228,7 +228,7 @@ class TestOAuthToken:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.oauth.consume_auth_code")
+    @patch("terrapod.api.routers.oauth.consume_auth_code", new_callable=AsyncMock)
     async def test_token_exchange_rejects_invalid_code(
         self,
         mock_consume_code,
@@ -266,7 +266,7 @@ class TestOAuthToken:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.oauth.consume_auth_code")
+    @patch("terrapod.api.routers.oauth.consume_auth_code", new_callable=AsyncMock)
     async def test_token_exchange_rejects_bad_pkce(
         self,
         mock_consume_code,

@@ -1,7 +1,7 @@
 """Tests for Redis-backed ephemeral auth state."""
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from terrapod.auth.auth_state import (
     AUTH_CODE_PREFIX,
@@ -74,7 +74,7 @@ class TestConsumeAuthState:
         pipe = AsyncMock()
         pipe.__aenter__ = AsyncMock(return_value=pipe)
         pipe.__aexit__ = AsyncMock(return_value=False)
-        redis.pipeline.return_value = pipe
+        redis.pipeline = MagicMock(return_value=pipe)
 
         state_data = {
             "provider_name": "oidc",
@@ -108,7 +108,7 @@ class TestConsumeAuthState:
         pipe = AsyncMock()
         pipe.__aenter__ = AsyncMock(return_value=pipe)
         pipe.__aexit__ = AsyncMock(return_value=False)
-        redis.pipeline.return_value = pipe
+        redis.pipeline = MagicMock(return_value=pipe)
         pipe.execute.return_value = [None, 0]
 
         result = await consume_auth_state("nonexistent")
@@ -152,7 +152,7 @@ class TestConsumeAuthCode:
         pipe = AsyncMock()
         pipe.__aenter__ = AsyncMock(return_value=pipe)
         pipe.__aexit__ = AsyncMock(return_value=False)
-        redis.pipeline.return_value = pipe
+        redis.pipeline = MagicMock(return_value=pipe)
 
         code_data = {
             "email": "test@example.com",
@@ -185,7 +185,7 @@ class TestConsumeAuthCode:
         pipe = AsyncMock()
         pipe.__aenter__ = AsyncMock(return_value=pipe)
         pipe.__aexit__ = AsyncMock(return_value=False)
-        redis.pipeline.return_value = pipe
+        redis.pipeline = MagicMock(return_value=pipe)
         pipe.execute.return_value = [None, 0]
 
         result = await consume_auth_code("expired-code")
