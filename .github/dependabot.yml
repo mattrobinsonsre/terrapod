@@ -17,6 +17,13 @@ updates:
     labels: [dependencies, web]
     commit-message:
       prefix: "deps(web):"
+    ignore:
+      - dependency-name: next
+        versions: [">=16.0.0"]
+      - dependency-name: eslint-config-next
+        versions: [">=16.0.0"]
+      - dependency-name: tailwindcss
+        versions: [">=4.0.0"]
 
   - package-ecosystem: docker
     directory: /docker
