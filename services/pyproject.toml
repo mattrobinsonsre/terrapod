@@ -15,7 +15,7 @@ pydantic-settings = "^2.7.0"
 structlog = "^25.5.0"
 httpx = "^0.28.0"
 pyyaml = "^6.0.0"
-aiofiles = "^24.1.0"
+aiofiles = "^25.1.0"
 # AWS S3
 aioboto3 = "^15.5.0"
 # Azure Blob Storage
