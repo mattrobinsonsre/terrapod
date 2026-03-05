@@ -62,7 +62,7 @@ export default function ProvidersPage() {
         body: JSON.stringify({
           data: {
             type: 'registry-providers',
-            attributes: { name: newName, namespace: newNamespace || org },
+            attributes: { name: newName, namespace: newNamespace || 'default' },
           },
         }),
       })
@@ -122,7 +122,7 @@ export default function ProvidersPage() {
                   type="text"
                   value={newNamespace}
                   onChange={(e) => setNewNamespace(e.target.value)}
-                  placeholder={org}
+                  placeholder="default"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
               </div>
