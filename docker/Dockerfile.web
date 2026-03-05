@@ -4,7 +4,7 @@
 # In Tilt, the builder stage is targeted directly with `next dev` as entrypoint
 # for hot reload. Production uses the final stage with standalone output.
 
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -22,7 +22,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # Production image — standalone mode (minimal, no full node_modules)
-FROM node:22-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 

@@ -106,9 +106,7 @@ async def import_signing_key(
     public_armor = derive_public_key(private_key_armor)
 
     # Delete any existing signing keys
-    result = await db.execute(
-        select(GPGKey).where(GPGKey.private_key_encrypted.isnot(None))
-    )
+    result = await db.execute(select(GPGKey).where(GPGKey.private_key_encrypted.isnot(None)))
     for old_key in result.scalars().all():
         await db.delete(old_key)
     await db.flush()

@@ -26,6 +26,9 @@ updates:
     labels: [dependencies, docker]
     commit-message:
       prefix: "deps(docker):"
+    ignore:
+      - dependency-name: node
+        versions: ["23.x", "25.x", "27.x", "29.x", "31.x"]
 
   - package-ecosystem: github-actions
     directory: /
