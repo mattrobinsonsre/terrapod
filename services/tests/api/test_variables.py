@@ -316,7 +316,6 @@ def _mock_varset(name="my-varset", vs_id=None):
     vs.id = vs_id or uuid.uuid4()
     vs.name = name
     vs.description = ""
-    vs.org_name = "default"
     vs.global_set = False
     vs.priority = False
     vs.created_at = datetime(2026, 1, 1, tzinfo=UTC)

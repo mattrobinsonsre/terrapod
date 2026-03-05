@@ -83,10 +83,8 @@ class TestCreateAPIToken:
             db=mock_db,
             user_email="test@example.com",
             token_type="organization",
-            org_name="default",
         )
         assert api_token.token_type == "organization"
-        assert api_token.org_name == "default"
 
 
 class TestValidateAPIToken:

@@ -28,7 +28,6 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws = MagicMock()
     ws.id = ws_id or uuid.uuid4()
     ws.name = name
-    ws.org_name = "default"
     ws.auto_apply = False
     ws.execution_mode = "remote"
     ws.terraform_version = "1.9.8"

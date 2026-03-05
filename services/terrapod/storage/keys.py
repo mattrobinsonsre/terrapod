@@ -49,31 +49,27 @@ def policy_set_key(policy_set_id: str, version_id: str) -> str:
 # --- Module Registry ---
 
 
-def module_tarball_key(org: str, namespace: str, name: str, provider: str, version: str) -> str:
+def module_tarball_key(namespace: str, name: str, provider: str, version: str) -> str:
     """Key for a module version tarball."""
-    return f"registry/modules/{org}/{namespace}/{name}/{provider}/{version}.tar.gz"
+    return f"registry/modules/{namespace}/{name}/{provider}/{version}.tar.gz"
 
 
 # --- Provider Registry ---
 
 
-def provider_binary_key(
-    org: str, namespace: str, name: str, version: str, os_: str, arch: str
-) -> str:
+def provider_binary_key(namespace: str, name: str, version: str, os_: str, arch: str) -> str:
     """Key for a provider binary zip."""
-    return (
-        f"registry/providers/{org}/{namespace}/{name}/{version}/{name}_{version}_{os_}_{arch}.zip"
-    )
+    return f"registry/providers/{namespace}/{name}/{version}/{name}_{version}_{os_}_{arch}.zip"
 
 
-def provider_shasums_key(org: str, namespace: str, name: str, version: str) -> str:
+def provider_shasums_key(namespace: str, name: str, version: str) -> str:
     """Key for a provider version's SHA256SUMS file."""
-    return f"registry/providers/{org}/{namespace}/{name}/{version}/SHA256SUMS"
+    return f"registry/providers/{namespace}/{name}/{version}/SHA256SUMS"
 
 
-def provider_shasums_sig_key(org: str, namespace: str, name: str, version: str) -> str:
+def provider_shasums_sig_key(namespace: str, name: str, version: str) -> str:
     """Key for a provider version's SHA256SUMS.sig file."""
-    return f"registry/providers/{org}/{namespace}/{name}/{version}/SHA256SUMS.sig"
+    return f"registry/providers/{namespace}/{name}/{version}/SHA256SUMS.sig"
 
 
 # --- Module Cache ---

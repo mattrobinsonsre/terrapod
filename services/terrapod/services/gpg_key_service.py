@@ -27,7 +27,6 @@ def extract_key_id(ascii_armor: str) -> str:
 
 async def create_gpg_key(
     db: AsyncSession,
-    org: str,
     ascii_armor: str,
     source: str = "terrapod",
     source_url: str | None = None,
@@ -36,7 +35,6 @@ async def create_gpg_key(
     key_id = extract_key_id(ascii_armor)
 
     gpg_key = GPGKey(
-        org_name=org,
         key_id=key_id,
         ascii_armor=ascii_armor,
         source=source,
@@ -45,18 +43,15 @@ async def create_gpg_key(
     db.add(gpg_key)
     await db.flush()
 
-    logger.info("GPG key created", org=org, key_id=key_id)
+    logger.info("GPG key created", key_id=key_id)
     return gpg_key
 
 
 async def list_gpg_keys(
     db: AsyncSession,
-    org: str | None = None,
 ) -> list[GPGKey]:
-    """List GPG keys, optionally filtered by organization."""
+    """List all GPG keys."""
     stmt = select(GPGKey).order_by(GPGKey.created_at.desc())
-    if org is not None:
-        stmt = stmt.where(GPGKey.org_name == org)
     result = await db.execute(stmt)
     return list(result.scalars().all())
 
@@ -72,11 +67,10 @@ async def get_gpg_key(
 
 async def get_gpg_key_by_key_id(
     db: AsyncSession,
-    org: str,
     key_id: str,
 ) -> GPGKey | None:
-    """Get a GPG key by org + GPG key ID."""
-    result = await db.execute(select(GPGKey).where(GPGKey.org_name == org, GPGKey.key_id == key_id))
+    """Get a GPG key by its GPG key ID."""
+    result = await db.execute(select(GPGKey).where(GPGKey.key_id == key_id))
     return result.scalars().first()
 
 

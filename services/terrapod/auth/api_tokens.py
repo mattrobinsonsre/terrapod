@@ -47,7 +47,6 @@ async def create_api_token(
     user_email: str,
     description: str = "",
     token_type: str = "user",
-    org_name: str | None = None,
 ) -> tuple[APIToken, str]:
     """Create an API token. Returns (model, raw_token_value).
 
@@ -62,7 +61,6 @@ async def create_api_token(
         description=description,
         user_email=user_email,
         token_type=token_type,
-        org_name=org_name,
     )
 
     db.add(api_token)

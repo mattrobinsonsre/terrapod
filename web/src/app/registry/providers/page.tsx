@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
-import { getAuthState, getUserId } from '@/lib/auth'
+import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
 interface Provider {
@@ -31,7 +31,6 @@ export default function ProvidersPage() {
   const [newNamespace, setNewNamespace] = useState('')
   const [creating, setCreating] = useState(false)
 
-  const org = getUserId()
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
@@ -41,7 +40,7 @@ export default function ProvidersPage() {
   async function loadProviders() {
     setLoading(true)
     try {
-      const res = await apiFetch(`/api/v2/organizations/${org}/registry-providers`)
+      const res = await apiFetch('/api/v2/organizations/default/registry-providers')
       if (!res.ok) throw new Error('Failed to load providers')
       const data = await res.json()
       setProviders(data.data || [])
@@ -57,7 +56,7 @@ export default function ProvidersPage() {
     setCreating(true)
     setError('')
     try {
-      const res = await apiFetch(`/api/v2/organizations/${org}/registry-providers`, {
+      const res = await apiFetch('/api/v2/organizations/default/registry-providers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -147,7 +146,7 @@ export default function ProvidersPage() {
             {providers.map((prov) => (
               <Link
                 key={prov.id}
-                href={`/registry/providers/${org}/${prov.attributes.namespace}/${prov.attributes.name}`}
+                href={`/registry/providers/default/${prov.attributes.namespace}/${prov.attributes.name}`}
                 className="bg-slate-800/50 rounded-lg border border-slate-700/50 hover:border-brand-600/30 p-4 transition-colors"
               >
                 <h3 className="font-semibold text-slate-200">{prov.attributes.name}</h3>

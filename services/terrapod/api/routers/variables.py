@@ -9,7 +9,7 @@ UX CONTRACT: Variable endpoints are consumed by the web frontend:
 Endpoints:
     GET/POST       /api/v2/workspaces/{id}/vars
     PATCH/DELETE   /api/v2/workspaces/{id}/vars/{var_id}
-    POST/GET       /api/v2/organizations/{org}/varsets
+    POST/GET       /api/v2/organizations/default/varsets
     GET/PATCH/DELETE /api/v2/varsets/{varset_id}
     POST/GET/PATCH/DELETE /api/v2/varsets/{varset_id}/relationships/vars[/{var_id}]
     POST/DELETE    /api/v2/varsets/{varset_id}/relationships/workspaces
@@ -38,8 +38,6 @@ from terrapod.services.workspace_rbac_service import has_permission, resolve_wor
 
 router = APIRouter(prefix="/api/v2", tags=["variables"])
 logger = get_logger(__name__)
-
-DEFAULT_ORG = "default"
 
 
 def _rfc3339(dt) -> str:
@@ -225,39 +223,31 @@ def _varset_json(vs: VariableSet) -> dict:
         },
         "relationships": {
             "organization": {
-                "data": {"id": vs.org_name, "type": "organizations"},
+                "data": {"id": "default", "type": "organizations"},
             },
         },
     }
 
 
-@router.get("/organizations/{org}/varsets")
+@router.get("/organizations/default/varsets")
 async def list_varsets(
-    org: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """List all variable sets for an organization."""
-    if org != DEFAULT_ORG:
-        raise HTTPException(status_code=404, detail="Organization not found")
+    """List all variable sets."""
 
-    result = await db.execute(
-        select(VariableSet).where(VariableSet.org_name == org).order_by(VariableSet.name)
-    )
+    result = await db.execute(select(VariableSet).order_by(VariableSet.name))
     varsets = result.scalars().all()
     return JSONResponse(content={"data": [_varset_json(vs) for vs in varsets]})
 
 
-@router.post("/organizations/{org}/varsets", status_code=201)
+@router.post("/organizations/default/varsets", status_code=201)
 async def create_varset(
-    org: str = Path(...),
     body: dict = Body(...),
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Create a variable set. Requires admin."""
-    if org != DEFAULT_ORG:
-        raise HTTPException(status_code=404, detail="Organization not found")
 
     attrs = body.get("data", {}).get("attributes", {})
     name = attrs.get("name", "")
@@ -265,7 +255,6 @@ async def create_varset(
         raise HTTPException(status_code=422, detail="Variable set name is required")
 
     vs = VariableSet(
-        org_name=org,
         name=name,
         description=attrs.get("description", ""),
         global_set=attrs.get("global", False),

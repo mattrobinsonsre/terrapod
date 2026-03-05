@@ -11,14 +11,14 @@ UX CONTRACT: Management endpoints are consumed by the web frontend:
   matched by corresponding updates to those frontend pages.
 
 CLI Protocol:
-    GET  /api/v2/registry/providers/{org}/{name}/versions
-    GET  /api/v2/registry/providers/{org}/{name}/{version}/download/{os}/{arch}
+    GET  /api/v2/registry/providers/{namespace}/{name}/versions
+    GET  /api/v2/registry/providers/{namespace}/{name}/{version}/download/{os}/{arch}
 
 TFE V2 Management:
-    POST   /api/v2/organizations/{org}/registry-providers
-    GET    /api/v2/organizations/{org}/registry-providers
-    GET    /api/v2/organizations/{org}/registry-providers/private/{ns}/{name}
-    DELETE /api/v2/organizations/{org}/registry-providers/private/{ns}/{name}
+    POST   /api/v2/organizations/default/registry-providers
+    GET    /api/v2/organizations/default/registry-providers
+    GET    /api/v2/organizations/default/registry-providers/private/{ns}/{name}
+    DELETE /api/v2/organizations/default/registry-providers/private/{ns}/{name}
     POST   .../private/{ns}/{name}/versions
     GET    .../private/{ns}/{name}/versions
     DELETE .../private/{ns}/{name}/versions/{ver}
@@ -183,15 +183,15 @@ async def _require_provider_permission(
 # --- CLI Protocol Endpoints ---
 
 
-@router.get("/api/v2/registry/providers/{org}/{name}/versions")
+@router.get("/api/v2/registry/providers/{namespace}/{name}/versions")
 async def list_provider_versions_cli(
-    org: str,
+    namespace: str,
     name: str,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List available versions for a provider (CLI protocol). Requires read."""
-    provider = await get_provider(db, org, org, name)
+    provider = await get_provider(db, namespace, name)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
@@ -217,9 +217,9 @@ async def list_provider_versions_cli(
     return JSONResponse(content={"versions": versions})
 
 
-@router.get("/api/v2/registry/providers/{org}/{name}/{version}/download/{os}/{arch}")
+@router.get("/api/v2/registry/providers/{namespace}/{name}/{version}/download/{os}/{arch}")
 async def download_provider_cli(
-    org: str,
+    namespace: str,
     name: str,
     version: str,
     os: str,
@@ -229,7 +229,7 @@ async def download_provider_cli(
     storage: ObjectStore = Depends(get_storage),
 ) -> JSONResponse:
     """Get download info for a provider version (CLI protocol). Requires read."""
-    provider = await get_provider(db, org, org, name)
+    provider = await get_provider(db, namespace, name)
     if provider is not None:
         perm = await resolve_registry_permission(
             db, user.email, user.roles, provider.name, provider.labels or {}, provider.owner_email
@@ -237,7 +237,7 @@ async def download_provider_cli(
         if not has_registry_permission(perm, "read"):
             raise HTTPException(status_code=404, detail="Provider platform not found")
 
-    info = await get_provider_download_info(db, storage, org, org, name, version, os, arch)
+    info = await get_provider_download_info(db, storage, namespace, name, version, os, arch)
     if info is None:
         raise HTTPException(status_code=404, detail="Provider platform not found")
 
@@ -246,26 +246,25 @@ async def download_provider_cli(
 
 # --- TFE V2 Management Endpoints ---
 
-_ORG_PREFIX = "/api/v2/organizations/{org}/registry-providers"
+_ORG_PREFIX = "/api/v2/organizations/default/registry-providers"
 
 
 @router.post(_ORG_PREFIX)
 async def create_provider_endpoint(
-    org: str,
     body: CreateProviderRequest,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Create a new registry provider. Any authenticated user; creator becomes owner."""
     attrs = body.data.attributes
-    namespace = attrs.namespace or org
+    namespace = attrs.namespace or "default"
 
-    provider = await create_provider(db, org, namespace, attrs.name)
+    provider = await create_provider(db, namespace, attrs.name)
     provider.owner_email = user.email
     provider.labels = attrs.labels
     await db.commit()
 
-    logger.info("Registry provider created", org=org, name=attrs.name, owner=user.email)
+    logger.info("Registry provider created", name=attrs.name, owner=user.email)
 
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
@@ -275,12 +274,11 @@ async def create_provider_endpoint(
 
 @router.get(_ORG_PREFIX)
 async def list_providers_endpoint(
-    org: str,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """List all registry providers for an organization (filtered by permissions)."""
-    providers = await list_providers(db, org)
+    """List all registry providers (filtered by permissions)."""
+    providers = await list_providers(db)
     visible = []
     for p in providers:
         perm = await resolve_registry_permission(
@@ -293,14 +291,13 @@ async def list_providers_endpoint(
 
 @router.get(_ORG_PREFIX + "/private/{namespace}/{name}")
 async def show_provider_endpoint(
-    org: str,
     namespace: str,
     name: str,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Show a specific registry provider. Requires read."""
-    provider = await get_provider(db, org, namespace, name)
+    provider = await get_provider(db, namespace, name)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
@@ -315,7 +312,6 @@ async def show_provider_endpoint(
 
 @router.delete(_ORG_PREFIX + "/private/{namespace}/{name}")
 async def delete_provider_endpoint(
-    org: str,
     namespace: str,
     name: str,
     user: AuthenticatedUser = Depends(get_current_user),
@@ -323,13 +319,13 @@ async def delete_provider_endpoint(
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Delete a registry provider and all its versions. Requires admin on provider."""
-    provider = await get_provider(db, org, namespace, name)
+    provider = await get_provider(db, namespace, name)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
     await _require_provider_permission(db, user, provider, "admin")
 
-    deleted = await delete_provider(db, storage, org, namespace, name)
+    deleted = await delete_provider(db, storage, namespace, name)
     if not deleted:
         raise HTTPException(status_code=404, detail="Provider not found")
 
@@ -342,7 +338,6 @@ async def delete_provider_endpoint(
 
 @router.post(_ORG_PREFIX + "/private/{namespace}/{name}/versions")
 async def create_provider_version_endpoint(
-    org: str,
     namespace: str,
     name: str,
     body: CreateProviderVersionRequest,
@@ -351,7 +346,7 @@ async def create_provider_version_endpoint(
     storage: ObjectStore = Depends(get_storage),
 ) -> JSONResponse:
     """Create a provider version and get upload URLs. Requires write."""
-    provider = await get_provider(db, org, namespace, name)
+    provider = await get_provider(db, namespace, name)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
@@ -364,7 +359,7 @@ async def create_provider_version_endpoint(
     if attrs.key_id:
         from terrapod.services.gpg_key_service import get_gpg_key_by_key_id
 
-        gpg_key = await get_gpg_key_by_key_id(db, org, attrs.key_id)
+        gpg_key = await get_gpg_key_by_key_id(db, attrs.key_id)
         if gpg_key is not None:
             gpg_key_uuid = gpg_key.id
 
@@ -395,14 +390,13 @@ async def create_provider_version_endpoint(
 
 @router.get(_ORG_PREFIX + "/private/{namespace}/{name}/versions")
 async def list_provider_versions_endpoint(
-    org: str,
     namespace: str,
     name: str,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List all versions for a provider. Requires read."""
-    provider = await get_provider(db, org, namespace, name)
+    provider = await get_provider(db, namespace, name)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
@@ -420,7 +414,6 @@ async def list_provider_versions_endpoint(
 
 @router.delete(_ORG_PREFIX + "/private/{namespace}/{name}/versions/{version}")
 async def delete_provider_version_endpoint(
-    org: str,
     namespace: str,
     name: str,
     version: str,
@@ -429,11 +422,11 @@ async def delete_provider_version_endpoint(
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Delete a provider version and its platforms. Requires admin."""
-    provider = await get_provider(db, org, namespace, name)
+    provider = await get_provider(db, namespace, name)
     if provider is not None:
         await _require_provider_permission(db, user, provider, "admin")
 
-    deleted = await delete_provider_version(db, storage, org, namespace, name, version)
+    deleted = await delete_provider_version(db, storage, namespace, name, version)
     if not deleted:
         raise HTTPException(status_code=404, detail="Provider version not found")
 
@@ -446,7 +439,6 @@ async def delete_provider_version_endpoint(
 
 @router.post(_ORG_PREFIX + "/private/{namespace}/{name}/versions/{version}/platforms")
 async def create_provider_platform_endpoint(
-    org: str,
     namespace: str,
     name: str,
     version: str,
@@ -456,7 +448,7 @@ async def create_provider_platform_endpoint(
     storage: ObjectStore = Depends(get_storage),
 ) -> JSONResponse:
     """Create a platform entry and get an upload URL. Requires write."""
-    provider = await get_provider(db, org, namespace, name)
+    provider = await get_provider(db, namespace, name)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
@@ -480,7 +472,6 @@ async def create_provider_platform_endpoint(
 
 @router.get(_ORG_PREFIX + "/private/{namespace}/{name}/versions/{version}/platforms")
 async def list_provider_platforms_endpoint(
-    org: str,
     namespace: str,
     name: str,
     version: str,
@@ -488,7 +479,7 @@ async def list_provider_platforms_endpoint(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List all platforms for a provider version. Requires read."""
-    provider = await get_provider(db, org, namespace, name)
+    provider = await get_provider(db, namespace, name)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
@@ -510,7 +501,6 @@ async def list_provider_platforms_endpoint(
 
 @router.delete(_ORG_PREFIX + "/private/{namespace}/{name}/versions/{version}/platforms/{os}/{arch}")
 async def delete_provider_platform_endpoint(
-    org: str,
     namespace: str,
     name: str,
     version: str,
@@ -521,11 +511,11 @@ async def delete_provider_platform_endpoint(
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Delete a specific provider platform binary. Requires admin."""
-    provider = await get_provider(db, org, namespace, name)
+    provider = await get_provider(db, namespace, name)
     if provider is not None:
         await _require_provider_permission(db, user, provider, "admin")
 
-    deleted = await delete_provider_platform(db, storage, org, namespace, name, version, os, arch)
+    deleted = await delete_provider_platform(db, storage, namespace, name, version, os, arch)
     if not deleted:
         raise HTTPException(status_code=404, detail="Provider platform not found")
 

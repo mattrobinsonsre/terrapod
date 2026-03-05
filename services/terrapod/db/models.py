@@ -161,8 +161,6 @@ class APIToken(Base):
     token_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default="user"
     )  # "user", "organization"
-    org_name: Mapped[str | None] = mapped_column(String(63), nullable=True)
-
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
@@ -185,7 +183,6 @@ class AgentPool(Base):
     )
     name: Mapped[str] = mapped_column(String(63), unique=True, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    org_name: Mapped[str | None] = mapped_column(String(63), nullable=True)
     service_account_name: Mapped[str] = mapped_column(String(63), nullable=False, default="")
 
     created_at: Mapped[datetime] = mapped_column(
@@ -269,17 +266,13 @@ class RunnerListener(Base):
 
 
 class Workspace(Base):
-    """Terraform workspace — isolates state, variables, and runs.
-
-    Part of a single hardcoded "default" organization for now.
-    """
+    """Terraform workspace — isolates state, variables, and runs."""
 
     __tablename__ = "workspaces"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=generate_uuid7
     )
-    org_name: Mapped[str] = mapped_column(String(63), nullable=False, default="default")
     name: Mapped[str] = mapped_column(String(90), nullable=False)
     execution_mode: Mapped[str] = mapped_column(
         String(20), nullable=False, default="local"
@@ -341,7 +334,7 @@ class Workspace(Base):
         back_populates="workspace", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (sa.UniqueConstraint("org_name", "name", name="uq_workspaces"),)
+    __table_args__ = (sa.UniqueConstraint("name", name="uq_workspaces"),)
 
 
 class StateVersion(Base):
@@ -384,8 +377,7 @@ class StateVersion(Base):
 class RegistryModule(Base):
     """Top-level module entity in the private registry.
 
-    Identified by (org_name, namespace, name, provider). The namespace
-    typically equals the org name for private registries.
+    Identified by (namespace, name, provider).
     """
 
     __tablename__ = "registry_modules"
@@ -393,7 +385,6 @@ class RegistryModule(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=generate_uuid7
     )
-    org_name: Mapped[str] = mapped_column(String(63), nullable=False)
     namespace: Mapped[str] = mapped_column(String(63), nullable=False)
     name: Mapped[str] = mapped_column(String(63), nullable=False)
     provider: Mapped[str] = mapped_column(String(63), nullable=False)
@@ -413,9 +404,7 @@ class RegistryModule(Base):
     )
 
     __table_args__ = (
-        sa.UniqueConstraint(
-            "org_name", "namespace", "name", "provider", name="uq_registry_modules"
-        ),
+        sa.UniqueConstraint("namespace", "name", "provider", name="uq_registry_modules"),
     )
 
 
@@ -457,7 +446,6 @@ class RegistryProvider(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=generate_uuid7
     )
-    org_name: Mapped[str] = mapped_column(String(63), nullable=False)
     namespace: Mapped[str] = mapped_column(String(63), nullable=False)
     name: Mapped[str] = mapped_column(String(63), nullable=False)
     labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
@@ -474,9 +462,7 @@ class RegistryProvider(Base):
         back_populates="provider", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (
-        sa.UniqueConstraint("org_name", "namespace", "name", name="uq_registry_providers"),
-    )
+    __table_args__ = (sa.UniqueConstraint("namespace", "name", name="uq_registry_providers"),)
 
 
 class GPGKey(Base):
@@ -487,7 +473,6 @@ class GPGKey(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=generate_uuid7
     )
-    org_name: Mapped[str] = mapped_column(String(63), nullable=False)
     key_id: Mapped[str] = mapped_column(String(40), nullable=False)
     ascii_armor: Mapped[str] = mapped_column(Text, nullable=False)
     source: Mapped[str] = mapped_column(String(63), nullable=False, default="terrapod")
@@ -500,7 +485,7 @@ class GPGKey(Base):
         DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
     )
 
-    __table_args__ = (sa.UniqueConstraint("org_name", "key_id", name="uq_gpg_keys"),)
+    __table_args__ = (sa.UniqueConstraint("key_id", name="uq_gpg_keys"),)
 
 
 class RegistryProviderVersion(Base):
@@ -705,7 +690,6 @@ class VCSConnection(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=generate_uuid7
     )
-    org_name: Mapped[str] = mapped_column(String(63), nullable=False, default="default")
     provider: Mapped[str] = mapped_column(
         String(20), nullable=False, default="github"
     )  # github, gitlab
@@ -799,7 +783,6 @@ class VariableSet(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=generate_uuid7
     )
-    org_name: Mapped[str] = mapped_column(String(63), nullable=False, default="default")
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     global_set: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -816,7 +799,7 @@ class VariableSet(Base):
         back_populates="variable_set", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (sa.UniqueConstraint("org_name", "name", name="uq_variable_sets"),)
+    __table_args__ = (sa.UniqueConstraint("name", name="uq_variable_sets"),)
 
 
 class VariableSetVariable(Base):
