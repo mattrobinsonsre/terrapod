@@ -2,12 +2,15 @@
 # Thin wrapper around scripts/*.sh — all build logic lives in scripts.
 #
 # Docker-first: lint, test, build, and publish all run in containers.
+#
+# Release workflow:
+#   make release VERSION=v0.1.0    # tag, images, chart, GitHub release — one command
 
 .PHONY: lint lint-python \
 	test test-python \
 	build images \
-	publish publish-images publish-chart publish-release \
-	release dev dev-down \
+	release publish publish-images publish-chart publish-release \
+	dev dev-down \
 	clean test-down \
 	help
 
@@ -30,24 +33,28 @@ images:             ## Build Docker images (single-arch, local)
 	docker build -f docker/Dockerfile.api -t terrapod-api:local .
 	docker build -f docker/Dockerfile.web -t terrapod-web:local .
 
-# ── Publish ───────────────────────────────────────────────
-publish:            ## Build + push multi-arch images to GHCR
-	scripts/publish.sh images
+# ── Release ──────────────────────────────────────────────
+release:            ## Full release: tag + images + chart + GitHub release (VERSION required)
+	@if [ -z "$(VERSION)" ]; then \
+		echo "\033[1;31m==> ERROR: VERSION is required.\033[0m"; \
+		echo "Usage: make release VERSION=v0.1.0"; \
+		exit 1; \
+	fi
+	VERSION=$(VERSION) scripts/publish.sh
 
-publish-images:     ## Push multi-arch images to GHCR
-	scripts/publish.sh images
+# ── Publish (individual targets) ─────────────────────────
+publish:            ## Publish images + chart (VERSION required)
+	VERSION=$(VERSION) scripts/publish.sh images
+	VERSION=$(VERSION) scripts/publish.sh chart
 
-publish-chart:      ## Push Helm chart to OCI registry
-	scripts/publish.sh chart
+publish-images:     ## Push multi-arch images to GHCR (VERSION required)
+	VERSION=$(VERSION) scripts/publish.sh images
 
-publish-release:    ## Create GitHub Release with auto-generated notes
-	scripts/publish.sh release
+publish-chart:      ## Push Helm chart to OCI registry (VERSION required)
+	VERSION=$(VERSION) scripts/publish.sh chart
 
-# ── Release ───────────────────────────────────────────────
-release:            ## Full release: lint, test, publish all
-	scripts/lint.sh
-	scripts/test.sh
-	scripts/publish.sh
+publish-release:    ## Create GitHub Release (VERSION required)
+	VERSION=$(VERSION) scripts/publish.sh release
 
 # ── Development ──────────────────────────────────────────
 dev:                ## Start Tilt development environment (port 10352)
