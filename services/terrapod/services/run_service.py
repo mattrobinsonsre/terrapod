@@ -10,10 +10,12 @@ from terrapod.db.models import (
     ConfigurationVersion,
     Run,
     RunnerListener,
+    RunTrigger,
     Workspace,
     utc_now,
 )
 from terrapod.logging_config import get_logger
+from terrapod.services.notification_service import STATUS_TO_TRIGGER
 from terrapod.storage import get_storage
 from terrapod.storage.keys import (
     apply_log_key,
@@ -38,6 +40,63 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
 TERMINAL_STATES = {"applied", "errored", "discarded", "canceled"}
 
 
+async def _enqueue_notification(run: Run, target_status: str) -> None:
+    """Enqueue a notification trigger for a run status change.
+
+    Maps the status to a trigger event and enqueues via the distributed
+    scheduler. Deduplication prevents duplicate notifications for the
+    same run+trigger combination.
+    """
+    from terrapod.services.scheduler import enqueue_trigger
+
+    trigger: str | None = None
+
+    if target_status == "planned":
+        # Distinguish between needs_attention and planned
+        if not run.auto_apply and not run.plan_only:
+            trigger = "run:needs_attention"
+        else:
+            trigger = "run:planned"
+    else:
+        trigger = STATUS_TO_TRIGGER.get(target_status)
+
+    if not trigger:
+        return
+
+    try:
+        await enqueue_trigger(
+            "notification_deliver",
+            {
+                "run_id": str(run.id),
+                "workspace_id": str(run.workspace_id),
+                "trigger": trigger,
+            },
+            dedup_key=f"notif:{run.id}:{trigger}",
+            dedup_ttl=60,
+        )
+    except Exception as e:
+        # Never let notification enqueuing break the run state machine
+        logger.warning("Failed to enqueue notification", error=str(e))
+
+
+async def _enqueue_drift_completed(run: Run) -> None:
+    """Enqueue a drift_run_completed trigger when a drift run finishes."""
+    from terrapod.services.scheduler import enqueue_trigger
+
+    try:
+        await enqueue_trigger(
+            "drift_run_completed",
+            {
+                "run_id": str(run.id),
+                "workspace_id": str(run.workspace_id),
+            },
+            dedup_key=f"drift:{run.id}",
+            dedup_ttl=60,
+        )
+    except Exception as e:
+        logger.warning("Failed to enqueue drift completion", error=str(e))
+
+
 def can_transition(current: str, target: str) -> bool:
     """Check if a state transition is valid."""
     if current in TERMINAL_STATES:
@@ -56,6 +115,7 @@ async def create_run(
     terraform_version: str = "",
     configuration_version_id: uuid.UUID | None = None,
     created_by: str = "",
+    is_drift_detection: bool = False,
 ) -> Run:
     """Create a new run for a workspace.
 
@@ -88,6 +148,7 @@ async def create_run(
         resource_memory=workspace.resource_memory,
         pool_id=pool_id,
         created_by=created_by,
+        is_drift_detection=is_drift_detection,
     )
     db.add(run)
     await db.flush()
@@ -98,6 +159,9 @@ async def create_run(
         workspace=workspace.name,
         status=run.status,
     )
+
+    # Enqueue run:created notification
+    await _enqueue_notification(run, "pending")
 
     return run
 
@@ -144,12 +208,71 @@ async def transition_run(
         to_status=target_status,
     )
 
+    # Fire run triggers when a non-speculative run completes apply
+    if target_status == "applied" and not run.plan_only:
+        await fire_run_triggers(db, run.workspace_id)
+
+    # Enqueue notification for this status change
+    await _enqueue_notification(run, target_status)
+
+    # Enqueue drift status update when a drift detection run reaches a terminal state
+    if run.is_drift_detection and target_status in TERMINAL_STATES:
+        await _enqueue_drift_completed(run)
+
     return run
 
 
 async def queue_run(db: AsyncSession, run: Run) -> Run:
     """Queue a run for execution."""
     return await transition_run(db, run, "queued")
+
+
+async def fire_run_triggers(
+    db: AsyncSession,
+    source_workspace_id: uuid.UUID,
+) -> None:
+    """Fire run triggers for downstream workspaces after a successful apply.
+
+    Queries all RunTrigger rows where this workspace is the source,
+    then creates and queues a new run for each destination workspace.
+    """
+    from sqlalchemy.orm import selectinload
+
+    result = await db.execute(
+        select(RunTrigger)
+        .options(selectinload(RunTrigger.workspace))
+        .where(RunTrigger.source_workspace_id == source_workspace_id)
+    )
+    triggers = list(result.scalars().all())
+
+    if not triggers:
+        return
+
+    # Get source workspace name for the run message
+    source_ws = await db.get(Workspace, source_workspace_id)
+    source_name = source_ws.name if source_ws else str(source_workspace_id)
+
+    for trigger in triggers:
+        dest_ws = trigger.workspace
+        if dest_ws is None:
+            continue
+
+        run = await create_run(
+            db,
+            workspace=dest_ws,
+            message=f"Triggered by successful apply in workspace '{source_name}'",
+            auto_apply=dest_ws.auto_apply,
+            plan_only=False,
+            source="tfe-api",
+        )
+        await queue_run(db, run)
+
+        logger.info(
+            "Run trigger fired",
+            source_workspace=source_name,
+            destination_workspace=dest_ws.name,
+            run_id=str(run.id),
+        )
 
 
 async def confirm_run(db: AsyncSession, run: Run) -> Run:

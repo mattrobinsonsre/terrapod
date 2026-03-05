@@ -13,6 +13,10 @@ spec:
       {{- include "terrapod.web.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      {{- with .Values.web.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       labels:
         {{- include "terrapod.web.selectorLabels" . | nindent 8 }}
     spec:
@@ -52,6 +56,33 @@ spec:
             initialDelaySeconds: {{ hasKey .Values.web.readinessProbe "initialDelaySeconds" | ternary .Values.web.readinessProbe.initialDelaySeconds 5 }}
             periodSeconds: {{ hasKey .Values.web.readinessProbe "periodSeconds" | ternary .Values.web.readinessProbe.periodSeconds 5 }}
             timeoutSeconds: {{ hasKey .Values.web.readinessProbe "timeoutSeconds" | ternary .Values.web.readinessProbe.timeoutSeconds 1 }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
           resources:
             {{- toYaml .Values.web.resources | nindent 12 }}
+      {{- with .Values.web.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.web.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.web.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.web.priorityClassName }}
+      priorityClassName: {{ .Values.web.priorityClassName | quote }}
+      {{- end }}
+      {{- with .Values.web.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.web.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 {{- end }}

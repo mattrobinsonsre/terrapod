@@ -3,7 +3,7 @@ name = "terrapod"
 version = "0.1.0"
 description = "Terrapod - Open-source Terraform Enterprise replacement - API Server"
 authors = ["Matt Robinson"]
-license = "Apache-2.0"
+license = "GPL-3.0-or-later"
 packages = [{include = "terrapod"}]
 
 [tool.poetry.dependencies]
@@ -42,6 +42,8 @@ kubernetes = "^31.0.0"
 pgpy = "^0.6.0"
 # GitHub App JWT signing for VCS integration
 pyjwt = {extras = ["crypto"], version = "^2.8.0"}
+# Async SMTP for email notifications
+aiosmtplib = "^3.0.0"
 # imghdr removed in Python 3.13; pgpy still imports it
 standard-imghdr = "^3.13"
 
@@ -104,5 +106,6 @@ module = [
     "asyncpg",
     "kubernetes.*",
     "pgpy.*",
+    "aiosmtplib",
 ]
 ignore_missing_imports = true

@@ -1,8 +1,8 @@
 """VCS poller — background task that detects new commits and triggers runs.
 
 Polling-first design: Terrapod polls VCS providers for changes (outbound
-HTTPS only). When webhooks are configured, they trigger an immediate poll
-cycle for faster feedback.
+HTTPS only). When webhooks are configured, they enqueue a triggered task
+via the distributed scheduler for cross-replica immediate polling.
 
 Each workspace tracks a branch (e.g. main). Pushes to that branch create
 real plan/apply runs. Open PRs/MRs targeting that branch create speculative
@@ -10,14 +10,16 @@ real plan/apply runs. Open PRs/MRs targeting that branch create speculative
 
 Provider-agnostic: dispatches to GitHub or GitLab based on the VCS connection's
 provider field.
-"""
 
-import asyncio
+Scheduling: The poll cycle is registered as a periodic task with the
+distributed scheduler. In a multi-replica deployment, exactly one replica
+runs each poll cycle per interval. Webhook-triggered immediate polls use
+the scheduler's trigger queue with deduplication.
+"""
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.config import settings
 from terrapod.db.models import Run, VCSConnection, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
@@ -27,21 +29,6 @@ from terrapod.storage import get_storage
 from terrapod.storage.keys import config_version_key
 
 logger = get_logger(__name__)
-
-# Event to trigger an immediate poll for a specific repo
-_immediate_poll_events: dict[str, asyncio.Event] = {}
-
-
-def trigger_immediate_poll(repo_full_name: str) -> None:
-    """Trigger an immediate poll cycle for a specific repo.
-
-    Called by the webhook handler when a push event is received.
-    The repo_full_name is "owner/repo".
-    """
-    event = _immediate_poll_events.get(repo_full_name)
-    if event:
-        event.set()
-        logger.info("Immediate poll triggered", repo=repo_full_name)
 
 
 # --- Provider dispatch ---
@@ -349,8 +336,12 @@ async def _poll_workspace(db: AsyncSession, ws: Workspace) -> None:
     await _poll_workspace_prs(db, ws, conn, owner, repo, branch)
 
 
-async def _poll_cycle() -> None:
-    """Execute one poll cycle: check all VCS-enabled workspaces."""
+async def poll_cycle() -> None:
+    """Execute one poll cycle: check all VCS-enabled workspaces.
+
+    Called by the distributed scheduler as a periodic task. Only one
+    replica runs this per interval across the entire deployment.
+    """
     async with get_db_session() as db:
         result = await db.execute(
             select(Workspace).where(
@@ -377,23 +368,14 @@ async def _poll_cycle() -> None:
                 )
 
 
-async def run_poller() -> None:
-    """Main poller loop — runs as an async background task.
+async def handle_immediate_poll(payload: dict) -> None:
+    """Handle a webhook-triggered immediate poll for a specific repo.
 
-    Polls every poll_interval_seconds (default 60s). Can be interrupted
-    by trigger_immediate_poll() for faster webhook feedback.
+    Called by the distributed scheduler's trigger consumer. The payload
+    contains {"repo": "owner/repo"} from the webhook handler.
+    Runs a full poll cycle (the repo filter is informational — we poll
+    all workspaces since multiple workspaces may track the same repo).
     """
-    interval = settings.vcs.poll_interval_seconds
-    logger.info("VCS poller started", interval_seconds=interval)
-
-    while True:
-        try:
-            await _poll_cycle()
-        except Exception as e:
-            logger.error("VCS poll cycle failed", error=str(e), exc_info=e)
-
-        try:
-            await asyncio.sleep(interval)
-        except asyncio.CancelledError:
-            logger.info("VCS poller stopping")
-            return
+    repo = payload.get("repo", "unknown")
+    logger.info("Immediate poll triggered by webhook", repo=repo)
+    await poll_cycle()

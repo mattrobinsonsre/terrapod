@@ -1,12 +1,14 @@
 """VCS webhook event receiver (optional).
 
 Only active when a webhook secret is configured. Validates HMAC signature
-and triggers an immediate poll for the affected repo — no complex event
-parsing. The poller does all the real work.
+and enqueues a triggered immediate poll via the distributed scheduler.
+The poller does all the real work.
 
 Endpoints:
     POST /api/v2/vcs-events/github   (GitHub webhook receiver)
 """
+
+import json
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
@@ -14,7 +16,7 @@ from fastapi.responses import JSONResponse
 from terrapod.config import settings
 from terrapod.logging_config import get_logger
 from terrapod.services.github_service import validate_webhook_signature
-from terrapod.services.vcs_poller import trigger_immediate_poll
+from terrapod.services.scheduler import enqueue_trigger
 
 router = APIRouter(prefix="/api/v2", tags=["vcs-events"])
 logger = get_logger(__name__)
@@ -25,7 +27,8 @@ async def github_webhook(request: Request) -> Response:
     """Receive GitHub webhook events.
 
     Validates HMAC-SHA256 signature when webhook_secret is configured.
-    Triggers an immediate poll for the affected repository.
+    Enqueues an immediate poll via the distributed scheduler so any
+    replica can pick it up.
     """
     # Check if webhooks are configured
     if not settings.vcs.github.webhook_secret:
@@ -49,8 +52,6 @@ async def github_webhook(request: Request) -> Response:
         return JSONResponse(content={"message": "pong"})
 
     # For push and pull_request events, extract the repo and trigger a poll
-    import json
-
     try:
         body = json.loads(payload)
     except json.JSONDecodeError:
@@ -69,6 +70,12 @@ async def github_webhook(request: Request) -> Response:
             event=event_type,
             repo=full_name,
         )
-        trigger_immediate_poll(full_name)
+        # Enqueue via scheduler — any replica can pick this up.
+        # Dedup key prevents duplicate polls for rapid-fire webhook events.
+        await enqueue_trigger(
+            "vcs_immediate_poll",
+            {"repo": full_name},
+            dedup_key=f"vcs_poll:{full_name}",
+        )
 
     return JSONResponse(content={"message": "accepted"})

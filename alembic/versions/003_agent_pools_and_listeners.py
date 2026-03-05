@@ -113,8 +113,8 @@ def upgrade() -> None:
     # Seed the default local pool
     op.execute(
         sa.text(
-            "INSERT INTO agent_pools (id, name, description) "
-            "VALUES (gen_random_uuid(), 'default', 'Local in-cluster runner pool')"
+            "INSERT INTO agent_pools (id, name, description, org_name) "
+            "VALUES (gen_random_uuid(), 'default', 'Local in-cluster runner pool', 'default')"
         )
     )
 

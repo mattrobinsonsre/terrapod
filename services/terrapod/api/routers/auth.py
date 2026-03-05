@@ -4,6 +4,12 @@ All authentication — local password, OIDC, SAML — goes through the same
 /authorize -> login -> /callback -> /token pipeline. The API server is the
 single gateway for all IDP communication.
 
+UX CONTRACT: Auth endpoints are consumed by the web frontend:
+  - web/src/app/login/page.tsx (provider list, local login)
+  - web/src/app/settings/sessions/page.tsx (session management)
+  Changes to response shapes, attribute names, or status codes here MUST be
+  matched by corresponding updates to those frontend pages.
+
 Consumers:
     Web UI:
         GET  /api/v2/auth/providers         — login page provider list

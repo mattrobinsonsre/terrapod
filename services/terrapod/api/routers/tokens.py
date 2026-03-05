@@ -3,6 +3,11 @@
 Implements the authentication-tokens endpoints in JSON:API format
 compatible with the TFE V2 API.
 
+UX CONTRACT: Token endpoints are consumed by the web frontend:
+  - web/src/app/settings/tokens/page.tsx (token CRUD)
+  Changes to response shapes, attribute names, or status codes here MUST be
+  matched by corresponding updates to that frontend page.
+
 Endpoints:
     POST   /api/v2/users/:user_id/authentication-tokens — create user token
     GET    /api/v2/users/:user_id/authentication-tokens — list user tokens

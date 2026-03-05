@@ -1,5 +1,11 @@
 """Agent pool, join token, listener management, and heartbeat endpoints.
 
+UX CONTRACT: Pool/token/listener endpoints are consumed by the web frontend:
+  - web/src/app/admin/agent-pools/page.tsx (pool list, create)
+  - web/src/app/admin/agent-pools/[id]/page.tsx (pool detail, tokens, listeners)
+  Changes to response shapes, attribute names, or status codes here MUST be
+  matched by corresponding updates to those frontend pages.
+
 Endpoints:
     GET/POST   /api/v2/organizations/{org}/agent-pools
     GET/PATCH/DELETE /api/v2/agent-pools/{pool_id}

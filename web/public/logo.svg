@@ -1,5 +1,6 @@
 <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
 	 width="100%" viewBox="253 28 521 521" enable-background="new 0 0 1024 559" xml:space="preserve">
+<g transform="rotate(180, 513.5, 288.5)">
 <path fill="#63326E" opacity="1.000000" stroke="none" 
 	d="
 M345.932739,303.754822 
@@ -704,4 +705,5 @@ M517.860840,410.997162
 	C455.880127,440.449646 472.367462,421.708710 490.551453,414.886810 
 	C499.303345,411.603455 508.231476,410.845306 517.860840,410.997162 
 z"/>
+</g>
 </svg>

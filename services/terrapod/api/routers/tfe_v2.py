@@ -3,6 +3,12 @@
 These endpoints implement the minimum TFE V2 API surface needed for
 terraform/tofu CLI and go-tfe client compatibility.
 
+UX CONTRACT: Workspace endpoints are consumed by the web frontend:
+  - web/src/app/workspaces/page.tsx (list, create)
+  - web/src/app/workspaces/[id]/page.tsx (detail, update, delete, lock/unlock, state)
+  Changes to response shapes, attribute names, or status codes here MUST be
+  matched by corresponding updates to those frontend pages.
+
 Endpoints:
     GET  /api/v2/ping — API version handshake
     GET  /api/v2/account/details — current user info
@@ -69,6 +75,13 @@ def _tfe_headers() -> dict[str, str]:
         "TFP-AppName": TFP_APP_NAME,
         "X-TFE-Version": X_TFE_VERSION,
     }
+
+
+def _clamp_drift_interval(value: int) -> int:
+    """Clamp drift detection interval to the configured minimum."""
+    from terrapod.config import settings
+
+    return max(int(value), settings.drift_detection.min_workspace_interval_seconds)
 
 
 def _validate_org(org: str) -> None:
@@ -260,6 +273,10 @@ def _workspace_json(ws: Workspace, effective_permission: str | None = None) -> d
                 "vcs-repo-url": ws.vcs_repo_url,
                 "vcs-branch": ws.vcs_branch,
                 "vcs-working-directory": ws.vcs_working_directory,
+                "drift-detection-enabled": ws.drift_detection_enabled,
+                "drift-detection-interval-seconds": ws.drift_detection_interval_seconds,
+                "drift-last-checked-at": _rfc3339(ws.drift_last_checked_at),
+                "drift-status": ws.drift_status,
                 "labels": ws.labels or {},
                 "owner-email": ws.owner_email,
                 "created-at": _rfc3339(ws.created_at),
@@ -410,6 +427,10 @@ async def create_workspace(
         vcs_repo_url=attrs.get("vcs-repo-url", ""),
         vcs_branch=attrs.get("vcs-branch", ""),
         vcs_working_directory=attrs.get("vcs-working-directory", ""),
+        drift_detection_enabled=attrs.get("drift-detection-enabled", False),
+        drift_detection_interval_seconds=_clamp_drift_interval(
+            attrs.get("drift-detection-interval-seconds", 86400)
+        ),
     )
     db.add(ws)
     await db.commit()
@@ -502,6 +523,12 @@ async def update_workspace(
         ws.vcs_branch = attrs["vcs-branch"]
     if "vcs-working-directory" in attrs:
         ws.vcs_working_directory = attrs["vcs-working-directory"]
+    if "drift-detection-enabled" in attrs:
+        ws.drift_detection_enabled = attrs["drift-detection-enabled"]
+    if "drift-detection-interval-seconds" in attrs:
+        ws.drift_detection_interval_seconds = _clamp_drift_interval(
+            attrs["drift-detection-interval-seconds"]
+        )
 
     # VCS connection relationship
     relationships = body.get("data", {}).get("relationships", {})

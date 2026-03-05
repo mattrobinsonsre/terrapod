@@ -68,10 +68,18 @@ EXIT_CODE=0
 
 if [ "$TP_PHASE" = "plan" ]; then
     echo "[entrypoint] Running $TP_BACKEND plan..."
-    "$TP_BIN" plan -input=false -no-color -out=tfplan 2>&1 | tee /tmp/plan.log &
+    "$TP_BIN" plan -input=false -no-color -detailed-exitcode -out=tfplan 2>&1 | tee /tmp/plan.log &
     CHILD_PID=$!
     wait "$CHILD_PID" || EXIT_CODE=$?
     CHILD_PID=""
+
+    # -detailed-exitcode: 0=no changes, 1=error, 2=changes present
+    if [ "$EXIT_CODE" = "2" ]; then
+        echo "[entrypoint] PLAN_HAS_CHANGES=true"
+        EXIT_CODE=0
+    elif [ "$EXIT_CODE" = "0" ]; then
+        echo "[entrypoint] PLAN_HAS_CHANGES=false"
+    fi
 
     # Upload plan log
     if [ -n "$TP_PLAN_LOG_UPLOAD_URL" ] && [ -f /tmp/plan.log ]; then

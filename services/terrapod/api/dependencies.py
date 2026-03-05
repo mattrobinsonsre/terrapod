@@ -16,7 +16,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,7 +32,7 @@ from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 # Redis cache TTL for API token role resolution (seconds)
 _TOKEN_ROLES_CACHE_TTL = 60
@@ -89,48 +89,51 @@ async def _resolve_user_roles(db: AsyncSession, email: str) -> list[str]:
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> AuthenticatedUser:
-    """Unified auth dependency — checks API tokens then sessions.
+    """Unified auth dependency — checks API tokens, then sessions.
 
-    1. Hash the bearer token, query api_tokens table
-    2. If not found, check Redis sessions
-    3. If neither matches, 401
+    Priority order:
+    1. Bearer token → API token (SHA-256 hash + DB lookup)
+    2. Bearer token → Redis session
+    3. 401
 
     Returns AuthenticatedUser with email, roles, auth_method.
     """
-    token = credentials.credentials
+    if credentials is not None:
+        token = credentials.credentials
 
-    # Try API token first (fast hash + indexed DB lookup)
-    api_token = await validate_api_token(db, token)
-    if api_token is not None:
-        # Resolve roles from DB (cached in Redis for 60s)
-        email = api_token.user_email or ""
-        roles = await _resolve_user_roles(db, email) if email else []
+        # Try API token first (fast hash + indexed DB lookup)
+        api_token = await validate_api_token(db, token)
+        if api_token is not None:
+            # Resolve roles from DB (cached in Redis for 60s)
+            email = api_token.user_email or ""
+            roles = await _resolve_user_roles(db, email) if email else []
 
-        return AuthenticatedUser(
-            email=email,
-            display_name=None,
-            roles=roles,
-            provider_name="api_token",
-            auth_method="api_token",
-        )
+            return AuthenticatedUser(
+                email=email,
+                display_name=None,
+                roles=roles,
+                provider_name="api_token",
+                auth_method="api_token",
+            )
 
-    # Try session (Redis lookup)
-    session = await get_session(token)
-    if session is not None:
-        # Sliding window: refresh TTL on activity (rate-limited to every 5 min)
-        if _should_refresh_session(session):
-            await refresh_session(token, session)
+        # Try session (Redis lookup)
+        session = await get_session(token)
+        if session is not None:
+            # Sliding window: refresh TTL on activity (rate-limited to every 5 min)
+            if _should_refresh_session(session):
+                await refresh_session(token, session)
 
-        return AuthenticatedUser(
-            email=session.email,
-            display_name=session.display_name,
-            roles=session.roles,
-            provider_name=session.provider_name,
-            auth_method="session",
-        )
+            return AuthenticatedUser(
+                email=session.email,
+                display_name=session.display_name,
+                roles=session.roles,
+                provider_name=session.provider_name,
+                auth_method="session",
+            )
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -140,12 +143,19 @@ async def get_current_user(
 
 
 async def get_current_session(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> Session:
     """Dependency to get the current authenticated session (sessions only).
 
     Does NOT check API tokens — use get_current_user for unified auth.
     """
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     token = credentials.credentials
     session = await get_session(token)
 

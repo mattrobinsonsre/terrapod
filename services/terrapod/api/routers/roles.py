@@ -1,5 +1,10 @@
 """Role CRUD endpoints (admin only).
 
+UX CONTRACT: Role endpoints are consumed by the web frontend:
+  - web/src/app/admin/roles/page.tsx (role CRUD, roles tab)
+  Changes to response shapes, attribute names, or status codes here MUST be
+  matched by corresponding updates to that frontend page.
+
 Endpoints:
     GET    /api/v2/roles               — list all roles (built-in + custom)
     POST   /api/v2/roles               — create custom role

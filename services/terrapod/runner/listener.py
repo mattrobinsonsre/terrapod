@@ -250,13 +250,15 @@ class RunnerListener:
         # storage HMAC secret for filesystem backend)
         urls = await self._fetch_urls_from_api(run_id, "plan")
 
-        # Get service account from pool
+        # Get service account: pool SA > global runner config SA
         sa_name = ""
         if pool_id:
             async with get_db_session() as db:
                 pool = await agent_pool_service.get_pool(db, pool_id)
-                if pool:
+                if pool and pool.service_account_name:
                     sa_name = pool.service_account_name
+        if not sa_name:
+            sa_name = self.runner_config.service_account_name
 
         # Start execution in background task
         task = asyncio.create_task(
@@ -332,6 +334,10 @@ class RunnerListener:
         from terrapod.runner.job_manager import create_job, watch_job
         from terrapod.runner.job_template import build_job_spec
 
+        # ── Pre-plan task stage ─────────────────────────────────────
+        if not await self._check_task_stage(run_id, "pre_plan"):
+            return
+
         # ── Plan phase ──────────────────────────────────────────────
         plan_spec = build_job_spec(
             run_id=run_id,
@@ -349,16 +355,27 @@ class RunnerListener:
         job_name = await create_job(plan_spec)
         result = await watch_job(job_name, timeout_seconds=60 * 60)
 
-        if result == "succeeded":
-            await self._report_status(run_id, "planned")
-        else:
+        if result != "succeeded":
             await self._report_status(run_id, "errored", f"Plan {result}")
             return
+
+        # Parse has_changes from pod logs (entrypoint emits marker)
+        has_changes = await self._parse_has_changes(job_name)
+
+        # ── Post-plan task stage ────────────────────────────────────
+        if not await self._check_task_stage(run_id, "post_plan"):
+            return
+
+        await self._report_status(run_id, "planned", has_changes=has_changes)
 
         # ── Wait for confirmation ───────────────────────────────────
         confirmed = await self._wait_for_confirmation(run_id, timeout=3600)
         if not confirmed:
             return  # Run was discarded or canceled
+
+        # ── Pre-apply task stage ────────────────────────────────────
+        if not await self._check_task_stage(run_id, "pre_apply"):
+            return
 
         # ── Apply phase ─────────────────────────────────────────────
         await self._report_status(run_id, "applying")
@@ -386,7 +403,13 @@ class RunnerListener:
         else:
             await self._report_status(run_id, "errored", f"Apply {apply_result}")
 
-    async def _report_status(self, run_id: str, status: str, error_message: str = "") -> None:
+    async def _report_status(
+        self,
+        run_id: str,
+        status: str,
+        error_message: str = "",
+        has_changes: bool | None = None,
+    ) -> None:
         """Report run status back to the API."""
         if self.identity.is_local:
             from terrapod.db.session import get_db_session
@@ -395,6 +418,9 @@ class RunnerListener:
             async with get_db_session() as db:
                 run = await run_service.get_run(db, uuid.UUID(run_id))
                 if run:
+                    if has_changes is not None:
+                        run.has_changes = has_changes
+
                     await run_service.transition_run(db, run, status, error_message=error_message)
 
                     # Auto-apply if configured
@@ -417,15 +443,39 @@ class RunnerListener:
                 cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
                 headers["X-Terrapod-Client-Cert"] = cert_b64
 
+            body: dict = {
+                "status": status,
+                "error_message": error_message,
+            }
+            if has_changes is not None:
+                body["has_changes"] = has_changes
+
             async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
                 await client.patch(
                     f"/api/v2/listeners/listener-{self.identity.listener_id}/runs/run-{run_id}",
-                    json={
-                        "status": status,
-                        "error_message": error_message,
-                    },
+                    json=body,
                     headers=headers,
                 )
+
+    async def _parse_has_changes(self, job_name: str) -> bool | None:
+        """Parse PLAN_HAS_CHANGES marker from pod logs after plan completes.
+
+        The runner entrypoint emits [entrypoint] PLAN_HAS_CHANGES=true/false
+        to stdout after the plan finishes. We read the tail of the pod logs
+        to find this marker.
+        """
+        try:
+            from terrapod.runner.job_manager import get_pod_logs
+
+            logs = await get_pod_logs(job_name, tail_lines=30)
+            for line in logs.splitlines():
+                if "PLAN_HAS_CHANGES=true" in line:
+                    return True
+                if "PLAN_HAS_CHANGES=false" in line:
+                    return False
+        except Exception as e:
+            logger.warning("Failed to parse has_changes from pod logs", error=str(e))
+        return None
 
     async def _wait_for_confirmation(self, run_id: str, timeout: int = 3600) -> bool:
         """Wait for a run to reach 'confirmed' status.
@@ -509,6 +559,122 @@ class RunnerListener:
                 )
                 response.raise_for_status()
                 return response.json()
+
+    async def _check_task_stage(self, run_id: str, stage_name: str) -> bool:
+        """Check for applicable run tasks at a stage boundary.
+
+        Creates a task stage if there are enabled run tasks for this stage,
+        then polls until all results are resolved. Returns True if the run
+        should proceed, False if blocked (mandatory failure, errored, or canceled).
+        """
+        if self.identity.is_local:
+            return await self._check_task_stage_local(run_id, stage_name)
+        else:
+            return await self._check_task_stage_remote(run_id, stage_name)
+
+    async def _check_task_stage_local(self, run_id: str, stage_name: str) -> bool:
+        """Check task stage via direct DB access (local listener)."""
+        from terrapod.db.session import get_db_session
+        from terrapod.services.run_task_service import create_task_stage, get_task_stage
+
+        # Create task stage (returns None if no applicable tasks)
+        async with get_db_session() as db:
+            from terrapod.services import run_service
+
+            run = await run_service.get_run(db, uuid.UUID(run_id))
+            if run is None:
+                return False
+
+            ts = await create_task_stage(db, run.id, run.workspace_id, stage_name)
+            if ts is None:
+                return True  # No tasks — proceed
+
+            ts_id = ts.id
+            await db.commit()
+
+        logger.info("Waiting for task stage", run_id=run_id, stage=stage_name, ts_id=str(ts_id))
+
+        # Poll until resolved
+        while not _shutdown.is_set():
+            async with get_db_session() as db:
+                ts = await get_task_stage(db, ts_id)
+                if ts is None:
+                    return False
+
+                if ts.status in ("passed", "overridden"):
+                    logger.info("Task stage passed", run_id=run_id, stage=stage_name)
+                    return True
+                elif ts.status in ("failed", "errored", "canceled"):
+                    logger.warning(
+                        "Task stage blocked run",
+                        run_id=run_id,
+                        stage=stage_name,
+                        status=ts.status,
+                    )
+                    return False
+
+            # Still running — wait and poll again
+            try:
+                await asyncio.wait_for(_shutdown.wait(), timeout=5)
+                return False  # Shutdown
+            except TimeoutError:
+                pass
+
+        return False
+
+    async def _check_task_stage_remote(self, run_id: str, stage_name: str) -> bool:
+        """Check task stage via API (remote listener).
+
+        Remote listeners create and poll task stages via HTTP.
+        """
+        import base64
+
+        import httpx
+
+        headers = {}
+        if self.identity.certificate_pem:
+            cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
+            headers["X-Terrapod-Client-Cert"] = cert_b64
+
+        # Create task stage via API
+        async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
+            response = await client.post(
+                f"/api/v2/runs/run-{run_id}/task-stages",
+                json={"stage": stage_name},
+                headers=headers,
+            )
+            if response.status_code == 204:
+                return True  # No applicable tasks
+            if response.status_code != 201:
+                logger.warning("Failed to create task stage", status=response.status_code)
+                return True  # Don't block on API errors
+
+            ts_data = response.json()["data"]
+            ts_id = ts_data["id"]
+
+        # Poll until resolved
+        while not _shutdown.is_set():
+            async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=10) as client:
+                response = await client.get(
+                    f"/api/v2/task-stages/{ts_id}",
+                    headers=headers,
+                )
+                if response.status_code != 200:
+                    return False
+
+                status = response.json()["data"]["attributes"]["status"]
+                if status in ("passed", "overridden"):
+                    return True
+                elif status in ("failed", "errored", "canceled"):
+                    return False
+
+            try:
+                await asyncio.wait_for(_shutdown.wait(), timeout=5)
+                return False
+            except TimeoutError:
+                pass
+
+        return False
 
     async def _recover_orphaned_runs(self) -> None:
         """Check for runs that were active when we crashed and recover them."""

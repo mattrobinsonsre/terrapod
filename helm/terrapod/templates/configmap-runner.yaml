@@ -15,7 +15,8 @@ data:
     server_url: {{ .Values.runners.serverUrl | default (printf "http://%s-api:8000" (include "terrapod.fullname" .)) | quote }}
     default_terraform_version: {{ .Values.runners.defaultTerraformVersion | default "1.9.8" | quote }}
     default_execution_backend: {{ .Values.runners.defaultExecutionBackend | default "terraform" | quote }}
-    service_account_name: {{ .Values.runners.serviceAccountName | quote }}
+    service_account_name: {{ include "terrapod.runnerServiceAccountName" . | quote }}
+    azure_workload_identity: {{ .Values.runners.azureWorkloadIdentity | default false }}
     ttl_seconds_after_finished: {{ .Values.runners.ttlSecondsAfterFinished }}
     definitions:
       {{- range .Values.runners.definitions }}
@@ -37,5 +38,24 @@ data:
     {{- end }}
     {{- with .Values.runners.tolerations }}
     tolerations:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.runners.affinity }}
+    affinity:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.runners.podAnnotations }}
+    pod_annotations:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- if .Values.runners.priorityClassName }}
+    priority_class_name: {{ .Values.runners.priorityClassName | quote }}
+    {{- end }}
+    {{- with .Values.runners.topologySpreadConstraints }}
+    topology_spread_constraints:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.runners.podSecurityContext }}
+    pod_security_context:
       {{- toYaml . | nindent 6 }}
     {{- end }}

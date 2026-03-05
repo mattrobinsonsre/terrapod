@@ -6,14 +6,14 @@ Terrapod supports multiple authentication methods: local passwords, OIDC, SAML, 
 
 ## Overview
 
-Two credential types share a single `Authorization: Bearer <token>` header:
+Two authentication methods, evaluated in priority order:
 
 | Type | Storage | Lifetime | Use Case |
 |---|---|---|---|
-| **Sessions** | Redis | 12h sliding TTL | Web UI |
 | **API Tokens** | PostgreSQL (SHA-256 hashed) | Configurable max TTL | terraform CLI, automation |
+| **Sessions** | Redis | 12h sliding TTL | Web UI |
 
-The unified auth dependency tries API token lookup first, then session lookup. Both return the same `AuthenticatedUser` shape to downstream handlers.
+The unified auth dependency tries API token first, then session. Both return the same `AuthenticatedUser` shape to downstream handlers.
 
 ---
 

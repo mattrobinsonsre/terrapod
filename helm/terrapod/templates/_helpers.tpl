@@ -76,6 +76,30 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
+Runner Job service account name.
+When runners.serviceAccount.create=true: defaults to "<fullname>-runner".
+When create=false: uses runners.serviceAccount.name, or "default" if unset.
+*/}}
+{{- define "terrapod.runnerServiceAccountName" -}}
+{{- if .Values.runners.serviceAccount.create }}
+{{- default (printf "%s-runner" (include "terrapod.fullname" .)) .Values.runners.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.runners.serviceAccount.name }}
+{{- end }}
+{{- end }}
+
+{{/*
+Listener service account name.
+*/}}
+{{- define "terrapod.listenerServiceAccountName" -}}
+{{- if .Values.listener.serviceAccount.create }}
+{{- default (printf "%s-listener" (include "terrapod.fullname" .)) .Values.listener.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.listener.serviceAccount.name }}
+{{- end }}
+{{- end }}
+
+{{/*
 Get the image tag, defaulting to appVersion
 */}}
 {{- define "terrapod.api.image" -}}

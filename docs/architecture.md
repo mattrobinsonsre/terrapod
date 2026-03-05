@@ -156,7 +156,8 @@ Terrapod's execution layer follows the Actions Runner Controller (ARC) pattern: 
    - Image: terrapod-runner (minimal Alpine)
    - Resources: from workspace config (cpu/memory requests + 2x limits)
    - Env vars: workspace variables + Terraform vars
-   - Service account: from agent pool config (for cloud identity)
+   - Service account: per-pool SA > global runner config SA > K8s default (for cloud identity)
+   - Azure Workload Identity pod label added when `runners.azureWorkloadIdentity: true`
         |
 5. Runner Job starts:
    a. Fetches terraform/tofu binary from binary cache
@@ -324,26 +325,25 @@ terraform login terrapod.local
 
 ### Unified Auth Dependency
 
-The API uses a single auth dependency (`api/dependencies.py:get_current_user`) for all endpoints:
+The API uses a single auth dependency (`api/dependencies.py:get_current_user`) for all endpoints. Two authentication methods are evaluated in priority order:
 
 ```
-Authorization: Bearer <token>
+Incoming request
   |
   v
-1. Try API token lookup:
-   - SHA-256 hash the token
-   - Query api_tokens table by hash
-   - Check max TTL (created_at + config TTL)
-   - Resolve roles from role_assignments + platform_role_assignments
+1. If Authorization: Bearer <token> header present:
+   a. Try API token lookup:
+      - SHA-256 hash the token
+      - Query api_tokens table by hash
+      - Check max TTL (created_at + config TTL)
+      - Resolve roles from role_assignments + platform_role_assignments
+   b. Try session lookup:
+      - Query Redis: tp:session:{token}
+      - Slide TTL on hit (12h)
+      - Return cached user + roles
   |
-  v (not found)
-2. Try session lookup:
-   - Query Redis: tp:session:{token}
-   - Slide TTL on hit (12h)
-   - Return cached user + roles
-  |
-  v (not found)
-3. Return 401 Unauthorized
+  v (no Bearer, or Bearer didn't match)
+2. Return 401 Unauthorized
 ```
 
 ---
@@ -390,6 +390,71 @@ For detailed setup instructions, see [vcs-integration.md](vcs-integration.md).
 
 ---
 
+## Distributed Task Scheduler
+
+The API server is designed to run with **multiple replicas** behind a load balancer. All background tasks -- periodic and event-triggered -- are coordinated via a distributed scheduler (`services/terrapod/services/scheduler.py`) using Redis. There is no leader election. Any replica can execute any task; Redis provides mutual exclusion.
+
+### Periodic Tasks
+
+Registered at startup with a name, interval, and async handler. Each replica runs a scheduler loop that tries `SET NX EX` on a Redis claim key every interval. Exactly one replica wins per interval. A separate "running" key (TTL = 3x interval) prevents overlap if a task execution exceeds its interval.
+
+```
+Replica A                Redis                    Replica B
+    |                       |                         |
+    |-- SET NX claim key -->|                         |
+    |<-- OK (won) ---------|                         |
+    |                       |<-- SET NX claim key ----|
+    |                       |-- nil (lost) ---------->|
+    |                       |                         |
+    |-- execute task ------>|                         |
+    |-- SET running key --->|                         |
+    |   (TTL = 3x interval) |                         |
+    |                       |                         |
+    |-- task complete ----->|                         |
+    |-- DEL running key --->|                         |
+```
+
+Currently registered periodic tasks:
+
+| Task | Interval | Handler | Description |
+|---|---|---|---|
+| `vcs_poll` | 60s (configurable) | `vcs_poller.poll_cycle` | Poll VCS providers for new commits and PRs |
+| `drift_detection` | 300s (configurable) | `drift_detector.check_cycle` | Check for workspaces due for drift detection and create plan-only runs |
+
+### Triggered Tasks
+
+Event-driven work items pushed to a Redis LIST queue. Any replica's consumer loop dequeues and executes. Deduplication via `SET NX` with TTL prevents duplicate items (e.g. rapid-fire webhooks for the same repo).
+
+Currently registered trigger handlers:
+
+| Handler | Description | Dedup |
+|---|---|---|
+| `vcs_immediate_poll` | Webhook-triggered immediate VCS poll for a specific repo | Per repo (5 min) |
+
+### Key Redis Patterns
+
+| Key | Purpose | TTL |
+|---|---|---|
+| `tp:sched:{name}:claim` | Periodic task distributed mutex | interval |
+| `tp:sched:{name}:running` | Task currently executing flag | 3x interval |
+| `tp:sched:{name}:last` | Last completed execution timestamp | -- |
+| `tp:sched:triggers` | Triggered task queue (Redis LIST) | -- |
+| `tp:sched:trigger:{dedup}` | Trigger deduplication key | 5 min |
+
+### Adding New Scheduled Tasks
+
+To add a new background task:
+
+1. Write an async handler function (no arguments for periodic, `dict` argument for triggered)
+2. In `app.py` lifespan, call `register_periodic_task()` or `register_trigger_handler()`
+3. The scheduler starts all registered tasks automatically via `start_scheduler()`
+
+**Never** use `asyncio.create_task()` directly for background work in the API server. Always use the scheduler to ensure multi-replica correctness.
+
+**Source:** `services/terrapod/services/scheduler.py`
+
+---
+
 ## Run State Machine
 
 ```
@@ -409,6 +474,7 @@ Any non-terminal state -----> canceled (user action)
 - Workspace is locked during an active run and unlocked on terminal state
 - Queue dispatch uses `SELECT ... FOR UPDATE SKIP LOCKED` (PostgreSQL job queue pattern)
 - Plan-only (speculative) runs skip the apply phase entirely
+- **Drift detection** runs are plan-only runs created by the `drift_detection` scheduler task. They execute `terraform plan` with `-detailed-exitcode` to detect out-of-band infrastructure changes without applying anything. The exit code determines the workspace's `drift-status`: exit 0 = `no_drift`, exit 2 = `drifted`, non-zero (other) = `errored`. Drift runs are marked with `is-drift-detection=true` and update the workspace's `drift-last-checked-at` timestamp on completion
 
 ---
 

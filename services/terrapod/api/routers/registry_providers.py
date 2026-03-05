@@ -4,6 +4,12 @@ Two API surfaces:
 1. CLI-facing protocol — what `terraform init` speaks for private registry providers
 2. TFE V2 management — JSON:API CRUD for managing providers, versions, platforms
 
+UX CONTRACT: Management endpoints are consumed by the web frontend:
+  - web/src/app/registry/providers/page.tsx (provider list, create)
+  - web/src/app/registry/providers/[org]/[namespace]/[name]/page.tsx (provider detail)
+  Changes to response shapes, attribute names, or status codes here MUST be
+  matched by corresponding updates to those frontend pages.
+
 CLI Protocol:
     GET  /api/v2/registry/providers/{org}/{name}/versions
     GET  /api/v2/registry/providers/{org}/{name}/{version}/download/{os}/{arch}

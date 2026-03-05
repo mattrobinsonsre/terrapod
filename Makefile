@@ -27,6 +27,7 @@ test-python:        ## Test Python only (Docker)
 # ── Build ─────────────────────────────────────────────────
 images:             ## Build Docker images (single-arch, local)
 	docker build -f docker/Dockerfile.api -t terrapod-api:local .
+	docker build -f docker/Dockerfile.web -t terrapod-web:local .
 
 # ── Development ──────────────────────────────────────────
 dev:                ## Start Tilt development environment (port 10352)

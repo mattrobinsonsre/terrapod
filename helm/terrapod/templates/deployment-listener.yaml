@@ -15,10 +15,13 @@ spec:
     metadata:
       annotations:
         checksum/runner-config: {{ include (print $.Template.BasePath "/configmap-runner.yaml") . | sha256sum }}
+        {{- with .Values.listener.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       labels:
         {{- include "terrapod.listener.selectorLabels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "terrapod.fullname" . }}-listener
+      serviceAccountName: {{ include "terrapod.listenerServiceAccountName" . }}
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -56,6 +59,20 @@ spec:
             - name: runner-config
               mountPath: /etc/terrapod
               readOnly: true
+          livenessProbe:
+            exec:
+              command: ["python", "-c", "import os; os.kill(0, 0)"]
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            exec:
+              command: ["python", "-c", "import os; os.kill(0, 0)"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
           resources:
             {{- toYaml .Values.listener.resources | nindent 12 }}
       volumes:
@@ -72,6 +89,17 @@ spec:
       {{- end }}
       {{- with .Values.listener.affinity }}
       affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.listener.priorityClassName }}
+      priorityClassName: {{ .Values.listener.priorityClassName | quote }}
+      {{- end }}
+      {{- with .Values.listener.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.listener.podSecurityContext }}
+      securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 {{- end }}

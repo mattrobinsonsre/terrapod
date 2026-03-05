@@ -4,6 +4,11 @@ Provides pull-through caching for terraform and tofu CLI binaries.
 Runner Jobs fetch their binary from here at startup instead of using
 images with a baked-in binary version.
 
+UX CONTRACT: Admin cache endpoints are consumed by the web frontend:
+  - web/src/app/admin/binary-cache/page.tsx (list, warm, purge)
+  Changes to response shapes, attribute names, or status codes here MUST be
+  matched by corresponding updates to that frontend page.
+
 Endpoints:
     GET    /api/v2/binary-cache/{tool}/{version}/{os}/{arch}    — download (redirect)
     GET    /api/v2/admin/binary-cache                           — list cached

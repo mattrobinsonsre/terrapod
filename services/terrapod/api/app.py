@@ -4,6 +4,7 @@ FastAPI application factory for Terrapod API server.
 Uses lifespan handler for startup/shutdown with async resource management.
 """
 
+import time
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -58,26 +59,88 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     except Exception as e:
         logger.warning("CA initialization skipped (migration may be pending)", error=str(e))
 
-    # Start VCS poller if enabled
-    import asyncio
+    # Register and start distributed scheduler (multi-replica safe)
+    from terrapod.services.scheduler import (
+        register_periodic_task,
+        register_trigger_handler,
+        start_scheduler,
+        stop_scheduler,
+    )
 
-    vcs_poller_task = None
     if settings.vcs.enabled:
-        from terrapod.services.vcs_poller import run_poller
+        from terrapod.services.vcs_poller import handle_immediate_poll, poll_cycle
 
-        vcs_poller_task = asyncio.create_task(run_poller())
-        logger.info("VCS poller started")
+        register_periodic_task(
+            "vcs_poll",
+            interval_seconds=settings.vcs.poll_interval_seconds,
+            handler=poll_cycle,
+            description="Poll VCS providers for new commits and PRs",
+        )
+        register_trigger_handler(
+            "vcs_immediate_poll",
+            handler=handle_immediate_poll,
+            description="Webhook-triggered immediate VCS poll",
+        )
+
+    # Notification delivery handler (always registered)
+    from terrapod.services.notification_dispatcher import handle_notification_delivery
+
+    register_trigger_handler(
+        "notification_deliver",
+        handler=handle_notification_delivery,
+        description="Deliver workspace notification on run state change",
+    )
+
+    # Run task webhook delivery handler
+    from terrapod.services.run_task_dispatcher import handle_run_task_call
+
+    register_trigger_handler(
+        "run_task_call",
+        handler=handle_run_task_call,
+        description="Deliver run task webhook to external service",
+    )
+
+    # Drift detection (scheduled plan-only runs)
+    if settings.drift_detection.enabled:
+        from terrapod.services.drift_detection_service import (
+            drift_check_cycle,
+            handle_drift_run_completed,
+        )
+
+        register_periodic_task(
+            "drift_check",
+            interval_seconds=settings.drift_detection.poll_interval_seconds,
+            handler=drift_check_cycle,
+            description="Check workspaces for infrastructure drift",
+        )
+        register_trigger_handler(
+            "drift_run_completed",
+            handler=handle_drift_run_completed,
+            description="Update workspace drift status on drift run completion",
+        )
+
+    # Audit log retention (daily)
+    async def _audit_retention() -> None:
+        from terrapod.services.audit_service import purge_old_entries
+
+        async with get_db_session() as db:
+            await purge_old_entries(db, settings.audit.retention_days)
+
+    register_periodic_task(
+        "audit_retention",
+        interval_seconds=86400,  # daily
+        handler=_audit_retention,
+        description="Purge audit log entries older than retention period",
+    )
+
+    await start_scheduler()
+    logger.info("Distributed scheduler started")
 
     yield
 
-    # Stop VCS poller
-    if vcs_poller_task is not None:
-        vcs_poller_task.cancel()
-        try:
-            await vcs_poller_task
-        except asyncio.CancelledError:
-            pass
-        logger.info("VCS poller stopped")
+    # Stop scheduler
+    await stop_scheduler()
+    logger.info("Distributed scheduler stopped")
 
     # Shutdown
     logger.info("Shutting down Terrapod API server")
@@ -118,6 +181,63 @@ def create_application() -> FastAPI:
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         structlog.contextvars.unbind_contextvars("request_id")
+
+        return response
+
+    # Security headers middleware
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):  # type: ignore[no-untyped-def]
+        """Add security headers to every response."""
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        return response
+
+    # Audit logging middleware
+    @app.middleware("http")
+    async def audit_logging(request: Request, call_next):  # type: ignore[no-untyped-def]
+        """Log API requests to the audit log."""
+        from terrapod.services.audit_service import (
+            parse_resource,
+            should_audit,
+        )
+
+        if not should_audit(request.url.path):
+            return await call_next(request)
+
+        start = time.monotonic()
+        response = await call_next(request)
+        duration_ms = int((time.monotonic() - start) * 1000)
+
+        # Extract actor from request state (set by auth dependency) or response
+        actor_email = ""
+        if hasattr(request.state, "user_email"):
+            actor_email = request.state.user_email
+
+        actor_ip = request.client.host if request.client else ""
+        request_id = response.headers.get("X-Request-ID", "")
+        resource_type, resource_id = parse_resource(request.url.path)
+
+        # Fire-and-forget: log asynchronously to avoid slowing down the response
+        try:
+            from terrapod.services.audit_service import log_audit_event
+
+            async with get_db_session() as db:
+                await log_audit_event(
+                    db,
+                    actor_email=actor_email,
+                    actor_ip=actor_ip,
+                    action=request.method,
+                    resource_type=resource_type,
+                    resource_id=resource_id,
+                    status_code=response.status_code,
+                    request_id=request_id,
+                    duration_ms=duration_ms,
+                )
+        except Exception:
+            logger.warning("Failed to write audit log entry", exc_info=True)
 
         return response
 
@@ -224,6 +344,38 @@ def create_application() -> FastAPI:
     from terrapod.api.routers.role_assignments import router as role_assignments_router
 
     app.include_router(role_assignments_router)
+
+    # Run trigger endpoints
+    from terrapod.api.routers.run_triggers import router as run_triggers_router
+
+    app.include_router(run_triggers_router)
+
+    # Audit log query endpoint
+    from terrapod.api.routers.audit import router as audit_router
+
+    app.include_router(audit_router)
+
+    # User management endpoints
+    from terrapod.api.routers.users import router as users_router
+
+    app.include_router(users_router)
+
+    # Notification configuration endpoints
+    from terrapod.api.routers.notification_configurations import (
+        router as notification_configurations_router,
+    )
+
+    app.include_router(notification_configurations_router)
+
+    # Run task endpoints
+    from terrapod.api.routers.run_tasks import router as run_tasks_router
+
+    app.include_router(run_tasks_router)
+
+    # Health dashboard endpoint
+    from terrapod.api.routers.health_dashboard import router as health_dashboard_router
+
+    app.include_router(health_dashboard_router)
 
     return app
 

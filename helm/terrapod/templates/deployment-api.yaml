@@ -16,6 +16,9 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap-api.yaml") . | sha256sum }}
+        {{- with .Values.api.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       labels:
         {{- include "terrapod.api.selectorLabels" . | nindent 8 }}
     spec:
@@ -71,6 +74,10 @@ spec:
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
           resources:
             {{- toYaml .Values.api.resources | nindent 12 }}
       volumes:
@@ -96,5 +103,16 @@ spec:
       {{- end }}
       {{- with .Values.api.affinity }}
       affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.api.priorityClassName }}
+      priorityClassName: {{ .Values.api.priorityClassName | quote }}
+      {{- end }}
+      {{- with .Values.api.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.podSecurityContext }}
+      securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}

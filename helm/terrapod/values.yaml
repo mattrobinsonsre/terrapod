@@ -75,7 +75,7 @@ api:
       local_enabled: true
       callback_base_url: ""  # Must be set to externally-reachable URL
       session_ttl_hours: 12
-      api_token_max_ttl_hours: 0  # 0 = no limit
+      api_token_max_ttl_hours: 168  # 7 days; 0 = no limit
       require_external_sso_for_roles: []
       sso:
         default_provider: ""
@@ -126,6 +126,25 @@ api:
         # Inject via env var: TERRAPOD_VCS__GITHUB__WEBHOOK_SECRET
         webhook_secret: ""
 
+    # Drift Detection — scheduled plan-only runs to detect infrastructure drift
+    drift_detection:
+      enabled: false
+      poll_interval_seconds: 300
+      min_workspace_interval_seconds: 3600
+
+    # Notifications
+    notifications:
+      enabled: true
+      delivery_timeout_seconds: 30
+      max_delivery_responses: 10
+      smtp:
+        host: ""
+        port: 587
+        username: ""
+        # password: inject via TERRAPOD_NOTIFICATIONS__SMTP__PASSWORD env var
+        from_address: "notifications@terrapod.local"
+        use_tls: true
+
     # CORS
     cors:
       allow_origins: []
@@ -133,6 +152,10 @@ api:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  podAnnotations: {}
+  priorityClassName: ""
+  topologySpreadConstraints: []
+  podSecurityContext: {}
 
   serviceAccount:
     create: true
@@ -170,6 +193,14 @@ web:
     limits:
       cpu: 200m
       memory: 128Mi
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  priorityClassName: ""
+  topologySpreadConstraints: []
+  podSecurityContext: {}
 
 # ── Runner Definitions ────────────────────────────────────────────────────────
 runners:
@@ -226,10 +257,38 @@ runners:
       timeout_minutes: 180
 
   # Shared Job settings (applied to all runner definitions)
-  serviceAccountName: ""  # SA for Jobs (may need cloud credentials)
   nodeSelector: {}
   tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  priorityClassName: ""
+  topologySpreadConstraints: []
+  podSecurityContext: {}
   ttlSecondsAfterFinished: 600  # Clean up completed Jobs after 10 min
+
+  # ServiceAccount for runner Jobs (cloud workload identity)
+  serviceAccount:
+    # Set to false to use a pre-existing SA managed externally
+    # (e.g. created by Terraform, eksctl, or az identity)
+    create: true
+    # SA name. Defaults to "<release>-runner" when create=true.
+    # When create=false, must reference an existing SA in the runner namespace.
+    name: ""
+    # Annotations for cloud workload identity:
+    #
+    # AWS IRSA:
+    #   eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/terrapod-runner
+    #
+    # Azure Workload Identity:
+    #   azure.workload.identity/client-id: <managed-identity-client-id>
+    #
+    # GCP Workload Identity Federation:
+    #   iam.gke.io/gcp-service-account: terrapod-runner@project.iam.gserviceaccount.com
+    annotations: {}
+
+  # Azure Workload Identity requires a pod label on runner Jobs.
+  # Enable this when using Azure WI — harmless on non-Azure clusters.
+  azureWorkloadIdentity: false
 
 # ── Runner Listener ──────────────────────────────────────────────────────────
 listener:
@@ -247,9 +306,22 @@ listener:
   # Namespace where runner Jobs are created (defaults to release namespace)
   runnerNamespace: ""
 
+  # ServiceAccount for the listener Deployment
+  serviceAccount:
+    # Set to false to use a pre-existing SA
+    create: true
+    name: ""
+    # Annotations for cloud workload identity (if listener needs
+    # direct cloud access, e.g. for object storage):
+    annotations: {}
+
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  podAnnotations: {}
+  priorityClassName: ""
+  topologySpreadConstraints: []
+  podSecurityContext: {}
 
 # ── Ingress ───────────────────────────────────────────────────────────────────
 # BFF pattern: all traffic enters through the web frontend (Next.js).

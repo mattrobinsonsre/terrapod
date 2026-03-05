@@ -14,6 +14,15 @@ from terrapod.api.dependencies import (
 )
 
 
+def _mock_request(client_host: str = "127.0.0.1", headers: dict | None = None):
+    """Create a mock Request with client IP and headers."""
+    request = MagicMock()
+    request.client = MagicMock()
+    request.client.host = client_host
+    request.headers = headers or {}
+    return request
+
+
 class TestGetCurrentUser:
     @patch("terrapod.api.dependencies._resolve_user_roles", return_value=["everyone"])
     @patch("terrapod.api.dependencies.get_session")
@@ -26,10 +35,11 @@ class TestGetCurrentUser:
         mock_token.user_email = "bot@example.com"
         mock_validate_token.return_value = mock_token
 
+        request = _mock_request()
         credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="test.tpod.token")
         mock_db = AsyncMock()
 
-        user = await get_current_user(credentials=credentials, db=mock_db)
+        user = await get_current_user(request=request, credentials=credentials, db=mock_db)
 
         assert user.email == "bot@example.com"
         assert user.auth_method == "api_token"
@@ -52,10 +62,11 @@ class TestGetCurrentUser:
 
         # Mock _should_refresh_session to return False
         with patch("terrapod.api.dependencies._should_refresh_session", return_value=False):
+            request = _mock_request()
             credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="session-token")
             mock_db = AsyncMock()
 
-            user = await get_current_user(credentials=credentials, db=mock_db)
+            user = await get_current_user(request=request, credentials=credentials, db=mock_db)
 
         assert user.email == "user@example.com"
         assert user.auth_method == "session"
@@ -68,11 +79,12 @@ class TestGetCurrentUser:
         mock_validate_token.return_value = None
         mock_get_session.return_value = None
 
+        request = _mock_request()
         credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid-token")
         mock_db = AsyncMock()
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_current_user(credentials=credentials, db=mock_db)
+            await get_current_user(request=request, credentials=credentials, db=mock_db)
 
         assert exc_info.value.status_code == 401
 
@@ -97,12 +109,23 @@ class TestGetCurrentUser:
         mock_session.provider_name = "oidc"
         mock_get_session.return_value = mock_session
 
+        request = _mock_request()
         credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="stale-session")
         mock_db = AsyncMock()
 
-        await get_current_user(credentials=credentials, db=mock_db)
+        await get_current_user(request=request, credentials=credentials, db=mock_db)
 
         mock_refresh.assert_called_once_with("stale-session", mock_session)
+
+    async def test_no_credentials_raises_401(self):
+        """No Bearer token → 401."""
+        request = _mock_request()
+        mock_db = AsyncMock()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user(request=request, credentials=None, db=mock_db)
+
+        assert exc_info.value.status_code == 401
 
 
 class TestRequireAdmin:

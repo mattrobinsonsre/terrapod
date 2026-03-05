@@ -64,7 +64,7 @@ data:
       callback_base_url: {{ .Values.api.config.auth.callback_base_url | quote }}
       {{- end }}
       session_ttl_hours: {{ .Values.api.config.auth.session_ttl_hours | default 12 }}
-      api_token_max_ttl_hours: {{ .Values.api.config.auth.api_token_max_ttl_hours | default 0 }}
+      api_token_max_ttl_hours: {{ .Values.api.config.auth.api_token_max_ttl_hours | default 168 }}
       {{- if .Values.api.config.auth.require_external_sso_for_roles }}
       require_external_sso_for_roles:
         {{- range .Values.api.config.auth.require_external_sso_for_roles }}
@@ -149,6 +149,30 @@ data:
     vcs:
       enabled: {{ .Values.api.config.vcs.enabled }}
       poll_interval_seconds: {{ .Values.api.config.vcs.poll_interval_seconds | default 60 }}
+    {{- end }}
+    {{- if .Values.api.config.drift_detection }}
+    drift_detection:
+      enabled: {{ .Values.api.config.drift_detection.enabled }}
+      poll_interval_seconds: {{ .Values.api.config.drift_detection.poll_interval_seconds | default 300 }}
+      min_workspace_interval_seconds: {{ .Values.api.config.drift_detection.min_workspace_interval_seconds | default 3600 }}
+    {{- end }}
+    {{- if .Values.api.config.notifications }}
+    notifications:
+      enabled: {{ .Values.api.config.notifications.enabled }}
+      delivery_timeout_seconds: {{ .Values.api.config.notifications.delivery_timeout_seconds | default 30 }}
+      max_delivery_responses: {{ .Values.api.config.notifications.max_delivery_responses | default 10 }}
+      {{- if .Values.api.config.notifications.smtp }}
+      smtp:
+        {{- if .Values.api.config.notifications.smtp.host }}
+        host: {{ .Values.api.config.notifications.smtp.host | quote }}
+        {{- end }}
+        port: {{ .Values.api.config.notifications.smtp.port | default 587 }}
+        {{- if .Values.api.config.notifications.smtp.username }}
+        username: {{ .Values.api.config.notifications.smtp.username | quote }}
+        {{- end }}
+        from_address: {{ .Values.api.config.notifications.smtp.from_address | default "notifications@terrapod.local" | quote }}
+        use_tls: {{ .Values.api.config.notifications.smtp.use_tls | default true }}
+      {{- end }}
     {{- end }}
     {{- if .Values.api.config.cors.allow_origins }}
     cors:

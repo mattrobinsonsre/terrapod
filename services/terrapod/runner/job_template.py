@@ -138,6 +138,15 @@ def build_job_spec(
     limit_cpu = _double_resource(resource_cpu)
     limit_memory = _double_resource(resource_memory)
 
+    # Pod labels (conditionally include Azure Workload Identity label)
+    pod_labels = {
+        "app.kubernetes.io/name": "terrapod-runner",
+        "terrapod.io/run-id": run_id,
+        "terrapod.io/phase": phase,
+    }
+    if runner_config.azure_workload_identity:
+        pod_labels["azure.workload.identity/use"] = "true"
+
     # Build Job spec
     job_spec = {
         "apiVersion": "batch/v1",
@@ -158,11 +167,7 @@ def build_job_spec(
             "ttlSecondsAfterFinished": runner_config.ttl_seconds_after_finished,
             "template": {
                 "metadata": {
-                    "labels": {
-                        "app.kubernetes.io/name": "terrapod-runner",
-                        "terrapod.io/run-id": run_id,
-                        "terrapod.io/phase": phase,
-                    },
+                    "labels": pod_labels,
                 },
                 "spec": {
                     "terminationGracePeriodSeconds": 120,
@@ -194,10 +199,22 @@ def build_job_spec(
     if service_account_name:
         job_spec["spec"]["template"]["spec"]["serviceAccountName"] = service_account_name
 
-    # Node selector and tolerations from runner config
+    # Scheduling and placement from runner config
+    pod_spec = job_spec["spec"]["template"]["spec"]
     if runner_config.node_selector:
-        job_spec["spec"]["template"]["spec"]["nodeSelector"] = runner_config.node_selector
+        pod_spec["nodeSelector"] = runner_config.node_selector
     if runner_config.tolerations:
-        job_spec["spec"]["template"]["spec"]["tolerations"] = runner_config.tolerations
+        pod_spec["tolerations"] = runner_config.tolerations
+    if runner_config.affinity:
+        pod_spec["affinity"] = runner_config.affinity
+    if runner_config.priority_class_name:
+        pod_spec["priorityClassName"] = runner_config.priority_class_name
+    if runner_config.topology_spread_constraints:
+        pod_spec["topologySpreadConstraints"] = runner_config.topology_spread_constraints
+    if runner_config.pod_security_context:
+        pod_spec["securityContext"] = runner_config.pod_security_context
+    if runner_config.pod_annotations:
+        pod_meta = job_spec["spec"]["template"]["metadata"]
+        pod_meta["annotations"] = runner_config.pod_annotations
 
     return job_spec

@@ -82,12 +82,18 @@ class RunnerConfig(BaseModel):
     default_terraform_version: str = Field(default="1.9.8")
     default_execution_backend: str = Field(default="terraform")
     service_account_name: str = Field(default="")
+    azure_workload_identity: bool = Field(default=False)
     ttl_seconds_after_finished: int = Field(default=600)
     definitions: list[RunnerDefinition] = Field(
         default_factory=lambda: [RunnerDefinition(name="standard", description="Standard runner")]
     )
     node_selector: dict[str, str] = Field(default_factory=dict)
     tolerations: list[dict] = Field(default_factory=list)
+    affinity: dict = Field(default_factory=dict)
+    pod_annotations: dict[str, str] = Field(default_factory=dict)
+    priority_class_name: str = Field(default="")
+    topology_spread_constraints: list[dict] = Field(default_factory=list)
+    pod_security_context: dict = Field(default_factory=dict)
 
 
 def load_runner_config(path: str = "/etc/terrapod/runners.yaml") -> RunnerConfig:
@@ -285,14 +291,49 @@ class AuthConfig(BaseSettings):
         description="Session TTL in hours",
     )
     api_token_max_ttl_hours: int = Field(
-        default=0,
-        description="Maximum API token lifetime in hours. 0 = no limit. "
-        "Computed at validation time as created_at + this value.",
+        default=168,
+        description="Maximum API token lifetime in hours (default: 168 = 7 days). "
+        "0 = no limit. Computed at validation time as created_at + this value.",
     )
     require_external_sso_for_roles: list[str] = Field(
         default_factory=list,
         description="Roles that require external SSO login (excludes local provider)",
     )
+
+
+# --- Audit Configuration ---
+
+
+class AuditConfig(BaseModel):
+    """Audit logging configuration."""
+
+    retention_days: int = Field(
+        default=90,
+        description="Number of days to retain audit log entries. Entries older than this are deleted by the retention task.",
+    )
+
+
+# --- Notifications Configuration ---
+
+
+class SMTPConfig(BaseModel):
+    """SMTP configuration for email notifications."""
+
+    host: str = ""
+    port: int = 587
+    username: str = ""
+    password: str = ""
+    from_address: str = "notifications@terrapod.local"
+    use_tls: bool = True
+
+
+class NotificationsConfig(BaseModel):
+    """Notification delivery configuration."""
+
+    enabled: bool = True
+    delivery_timeout_seconds: int = 30
+    max_delivery_responses: int = 10
+    smtp: SMTPConfig = Field(default_factory=SMTPConfig)
 
 
 # --- Registry Configuration ---
@@ -355,6 +396,27 @@ class VCSConfig(BaseModel):
     github: GitHubWebhookConfig = Field(default_factory=GitHubWebhookConfig)
 
 
+# --- Drift Detection Configuration ---
+
+
+class DriftDetectionConfig(BaseModel):
+    """Drift detection configuration.
+
+    When enabled, a periodic scheduler task checks all drift-enabled workspaces
+    and creates plan-only runs to detect infrastructure drift.
+    """
+
+    enabled: bool = Field(default=False, description="Enable drift detection")
+    poll_interval_seconds: int = Field(
+        default=300,
+        description="How often the scheduler checks for workspaces due for drift detection",
+    )
+    min_workspace_interval_seconds: int = Field(
+        default=3600,
+        description="Minimum per-workspace drift check interval (floor, 1 hour)",
+    )
+
+
 # --- CORS Configuration ---
 
 
@@ -414,11 +476,20 @@ class Settings(BaseSettings):
     # Authentication
     auth: AuthConfig = Field(default_factory=AuthConfig)
 
+    # Audit
+    audit: AuditConfig = Field(default_factory=AuditConfig)
+
     # Registry
     registry: RegistryConfig = Field(default_factory=RegistryConfig)
 
     # VCS
     vcs: VCSConfig = Field(default_factory=VCSConfig)
+
+    # Notifications
+    notifications: NotificationsConfig = Field(default_factory=NotificationsConfig)
+
+    # Drift Detection
+    drift_detection: DriftDetectionConfig = Field(default_factory=DriftDetectionConfig)
 
     # CORS
     cors: CORSConfig = Field(default_factory=CORSConfig)

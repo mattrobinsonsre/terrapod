@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Layers, Package, Blocks, Key, Activity, HardDrive, LogOut, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Shield, Server, Variable, HeartPulse, LogOut, Menu, X } from 'lucide-react'
 import { clearAuth, isAdmin } from '@/lib/auth'
 import { SessionExpiryBanner } from '@/components/session-expiry-banner'
 
@@ -79,10 +79,32 @@ export default function NavBar() {
         Sessions
       </NavLink>
       {admin && (
-        <NavLink href="/admin/binary-cache" onClick={closeMenu}>
-          <HardDrive size={16} />
-          Binary Cache
-        </NavLink>
+        <>
+          <NavLink href="/admin/binary-cache" onClick={closeMenu}>
+            <HardDrive size={16} />
+            Binary Cache
+          </NavLink>
+          <NavLink href="/admin/vcs-connections" onClick={closeMenu}>
+            <GitBranch size={16} />
+            VCS
+          </NavLink>
+          <NavLink href="/admin/roles" onClick={closeMenu}>
+            <Shield size={16} />
+            Roles
+          </NavLink>
+          <NavLink href="/admin/agent-pools" onClick={closeMenu}>
+            <Server size={16} />
+            Agent Pools
+          </NavLink>
+          <NavLink href="/admin/variable-sets" onClick={closeMenu}>
+            <Variable size={16} />
+            Variable Sets
+          </NavLink>
+          <NavLink href="/admin/health" onClick={closeMenu}>
+            <HeartPulse size={16} />
+            Health
+          </NavLink>
+        </>
       )}
     </>
   )

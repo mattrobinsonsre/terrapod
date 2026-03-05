@@ -4,6 +4,11 @@ VCS connections are platform-level resources that configure auth for a VCS
 provider (GitHub App installation, GitLab access token). Workspaces reference
 a connection to link to a repository.
 
+UX CONTRACT: VCS connection endpoints are consumed by the web frontend:
+  - web/src/app/admin/vcs-connections/page.tsx (connection CRUD)
+  Changes to response shapes, attribute names, or status codes here MUST be
+  matched by corresponding updates to that frontend page.
+
 Endpoints:
     GET    /api/v2/organizations/{org}/vcs-connections   (list connections)
     POST   /api/v2/organizations/{org}/vcs-connections   (create connection)

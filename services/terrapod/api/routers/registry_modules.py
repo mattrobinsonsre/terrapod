@@ -4,6 +4,12 @@ Two API surfaces:
 1. CLI-facing protocol — what `terraform init` speaks for private registry modules
 2. TFE V2 management — JSON:API CRUD for managing modules
 
+UX CONTRACT: Management endpoints are consumed by the web frontend:
+  - web/src/app/registry/modules/page.tsx (module list, create)
+  - web/src/app/registry/modules/[org]/[namespace]/[name]/[provider]/page.tsx (module detail)
+  Changes to response shapes, attribute names, or status codes here MUST be
+  matched by corresponding updates to those frontend pages.
+
 CLI Protocol:
     GET  /api/v2/registry/modules/{org}/{name}/{provider}/versions
     GET  /api/v2/registry/modules/{org}/{name}/{provider}/{version}/download

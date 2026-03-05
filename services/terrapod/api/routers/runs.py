@@ -1,5 +1,11 @@
 """Run CRUD and lifecycle endpoints (TFE V2 compatible).
 
+UX CONTRACT: Run endpoints are consumed by the web frontend:
+  - web/src/app/workspaces/[id]/page.tsx (runs tab: list, create)
+  - web/src/app/workspaces/[id]/runs/[runId]/page.tsx (run detail, logs, confirm/discard/cancel)
+  Changes to response shapes, attribute names, or status codes here MUST be
+  matched by corresponding updates to those frontend pages.
+
 Endpoints:
     POST   /api/v2/runs                              (create run)
     GET    /api/v2/runs/{run_id}                      (show run)
@@ -58,6 +64,8 @@ def _run_json(run: Run) -> dict:
                 "source": run.source,
                 "terraform-version": run.terraform_version,
                 "error-message": run.error_message,
+                "is-drift-detection": run.is_drift_detection,
+                "has-changes": run.has_changes,
                 "vcs-commit-sha": run.vcs_commit_sha,
                 "vcs-branch": run.vcs_branch,
                 "vcs-pull-request-number": run.vcs_pull_request_number,
@@ -92,6 +100,9 @@ def _run_json(run: Run) -> dict:
                 },
                 "apply": {
                     "data": {"id": f"apply-{run.id}", "type": "applies"},
+                },
+                "task-stages": {
+                    "links": {"related": f"/api/v2/runs/{run_id}/task-stages"},
                 },
             },
             "links": {
@@ -428,9 +439,14 @@ async def update_run_status(
 
     target_status = body.get("status", "")
     error_message = body.get("error_message", "")
+    has_changes = body.get("has_changes")
 
     if not target_status:
         raise HTTPException(status_code=422, detail="status is required")
+
+    # Set has_changes before transition (so it's visible in drift handler)
+    if has_changes is not None:
+        run.has_changes = has_changes
 
     try:
         run = await run_service.transition_run(db, run, target_status, error_message=error_message)

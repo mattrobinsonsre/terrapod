@@ -1,5 +1,11 @@
 """TFE V2 compatible variable CRUD endpoints.
 
+UX CONTRACT: Variable endpoints are consumed by the web frontend:
+  - web/src/app/workspaces/[id]/page.tsx (variables tab)
+  - web/src/app/admin/variable-sets/ (variable set CRUD)
+  Changes to response shapes, attribute names, or status codes here MUST be
+  matched by corresponding updates to those frontend pages.
+
 Endpoints:
     GET/POST       /api/v2/workspaces/{id}/vars
     PATCH/DELETE   /api/v2/workspaces/{id}/vars/{var_id}

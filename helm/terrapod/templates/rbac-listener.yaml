@@ -1,11 +1,17 @@
 {{- if .Values.listener.enabled }}
+{{- if .Values.listener.serviceAccount.create }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "terrapod.fullname" . }}-listener
+  name: {{ include "terrapod.listenerServiceAccountName" . }}
   labels:
     {{- include "terrapod.labels" . | nindent 4 }}
     app.kubernetes.io/component: listener
+  {{- with .Values.listener.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -40,6 +46,6 @@ roleRef:
   name: {{ include "terrapod.fullname" . }}-listener
 subjects:
   - kind: ServiceAccount
-    name: {{ include "terrapod.fullname" . }}-listener
+    name: {{ include "terrapod.listenerServiceAccountName" . }}
     namespace: {{ .Release.Namespace }}
 {{- end }}

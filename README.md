@@ -24,8 +24,6 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | Agent Pools | Implemented | Named groups of remote runner listeners with certificate-based auth |
 | CLI-Driven Runs | Implemented | `terraform plan` / `apply` via cloud backend (both `terraform` and `tofu` verified) |
 | TFE V2 API | Implemented | JSON:API surface compatible with `go-tfe` / `terraform login` |
-| Policy as Code (OPA) | Planned | OPA (Rego) policy evaluation on plan output |
-| Cost Estimation | Planned | Infracost integration for pre-apply cost estimates |
 | Audit Logging | Planned | Immutable event log for compliance |
 | SSO (OIDC / SAML) | Implemented | Pluggable identity providers (Auth0, Okta, Azure AD, etc.) |
 | Drift Detection | Planned | Scheduled plan-only runs to detect out-of-band changes |

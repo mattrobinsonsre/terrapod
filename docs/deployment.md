@@ -202,6 +202,27 @@ helm install terrapod ./helm/terrapod \
 | `api.config.vcs.poll_interval_seconds` | `60` | Poll interval |
 | `api.config.vcs.github.webhook_secret` | `""` | GitHub webhook HMAC secret |
 
+### Drift Detection
+
+| Value | Default | Description |
+|---|---|---|
+| `api.config.drift_detection.enabled` | `false` | Enable the drift detection scheduler |
+| `api.config.drift_detection.poll_interval_seconds` | `300` | How often the scheduler checks for workspaces due for a drift scan |
+| `api.config.drift_detection.min_workspace_interval_seconds` | `3600` | Minimum allowed per-workspace drift check interval (floor for `drift-detection-interval-seconds` on any workspace) |
+
+Example configuration in `values-production.yaml`:
+
+```yaml
+api:
+  config:
+    drift_detection:
+      enabled: true
+      poll_interval_seconds: 300
+      min_workspace_interval_seconds: 3600
+```
+
+When enabled, the drift detection scheduler runs as a periodic task (via the distributed scheduler) and creates plan-only runs with `-detailed-exitcode` for workspaces that have drift detection enabled and are past their check interval. The scheduler respects the per-workspace `drift-detection-interval-seconds` attribute, subject to the `min_workspace_interval_seconds` floor.
+
 ### Encryption
 
 | Value | Default | Description |
@@ -609,13 +630,20 @@ api:
 
 Logs are written to stdout in JSON format, suitable for log aggregation (Fluentd, Loki, CloudWatch, etc.).
 
+### Health Dashboard
+
+The admin health dashboard endpoint (`GET /api/v2/admin/health-dashboard`) provides a single-request overview of platform health, including workspace drift status, recent run statistics, and listener availability. This is useful for integration with external monitoring dashboards (Grafana, Datadog, etc.) or custom alerting.
+
+Requires `admin` or `audit` role. See the [API Reference](api-reference.md#health-dashboard) for the full response schema.
+
 ### Key Metrics to Monitor
 
 | Metric | Where to Find |
 |---|---|
 | API request latency | Ingress controller metrics or application logs |
-| Run queue depth | Count runs in `queued` state via API |
-| Listener heartbeat | Redis keys `tp:listener:{id}:status` |
+| Run queue depth | Count runs in `queued` state via API or health dashboard |
+| Drift status | Health dashboard `workspaces.by-drift-status` |
+| Listener heartbeat | Redis keys `tp:listener:{id}:status` or health dashboard |
 | Database connections | PostgreSQL `pg_stat_activity` |
 | Storage operations | Cloud provider metrics (S3/Blob/GCS) |
 | Job success/failure | Kubernetes Job status in runner namespace |

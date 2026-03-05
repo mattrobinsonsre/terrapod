@@ -1,5 +1,10 @@
 """Role assignment management endpoints (admin only).
 
+UX CONTRACT: Role assignment endpoints are consumed by the web frontend:
+  - web/src/app/admin/roles/page.tsx (assignments tab)
+  Changes to response shapes, attribute names, or status codes here MUST be
+  matched by corresponding updates to that frontend page.
+
 Endpoints:
     GET    /api/v2/role-assignments                       — list all assignments
     PUT    /api/v2/role-assignments                       — set roles for (provider, email)

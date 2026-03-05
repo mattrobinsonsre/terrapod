@@ -21,6 +21,8 @@ interface Workspace {
     locked: boolean
     'resource-cpu': string
     'resource-memory': string
+    'drift-detection-enabled': boolean
+    'drift-status': string
     'created-at': string
   }
 }
@@ -208,12 +210,25 @@ export default function WorkspacesPage() {
                 {workspaces.map((ws) => (
                   <tr key={ws.id} className="hover:bg-slate-700/20 transition-colors">
                     <td className="px-4 py-3">
-                      <Link
-                        href={`/workspaces/${ws.id}`}
-                        className="text-sm font-medium text-brand-400 hover:text-brand-300"
-                      >
-                        {ws.attributes.name}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/workspaces/${ws.id}`}
+                          className="text-sm font-medium text-brand-400 hover:text-brand-300"
+                        >
+                          {ws.attributes.name}
+                        </Link>
+                        {ws.attributes['drift-detection-enabled'] && ws.attributes['drift-status'] && (
+                          <span
+                            className={`inline-block w-2 h-2 rounded-full ${
+                              ws.attributes['drift-status'] === 'no_drift' ? 'bg-green-400' :
+                              ws.attributes['drift-status'] === 'drifted' ? 'bg-amber-400' :
+                              ws.attributes['drift-status'] === 'errored' ? 'bg-red-400' :
+                              'bg-slate-500'
+                            }`}
+                            title={`Drift: ${ws.attributes['drift-status'].replace('_', ' ')}`}
+                          />
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
                       <span className="text-xs text-slate-400">{ws.attributes['execution-mode']}</span>

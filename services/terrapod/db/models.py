@@ -312,6 +312,18 @@ class Workspace(Base):
     vcs_working_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     vcs_last_commit_sha: Mapped[str] = mapped_column(String(40), nullable=False, default="")
 
+    # Drift detection
+    drift_detection_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    drift_detection_interval_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=86400
+    )
+    drift_last_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    drift_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=""
+    )  # "", "no_drift", "drifted", "errored"
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -939,6 +951,10 @@ class Run(Base):
     )
     error_message: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
+    # Drift detection
+    is_drift_detection: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    has_changes: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+
     # VCS metadata
     vcs_commit_sha: Mapped[str] = mapped_column(String(40), nullable=False, default="")
     vcs_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
@@ -969,3 +985,245 @@ class Run(Base):
         Index("ix_runs_workspace_id", "workspace_id"),
         Index("ix_runs_status", "status"),
     )
+
+
+# --- Audit Logs ---
+
+
+class AuditLog(Base):
+    """Immutable audit log entry for API requests.
+
+    Captures who did what, when, and the result. Sensitive data is
+    redacted before persistence. Retained for a configurable number
+    of days (default 90).
+    """
+
+    __tablename__ = "audit_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    actor_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    actor_ip: Mapped[str] = mapped_column(String(45), nullable=False, default="")
+    action: Mapped[str] = mapped_column(
+        String(20), nullable=False
+    )  # HTTP method: GET, POST, PATCH, DELETE
+    resource_type: Mapped[str] = mapped_column(String(63), nullable=False, default="")
+    resource_id: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    status_code: Mapped[int] = mapped_column(Integer, nullable=False)
+    request_id: Mapped[str] = mapped_column(String(63), nullable=False, default="")
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    detail: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_audit_logs_timestamp", "timestamp"),
+        Index("ix_audit_logs_actor_email", "actor_email"),
+        Index("ix_audit_logs_resource", "resource_type", "resource_id"),
+    )
+
+
+# --- Run Triggers ---
+
+
+class RunTrigger(Base):
+    """Cross-workspace run trigger.
+
+    When the source workspace completes an apply, the destination workspace
+    automatically gets a new run queued. No data is passed — downstream
+    workspaces read outputs via terraform_remote_state independently.
+    """
+
+    __tablename__ = "run_triggers"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+
+    workspace: Mapped["Workspace"] = relationship(foreign_keys=[workspace_id])
+    source_workspace: Mapped["Workspace"] = relationship(foreign_keys=[source_workspace_id])
+
+    __table_args__ = (
+        sa.UniqueConstraint("workspace_id", "source_workspace_id", name="uq_run_triggers"),
+        Index("ix_run_triggers_source_workspace_id", "source_workspace_id"),
+    )
+
+
+# --- Notification Configurations ---
+
+
+class NotificationConfiguration(Base):
+    """Workspace-scoped notification configuration.
+
+    Fires notifications on run lifecycle events to generic webhooks,
+    Slack channels, or email addresses. Token is Fernet-encrypted at rest.
+    """
+
+    __tablename__ = "notification_configurations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    destination_type: Mapped[str] = mapped_column(
+        String(20), nullable=False
+    )  # generic, slack, email
+    url: Mapped[str] = mapped_column(String(2000), nullable=False, default="")
+    token_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    triggers: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=list)
+    email_addresses: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=list)
+    delivery_responses: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=list)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+    workspace: Mapped["Workspace"] = relationship()
+
+    __table_args__ = (Index("ix_notification_configurations_workspace_id", "workspace_id"),)
+
+
+# --- Run Tasks ---
+
+
+class RunTask(Base):
+    """Workspace-scoped run task definition.
+
+    Configures a webhook hook for external validation at a specific stage
+    of the run lifecycle (pre_plan, post_plan, pre_apply).
+    """
+
+    __tablename__ = "run_tasks"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    url: Mapped[str] = mapped_column(String(2000), nullable=False)
+    hmac_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    stage: Mapped[str] = mapped_column(String(20), nullable=False)  # pre_plan, post_plan, pre_apply
+    enforcement_level: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="mandatory"
+    )  # mandatory, advisory
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+    workspace: Mapped["Workspace"] = relationship()
+
+    __table_args__ = (Index("ix_run_tasks_workspace_id", "workspace_id"),)
+
+
+class TaskStage(Base):
+    """Per-run stage execution instance.
+
+    Created when a run reaches a stage boundary that has applicable run tasks.
+    Tracks overall pass/fail for the stage.
+    """
+
+    __tablename__ = "task_stages"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    stage: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="pending"
+    )  # pending/running/passed/failed/errored/canceled/overridden
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+    results: Mapped[list["TaskStageResult"]] = relationship(
+        back_populates="task_stage", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (Index("ix_task_stages_run_id", "run_id"),)
+
+
+class TaskStageResult(Base):
+    """Individual task result within a stage.
+
+    Each result corresponds to one RunTask webhook call. The external
+    service reports pass/fail via the callback endpoint using the
+    callback_token.
+    """
+
+    __tablename__ = "task_stage_results"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    task_stage_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("task_stages.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    run_task_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("run_tasks.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="pending"
+    )  # pending/running/passed/failed/errored/unreachable
+    message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    callback_token: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+
+    task_stage: Mapped["TaskStage"] = relationship(back_populates="results")
+    run_task: Mapped["RunTask | None"] = relationship()
+
+    __table_args__ = (Index("ix_task_stage_results_task_stage_id", "task_stage_id"),)

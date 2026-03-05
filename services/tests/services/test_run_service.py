@@ -1,0 +1,359 @@
+"""Tests for run state machine and lifecycle management."""
+
+import uuid
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from terrapod.services.run_service import (
+    TERMINAL_STATES,
+    VALID_TRANSITIONS,
+    can_transition,
+    cancel_run,
+    claim_next_run,
+    confirm_run,
+    create_run,
+    discard_run,
+    queue_run,
+    transition_run,
+)
+
+# ── can_transition ─────────────────────────────────────────────────────
+
+
+class TestCanTransition:
+    def test_all_valid_transitions_accepted(self):
+        """Every edge in VALID_TRANSITIONS is accepted."""
+        for source, targets in VALID_TRANSITIONS.items():
+            for target in targets:
+                assert can_transition(source, target) is True, (
+                    f"Expected {source} → {target} to be valid"
+                )
+
+    def test_terminal_states_reject_all(self):
+        """No transitions from terminal states."""
+        for terminal in TERMINAL_STATES:
+            for target in [
+                "pending",
+                "queued",
+                "planning",
+                "planned",
+                "confirmed",
+                "applying",
+                "applied",
+            ]:
+                assert can_transition(terminal, target) is False, (
+                    f"Expected {terminal} → {target} to be rejected"
+                )
+
+    def test_invalid_forward_transitions(self):
+        assert can_transition("pending", "planning") is False
+        assert can_transition("pending", "applied") is False
+        assert can_transition("queued", "confirmed") is False
+        assert can_transition("planning", "applying") is False
+
+    def test_backward_transitions_rejected(self):
+        assert can_transition("planned", "queued") is False
+        assert can_transition("applying", "planning") is False
+        assert can_transition("confirmed", "planned") is False
+
+    def test_pending_to_queued(self):
+        assert can_transition("pending", "queued") is True
+
+    def test_queued_to_planning(self):
+        assert can_transition("queued", "planning") is True
+
+    def test_planning_to_planned(self):
+        assert can_transition("planning", "planned") is True
+
+    def test_planned_to_confirmed(self):
+        assert can_transition("planned", "confirmed") is True
+
+    def test_planned_to_discarded(self):
+        assert can_transition("planned", "discarded") is True
+
+    def test_confirmed_to_applying(self):
+        assert can_transition("confirmed", "applying") is True
+
+    def test_applying_to_applied(self):
+        assert can_transition("applying", "applied") is True
+
+    def test_any_non_terminal_to_canceled(self):
+        for state in ["pending", "queued", "planning", "planned", "confirmed", "applying"]:
+            assert can_transition(state, "canceled") is True
+
+    def test_any_non_terminal_to_errored(self):
+        for state in ["pending", "queued", "planning", "planned", "confirmed", "applying"]:
+            assert can_transition(state, "errored") is True
+
+
+# ── transition_run ─────────────────────────────────────────────────────
+
+
+def _mock_run(**kwargs):
+    run = MagicMock()
+    run.id = kwargs.get("id", uuid.uuid4())
+    run.status = kwargs.get("status", "pending")
+    run.workspace_id = kwargs.get("workspace_id", uuid.uuid4())
+    run.plan_started_at = kwargs.get("plan_started_at", None)
+    run.plan_finished_at = kwargs.get("plan_finished_at", None)
+    run.apply_started_at = kwargs.get("apply_started_at", None)
+    run.apply_finished_at = kwargs.get("apply_finished_at", None)
+    run.error_message = kwargs.get("error_message", "")
+    run.auto_apply = kwargs.get("auto_apply", False)
+    run.plan_only = kwargs.get("plan_only", False)
+    run.listener_id = kwargs.get("listener_id", None)
+    run.locked = kwargs.get("locked", False)
+    return run
+
+
+class TestTransitionRun:
+    async def test_valid_transition_updates_status(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="pending")
+        result = await transition_run(db, run, "queued")
+        assert result.status == "queued"
+        db.flush.assert_called_once()
+
+    async def test_invalid_transition_raises(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="pending")
+        with pytest.raises(ValueError, match="Invalid transition"):
+            await transition_run(db, run, "applied")
+
+    async def test_planning_sets_plan_started_at(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="queued")
+        result = await transition_run(db, run, "planning")
+        assert result.plan_started_at is not None
+
+    async def test_planned_sets_plan_finished_at(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="planning", plan_started_at=datetime.now(UTC))
+        result = await transition_run(db, run, "planned")
+        assert result.plan_finished_at is not None
+
+    async def test_applying_sets_apply_started_at(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="confirmed")
+        result = await transition_run(db, run, "applying")
+        assert result.apply_started_at is not None
+
+    @patch("terrapod.services.run_service.fire_run_triggers", new_callable=AsyncMock)
+    async def test_applied_sets_apply_finished_at(self, mock_fire):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(
+            status="applying",
+            apply_started_at=datetime.now(UTC),
+        )
+        result = await transition_run(db, run, "applied")
+        assert result.apply_finished_at is not None
+
+    async def test_error_message_stored(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="planning")
+        await transition_run(db, run, "errored", error_message="terraform crashed")
+        assert run.error_message == "terraform crashed"
+
+    async def test_errored_during_plan_sets_plan_finished(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="planning", plan_started_at=datetime.now(UTC))
+        await transition_run(db, run, "errored")
+        assert run.plan_finished_at is not None
+
+    async def test_errored_during_apply_sets_apply_finished(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(
+            status="applying",
+            apply_started_at=datetime.now(UTC),
+        )
+        await transition_run(db, run, "errored")
+        assert run.apply_finished_at is not None
+
+
+# ── create_run ─────────────────────────────────────────────────────────
+
+
+def _mock_workspace(**kwargs):
+    ws = MagicMock()
+    ws.id = kwargs.get("id", uuid.uuid4())
+    ws.name = kwargs.get("name", "test-ws")
+    ws.auto_apply = kwargs.get("auto_apply", False)
+    ws.terraform_version = kwargs.get("terraform_version", "1.9.0")
+    ws.resource_cpu = kwargs.get("resource_cpu", "1")
+    ws.resource_memory = kwargs.get("resource_memory", "2Gi")
+    ws.agent_pool_id = kwargs.get("agent_pool_id", None)
+    return ws
+
+
+class TestCreateRun:
+    @patch("terrapod.services.run_service.Run")
+    async def test_creates_run_with_defaults(self, MockRun):
+        db = AsyncMock(spec=AsyncSession)
+        # Mock the default pool lookup
+        mock_pool = MagicMock()
+        mock_pool.id = uuid.uuid4()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_pool
+        db.execute.return_value = mock_result
+
+        ws = _mock_workspace()
+        instance = MockRun.return_value
+        instance.id = uuid.uuid4()
+        instance.status = "pending"
+
+        await create_run(db, ws, message="initial run")
+        MockRun.assert_called_once()
+        call_kwargs = MockRun.call_args[1]
+        assert call_kwargs["status"] == "pending"
+        assert call_kwargs["message"] == "initial run"
+        assert call_kwargs["auto_apply"] == ws.auto_apply
+        db.add.assert_called_once_with(instance)
+        db.flush.assert_called_once()
+
+    @patch("terrapod.services.run_service.Run")
+    async def test_auto_apply_override(self, MockRun):
+        db = AsyncMock(spec=AsyncSession)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        ws = _mock_workspace(auto_apply=False)
+        instance = MockRun.return_value
+        instance.id = uuid.uuid4()
+        instance.status = "pending"
+
+        await create_run(db, ws, auto_apply=True)
+        assert MockRun.call_args[1]["auto_apply"] is True
+
+    @patch("terrapod.services.run_service.Run")
+    async def test_resource_snapshot_from_workspace(self, MockRun):
+        db = AsyncMock(spec=AsyncSession)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        ws = _mock_workspace(resource_cpu="2", resource_memory="4Gi")
+        instance = MockRun.return_value
+        instance.id = uuid.uuid4()
+        instance.status = "pending"
+
+        await create_run(db, ws)
+        assert MockRun.call_args[1]["resource_cpu"] == "2"
+        assert MockRun.call_args[1]["resource_memory"] == "4Gi"
+
+    @patch("terrapod.services.run_service.Run")
+    async def test_pool_from_workspace(self, MockRun):
+        db = AsyncMock(spec=AsyncSession)
+        pool_id = uuid.uuid4()
+        ws = _mock_workspace(agent_pool_id=pool_id)
+        instance = MockRun.return_value
+        instance.id = uuid.uuid4()
+        instance.status = "pending"
+
+        await create_run(db, ws)
+        assert MockRun.call_args[1]["pool_id"] == pool_id
+
+
+# ── confirm_run / discard_run / cancel_run ─────────────────────────────
+
+
+class TestConfirmRun:
+    async def test_confirms_planned_run(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="planned")
+        result = await confirm_run(db, run)
+        assert result.status == "confirmed"
+
+    async def test_rejects_non_planned(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="queued")
+        with pytest.raises(ValueError, match="planned"):
+            await confirm_run(db, run)
+
+
+class TestDiscardRun:
+    async def test_discards_planned_run(self):
+        db = AsyncMock(spec=AsyncSession)
+        ws = MagicMock()
+        ws.locked = True
+        ws.lock_id = "lock-123"
+        db.get.return_value = ws
+        run = _mock_run(status="planned")
+        result = await discard_run(db, run)
+        assert result.status == "discarded"
+        # Workspace should be unlocked
+        assert ws.locked is False
+        assert ws.lock_id is None
+
+    async def test_rejects_non_planned(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="applying")
+        with pytest.raises(ValueError, match="planned"):
+            await discard_run(db, run)
+
+
+class TestCancelRun:
+    async def test_cancels_non_terminal_run(self):
+        db = AsyncMock(spec=AsyncSession)
+        ws = MagicMock()
+        ws.locked = True
+        db.get.return_value = ws
+        run = _mock_run(status="planning")
+        result = await cancel_run(db, run)
+        assert result.status == "canceled"
+        assert ws.locked is False
+
+    async def test_rejects_terminal_state(self):
+        db = AsyncMock(spec=AsyncSession)
+        for state in TERMINAL_STATES:
+            run = _mock_run(status=state)
+            with pytest.raises(ValueError, match="terminal"):
+                await cancel_run(db, run)
+
+
+# ── queue_run ──────────────────────────────────────────────────────────
+
+
+class TestQueueRun:
+    async def test_queues_pending_run(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="pending")
+        result = await queue_run(db, run)
+        assert result.status == "queued"
+
+
+# ── claim_next_run ─────────────────────────────────────────────────────
+
+
+class TestClaimNextRun:
+    async def test_claims_run_and_transitions_to_planning(self):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="queued")
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = run
+        db.execute.return_value = mock_result
+
+        listener = MagicMock()
+        listener.id = uuid.uuid4()
+        listener.pool_id = uuid.uuid4()
+        listener.name = "listener-1"
+
+        result = await claim_next_run(db, listener)
+        assert result is not None
+        assert result.status == "planning"
+        assert result.listener_id == listener.id
+
+    async def test_returns_none_when_queue_empty(self):
+        db = AsyncMock(spec=AsyncSession)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        listener = MagicMock()
+        listener.pool_id = uuid.uuid4()
+
+        result = await claim_next_run(db, listener)
+        assert result is None

@@ -4,7 +4,7 @@ Handles generation of:
 - CA certificate and key (Ed25519)
 - Listener certificates (1 year default) — for runner listener identity
 
-Ported from bamf, simplified for Terrapod's runner-only certificate needs.
+Handles Terrapod's runner-only certificate needs.
 """
 
 import datetime
