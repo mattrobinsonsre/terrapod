@@ -17,7 +17,7 @@ httpx = "^0.28.0"
 pyyaml = "^6.0.0"
 aiofiles = "^24.1.0"
 # AWS S3
-aioboto3 = "^13.0.0"
+aioboto3 = "^15.5.0"
 # Azure Blob Storage
 azure-storage-blob = "^12.25.0"
 azure-identity = "^1.21.0"
