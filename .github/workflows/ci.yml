@@ -16,14 +16,14 @@ jobs:
     name: Python Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: scripts/lint.sh python
 
   python-test:
     name: Python Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: scripts/test.sh python
 
   # ── Helm ────────────────────────────────────────────────
@@ -31,7 +31,7 @@ jobs:
     name: Helm Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Helm lint (containerized)
         run: |
           docker run --rm -v "$PWD:/chart" -w /chart \
@@ -43,7 +43,7 @@ jobs:
     name: Docker Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build API image
         run: docker build -f docker/Dockerfile.api -t terrapod-api:ci .
 
