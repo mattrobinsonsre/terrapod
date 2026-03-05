@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.db.models import Run, RunnerListener, Workspace
@@ -244,7 +245,7 @@ async def _get_listener_health(db: AsyncSession) -> dict:
     """Aggregate listener health data from DB + Redis."""
     from terrapod.redis.client import get_redis_client
 
-    result = await db.execute(select(RunnerListener))
+    result = await db.execute(select(RunnerListener).options(selectinload(RunnerListener.pool)))
     listeners = list(result.scalars().all())
 
     redis = get_redis_client()
