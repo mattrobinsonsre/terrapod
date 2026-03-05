@@ -33,7 +33,7 @@ redis = "^5.2.0"
 # Auth
 authlib = "^1.4.0"
 python3-saml = "^1.16.0"
-cryptography = "^44.0.0"
+cryptography = "^46.0.5"
 zxcvbn = "^4.4.28"
 python-multipart = "^0.0.20"
 # Kubernetes (runner listener)
