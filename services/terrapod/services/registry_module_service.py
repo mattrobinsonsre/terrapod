@@ -20,14 +20,12 @@ logger = get_logger(__name__)
 
 async def create_module(
     db: AsyncSession,
-    org: str,
     namespace: str,
     name: str,
     provider: str,
 ) -> RegistryModule:
     """Create a new registry module."""
     module = RegistryModule(
-        org_name=org,
         namespace=namespace,
         name=name,
         provider=provider,
@@ -40,12 +38,10 @@ async def create_module(
 
 async def list_modules(
     db: AsyncSession,
-    org: str,
 ) -> list[RegistryModule]:
-    """List all registry modules for an organization."""
+    """List all registry modules."""
     result = await db.execute(
         select(RegistryModule)
-        .where(RegistryModule.org_name == org)
         .options(selectinload(RegistryModule.versions))
         .order_by(RegistryModule.name)
     )
@@ -54,7 +50,6 @@ async def list_modules(
 
 async def get_module(
     db: AsyncSession,
-    org: str,
     namespace: str,
     name: str,
     provider: str,
@@ -63,7 +58,6 @@ async def get_module(
     result = await db.execute(
         select(RegistryModule)
         .where(
-            RegistryModule.org_name == org,
             RegistryModule.namespace == namespace,
             RegistryModule.name == name,
             RegistryModule.provider == provider,
@@ -76,19 +70,18 @@ async def get_module(
 async def delete_module(
     db: AsyncSession,
     storage: ObjectStore,
-    org: str,
     namespace: str,
     name: str,
     provider: str,
 ) -> bool:
     """Delete a module and all its versions. Returns True if found."""
-    module = await get_module(db, org, namespace, name, provider)
+    module = await get_module(db, namespace, name, provider)
     if module is None:
         return False
 
     # Clean up storage for all versions
     for version in module.versions:
-        key = module_tarball_key(org, namespace, name, provider, version.version)
+        key = module_tarball_key(namespace, name, provider, version.version)
         await storage.delete(key)
 
     await db.delete(module)
@@ -118,9 +111,7 @@ async def create_module_version(
     await db.flush()
 
     # Generate presigned upload URL
-    key = module_tarball_key(
-        module.org_name, module.namespace, module.name, module.provider, version
-    )
+    key = module_tarball_key(module.namespace, module.name, module.provider, version)
     upload_url = await storage.presigned_put_url(key, content_type="application/gzip")
 
     # Update module status
@@ -151,14 +142,13 @@ async def confirm_module_upload(
 async def delete_module_version(
     db: AsyncSession,
     storage: ObjectStore,
-    org: str,
     namespace: str,
     name: str,
     provider: str,
     version: str,
 ) -> bool:
     """Delete a specific module version."""
-    module = await get_module(db, org, namespace, name, provider)
+    module = await get_module(db, namespace, name, provider)
     if module is None:
         return False
 
@@ -172,7 +162,7 @@ async def delete_module_version(
     if mod_version is None:
         return False
 
-    key = module_tarball_key(org, namespace, name, provider, version)
+    key = module_tarball_key(namespace, name, provider, version)
     await storage.delete(key)
     await db.delete(mod_version)
     await db.flush()
@@ -182,14 +172,13 @@ async def delete_module_version(
 async def get_module_download_url(
     db: AsyncSession,
     storage: ObjectStore,
-    org: str,
     namespace: str,
     name: str,
     provider: str,
     version: str,
 ) -> str | None:
     """Get a presigned download URL for a module version tarball."""
-    module = await get_module(db, org, namespace, name, provider)
+    module = await get_module(db, namespace, name, provider)
     if module is None:
         return None
 
@@ -203,6 +192,6 @@ async def get_module_download_url(
     if mod_version is None:
         return None
 
-    key = module_tarball_key(org, namespace, name, provider, version)
+    key = module_tarball_key(namespace, name, provider, version)
     presigned = await storage.presigned_get_url(key)
     return presigned.url

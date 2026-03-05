@@ -42,16 +42,15 @@ def _user_to_jsonapi(user: User) -> dict:
     }
 
 
-@router.get("/organizations/{org}/users")
+@router.get("/organizations/default/users")
 async def list_users(
-    org: str,
     user: AuthenticatedUser = Depends(require_admin_or_audit),
     db: AsyncSession = Depends(get_db),
     filter_email: str | None = Query(None, alias="filter[email]"),
     page_number: int = Query(1, alias="page[number]", ge=1),
     page_size: int = Query(20, alias="page[size]", ge=1, le=100),
 ) -> dict:
-    """List users in the organization."""
+    """List users."""
     stmt = select(User)
     count_stmt = select(func.count()).select_from(User)
 

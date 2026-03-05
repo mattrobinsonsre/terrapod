@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
-import { getAuthState, getUserId } from '@/lib/auth'
+import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
 interface Module {
@@ -35,7 +35,7 @@ export default function ModulesPage() {
   const [newProvider, setNewProvider] = useState('')
   const [creating, setCreating] = useState(false)
 
-  const org = getUserId()
+
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
@@ -45,7 +45,7 @@ export default function ModulesPage() {
   async function loadModules() {
     setLoading(true)
     try {
-      const res = await apiFetch(`/api/v2/organizations/${org}/registry-modules`)
+      const res = await apiFetch('/api/v2/organizations/default/registry-modules')
       if (!res.ok) throw new Error('Failed to load modules')
       const data = await res.json()
       setModules(data.data || [])
@@ -61,7 +61,7 @@ export default function ModulesPage() {
     setCreating(true)
     setError('')
     try {
-      const res = await apiFetch(`/api/v2/organizations/${org}/registry-modules`, {
+      const res = await apiFetch('/api/v2/organizations/default/registry-modules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -152,7 +152,7 @@ export default function ModulesPage() {
             {modules.map((mod) => (
               <Link
                 key={mod.id}
-                href={`/registry/modules/${org}/${mod.attributes.namespace}/${mod.attributes.name}/${mod.attributes.provider}`}
+                href={`/registry/modules/default/${mod.attributes.namespace}/${mod.attributes.name}/${mod.attributes.provider}`}
                 className="bg-slate-800/50 rounded-lg border border-slate-700/50 hover:border-brand-600/30 p-4 transition-colors"
               >
                 <h3 className="font-semibold text-slate-200">{mod.attributes.name}</h3>

@@ -32,13 +32,11 @@ logger = get_logger(__name__)
 
 async def create_provider(
     db: AsyncSession,
-    org: str,
     namespace: str,
     name: str,
 ) -> RegistryProvider:
     """Create a new registry provider."""
     provider = RegistryProvider(
-        org_name=org,
         namespace=namespace,
         name=name,
     )
@@ -49,12 +47,10 @@ async def create_provider(
 
 async def list_providers(
     db: AsyncSession,
-    org: str,
 ) -> list[RegistryProvider]:
-    """List all registry providers for an organization."""
+    """List all registry providers."""
     result = await db.execute(
         select(RegistryProvider)
-        .where(RegistryProvider.org_name == org)
         .options(
             selectinload(RegistryProvider.versions).selectinload(RegistryProviderVersion.platforms)
         )
@@ -65,7 +61,6 @@ async def list_providers(
 
 async def get_provider(
     db: AsyncSession,
-    org: str,
     namespace: str,
     name: str,
 ) -> RegistryProvider | None:
@@ -73,7 +68,6 @@ async def get_provider(
     result = await db.execute(
         select(RegistryProvider)
         .where(
-            RegistryProvider.org_name == org,
             RegistryProvider.namespace == namespace,
             RegistryProvider.name == name,
         )
@@ -87,18 +81,17 @@ async def get_provider(
 async def delete_provider(
     db: AsyncSession,
     storage: ObjectStore,
-    org: str,
     namespace: str,
     name: str,
 ) -> bool:
     """Delete a provider and all its versions/platforms. Returns True if found."""
-    provider = await get_provider(db, org, namespace, name)
+    provider = await get_provider(db, namespace, name)
     if provider is None:
         return False
 
     # Clean up storage for all versions and platforms
     for version in provider.versions:
-        await _delete_version_storage(storage, org, namespace, name, version)
+        await _delete_version_storage(storage, namespace, name, version)
 
     await db.delete(provider)
     await db.flush()
@@ -132,12 +125,8 @@ async def create_provider_version(
     await db.flush()
 
     # Generate presigned upload URLs for shasums files
-    shasums_key = provider_shasums_key(
-        provider.org_name, provider.namespace, provider.name, version
-    )
-    sig_key = provider_shasums_sig_key(
-        provider.org_name, provider.namespace, provider.name, version
-    )
+    shasums_key = provider_shasums_key(provider.namespace, provider.name, version)
+    sig_key = provider_shasums_sig_key(provider.namespace, provider.name, version)
     shasums_url = await storage.presigned_put_url(shasums_key, content_type="text/plain")
     sig_url = await storage.presigned_put_url(sig_key, content_type="application/octet-stream")
 
@@ -178,13 +167,12 @@ async def get_provider_version(
 async def delete_provider_version(
     db: AsyncSession,
     storage: ObjectStore,
-    org: str,
     namespace: str,
     name: str,
     version: str,
 ) -> bool:
     """Delete a provider version and its platforms."""
-    provider = await get_provider(db, org, namespace, name)
+    provider = await get_provider(db, namespace, name)
     if provider is None:
         return False
 
@@ -192,7 +180,7 @@ async def delete_provider_version(
     if prov_version is None:
         return False
 
-    await _delete_version_storage(storage, org, namespace, name, prov_version)
+    await _delete_version_storage(storage, namespace, name, prov_version)
     await db.delete(prov_version)
     await db.flush()
     return True
@@ -233,7 +221,6 @@ async def create_provider_platform(
     await db.flush()
 
     key = provider_binary_key(
-        provider.org_name,
         provider.namespace,
         provider.name,
         prov_version.version,
@@ -261,7 +248,6 @@ async def list_provider_platforms(
 async def delete_provider_platform(
     db: AsyncSession,
     storage: ObjectStore,
-    org: str,
     namespace: str,
     name: str,
     version: str,
@@ -269,7 +255,7 @@ async def delete_provider_platform(
     arch: str,
 ) -> bool:
     """Delete a specific provider platform binary."""
-    provider = await get_provider(db, org, namespace, name)
+    provider = await get_provider(db, namespace, name)
     if provider is None:
         return False
 
@@ -288,7 +274,7 @@ async def delete_provider_platform(
     if platform is None:
         return False
 
-    key = provider_binary_key(org, namespace, name, version, os_, arch)
+    key = provider_binary_key(namespace, name, version, os_, arch)
     await storage.delete(key)
     await db.delete(platform)
     await db.flush()
@@ -301,7 +287,6 @@ async def delete_provider_platform(
 async def get_provider_download_info(
     db: AsyncSession,
     storage: ObjectStore,
-    org: str,
     namespace: str,
     name: str,
     version: str,
@@ -313,7 +298,7 @@ async def get_provider_download_info(
     Returns the dict that the CLI expects with download_url, shasums_url,
     signing_keys, etc. Returns None if not found.
     """
-    provider = await get_provider(db, org, namespace, name)
+    provider = await get_provider(db, namespace, name)
     if provider is None:
         return None
 
@@ -334,9 +319,9 @@ async def get_provider_download_info(
         return None
 
     # Generate presigned URLs
-    binary_k = provider_binary_key(org, namespace, name, version, os_, arch)
-    shasums_k = provider_shasums_key(org, namespace, name, version)
-    sig_k = provider_shasums_sig_key(org, namespace, name, version)
+    binary_k = provider_binary_key(namespace, name, version, os_, arch)
+    shasums_k = provider_shasums_key(namespace, name, version)
+    sig_k = provider_shasums_sig_key(namespace, name, version)
 
     download_url = await storage.presigned_get_url(binary_k)
     shasums_url = await storage.presigned_get_url(shasums_k)
@@ -377,19 +362,18 @@ async def get_provider_download_info(
 
 async def _delete_version_storage(
     storage: ObjectStore,
-    org: str,
     namespace: str,
     name: str,
     version: RegistryProviderVersion,
 ) -> None:
     """Delete all storage objects for a provider version."""
     # Delete shasums files
-    shasums_k = provider_shasums_key(org, namespace, name, version.version)
-    sig_k = provider_shasums_sig_key(org, namespace, name, version.version)
+    shasums_k = provider_shasums_key(namespace, name, version.version)
+    sig_k = provider_shasums_sig_key(namespace, name, version.version)
     await storage.delete(shasums_k)
     await storage.delete(sig_k)
 
     # Delete platform binaries
     for platform in version.platforms:
-        key = provider_binary_key(org, namespace, name, version.version, platform.os, platform.arch)
+        key = provider_binary_key(namespace, name, version.version, platform.os, platform.arch)
         await storage.delete(key)

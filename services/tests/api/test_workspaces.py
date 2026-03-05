@@ -36,12 +36,10 @@ def _mock_workspace(
     terraform_version="1.9.0",
     resource_cpu="1",
     resource_memory="2Gi",
-    org_name="default",
 ):
     ws = MagicMock()
     ws.id = ws_id or uuid.uuid4()
     ws.name = name
-    ws.org_name = org_name
     ws.auto_apply = auto_apply
     ws.execution_mode = execution_mode
     ws.terraform_version = terraform_version

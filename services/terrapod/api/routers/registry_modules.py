@@ -11,16 +11,16 @@ UX CONTRACT: Management endpoints are consumed by the web frontend:
   matched by corresponding updates to those frontend pages.
 
 CLI Protocol:
-    GET  /api/v2/registry/modules/{org}/{name}/{provider}/versions
-    GET  /api/v2/registry/modules/{org}/{name}/{provider}/{version}/download
+    GET  /api/v2/registry/modules/{namespace}/{name}/{provider}/versions
+    GET  /api/v2/registry/modules/{namespace}/{name}/{provider}/{version}/download
 
 TFE V2 Management:
-    POST   /api/v2/organizations/{org}/registry-modules
-    GET    /api/v2/organizations/{org}/registry-modules
-    GET    /api/v2/organizations/{org}/registry-modules/private/{ns}/{name}/{prov}
-    DELETE /api/v2/organizations/{org}/registry-modules/private/{ns}/{name}/{prov}
-    POST   /api/v2/organizations/{org}/registry-modules/private/{ns}/{name}/{prov}/versions
-    DELETE /api/v2/organizations/{org}/registry-modules/private/{ns}/{name}/{prov}/{ver}
+    POST   /api/v2/organizations/default/registry-modules
+    GET    /api/v2/organizations/default/registry-modules
+    GET    /api/v2/organizations/default/registry-modules/private/{ns}/{name}/{prov}
+    DELETE /api/v2/organizations/default/registry-modules/private/{ns}/{name}/{prov}
+    POST   /api/v2/organizations/default/registry-modules/private/{ns}/{name}/{prov}/versions
+    DELETE /api/v2/organizations/default/registry-modules/private/{ns}/{name}/{prov}/{ver}
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -104,16 +104,16 @@ def _module_to_jsonapi(module) -> dict:  # type: ignore[no-untyped-def]
 # --- CLI Protocol Endpoints ---
 
 
-@router.get("/api/v2/registry/modules/{org}/{name}/{provider}/versions")
+@router.get("/api/v2/registry/modules/{namespace}/{name}/{provider}/versions")
 async def list_module_versions_cli(
-    org: str,
+    namespace: str,
     name: str,
     provider: str,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List available versions for a module (CLI protocol). Requires read."""
-    module = await get_module(db, org, org, name, provider)
+    module = await get_module(db, namespace, name, provider)
     if module is None:
         raise HTTPException(status_code=404, detail="Module not found")
 
@@ -131,9 +131,9 @@ async def list_module_versions_cli(
     )
 
 
-@router.get("/api/v2/registry/modules/{org}/{name}/{provider}/{version}/download")
+@router.get("/api/v2/registry/modules/{namespace}/{name}/{provider}/{version}/download")
 async def download_module_cli(
-    org: str,
+    namespace: str,
     name: str,
     provider: str,
     version: str,
@@ -142,7 +142,7 @@ async def download_module_cli(
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Get download URL for a module version (CLI protocol). Requires read."""
-    module = await get_module(db, org, org, name, provider)
+    module = await get_module(db, namespace, name, provider)
     if module is not None:
         perm = await resolve_registry_permission(
             db, user.email, user.roles, module.name, module.labels or {}, module.owner_email
@@ -150,7 +150,7 @@ async def download_module_cli(
         if not has_registry_permission(perm, "read"):
             raise HTTPException(status_code=404, detail="Module version not found")
 
-    url = await get_module_download_url(db, storage, org, org, name, provider, version)
+    url = await get_module_download_url(db, storage, namespace, name, provider, version)
     if url is None:
         raise HTTPException(status_code=404, detail="Module version not found")
 
@@ -163,25 +163,24 @@ async def download_module_cli(
 # --- TFE V2 Management Endpoints ---
 
 
-@router.post("/api/v2/organizations/{org}/registry-modules")
+@router.post("/api/v2/organizations/default/registry-modules")
 async def create_module_endpoint(
-    org: str,
     body: CreateModuleRequest,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Create a new registry module. Any authenticated user; creator becomes owner."""
     attrs = body.data.attributes
-    namespace = attrs.namespace or org
+    namespace = attrs.namespace or "default"
 
-    module = await create_module(db, org, namespace, attrs.name, attrs.provider)
+    module = await create_module(db, namespace, attrs.name, attrs.provider)
     module.owner_email = user.email
     module.labels = attrs.labels
     await db.commit()
+    await db.refresh(module, attribute_names=["versions"])
 
     logger.info(
         "Registry module created",
-        org=org,
         name=attrs.name,
         provider=attrs.provider,
         owner=user.email,
@@ -193,14 +192,13 @@ async def create_module_endpoint(
     )
 
 
-@router.get("/api/v2/organizations/{org}/registry-modules")
+@router.get("/api/v2/organizations/default/registry-modules")
 async def list_modules_endpoint(
-    org: str,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """List all registry modules for an organization (filtered by permissions)."""
-    modules = await list_modules(db, org)
+    """List all registry modules (filtered by permissions)."""
+    modules = await list_modules(db)
     visible = []
     for m in modules:
         perm = await resolve_registry_permission(
@@ -211,9 +209,8 @@ async def list_modules_endpoint(
     return JSONResponse(content={"data": visible})
 
 
-@router.get("/api/v2/organizations/{org}/registry-modules/private/{namespace}/{name}/{provider}")
+@router.get("/api/v2/organizations/default/registry-modules/private/{namespace}/{name}/{provider}")
 async def show_module_endpoint(
-    org: str,
     namespace: str,
     name: str,
     provider: str,
@@ -221,7 +218,7 @@ async def show_module_endpoint(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Show a specific registry module. Requires read."""
-    module = await get_module(db, org, namespace, name, provider)
+    module = await get_module(db, namespace, name, provider)
     if module is None:
         raise HTTPException(status_code=404, detail="Module not found")
 
@@ -234,9 +231,10 @@ async def show_module_endpoint(
     return JSONResponse(content={"data": _module_to_jsonapi(module)})
 
 
-@router.delete("/api/v2/organizations/{org}/registry-modules/private/{namespace}/{name}/{provider}")
+@router.delete(
+    "/api/v2/organizations/default/registry-modules/private/{namespace}/{name}/{provider}"
+)
 async def delete_module_endpoint(
-    org: str,
     namespace: str,
     name: str,
     provider: str,
@@ -245,7 +243,7 @@ async def delete_module_endpoint(
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Delete a registry module and all its versions. Requires admin on module."""
-    module = await get_module(db, org, namespace, name, provider)
+    module = await get_module(db, namespace, name, provider)
     if module is None:
         raise HTTPException(status_code=404, detail="Module not found")
 
@@ -258,7 +256,7 @@ async def delete_module_endpoint(
             detail="Requires admin permission on module",
         )
 
-    deleted = await delete_module(db, storage, org, namespace, name, provider)
+    deleted = await delete_module(db, storage, namespace, name, provider)
     if not deleted:
         raise HTTPException(status_code=404, detail="Module not found")
 
@@ -267,10 +265,9 @@ async def delete_module_endpoint(
 
 
 @router.post(
-    "/api/v2/organizations/{org}/registry-modules/private/{namespace}/{name}/{provider}/versions"
+    "/api/v2/organizations/default/registry-modules/private/{namespace}/{name}/{provider}/versions"
 )
 async def create_module_version_endpoint(
-    org: str,
     namespace: str,
     name: str,
     provider: str,
@@ -280,7 +277,7 @@ async def create_module_version_endpoint(
     storage: ObjectStore = Depends(get_storage),
 ) -> JSONResponse:
     """Create a new module version and get an upload URL. Requires write."""
-    module = await get_module(db, org, namespace, name, provider)
+    module = await get_module(db, namespace, name, provider)
     if module is None:
         raise HTTPException(status_code=404, detail="Module not found")
 
@@ -325,10 +322,9 @@ async def create_module_version_endpoint(
 
 
 @router.delete(
-    "/api/v2/organizations/{org}/registry-modules/private/{namespace}/{name}/{provider}/{version}"
+    "/api/v2/organizations/default/registry-modules/private/{namespace}/{name}/{provider}/{version}"
 )
 async def delete_module_version_endpoint(
-    org: str,
     namespace: str,
     name: str,
     provider: str,
@@ -338,7 +334,7 @@ async def delete_module_version_endpoint(
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Delete a specific module version. Requires admin on module."""
-    module = await get_module(db, org, namespace, name, provider)
+    module = await get_module(db, namespace, name, provider)
     if module is not None:
         perm = await resolve_registry_permission(
             db, user.email, user.roles, module.name, module.labels or {}, module.owner_email
@@ -349,7 +345,7 @@ async def delete_module_version_endpoint(
                 detail="Requires admin permission on module",
             )
 
-    deleted = await delete_module_version(db, storage, org, namespace, name, provider, version)
+    deleted = await delete_module_version(db, storage, namespace, name, provider, version)
     if not deleted:
         raise HTTPException(status_code=404, detail="Module version not found")
 

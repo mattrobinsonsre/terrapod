@@ -57,7 +57,7 @@ def _gpg_key_to_jsonapi(key) -> dict:  # type: ignore[no-untyped-def]
         "attributes": {
             "key-id": key.key_id,
             "ascii-armor": key.ascii_armor,
-            "namespace": key.org_name,
+            "namespace": "default",
             "source": key.source,
             "source-url": key.source_url,
             "created-at": key.created_at.isoformat() if key.created_at else None,
@@ -80,7 +80,6 @@ async def create_gpg_key_endpoint(
     try:
         key = await create_gpg_key(
             db,
-            org=attrs.namespace,
             ascii_armor=attrs.ascii_armor,
             source=attrs.source,
             source_url=attrs.source_url,
@@ -106,7 +105,7 @@ async def list_gpg_keys_endpoint(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List GPG keys, optionally filtered by namespace (org)."""
-    keys = await list_gpg_keys(db, org=filter_namespace)
+    keys = await list_gpg_keys(db)
     return JSONResponse(
         content={"data": [_gpg_key_to_jsonapi(k) for k in keys]},
     )

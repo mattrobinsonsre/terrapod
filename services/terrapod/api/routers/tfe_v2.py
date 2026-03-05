@@ -12,11 +12,11 @@ UX CONTRACT: Workspace endpoints are consumed by the web frontend:
 Endpoints:
     GET  /api/v2/ping — API version handshake
     GET  /api/v2/account/details — current user info
-    GET  /api/v2/organizations/{org} — organization details
-    GET  /api/v2/organizations/{org}/entitlement-set — feature entitlements
-    GET  /api/v2/organizations/{org}/workspaces — list workspaces
-    GET  /api/v2/organizations/{org}/workspaces/{name} — workspace by name
-    POST /api/v2/organizations/{org}/workspaces — create workspace
+    GET  /api/v2/organizations/default — organization details
+    GET  /api/v2/organizations/default/entitlement-set — feature entitlements
+    GET  /api/v2/organizations/default/workspaces — list workspaces
+    GET  /api/v2/organizations/default/workspaces/{name} — workspace by name
+    POST /api/v2/organizations/default/workspaces — create workspace
     GET  /api/v2/workspaces/{id} — workspace by ID
     PATCH /api/v2/workspaces/{id} — update workspace
     DELETE /api/v2/workspaces/{id} — delete workspace
@@ -39,7 +39,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.dependencies import DEFAULT_ORG, AuthenticatedUser, get_current_user
 from terrapod.db.models import StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -56,10 +56,6 @@ logger = get_logger(__name__)
 TFP_API_VERSION = "2.6"
 TFP_APP_NAME = "Terrapod"
 X_TFE_VERSION = "v0.1.0"
-
-# All resources belong to the hardcoded "default" organization.
-# Multi-org is intentionally not supported — Terrapod is self-hosted, one org per instance.
-DEFAULT_ORG = "default"
 
 
 def _rfc3339(dt: datetime | None) -> str:
@@ -82,15 +78,6 @@ def _clamp_drift_interval(value: int) -> int:
     from terrapod.config import settings
 
     return max(int(value), settings.drift_detection.min_workspace_interval_seconds)
-
-
-def _validate_org(org: str) -> None:
-    """Raise 404 if the organization doesn't match the default."""
-    if org != DEFAULT_ORG:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f'organization "{org}" at host not found',
-        )
 
 
 @router.get("/ping")
@@ -141,16 +128,14 @@ async def account_details(
 # ── Organizations ────────────────────────────────────────────────────────────
 
 
-@router.get("/organizations/{org}")
+@router.get("/organizations/default")
 async def show_organization(
-    org: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> JSONResponse:
     """Return organization details in JSON:API format.
 
-    Stub: only the hardcoded "default" organization exists.
+    Only the hardcoded "default" organization exists.
     """
-    _validate_org(org)
 
     return JSONResponse(
         content={
@@ -196,16 +181,14 @@ async def show_organization(
     )
 
 
-@router.get("/organizations/{org}/entitlement-set")
+@router.get("/organizations/default/entitlement-set")
 async def organization_entitlements(
-    org: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> JSONResponse:
     """Return feature entitlements for an organization.
 
     Enables all features — Terrapod is open source with no feature gating.
     """
-    _validate_org(org)
 
     return JSONResponse(
         content={
@@ -300,7 +283,7 @@ def _workspace_json(ws: Workspace, effective_permission: str | None = None) -> d
             },
             "relationships": {
                 "organization": {
-                    "data": {"id": ws.org_name, "type": "organizations"},
+                    "data": {"id": DEFAULT_ORG, "type": "organizations"},
                 },
                 **(
                     {
@@ -319,17 +302,15 @@ def _workspace_json(ws: Workspace, effective_permission: str | None = None) -> d
     }
 
 
-@router.get("/organizations/{org}/workspaces")
+@router.get("/organizations/default/workspaces")
 async def list_workspaces(
-    org: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     request: Request = None,
 ) -> JSONResponse:
-    """List all workspaces in an organization (filtered by user permissions)."""
-    _validate_org(org)
+    """List all workspaces (filtered by user permissions)."""
 
-    query = select(Workspace).where(Workspace.org_name == org).order_by(Workspace.name)
+    query = select(Workspace).order_by(Workspace.name)
 
     # Support ?search[name]= filter
     search_name = request.query_params.get("search[name]", "") if request else ""
@@ -352,22 +333,15 @@ async def list_workspaces(
     )
 
 
-@router.get("/organizations/{org}/workspaces/{workspace_name}")
+@router.get("/organizations/default/workspaces/{workspace_name}")
 async def show_workspace(
-    org: str = Path(...),
     workspace_name: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Show a workspace by organization and name."""
-    _validate_org(org)
 
-    result = await db.execute(
-        select(Workspace).where(
-            Workspace.org_name == org,
-            Workspace.name == workspace_name,
-        )
-    )
+    result = await db.execute(select(Workspace).where(Workspace.name == workspace_name))
     ws = result.scalar_one_or_none()
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -379,15 +353,13 @@ async def show_workspace(
     return JSONResponse(content=_workspace_json(ws, perm), headers=_tfe_headers())
 
 
-@router.post("/organizations/{org}/workspaces")
+@router.post("/organizations/default/workspaces")
 async def create_workspace(
-    org: str = Path(...),
     body: dict = Body(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Create a workspace in an organization. Any authenticated user can create."""
-    _validate_org(org)
+    """Create a workspace. Any authenticated user can create."""
 
     attrs = body.get("data", {}).get("attributes", {})
     name = attrs.get("name", "")
@@ -395,9 +367,7 @@ async def create_workspace(
         raise HTTPException(status_code=422, detail="Workspace name is required")
 
     # Check for existing
-    result = await db.execute(
-        select(Workspace).where(Workspace.org_name == org, Workspace.name == name)
-    )
+    result = await db.execute(select(Workspace).where(Workspace.name == name))
     if result.scalar_one_or_none() is not None:
         raise HTTPException(status_code=422, detail=f"Workspace '{name}' already exists")
 
@@ -413,7 +383,6 @@ async def create_workspace(
             vcs_connection_id = _uuid.UUID(vcs_conn_id_str.removeprefix("vcs-"))
 
     ws = Workspace(
-        org_name=org,
         name=name,
         execution_mode=attrs.get("execution-mode", "local"),
         auto_apply=attrs.get("auto-apply", False),
@@ -436,7 +405,7 @@ async def create_workspace(
     await db.commit()
     await db.refresh(ws)
 
-    logger.info("Workspace created", org=org, workspace=name, owner=user.email)
+    logger.info("Workspace created", workspace=name, owner=user.email)
     return JSONResponse(
         content=_workspace_json(ws, "admin"),
         status_code=201,

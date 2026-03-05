@@ -56,7 +56,7 @@ export default function ModuleDetailPage() {
     setLoading(true)
     try {
       const res = await apiFetch(
-        `/api/v2/organizations/${org}/registry-modules/private/${namespace}/${name}/${provider}`
+        `/api/v2/organizations/default/registry-modules/private/${namespace}/${name}/${provider}`
       )
       if (!res.ok) throw new Error('Module not found')
       const data = await res.json()
@@ -75,7 +75,7 @@ export default function ModuleDetailPage() {
     setUploadUrl('')
     try {
       const res = await apiFetch(
-        `/api/v2/organizations/${org}/registry-modules/private/${namespace}/${name}/${provider}/versions`,
+        `/api/v2/organizations/default/registry-modules/private/${namespace}/${name}/${provider}/versions`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/vnd.api+json' },
@@ -108,8 +108,8 @@ export default function ModuleDetailPage() {
     setError('')
     try {
       const path = deleteTarget === 'module'
-        ? `/api/v2/organizations/${org}/registry-modules/private/${namespace}/${name}/${provider}`
-        : `/api/v2/organizations/${org}/registry-modules/private/${namespace}/${name}/${provider}/${deleteTarget}`
+        ? `/api/v2/organizations/default/registry-modules/private/${namespace}/${name}/${provider}`
+        : `/api/v2/organizations/default/registry-modules/private/${namespace}/${name}/${provider}/${deleteTarget}`
 
       const res = await apiFetch(path, { method: 'DELETE' })
       if (!res.ok && res.status !== 204) {

@@ -10,8 +10,8 @@ UX CONTRACT: VCS connection endpoints are consumed by the web frontend:
   matched by corresponding updates to that frontend page.
 
 Endpoints:
-    GET    /api/v2/organizations/{org}/vcs-connections   (list connections)
-    POST   /api/v2/organizations/{org}/vcs-connections   (create connection)
+    GET    /api/v2/organizations/default/vcs-connections   (list connections)
+    POST   /api/v2/organizations/default/vcs-connections   (create connection)
     GET    /api/v2/vcs-connections/{id}                  (show connection)
     DELETE /api/v2/vcs-connections/{id}                  (delete connection)
 """
@@ -32,7 +32,6 @@ from terrapod.logging_config import get_logger
 router = APIRouter(prefix="/api/v2", tags=["vcs-connections"])
 logger = get_logger(__name__)
 
-DEFAULT_ORG = "default"
 SUPPORTED_PROVIDERS = {"github", "gitlab"}
 
 
@@ -41,11 +40,6 @@ def _rfc3339(dt) -> str:
         return ""
 
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _validate_org(org: str) -> None:
-    if org != DEFAULT_ORG:
-        raise HTTPException(status_code=404, detail="Organization not found")
 
 
 def _connection_json(conn: VCSConnection) -> dict:
@@ -73,18 +67,14 @@ def _connection_json(conn: VCSConnection) -> dict:
         "attributes": attrs,
         "relationships": {
             "organization": {
-                "data": {"id": conn.org_name, "type": "organizations"},
+                "data": {"id": "default", "type": "organizations"},
             },
         },
     }
 
 
-async def _list_connections(db: AsyncSession, org_name: str) -> list[VCSConnection]:
-    result = await db.execute(
-        select(VCSConnection)
-        .where(VCSConnection.org_name == org_name)
-        .order_by(VCSConnection.created_at)
-    )
+async def _list_connections(db: AsyncSession) -> list[VCSConnection]:
+    result = await db.execute(select(VCSConnection).order_by(VCSConnection.created_at))
     return list(result.scalars().all())
 
 
@@ -93,21 +83,18 @@ async def _get_connection(db: AsyncSession, connection_id: uuid.UUID) -> VCSConn
     return result.scalar_one_or_none()
 
 
-@router.get("/organizations/{org}/vcs-connections")
+@router.get("/organizations/default/vcs-connections")
 async def list_connections(
-    org: str = Path(...),
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List all VCS connections (admin only)."""
-    _validate_org(org)
-    connections = await _list_connections(db, org)
+    connections = await _list_connections(db)
     return JSONResponse(content={"data": [_connection_json(c) for c in connections]})
 
 
-@router.post("/organizations/{org}/vcs-connections", status_code=201)
+@router.post("/organizations/default/vcs-connections", status_code=201)
 async def create_connection(
-    org: str = Path(...),
     body: dict = Body(...),
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
@@ -118,7 +105,6 @@ async def create_connection(
     (the PEM-encoded GitHub App private key). Optionally server-url for GHE.
     For GitLab: provide token and optionally server-url (defaults to gitlab.com).
     """
-    _validate_org(org)
 
     attrs = body.get("data", {}).get("attributes", {})
     name = attrs.get("name", "")
@@ -177,7 +163,6 @@ async def create_connection(
 
     conn = VCSConnection(
         id=generate_uuid7(),
-        org_name=org,
         provider=provider,
         name=name,
         server_url=attrs.get("server-url", ""),

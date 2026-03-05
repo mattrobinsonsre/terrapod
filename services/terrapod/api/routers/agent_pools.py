@@ -7,7 +7,7 @@ UX CONTRACT: Pool/token/listener endpoints are consumed by the web frontend:
   matched by corresponding updates to those frontend pages.
 
 Endpoints:
-    GET/POST   /api/v2/organizations/{org}/agent-pools
+    GET/POST   /api/v2/organizations/default/agent-pools
     GET/PATCH/DELETE /api/v2/agent-pools/{pool_id}
     POST/GET   /api/v2/agent-pools/{pool_id}/tokens
     DELETE     /api/v2/agent-pools/{pool_id}/tokens/{token_id}
@@ -25,15 +25,18 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Path
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_admin
+from terrapod.api.dependencies import (
+    DEFAULT_ORG,
+    AuthenticatedUser,
+    get_current_user,
+    require_admin,
+)
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service
 
 router = APIRouter(prefix="/api/v2", tags=["agent-pools"])
 logger = get_logger(__name__)
-
-DEFAULT_ORG = "default"
 
 
 def _rfc3339(dt) -> str:
@@ -55,7 +58,7 @@ def _pool_json(pool) -> dict:
         },
         "relationships": {
             "organization": {
-                "data": {"id": pool.org_name or DEFAULT_ORG, "type": "organizations"},
+                "data": {"id": DEFAULT_ORG, "type": "organizations"},
             },
         },
     }
@@ -100,11 +103,6 @@ def _listener_json(listener) -> dict:
     }
 
 
-def _validate_org(org: str) -> None:
-    if org != DEFAULT_ORG:
-        raise HTTPException(status_code=404, detail="Organization not found")
-
-
 async def _get_pool(pool_id: str, db: AsyncSession):
     pool_uuid = uuid.UUID(pool_id.removeprefix("apool-"))
     pool = await agent_pool_service.get_pool(db, pool_uuid)
@@ -116,27 +114,23 @@ async def _get_pool(pool_id: str, db: AsyncSession):
 # ── Agent Pools ──────────────────────────────────────────────────────────
 
 
-@router.get("/organizations/{org}/agent-pools")
+@router.get("/organizations/default/agent-pools")
 async def list_pools(
-    org: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List all agent pools."""
-    _validate_org(org)
-    pools = await agent_pool_service.list_pools(db, org)
+    pools = await agent_pool_service.list_pools(db)
     return JSONResponse(content={"data": [_pool_json(p) for p in pools]})
 
 
-@router.post("/organizations/{org}/agent-pools", status_code=201)
+@router.post("/organizations/default/agent-pools", status_code=201)
 async def create_pool(
-    org: str = Path(...),
     body: dict = Body(...),
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Create an agent pool (admin only)."""
-    _validate_org(org)
 
     attrs = body.get("data", {}).get("attributes", {})
     name = attrs.get("name", "")
@@ -147,7 +141,6 @@ async def create_pool(
         db,
         name=name,
         description=attrs.get("description", ""),
-        org_name=org,
         service_account_name=attrs.get("service-account-name", ""),
     )
     await db.commit()

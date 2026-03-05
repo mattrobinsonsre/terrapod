@@ -23,14 +23,12 @@ async def create_pool(
     db: AsyncSession,
     name: str,
     description: str = "",
-    org_name: str = "default",
     service_account_name: str = "",
 ) -> AgentPool:
     """Create a new agent pool."""
     pool = AgentPool(
         name=name,
         description=description,
-        org_name=org_name,
         service_account_name=service_account_name,
     )
     db.add(pool)
@@ -50,11 +48,9 @@ async def get_pool_by_name(db: AsyncSession, name: str) -> AgentPool | None:
     return result.scalar_one_or_none()
 
 
-async def list_pools(db: AsyncSession, org_name: str = "default") -> list[AgentPool]:
+async def list_pools(db: AsyncSession) -> list[AgentPool]:
     """List all agent pools."""
-    result = await db.execute(
-        select(AgentPool).where(AgentPool.org_name == org_name).order_by(AgentPool.name)
-    )
+    result = await db.execute(select(AgentPool).order_by(AgentPool.name))
     return list(result.scalars().all())
 
 

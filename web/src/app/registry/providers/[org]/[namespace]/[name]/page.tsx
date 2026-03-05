@@ -64,7 +64,7 @@ export default function ProviderDetailPage() {
     loadVersions()
   }, [router, org, namespace, name])
 
-  const basePath = `/api/v2/organizations/${org}/registry-providers/private/${namespace}/${name}`
+  const basePath = `/api/v2/organizations/default/registry-providers/private/${namespace}/${name}`
 
   async function loadVersions() {
     setLoading(true)

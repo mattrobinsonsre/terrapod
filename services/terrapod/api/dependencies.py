@@ -34,6 +34,13 @@ from terrapod.logging_config import get_logger
 logger = get_logger(__name__)
 security = HTTPBearer(auto_error=False)
 
+# ── Organization ─────────────────────────────────────────────────────────
+# Single org, always "default". Organization paths use literal "default"
+# in route patterns — no dynamic path parameter.
+
+DEFAULT_ORG = "default"
+
+
 # Redis cache TTL for API token role resolution (seconds)
 _TOKEN_ROLES_CACHE_TTL = 60
 _TOKEN_ROLES_PREFIX = "tp:token_roles:"
