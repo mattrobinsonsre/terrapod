@@ -419,7 +419,8 @@ Currently registered periodic tasks:
 | Task | Interval | Handler | Description |
 |---|---|---|---|
 | `vcs_poll` | 60s (configurable) | `vcs_poller.poll_cycle` | Poll VCS providers for new commits and PRs |
-| `drift_detection` | 300s (configurable) | `drift_detector.check_cycle` | Check for workspaces due for drift detection and create plan-only runs |
+| `audit_retention` | 86400s (daily) | `audit_service.purge_old_entries` | Purge audit log entries older than retention period |
+| `drift_check` | 300s (configurable) | `drift_detection_service.drift_check_cycle` | Check workspaces for infrastructure drift |
 
 ### Triggered Tasks
 
@@ -430,6 +431,9 @@ Currently registered trigger handlers:
 | Handler | Description | Dedup |
 |---|---|---|
 | `vcs_immediate_poll` | Webhook-triggered immediate VCS poll for a specific repo | Per repo (5 min) |
+| `notification_deliver` | Deliver workspace notification on run state change | Per run+trigger (60s) |
+| `run_task_call` | Deliver run task webhook to external service | Per result (5 min) |
+| `drift_run_completed` | Update workspace drift status when drift run completes | Per run (5 min) |
 
 ### Key Redis Patterns
 
@@ -474,7 +478,10 @@ Any non-terminal state -----> canceled (user action)
 - Workspace is locked during an active run and unlocked on terminal state
 - Queue dispatch uses `SELECT ... FOR UPDATE SKIP LOCKED` (PostgreSQL job queue pattern)
 - Plan-only (speculative) runs skip the apply phase entirely
-- **Drift detection** runs are plan-only runs created by the `drift_detection` scheduler task. They execute `terraform plan` with `-detailed-exitcode` to detect out-of-band infrastructure changes without applying anything. The exit code determines the workspace's `drift-status`: exit 0 = `no_drift`, exit 2 = `drifted`, non-zero (other) = `errored`. Drift runs are marked with `is-drift-detection=true` and update the workspace's `drift-last-checked-at` timestamp on completion
+- **Drift detection** runs are plan-only runs created by the `drift_check` scheduler task. They detect out-of-band infrastructure changes without applying anything. See [Drift Detection](drift-detection.md)
+- **Run tasks** can gate transitions at `pre_plan`, `post_plan`, and `pre_apply` boundaries. A mandatory task failure blocks the run until an admin overrides. See [Run Tasks](run-tasks.md)
+- **Run triggers** fire when a non-speculative run reaches `applied` — downstream workspaces automatically get new runs queued. See [Run Triggers](run-triggers.md)
+- **Notifications** are dispatched asynchronously on state transitions. See [Notifications](notifications.md)
 
 ---
 
@@ -506,6 +513,10 @@ The database schema is managed by Alembic migrations in `alembic/versions/`. Key
 | `CachedModule` | Pull-through module cache entries |
 | `CachedProviderPackage` | Pull-through provider cache entries |
 | `CachedBinary` | Pull-through CLI binary cache entries |
+| `RunTrigger` | Cross-workspace dependency chains |
+| `AuditLog` | Immutable API request log entries |
+| `NotificationConfiguration` | Workspace notification configs (webhook/Slack/email) |
+| `RunTask` / `TaskStage` / `TaskStageResult` | Run task webhooks and callback tracking |
 
 ---
 

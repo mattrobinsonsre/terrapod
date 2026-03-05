@@ -393,5 +393,9 @@ This stops all Tilt-managed resources and cleans up the namespace.
 
 - [Authentication](authentication.md) -- configure OIDC/SAML identity providers
 - [RBAC](rbac.md) -- set up roles and permissions
+- [Drift Detection](drift-detection.md) -- enable scheduled infrastructure drift checks
+- [Notifications](notifications.md) -- set up Slack, webhook, or email alerts on run events
+- [Run Triggers](run-triggers.md) -- create cross-workspace dependency chains
+- [Run Tasks](run-tasks.md) -- add pre/post-plan validation webhooks
 - [Deployment](deployment.md) -- deploy to production
 - [API Reference](api-reference.md) -- full API documentation

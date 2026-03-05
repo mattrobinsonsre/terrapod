@@ -6,6 +6,8 @@ Terrapod provides the collaboration, governance, state management, and UI layer 
 
 Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
+![Dashboard](docs/images/dashboard.png)
+
 ---
 
 ## Key Features
@@ -24,9 +26,14 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | Agent Pools | Implemented | Named groups of remote runner listeners with certificate-based auth |
 | CLI-Driven Runs | Implemented | `terraform plan` / `apply` via cloud backend (both `terraform` and `tofu` verified) |
 | TFE V2 API | Implemented | JSON:API surface compatible with `go-tfe` / `terraform login` |
-| Audit Logging | Planned | Immutable event log for compliance |
+| Audit Logging | Implemented | Immutable event log with configurable retention |
 | SSO (OIDC / SAML) | Implemented | Pluggable identity providers (Auth0, Okta, Azure AD, etc.) |
-| Drift Detection | Planned | Scheduled plan-only runs to detect out-of-band changes |
+| Drift Detection | Implemented | Scheduled plan-only runs to detect out-of-band changes |
+| Run Triggers | Implemented | Cross-workspace dependency chains — source apply triggers downstream runs |
+| Notifications | Implemented | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
+| Run Tasks | Implemented | Pre/post-plan webhook hooks for external validation |
+| Health Dashboard | Implemented | Workspace health scores, drift status, staleness metrics |
+| Cloud Credentials | Implemented | Dynamic provider credentials via K8s workload identity (AWS IRSA, GCP WIF, Azure WI) |
 
 ---
 
@@ -210,6 +217,13 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Deployment](docs/deployment.md) | Production Helm deployment, storage backends, scaling |
 | [Registry](docs/registry.md) | Private module/provider registry, caching layers |
 | [VCS Integration](docs/vcs-integration.md) | GitHub and GitLab setup, polling, webhooks |
+| [Drift Detection](docs/drift-detection.md) | Scheduled plan-only runs to detect infrastructure drift |
+| [Run Triggers](docs/run-triggers.md) | Cross-workspace dependency chains |
+| [Notifications](docs/notifications.md) | Webhook, Slack, and email alerts on run events |
+| [Run Tasks](docs/run-tasks.md) | Pre/post-plan webhook hooks for external validation |
+| [Audit Logging](docs/audit-logging.md) | Immutable event log, query API, retention |
+| [Health Dashboard](docs/health-dashboard.md) | Workspace health, drift status, run metrics |
+| [Cloud Credentials](docs/cloud-credentials.md) | AWS IRSA, GCP WIF, Azure WI setup |
 
 ---
 
@@ -261,7 +275,7 @@ make images       # Build production Docker images
 | [Terrateam](https://terrateam.io/) | GitHub-integrated TF automation | GitHub-coupled; limited community edition |
 | [Spacelift](https://spacelift.io/) | Commercial TF management platform | Not open source |
 
-Terrapod is a single, self-hosted platform covering the full TFE surface (state + runs + registry + policy + UI + API) under a permissive open-source license.
+Terrapod is a single, self-hosted platform covering the full TFE surface (state + runs + registry + governance + UI + API) under a copyleft (GPLv3) license.
 
 ---
 

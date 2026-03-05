@@ -1,0 +1,68 @@
+site_name: Terrapod
+site_description: Open-source platform replacement for Terraform Enterprise
+site_url: https://mattrobinsonsre.github.io/terrapod
+repo_url: https://github.com/mattrobinsonsre/terrapod
+repo_name: mattrobinsonsre/terrapod
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Architecture: architecture.md
+  - Features:
+      - VCS Integration: vcs-integration.md
+      - Drift Detection: drift-detection.md
+      - Run Triggers: run-triggers.md
+      - Notifications: notifications.md
+      - Run Tasks: run-tasks.md
+      - Audit Logging: audit-logging.md
+      - Health Dashboard: health-dashboard.md
+      - Cloud Credentials: cloud-credentials.md
+  - Admin:
+      - Authentication: authentication.md
+      - RBAC: rbac.md
+      - Registry: registry.md
+      - Deployment: deployment.md
+  - API Reference: api-reference.md

@@ -13,7 +13,7 @@ interface Provider {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <main className="h-screen flex items-center justify-center p-4">
+      <main className="h-dvh flex items-center justify-center p-4">
         <div className="text-slate-500">Loading...</div>
       </main>
     }>
@@ -135,9 +135,10 @@ function LoginContent() {
   }
 
   return (
-    <main className="h-screen flex flex-col items-center justify-center p-4 pb-[20vh]">
+    <main className="h-dvh flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
+          <img src="/logo.svg" alt="Terrapod" className="w-24 h-24 mx-auto mb-4" />
           <h1 className="text-3xl font-bold">Terrapod</h1>
           <p className="text-slate-400 mt-2">Sign in to manage your infrastructure</p>
         </div>

@@ -239,6 +239,13 @@ k8s_resource(
     links=[link('https://terrapod.local', 'Terrapod')],
 )
 
+# Runner Listener (uses same image as API)
+k8s_resource(
+    'terrapod-listener',
+    labels=['backend'],
+    resource_deps=['terrapod-api'],
+)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Local Commands
 # ─────────────────────────────────────────────────────────────────────────────
