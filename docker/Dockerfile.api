@@ -1,11 +1,13 @@
 # Terrapod API Server Dockerfile
 # Builds the Python FastAPI application
+#
+# Multi-stage: builder has gcc for compiling C extensions (asyncpg),
+# runtime image is slim with only runtime libraries.
 
-FROM python:3.14-slim
+FROM python:3.14-slim AS builder
 
-# Install system dependencies (xmlsec1 needed for python3-saml)
+# Install build + runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
     pkg-config \
     gcc \
     libc6-dev \
@@ -17,15 +19,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Poetry
 RUN pip install --no-cache-dir poetry==1.8.4
 
-# Set working directory
 WORKDIR /app
 
 # Copy dependency files
 COPY services/pyproject.toml services/poetry.lock* ./
 
-# Install dependencies (--no-root: don't install the project itself yet)
+# Install dependencies into system Python (no virtualenv)
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi --only main --no-root
+
+# ── Runtime stage ─────────────────────────────────────────────────────────────
+FROM python:3.14-slim
+
+# Runtime-only system libraries (no gcc, no -dev headers)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    xmlsec1 \
+    libxmlsec1-openssl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy installed Python packages from builder
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
 COPY services/terrapod ./terrapod
