@@ -87,6 +87,7 @@ publish_chart() {
   # Strip leading 'v' from version for Helm (semver without prefix)
   local chart_version="${VERSION#v}"
 
+  rm -rf "$REPO_ROOT/dist"
   mkdir -p "$REPO_ROOT/dist"
 
   # Package the chart with version and appVersion from git tag
