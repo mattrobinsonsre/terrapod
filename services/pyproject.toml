@@ -22,7 +22,7 @@ aioboto3 = "^13.0.0"
 azure-storage-blob = "^12.25.0"
 azure-identity = "^1.21.0"
 # GCP Cloud Storage
-google-cloud-storage = "^2.19.0"
+google-cloud-storage = "^3.9.0"
 gcloud-aio-storage = "^9.3.0"
 # Database
 sqlalchemy = {extras = ["asyncio"], version = "^2.0"}
