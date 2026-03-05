@@ -11,7 +11,7 @@ RUN apk add --no-cache \
     jq \
     unzip
 
-COPY runner-entrypoint.sh /entrypoint.sh
+COPY docker/runner-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 USER 1000:1000
