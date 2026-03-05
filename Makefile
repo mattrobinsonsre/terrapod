@@ -1,12 +1,13 @@
 # Terrapod Makefile
 # Thin wrapper around scripts/*.sh — all build logic lives in scripts.
 #
-# Docker-first: lint, test, and build all run in containers.
+# Docker-first: lint, test, build, and publish all run in containers.
 
 .PHONY: lint lint-python \
 	test test-python \
 	build images \
-	dev dev-down \
+	publish publish-images publish-chart publish-release \
+	release dev dev-down \
 	clean test-down \
 	help
 
@@ -29,6 +30,25 @@ images:             ## Build Docker images (single-arch, local)
 	docker build -f docker/Dockerfile.api -t terrapod-api:local .
 	docker build -f docker/Dockerfile.web -t terrapod-web:local .
 
+# ── Publish ───────────────────────────────────────────────
+publish:            ## Build + push multi-arch images to GHCR
+	scripts/publish.sh images
+
+publish-images:     ## Push multi-arch images to GHCR
+	scripts/publish.sh images
+
+publish-chart:      ## Push Helm chart to OCI registry
+	scripts/publish.sh chart
+
+publish-release:    ## Create GitHub Release with auto-generated notes
+	scripts/publish.sh release
+
+# ── Release ───────────────────────────────────────────────
+release:            ## Full release: lint, test, publish all
+	scripts/lint.sh
+	scripts/test.sh
+	scripts/publish.sh
+
 # ── Development ──────────────────────────────────────────
 dev:                ## Start Tilt development environment (port 10352)
 	tilt up --port 10352
@@ -39,6 +59,7 @@ dev-down:           ## Stop Tilt
 # ── Utility ──────────────────────────────────────────────
 clean:              ## Clean build artifacts
 	rm -rf services/.pytest_cache services/.coverage services/htmlcov
+	rm -rf dist/
 
 test-down:          ## Tear down test containers
 	docker compose -f docker-compose.test.yml down -v
