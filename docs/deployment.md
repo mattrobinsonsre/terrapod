@@ -18,16 +18,33 @@ Terrapod is deployed exclusively via Helm chart on Kubernetes. This guide covers
 
 ## Helm Chart Installation
 
+Terrapod is published to GitHub Container Registry (GHCR) as both Docker images and an OCI Helm chart:
+
+| Artifact | Registry |
+|---|---|
+| API image | `ghcr.io/mattrobinsonsre/terrapod-api` |
+| Web UI image | `ghcr.io/mattrobinsonsre/terrapod-web` |
+| Runner image | `ghcr.io/mattrobinsonsre/terrapod-runner` |
+| Helm chart | `oci://ghcr.io/mattrobinsonsre/terrapod` |
+
 ### Basic Install
 
 ```zsh
-helm install terrapod ./helm/terrapod \
+helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
   --namespace terrapod \
   --create-namespace \
   --set ingress.enabled=true \
   --set ingress.hostname=terrapod.example.com \
   --set postgresql.url="postgresql+asyncpg://terrapod:PASSWORD@db.example.com:5432/terrapod" \
   --set redis.url="redis://redis.example.com:6379"
+```
+
+To install a specific version:
+
+```zsh
+helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod --version 0.0.0 \
+  --namespace terrapod \
+  --create-namespace
 ```
 
 ### Install with Values File
@@ -108,7 +125,7 @@ bootstrap:
 ```
 
 ```zsh
-helm install terrapod ./helm/terrapod \
+helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
   --namespace terrapod \
   --create-namespace \
   -f values-production.yaml

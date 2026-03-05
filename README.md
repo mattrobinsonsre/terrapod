@@ -170,10 +170,10 @@ For detailed instructions, see [docs/getting-started.md](docs/getting-started.md
 
 ## Production Deployment
 
-Terrapod is deployed via Helm chart on Kubernetes.
+Terrapod is deployed via Helm chart on Kubernetes. Images and chart are published to GHCR.
 
 ```zsh
-helm install terrapod ./helm/terrapod \
+helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
   --namespace terrapod \
   --create-namespace \
   --set ingress.enabled=true \
