@@ -4,8 +4,8 @@ Adds tables for the pull-through caching layer:
 - cached_provider_packages: cached upstream provider binaries
 - cached_binaries: cached terraform/tofu CLI binaries
 
-Revision ID: 005
-Revises: 004
+Revision ID: a85a33da9786
+Revises: a41bd1932396
 Create Date: 2026-02-24
 """
 
@@ -15,8 +15,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "005"
-down_revision: Union[str, None] = "004"
+revision: str = "a85a33da9786"
+down_revision: Union[str, None] = "a41bd1932396"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

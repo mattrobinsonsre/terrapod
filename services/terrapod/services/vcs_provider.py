@@ -48,6 +48,10 @@ class VCSProvider(Protocol):
         """List open PRs/MRs targeting the given base branch."""
         ...
 
+    async def list_tags(self, conn: VCSConnection, owner: str, repo: str) -> list[dict[str, str]]:
+        """List repository tags. Returns [{"name": str, "sha": str}]."""
+        ...
+
     def parse_repo_url(self, repo_url: str) -> tuple[str, str] | None:
         """Parse a repo URL into (owner/namespace, repo). Returns None if unparseable."""
         ...

@@ -3,8 +3,8 @@
 When a source workspace completes an apply, all downstream workspaces
 with an inbound trigger automatically get a new run queued.
 
-Revision ID: 013
-Revises: 012
+Revision ID: 8c8a6a056ce2
+Revises: 65ec20e8d634
 Create Date: 2026-03-04
 """
 
@@ -14,8 +14,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "013"
-down_revision: Union[str, None] = "012"
+revision: str = "8c8a6a056ce2"
+down_revision: Union[str, None] = "65ec20e8d634"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

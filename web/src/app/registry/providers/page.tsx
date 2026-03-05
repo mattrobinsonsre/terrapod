@@ -28,7 +28,6 @@ export default function ProvidersPage() {
 
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
-  const [newNamespace, setNewNamespace] = useState('')
   const [creating, setCreating] = useState(false)
 
 
@@ -62,7 +61,7 @@ export default function ProvidersPage() {
         body: JSON.stringify({
           data: {
             type: 'registry-providers',
-            attributes: { name: newName, namespace: newNamespace || 'default' },
+            attributes: { name: newName },
           },
         }),
       })
@@ -71,7 +70,6 @@ export default function ProvidersPage() {
         throw new Error(data.detail || `Failed to create provider (${res.status})`)
       }
       setNewName('')
-      setNewNamespace('')
       setShowCreate(false)
       await loadProviders()
     } catch (err) {
@@ -102,30 +100,17 @@ export default function ProvidersPage() {
 
         {showCreate && (
           <form onSubmit={handleCreate} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="prov-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
-                <input
-                  id="prov-name"
-                  type="text"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  required
-                  placeholder="aws"
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label htmlFor="prov-ns" className="block text-sm font-medium text-slate-300 mb-1">Namespace (optional)</label>
-                <input
-                  id="prov-ns"
-                  type="text"
-                  value={newNamespace}
-                  onChange={(e) => setNewNamespace(e.target.value)}
-                  placeholder="default"
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                />
-              </div>
+            <div>
+              <label htmlFor="prov-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
+              <input
+                id="prov-name"
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                required
+                placeholder="aws"
+                className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+              />
             </div>
             <button
               type="submit"
@@ -146,11 +131,10 @@ export default function ProvidersPage() {
             {providers.map((prov) => (
               <Link
                 key={prov.id}
-                href={`/registry/providers/default/${prov.attributes.namespace}/${prov.attributes.name}`}
+                href={`/registry/providers/${prov.attributes.name}`}
                 className="bg-slate-800/50 rounded-lg border border-slate-700/50 hover:border-brand-600/30 p-4 transition-colors"
               >
                 <h3 className="font-semibold text-slate-200">{prov.attributes.name}</h3>
-                <p className="text-sm text-slate-500 mt-1">Namespace: {prov.attributes.namespace}</p>
               </Link>
             ))}
           </div>

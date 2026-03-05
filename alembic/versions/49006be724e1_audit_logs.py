@@ -3,8 +3,8 @@
 Captures actor, action, resource, status, and duration for every
 non-health API request. Retention managed by a daily scheduler task.
 
-Revision ID: 014
-Revises: 013
+Revision ID: 49006be724e1
+Revises: 8c8a6a056ce2
 Create Date: 2026-03-04
 """
 
@@ -14,8 +14,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "014"
-down_revision: Union[str, None] = "013"
+revision: str = "49006be724e1"
+down_revision: Union[str, None] = "8c8a6a056ce2"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

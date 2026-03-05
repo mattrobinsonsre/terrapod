@@ -4,6 +4,7 @@ Handles CRUD for registry providers, versions, and platforms, with presigned
 URL generation for binary upload/download via object storage.
 """
 
+import hashlib
 import uuid
 
 from sqlalchemy import select
@@ -355,6 +356,170 @@ async def get_provider_download_info(
             "gpg_public_keys": signing_keys,
         },
     }
+
+
+# --- Upsert helpers (for direct upload flow) ---
+
+
+async def upsert_provider_version(
+    db: AsyncSession,
+    provider_id: uuid.UUID,
+    version: str,
+) -> RegistryProviderVersion:
+    """Get or create a provider version record."""
+    result = await db.execute(
+        select(RegistryProviderVersion)
+        .where(
+            RegistryProviderVersion.provider_id == provider_id,
+            RegistryProviderVersion.version == version,
+        )
+        .options(selectinload(RegistryProviderVersion.platforms))
+    )
+    prov_version = result.scalars().first()
+    if prov_version is not None:
+        return prov_version
+
+    prov_version = RegistryProviderVersion(
+        provider_id=provider_id,
+        version=version,
+        protocols=["5.0"],
+    )
+    db.add(prov_version)
+    await db.flush()
+    return prov_version
+
+
+async def upsert_provider_platform(
+    db: AsyncSession,
+    version_id: uuid.UUID,
+    os_: str,
+    arch: str,
+) -> RegistryProviderPlatform:
+    """Get or create a provider platform record."""
+    result = await db.execute(
+        select(RegistryProviderPlatform).where(
+            RegistryProviderPlatform.version_id == version_id,
+            RegistryProviderPlatform.os == os_,
+            RegistryProviderPlatform.arch == arch,
+        )
+    )
+    platform = result.scalars().first()
+    if platform is not None:
+        return platform
+
+    platform = RegistryProviderPlatform(
+        version_id=version_id,
+        os=os_,
+        arch=arch,
+    )
+    db.add(platform)
+    await db.flush()
+    return platform
+
+
+async def regenerate_shasums(
+    db: AsyncSession,
+    storage: ObjectStore,
+    namespace: str,
+    name: str,
+    version_id: uuid.UUID,
+    version_str: str,
+) -> None:
+    """Regenerate SHA256SUMS from all uploaded platforms, sign, and link GPG key."""
+    from terrapod.services.gpg_key_service import get_or_create_signing_key, sign_data
+
+    result = await db.execute(
+        select(RegistryProviderPlatform)
+        .where(
+            RegistryProviderPlatform.version_id == version_id,
+            RegistryProviderPlatform.upload_status == "uploaded",
+        )
+        .order_by(RegistryProviderPlatform.os, RegistryProviderPlatform.arch)
+    )
+    platforms = list(result.scalars().all())
+
+    lines = []
+    for p in platforms:
+        if p.shasum and p.filename:
+            lines.append(f"{p.shasum}  {p.filename}")
+
+    content = "\n".join(lines) + "\n" if lines else ""
+    content_bytes = content.encode()
+    shasums_k = provider_shasums_key(namespace, name, version_str)
+    await storage.put(shasums_k, content_bytes, "text/plain")
+
+    # Look up the version record
+    ver_result = await db.execute(
+        select(RegistryProviderVersion).where(RegistryProviderVersion.id == version_id)
+    )
+    prov_version = ver_result.scalars().first()
+    if prov_version is None:
+        return
+
+    prov_version.shasums_uploaded = True
+
+    # Sign SHA256SUMS and store the detached signature
+    if content_bytes:
+        try:
+            gpg_key, private_armor = await get_or_create_signing_key(db)
+            sig_bytes = sign_data(private_armor, content_bytes)
+            sig_k = provider_shasums_sig_key(namespace, name, version_str)
+            await storage.put(sig_k, sig_bytes, "application/pgp-signature")
+            prov_version.shasums_sig_uploaded = True
+            prov_version.gpg_key_id = gpg_key.id
+            logger.info(
+                "SHA256SUMS signed",
+                provider=f"{namespace}/{name}",
+                version=version_str,
+                gpg_key_id=gpg_key.key_id,
+            )
+        except Exception:
+            logger.warning(
+                "Failed to sign SHA256SUMS, provider will work without signatures",
+                provider=f"{namespace}/{name}",
+                version=version_str,
+                exc_info=True,
+            )
+
+    await db.flush()
+
+
+async def upload_provider_binary(
+    db: AsyncSession,
+    storage: ObjectStore,
+    namespace: str,
+    name: str,
+    version_str: str,
+    os_: str,
+    arch: str,
+    data: bytes,
+) -> RegistryProviderPlatform:
+    """Upload a provider binary directly. Upserts version + platform, stores binary."""
+    provider = await get_provider(db, namespace, name)
+    if provider is None:
+        raise ValueError(f"Provider {namespace}/{name} not found")
+
+    prov_version = await upsert_provider_version(db, provider.id, version_str)
+    platform = await upsert_provider_platform(db, prov_version.id, os_, arch)
+
+    # Compute SHA-256
+    sha256 = hashlib.sha256(data).hexdigest()
+
+    # Store binary
+    filename = f"terraform-provider-{name}_{version_str}_{os_}_{arch}.zip"
+    key = provider_binary_key(namespace, name, version_str, os_, arch)
+    await storage.put(key, data, "application/zip")
+
+    # Update platform record
+    platform.shasum = sha256
+    platform.filename = filename
+    platform.upload_status = "uploaded"
+    await db.flush()
+
+    # Regenerate SHA256SUMS for this version
+    await regenerate_shasums(db, storage, namespace, name, prov_version.id, version_str)
+
+    return platform
 
 
 # --- Internal helpers ---

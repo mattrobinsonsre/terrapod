@@ -81,6 +81,7 @@ docker_build(
     dockerfile='docker/Dockerfile.api',
     live_update=[
         sync('./services/terrapod', '/app/terrapod'),
+        sync('./alembic', '/app/alembic'),
         run('cd /app && pip install -e .', trigger=['./services/pyproject.toml']),
     ],
 )
@@ -95,6 +96,7 @@ docker_build(
     live_update=[
         sync('./web/src', '/app/src'),
         sync('./web/public', '/app/public'),
+        sync('./web/next.config.js', '/app/next.config.js'),
     ],
 )
 

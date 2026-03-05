@@ -392,6 +392,18 @@ class RegistryModule(Base):
     labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     owner_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
 
+    # VCS source tracking
+    source: Mapped[str] = mapped_column(String(20), nullable=False, default="upload")
+    vcs_connection_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("vcs_connections.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    vcs_repo_url: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    vcs_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    vcs_tag_pattern: Mapped[str] = mapped_column(String(255), nullable=False, default="v*")
+    vcs_last_tag: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -477,6 +489,7 @@ class GPGKey(Base):
     ascii_armor: Mapped[str] = mapped_column(Text, nullable=False)
     source: Mapped[str] = mapped_column(String(63), nullable=False, default="terrapod")
     source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    private_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False

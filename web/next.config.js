@@ -16,6 +16,12 @@ const nextConfig = {
           : 'http://localhost:8001/.well-known/:path*',
       },
       {
+        source: '/oauth/:path*',
+        destination: process.env.API_URL
+          ? `${process.env.API_URL}/oauth/:path*`
+          : 'http://localhost:8001/oauth/:path*',
+      },
+      {
         source: '/v1/:path*',
         destination: process.env.API_URL
           ? `${process.env.API_URL}/v1/:path*`

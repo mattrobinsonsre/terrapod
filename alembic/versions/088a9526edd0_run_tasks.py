@@ -3,8 +3,8 @@
 Pre/post-plan/apply task stages that gate run progression based on
 external service pass/fail callbacks.
 
-Revision ID: 016
-Revises: 015
+Revision ID: 088a9526edd0
+Revises: 305686df7bbd
 Create Date: 2026-03-04
 """
 
@@ -14,8 +14,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "016"
-down_revision: Union[str, None] = "015"
+revision: str = "088a9526edd0"
+down_revision: Union[str, None] = "305686df7bbd"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -1,0 +1,648 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { Upload, FolderOpen, GitBranch } from 'lucide-react'
+import * as Dialog from '@radix-ui/react-dialog'
+import NavBar from '@/components/nav-bar'
+import { PageHeader } from '@/components/page-header'
+import { LoadingSpinner } from '@/components/loading-spinner'
+import { ErrorBanner } from '@/components/error-banner'
+import { EmptyState } from '@/components/empty-state'
+import { getAuthState } from '@/lib/auth'
+import { apiFetch } from '@/lib/api'
+
+interface VersionStatus {
+  version: string
+  status: string
+}
+
+interface VCSConnection {
+  id: string
+  attributes: {
+    name: string
+    provider: string
+  }
+}
+
+interface ModuleDetail {
+  id: string
+  attributes: {
+    name: string
+    namespace: string
+    provider: string
+    status: string
+    source: string
+    'vcs-connection-id': string | null
+    'vcs-repo-url': string
+    'vcs-branch': string
+    'vcs-tag-pattern': string
+    'vcs-last-tag': string
+    'version-statuses': VersionStatus[]
+    'created-at': string | null
+    'updated-at': string | null
+  }
+}
+
+async function buildTarGz(files: File[]): Promise<Uint8Array> {
+  const { strToU8, gzipSync } = await import('fflate')
+
+  // Build tar archive manually (512-byte header + file data per entry)
+  const entries: Uint8Array[] = []
+
+  for (const file of files) {
+    const data = new Uint8Array(await file.arrayBuffer())
+    // Use webkitRelativePath to get relative path within selected directory
+    const relativePath = file.webkitRelativePath
+      ? file.webkitRelativePath.split('/').slice(1).join('/')
+      : file.name
+
+    // Build tar header (512 bytes)
+    const header = new Uint8Array(512)
+    const encoder = new TextEncoder()
+
+    // name (0-99)
+    const nameBytes = encoder.encode(relativePath)
+    header.set(nameBytes.subarray(0, 100), 0)
+
+    // mode (100-107) — 0644
+    header.set(encoder.encode('0000644\0'), 100)
+
+    // uid (108-115)
+    header.set(encoder.encode('0000000\0'), 108)
+
+    // gid (116-123)
+    header.set(encoder.encode('0000000\0'), 116)
+
+    // size (124-135) — octal
+    const sizeStr = data.length.toString(8).padStart(11, '0') + '\0'
+    header.set(encoder.encode(sizeStr), 124)
+
+    // mtime (136-147) — current time in octal
+    const mtime = Math.floor(Date.now() / 1000).toString(8).padStart(11, '0') + '\0'
+    header.set(encoder.encode(mtime), 136)
+
+    // checksum placeholder (148-155) — spaces
+    header.set(encoder.encode('        '), 148)
+
+    // typeflag (156) — '0' for regular file
+    header[156] = 0x30
+
+    // magic (257-262) — "ustar\0"
+    header.set(encoder.encode('ustar\0'), 257)
+
+    // version (263-264)
+    header.set(encoder.encode('00'), 263)
+
+    // Calculate checksum
+    let checksum = 0
+    for (let i = 0; i < 512; i++) {
+      checksum += header[i]
+    }
+    const checksumStr = checksum.toString(8).padStart(6, '0') + '\0 '
+    header.set(encoder.encode(checksumStr), 148)
+
+    entries.push(header)
+    entries.push(data)
+
+    // Pad to 512-byte boundary
+    const padding = (512 - (data.length % 512)) % 512
+    if (padding > 0) {
+      entries.push(new Uint8Array(padding))
+    }
+  }
+
+  // Two 512-byte zero blocks to mark end of archive
+  entries.push(new Uint8Array(1024))
+
+  // Concatenate all entries
+  const totalSize = entries.reduce((s, e) => s + e.length, 0)
+  const tar = new Uint8Array(totalSize)
+  let offset = 0
+  for (const entry of entries) {
+    tar.set(entry, offset)
+    offset += entry.length
+  }
+
+  // Gzip compress
+  return gzipSync(tar)
+}
+
+export default function ModuleDetailPage() {
+  const router = useRouter()
+  const params = useParams<{ name: string; provider: string }>()
+  const { name, provider } = params
+
+  const [module, setModule] = useState<ModuleDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  // Upload state
+  const [showUpload, setShowUpload] = useState(false)
+  const [uploadVersion, setUploadVersion] = useState('')
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [uploading, setUploading] = useState(false)
+
+  // VCS state
+  const [showVcs, setShowVcs] = useState(false)
+  const [vcsConnections, setVcsConnections] = useState<VCSConnection[]>([])
+  const [vcsConnectionId, setVcsConnectionId] = useState('')
+  const [vcsRepoUrl, setVcsRepoUrl] = useState('')
+  const [vcsBranch, setVcsBranch] = useState('')
+  const [vcsTagPattern, setVcsTagPattern] = useState('v*')
+  const [savingVcs, setSavingVcs] = useState(false)
+
+  // Legacy create version
+  const [showCreateVersion, setShowCreateVersion] = useState(false)
+  const [newVersion, setNewVersion] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!getAuthState()) { router.push('/login'); return }
+    loadModule()
+  }, [router, name, provider])
+
+  async function loadModule() {
+    setLoading(true)
+    try {
+      const res = await apiFetch(
+        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}`
+      )
+      if (!res.ok) throw new Error('Module not found')
+      const data = await res.json()
+      setModule(data.data)
+
+      // Pre-fill VCS fields from module data
+      const attrs = data.data?.attributes
+      if (attrs) {
+        setVcsConnectionId(attrs['vcs-connection-id'] || '')
+        setVcsRepoUrl(attrs['vcs-repo-url'] || '')
+        setVcsBranch(attrs['vcs-branch'] || '')
+        setVcsTagPattern(attrs['vcs-tag-pattern'] || 'v*')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load module')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function loadVcsConnections() {
+    try {
+      const res = await apiFetch('/api/v2/organizations/default/vcs-connections')
+      if (res.ok) {
+        const data = await res.json()
+        setVcsConnections(data.data || [])
+      }
+    } catch {
+      // VCS connections are optional — ignore errors
+    }
+  }
+
+  const handleDirectorySelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+    const fileList: File[] = []
+    for (let i = 0; i < files.length; i++) {
+      // Skip hidden files and directories
+      if (!files[i].name.startsWith('.')) {
+        fileList.push(files[i])
+      }
+    }
+    setSelectedFiles(fileList)
+  }, [])
+
+  async function handleUpload() {
+    if (!uploadVersion || selectedFiles.length === 0) return
+    setUploading(true)
+    setError('')
+    try {
+      const tarGz = await buildTarGz(selectedFiles)
+      const res = await apiFetch(
+        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/versions/${uploadVersion}/upload`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/gzip' },
+          body: tarGz as unknown as BodyInit,
+        }
+      )
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `Upload failed (${res.status})`)
+      }
+
+      setSelectedFiles([])
+      setUploadVersion('')
+      setShowUpload(false)
+      await loadModule()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleSaveVcs() {
+    setSavingVcs(true)
+    setError('')
+    try {
+      const res = await apiFetch(
+        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/vcs`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/vnd.api+json' },
+          body: JSON.stringify({
+            data: {
+              type: 'registry-modules',
+              attributes: {
+                source: 'vcs',
+                vcs_connection_id: vcsConnectionId,
+                vcs_repo_url: vcsRepoUrl,
+                vcs_branch: vcsBranch,
+                vcs_tag_pattern: vcsTagPattern,
+              },
+            },
+          }),
+        }
+      )
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `Failed to save VCS config (${res.status})`)
+      }
+      await loadModule()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save VCS config')
+    } finally {
+      setSavingVcs(false)
+    }
+  }
+
+  async function handleDisableVcs() {
+    setSavingVcs(true)
+    setError('')
+    try {
+      const res = await apiFetch(
+        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/vcs`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/vnd.api+json' },
+          body: JSON.stringify({
+            data: {
+              type: 'registry-modules',
+              attributes: {
+                source: 'upload',
+                vcs_connection_id: '',
+                vcs_repo_url: '',
+                vcs_branch: '',
+                vcs_tag_pattern: 'v*',
+              },
+            },
+          }),
+        }
+      )
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `Failed to disable VCS (${res.status})`)
+      }
+      await loadModule()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to disable VCS')
+    } finally {
+      setSavingVcs(false)
+    }
+  }
+
+  async function handleCreateVersion(e: React.FormEvent) {
+    e.preventDefault()
+    setCreating(true)
+    setError('')
+    try {
+      const res = await apiFetch(
+        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/versions`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/vnd.api+json' },
+          body: JSON.stringify({
+            data: {
+              type: 'registry-module-versions',
+              attributes: { version: newVersion },
+            },
+          }),
+        }
+      )
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `Failed to create version (${res.status})`)
+      }
+      setNewVersion('')
+      setShowCreateVersion(false)
+      await loadModule()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create version')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setError('')
+    try {
+      const path = deleteTarget === 'module'
+        ? `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}`
+        : `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/${deleteTarget}`
+
+      const res = await apiFetch(path, { method: 'DELETE' })
+      if (!res.ok && res.status !== 204) {
+        throw new Error(`Delete failed (${res.status})`)
+      }
+
+      setDeleteTarget(null)
+      if (deleteTarget === 'module') {
+        router.push('/registry/modules')
+      } else {
+        await loadModule()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed')
+      setDeleteTarget(null)
+    }
+  }
+
+  const isVcsSource = module?.attributes.source === 'vcs'
+
+  return (
+    <>
+      <NavBar />
+      <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
+        {error && <ErrorBanner message={error} />}
+
+        {loading ? (
+          <LoadingSpinner />
+        ) : module ? (
+          <>
+            <PageHeader
+              title={module.attributes.name}
+              description={`Provider: ${module.attributes.provider}`}
+              actions={
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setShowUpload(!showUpload); setShowVcs(false) }}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors flex items-center gap-2"
+                  >
+                    <Upload size={16} />
+                    {showUpload ? 'Cancel' : 'Upload Version'}
+                  </button>
+                  <button
+                    onClick={() => { setShowVcs(!showVcs); setShowUpload(false); if (!showVcs) loadVcsConnections() }}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                      isVcsSource
+                        ? 'bg-green-900/50 text-green-300 border border-green-800/50 hover:bg-green-800/50'
+                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                    }`}
+                  >
+                    <GitBranch size={16} />
+                    {showVcs ? 'Cancel' : (isVcsSource ? 'VCS Connected' : 'Connect VCS')}
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget('module')}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-red-900/50 hover:bg-red-800/50 text-red-300 border border-red-800/50 transition-colors"
+                  >
+                    Delete Module
+                  </button>
+                </div>
+              }
+            />
+
+            {/* Upload section */}
+            {showUpload && (
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-5 mb-6 space-y-4">
+                <p className="text-sm text-slate-300">
+                  Select a directory containing your Terraform module files. They will be packaged into a tarball and uploaded.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="upload-ver" className="block text-sm font-medium text-slate-300 mb-1">Version</label>
+                    <input
+                      id="upload-ver"
+                      type="text"
+                      value={uploadVersion}
+                      onChange={(e) => setUploadVersion(e.target.value)}
+                      required
+                      placeholder="1.0.0"
+                      className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Module Directory</label>
+                    <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 cursor-pointer transition-colors border border-slate-600">
+                      <FolderOpen size={16} />
+                      {selectedFiles.length > 0 ? `${selectedFiles.length} file(s)` : 'Select Directory'}
+                      {/* @ts-expect-error webkitdirectory is not in standard types */}
+                      <input type="file" webkitdirectory="" multiple className="hidden" onChange={handleDirectorySelect} />
+                    </label>
+                  </div>
+                </div>
+
+                {selectedFiles.length > 0 && (
+                  <div className="bg-slate-900/50 rounded-lg p-3 max-h-48 overflow-y-auto">
+                    <p className="text-xs text-slate-500 mb-2">{selectedFiles.length} files to include:</p>
+                    <div className="space-y-0.5">
+                      {selectedFiles.slice(0, 50).map((f, i) => (
+                        <div key={i} className="text-xs text-slate-400 font-mono">
+                          {f.webkitRelativePath ? f.webkitRelativePath.split('/').slice(1).join('/') : f.name}
+                        </div>
+                      ))}
+                      {selectedFiles.length > 50 && (
+                        <div className="text-xs text-slate-500">...and {selectedFiles.length - 50} more</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleUpload}
+                  disabled={uploading || !uploadVersion || selectedFiles.length === 0}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors flex items-center gap-2"
+                >
+                  <Upload size={16} />
+                  {uploading ? 'Uploading...' : 'Upload'}
+                </button>
+              </div>
+            )}
+
+            {/* VCS configuration section */}
+            {showVcs && (
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-5 mb-6 space-y-4">
+                <p className="text-sm text-slate-300">
+                  Connect this module to a VCS repository. New versions will be published automatically when matching tags are pushed.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="vcs-conn" className="block text-sm font-medium text-slate-300 mb-1">VCS Connection</label>
+                    <select
+                      id="vcs-conn"
+                      value={vcsConnectionId}
+                      onChange={(e) => setVcsConnectionId(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    >
+                      <option value="">Select a connection...</option>
+                      {vcsConnections.map((conn) => (
+                        <option key={conn.id} value={conn.id}>
+                          {conn.attributes.name} ({conn.attributes.provider})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="vcs-repo" className="block text-sm font-medium text-slate-300 mb-1">Repository URL</label>
+                    <input
+                      id="vcs-repo"
+                      type="text"
+                      value={vcsRepoUrl}
+                      onChange={(e) => setVcsRepoUrl(e.target.value)}
+                      placeholder="https://github.com/org/terraform-module-vpc"
+                      className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="vcs-branch" className="block text-sm font-medium text-slate-300 mb-1">Branch (optional)</label>
+                    <input
+                      id="vcs-branch"
+                      type="text"
+                      value={vcsBranch}
+                      onChange={(e) => setVcsBranch(e.target.value)}
+                      placeholder="main (leave empty for default)"
+                      className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="vcs-tag" className="block text-sm font-medium text-slate-300 mb-1">Tag Pattern</label>
+                    <input
+                      id="vcs-tag"
+                      type="text"
+                      value={vcsTagPattern}
+                      onChange={(e) => setVcsTagPattern(e.target.value)}
+                      placeholder="v*"
+                      className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveVcs}
+                    disabled={savingVcs || !vcsConnectionId || !vcsRepoUrl}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+                  >
+                    {savingVcs ? 'Saving...' : 'Save VCS Configuration'}
+                  </button>
+                  {isVcsSource && (
+                    <button
+                      onClick={handleDisableVcs}
+                      disabled={savingVcs}
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
+                    >
+                      Disconnect VCS
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* VCS status info when connected but section not open */}
+            {isVcsSource && !showVcs && module.attributes['vcs-repo-url'] && (
+              <div className="bg-green-900/20 rounded-lg border border-green-800/30 px-4 py-3 mb-6 flex items-center gap-3">
+                <GitBranch size={16} className="text-green-400" />
+                <div className="text-sm">
+                  <span className="text-green-300">VCS connected:</span>{' '}
+                  <span className="text-slate-300 font-mono text-xs">{module.attributes['vcs-repo-url']}</span>
+                  {module.attributes['vcs-last-tag'] && (
+                    <span className="text-slate-400 ml-2">Last tag: {module.attributes['vcs-last-tag']}</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <h2 className="text-lg font-semibold text-slate-200 mb-3">Versions</h2>
+            {(module.attributes['version-statuses'] || []).length === 0 ? (
+              <EmptyState message="No versions yet. Upload a module or connect VCS to get started." />
+            ) : (
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-700/50">
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Version</th>
+                      <th className="text-left px-4 py-3 text-slate-400 font-medium">Status</th>
+                      <th className="text-right px-4 py-3 text-slate-400 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {module.attributes['version-statuses'].map((v) => (
+                      <tr key={v.version} className="border-b border-slate-700/30 last:border-0">
+                        <td className="px-4 py-3 text-slate-200 font-mono">{v.version}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            v.status === 'uploaded'
+                              ? 'bg-green-900/50 text-green-300'
+                              : 'bg-amber-900/50 text-amber-300'
+                          }`}>
+                            {v.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => setDeleteTarget(v.version)}
+                            className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        ) : null}
+
+        {/* Delete confirmation dialog */}
+        <Dialog.Root open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 bg-black/60" />
+            <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-800 rounded-lg border border-slate-700 p-6 w-full max-w-md shadow-xl">
+              <Dialog.Title className="text-lg font-semibold text-slate-100">
+                Confirm Delete
+              </Dialog.Title>
+              <Dialog.Description className="text-sm text-slate-400 mt-2">
+                {deleteTarget === 'module'
+                  ? 'This will permanently delete this module and all its versions.'
+                  : `This will permanently delete version ${deleteTarget}.`}
+              </Dialog.Description>
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
+      </main>
+    </>
+  )
+}

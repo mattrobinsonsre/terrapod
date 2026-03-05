@@ -8,8 +8,8 @@ Adds tables for the private module/provider registry:
 - registry_provider_platforms: per-OS/arch binaries
 - gpg_keys: GPG public keys for provider signing
 
-Revision ID: 004
-Revises: 003
+Revision ID: a41bd1932396
+Revises: 44edab8527a2
 Create Date: 2026-02-24
 """
 
@@ -19,8 +19,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "004"
-down_revision: Union[str, None] = "003"
+revision: str = "a41bd1932396"
+down_revision: Union[str, None] = "44edab8527a2"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

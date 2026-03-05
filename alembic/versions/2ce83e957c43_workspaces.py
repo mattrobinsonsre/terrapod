@@ -1,7 +1,7 @@
 """Add workspaces and state_versions tables.
 
-Revision ID: 006
-Revises: 005
+Revision ID: 2ce83e957c43
+Revises: a85a33da9786
 Create Date: 2026-02-24
 """
 
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = "006"
-down_revision: Union[str, None] = "005"
+revision: str = "2ce83e957c43"
+down_revision: Union[str, None] = "a85a33da9786"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

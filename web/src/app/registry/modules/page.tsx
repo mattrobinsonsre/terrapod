@@ -18,6 +18,7 @@ interface Module {
     namespace: string
     provider: string
     status: string
+    source: string
     'version-statuses': { version: string; status: string }[]
     'created-at': string | null
   }
@@ -152,7 +153,7 @@ export default function ModulesPage() {
             {modules.map((mod) => (
               <Link
                 key={mod.id}
-                href={`/registry/modules/default/${mod.attributes.namespace}/${mod.attributes.name}/${mod.attributes.provider}`}
+                href={`/registry/modules/${mod.attributes.name}/${mod.attributes.provider}`}
                 className="bg-slate-800/50 rounded-lg border border-slate-700/50 hover:border-brand-600/30 p-4 transition-colors"
               >
                 <h3 className="font-semibold text-slate-200">{mod.attributes.name}</h3>
@@ -162,12 +163,17 @@ export default function ModulesPage() {
                     {mod.attributes['version-statuses']?.length || 0} version(s)
                   </span>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                    mod.attributes.status === 'published'
+                    mod.attributes.status === 'setup_complete'
                       ? 'bg-green-900/50 text-green-300'
                       : 'bg-slate-700 text-slate-400'
                   }`}>
                     {mod.attributes.status}
                   </span>
+                  {mod.attributes.source === 'vcs' && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-900/50 text-blue-300">
+                      VCS
+                    </span>
+                  )}
                 </div>
               </Link>
             ))}

@@ -82,6 +82,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Webhook-triggered immediate VCS poll",
         )
 
+        # Registry module VCS publishing (piggybacks on VCS being enabled)
+        from terrapod.services.registry_vcs_poller import registry_vcs_poll_cycle
+
+        register_periodic_task(
+            "registry_vcs_poll",
+            interval_seconds=settings.vcs.poll_interval_seconds,
+            handler=registry_vcs_poll_cycle,
+            description="Poll VCS providers for new module version tags",
+        )
+
     # Notification delivery handler (always registered)
     from terrapod.services.notification_dispatcher import handle_notification_delivery
 

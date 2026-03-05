@@ -121,6 +121,58 @@ async def create_module_version(
     return mod_version, upload_url
 
 
+async def upsert_module_version(
+    db: AsyncSession,
+    module_id: uuid.UUID,
+    version: str,
+) -> RegistryModuleVersion:
+    """Get or create a module version record."""
+    result = await db.execute(
+        select(RegistryModuleVersion).where(
+            RegistryModuleVersion.module_id == module_id,
+            RegistryModuleVersion.version == version,
+        )
+    )
+    mod_version = result.scalars().first()
+    if mod_version is not None:
+        return mod_version
+
+    mod_version = RegistryModuleVersion(
+        module_id=module_id,
+        version=version,
+        upload_status="pending",
+    )
+    db.add(mod_version)
+    await db.flush()
+    return mod_version
+
+
+async def upload_module_tarball(
+    db: AsyncSession,
+    storage: ObjectStore,
+    namespace: str,
+    name: str,
+    provider: str,
+    version: str,
+    data: bytes,
+) -> RegistryModuleVersion:
+    """Upload a module tarball directly. Upserts version, stores tarball."""
+    module = await get_module(db, namespace, name, provider)
+    if module is None:
+        raise ValueError(f"Module {namespace}/{name}/{provider} not found")
+
+    mod_version = await upsert_module_version(db, module.id, version)
+
+    key = module_tarball_key(namespace, name, provider, version)
+    await storage.put(key, data, "application/gzip")
+
+    mod_version.upload_status = "uploaded"
+    module.status = "setup_complete"
+    await db.flush()
+
+    return mod_version
+
+
 async def confirm_module_upload(
     db: AsyncSession,
     storage: ObjectStore,

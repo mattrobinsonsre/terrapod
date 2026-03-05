@@ -48,6 +48,13 @@ htmlcov/
 # Docker
 *.log
 
+# Playwright MCP
+.playwright-mcp/
+
+# Screenshots (allow docs/images/)
+*.png
+!docs/images/*.png
+
 # Terraform (local dev testing)
 .terraform/
 *.tfstate

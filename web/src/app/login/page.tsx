@@ -34,6 +34,7 @@ function LoginContent() {
   const [password, setPassword] = useState('')
 
   const redirectUrl = searchParams.get('redirect')
+  const cliState = searchParams.get('cli_state')
 
   const hasLocalProvider = providers.some((p) => p.type === 'local')
   const externalProviders = providers.filter((p) => p.type !== 'local')
@@ -53,6 +54,24 @@ function LoginContent() {
     e.preventDefault()
     setError('')
     setSubmitting(true)
+
+    // CLI login flow: submit a real HTML form so the browser follows
+    // the 302 redirect to the CLI's localhost callback server
+    if (cliState) {
+      const form = document.createElement('form')
+      form.method = 'POST'
+      form.action = '/api/v2/auth/local/login'
+      for (const [k, v] of Object.entries({ state: cliState, email, password })) {
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = k
+        input.value = v
+        form.appendChild(input)
+      }
+      document.body.appendChild(form)
+      form.submit()
+      return
+    }
 
     try {
       const { verifier, challenge } = await generatePKCE()
@@ -140,7 +159,9 @@ function LoginContent() {
         <div className="text-center mb-8">
           <img src="/logo.svg" alt="Terrapod" className="w-24 h-24 mx-auto mb-4" />
           <h1 className="text-3xl font-bold">Terrapod</h1>
-          <p className="text-slate-400 mt-2">Sign in to manage your infrastructure</p>
+          <p className="text-slate-400 mt-2">
+            {cliState ? 'Sign in to authorize the CLI' : 'Sign in to manage your infrastructure'}
+          </p>
         </div>
 
         <div className="bg-slate-800 rounded-lg shadow-lg p-6 border border-slate-700/50">

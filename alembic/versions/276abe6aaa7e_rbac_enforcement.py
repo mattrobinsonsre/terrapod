@@ -4,8 +4,8 @@ Adds label-based RBAC columns to workspaces, registry modules, and registry
 providers. Adds workspace_permission to custom roles for hierarchical
 permission levels (read/plan/write/admin).
 
-Revision ID: 011
-Revises: 010
+Revision ID: 276abe6aaa7e
+Revises: 518b3395638e
 Create Date: 2026-02-27
 """
 
@@ -15,8 +15,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "011"
-down_revision: Union[str, None] = "010"
+revision: str = "276abe6aaa7e"
+down_revision: Union[str, None] = "518b3395638e"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

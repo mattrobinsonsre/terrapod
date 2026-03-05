@@ -108,6 +108,13 @@ api:
         terraform_mirror_url: "https://releases.hashicorp.com/terraform"
         tofu_mirror_url: "https://github.com/opentofu/opentofu/releases/download"
 
+    # GPG signing key for provider registry
+    # ASCII-armored GPG private key. If set, used to sign all provider SHA256SUMS.
+    # If empty, a key is auto-generated on first provider upload.
+    # In production, inject from K8s Secret via TERRAPOD_REGISTRY__SIGNING_KEY env var
+    # registry:
+    #   signing_key: ""
+
     # Encryption key for sensitive variables (Fernet key)
     # Generate with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
     # In production, inject from K8s Secret via TERRAPOD_ENCRYPTION__KEY env var

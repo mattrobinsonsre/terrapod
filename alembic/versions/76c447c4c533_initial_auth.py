@@ -1,6 +1,6 @@
 """Initial auth models: users, roles, role_assignments, platform_role_assignments, api_tokens.
 
-Revision ID: 001
+Revision ID: 76c447c4c533
 Revises: None
 Create Date: 2026-02-24
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "001"
+revision: str = "76c447c4c533"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

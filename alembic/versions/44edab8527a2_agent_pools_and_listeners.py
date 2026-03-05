@@ -7,8 +7,8 @@ Adds tables for the runner infrastructure:
 
 Seeds the default local pool.
 
-Revision ID: 003
-Revises: 002
+Revision ID: 44edab8527a2
+Revises: 659860ef7f53
 Create Date: 2026-02-24
 """
 
@@ -18,8 +18,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "003"
-down_revision: Union[str, None] = "002"
+revision: str = "44edab8527a2"
+down_revision: Union[str, None] = "659860ef7f53"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

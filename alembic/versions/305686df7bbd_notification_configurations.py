@@ -3,8 +3,8 @@
 Supports generic webhooks (HMAC-SHA512 signed), Slack (Block Kit), and
 email (SMTP) destinations. Fires asynchronously via the distributed scheduler.
 
-Revision ID: 015
-Revises: 014
+Revision ID: 305686df7bbd
+Revises: 49006be724e1
 Create Date: 2026-03-04
 """
 
@@ -14,8 +14,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "015"
-down_revision: Union[str, None] = "014"
+revision: str = "305686df7bbd"
+down_revision: Union[str, None] = "49006be724e1"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

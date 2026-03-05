@@ -2,8 +2,8 @@
 
 Adds the cached_modules table for pull-through module caching.
 
-Revision ID: 009
-Revises: 008
+Revision ID: e891915cd9d1
+Revises: 0890044564cb
 Create Date: 2026-02-27
 """
 
@@ -13,8 +13,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "009"
-down_revision: Union[str, None] = "008"
+revision: str = "e891915cd9d1"
+down_revision: Union[str, None] = "0890044564cb"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

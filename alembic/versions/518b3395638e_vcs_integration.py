@@ -3,8 +3,8 @@
 Adds the vcs_connections table (supports GitHub, GitLab) and VCS-related
 columns to workspaces and runs for polling-first, webhooks-optional design.
 
-Revision ID: 010
-Revises: 009
+Revision ID: 518b3395638e
+Revises: e891915cd9d1
 Create Date: 2026-02-27
 """
 
@@ -14,8 +14,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "010"
-down_revision: Union[str, None] = "009"
+revision: str = "518b3395638e"
+down_revision: Union[str, None] = "e891915cd9d1"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

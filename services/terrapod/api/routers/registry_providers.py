@@ -6,7 +6,7 @@ Two API surfaces:
 
 UX CONTRACT: Management endpoints are consumed by the web frontend:
   - web/src/app/registry/providers/page.tsx (provider list, create)
-  - web/src/app/registry/providers/[org]/[namespace]/[name]/page.tsx (provider detail)
+  - web/src/app/registry/providers/[name]/page.tsx (provider detail)
   Changes to response shapes, attribute names, or status codes here MUST be
   matched by corresponding updates to those frontend pages.
 
@@ -17,19 +17,19 @@ CLI Protocol:
 TFE V2 Management:
     POST   /api/v2/organizations/default/registry-providers
     GET    /api/v2/organizations/default/registry-providers
-    GET    /api/v2/organizations/default/registry-providers/private/{ns}/{name}
-    DELETE /api/v2/organizations/default/registry-providers/private/{ns}/{name}
-    POST   .../private/{ns}/{name}/versions
-    GET    .../private/{ns}/{name}/versions
-    DELETE .../private/{ns}/{name}/versions/{ver}
-    POST   .../private/{ns}/{name}/versions/{ver}/platforms
-    GET    .../private/{ns}/{name}/versions/{ver}/platforms
-    DELETE .../private/{ns}/{name}/versions/{ver}/platforms/{os}/{arch}
+    GET    /api/v2/organizations/default/registry-providers/private/default/{name}
+    DELETE /api/v2/organizations/default/registry-providers/private/default/{name}
+    POST   .../private/default/{name}/versions
+    GET    .../private/default/{name}/versions
+    DELETE .../private/default/{name}/versions/{ver}
+    POST   .../private/default/{name}/versions/{ver}/platforms
+    GET    .../private/default/{name}/versions/{ver}/platforms
+    DELETE .../private/default/{name}/versions/{ver}/platforms/{os}/{arch}
 """
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,6 +50,7 @@ from terrapod.services.registry_provider_service import (
     list_provider_platforms,
     list_provider_versions,
     list_providers,
+    upload_provider_binary,
 )
 from terrapod.services.registry_rbac_service import (
     has_registry_permission,
@@ -69,7 +70,6 @@ class CreateProviderRequest(BaseModel):
     class Data(BaseModel):
         class Attributes(BaseModel):
             name: str
-            namespace: str = ""
             labels: dict = {}
 
         type: str = "registry-providers"
@@ -257,9 +257,8 @@ async def create_provider_endpoint(
 ) -> JSONResponse:
     """Create a new registry provider. Any authenticated user; creator becomes owner."""
     attrs = body.data.attributes
-    namespace = attrs.namespace or "default"
 
-    provider = await create_provider(db, namespace, attrs.name)
+    provider = await create_provider(db, "default", attrs.name)
     provider.owner_email = user.email
     provider.labels = attrs.labels
     await db.commit()
@@ -289,15 +288,14 @@ async def list_providers_endpoint(
     return JSONResponse(content={"data": visible})
 
 
-@router.get(_ORG_PREFIX + "/private/{namespace}/{name}")
+@router.get(_ORG_PREFIX + "/private/default/{name}")
 async def show_provider_endpoint(
-    namespace: str,
     name: str,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Show a specific registry provider. Requires read."""
-    provider = await get_provider(db, namespace, name)
+    provider = await get_provider(db, "default", name)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
@@ -310,22 +308,21 @@ async def show_provider_endpoint(
     return JSONResponse(content={"data": _provider_to_jsonapi(provider)})
 
 
-@router.delete(_ORG_PREFIX + "/private/{namespace}/{name}")
+@router.delete(_ORG_PREFIX + "/private/default/{name}")
 async def delete_provider_endpoint(
-    namespace: str,
     name: str,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Delete a registry provider and all its versions. Requires admin on provider."""
-    provider = await get_provider(db, namespace, name)
+    provider = await get_provider(db, "default", name)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
     await _require_provider_permission(db, user, provider, "admin")
 
-    deleted = await delete_provider(db, storage, namespace, name)
+    deleted = await delete_provider(db, storage, "default", name)
     if not deleted:
         raise HTTPException(status_code=404, detail="Provider not found")
 
@@ -336,9 +333,8 @@ async def delete_provider_endpoint(
 # --- Version Management ---
 
 
-@router.post(_ORG_PREFIX + "/private/{namespace}/{name}/versions")
+@router.post(_ORG_PREFIX + "/private/default/{name}/versions")
 async def create_provider_version_endpoint(
-    namespace: str,
     name: str,
     body: CreateProviderVersionRequest,
     user: AuthenticatedUser = Depends(get_current_user),
@@ -346,7 +342,7 @@ async def create_provider_version_endpoint(
     storage: ObjectStore = Depends(get_storage),
 ) -> JSONResponse:
     """Create a provider version and get upload URLs. Requires write."""
-    provider = await get_provider(db, namespace, name)
+    provider = await get_provider(db, "default", name)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
@@ -388,15 +384,14 @@ async def create_provider_version_endpoint(
     )
 
 
-@router.get(_ORG_PREFIX + "/private/{namespace}/{name}/versions")
+@router.get(_ORG_PREFIX + "/private/default/{name}/versions")
 async def list_provider_versions_endpoint(
-    namespace: str,
     name: str,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List all versions for a provider. Requires read."""
-    provider = await get_provider(db, namespace, name)
+    provider = await get_provider(db, "default", name)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
@@ -412,9 +407,8 @@ async def list_provider_versions_endpoint(
     )
 
 
-@router.delete(_ORG_PREFIX + "/private/{namespace}/{name}/versions/{version}")
+@router.delete(_ORG_PREFIX + "/private/default/{name}/versions/{version}")
 async def delete_provider_version_endpoint(
-    namespace: str,
     name: str,
     version: str,
     user: AuthenticatedUser = Depends(get_current_user),
@@ -422,11 +416,11 @@ async def delete_provider_version_endpoint(
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Delete a provider version and its platforms. Requires admin."""
-    provider = await get_provider(db, namespace, name)
+    provider = await get_provider(db, "default", name)
     if provider is not None:
         await _require_provider_permission(db, user, provider, "admin")
 
-    deleted = await delete_provider_version(db, storage, namespace, name, version)
+    deleted = await delete_provider_version(db, storage, "default", name, version)
     if not deleted:
         raise HTTPException(status_code=404, detail="Provider version not found")
 
@@ -437,9 +431,8 @@ async def delete_provider_version_endpoint(
 # --- Platform Management ---
 
 
-@router.post(_ORG_PREFIX + "/private/{namespace}/{name}/versions/{version}/platforms")
+@router.post(_ORG_PREFIX + "/private/default/{name}/versions/{version}/platforms")
 async def create_provider_platform_endpoint(
-    namespace: str,
     name: str,
     version: str,
     body: CreateProviderPlatformRequest,
@@ -448,7 +441,7 @@ async def create_provider_platform_endpoint(
     storage: ObjectStore = Depends(get_storage),
 ) -> JSONResponse:
     """Create a platform entry and get an upload URL. Requires write."""
-    provider = await get_provider(db, namespace, name)
+    provider = await get_provider(db, "default", name)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
@@ -470,16 +463,15 @@ async def create_provider_platform_endpoint(
     )
 
 
-@router.get(_ORG_PREFIX + "/private/{namespace}/{name}/versions/{version}/platforms")
+@router.get(_ORG_PREFIX + "/private/default/{name}/versions/{version}/platforms")
 async def list_provider_platforms_endpoint(
-    namespace: str,
     name: str,
     version: str,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List all platforms for a provider version. Requires read."""
-    provider = await get_provider(db, namespace, name)
+    provider = await get_provider(db, "default", name)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
@@ -499,9 +491,48 @@ async def list_provider_platforms_endpoint(
     )
 
 
-@router.delete(_ORG_PREFIX + "/private/{namespace}/{name}/versions/{version}/platforms/{os}/{arch}")
+@router.put(_ORG_PREFIX + "/private/default/{name}/versions/{version}/platforms/{os}/{arch}/upload")
+async def upload_provider_binary_endpoint(
+    name: str,
+    version: str,
+    os: str,
+    arch: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Upload a provider binary directly. Requires write. Idempotent."""
+    provider = await get_provider(db, "default", name)
+    if provider is None:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    await _require_provider_permission(db, user, provider, "write")
+
+    data = await request.body()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty request body")
+
+    platform = await upload_provider_binary(db, storage, "default", name, version, os, arch, data)
+    await db.commit()
+
+    logger.info(
+        "Provider binary uploaded",
+        provider=name,
+        version=version,
+        os=os,
+        arch=arch,
+        size=len(data),
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"data": _platform_to_jsonapi(platform)},
+    )
+
+
+@router.delete(_ORG_PREFIX + "/private/default/{name}/versions/{version}/platforms/{os}/{arch}")
 async def delete_provider_platform_endpoint(
-    namespace: str,
     name: str,
     version: str,
     os: str,
@@ -511,11 +542,11 @@ async def delete_provider_platform_endpoint(
     storage: ObjectStore = Depends(get_storage),
 ) -> Response:
     """Delete a specific provider platform binary. Requires admin."""
-    provider = await get_provider(db, namespace, name)
+    provider = await get_provider(db, "default", name)
     if provider is not None:
         await _require_provider_permission(db, user, provider, "admin")
 
-    deleted = await delete_provider_platform(db, storage, namespace, name, version, os, arch)
+    deleted = await delete_provider_platform(db, storage, "default", name, version, os, arch)
     if not deleted:
         raise HTTPException(status_code=404, detail="Provider platform not found")
 

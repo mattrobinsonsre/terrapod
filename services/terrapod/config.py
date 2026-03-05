@@ -369,6 +369,13 @@ class RegistryConfig(BaseModel):
     """Private registry and caching configuration."""
 
     enabled: bool = Field(default=True)
+    signing_key: str = Field(
+        default="",
+        description="ASCII-armored GPG private key for provider signing. "
+        "If set, imported on first use and used to sign all provider SHA256SUMS. "
+        "If empty, a key is auto-generated on first provider upload. "
+        "Set via TERRAPOD_REGISTRY__SIGNING_KEY env var or K8s Secret.",
+    )
     module_cache: ModuleCacheConfig = Field(default_factory=ModuleCacheConfig)
     provider_cache: ProviderCacheConfig = Field(default_factory=ProviderCacheConfig)
     binary_cache: BinaryCacheConfig = Field(default_factory=BinaryCacheConfig)

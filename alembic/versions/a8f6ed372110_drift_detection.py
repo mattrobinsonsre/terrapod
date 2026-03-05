@@ -2,8 +2,8 @@
 
 Adds drift detection columns to workspaces and drift/has_changes tracking to runs.
 
-Revision ID: 017
-Revises: 016
+Revision ID: a8f6ed372110
+Revises: 088a9526edd0
 Create Date: 2026-03-04
 """
 
@@ -12,8 +12,8 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "017"
-down_revision: Union[str, None] = "016"
+revision: str = "a8f6ed372110"
+down_revision: Union[str, None] = "088a9526edd0"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

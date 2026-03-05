@@ -119,6 +119,26 @@ async def list_open_prs(
     ]
 
 
+async def list_tags(conn: VCSConnection, owner: str, repo: str) -> list[dict[str, str]]:
+    """List repository tags.
+
+    Returns a list of dicts with keys: name, sha.
+    """
+    api = _api_url(conn)
+    tok = _token(conn)
+    project = _project_path(owner, repo)
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{api}/projects/{project}/repository/tags",
+            params={"per_page": 100},
+            headers={"PRIVATE-TOKEN": tok},
+        )
+        resp.raise_for_status()
+
+    return [{"name": tag["name"], "sha": tag["commit"]["id"]} for tag in resp.json()]
+
+
 def parse_repo_url(repo_url: str) -> tuple[str, str] | None:
     """Parse a GitLab repo URL into (namespace, project).
 

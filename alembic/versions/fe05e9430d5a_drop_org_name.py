@@ -5,17 +5,19 @@ as a static string in TFE-compatible API paths. There is no multi-org
 support at any level. This migration removes the vestigial org_name columns
 and updates unique constraints accordingly.
 
-Revision ID: 018
-Revises: 017
+Revision ID: fe05e9430d5a
+Revises: a8f6ed372110
 """
+
+from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
 
-revision = "018"
-down_revision = "017"
-branch_labels = None
-depends_on = None
+revision: str = "fe05e9430d5a"
+down_revision: Union[str, None] = "a8f6ed372110"
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
