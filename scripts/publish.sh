@@ -71,7 +71,8 @@ publish_images() {
     fi
 
     info "  ${name}..."
-    docker buildx build -f "$REPO_ROOT/docker/${dockerfile}" \
+    docker buildx build --builder multiarch-builder \
+      -f "$REPO_ROOT/docker/${dockerfile}" \
       --platform linux/amd64,linux/arm64 \
       $tags --push "$REPO_ROOT"
   done

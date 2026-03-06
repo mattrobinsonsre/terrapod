@@ -52,7 +52,7 @@ require_publish_prereqs() {
     fi
     if ! docker buildx inspect multiarch-builder &>/dev/null 2>&1; then
       info "Creating docker buildx builder 'multiarch-builder'..."
-      docker buildx create --name multiarch-builder --use || {
+      docker buildx create --name multiarch-builder --platform linux/amd64,linux/arm64 || {
         error "Failed to create buildx builder"
         missing=1
       }
