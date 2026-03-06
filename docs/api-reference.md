@@ -436,6 +436,26 @@ POST /api/v2/runs/{run_id}/actions/cancel
 
 **Required permission:** `write` on the workspace.
 
+### Retry Run
+
+```
+POST /api/v2/runs/{run_id}/actions/retry
+```
+
+Creates a new run from a terminal run (applied, errored, canceled, discarded) using the same workspace, configuration version, VCS metadata, and settings. Returns a 409 if the run is not in a terminal state.
+
+**Required permission:** `plan` on the workspace (or `write` for apply runs).
+
+### Run Events (SSE)
+
+```
+GET /api/v2/workspaces/{workspace_id}/runs/events
+```
+
+Server-Sent Events stream for real-time run status updates. The stream emits `run_update` events whenever a run in the workspace changes state. Used by the web UI for live updates without polling.
+
+**Required permission:** `read` on the workspace.
+
 ### Plan Details
 
 ```
@@ -1130,22 +1150,6 @@ Returns platform-wide health data including workspace status summaries, recent r
 
 ---
 
-## Module Cache (Mirror)
-
-### Module Versions (Upstream Proxy)
-
-```
-GET /v1/modules/{hostname}/{namespace}/{name}/{provider}/versions
-```
-
-### Module Download (Upstream Proxy)
-
-```
-GET /v1/modules/{hostname}/{namespace}/{name}/{provider}/{version}/download
-```
-
----
-
 ## Provider Cache (Network Mirror)
 
 ### Provider Version Index
@@ -1327,7 +1331,7 @@ POST /api/v2/workspaces/{id}/notification-configurations
 | `slack` | `url` (Slack webhook URL) | — |
 | `email` | `email-addresses` (list) | — |
 
-**Valid triggers:** `run:created`, `run:planning`, `run:needs_attention`, `run:planned`, `run:applying`, `run:completed`, `run:errored`
+**Valid triggers:** `run:created`, `run:planning`, `run:needs_attention`, `run:planned`, `run:applying`, `run:completed`, `run:errored`, `run:drift_detected`
 
 **Required permission:** `admin` on the workspace.
 

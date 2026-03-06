@@ -119,16 +119,15 @@ ObjectStore Protocol
 All storage paths are constructed via `storage/keys.py`:
 
 ```
-state/{workspace_id}/{version_id}.tfstate       # State files (encrypted at rest by object store)
-config/{workspace_id}/{config_version_id}.tar.gz # Configuration tarballs
-plans/{run_id}/plan.json                         # Plan output
-logs/{run_id}/plan.log                           # Plan logs
-logs/{run_id}/apply.log                          # Apply logs
-registry/modules/{org}/{ns}/{name}/{prov}/{ver}.tar.gz   # Private modules
-registry/providers/{org}/{ns}/{name}/{ver}/...            # Private providers
-cache/modules/{host}/{ns}/{name}/{prov}/{ver}.tar.gz     # Cached modules
+state/{workspace_id}/{version_id}.tfstate             # State files (encrypted at rest by object store)
+config/{workspace_id}/{config_version_id}.tar.gz       # Configuration tarballs
+plans/{workspace_id}/{run_id}.tfplan                    # Plan output
+logs/{workspace_id}/plans/{run_id}.log                  # Plan logs
+logs/{workspace_id}/applies/{run_id}.log                # Apply logs
+registry/modules/{ns}/{name}/{prov}/{ver}.tar.gz        # Private modules
+registry/providers/{ns}/{name}/{ver}/...                 # Private providers
 cache/providers/{host}/{ns}/{type}/{ver}/{file}          # Cached providers
-cache/binaries/{tool}/{ver}/{os}/{arch}/{file}           # Cached CLI binaries
+cache/binaries/{tool}/{ver}/{os}_{arch}                  # Cached CLI binaries
 ```
 
 ### Presigned URLs
@@ -423,6 +422,7 @@ Currently registered periodic tasks:
 | Task | Interval | Handler | Description |
 |---|---|---|---|
 | `vcs_poll` | 60s (configurable) | `vcs_poller.poll_cycle` | Poll VCS providers for new commits and PRs |
+| `registry_vcs_poll` | 60s (configurable) | `registry_vcs_poller.poll_cycle` | Poll VCS for new module version tags |
 | `audit_retention` | 86400s (daily) | `audit_service.purge_old_entries` | Purge audit log entries older than retention period |
 | `drift_check` | 300s (configurable) | `drift_detection_service.drift_check_cycle` | Check workspaces for infrastructure drift |
 
@@ -435,6 +435,7 @@ Currently registered trigger handlers:
 | Handler | Description | Dedup |
 |---|---|---|
 | `vcs_immediate_poll` | Webhook-triggered immediate VCS poll for a specific repo | Per repo (5 min) |
+| `vcs_commit_status` | Post commit status to VCS provider on run state change | Per run+status (60s) |
 | `notification_deliver` | Deliver workspace notification on run state change | Per run+trigger (60s) |
 | `run_task_call` | Deliver run task webhook to external service | Per result (5 min) |
 | `drift_run_completed` | Update workspace drift status when drift run completes | Per run (5 min) |
@@ -514,7 +515,6 @@ The database schema is managed by Alembic migrations in `alembic/versions/`. Key
 | `RegistryModule` / `RegistryModuleVersion` | Private module registry |
 | `RegistryProvider` / `RegistryProviderVersion` / `RegistryProviderPlatform` | Private provider registry |
 | `GPGKey` | GPG keys for provider signing |
-| `CachedModule` | Pull-through module cache entries |
 | `CachedProviderPackage` | Pull-through provider cache entries |
 | `CachedBinary` | Pull-through CLI binary cache entries |
 | `RunTrigger` | Cross-workspace dependency chains |

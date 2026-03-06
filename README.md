@@ -1,5 +1,8 @@
 # Terrapod
 
+[![CI](https://github.com/mattrobinsonsre/terrapod/actions/workflows/ci.yml/badge.svg)](https://github.com/mattrobinsonsre/terrapod/actions/workflows/ci.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+
 **Open-source platform replacement for Terraform Enterprise.**
 
 Terrapod provides the collaboration, governance, state management, and UI layer that wraps around `terraform` or `tofu` as pluggable execution backends. It targets API compatibility with the [HCP Terraform / TFE V2 API](https://developer.hashicorp.com/terraform/enterprise/api-docs) so that existing tooling -- the `terraform` CLI with `cloud` block, the [`go-tfe`](https://pkg.go.dev/github.com/hashicorp/go-tfe) client, CI/CD integrations -- can point at a Terrapod instance with minimal reconfiguration.
@@ -20,7 +23,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | VCS Integration | Implemented | GitHub (App) and GitLab (access token); polling-first with optional webhooks |
 | Variables & Secrets | Implemented | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets |
 | RBAC | Implemented | Label-based role system with hierarchical workspace permissions (read/plan/write/admin) |
-| Private Module Registry | Implemented | Publish, version, and share modules internally with pull-through caching |
+| Private Module Registry | Implemented | Publish, version, and share modules internally |
 | Private Provider Registry | Implemented | Publish, version, and share providers with GPG signing and network mirror caching |
 | Binary Caching | Implemented | Pull-through cache for terraform/tofu CLI binaries |
 | Agent Pools | Implemented | Named groups of runner listeners; join token → certificate exchange for auth |

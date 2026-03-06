@@ -11,8 +11,7 @@ terraform init
     |
     +-- Module sources (e.g., "terrapod.local/myorg/vpc/aws")
     |       |
-    |       +-- Private module? --> Terrapod Module Registry
-    |       +-- Public module?  --> Terrapod Module Cache --> registry.terraform.io
+    |       +-- Terrapod Module Registry (private modules only)
     |
     +-- Provider sources (e.g., "hashicorp/aws")
             |
@@ -22,7 +21,7 @@ terraform init
                     +-- Not cached? --> Fetch from registry.terraform.io, cache, serve
 ```
 
-All three caching layers (modules, providers, binaries) sit in front of the Terrapod API, so runner Jobs have zero direct upstream dependencies.
+Both caching layers (providers and binaries) sit in front of the Terrapod API, so runner Jobs have zero direct upstream dependencies.
 
 ---
 
@@ -122,7 +121,7 @@ curl -X DELETE https://terrapod.example.com/api/v2/organizations/default/registr
 Module tarballs are stored at:
 
 ```
-registry/modules/{org}/{namespace}/{name}/{provider}/{version}.tar.gz
+registry/modules/{namespace}/{name}/{provider}/{version}.tar.gz
 ```
 
 ### RBAC
@@ -210,7 +209,7 @@ This means:
 The archive at the tag ref is stored as a tarball at:
 
 ```
-registry/modules/{org}/{namespace}/{name}/{provider}/{version}.tar.gz
+registry/modules/{namespace}/{name}/{provider}/{version}.tar.gz
 ```
 
 ### Manual Upload Still Works
@@ -337,48 +336,10 @@ terraform {
 ### Storage Layout
 
 ```
-registry/providers/{org}/{namespace}/{name}/{version}/
+registry/providers/{namespace}/{name}/{version}/
   terraform-provider-{name}_{version}_{os}_{arch}.zip
   SHA256SUMS
   SHA256SUMS.sig
-```
-
----
-
-## Module Caching (Pull-Through Proxy)
-
-The module cache transparently proxies upstream public module registries. On first request, it fetches the module from upstream, stores it in object storage, and serves from cache on subsequent requests.
-
-### How It Works
-
-1. Terraform requests a module version from the Terrapod registry
-2. If the source hostname matches an upstream registry (e.g., `registry.terraform.io`):
-   a. Check the cache database (`cached_modules` table)
-   b. If cached and not expired: serve from object storage
-   c. If not cached or expired: fetch from upstream, store, serve
-
-### Configuration
-
-```yaml
-api:
-  config:
-    registry:
-      module_cache:
-        enabled: true
-        upstream_registries:
-          - registry.terraform.io
-        warm_on_first_request: true
-```
-
-### No Ambiguity with Private Modules
-
-- Private modules use the Terrapod hostname (e.g., `terrapod.example.com/myorg/vpc/aws`)
-- Cached upstream modules retain their original hostname (e.g., `registry.terraform.io/hashicorp/consul/aws`)
-
-### Storage Layout
-
-```
-cache/modules/{hostname}/{namespace}/{name}/{provider}/{version}.tar.gz
 ```
 
 ---
@@ -505,42 +466,12 @@ curl -X DELETE https://terrapod.example.com/api/v2/admin/binary-cache/terraform/
 ### Storage Layout
 
 ```
-cache/binaries/{tool}/{version}/{os}/{arch}/{filename}
+cache/binaries/{tool}/{version}/{os}_{arch}
 ```
 
 ### Admin UI
 
 The web UI includes a binary cache admin page at `/admin/binary-cache` (admin-only) for viewing, warming, and purging cached binaries.
-
----
-
-## Cache TTL and Eviction
-
-All three caching layers share a configurable TTL.
-
-### Configuration
-
-```yaml
-api:
-  config:
-    registry:
-      cache_ttl_days: 30  # Default: 30 days
-```
-
-### How Eviction Works
-
-1. Each cache record has a `cached_at` timestamp
-2. At request time: if `cached_at + TTL < now()`, the entry is expired
-3. Expired entries trigger a fresh pull-through fetch from upstream
-4. Background reaper runs on a configurable schedule (default: daily)
-5. Reaper deletes entries where `cached_at + TTL < now()` from both database and object storage
-6. On next request, a cache miss triggers a new fetch
-
-### Impact
-
-- Setting `cache_ttl_days: 0` effectively disables caching (all requests go upstream)
-- A long TTL reduces upstream traffic but delays picking up new upstream versions
-- The default 30-day TTL is a good balance for most deployments
 
 ---
 
@@ -566,17 +497,12 @@ For fully air-gapped environments where runner Jobs have no internet access:
 1. **Pre-warm the binary cache** with the required terraform/tofu versions
 2. **Pre-warm the provider cache** by running `terraform init` once from a machine with internet access (the first request populates the cache)
 3. **Upload private modules** to the module registry
-4. **Configure long TTLs** to avoid cache expiry when upstream is unreachable
 
 ```yaml
 api:
   config:
     registry:
       enabled: true
-      cache_ttl_days: 365  # 1 year for air-gapped
-      module_cache:
-        enabled: true
-        warm_on_first_request: true
       provider_cache:
         enabled: true
         warm_on_first_request: true

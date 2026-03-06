@@ -1053,7 +1053,7 @@ class NotificationConfiguration(Base):
     """Workspace-scoped notification configuration.
 
     Fires notifications on run lifecycle events to generic webhooks,
-    Slack channels, or email addresses. Token is Fernet-encrypted at rest.
+    Slack channels, or email addresses.
     """
 
     __tablename__ = "notification_configurations"

@@ -80,8 +80,6 @@ api:
 
     registry:
       enabled: true
-      module_cache:
-        enabled: true
       provider_cache:
         enabled: true
       binary_cache:
@@ -111,9 +109,6 @@ ingress:
 
 runners:
   default: standard
-  defaultTerraformVersion: "1.9.8"
-  defaultExecutionBackend: terraform
-  serviceAccountName: terrapod-runner
 
 postgresql:
   url: ""  # Injected via secret
@@ -199,7 +194,7 @@ helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
 | `api.config.auth.local_enabled` | `true` | Enable local password auth |
 | `api.config.auth.callback_base_url` | `""` | Externally-reachable URL for callbacks |
 | `api.config.auth.session_ttl_hours` | `12` | Session lifetime |
-| `api.config.auth.api_token_max_ttl_hours` | `0` | Max API token lifetime (0 = no limit) |
+| `api.config.auth.api_token_max_ttl_hours` | `168` | Max API token lifetime in hours (168 = 7 days) |
 | `api.config.auth.sso.default_provider` | `""` | Default SSO provider name |
 | `api.config.auth.sso.oidc` | `[]` | OIDC provider configurations |
 | `api.config.auth.sso.saml` | `[]` | SAML provider configurations |
@@ -209,7 +204,6 @@ helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
 | Value | Default | Description |
 |---|---|---|
 | `api.config.registry.enabled` | `true` | Enable private registry |
-| `api.config.registry.module_cache.enabled` | `true` | Enable module caching |
 | `api.config.registry.provider_cache.enabled` | `true` | Enable provider caching |
 | `api.config.registry.binary_cache.enabled` | `true` | Enable binary caching |
 
@@ -294,11 +288,11 @@ listener:
 |---|---|---|
 | `runners.default` | `standard` | Default runner definition name |
 | `runners.image.repository` | `ghcr.io/mattrobinsonsre/terrapod-runner` | Runner Job image |
-| `runners.defaultTerraformVersion` | `1.9.8` | Default terraform version |
-| `runners.defaultExecutionBackend` | `terraform` | Default backend (`terraform` or `tofu`) |
-| `runners.serviceAccountName` | `""` | SA for runner Jobs (cloud identity) |
 | `runners.ttlSecondsAfterFinished` | `600` | Job cleanup TTL |
 | `runners.definitions` | See values.yaml | Named runner definitions |
+| `runners.serviceAccount.create` | `true` | Create ServiceAccount for runner Jobs |
+| `runners.serviceAccount.name` | `""` | SA name (cloud identity) |
+| `runners.serviceAccount.annotations` | `{}` | SA annotations (for IRSA, GCP WIF, Azure WI) |
 
 ### Ingress
 

@@ -195,7 +195,7 @@ GitLab integration uses a **Project or Group Access Token** for repository acces
    - **Name**: `Terrapod`
    - **Expiration**: set an appropriate expiration (or leave blank for no expiry)
    - **Role**: `Reporter` (minimum for read access)
-   - **Scopes**: `read_api`, `read_repository`
+   - **Scopes**: `api` (required for commit statuses and MR comments; `read_api` + `read_repository` is sufficient if you don't need status reporting)
 3. Click **Create group access token**
 4. Copy the token value -- it will only be shown once
 
