@@ -4,7 +4,9 @@
 # In Tilt, the builder stage is targeted directly with `next dev` as entrypoint
 # for hot reload. Production uses the final stage with standalone output.
 
-FROM node:24-alpine AS builder
+# Build on the native platform (avoids emulation segfaults in Next.js/SWC).
+# The output is pure JavaScript, so it's architecture-independent.
+FROM --platform=$BUILDPLATFORM node:24-alpine AS builder
 
 WORKDIR /app
 
