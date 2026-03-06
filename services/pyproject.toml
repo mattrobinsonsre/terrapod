@@ -45,7 +45,7 @@ pyjwt = {extras = ["crypto"], version = "^2.8.0"}
 # Async SMTP for email notifications
 aiosmtplib = "^3.0.0"
 # SSE (Server-Sent Events) for real-time run status updates
-sse-starlette = "^2.0.0"
+sse-starlette = "^3.3.2"
 # imghdr removed in Python 3.13; pgpy still imports it
 standard-imghdr = "^3.13"
 
