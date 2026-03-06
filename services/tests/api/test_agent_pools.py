@@ -39,9 +39,7 @@ class TestListenerHeartbeat:
         app = create_app()
         app.dependency_overrides[get_db] = lambda: mock_db
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url=_BASE
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
                 f"/api/v2/listeners/{listener.id}/heartbeat",
                 json={"capacity": 5, "active_runs": 2, "runner_definitions": ["default"]},
@@ -76,9 +74,7 @@ class TestListenerHeartbeat:
         app = create_app()
         app.dependency_overrides[get_db] = lambda: mock_db
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url=_BASE
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
                 f"/api/v2/listeners/{listener.id}/heartbeat",
                 json={"capacity": 3, "active_runs": 1},
@@ -101,9 +97,7 @@ class TestListenerHeartbeat:
         app = create_app()
         app.dependency_overrides[get_db] = lambda: mock_db
 
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url=_BASE
-        ) as client:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
                 f"/api/v2/listeners/{uuid.uuid4()}/heartbeat",
                 json={"capacity": 1},

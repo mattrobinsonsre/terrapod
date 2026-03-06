@@ -473,9 +473,7 @@ async def workspace_list_events(
             while True:
                 if await request.is_disconnected():
                     break
-                message = await pubsub.get_message(
-                    ignore_subscribe_messages=True, timeout=1.0
-                )
+                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
                 if message and message["type"] == "message":
                     data = message["data"]
                     if isinstance(data, bytes):

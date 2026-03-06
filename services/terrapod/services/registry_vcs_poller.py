@@ -141,9 +141,7 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
     tags = await list_tags_fn(conn, owner, repo)
 
     # Build lookup of existing versions by version string
-    existing_versions: dict[str, RegistryModuleVersion] = {
-        v.version: v for v in module.versions
-    }
+    existing_versions: dict[str, RegistryModuleVersion] = {v.version: v for v in module.versions}
     pattern = module.vcs_tag_pattern or "v*"
 
     changed_count = 0

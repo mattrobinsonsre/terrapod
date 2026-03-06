@@ -77,9 +77,7 @@ async def bootstrap() -> None:
                 logger.info("Created user: %s", admin_email)
                 if generated:
                     logger.info("Generated password: %s", admin_password)
-                    logger.warning(
-                        "IMPORTANT: Save this password now. It will not be shown again."
-                    )
+                    logger.warning("IMPORTANT: Save this password now. It will not be shown again.")
 
             # ── Admin role ──────────────────────────────────────────
             result = await session.execute(

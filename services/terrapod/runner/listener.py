@@ -164,7 +164,9 @@ class RunnerListener:
 
             # Extract resolved workspace variables from API response
             env_vars = [{"key": v["key"], "value": v["value"]} for v in attrs.get("env-vars", [])]
-            terraform_vars = [{"key": v["key"], "value": v["value"]} for v in attrs.get("terraform-vars", [])]
+            terraform_vars = [
+                {"key": v["key"], "value": v["value"]} for v in attrs.get("terraform-vars", [])
+            ]
 
             task = asyncio.create_task(
                 self._execute_run(
@@ -294,9 +296,7 @@ class RunnerListener:
             service_account_name=service_account_name,
         )
 
-        apply_job_name, apply_result = await self._create_and_watch_job(
-            apply_spec, run_id, "apply"
-        )
+        apply_job_name, apply_result = await self._create_and_watch_job(apply_spec, run_id, "apply")
 
         if apply_result == "succeeded":
             logger.info("Apply succeeded", run_id=run_id)
@@ -465,7 +465,9 @@ class RunnerListener:
                     headers=self._auth_headers(),
                 )
                 if response.status_code != 200:
-                    logger.warning("Failed to fetch run status", run_id=run_id, status=response.status_code)
+                    logger.warning(
+                        "Failed to fetch run status", run_id=run_id, status=response.status_code
+                    )
                     return "unknown"
                 return response.json()["data"]["attributes"]["status"]
         except Exception as e:

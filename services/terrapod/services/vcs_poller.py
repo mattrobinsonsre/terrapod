@@ -120,8 +120,10 @@ def _strip_top_level_dir(archive: bytes) -> bytes:
     in_buf = io.BytesIO(archive)
     out_buf = io.BytesIO()
 
-    with tarfile.open(fileobj=in_buf, mode="r:gz") as src, \
-         tarfile.open(fileobj=out_buf, mode="w:gz") as dst:
+    with (
+        tarfile.open(fileobj=in_buf, mode="r:gz") as src,
+        tarfile.open(fileobj=out_buf, mode="w:gz") as dst,
+    ):
         for member in src.getmembers():
             # Strip first path component: "owner-repo-sha/file" → "file"
             parts = member.name.split("/", 1)

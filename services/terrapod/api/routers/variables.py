@@ -18,9 +18,9 @@ Endpoints:
 import uuid
 from datetime import UTC
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
 from fastapi.responses import JSONResponse
-import sqlalchemy as sa
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -214,7 +214,9 @@ def _varset_json(vs: VariableSet) -> dict:
     """Serialize a VariableSet to TFE V2 JSON:API format."""
     # Count variables and workspaces from eagerly loaded relationships
     var_count = len(vs.variables) if "variables" in sa.inspect(vs).dict else 0
-    ws_assignments = vs.workspace_assignments if "workspace_assignments" in sa.inspect(vs).dict else []
+    ws_assignments = (
+        vs.workspace_assignments if "workspace_assignments" in sa.inspect(vs).dict else []
+    )
     ws_count = len(ws_assignments)
 
     relationships: dict = {
@@ -230,7 +232,9 @@ def _varset_json(vs: VariableSet) -> dict:
                 {
                     "id": f"ws-{a.workspace_id}",
                     "type": "workspaces",
-                    "attributes": {"name": a.workspace.name if a.workspace else str(a.workspace_id)},
+                    "attributes": {
+                        "name": a.workspace.name if a.workspace else str(a.workspace_id)
+                    },
                 }
                 for a in ws_assignments
             ],
@@ -264,7 +268,9 @@ async def list_varsets(
 
     result = await db.execute(
         select(VariableSet)
-        .options(selectinload(VariableSet.variables), selectinload(VariableSet.workspace_assignments))
+        .options(
+            selectinload(VariableSet.variables), selectinload(VariableSet.workspace_assignments)
+        )
         .order_by(VariableSet.name)
     )
     varsets = result.scalars().all()
@@ -302,7 +308,9 @@ async def _get_varset(varset_id: str, db: AsyncSession) -> VariableSet:
     result = await db.execute(
         select(VariableSet)
         .where(VariableSet.id == vs_uuid)
-        .options(selectinload(VariableSet.variables), selectinload(VariableSet.workspace_assignments))
+        .options(
+            selectinload(VariableSet.variables), selectinload(VariableSet.workspace_assignments)
+        )
     )
     vs = result.scalar_one_or_none()
     if vs is None:

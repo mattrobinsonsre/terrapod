@@ -302,11 +302,13 @@ async def handle_drift_run_completed(payload: dict) -> None:
                 publish_event,
             )
 
-            drift_payload = json.dumps({
-                "event": "drift_status_change",
-                "workspace_id": str(ws.id),
-                "drift_status": ws.drift_status,
-            })
+            drift_payload = json.dumps(
+                {
+                    "event": "drift_status_change",
+                    "workspace_id": str(ws.id),
+                    "drift_status": ws.drift_status,
+                }
+            )
             await publish_event(ADMIN_EVENTS_CHANNEL, drift_payload)
             await publish_event(WORKSPACE_LIST_EVENTS_CHANNEL, drift_payload)
         except Exception as e:

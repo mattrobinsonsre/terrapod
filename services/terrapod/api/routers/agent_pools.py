@@ -412,13 +412,15 @@ async def listener_heartbeat(
 
         await publish_event(
             ADMIN_EVENTS_CHANNEL,
-            json.dumps({
-                "event": "listener_heartbeat",
-                "listener_id": str(listener.id),
-                "listener_name": listener.name,
-                "capacity": capacity,
-                "active_runs": active_runs,
-            }),
+            json.dumps(
+                {
+                    "event": "listener_heartbeat",
+                    "listener_id": str(listener.id),
+                    "listener_name": listener.name,
+                    "capacity": capacity,
+                    "active_runs": active_runs,
+                }
+            ),
         )
     except Exception:
         pass  # Never break heartbeat for SSE

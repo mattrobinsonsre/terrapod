@@ -90,7 +90,9 @@ def _run_json(run: Run) -> dict:
                 "created-at": _rfc3339(run.created_at),
                 "updated-at": _rfc3339(run.updated_at),
                 "actions": {
-                    "is-confirmable": run.status == "planned" and not run.auto_apply and not run.plan_only,
+                    "is-confirmable": run.status == "planned"
+                    and not run.auto_apply
+                    and not run.plan_only,
                     "is-discardable": run.status == "planned" and not run.plan_only,
                     "is-cancelable": run.status not in run_service.TERMINAL_STATES,
                     "is-retryable": run.status in run_service.TERMINAL_STATES,
@@ -567,9 +569,7 @@ async def run_events_stream(
             while True:
                 if await request.is_disconnected():
                     break
-                message = await pubsub.get_message(
-                    ignore_subscribe_messages=True, timeout=1.0
-                )
+                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
                 if message and message["type"] == "message":
                     data = message["data"]
                     if isinstance(data, bytes):
@@ -619,7 +619,9 @@ async def next_run(
 
     resolved = await resolve_variables(db, run.workspace_id)
     env_vars = [{"key": v.key, "value": v.value} for v in resolved if v.category == "env"]
-    terraform_vars = [{"key": v.key, "value": v.value} for v in resolved if v.category == "terraform"]
+    terraform_vars = [
+        {"key": v.key, "value": v.value} for v in resolved if v.category == "terraform"
+    ]
 
     await db.commit()
 

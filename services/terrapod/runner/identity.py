@@ -175,9 +175,7 @@ async def _join_via_token(name: str, api_url: str) -> ListenerIdentity:
                 )
                 await asyncio.sleep(wait)
             else:
-                raise RuntimeError(
-                    f"Failed to join pool after {max_retries} attempts: {e}"
-                ) from e
+                raise RuntimeError(f"Failed to join pool after {max_retries} attempts: {e}") from e
 
     raise RuntimeError("Unreachable")
 

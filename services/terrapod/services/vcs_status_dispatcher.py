@@ -226,30 +226,31 @@ async def handle_vcs_commit_status(payload: dict) -> None:
         owner, repo = parsed
 
         # Resolve status
-        github_state, gitlab_state, description = _resolve_status(
-            target_status, run.plan_only
-        )
+        github_state, gitlab_state, description = _resolve_status(target_status, run.plan_only)
 
         # Build target URL
         target_url = ""
         if settings.external_url:
-            target_url = (
-                f"{settings.external_url.rstrip('/')}"
-                f"/workspaces/{ws.id}/runs/{run.id}"
-            )
+            target_url = f"{settings.external_url.rstrip('/')}/workspaces/{ws.id}/runs/{run.id}"
 
         # Post commit status
         try:
             if conn.provider == "gitlab":
                 await gitlab_service.create_commit_status(
-                    conn, owner, repo, run.vcs_commit_sha,
+                    conn,
+                    owner,
+                    repo,
+                    run.vcs_commit_sha,
                     state=gitlab_state,
                     description=description,
                     target_url=target_url,
                 )
             else:
                 await github_service.create_commit_status(
-                    conn, owner, repo, run.vcs_commit_sha,
+                    conn,
+                    owner,
+                    repo,
+                    run.vcs_commit_sha,
                     state=github_state,
                     description=description,
                     target_url=target_url,

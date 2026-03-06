@@ -7,7 +7,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import (
-
     ConfigurationVersion,
     Run,
     RunnerListener,
@@ -131,13 +130,15 @@ async def _publish_run_event(run: Run, old_status: str, new_status: str) -> None
             publish_event,
         )
 
-        payload = json.dumps({
-            "event": "run_status_change",
-            "run_id": str(run.id),
-            "workspace_id": str(run.workspace_id),
-            "old_status": old_status,
-            "new_status": new_status,
-        })
+        payload = json.dumps(
+            {
+                "event": "run_status_change",
+                "run_id": str(run.id),
+                "workspace_id": str(run.workspace_id),
+                "old_status": old_status,
+                "new_status": new_status,
+            }
+        )
         # Per-workspace channel (run detail / workspace detail pages)
         await publish_event(f"{RUN_EVENTS_PREFIX}{run.workspace_id}", payload)
         # Admin health dashboard

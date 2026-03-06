@@ -291,7 +291,9 @@ class Workspace(Base):
         ForeignKey("agent_pools.id", ondelete="SET NULL"),
         nullable=True,
     )
-    agent_pool: Mapped["AgentPool | None"] = relationship("AgentPool", foreign_keys=[agent_pool_id], lazy="joined")
+    agent_pool: Mapped["AgentPool | None"] = relationship(
+        "AgentPool", foreign_keys=[agent_pool_id], lazy="joined"
+    )
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
 
