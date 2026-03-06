@@ -132,6 +132,10 @@ api:
         # Inject via env var: TERRAPOD_VCS__GITHUB__WEBHOOK_SECRET
         webhook_secret: ""
 
+    # Audit logging
+    audit:
+      retention_days: 90
+
     # Drift Detection — scheduled plan-only runs to detect infrastructure drift
     drift_detection:
       enabled: false

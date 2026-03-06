@@ -16,6 +16,7 @@ interface RunActions {
   'is-confirmable': boolean
   'is-discardable': boolean
   'is-cancelable': boolean
+  'is-retryable': boolean
 }
 
 interface RunAttrs {
@@ -283,7 +284,7 @@ export default function RunDetailPage() {
         const data = await res.json()
         const newRunId = data?.data?.id
         if (newRunId) {
-          router.push(`/workspaces/${id}/runs/${newRunId}`)
+          router.push(`/workspaces/${workspaceId}/runs/${newRunId}`)
           return
         }
       }

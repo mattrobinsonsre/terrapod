@@ -146,6 +146,10 @@ data:
         webhook_secret: {{ .Values.api.config.vcs.github.webhook_secret | quote }}
       {{- end }}
     {{- end }}
+    {{- if .Values.api.config.audit }}
+    audit:
+      retention_days: {{ .Values.api.config.audit.retention_days | default 90 }}
+    {{- end }}
     {{- if .Values.api.config.drift_detection }}
     drift_detection:
       enabled: {{ .Values.api.config.drift_detection.enabled }}

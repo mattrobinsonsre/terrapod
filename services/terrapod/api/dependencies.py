@@ -119,6 +119,7 @@ async def get_current_user(
             email = api_token.user_email or ""
             roles = await _resolve_user_roles(db, email) if email else []
 
+            request.state.user_email = email  # for audit middleware
             return AuthenticatedUser(
                 email=email,
                 display_name=None,
@@ -134,6 +135,7 @@ async def get_current_user(
             if _should_refresh_session(session):
                 await refresh_session(token, session)
 
+            request.state.user_email = session.email  # for audit middleware
             return AuthenticatedUser(
                 email=session.email,
                 display_name=session.display_name,

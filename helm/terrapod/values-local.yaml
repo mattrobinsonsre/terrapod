@@ -30,6 +30,8 @@ api:
         root_dir: /var/lib/terrapod/storage
         base_url: "https://terrapod.local"
         hmac_secret: "terrapod-local-dev-hmac-secret-do-not-use-in-prod"
+    audit:
+      retention_days: 90
     auth:
       local_enabled: true
       callback_base_url: "https://terrapod.local"

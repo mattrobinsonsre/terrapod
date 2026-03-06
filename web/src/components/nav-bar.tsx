@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Users, Shield, Server, Variable, HeartPulse, LogOut, Menu, X } from 'lucide-react'
-import { clearAuth, isAdmin } from '@/lib/auth'
+import { Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Users, Shield, Server, Variable, HeartPulse, FileText, LogOut, Menu, X } from 'lucide-react'
+import { clearAuth, isAdmin, isAdminOrAudit } from '@/lib/auth'
 import { SessionExpiryBanner } from '@/components/session-expiry-banner'
 
 function NavLink({
@@ -17,9 +17,7 @@ function NavLink({
   onClick?: () => void
 }) {
   const pathname = usePathname()
-  const active = href === '/'
-    ? pathname === '/'
-    : pathname === href || pathname.startsWith(href + '/')
+  const active = pathname === href || pathname.startsWith(href + '/')
 
   return (
     <Link
@@ -39,7 +37,8 @@ function NavLink({
 export default function NavBar() {
   const router = useRouter()
   const [admin, setAdmin] = useState(false)
-  useEffect(() => { setAdmin(isAdmin()) }, [])
+  const [adminOrAudit, setAdminOrAudit] = useState(false)
+  useEffect(() => { setAdmin(isAdmin()); setAdminOrAudit(isAdminOrAudit()) }, [])
   const [menuOpen, setMenuOpen] = useState(false)
 
   const handleLogout = () => {
@@ -51,10 +50,6 @@ export default function NavBar() {
 
   const navLinks = (
     <>
-      <NavLink href="/" onClick={closeMenu}>
-        <LayoutDashboard size={16} />
-        Dashboard
-      </NavLink>
       <NavLink href="/workspaces" onClick={closeMenu}>
         <Layers size={16} />
         Workspaces
@@ -106,6 +101,12 @@ export default function NavBar() {
             Health
           </NavLink>
         </>
+      )}
+      {adminOrAudit && (
+        <NavLink href="/admin/audit-log" onClick={closeMenu}>
+          <FileText size={16} />
+          Audit Log
+        </NavLink>
       )}
     </>
   )
