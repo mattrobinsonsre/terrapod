@@ -69,3 +69,24 @@ async def get_redis_health() -> bool:
     except Exception as e:
         logger.error("Redis health check failed", error=str(e))
         return False
+
+
+# ── Pub/Sub Helpers ───────────────────────────────────────────────────────
+
+RUN_EVENTS_PREFIX = "tp:run_events:"
+ADMIN_EVENTS_CHANNEL = "tp:admin_events"
+WORKSPACE_LIST_EVENTS_CHANNEL = "tp:workspace_list_events"
+
+
+async def publish_event(channel: str, data: str) -> None:
+    """Publish a message to a Redis pub/sub channel."""
+    client = get_redis_client()
+    await client.publish(channel, data)
+
+
+async def subscribe_channel(channel: str) -> aioredis.client.PubSub:
+    """Create a pub/sub subscription and return the PubSub object."""
+    client = get_redis_client()
+    pubsub = client.pubsub()
+    await pubsub.subscribe(channel)
+    return pubsub

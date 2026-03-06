@@ -19,7 +19,6 @@ from terrapod.config import settings
 from terrapod.db.session import close_db, get_db_session, init_db
 from terrapod.logging_config import configure_logging, get_logger
 from terrapod.redis.client import close_redis, init_redis
-from terrapod.services.encryption_service import init_encryption
 from terrapod.storage import close_storage, init_storage
 
 from .health import router as health_router
@@ -45,9 +44,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     await init_storage()
     logger.info("Storage initialized")
-
-    init_encryption()
-    logger.info("Encryption initialized")
 
     # Initialize Certificate Authority
     from terrapod.auth.ca import init_ca
@@ -82,6 +78,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Webhook-triggered immediate VCS poll",
         )
 
+        # VCS commit status posting (commit statuses + PR comments)
+        from terrapod.services.vcs_status_dispatcher import handle_vcs_commit_status
+
+        register_trigger_handler(
+            "vcs_commit_status",
+            handler=handle_vcs_commit_status,
+            description="Post commit status to VCS on run state change",
+        )
+
         # Registry module VCS publishing (piggybacks on VCS being enabled)
         from terrapod.services.registry_vcs_poller import registry_vcs_poll_cycle
 
@@ -110,23 +115,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         description="Deliver run task webhook to external service",
     )
 
-    # Drift detection (scheduled plan-only runs)
+    # Drift detection
+    from terrapod.services.drift_detection_service import (
+        handle_drift_run_completed,
+    )
+
+    # The completion handler must always be registered so manual "Check Now"
+    # drift runs update workspace drift_status even when automatic polling
+    # is disabled.
+    register_trigger_handler(
+        "drift_run_completed",
+        handler=handle_drift_run_completed,
+        description="Update workspace drift status on drift run completion",
+    )
+
+    # Periodic polling is only active when explicitly enabled.
     if settings.drift_detection.enabled:
-        from terrapod.services.drift_detection_service import (
-            drift_check_cycle,
-            handle_drift_run_completed,
-        )
+        from terrapod.services.drift_detection_service import drift_check_cycle
 
         register_periodic_task(
             "drift_check",
             interval_seconds=settings.drift_detection.poll_interval_seconds,
             handler=drift_check_cycle,
             description="Check workspaces for infrastructure drift",
-        )
-        register_trigger_handler(
-            "drift_run_completed",
-            handler=handle_drift_run_completed,
-            description="Update workspace drift status on drift run completion",
         )
 
     # Audit log retention (daily)
@@ -302,11 +313,7 @@ def create_application() -> FastAPI:
 
     app.include_router(gpg_keys_router)
 
-    # Caching routes (module mirror, provider mirror, binary cache)
-    from terrapod.api.routers.module_mirror import router as module_mirror_router
-
-    app.include_router(module_mirror_router)
-
+    # Caching routes (provider mirror, binary cache)
     from terrapod.api.routers.provider_mirror import router as provider_mirror_router
 
     app.include_router(provider_mirror_router)

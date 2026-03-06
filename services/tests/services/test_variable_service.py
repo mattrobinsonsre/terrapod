@@ -14,36 +14,6 @@ from terrapod.services.variable_service import (
     update_variable,
 )
 
-# ── Fixtures ───────────────────────────────────────────────────────────
-
-
-@pytest.fixture(autouse=True)
-def mock_encryption():
-    """Mock encryption service for all tests."""
-    with (
-        patch("terrapod.services.variable_service.is_encryption_available", return_value=True),
-        patch(
-            "terrapod.services.variable_service.encrypt_value",
-            side_effect=lambda v: f"ENC:{v}",
-        ),
-        patch(
-            "terrapod.services.variable_service.decrypt_value",
-            side_effect=lambda v: v.removeprefix("ENC:"),
-        ),
-    ):
-        yield
-
-
-@pytest.fixture()
-def no_encryption():
-    """Override mock_encryption to simulate no encryption."""
-    with patch(
-        "terrapod.services.variable_service.is_encryption_available",
-        return_value=False,
-    ):
-        yield
-
-
 # ── _version_hash ──────────────────────────────────────────────────────
 
 
@@ -75,26 +45,19 @@ class TestCreateVariable:
         call_kwargs = MockVar.call_args[1]
         assert call_kwargs["key"] == "region"
         assert call_kwargs["value"] == "us-east-1"
-        assert call_kwargs["encrypted_value"] is None
         assert call_kwargs["sensitive"] is False
         db.add.assert_called_once()
         db.flush.assert_called_once()
 
     @patch("terrapod.services.variable_service.Variable")
-    async def test_sensitive_encrypts(self, MockVar):
+    async def test_sensitive_stores_value_directly(self, MockVar):
         db = AsyncMock(spec=AsyncSession)
         ws_id = uuid.uuid4()
 
         await create_variable(db, ws_id, key="secret", value="mysecret", sensitive=True)
         call_kwargs = MockVar.call_args[1]
-        assert call_kwargs["value"] == ""
-        assert call_kwargs["encrypted_value"] == "ENC:mysecret"
+        assert call_kwargs["value"] == "mysecret"
         assert call_kwargs["sensitive"] is True
-
-    async def test_sensitive_no_encryption_raises(self, no_encryption):
-        db = AsyncMock(spec=AsyncSession)
-        with pytest.raises(ValueError, match="encryption not configured"):
-            await create_variable(db, uuid.uuid4(), key="secret", value="x", sensitive=True)
 
     @patch("terrapod.services.variable_service.Variable")
     async def test_version_id_set(self, MockVar):
@@ -114,14 +77,13 @@ class TestUpdateVariable:
         var.key = "old_key"
         var.value = "val"
         var.sensitive = False
-        var.encrypted_value = None
         var.category = "terraform"
 
         await update_variable(db, var, key="new_key")
         assert var.key == "new_key"
         db.flush.assert_called_once()
 
-    async def test_update_value_non_sensitive(self):
+    async def test_update_value(self):
         db = AsyncMock(spec=AsyncSession)
         var = MagicMock()
         var.key = "k"
@@ -130,59 +92,17 @@ class TestUpdateVariable:
 
         await update_variable(db, var, value="new_val")
         assert var.value == "new_val"
-        assert var.encrypted_value is None
 
-    async def test_update_value_sensitive(self):
-        db = AsyncMock(spec=AsyncSession)
-        var = MagicMock()
-        var.key = "k"
-        var.sensitive = True
-        var.category = "terraform"
-
-        await update_variable(db, var, value="secret_val")
-        assert var.value == ""
-        assert var.encrypted_value == "ENC:secret_val"
-
-    async def test_make_sensitive(self):
-        """Change non-sensitive to sensitive without providing new value."""
+    async def test_update_sensitive_flag(self):
         db = AsyncMock(spec=AsyncSession)
         var = MagicMock()
         var.key = "k"
         var.value = "plaintext"
         var.sensitive = False
-        var.encrypted_value = None
         var.category = "terraform"
 
         await update_variable(db, var, sensitive=True)
         assert var.sensitive is True
-        assert var.value == ""
-        assert var.encrypted_value == "ENC:plaintext"
-
-    async def test_make_non_sensitive(self):
-        """Change sensitive to non-sensitive (decrypts stored value)."""
-        db = AsyncMock(spec=AsyncSession)
-        var = MagicMock()
-        var.key = "k"
-        var.value = ""
-        var.sensitive = True
-        var.encrypted_value = "ENC:secret"
-        var.category = "terraform"
-
-        await update_variable(db, var, sensitive=False)
-        assert var.sensitive is False
-        assert var.value == "secret"
-        assert var.encrypted_value is None
-
-    async def test_make_sensitive_no_encryption_raises(self, no_encryption):
-        db = AsyncMock(spec=AsyncSession)
-        var = MagicMock()
-        var.key = "k"
-        var.value = "plain"
-        var.sensitive = False
-        var.category = "terraform"
-
-        with pytest.raises(ValueError, match="encryption not configured"):
-            await update_variable(db, var, sensitive=True)
 
     async def test_version_id_updated_on_value_change(self):
         db = AsyncMock(spec=AsyncSession)
@@ -211,7 +131,6 @@ class TestResolveVariables:
         vsv = MagicMock()
         vsv.key = "region"
         vsv.value = "us-west-2"
-        vsv.encrypted_value = None
         vsv.sensitive = False
         vsv.category = "terraform"
         vsv.hcl = False
@@ -219,8 +138,6 @@ class TestResolveVariables:
         varset = MagicMock()
         varset.variables = [vsv]
 
-        # First call (priority=False) returns our varset
-        # Second call (priority=True) returns empty
         mock_get_varsets.side_effect = [
             [varset],  # non-priority
             [],  # priority
@@ -230,7 +147,6 @@ class TestResolveVariables:
         ws_var = MagicMock()
         ws_var.key = "region"
         ws_var.value = "us-east-1"
-        ws_var.encrypted_value = None
         ws_var.sensitive = False
         ws_var.category = "terraform"
         ws_var.hcl = False
@@ -251,7 +167,6 @@ class TestResolveVariables:
         ws_var = MagicMock()
         ws_var.key = "env"
         ws_var.value = "dev"
-        ws_var.encrypted_value = None
         ws_var.sensitive = False
         ws_var.category = "terraform"
         ws_var.hcl = False
@@ -261,7 +176,6 @@ class TestResolveVariables:
         vsv = MagicMock()
         vsv.key = "env"
         vsv.value = "prod"
-        vsv.encrypted_value = None
         vsv.sensitive = False
         vsv.category = "terraform"
         vsv.hcl = False
@@ -280,14 +194,13 @@ class TestResolveVariables:
 
     @patch("terrapod.services.variable_service._get_applicable_varsets")
     @patch("terrapod.services.variable_service.list_variables")
-    async def test_sensitive_vars_decrypted(self, mock_list_vars, mock_get_varsets):
+    async def test_sensitive_vars_resolved(self, mock_list_vars, mock_get_varsets):
         ws_id = uuid.uuid4()
         mock_get_varsets.side_effect = [[], []]
 
         ws_var = MagicMock()
         ws_var.key = "secret"
-        ws_var.value = ""
-        ws_var.encrypted_value = "ENC:s3cret"
+        ws_var.value = "s3cret"
         ws_var.sensitive = True
         ws_var.category = "env"
         ws_var.hcl = False
@@ -308,7 +221,6 @@ class TestResolveVariables:
         vsv_base = MagicMock()
         vsv_base.key = "base_url"
         vsv_base.value = "https://api.dev"
-        vsv_base.encrypted_value = None
         vsv_base.sensitive = False
         vsv_base.category = "env"
         vsv_base.hcl = False
@@ -320,7 +232,6 @@ class TestResolveVariables:
         ws_var = MagicMock()
         ws_var.key = "region"
         ws_var.value = "eu-west-1"
-        ws_var.encrypted_value = None
         ws_var.sensitive = False
         ws_var.category = "terraform"
         ws_var.hcl = False
@@ -330,7 +241,6 @@ class TestResolveVariables:
         vsv_override = MagicMock()
         vsv_override.key = "override_key"
         vsv_override.value = "forced"
-        vsv_override.encrypted_value = None
         vsv_override.sensitive = False
         vsv_override.category = "terraform"
         vsv_override.hcl = False

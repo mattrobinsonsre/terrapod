@@ -179,7 +179,7 @@ assert hmac.compare_digest(
 
 ## Callback Tokens
 
-Callback tokens are short-lived (1 hour) HMAC-SHA256 signed tokens. They contain the result ID, a timestamp, and a signature derived from the platform encryption key. The external service receives the token in the webhook payload and must include it in the callback request.
+Callback tokens are short-lived (1 hour) HMAC-SHA256 signed tokens. They contain the result ID, a timestamp, and a signature derived from a server-side secret. The external service receives the token in the webhook payload and must include it in the callback request.
 
 Token format: `{result_id}:{timestamp}:{hmac_sha256_signature}`
 

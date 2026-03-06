@@ -1,9 +1,9 @@
 /**
  * Auth helpers for client-side session state.
  *
- * Session metadata (token, email, roles, userId) is stored in sessionStorage.
- * Survives page navigation/refreshes within the same tab but cleared when
- * the tab is closed.
+ * Session metadata (token, email, roles, userId) is stored in localStorage.
+ * Persists across tabs and browser restarts. Cleared on explicit logout
+ * or when the server-side Redis session expires (API returns 401).
  */
 
 const AUTH_KEY = 'terrapod_auth'
@@ -19,7 +19,7 @@ interface AuthState {
 function loadAuth(): AuthState | null {
   if (typeof window === 'undefined') return null
   try {
-    const raw = sessionStorage.getItem(AUTH_KEY)
+    const raw = localStorage.getItem(AUTH_KEY)
     if (!raw) return null
     return JSON.parse(raw) as AuthState
   } catch {
@@ -31,7 +31,7 @@ export function setAuth(token: string, email: string, roles: string[], expiresAt
   const userId = email.split('@')[0] || email
   const state: AuthState = { token, email, roles, userId, expiresAt }
   if (typeof window !== 'undefined') {
-    sessionStorage.setItem(AUTH_KEY, JSON.stringify(state))
+    localStorage.setItem(AUTH_KEY, JSON.stringify(state))
   }
 }
 
@@ -65,7 +65,7 @@ export function getExpiresAt(): Date | null {
 
 export function clearAuth(): void {
   if (typeof window !== 'undefined') {
-    sessionStorage.removeItem(AUTH_KEY)
+    localStorage.removeItem(AUTH_KEY)
   }
 }
 

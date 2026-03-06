@@ -46,6 +46,8 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.drift_detection_interval_seconds = overrides.get("drift_detection_interval_seconds", 86400)
     ws.drift_last_checked_at = overrides.get("drift_last_checked_at", None)
     ws.drift_status = overrides.get("drift_status", "")
+    ws.execution_backend = overrides.get("execution_backend", "tofu")
+    ws.agent_pool = None
     ws.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     ws.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
     return ws
@@ -276,6 +278,7 @@ class TestRunDriftAttributes:
         run.plan_finished_at = datetime(2026, 1, 1, 0, 0, 30, tzinfo=UTC)
         run.apply_started_at = None
         run.apply_finished_at = None
+        run.execution_backend = "tofu"
         run.listener_id = None
 
         ws = _mock_workspace(ws_id=ws_id)

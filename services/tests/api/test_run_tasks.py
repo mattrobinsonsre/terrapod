@@ -29,6 +29,7 @@ def _mock_workspace(ws_id=None, name="test-ws"):
     ws.id = ws_id or uuid.uuid4()
     ws.name = name
     ws.auto_apply = False
+    ws.execution_backend = "tofu"
     ws.labels = {}
     ws.owner_email = "test@example.com"
     return ws
@@ -42,7 +43,7 @@ def _mock_run_task(rt_id=None, ws=None, name="OPA Check", stage="post_plan"):
     rt.workspace = ws
     rt.name = name
     rt.url = "https://opa.example.com/check"
-    rt.hmac_key_encrypted = None
+    rt.hmac_key = None
     rt.enabled = True
     rt.stage = stage
     rt.enforcement_level = "mandatory"

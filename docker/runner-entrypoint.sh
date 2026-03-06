@@ -45,6 +45,21 @@ if [ -n "$TP_CONFIG_URL" ]; then
     echo "[entrypoint] Downloading configuration..."
     curl -sSfL "$TP_CONFIG_URL" -o /tmp/config.tar.gz
     tar xzf /tmp/config.tar.gz -C "$WORK_DIR"
+
+    # Strip cloud {} and backend {} blocks from .tf files.
+    # Uploaded configs have cloud/backend blocks that would cause recursive
+    # backend use when running in remote execution mode.
+    for tf_file in "$WORK_DIR"/*.tf; do
+        [ -f "$tf_file" ] || continue
+        awk '
+        /^[[:space:]]*(cloud|backend)[[:space:]]*(\{|"[^"]*"[[:space:]]*\{)/ { depth=1; next }
+        depth > 0 { if (/\{/) depth++; if (/\}/) depth--; next }
+        { print }
+        ' "$tf_file" > "${tf_file}.tmp" && mv "${tf_file}.tmp" "$tf_file"
+    done
+    # Remove lock file — the runner resolves providers independently
+    rm -f "$WORK_DIR/.terraform.lock.hcl"
+    echo "[entrypoint] Stripped cloud/backend blocks from uploaded config"
 fi
 
 # --- Download current state ---
@@ -59,19 +74,50 @@ if [ -n "$TP_SETUP_SCRIPT" ]; then
     eval "$TP_SETUP_SCRIPT"
 fi
 
+# --- Configure provider mirror ---
+# Only configure network mirror for HTTPS URLs (terraform/tofu require HTTPS)
+if [ -n "$TP_API_URL" ]; then
+    case "$TP_API_URL" in
+        https://*)
+            cat > /tmp/terraform.rc <<TFEOF
+provider_installation {
+  network_mirror {
+    url = "${TP_API_URL}/v1/providers/"
+  }
+}
+TFEOF
+            export TF_CLI_CONFIG_FILE="/tmp/terraform.rc"
+            echo "[entrypoint] Provider mirror configured: ${TP_API_URL}/v1/providers/"
+            ;;
+        *)
+            echo "[entrypoint] Skipping provider mirror (requires HTTPS): ${TP_API_URL}"
+            ;;
+    esac
+fi
+
 # --- Initialize ---
 echo "[entrypoint] Running $TP_BACKEND init..."
-"$TP_BIN" init -input=false -no-color 2>&1
+"$TP_BIN" init -input=false 2>&1
 
 # --- Execute phase ---
 EXIT_CODE=0
 
 if [ "$TP_PHASE" = "plan" ]; then
     echo "[entrypoint] Running $TP_BACKEND plan..."
-    "$TP_BIN" plan -input=false -no-color -detailed-exitcode -out=tfplan 2>&1 | tee /tmp/plan.log &
+    # Redirect to file (not tee) so $! gives the plan PID for correct exit
+    # code capture and signal forwarding. Output shown via cat afterwards.
+    PLAN_ARGS="-input=false -detailed-exitcode"
+    # Only save plan file if not plan-only (plan file is discarded for plan-only runs)
+    if [ "${TP_PLAN_ONLY:-false}" != "true" ]; then
+        PLAN_ARGS="$PLAN_ARGS -out=tfplan"
+    fi
+    "$TP_BIN" plan $PLAN_ARGS > /tmp/plan.log 2>&1 &
     CHILD_PID=$!
     wait "$CHILD_PID" || EXIT_CODE=$?
     CHILD_PID=""
+
+    # Show plan output in pod logs
+    cat /tmp/plan.log 2>/dev/null || true
 
     # -detailed-exitcode: 0=no changes, 1=error, 2=changes present
     if [ "$EXIT_CODE" = "2" ]; then
@@ -100,13 +146,16 @@ elif [ "$TP_PHASE" = "apply" ]; then
 
     echo "[entrypoint] Running $TP_BACKEND apply..."
     if [ -f tfplan ]; then
-        "$TP_BIN" apply -input=false -no-color tfplan 2>&1 | tee /tmp/apply.log &
+        "$TP_BIN" apply -input=false tfplan > /tmp/apply.log 2>&1 &
     else
-        "$TP_BIN" apply -input=false -no-color -auto-approve 2>&1 | tee /tmp/apply.log &
+        "$TP_BIN" apply -input=false -auto-approve > /tmp/apply.log 2>&1 &
     fi
     CHILD_PID=$!
     wait "$CHILD_PID" || EXIT_CODE=$?
     CHILD_PID=""
+
+    # Show apply output in pod logs
+    cat /tmp/apply.log 2>/dev/null || true
 
     # Upload apply log
     if [ -n "$TP_APPLY_LOG_UPLOAD_URL" ] && [ -f /tmp/apply.log ]; then

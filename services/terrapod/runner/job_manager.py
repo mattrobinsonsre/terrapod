@@ -6,7 +6,7 @@ Uses the kubernetes Python client to interact with the K8s API.
 import asyncio
 import os
 
-from kubernetes import client, config, watch
+from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
 from terrapod.logging_config import get_logger
@@ -81,42 +81,82 @@ async def create_job(job_spec: dict, namespace: str = "") -> str:
         raise
 
 
+_STUCK_POD_REASONS = {
+    "ErrImageNeverPull",
+    "ErrImagePull",
+    "ImagePullBackOff",
+    "InvalidImageName",
+    "CreateContainerConfigError",
+}
+
+
 async def watch_job(
     job_name: str,
     namespace: str = "",
     timeout_seconds: int = 3600,
+    poll_interval: int = 5,
 ) -> str:
-    """Watch a Job until completion or failure.
+    """Poll a Job until completion, failure, deletion, or stuck pod.
 
-    Returns the final status: "succeeded", "failed", or "timeout".
+    Returns: "succeeded", "failed", "deleted", "timeout", or "pod_error:{reason}".
     """
     if not namespace:
         namespace = _default_namespace()
 
-    batch_api = _get_batch_api()
+    deadline = asyncio.get_event_loop().time() + timeout_seconds
 
-    def _watch() -> str:
-        w = watch.Watch()
-        try:
-            for event in w.stream(
-                batch_api.list_namespaced_job,
+    prev_status = None
+    while asyncio.get_event_loop().time() < deadline:
+        status = await get_job_status(job_name, namespace)
+
+        if status != prev_status:
+            logger.info("Job status", job=job_name, status=status)
+            prev_status = status
+
+        if status is None:
+            logger.info("Job deleted externally", job=job_name)
+            return "deleted"
+        if status == "succeeded":
+            return "succeeded"
+        if status == "failed":
+            return "failed"
+
+        stuck_reason = await _check_pod_stuck(job_name, namespace)
+        if stuck_reason:
+            logger.warning("Pod stuck", job=job_name, reason=stuck_reason)
+            return f"pod_error:{stuck_reason}"
+
+        await asyncio.sleep(poll_interval)
+
+    return "timeout"
+
+
+async def _check_pod_stuck(job_name: str, namespace: str) -> str | None:
+    """Check if a Job's pod is stuck in an unrecoverable waiting state."""
+    core_api = _get_core_api()
+
+    try:
+        loop = asyncio.get_event_loop()
+        pods = await loop.run_in_executor(
+            None,
+            lambda: core_api.list_namespaced_pod(
                 namespace=namespace,
-                field_selector=f"metadata.name={job_name}",
-                timeout_seconds=timeout_seconds,
-            ):
-                job = event["object"]
-                if job.status.succeeded and job.status.succeeded > 0:
-                    w.stop()
-                    return "succeeded"
-                if job.status.failed and job.status.failed > 0:
-                    w.stop()
-                    return "failed"
-        except Exception:
-            pass
-        return "timeout"
+                label_selector=f"job-name={job_name}",
+            ),
+        )
 
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _watch)
+        for pod in pods.items:
+            if not pod.status or not pod.status.container_statuses:
+                continue
+            for cs in pod.status.container_statuses:
+                if cs.state and cs.state.waiting:
+                    reason = cs.state.waiting.reason or ""
+                    if reason in _STUCK_POD_REASONS:
+                        return reason
+    except Exception:
+        pass
+
+    return None
 
 
 async def delete_job(

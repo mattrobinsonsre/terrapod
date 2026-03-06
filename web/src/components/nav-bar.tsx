@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Shield, Server, Variable, HeartPulse, LogOut, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Users, Shield, Server, Variable, HeartPulse, LogOut, Menu, X } from 'lucide-react'
 import { clearAuth, isAdmin } from '@/lib/auth'
 import { SessionExpiryBanner } from '@/components/session-expiry-banner'
 
@@ -39,11 +39,8 @@ function NavLink({
 export default function NavBar() {
   const router = useRouter()
   const [admin, setAdmin] = useState(false)
+  useEffect(() => { setAdmin(isAdmin()) }, [])
   const [menuOpen, setMenuOpen] = useState(false)
-
-  useEffect(() => {
-    setAdmin(isAdmin())
-  }, [])
 
   const handleLogout = () => {
     clearAuth()
@@ -87,6 +84,10 @@ export default function NavBar() {
           <NavLink href="/admin/vcs-connections" onClick={closeMenu}>
             <GitBranch size={16} />
             VCS
+          </NavLink>
+          <NavLink href="/admin/users" onClick={closeMenu}>
+            <Users size={16} />
+            Users
           </NavLink>
           <NavLink href="/admin/roles" onClick={closeMenu}>
             <Shield size={16} />

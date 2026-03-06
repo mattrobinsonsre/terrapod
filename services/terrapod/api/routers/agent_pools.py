@@ -305,6 +305,40 @@ async def join_listener(
     return JSONResponse(content={"data": result}, status_code=201)
 
 
+@router.post("/agent-pools/join", status_code=201)
+async def join_listener_by_token(
+    body: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Register a new listener using only a join token.
+
+    The token identifies the pool — no pool ID needed in the URL.
+    No Bearer auth — the join token in the body IS the credential.
+    """
+    join_token = body.get("join_token", "")
+    name = body.get("name", "")
+    runner_definitions = body.get("runner_definitions", ["standard"])
+
+    if not join_token:
+        raise HTTPException(status_code=422, detail="join_token is required")
+    if not name:
+        raise HTTPException(status_code=422, detail="name is required")
+
+    token = await agent_pool_service.validate_join_token(db, join_token)
+    if token is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired join token")
+
+    pool = await agent_pool_service.get_pool(db, token.pool_id)
+    if pool is None:
+        raise HTTPException(status_code=404, detail="Pool not found")
+
+    result = await agent_pool_service.join_listener(db, pool, token, name, runner_definitions)
+    result["pool_id"] = str(pool.id)
+    await db.commit()
+
+    return JSONResponse(content={"data": result}, status_code=201)
+
+
 # ── Listeners ────────────────────────────────────────────────────────────
 
 
@@ -354,9 +388,9 @@ async def listener_heartbeat(
     if listener is None:
         raise HTTPException(status_code=404, detail="Listener not found")
 
-    from terrapod.redis.client import get_redis
+    from terrapod.redis.client import get_redis_client
 
-    redis = get_redis()
+    redis = get_redis_client()
     prefix = f"tp:listener:{listener.id}"
     ttl = 180  # seconds
 
@@ -371,6 +405,23 @@ async def listener_heartbeat(
     await redis.setex(f"{prefix}:capacity", ttl, str(capacity))
     await redis.setex(f"{prefix}:active_runs", ttl, str(active_runs))
     await redis.setex(f"{prefix}:runner_defs", ttl, json.dumps(runner_defs))
+
+    # Publish heartbeat event to admin dashboard SSE
+    try:
+        from terrapod.redis.client import ADMIN_EVENTS_CHANNEL, publish_event
+
+        await publish_event(
+            ADMIN_EVENTS_CHANNEL,
+            json.dumps({
+                "event": "listener_heartbeat",
+                "listener_id": str(listener.id),
+                "listener_name": listener.name,
+                "capacity": capacity,
+                "active_runs": active_runs,
+            }),
+        )
+    except Exception:
+        pass  # Never break heartbeat for SSE
 
     return JSONResponse(content={"status": "ok"})
 

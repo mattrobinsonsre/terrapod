@@ -190,12 +190,6 @@ These are returned in the `delivery-responses` attribute of the notification con
 
 ---
 
-## Encryption
-
-Notification tokens are encrypted at rest using Fernet (AES-128-CBC + HMAC-SHA256). The `TERRAPOD_ENCRYPTION__KEY` environment variable must be set. Without it, token creation is rejected.
-
----
-
 ## Delivery Flow
 
 1. A run state change triggers notification delivery via the distributed scheduler

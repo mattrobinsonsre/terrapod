@@ -23,6 +23,7 @@ api:
 
   config:
     log_level: debug
+    external_url: "https://terrapod.local"
     storage:
       backend: filesystem
       filesystem:
@@ -73,6 +74,11 @@ ingress:
 
 tls:
   existingSecret: terrapod-tls-local
+
+# Listener join token for local dev (must match pool token created by setup-dev-pool)
+listener:
+  name: "dev-listener"
+  joinToken: "dev-join-token-do-not-use-in-prod"
 
 # Bootstrap admin user for local dev
 bootstrap:

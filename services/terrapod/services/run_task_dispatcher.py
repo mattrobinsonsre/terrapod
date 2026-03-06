@@ -14,7 +14,6 @@ from datetime import UTC
 from terrapod.db.models import Run, RunTask, TaskStage, TaskStageResult, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services.encryption_service import decrypt_value
 from terrapod.services.run_task_service import resolve_stage
 
 logger = get_logger(__name__)
@@ -133,13 +132,7 @@ async def handle_run_task_call(payload: dict) -> None:
             access_token=tsr.callback_token,
         )
 
-        # Decrypt HMAC key if present
-        hmac_key: str | None = None
-        if rt.hmac_key_encrypted:
-            try:
-                hmac_key = decrypt_value(rt.hmac_key_encrypted)
-            except Exception:
-                logger.warning("Failed to decrypt HMAC key", run_task_id=str(rt.id))
+        hmac_key: str | None = rt.hmac_key or None
 
         # Send webhook
         body_bytes = json.dumps(task_payload).encode()

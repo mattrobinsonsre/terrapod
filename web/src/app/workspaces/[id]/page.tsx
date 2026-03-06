@@ -1,30 +1,44 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
-import { getAuthState } from '@/lib/auth'
+import { SortableHeader } from '@/components/sortable-header'
+import { LabelsEditor } from '@/components/labels-editor'
+import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { useSortable } from '@/lib/use-sortable'
+import { useRunEvents } from '@/lib/use-run-events'
 
 interface WorkspaceAttrs {
   name: string
   'execution-mode': string
+  'execution-backend': string
   'auto-apply': boolean
   'terraform-version': string
   'working-directory': string
   locked: boolean
   'resource-cpu': string
   'resource-memory': string
+  'agent-pool-id': string | null
+  'agent-pool-name': string | null
+  labels: Record<string, string>
+  'owner-email': string
   'drift-detection-enabled': boolean
   'drift-detection-interval-seconds': number
   'drift-last-checked-at': string
   'drift-status': string
   'created-at': string
   'updated-at': string
+}
+
+interface AgentPool {
+  id: string
+  attributes: { name: string }
 }
 
 interface Workspace {
@@ -116,15 +130,32 @@ const ALL_ENFORCEMENT_LEVELS = ['mandatory', 'advisory'] as const
 
 type Tab = 'overview' | 'variables' | 'runs' | 'state' | 'notifications' | 'run-tasks'
 
+const VALID_TABS: Set<string> = new Set(['overview', 'variables', 'runs', 'state', 'notifications', 'run-tasks'])
+
 export default function WorkspaceDetailPage() {
+  return (
+    <Suspense fallback={<><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><LoadingSpinner /></main></>}>
+      <WorkspaceDetailContent />
+    </Suspense>
+  )
+}
+
+function WorkspaceDetailContent() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const workspaceId = params.id as string
+
+  const tabParam = searchParams.get('tab') || 'overview'
+  const activeTab: Tab = VALID_TABS.has(tabParam) ? (tabParam as Tab) : 'overview'
+
+  function setActiveTab(tab: Tab) {
+    router.replace(`?tab=${tab}`, { scroll: false })
+  }
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
 
   // Overview editing
   const [editing, setEditing] = useState(false)
@@ -132,7 +163,20 @@ export default function WorkspaceDetailPage() {
   const [editMemory, setEditMemory] = useState('')
   const [editAutoApply, setEditAutoApply] = useState(false)
   const [editExecMode, setEditExecMode] = useState('')
+  const [editBackend, setEditBackend] = useState('')
+  const [editVersion, setEditVersion] = useState('')
+  const [editPoolId, setEditPoolId] = useState<string | null>(null)
+  const [editLabels, setEditLabels] = useState<Record<string, string>>({})
+  const [editOwner, setEditOwner] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Agent pools
+  const [agentPools, setAgentPools] = useState<AgentPool[]>([])
+  const [poolsLoaded, setPoolsLoaded] = useState(false)
+
+  // Version suggestions
+  const [versionSuggestions, setVersionSuggestions] = useState<string[]>([])
+  const [versionsBackend, setVersionsBackend] = useState('')
 
   // Variables
   const [variables, setVariables] = useState<Variable[]>([])
@@ -200,6 +244,48 @@ export default function WorkspaceDetailPage() {
   const [addingRunTask, setAddingRunTask] = useState(false)
   const [deleteRtId, setDeleteRtId] = useState<string | null>(null)
 
+  // Sorting for runs tab
+  type RunSortKey = 'id' | 'status' | 'type' | 'source' | 'created-at'
+  const { sortedItems: sortedRuns, sortState: runSortState, toggleSort: toggleRunSort } = useSortable<RunItem, RunSortKey>(
+    runs, 'created-at', 'desc',
+    useCallback((item: RunItem, key: RunSortKey) => {
+      switch (key) {
+        case 'id': return item.id
+        case 'status': return item.attributes.status
+        case 'type': return item.attributes['plan-only'] ? 'plan only' : 'plan + apply'
+        case 'source': return item.attributes.source
+        case 'created-at': return item.attributes['created-at']
+      }
+    }, []),
+  )
+
+  // Sorting for state tab
+  type StateSortKey = 'serial' | 'lineage' | 'size' | 'created-at'
+  const { sortedItems: sortedState, sortState: stateSortState, toggleSort: toggleStateSort } = useSortable<StateVersionItem, StateSortKey>(
+    stateVersions, 'serial', 'desc',
+    useCallback((item: StateVersionItem, key: StateSortKey) => {
+      switch (key) {
+        case 'serial': return item.attributes.serial
+        case 'lineage': return item.attributes.lineage
+        case 'size': return item.attributes.size
+        case 'created-at': return item.attributes['created-at']
+      }
+    }, []),
+  )
+
+  // Sorting for variables tab
+  type VarSortKey = 'key' | 'value' | 'category'
+  const { sortedItems: sortedVars, sortState: varSortState, toggleSort: toggleVarSort } = useSortable<Variable, VarSortKey>(
+    variables, 'key', 'asc',
+    useCallback((item: Variable, key: VarSortKey) => {
+      switch (key) {
+        case 'key': return item.attributes.key
+        case 'value': return item.attributes.sensitive ? '' : item.attributes.value
+        case 'category': return item.attributes.category
+      }
+    }, []),
+  )
+
   const loadWorkspace = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`)
@@ -218,6 +304,20 @@ export default function WorkspaceDetailPage() {
     loadWorkspace()
   }, [router, loadWorkspace])
 
+  const loadRuns = useCallback(async () => {
+    setRunsLoading(true)
+    try {
+      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/runs`)
+      if (!res.ok) throw new Error('Failed to load runs')
+      const data = await res.json()
+      setRuns(data.data || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load runs')
+    } finally {
+      setRunsLoading(false)
+    }
+  }, [workspaceId])
+
   // Load tab data when tab changes
   useEffect(() => {
     if (!workspace) return
@@ -226,7 +326,13 @@ export default function WorkspaceDetailPage() {
     if (activeTab === 'state') loadStateVersions()
     if (activeTab === 'notifications') loadNotifications()
     if (activeTab === 'run-tasks') loadRunTasks()
-  }, [activeTab, workspace])
+  }, [activeTab, workspace, loadRuns])
+
+  // Real-time run status updates via SSE
+  useRunEvents(workspaceId, useCallback(() => {
+    if (activeTab === 'runs') loadRuns()
+    loadWorkspace()
+  }, [activeTab, loadRuns, loadWorkspace]))
 
   async function loadVariables() {
     setVarsLoading(true)
@@ -239,20 +345,6 @@ export default function WorkspaceDetailPage() {
       setError(err instanceof Error ? err.message : 'Failed to load variables')
     } finally {
       setVarsLoading(false)
-    }
-  }
-
-  async function loadRuns() {
-    setRunsLoading(true)
-    try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/runs`)
-      if (!res.ok) throw new Error('Failed to load runs')
-      const data = await res.json()
-      setRuns(data.data || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load runs')
-    } finally {
-      setRunsLoading(false)
     }
   }
 
@@ -366,7 +458,28 @@ export default function WorkspaceDetailPage() {
     setEditMemory(workspace.attributes['resource-memory'])
     setEditAutoApply(workspace.attributes['auto-apply'])
     setEditExecMode(workspace.attributes['execution-mode'])
+    setEditBackend(workspace.attributes['execution-backend'] || 'tofu')
+    setEditVersion(workspace.attributes['terraform-version'] || '')
+    setEditPoolId(workspace.attributes['agent-pool-id'])
+    setEditLabels(workspace.attributes.labels || {})
+    setEditOwner(workspace.attributes['owner-email'] || '')
     setEditing(true)
+    if (!poolsLoaded) {
+      apiFetch('/api/v2/organizations/default/agent-pools').then(res => res.ok ? res.json() : { data: [] }).then(data => {
+        setAgentPools(data.data || [])
+        setPoolsLoaded(true)
+      }).catch(() => {})
+    }
+    const backend = workspace.attributes['execution-backend'] || 'tofu'
+    if (versionsBackend !== backend) {
+      apiFetch(`/api/v2/binary-cache/versions?tool=${backend}`)
+        .then(res => res.ok ? res.json() : { data: [] })
+        .then(data => {
+          setVersionSuggestions(data.data || [])
+          setVersionsBackend(backend)
+        })
+        .catch(() => {})
+    }
   }
 
   async function handleSave() {
@@ -384,6 +497,11 @@ export default function WorkspaceDetailPage() {
               'resource-memory': editMemory,
               'auto-apply': editAutoApply,
               'execution-mode': editExecMode,
+              'execution-backend': editBackend,
+              'terraform-version': editVersion,
+              'agent-pool-id': editPoolId,
+              labels: editLabels,
+              ...(isAdmin() ? { 'owner-email': editOwner } : {}),
             },
           },
         }),
@@ -467,6 +585,7 @@ export default function WorkspaceDetailPage() {
             type: 'runs',
             attributes: {
               'plan-only': true,
+              'is-drift-detection': true,
               message: 'Manual drift check from UI',
             },
             relationships: {
@@ -816,6 +935,15 @@ export default function WorkspaceDetailPage() {
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
+            {attrs['execution-mode'] === 'remote' && !attrs['agent-pool-id'] && (
+              <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 flex items-start gap-3">
+                <svg className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+                <div>
+                  <p className="text-sm font-medium text-amber-300">No agent pool assigned</p>
+                  <p className="text-xs text-amber-400/80 mt-1">This workspace is in remote execution mode but has no agent pool. Runs will be queued indefinitely because no runner can claim them. Assign an agent pool in the settings below.</p>
+                </div>
+              </div>
+            )}
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-slate-300">Settings</h3>
@@ -872,12 +1000,71 @@ export default function WorkspaceDetailPage() {
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Terraform Version</dt>
-                  <dd className="mt-1 text-sm text-slate-200">{attrs['terraform-version'] || 'Default'}</dd>
+                  <dt className="text-xs text-slate-500">Execution Backend</dt>
+                  {editing ? (
+                    <select value={editBackend} onChange={(e) => setEditBackend(e.target.value)} className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                      <option value="tofu">OpenTofu</option>
+                      <option value="terraform">Terraform</option>
+                    </select>
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['execution-backend'] === 'terraform' ? 'Terraform' : 'OpenTofu'}</dd>
+                  )}
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">Version</dt>
+                  {editing ? (
+                    <>
+                      <input type="text" list="edit-version-suggestions" value={editVersion} onChange={(e) => setEditVersion(e.target.value)} placeholder="e.g. 1.9 or 1.9.8" className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                      <datalist id="edit-version-suggestions">
+                        {versionSuggestions.map(v => (
+                          <option key={v} value={v} />
+                        ))}
+                      </datalist>
+                    </>
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['terraform-version'] || 'Default'}</dd>
+                  )}
                 </div>
                 <div>
                   <dt className="text-xs text-slate-500">Working Directory</dt>
                   <dd className="mt-1 text-sm text-slate-200">{attrs['working-directory'] || '/'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">Agent Pool</dt>
+                  {editing ? (
+                    <select
+                      value={editPoolId || ''}
+                      onChange={(e) => setEditPoolId(e.target.value || null)}
+                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    >
+                      <option value="">None</option>
+                      {agentPools.map((p) => (
+                        <option key={p.id} value={p.id}>{p.attributes.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">
+                      {attrs['agent-pool-name'] || (attrs['agent-pool-id'] ? attrs['agent-pool-id'] : 'None')}
+                    </dd>
+                  )}
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">Owner</dt>
+                  {editing && isAdmin() ? (
+                    <input type="email" value={editOwner} onChange={(e) => setEditOwner(e.target.value)} placeholder="user@example.com" className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['owner-email'] || 'None'}</dd>
+                  )}
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-slate-500 mb-1">Labels</dt>
+                  {editing ? (
+                    <LabelsEditor labels={editLabels} onChange={setEditLabels} />
+                  ) : (
+                    <dd className="mt-1">
+                      <LabelsEditor labels={attrs.labels || {}} readOnly />
+                    </dd>
+                  )}
                 </div>
               </dl>
             </div>
@@ -953,9 +1140,9 @@ export default function WorkspaceDetailPage() {
                 <div className="flex items-end">
                   <button
                     onClick={handleCheckDriftNow}
-                    disabled={checkingDrift || attrs.locked}
+                    disabled={checkingDrift || attrs.locked || !attrs['drift-detection-enabled']}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
-                    title={attrs.locked ? 'Workspace is locked' : 'Queue a plan-only run to check for drift'}
+                    title={!attrs['drift-detection-enabled'] ? 'Enable drift detection first' : attrs.locked ? 'Workspace is locked' : 'Queue a plan-only run to check for drift'}
                   >
                     {checkingDrift ? 'Queuing...' : 'Check Now'}
                   </button>
@@ -1052,14 +1239,14 @@ export default function WorkspaceDetailPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Key</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Value</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Category</th>
+                      <SortableHeader label="Key" sortKey="key" sortState={varSortState} onSort={toggleVarSort} />
+                      <SortableHeader label="Value" sortKey="value" sortState={varSortState} onSort={toggleVarSort} />
+                      <SortableHeader label="Category" sortKey="category" sortState={varSortState} onSort={toggleVarSort} className="hidden sm:table-cell" />
                       <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
-                    {variables.map((v) =>
+                    {sortedVars.map((v) =>
                       editingVarId === v.id ? (
                         <tr key={v.id} className="bg-slate-700/20">
                           <td className="px-4 py-3">
@@ -1150,21 +1337,21 @@ export default function WorkspaceDetailPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Run ID</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Type</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Source</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Created</th>
+                      <SortableHeader label="Run ID" sortKey="id" sortState={runSortState} onSort={toggleRunSort} />
+                      <SortableHeader label="Status" sortKey="status" sortState={runSortState} onSort={toggleRunSort} />
+                      <SortableHeader label="Type" sortKey="type" sortState={runSortState} onSort={toggleRunSort} className="hidden sm:table-cell" />
+                      <SortableHeader label="Source" sortKey="source" sortState={runSortState} onSort={toggleRunSort} className="hidden sm:table-cell" />
+                      <SortableHeader label="Created" sortKey="created-at" sortState={runSortState} onSort={toggleRunSort} className="hidden md:table-cell" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
-                    {runs.map((run) => (
+                    {sortedRuns.map((run) => (
                       <tr
                         key={run.id}
                         onClick={() => router.push(`/workspaces/${workspaceId}/runs/${run.id}`)}
                         className="hover:bg-slate-700/20 transition-colors cursor-pointer"
                       >
-                        <td className="px-4 py-3 text-sm text-brand-400 font-mono">{run.id.slice(0, 8)}</td>
+                        <td className="px-4 py-3 text-sm text-brand-400 font-mono">{run.id.replace(/^run-/, '').split('-').pop()}</td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(run.attributes.status)}`}>
                             {run.attributes.status}
@@ -1204,15 +1391,15 @@ export default function WorkspaceDetailPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Serial</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Lineage</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Size</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden lg:table-cell">Created</th>
+                      <SortableHeader label="Serial" sortKey="serial" sortState={stateSortState} onSort={toggleStateSort} />
+                      <SortableHeader label="Lineage" sortKey="lineage" sortState={stateSortState} onSort={toggleStateSort} className="hidden sm:table-cell" />
+                      <SortableHeader label="Size" sortKey="size" sortState={stateSortState} onSort={toggleStateSort} className="hidden md:table-cell" />
+                      <SortableHeader label="Created" sortKey="created-at" sortState={stateSortState} onSort={toggleStateSort} className="hidden lg:table-cell" />
                       <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
-                    {stateVersions.map((sv) => (
+                    {sortedState.map((sv) => (
                       <tr key={sv.id} className="hover:bg-slate-700/20 transition-colors">
                         <td className="px-4 py-3 text-sm text-slate-200 font-mono">#{sv.attributes.serial}</td>
                         <td className="px-4 py-3 text-xs text-slate-400 font-mono hidden sm:table-cell">{sv.attributes.lineage || '-'}</td>

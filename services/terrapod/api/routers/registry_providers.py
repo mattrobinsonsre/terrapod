@@ -330,6 +330,38 @@ async def delete_provider_endpoint(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.patch(_ORG_PREFIX + "/private/default/{name}")
+async def update_provider_endpoint(
+    name: str,
+    body: dict,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Update a registry provider's labels and/or owner. Requires admin on provider."""
+    provider = await get_provider(db, "default", name)
+    if provider is None:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    await _require_provider_permission(db, user, provider, "admin")
+
+    attrs = body.get("data", {}).get("attributes", {})
+
+    if "owner-email" in attrs:
+        if "admin" not in user.roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only platform admins can change owner",
+            )
+        provider.owner_email = attrs["owner-email"]
+
+    if "labels" in attrs:
+        provider.labels = attrs["labels"]
+
+    await db.commit()
+    await db.refresh(provider)
+    return JSONResponse(content={"data": _provider_to_jsonapi(provider)})
+
+
 # --- Version Management ---
 
 

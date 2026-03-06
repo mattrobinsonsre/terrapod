@@ -24,6 +24,10 @@ VALID_TOOLS = {"terraform", "tofu"}
 VALID_OS = {"linux", "darwin", "windows", "freebsd", "openbsd", "solaris"}
 VALID_ARCH = {"amd64", "arm64", "arm", "386"}
 
+# Redis key prefix and TTL for version resolution cache
+_VERSION_CACHE_PREFIX = "tp:version_resolve"
+_VERSION_CACHE_TTL = 3600  # 1 hour
+
 
 async def get_or_cache_binary(
     db: AsyncSession,
@@ -136,6 +140,215 @@ async def warm_binary(
 ) -> str:
     """Pre-warm a binary into the cache. Returns presigned URL."""
     return await get_or_cache_binary(db, storage, tool, version, os_, arch)
+
+
+# --- Available Versions ---
+
+
+async def list_available_versions(tool: str) -> list[str]:
+    """List available stable versions for a tool, newest first.
+
+    Fetches from upstream and caches in Redis for 1 hour.
+    Returns both exact versions and major.minor shortcuts.
+    """
+    if tool not in VALID_TOOLS:
+        raise ValueError(f"Invalid tool: {tool}. Must be one of {VALID_TOOLS}")
+
+    # Check Redis cache
+    cache_key = f"tp:versions:{tool}"
+    try:
+        from terrapod.redis.client import get_redis_client
+
+        redis = get_redis_client()
+        cached = await redis.get(cache_key)
+        if cached:
+            import json
+
+            raw = cached.decode() if isinstance(cached, bytes) else cached
+            return json.loads(raw)
+    except Exception:
+        pass
+
+    if tool == "terraform":
+        versions = await _fetch_terraform_versions()
+    else:
+        versions = await _fetch_tofu_versions()
+
+    # Sort descending
+    versions.sort(key=lambda v: [int(x) for x in v.split(".")], reverse=True)
+
+    # Add major.minor shortcuts (deduplicated, in order)
+    shortcuts: list[str] = []
+    seen: set[str] = set()
+    for v in versions:
+        parts = v.split(".")
+        if len(parts) >= 2:
+            shortcut = f"{parts[0]}.{parts[1]}"
+            if shortcut not in seen:
+                seen.add(shortcut)
+                shortcuts.append(shortcut)
+
+    result = shortcuts + versions
+
+    # Cache in Redis
+    try:
+        import json
+
+        from terrapod.redis.client import get_redis_client
+
+        redis = get_redis_client()
+        await redis.setex(cache_key, 3600, json.dumps(result))
+    except Exception:
+        pass
+
+    return result
+
+
+async def _fetch_terraform_versions() -> list[str]:
+    """Fetch stable terraform versions from releases.hashicorp.com."""
+    url = "https://releases.hashicorp.com/terraform/index.json"
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+        data = resp.json()
+
+    versions = []
+    for v in data.get("versions", {}):
+        if any(tag in v for tag in ("-alpha", "-beta", "-rc", "-dev")):
+            continue
+        parts = v.split(".")
+        if len(parts) >= 3:
+            versions.append(v)
+    return versions
+
+
+async def _fetch_tofu_versions() -> list[str]:
+    """Fetch stable tofu versions from GitHub releases."""
+    url = "https://api.github.com/repos/opentofu/opentofu/releases"
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(url, params={"per_page": 100})
+        resp.raise_for_status()
+        releases = resp.json()
+
+    versions = []
+    for release in releases:
+        if release.get("prerelease", False):
+            continue
+        tag = release.get("tag_name", "")
+        version = tag.lstrip("v")
+        if any(t in version for t in ("-alpha", "-beta", "-rc")):
+            continue
+        parts = version.split(".")
+        if len(parts) >= 3:
+            versions.append(version)
+    return versions
+
+
+# --- Version Resolution ---
+
+
+async def resolve_version(tool: str, partial_version: str) -> str:
+    """Resolve a partial version (e.g. '1.9') to the latest exact version (e.g. '1.9.8').
+
+    If the version already has 3+ components (x.y.z), returns as-is.
+    For 2-component versions (x.y), queries upstream for the latest patch.
+    Results are cached in Redis for 1 hour.
+    """
+    parts = partial_version.split(".")
+    if len(parts) >= 3:
+        return partial_version  # Already exact
+
+    # Check Redis cache
+    try:
+        from terrapod.redis.client import get_redis_client
+
+        redis = get_redis_client()
+        cache_key = f"{_VERSION_CACHE_PREFIX}:{tool}:{partial_version}"
+        cached = await redis.get(cache_key)
+        if cached:
+            return cached.decode() if isinstance(cached, bytes) else cached
+    except Exception:
+        pass  # Redis unavailable — resolve without cache
+
+    if tool == "terraform":
+        resolved = await _resolve_terraform_version(partial_version)
+    elif tool == "tofu":
+        resolved = await _resolve_tofu_version(partial_version)
+    else:
+        return partial_version
+
+    # Cache the result
+    try:
+        from terrapod.redis.client import get_redis_client
+
+        redis = get_redis_client()
+        await redis.setex(cache_key, _VERSION_CACHE_TTL, resolved)
+    except Exception:
+        pass
+
+    logger.info(
+        "Resolved partial version",
+        tool=tool,
+        partial=partial_version,
+        resolved=resolved,
+    )
+    return resolved
+
+
+async def _resolve_terraform_version(partial: str) -> str:
+    """Resolve partial terraform version via releases.hashicorp.com index."""
+    url = "https://releases.hashicorp.com/terraform/index.json"
+    prefix = f"{partial}."
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+        data = resp.json()
+
+    versions = data.get("versions", {})
+    matching = []
+    for v in versions:
+        if v.startswith(prefix):
+            # Skip pre-release versions
+            if any(tag in v for tag in ("-alpha", "-beta", "-rc", "-dev")):
+                continue
+            matching.append(v)
+
+    if not matching:
+        logger.warning("No matching terraform version found", partial=partial)
+        return partial
+
+    # Sort by version parts and return the latest
+    matching.sort(key=lambda v: [int(x) for x in v.split(".")])
+    return matching[-1]
+
+
+async def _resolve_tofu_version(partial: str) -> str:
+    """Resolve partial tofu version via GitHub releases API."""
+    url = "https://api.github.com/repos/opentofu/opentofu/releases"
+    prefix = f"v{partial}."
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(url, params={"per_page": 100})
+        resp.raise_for_status()
+        releases = resp.json()
+
+    matching = []
+    for release in releases:
+        tag = release.get("tag_name", "")
+        if tag.startswith(prefix) and not release.get("prerelease", False):
+            # Strip the 'v' prefix
+            version = tag.lstrip("v")
+            if any(t in version for t in ("-alpha", "-beta", "-rc")):
+                continue
+            matching.append(version)
+
+    if not matching:
+        logger.warning("No matching tofu version found", partial=partial)
+        return partial
+
+    matching.sort(key=lambda v: [int(x) for x in v.split(".")])
+    return matching[-1]
 
 
 # --- Internal helpers ---

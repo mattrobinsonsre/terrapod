@@ -72,14 +72,6 @@ def provider_shasums_sig_key(namespace: str, name: str, version: str) -> str:
     return f"registry/providers/{namespace}/{name}/{version}/SHA256SUMS.sig"
 
 
-# --- Module Cache ---
-
-
-def module_cache_key(hostname: str, namespace: str, name: str, provider: str, version: str) -> str:
-    """Key for a cached upstream module tarball."""
-    return f"cache/modules/{hostname}/{namespace}/{name}/{provider}/{version}.tar.gz"
-
-
 # --- Provider Cache ---
 
 

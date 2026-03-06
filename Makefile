@@ -9,6 +9,7 @@
 .PHONY: lint lint-python \
 	test test-python \
 	build images \
+	pentest pentest-sast pentest-images pentest-dast \
 	release publish publish-images publish-chart publish-release \
 	dev dev-down \
 	clean test-down \
@@ -32,6 +33,19 @@ test-python:        ## Test Python only (Docker)
 images:             ## Build Docker images (single-arch, local)
 	docker build -f docker/Dockerfile.api -t terrapod-api:local .
 	docker build -f docker/Dockerfile.web -t terrapod-web:local .
+
+# ── Security Testing ────────────────────────────────────────
+pentest:            ## Run all pen tests (SAST + images + DAST)
+	scripts/pentest.sh
+
+pentest-sast:       ## Run SAST analysis (Semgrep)
+	scripts/pentest.sh sast
+
+pentest-images:     ## Scan container images for CVEs (Trivy)
+	scripts/pentest.sh images
+
+pentest-dast:       ## Run DAST analysis (Nuclei, requires running stack)
+	scripts/pentest.sh dast
 
 # ── Release ──────────────────────────────────────────────
 release:            ## Full release: tag + images + chart + GitHub release (VERSION required)

@@ -29,6 +29,7 @@ def _mock_workspace(ws_id=None, name="test-ws"):
     ws.id = ws_id or uuid.uuid4()
     ws.name = name
     ws.auto_apply = False
+    ws.execution_backend = "tofu"
     return ws
 
 

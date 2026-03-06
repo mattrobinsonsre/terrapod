@@ -13,7 +13,6 @@ from terrapod.config import settings
 from terrapod.db.models import NotificationConfiguration, Run, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services.encryption_service import decrypt_value
 from terrapod.services.notification_service import (
     build_run_payload,
     deliver_notification,
@@ -73,16 +72,7 @@ async def handle_notification_delivery(payload: dict) -> None:
             if trigger not in nc_triggers:
                 continue
 
-            # Decrypt token if present
-            token: str | None = None
-            if nc.token_encrypted:
-                try:
-                    token = decrypt_value(nc.token_encrypted)
-                except Exception:
-                    logger.warning(
-                        "Failed to decrypt notification token",
-                        nc_id=str(nc.id),
-                    )
+            token: str | None = nc.token or None
 
             # Build payload
             from terrapod.services.notification_service import _rfc3339

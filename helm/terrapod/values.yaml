@@ -36,6 +36,15 @@ api:
   config:
     log_level: info
 
+    # Public-facing Terrapod URL (the Next.js frontend ingress).
+    # Used for VCS commit status links, notification URLs, and any
+    # outbound references back to the UI. Example: https://terrapod.example.com
+    external_url: ""
+
+    # Default execution backend and version for new workspaces
+    default_execution_backend: tofu  # tofu | terraform
+    default_terraform_version: "1.9"
+
     # Storage configuration — exactly one backend must be configured.
     storage:
       # Backend: s3 | azure | gcs | filesystem
@@ -92,11 +101,6 @@ api:
     # Private Registry & Caching
     registry:
       enabled: true
-      module_cache:
-        enabled: true
-        upstream_registries:
-          - registry.terraform.io
-        warm_on_first_request: true
       provider_cache:
         enabled: true
         upstream_registries:
@@ -115,17 +119,12 @@ api:
     # registry:
     #   signing_key: ""
 
-    # Encryption key for sensitive variables (Fernet key)
-    # Generate with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
-    # In production, inject from K8s Secret via TERRAPOD_ENCRYPTION__KEY env var
-    encryption_key: ""
-
     # VCS Integration
     # VCS connections (GitHub App installations, GitLab tokens) are created
-    # dynamically via the API. All credentials are stored encrypted on the
-    # connection itself — no secrets in Helm values.
+    # dynamically via the API. All credentials are stored on the connection
+    # itself — no secrets in Helm values.
     vcs:
-      enabled: false
+      enabled: true
       poll_interval_seconds: 60
       github:
         # Optional: webhook secret for HMAC signature validation.
@@ -224,10 +223,6 @@ runners:
   # for presigned storage URLs. Defaults to http://<release>-api:8000.
   serverUrl: ""
 
-  # Default terraform/tofu version for runner Jobs (per-workspace override planned)
-  defaultTerraformVersion: "1.9.8"
-  defaultExecutionBackend: terraform  # terraform | tofu
-
   # Named runner definitions — each defines a K8s Job resource envelope
   definitions:
     - name: standard
@@ -301,6 +296,14 @@ runners:
 listener:
   enabled: true
   replicas: 1
+  name: "listener"
+
+  # Join token for pool registration.
+  # Either set joinToken directly or reference an existing K8s Secret.
+  # The token is obtained by creating an agent pool + join token via the API.
+  joinToken: ""
+  # existingSecret: "my-listener-credentials"
+  # joinTokenKey: "join-token"  # key within the Secret (default: join-token)
 
   resources:
     requests:

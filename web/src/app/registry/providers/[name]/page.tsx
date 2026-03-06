@@ -9,8 +9,21 @@ import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
-import { getAuthState } from '@/lib/auth'
+import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { LabelsEditor } from '@/components/labels-editor'
+
+interface ProviderMeta {
+  id: string
+  attributes: {
+    name: string
+    namespace: string
+    labels: Record<string, string>
+    'owner-email': string
+    'created-at': string | null
+    'updated-at': string | null
+  }
+}
 
 interface Platform {
   os: string
@@ -76,12 +89,20 @@ export default function ProviderDetailPage() {
   const [newFilename, setNewFilename] = useState('')
   const [creatingPlatform, setCreatingPlatform] = useState(false)
 
+  // Provider metadata
+  const [providerMeta, setProviderMeta] = useState<ProviderMeta | null>(null)
+  const [editingMeta, setEditingMeta] = useState(false)
+  const [editLabels, setEditLabels] = useState<Record<string, string>>({})
+  const [editOwner, setEditOwner] = useState('')
+  const [savingMeta, setSavingMeta] = useState(false)
+
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<{ type: string; version?: string; os?: string; arch?: string } | null>(null)
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
     loadVersions()
+    loadProviderMeta()
   }, [router, name])
 
   const basePath = `/api/v2/organizations/default/registry-providers/private/default/${name}`
@@ -97,6 +118,45 @@ export default function ProviderDetailPage() {
       setError(err instanceof Error ? err.message : 'Failed to load versions')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadProviderMeta() {
+    try {
+      const res = await apiFetch(basePath)
+      if (res.ok) {
+        const data = await res.json()
+        setProviderMeta(data.data)
+      }
+    } catch {}
+  }
+
+  function startEditingMeta() {
+    if (!providerMeta) return
+    setEditLabels(providerMeta.attributes.labels || {})
+    setEditOwner(providerMeta.attributes['owner-email'] || '')
+    setEditingMeta(true)
+  }
+
+  async function handleSaveMeta() {
+    setSavingMeta(true)
+    setError('')
+    try {
+      const res = await apiFetch(basePath, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: { type: 'registry-providers', attributes: { labels: editLabels, ...(isAdmin() ? { 'owner-email': editOwner } : {}) } },
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to update provider')
+      const data = await res.json()
+      setProviderMeta(data.data)
+      setEditingMeta(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update provider')
+    } finally {
+      setSavingMeta(false)
     }
   }
 
@@ -405,6 +465,41 @@ export default function ProviderDetailPage() {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Metadata: Owner & Labels */}
+        {providerMeta && (
+          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-5 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-slate-300">Metadata</h3>
+              {!editingMeta ? (
+                <button onClick={startEditingMeta} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
+              ) : (
+                <div className="flex gap-2">
+                  <button onClick={() => setEditingMeta(false)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
+                  <button onClick={handleSaveMeta} disabled={savingMeta} className="text-xs text-brand-400 hover:text-brand-300">{savingMeta ? 'Saving...' : 'Save'}</button>
+                </div>
+              )}
+            </div>
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <dt className="text-xs text-slate-500">Owner</dt>
+                {editingMeta && isAdmin() ? (
+                  <input type="email" value={editOwner} onChange={(e) => setEditOwner(e.target.value)} placeholder="user@example.com" className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                ) : (
+                  <dd className="mt-1 text-sm text-slate-200">{providerMeta.attributes['owner-email'] || 'None'}</dd>
+                )}
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500 mb-1">Labels</dt>
+                {editingMeta ? (
+                  <LabelsEditor labels={editLabels} onChange={setEditLabels} />
+                ) : (
+                  <dd className="mt-1"><LabelsEditor labels={providerMeta.attributes.labels || {}} readOnly /></dd>
+                )}
+              </div>
+            </dl>
           </div>
         )}
 

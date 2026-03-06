@@ -7,6 +7,7 @@ Triggered handler: handle_drift_run_completed() updates workspace drift_status b
 on the run outcome and fires drift_detected notifications when drift is found.
 """
 
+import json
 import uuid
 
 from sqlalchemy import func, select
@@ -283,6 +284,7 @@ async def handle_drift_run_completed(payload: dict) -> None:
         else:
             return
 
+        ws.drift_last_checked_at = utc_now()
         await db.commit()
 
         logger.info(
@@ -291,6 +293,24 @@ async def handle_drift_run_completed(payload: dict) -> None:
             drift_status=ws.drift_status,
             run_id=run_id,
         )
+
+        # Publish drift status change to SSE channels
+        try:
+            from terrapod.redis.client import (
+                ADMIN_EVENTS_CHANNEL,
+                WORKSPACE_LIST_EVENTS_CHANNEL,
+                publish_event,
+            )
+
+            drift_payload = json.dumps({
+                "event": "drift_status_change",
+                "workspace_id": str(ws.id),
+                "drift_status": ws.drift_status,
+            })
+            await publish_event(ADMIN_EVENTS_CHANNEL, drift_payload)
+            await publish_event(WORKSPACE_LIST_EVENTS_CHANNEL, drift_payload)
+        except Exception as e:
+            logger.debug("Failed to publish drift event", error=str(e))
 
         # Fire drift_detected notification if drifted
         if ws.drift_status == "drifted":

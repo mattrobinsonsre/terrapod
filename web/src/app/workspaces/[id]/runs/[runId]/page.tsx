@@ -1,14 +1,16 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import Convert from 'ansi-to-html'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { useRunEvents } from '@/lib/use-run-events'
 
 interface RunActions {
   'is-confirmable': boolean
@@ -21,6 +23,7 @@ interface RunAttrs {
   source: string
   message: string
   'error-message': string | null
+  'execution-backend': string
   'created-at': string
   'auto-apply': boolean
   'plan-only': boolean
@@ -43,6 +46,134 @@ interface PlanApply {
     status: string
     'log-read-url': string | null
   }
+}
+
+const ansiConverter = new Convert({
+  fg: '#cbd5e1',
+  bg: 'transparent',
+  escapeXML: true,
+})
+
+function stripAnsi(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+}
+
+function stripStxEtx(text: string): string {
+  return text.replace(/[\x02\x03]/g, '')
+}
+
+function downloadFile(content: string, filename: string) {
+  const blob = new Blob([content], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function LogPanel({
+  log,
+  loading,
+  emptyMessage,
+  phase,
+  runId,
+}: {
+  log: string | null
+  loading: boolean
+  emptyMessage: string
+  phase: 'plan' | 'apply'
+  runId: string
+}) {
+  const [colorMode, setColorMode] = useState(true)
+
+  const cleanLog = useMemo(() => (log ? stripStxEtx(log) : null), [log])
+
+  const htmlContent = useMemo(() => {
+    if (!cleanLog) return ''
+    if (!colorMode) return ''
+    return ansiConverter.toHtml(cleanLog)
+  }, [cleanLog, colorMode])
+
+  const plainContent = useMemo(() => {
+    if (!cleanLog) return ''
+    return stripAnsi(cleanLog)
+  }, [cleanLog])
+
+  if (loading) {
+    return (
+      <div className="bg-slate-900 rounded-lg border border-slate-700/50 overflow-hidden">
+        <div className="p-6"><LoadingSpinner /></div>
+      </div>
+    )
+  }
+
+  if (!log) {
+    return (
+      <div className="bg-slate-900 rounded-lg border border-slate-700/50 overflow-hidden">
+        <div className="p-6 text-sm text-slate-500">{emptyMessage}</div>
+      </div>
+    )
+  }
+
+  const shortId = runId.replace(/^run-/, '').split('-').pop() ?? runId
+
+  return (
+    <div className="bg-slate-900 rounded-lg border border-slate-700/50 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-700/50 bg-slate-800/50">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setColorMode(true)}
+            className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
+              colorMode
+                ? 'bg-brand-600 text-white'
+                : 'bg-slate-700 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Color
+          </button>
+          <button
+            onClick={() => setColorMode(false)}
+            className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
+              !colorMode
+                ? 'bg-brand-600 text-white'
+                : 'bg-slate-700 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Plain
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => downloadFile(cleanLog!, `${shortId}-${phase}.log`)}
+            className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+            title="Download with ANSI color codes"
+          >
+            Download colored
+          </button>
+          <button
+            onClick={() => downloadFile(plainContent, `${shortId}-${phase}-plain.log`)}
+            className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+            title="Download plain text (no color codes)"
+          >
+            Download plain
+          </button>
+        </div>
+      </div>
+
+      {colorMode ? (
+        <pre
+          className="p-4 text-sm text-slate-300 font-mono overflow-x-auto whitespace-pre-wrap max-h-[600px] overflow-y-auto"
+          dangerouslySetInnerHTML={{ __html: htmlContent }}
+        />
+      ) : (
+        <pre className="p-4 text-sm text-slate-300 font-mono overflow-x-auto whitespace-pre-wrap max-h-[600px] overflow-y-auto">
+          {plainContent}
+        </pre>
+      )}
+    </div>
+  )
 }
 
 export default function RunDetailPage() {
@@ -80,6 +211,13 @@ export default function RunDetailPage() {
     if (!getAuthState()) { router.push('/login'); return }
     loadRun()
   }, [router, loadRun])
+
+  // Real-time updates via SSE
+  useRunEvents(workspaceId, useCallback((event) => {
+    if (event.run_id === runId.replace(/^run-/, '')) {
+      loadRun()
+    }
+  }, [runId, loadRun]))
 
   useEffect(() => {
     if (!run) return
@@ -132,7 +270,7 @@ export default function RunDetailPage() {
     }
   }
 
-  async function handleAction(action: 'confirm' | 'discard' | 'cancel') {
+  async function handleAction(action: 'confirm' | 'discard' | 'cancel' | 'retry') {
     setActionLoading(action)
     setError('')
     try {
@@ -140,6 +278,14 @@ export default function RunDetailPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.detail || `Failed to ${action} run`)
+      }
+      if (action === 'retry') {
+        const data = await res.json()
+        const newRunId = data?.data?.id
+        if (newRunId) {
+          router.push(`/workspaces/${id}/runs/${newRunId}`)
+          return
+        }
       }
       await loadRun()
     } catch (err) {
@@ -178,13 +324,13 @@ export default function RunDetailPage() {
       <NavBar />
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <div className="mb-4">
-          <Link href={`/workspaces/${workspaceId}`} className="text-sm text-slate-400 hover:text-slate-200">
+          <Link href={`/workspaces/${workspaceId}?tab=runs`} className="text-sm text-slate-400 hover:text-slate-200">
             &larr; Back to workspace
           </Link>
         </div>
 
         <PageHeader
-          title={`Run ${run.id.slice(0, 8)}`}
+          title={`Run ${run.id.replace(/^run-/, '').split('-').pop()}`}
           description={attrs.message || `${attrs.source} run`}
           actions={
             <div className="flex items-center gap-2">
@@ -202,6 +348,15 @@ export default function RunDetailPage() {
 
         {error && <ErrorBanner message={error} />}
 
+        {/* Remote plan-only indicator for CLI-sourced runs */}
+        {attrs['plan-only'] && attrs.source === 'tfe-api' && (
+          <div className="mb-6 p-4 bg-cyan-900/20 rounded-lg border border-cyan-800/50">
+            <p className="text-sm text-cyan-300">
+              This is a <strong>plan-only</strong> remote run initiated from the CLI. Apply is not available for CLI-uploaded code &mdash; only VCS-managed code can be applied.
+            </p>
+          </div>
+        )}
+
         {/* Error message */}
         {attrs['error-message'] && (
           <div className="mb-6 p-4 bg-red-900/20 rounded-lg border border-red-800/50">
@@ -211,8 +366,17 @@ export default function RunDetailPage() {
         )}
 
         {/* Action buttons */}
-        {(actions['is-confirmable'] || actions['is-discardable'] || actions['is-cancelable']) && (
+        {(actions['is-confirmable'] || actions['is-discardable'] || actions['is-cancelable'] || actions['is-retryable']) && (
           <div className="flex gap-3 mb-6">
+            {actions['is-retryable'] && (
+              <button
+                onClick={() => handleAction('retry')}
+                disabled={!!actionLoading}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+              >
+                {actionLoading === 'retry' ? 'Retrying...' : 'Retry Run'}
+              </button>
+            )}
             {actions['is-confirmable'] && (
               <button
                 onClick={() => handleAction('confirm')}
@@ -247,6 +411,10 @@ export default function RunDetailPage() {
         <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 mb-6">
           <h3 className="text-sm font-medium text-slate-300 mb-4">Details</h3>
           <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div>
+              <dt className="text-xs text-slate-500">Execution Backend</dt>
+              <dd className="mt-1 text-sm text-slate-200">{attrs['execution-backend'] === 'terraform' ? 'Terraform' : 'OpenTofu'}</dd>
+            </div>
             <div>
               <dt className="text-xs text-slate-500">Source</dt>
               <dd className="mt-1 text-sm text-slate-200">{attrs.source}</dd>
@@ -340,32 +508,24 @@ export default function RunDetailPage() {
 
         {/* Plan output */}
         {activeSection === 'plan' && (
-          <div className="bg-slate-900 rounded-lg border border-slate-700/50 overflow-hidden">
-            {planLogLoading ? (
-              <div className="p-6"><LoadingSpinner /></div>
-            ) : planLog ? (
-              <pre className="p-4 text-sm text-slate-300 font-mono overflow-x-auto whitespace-pre-wrap max-h-[600px] overflow-y-auto">
-                {planLog}
-              </pre>
-            ) : (
-              <div className="p-6 text-sm text-slate-500">No plan output available yet.</div>
-            )}
-          </div>
+          <LogPanel
+            log={planLog}
+            loading={planLogLoading}
+            emptyMessage="No plan output available yet."
+            phase="plan"
+            runId={runId}
+          />
         )}
 
         {/* Apply output */}
         {activeSection === 'apply' && (
-          <div className="bg-slate-900 rounded-lg border border-slate-700/50 overflow-hidden">
-            {applyLogLoading ? (
-              <div className="p-6"><LoadingSpinner /></div>
-            ) : applyLog ? (
-              <pre className="p-4 text-sm text-slate-300 font-mono overflow-x-auto whitespace-pre-wrap max-h-[600px] overflow-y-auto">
-                {applyLog}
-              </pre>
-            ) : (
-              <div className="p-6 text-sm text-slate-500">No apply output available yet.</div>
-            )}
-          </div>
+          <LogPanel
+            log={applyLog}
+            loading={applyLogLoading}
+            emptyMessage="No apply output available yet."
+            phase="apply"
+            runId={runId}
+          />
         )}
       </main>
     </>

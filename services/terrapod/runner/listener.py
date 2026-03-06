@@ -3,7 +3,7 @@
 Entrypoint: python -m terrapod.runner.listener
 
 The listener:
-1. Establishes identity (local auto-register or remote join)
+1. Establishes identity (join pool via token exchange)
 2. Starts heartbeat loop (every 60s)
 3. Polls for queued runs (every 5s)
 4. Spawns K8s Jobs for claimed runs
@@ -11,15 +11,15 @@ The listener:
 """
 
 import asyncio
-import json
+import base64
 import os
 import signal
 import time
-import uuid
 from urllib.parse import urlparse, urlunparse
 
+import httpx
+
 from terrapod.config import load_runner_config
-from terrapod.db.models import Workspace
 from terrapod.logging_config import configure_logging, get_logger
 
 logger = get_logger(__name__)
@@ -39,29 +39,28 @@ class RunnerListener:
         self._heartbeat_interval = int(os.environ.get("TERRAPOD_HEARTBEAT_INTERVAL", "60"))
         self._max_concurrent = int(os.environ.get("TERRAPOD_MAX_CONCURRENT", "3"))
 
+    def _auth_headers(self) -> dict[str, str]:
+        """Build authentication headers for API calls."""
+        headers = {}
+        if self.identity.certificate_pem:
+            cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
+            headers["X-Terrapod-Client-Cert"] = cert_b64
+        return headers
+
     async def start(self) -> None:
         """Main entry point — initialize and start loops."""
-        # Initialize infrastructure
-        from terrapod.db.session import init_db
-        from terrapod.redis.client import init_redis
         from terrapod.runner.identity import establish_identity
         from terrapod.runner.job_manager import init_k8s
 
-        await init_db()
-        await init_redis()
         init_k8s()
 
-        # Establish identity
+        # Establish identity via join token
         self.identity = await establish_identity()
         logger.info(
             "Listener started",
             listener_id=str(self.identity.listener_id),
             name=self.identity.name,
-            mode=self.identity.mode,
         )
-
-        # Recovery: check for orphaned runs from a previous crash
-        await self._recover_orphaned_runs()
 
         # Start concurrent loops
         await asyncio.gather(
@@ -105,41 +104,17 @@ class RunnerListener:
                 pass
 
     async def _send_heartbeat(self) -> None:
-        """Send heartbeat — local uses Redis directly, remote uses API."""
-        if self.identity.is_local:
-            from terrapod.redis.client import get_redis_client
-
-            redis = get_redis_client()
-            prefix = f"tp:listener:{self.identity.listener_id}"
-            ttl = 180
-
-            runner_defs = [d.name for d in self.runner_config.definitions]
-
-            await redis.setex(f"{prefix}:status", ttl, "online")
-            await redis.setex(f"{prefix}:heartbeat", ttl, str(int(time.time())))
-            await redis.setex(f"{prefix}:capacity", ttl, str(self._max_concurrent))
-            await redis.setex(f"{prefix}:active_runs", ttl, str(len(self.active_tasks)))
-            await redis.setex(f"{prefix}:runner_defs", ttl, json.dumps(runner_defs))
-        else:
-            import base64
-
-            import httpx
-
-            headers = {}
-            if self.identity.certificate_pem:
-                cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
-                headers["X-Terrapod-Client-Cert"] = cert_b64
-
-            async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=10) as client:
-                await client.post(
-                    f"/api/v2/listeners/listener-{self.identity.listener_id}/heartbeat",
-                    json={
-                        "capacity": self._max_concurrent,
-                        "active_runs": len(self.active_tasks),
-                        "runner_definitions": [d.name for d in self.runner_config.definitions],
-                    },
-                    headers=headers,
-                )
+        """Send heartbeat via API."""
+        async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=10) as client:
+            await client.post(
+                f"/api/v2/listeners/listener-{self.identity.listener_id}/heartbeat",
+                json={
+                    "capacity": self._max_concurrent,
+                    "active_runs": len(self.active_tasks),
+                    "runner_definitions": [d.name for d in self.runner_config.definitions],
+                },
+                headers=self._auth_headers(),
+            )
 
     async def _poll_loop(self) -> None:
         """Poll for queued runs every 5 seconds."""
@@ -168,37 +143,47 @@ class RunnerListener:
                 pass
 
     async def _poll_for_run(self) -> None:
-        """Try to claim the next queued run."""
-        if self.identity.is_local:
-            await self._poll_local()
-        else:
-            await self._poll_remote()
+        """Try to claim the next queued run via the API."""
+        async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
+            response = await client.get(
+                f"/api/v2/listeners/listener-{self.identity.listener_id}/runs/next",
+                headers=self._auth_headers(),
+            )
 
-    @property
-    def _api_base_url(self) -> str:
-        """API base URL for internal HTTP calls (used by local listener)."""
-        return self.runner_config.server_url or os.environ.get(
-            "TERRAPOD_API_URL", "http://localhost:8000"
-        )
-
-    async def _fetch_urls_from_api(self, run_id: str, phase: str) -> dict[str, str]:
-        """Fetch presigned URLs from the API via HTTP.
-
-        The API process owns storage initialization (and HMAC secrets for
-        filesystem backend).  The listener must not generate presigned URLs
-        itself — it asks the API instead.
-        """
-        import httpx
-
-        lid = f"listener-{self.identity.listener_id}"
-        endpoint = f"/api/v2/listeners/{lid}/runs/run-{run_id}/{phase}-urls"
-
-        async with httpx.AsyncClient(base_url=self._api_base_url, timeout=30) as client:
-            response = await client.get(endpoint)
+            if response.status_code == 204:
+                return  # No runs available
             response.raise_for_status()
-            urls = response.json()
 
-        return self._rewrite_urls(urls)
+            data = response.json()["data"]
+            run_id = data["id"].removeprefix("run-")
+            attrs = data.get("attributes", {})
+            urls = attrs.get("presigned-urls", {})
+
+            # Rewrite URLs for internal access
+            urls = self._rewrite_urls(urls)
+
+            # Extract resolved workspace variables from API response
+            env_vars = [{"key": v["key"], "value": v["value"]} for v in attrs.get("env-vars", [])]
+            terraform_vars = [{"key": v["key"], "value": v["value"]} for v in attrs.get("terraform-vars", [])]
+
+            task = asyncio.create_task(
+                self._execute_run(
+                    run_id=run_id,
+                    phase="plan",
+                    resource_cpu=attrs.get("resource-cpu", "1"),
+                    resource_memory=attrs.get("resource-memory", "2Gi"),
+                    presigned_urls=urls,
+                    env_vars=env_vars,
+                    terraform_vars=terraform_vars,
+                    terraform_version=attrs.get("terraform-version", ""),
+                    execution_backend=attrs.get("execution-backend", "tofu"),
+                    service_account_name=attrs.get("service-account-name", ""),
+                    plan_only=attrs.get("plan-only", False),
+                )
+            )
+            self.active_tasks[run_id] = task
+
+        logger.info("Claimed and started run", run_id=run_id)
 
     def _rewrite_urls(self, urls: dict[str, str]) -> dict[str, str]:
         """Rewrite presigned URL hostnames to the runner server_url.
@@ -223,101 +208,6 @@ class RunnerListener:
             )
         return rewritten
 
-    async def _poll_local(self) -> None:
-        """Poll using direct DB access (local listener)."""
-        from terrapod.db.session import get_db_session
-        from terrapod.services import agent_pool_service, run_service
-
-        async with get_db_session() as db:
-            listener = await agent_pool_service.get_listener(db, self.identity.listener_id)
-            if listener is None:
-                return
-
-            run = await run_service.claim_next_run(db, listener)
-            if run is None:
-                return
-
-            # Resolve variables (needs DB)
-            resolved = await resolve_run_variables(db, run)
-
-            run_id = str(run.id)
-            resource_cpu = run.resource_cpu
-            resource_memory = run.resource_memory
-            terraform_version = run.terraform_version
-            pool_id = run.pool_id
-
-        # Get presigned URLs from the API (not locally — the API owns the
-        # storage HMAC secret for filesystem backend)
-        urls = await self._fetch_urls_from_api(run_id, "plan")
-
-        # Get service account: pool SA > global runner config SA
-        sa_name = ""
-        if pool_id:
-            async with get_db_session() as db:
-                pool = await agent_pool_service.get_pool(db, pool_id)
-                if pool and pool.service_account_name:
-                    sa_name = pool.service_account_name
-        if not sa_name:
-            sa_name = self.runner_config.service_account_name
-
-        # Start execution in background task
-        task = asyncio.create_task(
-            self._execute_run(
-                run_id=run_id,
-                phase="plan",
-                resource_cpu=resource_cpu,
-                resource_memory=resource_memory,
-                presigned_urls=urls,
-                env_vars=resolved.get("env", []),
-                terraform_vars=resolved.get("terraform", []),
-                terraform_version=terraform_version,
-                service_account_name=sa_name,
-            )
-        )
-        self.active_tasks[run_id] = task
-
-        logger.info("Claimed and started run", run_id=run_id)
-
-    async def _poll_remote(self) -> None:
-        """Poll via API (remote listener)."""
-        import base64
-
-        import httpx
-
-        headers = {}
-        if self.identity.certificate_pem:
-            cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
-            headers["X-Terrapod-Client-Cert"] = cert_b64
-
-        async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
-            response = await client.get(
-                f"/api/v2/listeners/listener-{self.identity.listener_id}/runs/next",
-                headers=headers,
-            )
-
-            if response.status_code == 204:
-                return  # No runs available
-            response.raise_for_status()
-
-            data = response.json()["data"]
-            run_id = data["id"].removeprefix("run-")
-            attrs = data.get("attributes", {})
-            urls = attrs.get("presigned-urls", {})
-
-            task = asyncio.create_task(
-                self._execute_run(
-                    run_id=run_id,
-                    phase="plan",
-                    resource_cpu=attrs.get("resource-cpu", "1"),
-                    resource_memory=attrs.get("resource-memory", "2Gi"),
-                    presigned_urls=urls,
-                    env_vars=[],  # Remote gets vars from presigned URLs
-                    terraform_vars=[],
-                    terraform_version=attrs.get("terraform-version", ""),
-                )
-            )
-            self.active_tasks[run_id] = task
-
     async def _execute_run(
         self,
         run_id: str,
@@ -328,10 +218,11 @@ class RunnerListener:
         env_vars: list,
         terraform_vars: list,
         terraform_version: str = "",
+        execution_backend: str = "",
         service_account_name: str = "",
+        plan_only: bool = False,
     ) -> None:
         """Execute a run by creating a K8s Job and watching it (plan + apply)."""
-        from terrapod.runner.job_manager import create_job, watch_job
         from terrapod.runner.job_template import build_job_spec
 
         # ── Pre-plan task stage ─────────────────────────────────────
@@ -349,13 +240,15 @@ class RunnerListener:
             resource_cpu=resource_cpu,
             resource_memory=resource_memory,
             terraform_version=terraform_version,
+            execution_backend=execution_backend,
             service_account_name=service_account_name,
+            plan_only=plan_only,
         )
 
-        job_name = await create_job(plan_spec)
-        result = await watch_job(job_name, timeout_seconds=60 * 60)
+        job_name, result = await self._create_and_watch_job(plan_spec, run_id, "plan")
 
         if result != "succeeded":
+            logger.error("Plan failed", run_id=run_id, result=result)
             await self._report_status(run_id, "errored", f"Plan {result}")
             return
 
@@ -367,6 +260,11 @@ class RunnerListener:
             return
 
         await self._report_status(run_id, "planned", has_changes=has_changes)
+
+        # Plan-only runs stop here — no confirmation or apply phase
+        if plan_only:
+            logger.info("Plan-only run completed", run_id=run_id)
+            return
 
         # ── Wait for confirmation ───────────────────────────────────
         confirmed = await self._wait_for_confirmation(run_id, timeout=3600)
@@ -392,16 +290,84 @@ class RunnerListener:
             resource_cpu=resource_cpu,
             resource_memory=resource_memory,
             terraform_version=terraform_version,
+            execution_backend=execution_backend,
             service_account_name=service_account_name,
         )
 
-        apply_job_name = await create_job(apply_spec)
-        apply_result = await watch_job(apply_job_name, timeout_seconds=60 * 60)
+        apply_job_name, apply_result = await self._create_and_watch_job(
+            apply_spec, run_id, "apply"
+        )
 
         if apply_result == "succeeded":
+            logger.info("Apply succeeded", run_id=run_id)
             await self._report_status(run_id, "applied")
         else:
+            logger.error("Apply failed", run_id=run_id, result=apply_result)
             await self._report_status(run_id, "errored", f"Apply {apply_result}")
+
+    async def _create_and_watch_job(
+        self,
+        spec: dict,
+        run_id: str,
+        phase: str,
+        max_retries: int = 2,
+    ) -> tuple[str, str]:
+        """Create a K8s Job and watch it, retrying on transient failures.
+
+        Retries on: Job deleted externally, pod stuck in image pull errors,
+        etc. Does NOT retry on: container ran and exited non-zero (failed),
+        or timeout.
+
+        Returns (job_name, result).
+        """
+        from terrapod.runner.job_manager import create_job, delete_job, get_job_status, watch_job
+
+        job_name = spec.get("metadata", {}).get("name", "unknown")
+        result = "timeout"
+
+        for attempt in range(max_retries + 1):
+            if attempt > 0:
+                # Clean up previous Job before retry
+                try:
+                    await delete_job(job_name)
+                except Exception:
+                    pass
+                for _ in range(15):
+                    if await get_job_status(job_name) is None:
+                        break
+                    await asyncio.sleep(2)
+                await asyncio.sleep(5 * attempt)
+
+            try:
+                job_name = await create_job(spec)
+            except Exception as e:
+                logger.error(
+                    "Failed to create Job",
+                    run_id=run_id,
+                    phase=phase,
+                    attempt=attempt + 1,
+                    error=str(e),
+                )
+                result = "create_error"
+                continue
+
+            result = await watch_job(job_name, timeout_seconds=60 * 60)
+
+            if result in ("succeeded", "failed", "timeout"):
+                return job_name, result
+
+            # Retryable: deleted, pod_error:*
+            if attempt < max_retries:
+                logger.warning(
+                    "Job failed with retryable error, will retry",
+                    run_id=run_id,
+                    phase=phase,
+                    result=result,
+                    attempt=attempt + 1,
+                    max_retries=max_retries,
+                )
+
+        return job_name, result
 
     async def _report_status(
         self,
@@ -411,50 +377,27 @@ class RunnerListener:
         has_changes: bool | None = None,
     ) -> None:
         """Report run status back to the API."""
-        if self.identity.is_local:
-            from terrapod.db.session import get_db_session
-            from terrapod.services import run_service
+        body: dict = {
+            "status": status,
+            "error_message": error_message,
+        }
+        if has_changes is not None:
+            body["has_changes"] = has_changes
 
-            async with get_db_session() as db:
-                run = await run_service.get_run(db, uuid.UUID(run_id))
-                if run:
-                    if has_changes is not None:
-                        run.has_changes = has_changes
+        logger.info("Reporting run status", run_id=run_id, status=status)
 
-                    await run_service.transition_run(db, run, status, error_message=error_message)
-
-                    # Auto-apply if configured
-                    if status == "planned" and run.auto_apply and not run.plan_only:
-                        await run_service.transition_run(db, run, "confirmed")
-
-                    # Unlock workspace on terminal state
-                    if status in run_service.TERMINAL_STATES:
-                        ws = await db.get(Workspace, run.workspace_id)
-                        if ws and ws.locked:
-                            ws.locked = False
-                            ws.lock_id = None
-        else:
-            import base64
-
-            import httpx
-
-            headers = {}
-            if self.identity.certificate_pem:
-                cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
-                headers["X-Terrapod-Client-Cert"] = cert_b64
-
-            body: dict = {
-                "status": status,
-                "error_message": error_message,
-            }
-            if has_changes is not None:
-                body["has_changes"] = has_changes
-
-            async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
-                await client.patch(
-                    f"/api/v2/listeners/listener-{self.identity.listener_id}/runs/run-{run_id}",
-                    json=body,
-                    headers=headers,
+        async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
+            response = await client.patch(
+                f"/api/v2/listeners/listener-{self.identity.listener_id}/runs/run-{run_id}",
+                json=body,
+                headers=self._auth_headers(),
+            )
+            if response.status_code >= 400:
+                logger.warning(
+                    "Failed to report status",
+                    run_id=run_id,
+                    status=status,
+                    http_status=response.status_code,
                 )
 
     async def _parse_has_changes(self, job_name: str) -> bool | None:
@@ -510,55 +453,35 @@ class RunnerListener:
         return False
 
     async def _get_run_status(self, run_id: str) -> str:
-        """Get current run status."""
-        if self.identity.is_local:
-            from terrapod.db.session import get_db_session
-            from terrapod.services import run_service
+        """Get current run status via API.
 
-            async with get_db_session() as db:
-                run = await run_service.get_run(db, uuid.UUID(run_id))
-                return run.status if run else "errored"
-        else:
-            import base64
-
-            import httpx
-
-            headers = {}
-            if self.identity.certificate_pem:
-                cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
-                headers["X-Terrapod-Client-Cert"] = cert_b64
-
+        Returns "unknown" on transient errors so callers don't mistake
+        a failed API call for the run actually being in errored state.
+        """
+        try:
             async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=10) as client:
                 response = await client.get(
                     f"/api/v2/runs/run-{run_id}",
-                    headers=headers,
+                    headers=self._auth_headers(),
                 )
                 if response.status_code != 200:
-                    return "errored"
+                    logger.warning("Failed to fetch run status", run_id=run_id, status=response.status_code)
+                    return "unknown"
                 return response.json()["data"]["attributes"]["status"]
+        except Exception as e:
+            logger.warning("Error fetching run status", run_id=run_id, error=str(e))
+            return "unknown"
 
     async def _get_apply_urls(self, run_id: str) -> dict[str, str]:
         """Get presigned URLs for the apply phase."""
-        if self.identity.is_local:
-            return await self._fetch_urls_from_api(run_id, "apply")
-        else:
-            import base64
-
-            import httpx
-
-            headers = {}
-            if self.identity.certificate_pem:
-                cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
-                headers["X-Terrapod-Client-Cert"] = cert_b64
-
-            async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
-                response = await client.get(
-                    f"/api/v2/listeners/listener-{self.identity.listener_id}"
-                    f"/runs/run-{run_id}/apply-urls",
-                    headers=headers,
-                )
-                response.raise_for_status()
-                return response.json()
+        async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
+            response = await client.get(
+                f"/api/v2/listeners/listener-{self.identity.listener_id}"
+                f"/runs/run-{run_id}/apply-urls",
+                headers=self._auth_headers(),
+            )
+            response.raise_for_status()
+            return self._rewrite_urls(response.json())
 
     async def _check_task_stage(self, run_id: str, stage_name: str) -> bool:
         """Check for applicable run tasks at a stage boundary.
@@ -567,81 +490,12 @@ class RunnerListener:
         then polls until all results are resolved. Returns True if the run
         should proceed, False if blocked (mandatory failure, errored, or canceled).
         """
-        if self.identity.is_local:
-            return await self._check_task_stage_local(run_id, stage_name)
-        else:
-            return await self._check_task_stage_remote(run_id, stage_name)
-
-    async def _check_task_stage_local(self, run_id: str, stage_name: str) -> bool:
-        """Check task stage via direct DB access (local listener)."""
-        from terrapod.db.session import get_db_session
-        from terrapod.services.run_task_service import create_task_stage, get_task_stage
-
-        # Create task stage (returns None if no applicable tasks)
-        async with get_db_session() as db:
-            from terrapod.services import run_service
-
-            run = await run_service.get_run(db, uuid.UUID(run_id))
-            if run is None:
-                return False
-
-            ts = await create_task_stage(db, run.id, run.workspace_id, stage_name)
-            if ts is None:
-                return True  # No tasks — proceed
-
-            ts_id = ts.id
-            await db.commit()
-
-        logger.info("Waiting for task stage", run_id=run_id, stage=stage_name, ts_id=str(ts_id))
-
-        # Poll until resolved
-        while not _shutdown.is_set():
-            async with get_db_session() as db:
-                ts = await get_task_stage(db, ts_id)
-                if ts is None:
-                    return False
-
-                if ts.status in ("passed", "overridden"):
-                    logger.info("Task stage passed", run_id=run_id, stage=stage_name)
-                    return True
-                elif ts.status in ("failed", "errored", "canceled"):
-                    logger.warning(
-                        "Task stage blocked run",
-                        run_id=run_id,
-                        stage=stage_name,
-                        status=ts.status,
-                    )
-                    return False
-
-            # Still running — wait and poll again
-            try:
-                await asyncio.wait_for(_shutdown.wait(), timeout=5)
-                return False  # Shutdown
-            except TimeoutError:
-                pass
-
-        return False
-
-    async def _check_task_stage_remote(self, run_id: str, stage_name: str) -> bool:
-        """Check task stage via API (remote listener).
-
-        Remote listeners create and poll task stages via HTTP.
-        """
-        import base64
-
-        import httpx
-
-        headers = {}
-        if self.identity.certificate_pem:
-            cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
-            headers["X-Terrapod-Client-Cert"] = cert_b64
-
         # Create task stage via API
         async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
             response = await client.post(
                 f"/api/v2/runs/run-{run_id}/task-stages",
                 json={"stage": stage_name},
-                headers=headers,
+                headers=self._auth_headers(),
             )
             if response.status_code == 204:
                 return True  # No applicable tasks
@@ -657,7 +511,7 @@ class RunnerListener:
             async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=10) as client:
                 response = await client.get(
                     f"/api/v2/task-stages/{ts_id}",
-                    headers=headers,
+                    headers=self._auth_headers(),
                 )
                 if response.status_code != 200:
                     return False
@@ -676,69 +530,6 @@ class RunnerListener:
 
         return False
 
-    async def _recover_orphaned_runs(self) -> None:
-        """Check for runs that were active when we crashed and recover them."""
-        if not self.identity.is_local:
-            return  # Remote listeners can't do direct DB recovery
-
-        from terrapod.db.session import get_db_session
-        from terrapod.runner.job_manager import get_job_status
-        from terrapod.services import run_service
-
-        async with get_db_session() as db:
-            orphaned = await run_service.find_orphaned_runs(db, [self.identity.listener_id])
-
-            for run in orphaned:
-                run_id = str(run.id)
-                run_short = run_id[:8]
-
-                # Determine which phase was active
-                phase = "apply" if run.apply_started_at else "plan"
-                job_name = f"tprun-{run_short}-{phase}"
-
-                job_status = await get_job_status(job_name)
-
-                if job_status == "running":
-                    # Resume watching
-                    logger.info("Resuming watch for orphaned Job", job=job_name, run_id=run_id)
-                    task = asyncio.create_task(self._resume_watch(run_id, job_name))
-                    self.active_tasks[run_id] = task
-                elif job_status in ("succeeded", "failed"):
-                    target = (
-                        "planned"
-                        if job_status == "succeeded" and phase == "plan"
-                        else ("applied" if job_status == "succeeded" else "errored")
-                    )
-                    await run_service.transition_run(
-                        db,
-                        run,
-                        target,
-                        error_message=f"Recovered from crash: {job_status}"
-                        if target == "errored"
-                        else "",
-                    )
-                    logger.info("Recovered orphaned run", run_id=run_id, status=target)
-                else:
-                    # Job gone — mark errored
-                    await run_service.transition_run(
-                        db,
-                        run,
-                        "errored",
-                        error_message="Listener crashed and Job not found",
-                    )
-                    logger.warning("Orphaned run marked errored", run_id=run_id)
-
-    async def _resume_watch(self, run_id: str, job_name: str) -> None:
-        """Resume watching a Job that was running before crash."""
-        from terrapod.runner.job_manager import watch_job
-
-        result = await watch_job(job_name)
-
-        if result == "succeeded":
-            await self._report_status(run_id, "planned")
-        else:
-            await self._report_status(run_id, "errored", f"Recovered: {result}")
-
 
 def _handle_signals() -> None:
     """Register signal handlers for graceful shutdown."""
@@ -746,18 +537,6 @@ def _handle_signals() -> None:
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, lambda: _shutdown.set())
-
-
-async def resolve_run_variables(db, run) -> dict:
-    """Resolve variables for a run, split by category."""
-    from terrapod.services.variable_service import resolve_variables
-
-    resolved = await resolve_variables(db, run.workspace_id)
-    env_vars = [{"key": v.key, "value": v.value} for v in resolved if v.category == "env"]
-    terraform_vars = [
-        {"key": v.key, "value": v.value} for v in resolved if v.category == "terraform"
-    ]
-    return {"env": env_vars, "terraform": terraform_vars}
 
 
 def main() -> None:

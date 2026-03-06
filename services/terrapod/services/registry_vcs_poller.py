@@ -140,15 +140,18 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
     list_tags_fn = _dispatch_list_tags(conn.provider)
     tags = await list_tags_fn(conn, owner, repo)
 
-    # Get existing version strings
-    existing_versions = {v.version for v in module.versions}
+    # Build lookup of existing versions by version string
+    existing_versions: dict[str, RegistryModuleVersion] = {
+        v.version: v for v in module.versions
+    }
     pattern = module.vcs_tag_pattern or "v*"
 
-    new_count = 0
+    changed_count = 0
     latest_tag = module.vcs_last_tag
 
     for tag in tags:
         tag_name = tag["name"]
+        tag_sha = tag.get("sha", "")
 
         # Check if tag matches pattern
         if not fnmatch.fnmatch(tag_name, pattern):
@@ -159,11 +162,13 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
         if not version_str:
             continue
 
-        # Skip if version already exists
-        if version_str in existing_versions:
+        existing = existing_versions.get(version_str)
+
+        # Skip if version exists and SHA matches (no change)
+        if existing and existing.vcs_commit_sha == tag_sha and tag_sha:
             continue
 
-        # Download archive at this tag
+        # Download archive at this tag (new version or SHA mismatch)
         download_fn = _dispatch_download_archive(conn.provider)
         try:
             archive_bytes = await download_fn(conn, owner, repo, tag_name)
@@ -176,30 +181,46 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
             )
             continue
 
-        # Store tarball
+        # Store tarball (overwrites existing if tag was moved)
         key = module_tarball_key(module.namespace, module.name, module.provider, version_str)
         await storage.put(key, archive_bytes, "application/gzip")
 
-        # Create version record
-        mod_version = RegistryModuleVersion(
-            module_id=module.id,
-            version=version_str,
-            upload_status="uploaded",
-        )
-        db.add(mod_version)
-        existing_versions.add(version_str)
-        new_count += 1
+        if existing:
+            # Tag moved to a different commit — update existing record
+            existing.vcs_commit_sha = tag_sha
+            existing.vcs_tag = tag_name
+            logger.info(
+                "Module version updated (tag moved)",
+                module_name=module.name,
+                provider=module.provider,
+                version=version_str,
+                tag=tag_name,
+                sha=tag_sha[:12] if tag_sha else "",
+            )
+        else:
+            # New version
+            mod_version = RegistryModuleVersion(
+                module_id=module.id,
+                version=version_str,
+                upload_status="uploaded",
+                vcs_commit_sha=tag_sha,
+                vcs_tag=tag_name,
+            )
+            db.add(mod_version)
+            existing_versions[version_str] = mod_version
+            logger.info(
+                "Module version created from VCS tag",
+                module_name=module.name,
+                provider=module.provider,
+                version=version_str,
+                tag=tag_name,
+                sha=tag_sha[:12] if tag_sha else "",
+            )
+
+        changed_count += 1
         latest_tag = tag_name
 
-        logger.info(
-            "Module version created from VCS tag",
-            module_name=module.name,
-            provider=module.provider,
-            version=version_str,
-            tag=tag_name,
-        )
-
-    if new_count > 0:
+    if changed_count > 0:
         module.status = "setup_complete"
         if latest_tag:
             module.vcs_last_tag = latest_tag
@@ -208,5 +229,5 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
         logger.info(
             "Module VCS poll complete",
             module_name=module.name,
-            new_versions=new_count,
+            versions_changed=changed_count,
         )

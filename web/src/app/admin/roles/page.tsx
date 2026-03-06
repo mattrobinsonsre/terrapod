@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
+import { SortableHeader } from '@/components/sortable-header'
+import { useSortable } from '@/lib/use-sortable'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
@@ -80,6 +82,19 @@ export default function RolesPage() {
   const [assignEmail, setAssignEmail] = useState('')
   const [assignRoles, setAssignRoles] = useState<string[]>([])
   const [creatingAssignment, setCreatingAssignment] = useState(false)
+
+  type AssignmentSortKey = 'provider' | 'email' | 'role' | 'created'
+  const assignmentAccessor = useCallback((item: RoleAssignment, key: AssignmentSortKey) => {
+    switch (key) {
+      case 'provider': return item.attributes.provider
+      case 'email': return item.attributes.email
+      case 'role': return item.attributes['role-name']
+      case 'created': return item.attributes['created-at']
+    }
+  }, [])
+  const { sortedItems: sortedAssignments, sortState: assignmentSortState, toggleSort: toggleAssignmentSort } = useSortable<RoleAssignment, AssignmentSortKey>(
+    assignments, 'email', 'asc', assignmentAccessor,
+  )
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
@@ -575,15 +590,15 @@ export default function RolesPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Provider</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Email</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Role</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Created</th>
+                      <SortableHeader label="Provider" sortKey="provider" sortState={assignmentSortState} onSort={toggleAssignmentSort} />
+                      <SortableHeader label="Email" sortKey="email" sortState={assignmentSortState} onSort={toggleAssignmentSort} />
+                      <SortableHeader label="Role" sortKey="role" sortState={assignmentSortState} onSort={toggleAssignmentSort} />
+                      <SortableHeader label="Created" sortKey="created" sortState={assignmentSortState} onSort={toggleAssignmentSort} className="hidden sm:table-cell" />
                       <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
-                    {assignments.map((a) => (
+                    {sortedAssignments.map((a) => (
                       <tr key={a.id} className="hover:bg-slate-700/20 transition-colors">
                         <td className="px-4 py-3 text-sm text-slate-400">{a.attributes.provider}</td>
                         <td className="px-4 py-3 text-sm text-slate-200">{a.attributes.email}</td>

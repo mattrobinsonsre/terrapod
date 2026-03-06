@@ -6,13 +6,16 @@ on demand — no background jobs or new tables needed.
 UX CONTRACT: Consumed by web/src/app/admin/health/page.tsx
 """
 
+import asyncio
+import json
 from datetime import UTC, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sse_starlette.sse import EventSourceResponse
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.db.models import Run, RunnerListener, Workspace
@@ -305,3 +308,53 @@ async def _get_listener_health(db: AsyncSession) -> dict:
         "offline": len(listeners) - online_count,
         "details": details,
     }
+
+
+# ── SSE (Server-Sent Events) ─────────────────────────────────────────────
+
+
+@router.get("/admin/health-dashboard/events")
+async def health_dashboard_events(
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> EventSourceResponse:
+    """Stream admin health events via SSE for real-time dashboard updates.
+
+    Publishes run_status_change, drift_status_change, and listener_heartbeat events.
+    Requires admin or audit role.
+    """
+    if "admin" not in user.roles and "audit" not in user.roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin or audit role required",
+        )
+
+    from terrapod.redis.client import ADMIN_EVENTS_CHANNEL, subscribe_channel
+
+    pubsub = await subscribe_channel(ADMIN_EVENTS_CHANNEL)
+
+    async def event_generator():
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                message = await pubsub.get_message(
+                    ignore_subscribe_messages=True, timeout=1.0
+                )
+                if message and message["type"] == "message":
+                    data = message["data"]
+                    if isinstance(data, bytes):
+                        data = data.decode()
+                    payload = json.loads(data)
+                    yield {
+                        "event": payload.get("event", "update"),
+                        "data": json.dumps(payload),
+                    }
+                else:
+                    yield {"comment": "keepalive"}
+                    await asyncio.sleep(1)
+        finally:
+            await pubsub.unsubscribe(ADMIN_EVENTS_CHANNEL)
+            await pubsub.aclose()
+
+    return EventSourceResponse(event_generator())

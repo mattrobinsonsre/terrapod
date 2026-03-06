@@ -30,7 +30,6 @@ from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.db.models import Run, RunTask, TaskStage, TaskStageResult, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services.encryption_service import encrypt_value, is_encryption_available
 from terrapod.services.run_task_service import (
     VALID_ENFORCEMENT_LEVELS,
     VALID_STAGES,
@@ -63,7 +62,7 @@ def _run_task_json(rt: RunTask) -> dict:
             "enabled": rt.enabled,
             "stage": rt.stage,
             "enforcement-level": rt.enforcement_level,
-            "has-hmac-key": rt.hmac_key_encrypted is not None and rt.hmac_key_encrypted != "",
+            "has-hmac-key": rt.hmac_key is not None and rt.hmac_key != "",
             "created-at": _rfc3339(rt.created_at),
             "updated-at": _rfc3339(rt.updated_at),
         },
@@ -203,22 +202,13 @@ async def create_run_task(
             detail=f"enforcement-level must be one of: {', '.join(sorted(VALID_ENFORCEMENT_LEVELS))}",
         )
 
-    # Encrypt HMAC key if provided
-    hmac_key_encrypted = None
-    hmac_key = attrs.get("hmac-key", "")
-    if hmac_key:
-        if not is_encryption_available():
-            raise HTTPException(
-                status_code=422,
-                detail="Encryption key not configured — cannot store HMAC key",
-            )
-        hmac_key_encrypted = encrypt_value(hmac_key)
+    hmac_key = attrs.get("hmac-key", "") or None
 
     rt = RunTask(
         workspace_id=ws.id,
         name=name,
         url=url,
-        hmac_key_encrypted=hmac_key_encrypted,
+        hmac_key=hmac_key,
         enabled=attrs.get("enabled", True),
         stage=stage,
         enforcement_level=enforcement,
@@ -312,15 +302,7 @@ async def update_run_task(
 
     if "hmac-key" in attrs:
         hmac_key = attrs["hmac-key"]
-        if hmac_key:
-            if not is_encryption_available():
-                raise HTTPException(
-                    status_code=422,
-                    detail="Encryption key not configured — cannot store HMAC key",
-                )
-            rt.hmac_key_encrypted = encrypt_value(hmac_key)
-        else:
-            rt.hmac_key_encrypted = None
+        rt.hmac_key = hmac_key if hmac_key else None
 
     await db.flush()
     await db.commit()

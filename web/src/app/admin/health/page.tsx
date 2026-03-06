@@ -1,11 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
+import { SortableHeader } from '@/components/sortable-header'
+import { useSortable } from '@/lib/use-sortable'
+import { useAdminEvents } from '@/lib/use-admin-events'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
@@ -67,6 +70,34 @@ export default function HealthDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  type StaleSortKey = 'name' | 'last-applied' | 'days' | 'drift'
+  const staleAccessor = useCallback((item: StaleWorkspace, key: StaleSortKey) => {
+    switch (key) {
+      case 'name': return item.name
+      case 'last-applied': return item['last-applied-at']
+      case 'days': return item['days-since-apply']
+      case 'drift': return item['drift-status']
+    }
+  }, [])
+  const { sortedItems: sortedStale, sortState: staleSortState, toggleSort: toggleStaleSort } = useSortable<StaleWorkspace, StaleSortKey>(
+    data?.workspaces?.stale ?? [], 'days', 'desc', staleAccessor,
+  )
+
+  type ListenerSortKey = 'name' | 'pool' | 'status' | 'capacity' | 'active' | 'heartbeat'
+  const listenerAccessor = useCallback((item: ListenerDetail, key: ListenerSortKey) => {
+    switch (key) {
+      case 'name': return item.name
+      case 'pool': return item['pool-name']
+      case 'status': return item.status
+      case 'capacity': return item.capacity
+      case 'active': return item['active-runs']
+      case 'heartbeat': return item['last-heartbeat']
+    }
+  }, [])
+  const { sortedItems: sortedListeners, sortState: listenerSortState, toggleSort: toggleListenerSort } = useSortable<ListenerDetail, ListenerSortKey>(
+    data?.listeners?.details ?? [], 'name', 'asc', listenerAccessor,
+  )
+
   useEffect(() => {
     const auth = getAuthState()
     if (!auth) { router.push('/login'); return }
@@ -89,6 +120,23 @@ export default function HealthDashboardPage() {
       setLoading(false)
     }
   }
+
+  // SSE: debounced refresh on admin events (2s coalesce window)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useAdminEvents(!loading && data !== null, useCallback(() => {
+    if (debounceRef.current !== undefined) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      loadDashboard()
+    }, 2000)
+  }, []))
+
+  // Polling fallback for listener offline detection (Redis key TTL expiry
+  // doesn't generate pub/sub events, so we poll every 60s)
+  useEffect(() => {
+    if (loading || !data) return
+    const interval = setInterval(() => { loadDashboard() }, 60000)
+    return () => clearInterval(interval)
+  }, [loading, data])
 
   function driftStatusColor(s: string): string {
     switch (s) {
@@ -158,14 +206,14 @@ export default function HealthDashboardPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-slate-700/50">
-                        <th className="px-3 py-2 text-left text-xs font-medium text-slate-400">Name</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 hidden sm:table-cell">Last Applied</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-slate-400">Days</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 hidden sm:table-cell">Drift</th>
+                        <SortableHeader label="Name" sortKey="name" sortState={staleSortState} onSort={toggleStaleSort} />
+                        <SortableHeader label="Last Applied" sortKey="last-applied" sortState={staleSortState} onSort={toggleStaleSort} className="hidden sm:table-cell" />
+                        <SortableHeader label="Days" sortKey="days" sortState={staleSortState} onSort={toggleStaleSort} />
+                        <SortableHeader label="Drift" sortKey="drift" sortState={staleSortState} onSort={toggleStaleSort} className="hidden sm:table-cell" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-700/30">
-                      {ws.stale.map((s) => (
+                      {sortedStale.map((s) => (
                         <tr key={s.id} className="hover:bg-slate-700/20 transition-colors">
                           <td className="px-3 py-2 text-sm text-brand-400 font-medium">
                             <a href={`/workspaces/${s.id}`} className="hover:text-brand-300">{s.name}</a>
@@ -253,16 +301,16 @@ export default function HealthDashboardPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-400">Name</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 hidden sm:table-cell">Pool</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-400">Status</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 hidden sm:table-cell">Capacity</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 hidden sm:table-cell">Active</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 hidden md:table-cell">Heartbeat</th>
+                      <SortableHeader label="Name" sortKey="name" sortState={listenerSortState} onSort={toggleListenerSort} />
+                      <SortableHeader label="Pool" sortKey="pool" sortState={listenerSortState} onSort={toggleListenerSort} className="hidden sm:table-cell" />
+                      <SortableHeader label="Status" sortKey="status" sortState={listenerSortState} onSort={toggleListenerSort} />
+                      <SortableHeader label="Capacity" sortKey="capacity" sortState={listenerSortState} onSort={toggleListenerSort} className="hidden sm:table-cell" />
+                      <SortableHeader label="Active" sortKey="active" sortState={listenerSortState} onSort={toggleListenerSort} className="hidden sm:table-cell" />
+                      <SortableHeader label="Heartbeat" sortKey="heartbeat" sortState={listenerSortState} onSort={toggleListenerSort} className="hidden md:table-cell" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
-                    {listeners.details.map((l) => (
+                    {sortedListeners.map((l) => (
                       <tr key={l.id} className="hover:bg-slate-700/20 transition-colors">
                         <td className="px-3 py-2 text-sm text-slate-200">{l.name}</td>
                         <td className="px-3 py-2 text-xs text-slate-400 hidden sm:table-cell">{l['pool-name'] || '-'}</td>

@@ -98,6 +98,8 @@ web:
 listener:
   enabled: true
   replicas: 1
+  name: "production-listener"
+  existingSecret: terrapod-listener-credentials  # K8s Secret with join-token key
 
 ingress:
   enabled: true
@@ -240,21 +242,51 @@ api:
 
 When enabled, the drift detection scheduler runs as a periodic task (via the distributed scheduler) and creates plan-only runs with `-detailed-exitcode` for workspaces that have drift detection enabled and are past their check interval. The scheduler respects the per-workspace `drift-detection-interval-seconds` attribute, subject to the `min_workspace_interval_seconds` floor.
 
-### Encryption
+### Encryption at Rest
 
-| Value | Default | Description |
+Terrapod delegates encryption at rest to the underlying infrastructure services. No application-level encryption key is required.
+
+| Data | Storage | Encryption |
 |---|---|---|
-| `api.config.encryption_key` | `""` | Fernet encryption key (inject via env var) |
+| Sensitive variables, VCS tokens | PostgreSQL | Database encryption-at-rest (RDS, Cloud SQL, Azure Database) |
+| State files, config tarballs, logs | Object storage | Object store encryption-at-rest (S3 SSE, Azure Storage, GCS default) |
+
+Enable encryption on your managed database and object storage services. For filesystem-backed storage, use encrypted volumes.
 
 ### Runner Listener
 
 | Value | Default | Description |
 |---|---|---|
-| `listener.enabled` | `true` | Enable local runner listener |
+| `listener.enabled` | `true` | Enable runner listener |
 | `listener.replicas` | `1` | Number of listener replicas |
+| `listener.name` | `"listener"` | Listener name (registered in the pool) |
+| `listener.joinToken` | `""` | Raw join token (use `existingSecret` for production) |
+| `listener.existingSecret` | `""` | K8s Secret containing the join token |
+| `listener.joinTokenKey` | `"join-token"` | Key within the Secret for the join token |
 | `listener.runnerNamespace` | `""` | Namespace for runner Jobs (defaults to release namespace) |
 | `listener.resources.requests.cpu` | `100m` | CPU request |
 | `listener.resources.requests.memory` | `256Mi` | Memory request |
+
+The listener joins an agent pool on startup using the join token. The pool must already exist (created by an admin via the API). To set up the listener:
+
+1. Create an agent pool via the API: `POST /api/v2/organizations/default/agent-pools`
+2. Create a join token for the pool: `POST /api/v2/agent-pools/{pool_id}/tokens`
+3. Store the raw token in a Kubernetes Secret:
+
+```zsh
+kubectl create secret generic terrapod-listener-credentials \
+  --namespace terrapod \
+  --from-literal=join-token="<raw-token-from-step-2>"
+```
+
+4. Configure the listener in values:
+
+```yaml
+listener:
+  enabled: true
+  name: "my-listener"
+  existingSecret: terrapod-listener-credentials
+```
 
 ### Runners
 
@@ -292,7 +324,9 @@ When enabled, the drift detection scheduler runs as a periodic task (via the dis
 |---|---|---|
 | `bootstrap.adminEmail` | | Initial admin email |
 | `bootstrap.adminPassword` | | Initial admin password |
-| `bootstrap.existingSecret` | | K8s secret with credentials |
+| `bootstrap.existingSecret` | | K8s secret with admin credentials |
+| `bootstrap.poolName` | `""` | Optional: create an agent pool with this name |
+| `bootstrap.poolToken` | `""` | Optional: raw join token for the pool (generated if omitted) |
 
 ### Migrations
 
@@ -525,33 +559,38 @@ The Ingress routes all traffic to the web (Next.js) service. The web service pro
 
 ---
 
-## Encryption Key
+## Encryption at Rest
 
-The Fernet encryption key protects:
-- Sensitive variables
-- VCS connection tokens (GitHub private keys, GitLab tokens)
-- State files at rest
+Terrapod delegates encryption at rest to the underlying infrastructure services. No application-level encryption key is needed.
 
-Generate a key:
+### What to encrypt
+
+| Data | Where it lives | How to encrypt |
+|---|---|---|
+| Sensitive variables, VCS tokens, user credentials | PostgreSQL | Enable encryption on your managed database (RDS encryption, Cloud SQL encryption, Azure Database encryption) |
+| State files, configuration tarballs, plan outputs, logs | Object storage | Enable server-side encryption (S3 SSE-S3/SSE-KMS, Azure Storage encryption, GCS default encryption) |
+| Filesystem-backed storage (dev/non-cloud) | PVC | Use encrypted volumes at the infrastructure level |
+
+### AWS example
+
+- **RDS**: Enable `StorageEncrypted: true` (default for new instances) with an AWS KMS key
+- **S3**: Enable default bucket encryption with SSE-S3 or SSE-KMS:
 
 ```zsh
-python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
+aws s3api put-bucket-encryption --bucket terrapod-storage \
+  --server-side-encryption-configuration \
+  '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"aws:kms"}}]}'
 ```
 
-Store it in a Kubernetes Secret and inject via environment variable:
+### Azure example
 
-```zsh
-kubectl create secret generic terrapod-encryption \
-  --namespace terrapod \
-  --from-literal=encryption-key="your-fernet-key"
-```
+- **Azure Database for PostgreSQL**: Storage encryption is enabled by default with Microsoft-managed keys
+- **Azure Blob Storage**: Encryption at rest is enabled by default with Microsoft-managed keys (optionally use customer-managed keys via Key Vault)
 
-Reference it as `TERRAPOD_ENCRYPTION__KEY` in the API deployment.
+### GCP example
 
-Without an encryption key:
-- Sensitive variables are rejected
-- State files are stored unencrypted
-- VCS connections cannot be created
+- **Cloud SQL**: Encryption at rest is enabled by default with Google-managed keys (optionally use CMEK via Cloud KMS)
+- **GCS**: All objects are encrypted at rest by default with Google-managed keys (optionally use CMEK)
 
 ---
 

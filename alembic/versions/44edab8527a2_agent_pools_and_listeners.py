@@ -2,10 +2,8 @@
 
 Adds tables for the runner infrastructure:
 - agent_pools: named groups of runner listeners
-- agent_pool_tokens: join tokens for remote listener registration
+- agent_pool_tokens: join tokens for listener registration
 - runner_listeners: registered listener identities (runtime state in Redis)
-
-Seeds the default local pool.
 
 Revision ID: 44edab8527a2
 Revises: 659860ef7f53
@@ -110,13 +108,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_runner_listeners_pool_id", "runner_listeners", ["pool_id"])
 
-    # Seed the default local pool
-    op.execute(
-        sa.text(
-            "INSERT INTO agent_pools (id, name, description, org_name) "
-            "VALUES (gen_random_uuid(), 'default', 'Local in-cluster runner pool', 'default')"
-        )
-    )
+    # Note: pools are created by admins via the API, not seeded in migrations.
 
 
 def downgrade() -> None:

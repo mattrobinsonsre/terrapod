@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
+import { SortableHeader } from '@/components/sortable-header'
+import { useSortable } from '@/lib/use-sortable'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
@@ -29,6 +31,20 @@ export default function BinaryCachePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  type BinarySortKey = 'tool' | 'version' | 'os' | 'arch' | 'cached-at'
+  const binaryAccessor = useCallback((item: CachedBinary, key: BinarySortKey) => {
+    switch (key) {
+      case 'tool': return item.attributes.tool
+      case 'version': return item.attributes.version
+      case 'os': return item.attributes.os
+      case 'arch': return item.attributes.arch
+      case 'cached-at': return item.attributes['cached-at']
+    }
+  }, [])
+  const { sortedItems: sortedEntries, sortState: binarySortState, toggleSort: toggleBinarySort } = useSortable<CachedBinary, BinarySortKey>(
+    entries, 'cached-at', 'desc', binaryAccessor,
+  )
 
   // Warm form
   const [showWarm, setShowWarm] = useState(false)
@@ -175,16 +191,16 @@ export default function BinaryCachePage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-700/50">
-                  <th className="text-left px-4 py-3 text-slate-400 font-medium">Tool</th>
-                  <th className="text-left px-4 py-3 text-slate-400 font-medium">Version</th>
-                  <th className="text-left px-4 py-3 text-slate-400 font-medium">OS</th>
-                  <th className="text-left px-4 py-3 text-slate-400 font-medium">Arch</th>
-                  <th className="text-left px-4 py-3 text-slate-400 font-medium">Cached At</th>
+                  <SortableHeader label="Tool" sortKey="tool" sortState={binarySortState} onSort={toggleBinarySort} />
+                  <SortableHeader label="Version" sortKey="version" sortState={binarySortState} onSort={toggleBinarySort} />
+                  <SortableHeader label="OS" sortKey="os" sortState={binarySortState} onSort={toggleBinarySort} />
+                  <SortableHeader label="Arch" sortKey="arch" sortState={binarySortState} onSort={toggleBinarySort} />
+                  <SortableHeader label="Cached At" sortKey="cached-at" sortState={binarySortState} onSort={toggleBinarySort} />
                   <th className="text-right px-4 py-3 text-slate-400 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {entries.map((entry) => (
+                {sortedEntries.map((entry) => (
                   <tr key={entry.id} className="border-b border-slate-700/30 last:border-0">
                     <td className="px-4 py-3 text-slate-200 font-mono">{entry.attributes.tool}</td>
                     <td className="px-4 py-3 text-slate-200 font-mono">{entry.attributes.version}</td>

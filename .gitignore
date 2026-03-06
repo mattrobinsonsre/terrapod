@@ -19,6 +19,7 @@ ENV/
 node_modules/
 .next/
 out/
+*.tsbuildinfo
 
 # IDE
 .idea/
@@ -54,6 +55,9 @@ htmlcov/
 # Screenshots (allow docs/images/)
 *.png
 !docs/images/*.png
+
+# Pen test reports
+reports/
 
 # Terraform (local dev testing)
 .terraform/

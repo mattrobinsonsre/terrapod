@@ -1,7 +1,7 @@
 """GitLab VCS provider implementation.
 
-Authenticates via Project/Group Access Token (stored encrypted on the
-VCSConnection). Supports GitLab.com and self-hosted GitLab instances.
+Authenticates via Project/Group Access Token (stored on the VCSConnection).
+Supports GitLab.com and self-hosted GitLab instances.
 """
 
 from urllib.parse import quote as url_quote
@@ -10,7 +10,6 @@ import httpx
 
 from terrapod.db.models import VCSConnection
 from terrapod.logging_config import get_logger
-from terrapod.services.encryption_service import decrypt_value
 from terrapod.services.vcs_provider import PullRequest
 
 logger = get_logger(__name__)
@@ -25,10 +24,10 @@ def _api_url(conn: VCSConnection) -> str:
 
 
 def _token(conn: VCSConnection) -> str:
-    """Decrypt the stored access token."""
-    if not conn.token_encrypted:
+    """Get the stored access token."""
+    if not conn.token:
         raise ValueError("GitLab connection has no token configured")
-    return decrypt_value(conn.token_encrypted)
+    return conn.token
 
 
 def _headers(conn: VCSConnection) -> dict[str, str]:
@@ -137,6 +136,99 @@ async def list_tags(conn: VCSConnection, owner: str, repo: str) -> list[dict[str
         resp.raise_for_status()
 
     return [{"name": tag["name"], "sha": tag["commit"]["id"]} for tag in resp.json()]
+
+
+async def create_commit_status(
+    conn: VCSConnection,
+    owner: str,
+    repo: str,
+    sha: str,
+    state: str,
+    description: str,
+    target_url: str = "",
+    context: str = "terrapod",
+) -> None:
+    """Post a commit status to GitLab.
+
+    Args:
+        state: One of pending, running, success, failed, canceled.
+        description: Status description text.
+    """
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+
+    params: dict[str, str] = {
+        "state": state,
+        "description": description[:140],
+        "name": context,
+    }
+    if target_url:
+        params["target_url"] = target_url
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{api}/projects/{project}/statuses/{sha}",
+            json=params,
+            headers=_headers(conn),
+        )
+        resp.raise_for_status()
+
+    logger.debug(
+        "GitLab commit status posted",
+        project=f"{owner}/{repo}",
+        sha=sha[:8],
+        state=state,
+    )
+
+
+async def create_mr_comment(
+    conn: VCSConnection, owner: str, repo: str, mr_number: int, body: str
+) -> int:
+    """Create a note on a merge request. Returns the note ID."""
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{api}/projects/{project}/merge_requests/{mr_number}/notes",
+            json={"body": body},
+            headers=_headers(conn),
+        )
+        resp.raise_for_status()
+        return resp.json()["id"]
+
+
+async def update_mr_comment(
+    conn: VCSConnection, owner: str, repo: str, mr_number: int, note_id: int, body: str
+) -> None:
+    """Update an existing merge request note."""
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.put(
+            f"{api}/projects/{project}/merge_requests/{mr_number}/notes/{note_id}",
+            json={"body": body},
+            headers=_headers(conn),
+        )
+        resp.raise_for_status()
+
+
+async def list_mr_comments(
+    conn: VCSConnection, owner: str, repo: str, mr_number: int
+) -> list[dict]:
+    """List notes on a merge request. Used for marker-based comment lookup."""
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{api}/projects/{project}/merge_requests/{mr_number}/notes",
+            params={"per_page": 100, "sort": "desc"},
+            headers=_headers(conn),
+        )
+        resp.raise_for_status()
+        return resp.json()
 
 
 def parse_repo_url(repo_url: str) -> tuple[str, str] | None:

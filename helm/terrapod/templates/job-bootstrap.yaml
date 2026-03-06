@@ -54,6 +54,14 @@ spec:
             - name: TERRAPOD_BOOTSTRAP_ADMIN_PASSWORD
               value: {{ .Values.bootstrap.adminPassword | quote }}
             {{- end }}
+            {{- if .Values.bootstrap.poolName }}
+            - name: TERRAPOD_BOOTSTRAP_POOL_NAME
+              value: {{ .Values.bootstrap.poolName | quote }}
+            {{- end }}
+            {{- if .Values.bootstrap.poolToken }}
+            - name: TERRAPOD_BOOTSTRAP_POOL_TOKEN
+              value: {{ .Values.bootstrap.poolToken | quote }}
+            {{- end }}
           resources:
             requests:
               cpu: 250m

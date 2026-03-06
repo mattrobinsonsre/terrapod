@@ -119,7 +119,7 @@ ObjectStore Protocol
 All storage paths are constructed via `storage/keys.py`:
 
 ```
-state/{workspace_id}/{version_id}.tfstate       # State files (Fernet-encrypted)
+state/{workspace_id}/{version_id}.tfstate       # State files (encrypted at rest by object store)
 config/{workspace_id}/{config_version_id}.tar.gz # Configuration tarballs
 plans/{run_id}/plan.json                         # Plan output
 logs/{run_id}/plan.log                           # Plan logs
@@ -201,19 +201,22 @@ Exits cleanly
 
 The entrypoint script is at `docker/runner-entrypoint.sh`.
 
-### Local vs Remote Listeners
+### Agent Pools and Listeners
 
-**Local listener** (in-cluster):
-- Deployed as a Kubernetes Deployment in the same cluster
-- Uses the same Docker image as the API with a different entrypoint (`python -m terrapod.runner.listener`)
-- Has RBAC permissions to create/watch/delete Jobs and Pods in the runner namespace
-- Authenticates to the API via internal service URL
+All listeners follow the same flow — there is no "local" vs "remote" distinction:
 
-**Remote listener** (agent pool):
-- Deployed in a separate cluster
-- Joins via join token, receives X.509 certificate (Ed25519)
-- Authenticates via `X-Terrapod-Client-Cert` header
-- Heartbeats every 60s (180s TTL in Redis)
+1. An admin creates an **agent pool** via the API (e.g. "production", "dev")
+2. An admin generates a **join token** for the pool
+3. The listener is configured with `TERRAPOD_JOIN_TOKEN` and `TERRAPOD_API_URL`
+4. On startup, the listener calls `POST /api/v2/agent-pools/join` with the token
+5. The API validates the token, issues an X.509 certificate (Ed25519), and returns the listener ID, cert, and pool ID
+6. Certificates are saved to disk for restart persistence (avoiding unnecessary re-joins)
+7. The listener authenticates subsequent API calls via `X-Terrapod-Client-Cert` header (base64-encoded PEM)
+8. Heartbeats every 60s (180s TTL in Redis)
+
+A listener can be deployed in the same cluster as the API or in a completely separate cluster — the join flow is identical. The Helm chart deploys a listener as a Deployment using the same Docker image as the API (`python -m terrapod.runner.listener`) with RBAC to create/watch/delete Jobs and Pods in the runner namespace.
+
+Pools are never auto-created. For initial deployment, the bootstrap job can optionally create a pool and join token when `TERRAPOD_BOOTSTRAP_POOL_NAME` is configured. For local development, Tilt automates this via a `setup-dev-pool` resource.
 
 ### Per-Workspace Resources
 
@@ -230,7 +233,7 @@ Limits are computed as 2x the requests automatically. Values are snapshotted to 
 
 ## Certificate Authority
 
-Terrapod includes a built-in Certificate Authority for authenticating remote runner listeners.
+Terrapod includes a built-in Certificate Authority for authenticating runner listeners.
 
 ```
 CA Initialization (first startup)
@@ -241,14 +244,15 @@ CN = "Terrapod Certificate Authority"
 Store in certificate_authority DB table (single row)
     |
     v
-Remote Listener Join Flow:
+Listener Join Flow:
     1. Admin creates agent pool + join token
-    2. Listener calls POST /api/v2/agent-pools/{pool_id}/listeners/join
+    2. Listener calls POST /api/v2/agent-pools/join with the token
     3. API validates join token (SHA-256 hash, expiry, max_uses)
     4. API issues X.509 certificate with SAN URIs:
        - terrapod://listener/{name}
        - terrapod://pool/{pool_name}
-    5. Returns: listener ID, certificate, CA cert
+    5. Returns: listener ID, pool ID, certificate, private key, CA cert
+    6. Listener saves certs to disk for restart persistence
     |
     v
 Ongoing Authentication:
@@ -264,7 +268,7 @@ Certificate Renewal:
 **Source files:**
 - `services/terrapod/auth/ca.py` -- CA keypair generation, certificate issuance
 - `services/terrapod/api/routers/agent_pools.py` -- join and renew endpoints
-- `services/terrapod/runner/identity.py` -- local vs remote identity establishment
+- `services/terrapod/runner/identity.py` -- join token identity establishment
 
 ---
 
@@ -498,12 +502,12 @@ The database schema is managed by Alembic migrations in `alembic/versions/`. Key
 | `APIToken` | Long-lived API tokens (SHA-256 hashed) |
 | `Workspace` | Workspace config, VCS settings, labels, owner |
 | `StateVersion` | State version metadata (serial, lineage, MD5) |
-| `Variable` | Per-workspace variables (sensitive values Fernet-encrypted) |
+| `Variable` | Per-workspace variables (sensitive values protected by database encryption-at-rest) |
 | `VariableSet` | Org-scoped variable sets with workspace assignments |
 | `ConfigurationVersion` | Uploaded configuration tarballs |
 | `Run` | Run lifecycle (status, timestamps, VCS metadata, resources) |
 | `AgentPool` | Named runner pool with service account |
-| `AgentPoolToken` | Join tokens for remote listeners |
+| `AgentPoolToken` | Join tokens for listener registration |
 | `RunnerListener` | Registered listener identity and certificate |
 | `CertificateAuthorityModel` | CA keypair for listener certificates |
 | `VCSConnection` | VCS provider auth config (GitHub App or GitLab token) |

@@ -49,7 +49,7 @@ def _connection_json(conn: VCSConnection) -> dict:
         "provider": conn.provider,
         "server-url": conn.server_url,
         "status": conn.status,
-        "has-token": conn.token_encrypted is not None and conn.token_encrypted != "",
+        "has-token": conn.token is not None and conn.token != "",
         "created-at": _rfc3339(conn.created_at),
         "updated-at": _rfc3339(conn.updated_at),
     }
@@ -118,14 +118,12 @@ async def create_connection(
             detail=f"Unsupported provider '{provider}'. Supported: {', '.join(sorted(SUPPORTED_PROVIDERS))}",
         )
 
-    from terrapod.services.encryption_service import encrypt_value
-
     # Provider-specific validation
-    token_encrypted = None
+    token_value = None
 
     if provider == "github":
-        app_id = attrs.get("github-app-id", 0)
-        installation_id = attrs.get("github-installation-id", 0)
+        app_id = int(attrs.get("github-app-id", 0))
+        installation_id = int(attrs.get("github-installation-id", 0))
         private_key = attrs.get("private-key", "")
         if not app_id:
             raise HTTPException(
@@ -139,8 +137,7 @@ async def create_connection(
             raise HTTPException(
                 status_code=422, detail="private-key is required for GitHub connections"
             )
-        # Encrypt the private key for storage
-        token_encrypted = encrypt_value(private_key)
+        token_value = private_key
         # Check for duplicate GitHub installation
         existing = await db.execute(
             select(VCSConnection).where(
@@ -158,18 +155,17 @@ async def create_connection(
         token = attrs.get("token", "")
         if not token:
             raise HTTPException(status_code=422, detail="token is required for GitLab connections")
-        # Encrypt the token for storage
-        token_encrypted = encrypt_value(token)
+        token_value = token
 
     conn = VCSConnection(
         id=generate_uuid7(),
         provider=provider,
         name=name,
         server_url=attrs.get("server-url", ""),
-        token_encrypted=token_encrypted,
+        token=token_value,
         # GitHub-specific
-        github_app_id=attrs.get("github-app-id", 0),
-        github_installation_id=attrs.get("github-installation-id", 0),
+        github_app_id=int(attrs.get("github-app-id", 0)),
+        github_installation_id=int(attrs.get("github-installation-id", 0)),
         github_account_login=attrs.get("github-account-login", ""),
         github_account_type=attrs.get("github-account-type", ""),
         status="active",

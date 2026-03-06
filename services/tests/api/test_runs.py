@@ -47,6 +47,7 @@ def _mock_run(
     run.has_changes = None
     run.vcs_commit_sha = ""
     run.vcs_branch = ""
+    run.execution_backend = "tofu"
     run.vcs_pull_request_number = None
     run.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     run.updated_at = datetime(2026, 1, 1, tzinfo=UTC)

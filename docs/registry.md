@@ -134,6 +134,100 @@ Modules follow the same owner + label RBAC model as workspaces:
 
 ---
 
+## VCS-Driven Module Publishing
+
+Instead of uploading tarballs manually, you can connect a module to a VCS repository. Terrapod watches for new git tags and automatically publishes matching versions.
+
+### Overview
+
+1. Create a module in the registry
+2. Connect it to a VCS repository (GitHub or GitLab) via the UI or API
+3. Push semver tags (e.g. `v1.0.0`) to the repository
+4. Terrapod's background poller detects the tag, downloads the archive, and creates the module version
+
+### Setup via API
+
+```zsh
+# 1. Create the module
+curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-modules \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{
+    "data": {
+      "type": "registry-modules",
+      "attributes": { "name": "vpc", "provider": "aws" }
+    }
+  }'
+
+# 2. Connect VCS
+curl -X PATCH https://terrapod.example.com/api/v2/organizations/default/registry-modules/private/default/vpc/aws/vcs \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{
+    "data": {
+      "type": "registry-modules",
+      "attributes": {
+        "source": "vcs",
+        "vcs_connection_id": "<connection-id>",
+        "vcs_repo_url": "https://github.com/my-org/terraform-aws-vpc",
+        "vcs_tag_pattern": "v*"
+      }
+    }
+  }'
+```
+
+You can also configure VCS from the module detail page in the web UI using the **Connect VCS** button.
+
+### Tag Patterns
+
+The `vcs_tag_pattern` field uses glob syntax to match tags and extract version strings:
+
+| Pattern | Tag Example | Extracted Version |
+|---|---|---|
+| `v*` (default) | `v1.2.3` | `1.2.3` |
+| `release-*` | `release-1.0.0` | `1.0.0` |
+| `*` | `1.0.0` | `1.0.0` |
+
+Only tags matching the pattern are considered. The prefix before the `*` wildcard is stripped to produce the version string.
+
+### Polling Behaviour
+
+- The registry VCS poller runs as a periodic task via the distributed scheduler (default: every 60 seconds, shared with the workspace VCS poller interval)
+- Exactly one replica executes each poll cycle (multi-replica safe via Redis)
+- Each cycle queries all modules with `source=vcs` and a configured VCS connection, then lists tags from the VCS provider
+
+### Git as Source of Truth
+
+**Published versions track git, not the other way around.** If a tag is moved to a different commit (e.g. via `git tag -f v1.0.0 <new-sha> && git push --force --tags`), Terrapod detects the SHA mismatch on the next poll cycle, re-downloads the archive, and replaces the stored tarball. The `vcs-commit-sha` on the version record is updated to reflect the new commit.
+
+This means:
+- Versions are **not** immutable when backed by VCS
+- The registry always reflects the current state of git tags
+- Each version tracks which commit SHA and tag name produced it
+
+### What Gets Stored
+
+The archive at the tag ref is stored as a tarball at:
+
+```
+registry/modules/{org}/{namespace}/{name}/{provider}/{version}.tar.gz
+```
+
+### Manual Upload Still Works
+
+Even with VCS connected, you can still upload versions directly via the API or web UI. Manually-uploaded versions will have empty `vcs-commit-sha` and `vcs-tag` fields.
+
+### Version Metadata
+
+Each version exposes VCS metadata in the API response:
+
+| Field | Description |
+|---|---|
+| `vcs-commit-sha` | The git commit SHA this version was built from (empty for manual uploads) |
+| `vcs-tag` | The tag name that matched (e.g. `v1.2.3`; empty for manual uploads) |
+
+---
+
 ## Private Provider Registry
 
 Publish, version, and share Terraform providers internally with GPG signing.

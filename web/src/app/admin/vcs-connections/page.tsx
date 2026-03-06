@@ -1,14 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
+import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { useSortable } from '@/lib/use-sortable'
 
 interface VCSConnection {
   id: string
@@ -24,6 +26,8 @@ interface VCSConnection {
     'created-at': string
   }
 }
+
+type VCSSortKey = 'name' | 'provider' | 'server-url' | 'status' | 'created'
 
 export default function VCSConnectionsPage() {
   const router = useRouter()
@@ -41,12 +45,28 @@ export default function VCSConnectionsPage() {
   const [appId, setAppId] = useState('')
   const [installationId, setInstallationId] = useState('')
   const [privateKey, setPrivateKey] = useState('')
+  const [pemDragOver, setPemDragOver] = useState(false)
+  const pemFileRef = useRef<HTMLInputElement>(null)
   // GitLab fields
   const [token, setToken] = useState('')
   const [creating, setCreating] = useState(false)
 
   // Delete confirmation
   const [deleteId, setDeleteId] = useState<string | null>(null)
+
+  const vcsAccessor = useCallback((item: VCSConnection, key: VCSSortKey) => {
+    switch (key) {
+      case 'name': return item.attributes.name
+      case 'provider': return item.attributes.provider
+      case 'server-url': return item.attributes['server-url']
+      case 'status': return item.attributes.status
+      case 'created': return item.attributes['created-at']
+    }
+  }, [])
+
+  const { sortedItems, sortState, toggleSort } = useSortable<VCSConnection, VCSSortKey>(
+    connections, 'name', 'asc', vcsAccessor,
+  )
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
@@ -198,10 +218,25 @@ export default function VCSConnectionsPage() {
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="gh-key" className="block text-sm font-medium text-slate-300 mb-1">Private Key (PEM)</label>
+                  <div className="flex items-center gap-2 mb-1">
+                    <label htmlFor="gh-key" className="block text-sm font-medium text-slate-300">Private Key (PEM)</label>
+                    <button type="button" onClick={() => pemFileRef.current?.click()}
+                      className="text-xs text-brand-400 hover:text-brand-300 transition-colors">Browse...</button>
+                    <input ref={pemFileRef} type="file" accept=".pem,.key" className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) f.text().then(t => setPrivateKey(t)) }} />
+                  </div>
                   <textarea id="gh-key" value={privateKey} onChange={(e) => setPrivateKey(e.target.value)} required rows={4}
-                    placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;..."
-                    className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent font-mono text-xs" />
+                    placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;&#10;Drop a .pem file here or click Browse"
+                    className={`w-full px-3 py-2 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent font-mono text-xs transition-colors ${pemDragOver ? 'border-2 border-dashed border-brand-400 bg-brand-900/20' : 'border border-slate-600'}`}
+                    onDragOver={(e) => { e.preventDefault(); setPemDragOver(true) }}
+                    onDragLeave={() => setPemDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      setPemDragOver(false)
+                      const f = e.dataTransfer.files[0]
+                      if (f) f.text().then(t => setPrivateKey(t))
+                    }}
+                  />
                 </div>
               </div>
             ) : (
@@ -229,16 +264,16 @@ export default function VCSConnectionsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Provider</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Server URL</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden lg:table-cell">Created</th>
+                  <SortableHeader label="Name" sortKey="name" sortState={sortState} onSort={toggleSort} />
+                  <SortableHeader label="Provider" sortKey="provider" sortState={sortState} onSort={toggleSort} />
+                  <SortableHeader label="Server URL" sortKey="server-url" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
+                  <SortableHeader label="Status" sortKey="status" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortableHeader label="Created" sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
                   <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/30">
-                {connections.map((conn) => (
+                {sortedItems.map((conn) => (
                   <tr key={conn.id} className="hover:bg-slate-700/20 transition-colors">
                     <td className="px-4 py-3 text-sm text-slate-200">{conn.attributes.name}</td>
                     <td className="px-4 py-3">

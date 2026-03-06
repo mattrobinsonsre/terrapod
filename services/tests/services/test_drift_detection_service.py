@@ -241,3 +241,35 @@ class TestHandleDriftRunCompleted:
         )
 
         assert ws.drift_status == "drifted"
+
+    @patch("terrapod.redis.client.publish_event", new_callable=AsyncMock)
+    @patch("terrapod.services.drift_detection_service._enqueue_drift_notification")
+    @patch("terrapod.services.drift_detection_service.get_db_session")
+    @patch("terrapod.services.drift_detection_service.run_service")
+    async def test_publishes_drift_status_change_event(
+        self, mock_run_svc, mock_session, mock_notif, mock_publish
+    ):
+        """Drift status change publishes to admin and workspace list channels."""
+        from terrapod.services.drift_detection_service import handle_drift_run_completed
+
+        run = _mock_run(status="planned", has_changes=True)
+        ws = _mock_workspace()
+
+        mock_db = AsyncMock()
+        mock_run_svc.get_run = AsyncMock(return_value=run)
+        mock_db.get.return_value = ws
+        mock_session.return_value.__aenter__ = AsyncMock(return_value=mock_db)
+        mock_session.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        await handle_drift_run_completed(
+            {
+                "run_id": str(run.id),
+                "workspace_id": str(ws.id),
+            }
+        )
+
+        # Should publish to both admin and workspace list channels
+        assert mock_publish.call_count == 2
+        channels = [call.args[0] for call in mock_publish.call_args_list]
+        assert "tp:admin_events" in channels
+        assert "tp:workspace_list_events" in channels

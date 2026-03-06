@@ -17,11 +17,6 @@ from terrapod.db.models import (
     VariableSetWorkspace,
 )
 from terrapod.logging_config import get_logger
-from terrapod.services.encryption_service import (
-    decrypt_value,
-    encrypt_value,
-    is_encryption_available,
-)
 
 logger = get_logger(__name__)
 
@@ -54,17 +49,10 @@ async def create_variable(
     sensitive: bool = False,
 ) -> Variable:
     """Create a workspace variable."""
-    if sensitive and not is_encryption_available():
-        raise ValueError(
-            "Cannot create sensitive variable: encryption not configured. "
-            "Set TERRAPOD_ENCRYPTION__KEY."
-        )
-
     var = Variable(
         workspace_id=workspace_id,
         key=key,
-        value="" if sensitive else value,
-        encrypted_value=encrypt_value(value) if sensitive else None,
+        value=value,
         description=description,
         category=category,
         hcl=hcl,
@@ -96,29 +84,9 @@ async def update_variable(
     if hcl is not None:
         var.hcl = hcl
 
-    # Handle sensitivity change
-    new_sensitive = sensitive if sensitive is not None else var.sensitive
-
     if value is not None:
-        if new_sensitive:
-            if not is_encryption_available():
-                raise ValueError("Cannot set sensitive variable: encryption not configured.")
-            var.value = ""
-            var.encrypted_value = encrypt_value(value)
-        else:
-            var.value = value
-            var.encrypted_value = None
+        var.value = value
         var.version_id = _version_hash(var.key, value, var.category)
-    elif sensitive is not None and sensitive != var.sensitive:
-        # Sensitivity changed but value not provided
-        if sensitive and var.value:
-            if not is_encryption_available():
-                raise ValueError("Cannot set sensitive variable: encryption not configured.")
-            var.encrypted_value = encrypt_value(var.value)
-            var.value = ""
-        elif not sensitive and var.encrypted_value:
-            var.value = decrypt_value(var.encrypted_value)
-            var.encrypted_value = None
 
     if sensitive is not None:
         var.sensitive = sensitive
@@ -162,7 +130,7 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
     2. Workspace-level variables
     3. Non-priority variable set vars
 
-    Returns decrypted values ready for runner injection.
+    Returns values ready for runner injection.
     """
     resolved: dict[str, ResolvedVariable] = {}
 
@@ -170,10 +138,9 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
     varsets = await _get_applicable_varsets(db, workspace_id, priority=False)
     for vs in varsets:
         for vsv in vs.variables:
-            value = _decrypt_var_value(vsv.value, vsv.encrypted_value, vsv.sensitive)
             resolved[vsv.key] = ResolvedVariable(
                 key=vsv.key,
-                value=value,
+                value=vsv.value,
                 category=vsv.category,
                 hcl=vsv.hcl,
                 sensitive=vsv.sensitive,
@@ -182,10 +149,9 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
     # Layer 2: Workspace variables (override non-priority sets)
     ws_vars = await list_variables(db, workspace_id)
     for var in ws_vars:
-        value = _decrypt_var_value(var.value, var.encrypted_value, var.sensitive)
         resolved[var.key] = ResolvedVariable(
             key=var.key,
-            value=value,
+            value=var.value,
             category=var.category,
             hcl=var.hcl,
             sensitive=var.sensitive,
@@ -195,23 +161,15 @@ async def resolve_variables(db: AsyncSession, workspace_id: uuid.UUID) -> list[R
     priority_varsets = await _get_applicable_varsets(db, workspace_id, priority=True)
     for vs in priority_varsets:
         for vsv in vs.variables:
-            value = _decrypt_var_value(vsv.value, vsv.encrypted_value, vsv.sensitive)
             resolved[vsv.key] = ResolvedVariable(
                 key=vsv.key,
-                value=value,
+                value=vsv.value,
                 category=vsv.category,
                 hcl=vsv.hcl,
                 sensitive=vsv.sensitive,
             )
 
     return list(resolved.values())
-
-
-def _decrypt_var_value(value: str, encrypted_value: str | None, sensitive: bool) -> str:
-    """Decrypt a variable value if sensitive."""
-    if sensitive and encrypted_value:
-        return decrypt_value(encrypted_value)
-    return value
 
 
 async def _get_applicable_varsets(

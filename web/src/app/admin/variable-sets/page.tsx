@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
@@ -8,8 +8,10 @@ import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
+import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { useSortable } from '@/lib/use-sortable'
 
 interface VariableSet {
   id: string
@@ -24,6 +26,8 @@ interface VariableSet {
   }
 }
 
+type VarsetSortKey = 'name' | 'description' | 'scope' | 'vars' | 'created'
+
 export default function VariableSetsPage() {
   const router = useRouter()
   const [varsets, setVarsets] = useState<VariableSet[]>([])
@@ -37,6 +41,20 @@ export default function VariableSetsPage() {
   const [global, setGlobal] = useState(false)
   const [priority, setPriority] = useState(false)
   const [creating, setCreating] = useState(false)
+
+  const varsetAccessor = useCallback((item: VariableSet, key: VarsetSortKey): string | number | null | undefined => {
+    switch (key) {
+      case 'name': return item.attributes.name
+      case 'description': return item.attributes.description
+      case 'scope': return item.attributes.global ? 'a-global' : item.attributes.priority ? 'b-priority' : 'c-standard'
+      case 'vars': return item.attributes['var-count']
+      case 'created': return item.attributes['created-at']
+    }
+  }, [])
+
+  const { sortedItems, sortState, toggleSort } = useSortable<VariableSet, VarsetSortKey>(
+    varsets, 'name', 'asc', varsetAccessor,
+  )
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
@@ -153,15 +171,15 @@ export default function VariableSetsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Description</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Scope</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Variables</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden lg:table-cell">Created</th>
+                  <SortableHeader label="Name" sortKey="name" sortState={sortState} onSort={toggleSort} />
+                  <SortableHeader label="Description" sortKey="description" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
+                  <SortableHeader label="Scope" sortKey="scope" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortableHeader label="Variables" sortKey="vars" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortableHeader label="Created" sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/30">
-                {varsets.map((vs) => (
+                {sortedItems.map((vs) => (
                   <tr key={vs.id} className="hover:bg-slate-700/20 transition-colors cursor-pointer"
                     onClick={() => router.push(`/admin/variable-sets/${vs.id}`)}>
                     <td className="px-4 py-3">

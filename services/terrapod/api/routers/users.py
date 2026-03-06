@@ -1,11 +1,12 @@
 """User management endpoints (admin or audit role required)."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, require_admin, require_admin_or_audit
+from terrapod.auth.passwords import hash_password, validate_password_strength
 from terrapod.db.models import (
     PlatformRoleAssignment,
     RoleAssignment,
@@ -35,11 +36,79 @@ def _user_to_jsonapi(user: User) -> dict:
             "email": user.email,
             "display-name": user.display_name,
             "is-active": user.is_active,
+            "has-password": user.password_hash is not None,
             "last-login-at": _format_timestamp(user.last_login_at),
             "created-at": _format_timestamp(user.created_at),
             "updated-at": _format_timestamp(user.updated_at),
         },
     }
+
+
+class UserCreateAttributes(BaseModel):
+    """Attributes for creating a user."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    email: str
+    password: str | None = None
+    display_name: str | None = Field(None, alias="display-name")
+
+
+class UserCreateData(BaseModel):
+    type: str = "users"
+    attributes: UserCreateAttributes
+
+
+class UserCreateRequest(BaseModel):
+    data: UserCreateData
+
+
+@router.post("/organizations/default/users", status_code=status.HTTP_201_CREATED)
+async def create_user(
+    body: UserCreateRequest,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Create a new local user (admin only)."""
+    attrs = body.data.attributes
+    email = attrs.email.strip().lower()
+
+    if not email or "@" not in email:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A valid email address is required",
+        )
+
+    # Check duplicate
+    existing = await db.execute(select(User).where(User.email == email))
+    if existing.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"User with email '{email}' already exists",
+        )
+
+    # Validate and hash password if provided
+    pw_hash = None
+    if attrs.password:
+        try:
+            validate_password_strength(attrs.password, [email])
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(e),
+            )
+        pw_hash = hash_password(attrs.password)
+
+    new_user = User(
+        email=email,
+        display_name=attrs.display_name,
+        password_hash=pw_hash,
+    )
+    db.add(new_user)
+    await db.commit()
+    await db.refresh(new_user)
+    logger.info("Created user", target_email=email, by=user.email)
+    return {"data": _user_to_jsonapi(new_user)}
 
 
 @router.get("/organizations/default/users")
@@ -98,8 +167,11 @@ async def show_user(
 class UserUpdateAttributes(BaseModel):
     """Updatable user attributes."""
 
-    is_active: bool | None = None
-    display_name: str | None = None
+    model_config = ConfigDict(populate_by_name=True)
+
+    is_active: bool | None = Field(None, alias="is-active")
+    display_name: str | None = Field(None, alias="display-name")
+    password: str | None = None
 
 
 class UserUpdateData(BaseModel):
@@ -127,6 +199,17 @@ async def update_user(
     attrs = body.data.attributes
     if attrs.display_name is not None:
         target.display_name = attrs.display_name
+
+    if attrs.password is not None:
+        try:
+            validate_password_strength(attrs.password, [email])
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(e),
+            )
+        target.password_hash = hash_password(attrs.password)
+        logger.info("Reset password for user", target_email=email, by=user.email)
 
     if attrs.is_active is not None:
         target.is_active = attrs.is_active

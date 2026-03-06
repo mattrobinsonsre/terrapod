@@ -83,7 +83,15 @@ class CreateModuleVersionRequest(BaseModel):
 
 
 def _module_to_jsonapi(module) -> dict:  # type: ignore[no-untyped-def]
-    versions = [{"version": v.version, "status": v.upload_status} for v in (module.versions or [])]
+    versions = [
+        {
+            "version": v.version,
+            "status": v.upload_status,
+            "vcs-commit-sha": v.vcs_commit_sha or "",
+            "vcs-tag": v.vcs_tag or "",
+        }
+        for v in (module.versions or [])
+    ]
     return {
         "id": str(module.id),
         "type": "registry-modules",
@@ -265,6 +273,46 @@ async def delete_module_endpoint(
 
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/api/v2/organizations/default/registry-modules/private/default/{name}/{provider}")
+async def update_module_endpoint(
+    name: str,
+    provider: str,
+    body: dict,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Update a registry module's labels and/or owner. Requires admin on module."""
+    module = await get_module(db, "default", name, provider)
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found")
+
+    perm = await resolve_registry_permission(
+        db, user.email, user.roles, module.name, module.labels or {}, module.owner_email
+    )
+    if not has_registry_permission(perm, "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires admin permission on module",
+        )
+
+    attrs = body.get("data", {}).get("attributes", {})
+
+    if "owner-email" in attrs:
+        if "admin" not in user.roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only platform admins can change owner",
+            )
+        module.owner_email = attrs["owner-email"]
+
+    if "labels" in attrs:
+        module.labels = attrs["labels"]
+
+    await db.commit()
+    await db.refresh(module)
+    return JSONResponse(content={"data": _module_to_jsonapi(module)})
 
 
 @router.post(

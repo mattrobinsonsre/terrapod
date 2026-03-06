@@ -782,10 +782,28 @@ GET  /api/v2/agent-pools/{id}/authentication-tokens
 ### Listener Join
 
 ```
-POST /api/v2/agent-pools/{pool_id}/listeners/join
+POST /api/v2/agent-pools/join
 ```
 
-Used by remote listeners to register and receive certificates.
+Registers a listener using a join token. The token identifies the pool — no pool ID needed in the URL. No Bearer auth required; the join token in the body IS the credential.
+
+**Request body:**
+```json
+{
+  "join_token": "<raw-token>",
+  "name": "my-listener",
+  "runner_definitions": ["standard"]
+}
+```
+
+**Response:** listener ID, pool ID, X.509 certificate, private key, CA certificate.
+
+If a listener with the same name already exists, its certificate is reissued (handles pod restarts).
+
+**Legacy endpoint** (still supported):
+```
+POST /api/v2/agent-pools/{pool_id}/listeners/join
+```
 
 ### Listener Heartbeat
 

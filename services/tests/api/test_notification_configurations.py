@@ -29,6 +29,7 @@ def _mock_workspace(ws_id=None, name="test-ws"):
     ws.id = ws_id or uuid.uuid4()
     ws.name = name
     ws.auto_apply = False
+    ws.execution_backend = "tofu"
     ws.labels = {}
     ws.owner_email = "test@example.com"
     return ws
@@ -43,7 +44,7 @@ def _mock_nc(nc_id=None, ws=None, name="test-notif", dest_type="generic"):
     nc.name = name
     nc.destination_type = dest_type
     nc.url = "https://example.com/hook"
-    nc.token_encrypted = None
+    nc.token = None
     nc.enabled = False
     nc.triggers = ["run:completed"]
     nc.email_addresses = []

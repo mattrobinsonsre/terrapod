@@ -167,7 +167,10 @@ async def join_listener(
     name: str,
     runner_definitions: list[str],
 ) -> dict:
-    """Register a new listener via join token exchange.
+    """Register or re-register a listener via join token exchange.
+
+    If a listener with the same name already exists, it is updated with a
+    fresh certificate. This handles pod restarts where saved certs were lost.
 
     Returns dict with listener_id, certificate PEM, private key PEM, CA cert PEM.
     """
@@ -177,26 +180,39 @@ async def join_listener(
     cert, private_key = ca.issue_listener_certificate(name, pool.name)
     fingerprint = get_certificate_fingerprint(cert)
 
-    # Create listener record
-    listener = RunnerListener(
-        pool_id=pool.id,
-        name=name,
-        certificate_fingerprint=fingerprint,
-        certificate_expires_at=cert.not_valid_after_utc,
-        runner_definitions=runner_definitions,
-    )
-    db.add(listener)
+    # Check if listener already exists (re-join after restart)
+    existing = await get_listener_by_name(db, name)
+    if existing:
+        existing.pool_id = pool.id
+        existing.certificate_fingerprint = fingerprint
+        existing.certificate_expires_at = cert.not_valid_after_utc
+        existing.runner_definitions = runner_definitions
+        listener = existing
+        logger.info(
+            "Listener re-joined (updated existing)",
+            listener=name,
+            pool=pool.name,
+            fingerprint=fingerprint[:16],
+        )
+    else:
+        listener = RunnerListener(
+            pool_id=pool.id,
+            name=name,
+            certificate_fingerprint=fingerprint,
+            certificate_expires_at=cert.not_valid_after_utc,
+            runner_definitions=runner_definitions,
+        )
+        db.add(listener)
+        logger.info(
+            "Listener joined",
+            listener=name,
+            pool=pool.name,
+            fingerprint=fingerprint[:16],
+        )
 
     # Increment token use count
     token.use_count += 1
     await db.flush()
-
-    logger.info(
-        "Listener joined",
-        listener=name,
-        pool=pool.name,
-        fingerprint=fingerprint[:16],
-    )
 
     return {
         "listener_id": str(listener.id),
@@ -204,46 +220,6 @@ async def join_listener(
         "private_key": serialize_private_key(private_key).decode(),
         "ca_certificate": ca.ca_cert_pem,
     }
-
-
-async def register_local_listener(
-    db: AsyncSession,
-    pool_name: str = "default",
-    listener_name: str = "local",
-    runner_definitions: list[str] | None = None,
-) -> RunnerListener:
-    """Register or update the local in-cluster listener.
-
-    Called on startup when TERRAPOD_LISTENER_MODE=local. No join token needed.
-    """
-    if runner_definitions is None:
-        runner_definitions = ["standard"]
-
-    # Ensure pool exists
-    pool = await get_pool_by_name(db, pool_name)
-    if pool is None:
-        pool = await create_pool(db, pool_name, description="Default local pool")
-
-    # Check if listener already exists
-    result = await db.execute(select(RunnerListener).where(RunnerListener.name == listener_name))
-    listener = result.scalar_one_or_none()
-
-    if listener:
-        listener.runner_definitions = runner_definitions
-        listener.pool_id = pool.id
-        await db.flush()
-        logger.info("Updated local listener registration", listener=listener_name)
-    else:
-        listener = RunnerListener(
-            pool_id=pool.id,
-            name=listener_name,
-            runner_definitions=runner_definitions,
-        )
-        db.add(listener)
-        await db.flush()
-        logger.info("Registered local listener", listener=listener_name)
-
-    return listener
 
 
 async def get_listener(db: AsyncSession, listener_id: uuid.UUID) -> RunnerListener | None:

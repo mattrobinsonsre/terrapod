@@ -2,7 +2,7 @@
 
 Handles JWT generation, installation token management, and repository
 operations via the GitHub REST API. All credentials (app_id, private key)
-are stored on the VCSConnection and decrypted at runtime.
+are stored on the VCSConnection.
 """
 
 import hashlib
@@ -15,7 +15,6 @@ import jwt
 from terrapod.config import settings
 from terrapod.db.models import VCSConnection
 from terrapod.logging_config import get_logger
-from terrapod.services.encryption_service import decrypt_value
 
 logger = get_logger(__name__)
 
@@ -31,10 +30,10 @@ def _api_url(conn: VCSConnection) -> str:
 
 
 def _private_key(conn: VCSConnection) -> str:
-    """Decrypt the GitHub App private key from the connection."""
-    if not conn.token_encrypted:
+    """Get the GitHub App private key from the connection."""
+    if not conn.token:
         raise ValueError("GitHub connection has no private key configured")
-    return decrypt_value(conn.token_encrypted)
+    return conn.token
 
 
 def _generate_app_jwt(app_id: int, private_key: str) -> str:
@@ -47,7 +46,7 @@ def _generate_app_jwt(app_id: int, private_key: str) -> str:
     payload = {
         "iat": now - 60,  # 60s clock skew allowance
         "exp": now + (10 * 60),  # 10 minutes
-        "iss": app_id,
+        "iss": str(app_id),
     }
     return jwt.encode(payload, private_key, algorithm="RS256")
 
@@ -235,6 +234,116 @@ async def list_repo_tags(conn: VCSConnection, owner: str, repo: str) -> list[dic
         resp.raise_for_status()
 
     return [{"name": tag["name"], "sha": tag["commit"]["sha"]} for tag in resp.json()]
+
+
+async def create_commit_status(
+    conn: VCSConnection,
+    owner: str,
+    repo: str,
+    sha: str,
+    state: str,
+    description: str,
+    target_url: str = "",
+    context: str = "terrapod",
+) -> None:
+    """Post a commit status to GitHub.
+
+    Args:
+        state: One of pending, success, failure, error.
+        description: Max 140 chars.
+    """
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+
+    body: dict[str, str] = {
+        "state": state,
+        "description": description[:140],
+        "context": context,
+    }
+    if target_url:
+        body["target_url"] = target_url
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{api_url}/repos/{owner}/{repo}/statuses/{sha}",
+            json=body,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        resp.raise_for_status()
+
+    logger.debug(
+        "GitHub commit status posted",
+        owner=owner,
+        repo=repo,
+        sha=sha[:8],
+        state=state,
+    )
+
+
+async def create_pr_comment(
+    conn: VCSConnection, owner: str, repo: str, pr_number: int, body: str
+) -> int:
+    """Create a comment on a PR. Returns the comment ID."""
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{api_url}/repos/{owner}/{repo}/issues/{pr_number}/comments",
+            json={"body": body},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()["id"]
+
+
+async def update_pr_comment(
+    conn: VCSConnection, owner: str, repo: str, comment_id: int, body: str
+) -> None:
+    """Update an existing PR comment."""
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.patch(
+            f"{api_url}/repos/{owner}/{repo}/issues/comments/{comment_id}",
+            json={"body": body},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        resp.raise_for_status()
+
+
+async def list_pr_comments(
+    conn: VCSConnection, owner: str, repo: str, pr_number: int
+) -> list[dict]:
+    """List comments on a PR. Used for marker-based comment lookup."""
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{api_url}/repos/{owner}/{repo}/issues/{pr_number}/comments",
+            params={"per_page": 100},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
 
 
 def parse_repo_url(repo_url: str) -> tuple[str, str] | None:

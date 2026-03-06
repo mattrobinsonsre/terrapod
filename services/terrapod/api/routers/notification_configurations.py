@@ -27,11 +27,6 @@ from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.db.models import NotificationConfiguration, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services.encryption_service import (
-    decrypt_value,
-    encrypt_value,
-    is_encryption_available,
-)
 from terrapod.services.notification_service import (
     VALID_TRIGGERS,
     build_verification_payload,
@@ -62,7 +57,7 @@ def _nc_json(nc: NotificationConfiguration) -> dict:
             "destination-type": nc.destination_type,
             "url": nc.url,
             "enabled": nc.enabled,
-            "has-token": nc.token_encrypted is not None and nc.token_encrypted != "",
+            "has-token": nc.token is not None and nc.token != "",
             "triggers": nc.triggers or [],
             "email-addresses": nc.email_addresses or [],
             "delivery-responses": nc.delivery_responses or [],
@@ -144,23 +139,14 @@ async def create_notification_configuration(
     if dest_type == "email" and not email_addresses:
         raise HTTPException(status_code=422, detail="email-addresses is required for email type")
 
-    # Encrypt token if provided
-    token_encrypted = None
-    token = attrs.get("token", "")
-    if token:
-        if not is_encryption_available():
-            raise HTTPException(
-                status_code=422,
-                detail="Encryption key not configured — cannot store notification token",
-            )
-        token_encrypted = encrypt_value(token)
+    token = attrs.get("token", "") or None
 
     nc = NotificationConfiguration(
         workspace_id=ws.id,
         name=name,
         destination_type=dest_type,
         url=url,
-        token_encrypted=token_encrypted,
+        token=token,
         enabled=attrs.get("enabled", False),
         triggers=triggers,
         email_addresses=email_addresses,
@@ -262,15 +248,7 @@ async def update_notification_configuration(
 
     if "token" in attrs:
         token = attrs["token"]
-        if token:
-            if not is_encryption_available():
-                raise HTTPException(
-                    status_code=422,
-                    detail="Encryption key not configured — cannot store notification token",
-                )
-            nc.token_encrypted = encrypt_value(token)
-        else:
-            nc.token_encrypted = None
+        nc.token = token if token else None
 
     await db.flush()
     await db.commit()
@@ -311,13 +289,7 @@ async def verify_notification_configuration(
 
     payload = build_verification_payload(nc.name)
 
-    # Decrypt token if present
-    token: str | None = None
-    if nc.token_encrypted:
-        try:
-            token = decrypt_value(nc.token_encrypted)
-        except Exception:
-            logger.warning("Failed to decrypt notification token for verify", nc_id=nc_id)
+    token: str | None = nc.token or None
 
     email_addresses = nc.email_addresses if nc.email_addresses else []
     response = await deliver_notification(

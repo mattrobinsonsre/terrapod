@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
@@ -8,8 +8,10 @@ import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
+import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { useSortable } from '@/lib/use-sortable'
 
 interface AgentPool {
   id: string
@@ -21,6 +23,8 @@ interface AgentPool {
     'created-at': string
   }
 }
+
+type PoolSortKey = 'name' | 'description' | 'sa' | 'created'
 
 export default function AgentPoolsPage() {
   const router = useRouter()
@@ -34,6 +38,19 @@ export default function AgentPoolsPage() {
   const [description, setDescription] = useState('')
   const [serviceAccount, setServiceAccount] = useState('')
   const [creating, setCreating] = useState(false)
+
+  const poolAccessor = useCallback((item: AgentPool, key: PoolSortKey) => {
+    switch (key) {
+      case 'name': return item.attributes.name
+      case 'description': return item.attributes.description
+      case 'sa': return item.attributes['service-account-name']
+      case 'created': return item.attributes['created-at']
+    }
+  }, [])
+
+  const { sortedItems, sortState, toggleSort } = useSortable<AgentPool, PoolSortKey>(
+    pools, 'name', 'asc', poolAccessor,
+  )
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
@@ -142,14 +159,14 @@ export default function AgentPoolsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Description</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Service Account</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden lg:table-cell">Created</th>
+                  <SortableHeader label="Name" sortKey="name" sortState={sortState} onSort={toggleSort} />
+                  <SortableHeader label="Description" sortKey="description" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
+                  <SortableHeader label="Service Account" sortKey="sa" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortableHeader label="Created" sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/30">
-                {pools.map((pool) => (
+                {sortedItems.map((pool) => (
                   <tr key={pool.id} className="hover:bg-slate-700/20 transition-colors cursor-pointer"
                     onClick={() => router.push(`/admin/agent-pools/${pool.id}`)}>
                     <td className="px-4 py-3">

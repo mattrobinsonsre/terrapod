@@ -32,7 +32,7 @@ class TestHandleNotificationDelivery:
         nc.name = "test-notif"
         nc.destination_type = "generic"
         nc.url = "https://example.com/hook"
-        nc.token_encrypted = None
+        nc.token = None
         nc.triggers = ["run:completed"]
         nc.email_addresses = []
         nc.enabled = True
@@ -153,7 +153,7 @@ class TestHandleNotificationDelivery:
         nc.name = "fail-notif"
         nc.destination_type = "generic"
         nc.url = "https://bad.example.com"
-        nc.token_encrypted = None
+        nc.token = None
         nc.triggers = ["run:errored"]
         nc.email_addresses = []
         nc.enabled = True

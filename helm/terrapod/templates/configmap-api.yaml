@@ -9,6 +9,9 @@ metadata:
 data:
   config.yaml: |
     log_level: {{ .Values.api.config.log_level | quote }}
+    {{- if .Values.api.config.external_url }}
+    external_url: {{ .Values.api.config.external_url | quote }}
+    {{- end }}
     storage:
       backend: {{ .Values.api.config.storage.backend | quote }}
       {{- if eq .Values.api.config.storage.backend "s3" }}
@@ -112,17 +115,6 @@ data:
     {{- if .Values.api.config.registry }}
     registry:
       enabled: {{ .Values.api.config.registry.enabled }}
-      {{- if .Values.api.config.registry.module_cache }}
-      module_cache:
-        enabled: {{ .Values.api.config.registry.module_cache.enabled }}
-        {{- if .Values.api.config.registry.module_cache.upstream_registries }}
-        upstream_registries:
-          {{- range .Values.api.config.registry.module_cache.upstream_registries }}
-          - {{ . | quote }}
-          {{- end }}
-        {{- end }}
-        warm_on_first_request: {{ .Values.api.config.registry.module_cache.warm_on_first_request }}
-      {{- end }}
       {{- if .Values.api.config.registry.provider_cache }}
       provider_cache:
         enabled: {{ .Values.api.config.registry.provider_cache.enabled }}
@@ -149,6 +141,10 @@ data:
     vcs:
       enabled: {{ .Values.api.config.vcs.enabled }}
       poll_interval_seconds: {{ .Values.api.config.vcs.poll_interval_seconds | default 60 }}
+      {{- if and .Values.api.config.vcs.github .Values.api.config.vcs.github.webhook_secret }}
+      github:
+        webhook_secret: {{ .Values.api.config.vcs.github.webhook_secret | quote }}
+      {{- end }}
     {{- end }}
     {{- if .Values.api.config.drift_detection }}
     drift_detection:
@@ -174,6 +170,8 @@ data:
         use_tls: {{ .Values.api.config.notifications.smtp.use_tls | default true }}
       {{- end }}
     {{- end }}
+    default_execution_backend: {{ .Values.api.config.default_execution_backend | default "tofu" | quote }}
+    default_terraform_version: {{ .Values.api.config.default_terraform_version | default "1.9" | quote }}
     {{- if .Values.api.config.cors.allow_origins }}
     cors:
       allow_origins:

@@ -47,7 +47,9 @@ def _mock_workspace(
     ws.locked = locked
     ws.lock_id = lock_id
     ws.resource_cpu = resource_cpu
+    ws.execution_backend = "tofu"
     ws.resource_memory = resource_memory
+    ws.agent_pool = None
     ws.labels = labels or {}
     ws.owner_email = owner_email
     ws.vcs_connection_id = None

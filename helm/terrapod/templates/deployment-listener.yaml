@@ -35,30 +35,28 @@ spec:
             - -m
             - terrapod.runner.listener
           env:
-            {{- if .Values.postgresql.url }}
-            - name: TERRAPOD_DATABASE_URL
-              value: {{ .Values.postgresql.url | quote }}
-            {{- end }}
-            {{- if .Values.redis.url }}
-            - name: TERRAPOD_REDIS_URL
-              value: {{ .Values.redis.url | quote }}
-            {{- end }}
             - name: TERRAPOD_RUNNER_NAMESPACE
               value: {{ include "terrapod.runnerNamespace" . | quote }}
-            - name: TERRAPOD_LISTENER_MODE
-              value: "local"
             - name: TERRAPOD_LISTENER_NAME
-              value: "local"
+              value: {{ .Values.listener.name | default "listener" | quote }}
             - name: TERRAPOD_API_URL
               value: "http://{{ include "terrapod.fullname" . }}-api:8000"
-            {{- if .Values.api.config.encryption_key }}
-            - name: TERRAPOD_ENCRYPTION__KEY
-              value: {{ .Values.api.config.encryption_key | quote }}
+            {{- if .Values.listener.existingSecret }}
+            - name: TERRAPOD_JOIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.listener.existingSecret }}
+                  key: {{ .Values.listener.joinTokenKey | default "join-token" }}
+            {{- else if .Values.listener.joinToken }}
+            - name: TERRAPOD_JOIN_TOKEN
+              value: {{ .Values.listener.joinToken | quote }}
             {{- end }}
           volumeMounts:
             - name: runner-config
               mountPath: /etc/terrapod
               readOnly: true
+            - name: certs
+              mountPath: /var/lib/terrapod/certs
           livenessProbe:
             exec:
               command: ["python", "-c", "import os; os.kill(0, 0)"]
@@ -79,6 +77,8 @@ spec:
         - name: runner-config
           configMap:
             name: {{ include "terrapod.fullname" . }}-runner-config
+        - name: certs
+          emptyDir: {}
       {{- with .Values.listener.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

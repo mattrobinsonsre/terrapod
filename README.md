@@ -15,15 +15,15 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | Feature | Status | Description |
 |---|---|---|
 | Workspaces | Implemented | Isolate state, variables, and runs per workspace |
-| Remote State Management | Implemented | Versioned state storage with locking, rollback, Fernet encryption at rest |
+| Remote State Management | Implemented | Versioned state storage with locking, rollback, encryption at rest via CSP services |
 | Remote Execution | Implemented | Plan/apply runs on the server via K8s Job-based runner infrastructure |
 | VCS Integration | Implemented | GitHub (App) and GitLab (access token); polling-first with optional webhooks |
-| Variables & Secrets | Implemented | Per-workspace env and Terraform variables; Fernet-encrypted sensitive values; variable sets |
+| Variables & Secrets | Implemented | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets |
 | RBAC | Implemented | Label-based role system with hierarchical workspace permissions (read/plan/write/admin) |
 | Private Module Registry | Implemented | Publish, version, and share modules internally with pull-through caching |
 | Private Provider Registry | Implemented | Publish, version, and share providers with GPG signing and network mirror caching |
 | Binary Caching | Implemented | Pull-through cache for terraform/tofu CLI binaries |
-| Agent Pools | Implemented | Named groups of remote runner listeners with certificate-based auth |
+| Agent Pools | Implemented | Named groups of runner listeners; join token → certificate exchange for auth |
 | CLI-Driven Runs | Implemented | `terraform plan` / `apply` via cloud backend (both `terraform` and `tofu` verified) |
 | TFE V2 API | Implemented | JSON:API surface compatible with `go-tfe` / `terraform login` |
 | Audit Logging | Implemented | Immutable event log with configurable retention |
@@ -71,19 +71,20 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
               |  metadata) |  |  locks| |  GCS/FS)   | +------------+
               +-----------+   +------+  +-----------+
                                               ^
-                              +---------------+---------------+
-                              |                               |
-                    +---------v----------+         +----------v--------+
-                    |  Runner Listener   |         | Remote Listener   |
-                    |  (local, in-cluster|         | (agent pool,      |
-                    |   Deployment)      |         |  separate cluster)|
-                    +---------+----------+         +----------+--------+
-                              |                               |
-                    +---------v----------+         +----------v--------+
-                    |  K8s Jobs          |         |  K8s Jobs          |
-                    |  (ephemeral        |         |  (ephemeral        |
-                    |   terraform/tofu)  |         |   terraform/tofu)  |
-                    +--------------------+         +--------------------+
+                              +---------------+
+                              |               |
+                    +---------v----------+    |
+                    |  Runner Listener   |    |  (one or more, each
+                    |  (K8s Deployment,  |    |   joins a pool via
+                    |   joins pool via   |    |   join token)
+                    |   join token)      |    |
+                    +---------+----------+    |
+                              |               |
+                    +---------v----------+    |
+                    |  K8s Jobs          |    |
+                    |  (ephemeral        |    |
+                    |   terraform/tofu)  |    |
+                    +--------------------+    +
 ```
 
 ### Design Principles
@@ -262,6 +263,27 @@ make images       # Build production Docker images
 - **API contract**: JSON:API spec; compatibility tested against `go-tfe` client
 - **Migrations**: Alembic with async SQLAlchemy
 - **Local dev**: Tilt with live_update for Python and Node.js hot reload
+
+---
+
+## Security Testing
+
+Terrapod includes a three-layer pen testing framework. All tools run in Docker.
+
+```zsh
+make pentest-sast     # Static analysis (Semgrep)
+make pentest-images   # Container image CVE scan (Trivy)
+make pentest-dast     # Dynamic testing against live stack (Nuclei)
+make pentest          # All three layers
+```
+
+| Layer | Tool | What it covers |
+|-------|------|----------------|
+| SAST | [Semgrep](https://semgrep.dev/) | OWASP Top 10, secrets detection, project-specific rules (naive datetimes, raw background tasks) |
+| Container scanning | [Trivy](https://trivy.dev/) | HIGH/CRITICAL CVEs in `terrapod-api` and `terrapod-web` images |
+| DAST | [Nuclei](https://nuclei.projectdiscovery.io/) | Auth bypass, header injection, CORS validation, state endpoint security, HTTP method restriction |
+
+Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for the full security policy.
 
 ---
 

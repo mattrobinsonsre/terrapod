@@ -1,14 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
+import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { useSortable } from '@/lib/use-sortable'
 
 interface Session {
   email: string
@@ -27,6 +29,19 @@ export default function SessionsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [admin, setAdmin] = useState(false)
+
+  type SessionSortKey = 'provider' | 'created_at' | 'expires_at' | 'last_active_at'
+  const { sortedItems: sortedSessions, sortState, toggleSort } = useSortable<Session, SessionSortKey>(
+    sessions, 'created_at', 'desc',
+    useCallback((item: Session, key: SessionSortKey) => {
+      switch (key) {
+        case 'provider': return item.provider_name
+        case 'created_at': return item.created_at
+        case 'expires_at': return item.expires_at
+        case 'last_active_at': return item.last_active_at
+      }
+    }, []),
+  )
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
@@ -70,13 +85,13 @@ export default function SessionsPage() {
     })
   }
 
-  // Group sessions by email for admin view
+  // Group sessions by email for admin view (sorting is applied before grouping)
   const grouped = admin
-    ? sessions.reduce<Record<string, Session[]>>((acc, s) => {
+    ? sortedSessions.reduce<Record<string, Session[]>>((acc, s) => {
         ;(acc[s.email] ||= []).push(s)
         return acc
       }, {})
-    : { '': sessions }
+    : { '': sortedSessions }
 
   return (
     <>
@@ -112,10 +127,10 @@ export default function SessionsPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-700/50">
-                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Provider</th>
-                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Created</th>
-                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Expires</th>
-                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Last Active</th>
+                        <SortableHeader label="Provider" sortKey="provider" sortState={sortState} onSort={toggleSort} />
+                        <SortableHeader label="Created" sortKey="created_at" sortState={sortState} onSort={toggleSort} />
+                        <SortableHeader label="Expires" sortKey="expires_at" sortState={sortState} onSort={toggleSort} />
+                        <SortableHeader label="Last Active" sortKey="last_active_at" sortState={sortState} onSort={toggleSort} />
                         <th className="text-left px-4 py-3 text-slate-400 font-medium">Token</th>
                       </tr>
                     </thead>

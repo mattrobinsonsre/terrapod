@@ -68,7 +68,7 @@ class RunnerImageConfig(BaseModel):
 class RunnerConfig(BaseModel):
     """Runner configuration, loaded from /etc/terrapod/runners.yaml.
 
-    Separate from main Settings because remote listeners need their own
+    Separate from main Settings because listeners need their own
     runner definitions independent of the API server's config.
     """
 
@@ -357,14 +357,6 @@ class BinaryCacheConfig(BaseModel):
     tofu_mirror_url: str = Field(default="https://github.com/opentofu/opentofu/releases/download")
 
 
-class ModuleCacheConfig(BaseModel):
-    """Module caching (pull-through proxy) configuration."""
-
-    enabled: bool = Field(default=True)
-    upstream_registries: list[str] = Field(default=["registry.terraform.io"])
-    warm_on_first_request: bool = Field(default=True)
-
-
 class RegistryConfig(BaseModel):
     """Private registry and caching configuration."""
 
@@ -376,7 +368,6 @@ class RegistryConfig(BaseModel):
         "If empty, a key is auto-generated on first provider upload. "
         "Set via TERRAPOD_REGISTRY__SIGNING_KEY env var or K8s Secret.",
     )
-    module_cache: ModuleCacheConfig = Field(default_factory=ModuleCacheConfig)
     provider_cache: ProviderCacheConfig = Field(default_factory=ProviderCacheConfig)
     binary_cache: BinaryCacheConfig = Field(default_factory=BinaryCacheConfig)
 
@@ -396,7 +387,7 @@ class GitHubWebhookConfig(BaseModel):
 class VCSConfig(BaseModel):
     """VCS integration configuration."""
 
-    enabled: bool = Field(default=False, description="Enable VCS integration")
+    enabled: bool = Field(default=True, description="Enable VCS integration")
     poll_interval_seconds: int = Field(
         default=60, description="Polling interval in seconds for VCS changes"
     )
@@ -464,6 +455,11 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False)
     log_level: str = Field(default="INFO")
     json_logs: bool = Field(default=True, description="JSON logging in production")
+    external_url: str = Field(
+        default="",
+        description="Public-facing Terrapod URL (e.g. https://terrapod.example.com). "
+        "Used for commit status links, notification URLs, and any outbound links back to the UI.",
+    )
 
     # Database
     database_url: PostgresDsn = Field(
@@ -501,11 +497,14 @@ class Settings(BaseSettings):
     # CORS
     cors: CORSConfig = Field(default_factory=CORSConfig)
 
-    # Encryption
-    encryption_key: str = Field(
-        default="",
-        description="Fernet encryption key for sensitive variables. "
-        "Generate with: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'",
+    # Workspace defaults
+    default_execution_backend: str = Field(
+        default="tofu",
+        description="Default execution backend for new workspaces (tofu or terraform)",
+    )
+    default_terraform_version: str = Field(
+        default="1.9",
+        description="Default terraform/tofu version for new workspaces",
     )
 
     # API

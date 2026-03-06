@@ -86,6 +86,18 @@ docker_build(
     ],
 )
 
+# Runner Job image (Alpine + curl/tar/jq, signal-forwarding entrypoint)
+# Built as a local_resource (not docker_build) because the runner image is
+# referenced in the runners.yaml ConfigMap, not in a pod spec — Tilt's image
+# injection doesn't apply.  values-local.yaml sets terrapod-runner:local with
+# pullPolicy: Never so K8s Jobs find it in the local Docker daemon.
+local_resource(
+    'build-runner-image',
+    cmd='docker build -f docker/Dockerfile.runner -t terrapod-runner:local .',
+    deps=['docker/Dockerfile.runner', 'docker/runner-entrypoint.sh'],
+    labels=['build'],
+)
+
 # Web UI (Next.js) — use builder stage for dev mode with hot reload
 docker_build(
     'terrapod-web',
@@ -191,6 +203,13 @@ k8s_resource('terrapod-redis', labels=['infra'])
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Load Helm chart with local overrides
+# Explicit watch_file() calls ensure Tilt re-renders the chart when values
+# or templates change. The helm() function should do this automatically but
+# in practice it's unreliable (see tilt-dev/tilt#5932).
+watch_file('helm/terrapod/values.yaml')
+watch_file('helm/terrapod/values-local.yaml')
+watch_file('helm/terrapod/templates')
+
 k8s_yaml(helm(
     'helm/terrapod',
     name='terrapod',
@@ -241,11 +260,32 @@ k8s_resource(
     links=[link('https://terrapod.local', 'Terrapod')],
 )
 
-# Runner Listener (uses same image as API)
+# Dev pool setup — creates pool + join token via the API pod's bootstrap script.
+# Idempotent: skips if pool already exists.
+local_resource(
+    'setup-dev-pool',
+    cmd='''
+echo "Waiting for API pod to be ready..."
+kubectl -n terrapod wait --for=condition=Ready pod -l app.kubernetes.io/name=terrapod,app.kubernetes.io/component=api --timeout=120s
+
+echo "Creating dev pool + join token..."
+kubectl -n terrapod exec deploy/terrapod-api -- env \
+    DATABASE_URL="postgresql+asyncpg://terrapod:terrapod@terrapod-postgresql:5432/terrapod" \
+    TERRAPOD_BOOTSTRAP_ADMIN_EMAIL=admin \
+    TERRAPOD_BOOTSTRAP_ADMIN_PASSWORD=admin \
+    TERRAPOD_BOOTSTRAP_POOL_NAME=dev \
+    TERRAPOD_BOOTSTRAP_POOL_TOKEN=dev-join-token-do-not-use-in-prod \
+    python -m terrapod.cli.bootstrap
+''',
+    labels=['setup'],
+    resource_deps=['terrapod-api'],
+)
+
+# Runner Listener (uses same image as API, needs dev pool)
 k8s_resource(
     'terrapod-listener',
     labels=['backend'],
-    resource_deps=['terrapod-api'],
+    resource_deps=['setup-dev-pool'],
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

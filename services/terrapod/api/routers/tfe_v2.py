@@ -31,13 +31,16 @@ Endpoints:
     PUT  /api/v2/state-versions/{id}/json-content — upload JSON state
 """
 
+import asyncio
 import hashlib
+import json
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sse_starlette.sse import EventSourceResponse
 
 from terrapod.api.dependencies import DEFAULT_ORG, AuthenticatedUser, get_current_user
 from terrapod.db.models import StateVersion, Workspace
@@ -248,6 +251,7 @@ def _workspace_json(ws: Workspace, effective_permission: str | None = None) -> d
                 "auto-apply": ws.auto_apply,
                 "execution-mode": ws.execution_mode,
                 "operations": ws.execution_mode == "remote",
+                "execution-backend": ws.execution_backend,
                 "terraform-version": ws.terraform_version or "",
                 "working-directory": ws.working_directory,
                 "locked": ws.locked,
@@ -260,6 +264,8 @@ def _workspace_json(ws: Workspace, effective_permission: str | None = None) -> d
                 "drift-detection-interval-seconds": ws.drift_detection_interval_seconds,
                 "drift-last-checked-at": _rfc3339(ws.drift_last_checked_at),
                 "drift-status": ws.drift_status,
+                "agent-pool-id": f"apool-{ws.agent_pool_id}" if ws.agent_pool_id else None,
+                "agent-pool-name": ws.agent_pool.name if ws.agent_pool else None,
                 "labels": ws.labels or {},
                 "owner-email": ws.owner_email,
                 "created-at": _rfc3339(ws.created_at),
@@ -382,11 +388,14 @@ async def create_workspace(
 
             vcs_connection_id = _uuid.UUID(vcs_conn_id_str.removeprefix("vcs-"))
 
+    from terrapod.config import settings
+
     ws = Workspace(
         name=name,
         execution_mode=attrs.get("execution-mode", "local"),
         auto_apply=attrs.get("auto-apply", False),
-        terraform_version=attrs.get("terraform-version", ""),
+        execution_backend=attrs.get("execution-backend", settings.default_execution_backend),
+        terraform_version=attrs.get("terraform-version", settings.default_terraform_version),
         working_directory=attrs.get("working-directory", ""),
         resource_cpu=attrs.get("resource-cpu", "1"),
         resource_memory=attrs.get("resource-memory", "2Gi"),
@@ -440,6 +449,52 @@ async def _require_ws_permission(
     return ws, perm
 
 
+# ── SSE (Server-Sent Events) ─────────────────────────────────────────────
+# This MUST come before parameterized /workspaces/{workspace_id} routes
+# so FastAPI doesn't match "workspace-events" as a workspace_id parameter.
+
+
+@router.get("/workspace-events")
+async def workspace_list_events(
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> EventSourceResponse:
+    """Stream workspace list events via SSE for real-time updates.
+
+    Any authenticated user can subscribe. Publishes run_status_change
+    and drift_status_change events for all workspaces.
+    """
+    from terrapod.redis.client import WORKSPACE_LIST_EVENTS_CHANNEL, subscribe_channel
+
+    pubsub = await subscribe_channel(WORKSPACE_LIST_EVENTS_CHANNEL)
+
+    async def event_generator():
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                message = await pubsub.get_message(
+                    ignore_subscribe_messages=True, timeout=1.0
+                )
+                if message and message["type"] == "message":
+                    data = message["data"]
+                    if isinstance(data, bytes):
+                        data = data.decode()
+                    payload = json.loads(data)
+                    yield {
+                        "event": payload.get("event", "update"),
+                        "data": json.dumps(payload),
+                    }
+                else:
+                    yield {"comment": "keepalive"}
+                    await asyncio.sleep(1)
+        finally:
+            await pubsub.unsubscribe(WORKSPACE_LIST_EVENTS_CHANNEL)
+            await pubsub.aclose()
+
+    return EventSourceResponse(event_generator())
+
+
 @router.get("/workspaces/{workspace_id}")
 async def show_workspace_by_id(
     workspace_id: str = Path(...),
@@ -476,6 +531,14 @@ async def update_workspace(
         ws.execution_mode = attrs["execution-mode"]
     if "auto-apply" in attrs:
         ws.auto_apply = attrs["auto-apply"]
+    if "execution-backend" in attrs:
+        backend = attrs["execution-backend"]
+        if backend not in ("terraform", "tofu"):
+            raise HTTPException(
+                status_code=422,
+                detail="execution-backend must be 'terraform' or 'tofu'",
+            )
+        ws.execution_backend = backend
     if "terraform-version" in attrs:
         ws.terraform_version = attrs["terraform-version"]
     if "working-directory" in attrs:
@@ -492,6 +555,14 @@ async def update_workspace(
         ws.vcs_branch = attrs["vcs-branch"]
     if "vcs-working-directory" in attrs:
         ws.vcs_working_directory = attrs["vcs-working-directory"]
+    if "agent-pool-id" in attrs:
+        import uuid as _uuid
+
+        pool_val = attrs["agent-pool-id"]
+        if pool_val is None:
+            ws.agent_pool_id = None
+        else:
+            ws.agent_pool_id = _uuid.UUID(str(pool_val).removeprefix("apool-"))
     if "drift-detection-enabled" in attrs:
         ws.drift_detection_enabled = attrs["drift-detection-enabled"]
     if "drift-detection-interval-seconds" in attrs:
@@ -611,11 +682,6 @@ async def download_state(
         data = await storage.get(key)
     except Exception:
         raise HTTPException(status_code=404, detail="State data not yet uploaded") from None
-
-    # Decrypt state at rest (Fernet envelope)
-    from terrapod.services.encryption_service import decrypt_state
-
-    data = decrypt_state(data)
 
     return Response(content=data, media_type="application/json")
 
@@ -751,14 +817,10 @@ async def upload_state_content(
         raise HTTPException(status_code=422, detail="State data is required")
 
     # Encrypt state at rest (Fernet envelope)
-    from terrapod.services.encryption_service import encrypt_state
-
-    encrypted_data = encrypt_state(state_data)
-
     # Store in object storage
     storage = get_storage()
     key = state_key(str(sv.workspace_id), str(sv.id))
-    await storage.put(key, encrypted_data, content_type="application/octet-stream")
+    await storage.put(key, state_data, content_type="application/octet-stream")
 
     # Update metadata
     sv.state_size = len(state_data)

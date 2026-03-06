@@ -9,12 +9,15 @@ import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
-import { getAuthState } from '@/lib/auth'
+import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { LabelsEditor } from '@/components/labels-editor'
 
 interface VersionStatus {
   version: string
   status: string
+  'vcs-commit-sha'?: string
+  'vcs-tag'?: string
 }
 
 interface VCSConnection {
@@ -33,6 +36,8 @@ interface ModuleDetail {
     provider: string
     status: string
     source: string
+    labels: Record<string, string>
+    'owner-email': string
     'vcs-connection-id': string | null
     'vcs-repo-url': string
     'vcs-branch': string
@@ -156,6 +161,12 @@ export default function ModuleDetailPage() {
   const [showCreateVersion, setShowCreateVersion] = useState(false)
   const [newVersion, setNewVersion] = useState('')
   const [creating, setCreating] = useState(false)
+
+  // Metadata editing (labels/owner)
+  const [editingMeta, setEditingMeta] = useState(false)
+  const [editLabels, setEditLabels] = useState<Record<string, string>>({})
+  const [editOwner, setEditOwner] = useState('')
+  const [savingMeta, setSavingMeta] = useState(false)
 
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
@@ -372,6 +383,36 @@ export default function ModuleDetailPage() {
     }
   }
 
+  function startEditingMeta() {
+    if (!module) return
+    setEditLabels(module.attributes.labels || {})
+    setEditOwner(module.attributes['owner-email'] || '')
+    setEditingMeta(true)
+  }
+
+  async function handleSaveMeta() {
+    if (!module) return
+    setSavingMeta(true)
+    setError('')
+    try {
+      const res = await apiFetch(`/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: { type: 'registry-modules', attributes: { labels: editLabels, ...(isAdmin() ? { 'owner-email': editOwner } : {}) } },
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to update module')
+      const data = await res.json()
+      setModule(data.data)
+      setEditingMeta(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update module')
+    } finally {
+      setSavingMeta(false)
+    }
+  }
+
   const isVcsSource = module?.attributes.source === 'vcs'
 
   return (
@@ -569,6 +610,39 @@ export default function ModuleDetailPage() {
               </div>
             )}
 
+            {/* Metadata: Owner & Labels */}
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-5 mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-slate-300">Metadata</h3>
+                {!editingMeta ? (
+                  <button onClick={startEditingMeta} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button onClick={() => setEditingMeta(false)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
+                    <button onClick={handleSaveMeta} disabled={savingMeta} className="text-xs text-brand-400 hover:text-brand-300">{savingMeta ? 'Saving...' : 'Save'}</button>
+                  </div>
+                )}
+              </div>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <dt className="text-xs text-slate-500">Owner</dt>
+                  {editingMeta && isAdmin() ? (
+                    <input type="email" value={editOwner} onChange={(e) => setEditOwner(e.target.value)} placeholder="user@example.com" className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">{module.attributes['owner-email'] || 'None'}</dd>
+                  )}
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500 mb-1">Labels</dt>
+                  {editingMeta ? (
+                    <LabelsEditor labels={editLabels} onChange={setEditLabels} />
+                  ) : (
+                    <dd className="mt-1"><LabelsEditor labels={module.attributes.labels || {}} readOnly /></dd>
+                  )}
+                </div>
+              </dl>
+            </div>
+
             <h2 className="text-lg font-semibold text-slate-200 mb-3">Versions</h2>
             {(module.attributes['version-statuses'] || []).length === 0 ? (
               <EmptyState message="No versions yet. Upload a module or connect VCS to get started." />
@@ -579,6 +653,9 @@ export default function ModuleDetailPage() {
                     <tr className="border-b border-slate-700/50">
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Version</th>
                       <th className="text-left px-4 py-3 text-slate-400 font-medium">Status</th>
+                      {isVcsSource && (
+                        <th className="text-left px-4 py-3 text-slate-400 font-medium">Source</th>
+                      )}
                       <th className="text-right px-4 py-3 text-slate-400 font-medium">Actions</th>
                     </tr>
                   </thead>
@@ -595,6 +672,22 @@ export default function ModuleDetailPage() {
                             {v.status}
                           </span>
                         </td>
+                        {isVcsSource && (
+                          <td className="px-4 py-3">
+                            {v['vcs-tag'] ? (
+                              <span className="text-slate-300 text-xs">
+                                <span className="font-mono">{v['vcs-tag']}</span>
+                                {v['vcs-commit-sha'] && (
+                                  <span className="text-slate-500 ml-1.5" title={v['vcs-commit-sha']}>
+                                    ({v['vcs-commit-sha'].slice(0, 7)})
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-slate-500 text-xs">manual upload</span>
+                            )}
+                          </td>
+                        )}
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => setDeleteTarget(v.version)}

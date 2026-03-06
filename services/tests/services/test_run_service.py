@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.services.run_service import (
     TERMINAL_STATES,
     VALID_TRANSITIONS,
+    _publish_run_event,
     can_transition,
     cancel_run,
     claim_next_run,
@@ -192,12 +193,6 @@ class TestCreateRun:
     @patch("terrapod.services.run_service.Run")
     async def test_creates_run_with_defaults(self, MockRun):
         db = AsyncMock(spec=AsyncSession)
-        # Mock the default pool lookup
-        mock_pool = MagicMock()
-        mock_pool.id = uuid.uuid4()
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = mock_pool
-        db.execute.return_value = mock_result
 
         ws = _mock_workspace()
         instance = MockRun.return_value
@@ -357,3 +352,22 @@ class TestClaimNextRun:
 
         result = await claim_next_run(db, listener)
         assert result is None
+
+
+# ── _publish_run_event ────────────────────────────────────────────────
+
+
+class TestPublishRunEvent:
+    @patch("terrapod.redis.client.publish_event", new_callable=AsyncMock)
+    async def test_publishes_to_all_three_channels(self, mock_publish):
+        """Run events publish to per-workspace, admin, and workspace list channels."""
+        run = _mock_run(status="planning")
+        workspace_id = run.workspace_id
+
+        await _publish_run_event(run, "queued", "planning")
+
+        assert mock_publish.call_count == 3
+        channels = [call.args[0] for call in mock_publish.call_args_list]
+        assert f"tp:run_events:{workspace_id}" in channels
+        assert "tp:admin_events" in channels
+        assert "tp:workspace_list_events" in channels

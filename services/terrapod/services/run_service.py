@@ -1,12 +1,13 @@
 """Run state machine and lifecycle management service."""
 
+import json
 import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import (
-    AgentPool,
+
     ConfigurationVersion,
     Run,
     RunnerListener,
@@ -79,6 +80,29 @@ async def _enqueue_notification(run: Run, target_status: str) -> None:
         logger.warning("Failed to enqueue notification", error=str(e))
 
 
+async def _enqueue_vcs_status(run: Run, target_status: str) -> None:
+    """Enqueue a VCS commit status update for a run state change.
+
+    Only meaningful for VCS-sourced runs (those with a commit SHA).
+    Posts commit status and optionally PR comments back to the provider.
+    """
+    from terrapod.services.scheduler import enqueue_trigger
+
+    try:
+        await enqueue_trigger(
+            "vcs_commit_status",
+            {
+                "run_id": str(run.id),
+                "workspace_id": str(run.workspace_id),
+                "target_status": target_status,
+            },
+            dedup_key=f"vcs_status:{run.id}:{target_status}",
+            dedup_ttl=60,
+        )
+    except Exception as e:
+        logger.warning("Failed to enqueue VCS status", error=str(e))
+
+
 async def _enqueue_drift_completed(run: Run) -> None:
     """Enqueue a drift_run_completed trigger when a drift run finishes."""
     from terrapod.services.scheduler import enqueue_trigger
@@ -95,6 +119,34 @@ async def _enqueue_drift_completed(run: Run) -> None:
         )
     except Exception as e:
         logger.warning("Failed to enqueue drift completion", error=str(e))
+
+
+async def _publish_run_event(run: Run, old_status: str, new_status: str) -> None:
+    """Publish a run status change event via Redis pub/sub for SSE streaming."""
+    try:
+        from terrapod.redis.client import (
+            ADMIN_EVENTS_CHANNEL,
+            RUN_EVENTS_PREFIX,
+            WORKSPACE_LIST_EVENTS_CHANNEL,
+            publish_event,
+        )
+
+        payload = json.dumps({
+            "event": "run_status_change",
+            "run_id": str(run.id),
+            "workspace_id": str(run.workspace_id),
+            "old_status": old_status,
+            "new_status": new_status,
+        })
+        # Per-workspace channel (run detail / workspace detail pages)
+        await publish_event(f"{RUN_EVENTS_PREFIX}{run.workspace_id}", payload)
+        # Admin health dashboard
+        await publish_event(ADMIN_EVENTS_CHANNEL, payload)
+        # Workspace list page
+        await publish_event(WORKSPACE_LIST_EVENTS_CHANNEL, payload)
+    except Exception as e:
+        # Never let SSE publishing break the state machine
+        logger.debug("Failed to publish run event", error=str(e))
 
 
 def can_transition(current: str, target: str) -> bool:
@@ -125,14 +177,7 @@ async def create_run(
     if auto_apply is None:
         auto_apply = workspace.auto_apply
 
-    # Resolve pool — fall back to the default pool if workspace has none
     pool_id = workspace.agent_pool_id
-    if pool_id is None:
-        default_pool = (
-            await db.execute(select(AgentPool).where(AgentPool.name == "default").limit(1))
-        ).scalar_one_or_none()
-        if default_pool:
-            pool_id = default_pool.id
 
     run = Run(
         workspace_id=workspace.id,
@@ -143,6 +188,7 @@ async def create_run(
         auto_apply=auto_apply,
         plan_only=plan_only,
         source=source,
+        execution_backend=workspace.execution_backend,
         terraform_version=terraform_version or workspace.terraform_version,
         resource_cpu=workspace.resource_cpu,
         resource_memory=workspace.resource_memory,
@@ -162,6 +208,9 @@ async def create_run(
 
     # Enqueue run:created notification
     await _enqueue_notification(run, "pending")
+
+    # Publish SSE event
+    await _publish_run_event(run, "", "pending")
 
     return run
 
@@ -208,6 +257,9 @@ async def transition_run(
         to_status=target_status,
     )
 
+    # Publish SSE event
+    await _publish_run_event(run, old_status, target_status)
+
     # Fire run triggers when a non-speculative run completes apply
     if target_status == "applied" and not run.plan_only:
         await fire_run_triggers(db, run.workspace_id)
@@ -215,8 +267,14 @@ async def transition_run(
     # Enqueue notification for this status change
     await _enqueue_notification(run, target_status)
 
-    # Enqueue drift status update when a drift detection run reaches a terminal state
-    if run.is_drift_detection and target_status in TERMINAL_STATES:
+    # Enqueue VCS commit status for VCS-sourced runs
+    if run.vcs_commit_sha:
+        await _enqueue_vcs_status(run, target_status)
+
+    # Enqueue drift status update when a drift detection run reaches a terminal state.
+    # Plan-only drift runs end in "planned" (not in TERMINAL_STATES), so check that too.
+    drift_terminal = TERMINAL_STATES | {"planned"}
+    if run.is_drift_detection and target_status in drift_terminal:
         await _enqueue_drift_completed(run)
 
     return run
@@ -419,6 +477,17 @@ async def get_run_presigned_urls(
         await storage.presigned_put_url(state_key(ws_id, f"{run_id}-new"))
     ).url
 
+    # Binary cache URL (resolve partial version → exact)
+    try:
+        from terrapod.services.binary_cache_service import get_or_cache_binary, resolve_version
+
+        resolved_version = await resolve_version(run.execution_backend, run.terraform_version)
+        urls["binary_url"] = await get_or_cache_binary(
+            db, storage, run.execution_backend, resolved_version, "linux", "amd64"
+        )
+    except Exception as e:
+        logger.warning("Failed to resolve binary URL", error=str(e))
+
     return urls
 
 
@@ -471,6 +540,17 @@ async def get_apply_presigned_urls(
     urls["state_upload_url"] = (
         await storage.presigned_put_url(state_key(ws_id, f"{run_id}-new"))
     ).url
+
+    # Binary cache URL (resolve partial version → exact)
+    try:
+        from terrapod.services.binary_cache_service import get_or_cache_binary, resolve_version
+
+        resolved_version = await resolve_version(run.execution_backend, run.terraform_version)
+        urls["binary_url"] = await get_or_cache_binary(
+            db, storage, run.execution_backend, resolved_version, "linux", "amd64"
+        )
+    except Exception as e:
+        logger.warning("Failed to resolve binary URL for apply", error=str(e))
 
     return urls
 

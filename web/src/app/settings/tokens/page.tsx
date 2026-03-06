@@ -1,14 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
+import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, getUserId } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { useSortable } from '@/lib/use-sortable'
 
 interface Token {
   id: string
@@ -33,6 +35,18 @@ export default function TokensPage() {
   const [createdToken, setCreatedToken] = useState<string | null>(null)
 
   const userId = getUserId()
+
+  type TokenSortKey = 'description' | 'created-at' | 'last-used-at'
+  const { sortedItems: sortedTokens, sortState, toggleSort } = useSortable<Token, TokenSortKey>(
+    tokens, 'created-at', 'desc',
+    useCallback((item: Token, key: TokenSortKey) => {
+      switch (key) {
+        case 'description': return item.attributes.description
+        case 'created-at': return item.attributes['created-at']
+        case 'last-used-at': return item.attributes['last-used-at']
+      }
+    }, []),
+  )
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
@@ -175,14 +189,14 @@ export default function TokensPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-700/50">
-                  <th className="text-left px-4 py-3 text-slate-400 font-medium">Description</th>
-                  <th className="text-left px-4 py-3 text-slate-400 font-medium">Created</th>
-                  <th className="text-left px-4 py-3 text-slate-400 font-medium">Last Used</th>
+                  <SortableHeader label="Description" sortKey="description" sortState={sortState} onSort={toggleSort} />
+                  <SortableHeader label="Created" sortKey="created-at" sortState={sortState} onSort={toggleSort} />
+                  <SortableHeader label="Last Used" sortKey="last-used-at" sortState={sortState} onSort={toggleSort} />
                   <th className="text-right px-4 py-3 text-slate-400 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {tokens.map((tok) => (
+                {sortedTokens.map((tok) => (
                   <tr key={tok.id} className="border-b border-slate-700/30 last:border-0">
                     <td className="px-4 py-3 text-slate-200">
                       {tok.attributes.description || <span className="text-slate-500 italic">No description</span>}

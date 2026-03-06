@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
@@ -8,8 +8,11 @@ import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
+import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { useSortable } from '@/lib/use-sortable'
+import { useWorkspaceListEvents } from '@/lib/use-workspace-list-events'
 
 interface Workspace {
   id: string
@@ -38,14 +41,51 @@ export default function WorkspacesPage() {
   const [newName, setNewName] = useState('')
   const [newExecMode, setNewExecMode] = useState('local')
   const [newAutoApply, setNewAutoApply] = useState(false)
+  const [newBackend, setNewBackend] = useState('tofu')
+  const [newVersion, setNewVersion] = useState('1.9')
   const [newCpu, setNewCpu] = useState('1')
   const [newMemory, setNewMemory] = useState('2Gi')
   const [creating, setCreating] = useState(false)
+
+  // Version suggestions
+  const [versionSuggestions, setVersionSuggestions] = useState<string[]>([])
+  const [versionsBackend, setVersionsBackend] = useState('')
+
+  type WsSortKey = 'name' | 'mode' | 'resources' | 'status' | 'created'
+  const { sortedItems: sortedWorkspaces, sortState, toggleSort } = useSortable<Workspace, WsSortKey>(
+    workspaces, 'name', 'asc',
+    useCallback((item: Workspace, key: WsSortKey) => {
+      switch (key) {
+        case 'name': return item.attributes.name
+        case 'mode': return item.attributes['execution-mode']
+        case 'resources': return item.attributes['resource-cpu']
+        case 'status': return item.attributes.locked ? 'locked' : 'unlocked'
+        case 'created': return item.attributes['created-at']
+      }
+    }, []),
+  )
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
     loadWorkspaces()
   }, [router])
+
+  // Real-time workspace list updates via SSE
+  useWorkspaceListEvents(workspaces.length > 0, useCallback(() => {
+    loadWorkspaces()
+  }, []))
+
+  // Fetch version suggestions when backend changes and form is open
+  useEffect(() => {
+    if (!showCreate || newBackend === versionsBackend) return
+    apiFetch(`/api/v2/binary-cache/versions?tool=${newBackend}`)
+      .then(res => res.ok ? res.json() : { data: [] })
+      .then(data => {
+        setVersionSuggestions(data.data || [])
+        setVersionsBackend(newBackend)
+      })
+      .catch(() => {})
+  }, [showCreate, newBackend, versionsBackend])
 
   async function loadWorkspaces() {
     setLoading(true)
@@ -75,6 +115,8 @@ export default function WorkspacesPage() {
             attributes: {
               name: newName,
               'execution-mode': newExecMode,
+              'execution-backend': newBackend,
+              'terraform-version': newVersion,
               'auto-apply': newAutoApply,
               'resource-cpu': newCpu,
               'resource-memory': newMemory,
@@ -88,6 +130,8 @@ export default function WorkspacesPage() {
       }
       setNewName('')
       setNewExecMode('local')
+      setNewBackend('tofu')
+      setNewVersion('1.9')
       setNewAutoApply(false)
       setNewCpu('1')
       setNewMemory('2Gi')
@@ -147,6 +191,35 @@ export default function WorkspacesPage() {
                 </select>
               </div>
               <div>
+                <label htmlFor="ws-backend" className="block text-sm font-medium text-slate-300 mb-1">Execution Backend</label>
+                <select
+                  id="ws-backend"
+                  value={newBackend}
+                  onChange={(e) => setNewBackend(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                >
+                  <option value="tofu">OpenTofu</option>
+                  <option value="terraform">Terraform</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="ws-version" className="block text-sm font-medium text-slate-300 mb-1">Version</label>
+                <input
+                  id="ws-version"
+                  type="text"
+                  list="version-suggestions"
+                  value={newVersion}
+                  onChange={(e) => setNewVersion(e.target.value)}
+                  placeholder="e.g. 1.9 or 1.9.8"
+                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                />
+                <datalist id="version-suggestions">
+                  {versionSuggestions.map(v => (
+                    <option key={v} value={v} />
+                  ))}
+                </datalist>
+              </div>
+              <div>
                 <label htmlFor="ws-cpu" className="block text-sm font-medium text-slate-300 mb-1">CPU Request</label>
                 <input
                   id="ws-cpu"
@@ -199,15 +272,15 @@ export default function WorkspacesPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Mode</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Resources</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden lg:table-cell">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden lg:table-cell">Created</th>
+                  <SortableHeader label="Name" sortKey="name" sortState={sortState} onSort={toggleSort} />
+                  <SortableHeader label="Mode" sortKey="mode" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
+                  <SortableHeader label="Resources" sortKey="resources" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortableHeader label="Status" sortKey="status" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
+                  <SortableHeader label="Created" sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/30">
-                {workspaces.map((ws) => (
+                {sortedWorkspaces.map((ws) => (
                   <tr key={ws.id} className="hover:bg-slate-700/20 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">

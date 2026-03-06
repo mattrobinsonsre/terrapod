@@ -85,7 +85,7 @@ async def create_gpg_key(
         ascii_armor=ascii_armor,
         source=source,
         source_url=source_url,
-        private_key_encrypted=private_key_armor,
+        private_key=private_key_armor,
     )
     db.add(gpg_key)
     await db.flush()
@@ -106,7 +106,7 @@ async def import_signing_key(
     public_armor = derive_public_key(private_key_armor)
 
     # Delete any existing signing keys
-    result = await db.execute(select(GPGKey).where(GPGKey.private_key_encrypted.isnot(None)))
+    result = await db.execute(select(GPGKey).where(GPGKey.private_key.isnot(None)))
     for old_key in result.scalars().all():
         await db.delete(old_key)
     await db.flush()
@@ -134,14 +134,14 @@ async def get_or_create_signing_key(db: AsyncSession) -> tuple[GPGKey, str]:
     # 1. Existing key in DB
     result = await db.execute(
         select(GPGKey)
-        .where(GPGKey.private_key_encrypted.isnot(None))
+        .where(GPGKey.private_key.isnot(None))
         .order_by(GPGKey.created_at.desc())
         .limit(1)
     )
     gpg_key = result.scalars().first()
 
     if gpg_key is not None:
-        return gpg_key, gpg_key.private_key_encrypted  # type: ignore[return-value]
+        return gpg_key, gpg_key.private_key  # type: ignore[return-value]
 
     # 2. Provided via config/env var
     from terrapod.config import settings

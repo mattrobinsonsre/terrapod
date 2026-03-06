@@ -47,8 +47,10 @@ def build_job_spec(
     resource_memory: str = "2Gi",
     timeout_minutes: int = 60,
     terraform_version: str = "",
+    execution_backend: str = "",
     service_account_name: str = "",
     namespace: str = "",
+    plan_only: bool = False,
 ) -> dict:
     """Build a K8s Job spec for a run phase.
 
@@ -63,6 +65,7 @@ def build_job_spec(
         resource_memory: Memory request (e.g. "2Gi", "256Mi").
         timeout_minutes: Job timeout in minutes.
         terraform_version: Terraform/tofu version to use.
+        execution_backend: Execution backend (terraform or tofu).
         service_account_name: K8s SA for the Job (CSP identity).
         namespace: Target namespace for the Job.
     """
@@ -95,9 +98,11 @@ def build_job_spec(
 
     # Terraform version + backend
     version = terraform_version or runner_config.default_terraform_version
-    backend = runner_config.default_execution_backend
+    backend = execution_backend or runner_config.default_execution_backend
     container_env.append({"name": "TP_VERSION", "value": version})
     container_env.append({"name": "TP_BACKEND", "value": backend})
+    if plan_only:
+        container_env.append({"name": "TP_PLAN_ONLY", "value": "true"})
 
     # Binary cache URL
     container_env.append(

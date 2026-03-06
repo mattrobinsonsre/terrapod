@@ -17,6 +17,9 @@ runs each poll cycle per interval. Webhook-triggered immediate polls use
 the scheduler's trigger queue with deduplication.
 """
 
+import io
+import tarfile
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -107,6 +110,34 @@ async def _resolve_branch(conn: VCSConnection, ws: Workspace, owner: str, repo: 
     return None
 
 
+def _strip_top_level_dir(archive: bytes) -> bytes:
+    """Repack a tarball, stripping the single top-level directory.
+
+    GitHub/GitLab tarballs wrap content in a directory like
+    ``owner-repo-sha/``.  The runner entrypoint extracts to /workspace
+    and expects .tf files at the root, so we strip the wrapper.
+    """
+    in_buf = io.BytesIO(archive)
+    out_buf = io.BytesIO()
+
+    with tarfile.open(fileobj=in_buf, mode="r:gz") as src, \
+         tarfile.open(fileobj=out_buf, mode="w:gz") as dst:
+        for member in src.getmembers():
+            # Strip first path component: "owner-repo-sha/file" → "file"
+            parts = member.name.split("/", 1)
+            if len(parts) < 2 or not parts[1]:
+                continue  # skip the top-level directory entry itself
+            member.name = parts[1]
+            if member.isfile():
+                f = src.extractfile(member)
+                if f:
+                    dst.addfile(member, f)
+            else:
+                dst.addfile(member)
+
+    return out_buf.getvalue()
+
+
 async def _create_vcs_run(
     db: AsyncSession,
     ws: Workspace,
@@ -131,6 +162,9 @@ async def _create_vcs_run(
             error=str(e),
         )
         return None
+
+    # VCS tarballs have a top-level directory wrapper — strip it
+    archive = _strip_top_level_dir(archive)
 
     cv = await run_service.create_configuration_version(
         db,
@@ -265,6 +299,30 @@ async def _poll_workspace_prs(
         )
         if existing.scalar_one_or_none() is not None:
             continue
+
+        # Cancel any existing non-terminal runs for this PR (superseded by new commit)
+        stale_result = await db.execute(
+            select(Run).where(
+                Run.workspace_id == ws.id,
+                Run.vcs_pull_request_number == pr.number,
+                Run.status.notin_(run_service.TERMINAL_STATES),
+            )
+        )
+        for stale_run in stale_result.scalars().all():
+            try:
+                await run_service.cancel_run(db, stale_run)
+                logger.info(
+                    "Canceled stale PR run",
+                    run_id=str(stale_run.id),
+                    pr_number=pr.number,
+                    workspace=ws.name,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to cancel stale PR run",
+                    run_id=str(stale_run.id),
+                    error=str(e),
+                )
 
         logger.info(
             "New PR commit detected",

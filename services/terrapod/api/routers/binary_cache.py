@@ -27,6 +27,7 @@ from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.binary_cache_service import (
     get_or_cache_binary,
+    list_available_versions,
     list_cached_binaries,
     purge_binary,
     warm_binary,
@@ -43,6 +44,33 @@ class WarmBinaryRequest(BaseModel):
     version: str
     os: str = "linux"
     arch: str = "amd64"
+
+
+# --- Version suggestions ---
+
+
+@router.get("/api/v2/binary-cache/versions")
+async def available_versions(
+    tool: str = "tofu",
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> JSONResponse:
+    """List available stable versions for a tool.
+
+    Returns version strings sorted newest first, including major.minor shortcuts.
+    Cached in Redis for 1 hour. Any authenticated user can access.
+    """
+    try:
+        versions = await list_available_versions(tool)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    except Exception as e:
+        logger.error("Failed to fetch versions", tool=tool, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to fetch versions for {tool}: {e}",
+        ) from e
+
+    return JSONResponse(content={"data": versions})
 
 
 # --- Runner-facing endpoint ---

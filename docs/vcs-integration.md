@@ -69,7 +69,7 @@ The `VCSProvider` protocol defines the interface for VCS operations. The poller 
 - A running Terrapod instance with API access
 - Admin access to Terrapod (for creating VCS connections)
 - **For GitHub**: a GitHub account or organization where you can create GitHub Apps
-- **For GitLab**: a Project or Group Access Token with `read_api` and `read_repository` scopes
+- **For GitLab**: a Project or Group Access Token with `api` scope (required for commit statuses and MR comments; `read_api` + `read_repository` is sufficient if you don't need status reporting)
 
 ---
 
@@ -113,12 +113,12 @@ GitHub integration uses a **GitHub App** for fine-grained permissions and org-le
 
 3. Set **Repository permissions**:
 
-   | Permission | Access |
-   |---|---|
-   | **Contents** | Read-only |
-   | **Metadata** | Read-only (auto-selected) |
-
-   > **Checks** (Read & write) and **Pull requests** (Read & write) are needed later for PR status reporting. You can add them now or later.
+   | Permission | Access | Purpose |
+   |---|---|---|
+   | **Contents** | Read-only | Download repository archives |
+   | **Metadata** | Read-only (auto-selected) | Repository metadata |
+   | **Commit statuses** | Read & write | Post plan/apply status to commits |
+   | **Pull requests** | Read & write | Post and update PR comments |
 
 4. Under **Where can this GitHub App be installed?**, choose based on your needs:
    - **Only on this account** -- if all repos are in one org/account
@@ -162,7 +162,7 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/vcs-conne
   }'
 ```
 
-The private key is Fernet-encrypted at rest and never returned in API responses.
+The private key is stored encrypted at rest (protected by database encryption) and never returned in API responses.
 
 Note the returned connection ID (e.g. `vcs-01234...`).
 
@@ -225,7 +225,7 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/vcs-conne
   }'
 ```
 
-The token is Fernet-encrypted at rest and never returned in API responses.
+The token is stored encrypted at rest (protected by database encryption) and never returned in API responses.
 
 Note the returned connection ID (e.g. `vcs-01234...`).
 
@@ -391,6 +391,73 @@ Runs created by the VCS poller carry metadata:
 
 ---
 
+## Commit Status Reporting
+
+Terrapod automatically posts **commit statuses** back to your VCS provider for all VCS-driven runs. This gives you inline feedback on pull requests and branch pushes without leaving GitHub or GitLab.
+
+### How It Works
+
+Whenever a VCS-triggered run changes state (queued, planning, planned, applied, errored, etc.), Terrapod posts a commit status to the VCS provider. For PR/MR runs, Terrapod also posts (or updates) a **comment on the PR/MR** with a summary of the run status and a link to the run page.
+
+- **Commit statuses** appear as status checks on the commit (e.g. the green checkmark or red X on a PR)
+- **PR/MR comments** are updated in place -- one comment per workspace per PR, not a new comment on every status change
+- Clicking the status link or comment link navigates directly to the run page in Terrapod
+
+### Configuration
+
+Set `external_url` so that commit status links point to your Terrapod UI:
+
+```yaml
+api:
+  config:
+    external_url: "https://terrapod.example.com"
+```
+
+Or via environment variable:
+
+```zsh
+TERRAPOD_EXTERNAL_URL=https://terrapod.example.com
+```
+
+Without `external_url`, commit statuses are still posted but without clickable links.
+
+### Required Permissions
+
+**GitHub App** -- ensure the following repository permissions are enabled:
+
+| Permission | Access |
+|---|---|
+| **Commit statuses** | Read & write |
+| **Pull requests** | Read & write |
+
+**GitLab** -- the access token needs `api` scope (not just `read_api`) to post commit statuses and MR comments.
+
+### Status Mapping
+
+| Run Status | GitHub State | GitLab State | Description |
+|---|---|---|---|
+| `queued` | `pending` | `pending` | Waiting for runner |
+| `planning` | `pending` | `running` | Plan in progress |
+| `planned` (plan-only) | `success` | `success` | Plan finished |
+| `planned` (full run) | `pending` | `running` | Awaiting confirmation |
+| `applying` | `pending` | `running` | Apply in progress |
+| `applied` | `success` | `success` | Apply complete |
+| `errored` | `failure` | `failed` | Run failed |
+| `discarded` | `failure` | `failed` | Plan discarded |
+| `canceled` | `error` | `canceled` | Run canceled |
+
+### PR/MR Comment Format
+
+PR comments include a hidden HTML marker so Terrapod can find and update them. Each workspace gets its own comment on a PR -- if multiple workspaces track the same repo, each posts its own comment.
+
+When a PR is updated with a new commit, old speculative runs are automatically **canceled** (the old comment is updated to show the canceled status), and a new run is created for the latest commit.
+
+### Stale PR Run Cancellation
+
+When the VCS poller detects a new commit on an open PR, it cancels any existing non-terminal runs for that workspace + PR number before creating a new speculative run. This keeps PRs clean with only the latest run visible.
+
+---
+
 ## Optional: GitHub Webhooks for Faster Feedback
 
 If Terrapod is accessible from GitHub (not behind a firewall), you can add webhooks for near-instant run triggering:
@@ -421,6 +488,14 @@ api:
 When a push event arrives, the webhook handler validates the HMAC-SHA256 signature and triggers an immediate poll for the affected repository. The poller still does all the work -- the webhook just makes it faster.
 
 > GitLab webhook support is not yet implemented. GitLab connections use polling only.
+
+---
+
+## Module Registry VCS Publishing
+
+VCS connections are also used for **automatic module publishing** in the private module registry. When a module is connected to a VCS repository, Terrapod watches for new git tags and publishes matching versions automatically.
+
+For full details on setup, tag patterns, and behaviour, see the [VCS-Driven Module Publishing](registry.md#vcs-driven-module-publishing) section in the registry documentation.
 
 ---
 
@@ -480,11 +555,9 @@ curl -X PATCH https://terrapod.example.com/api/v2/workspaces/ws-{id} \
 
 ### Credential Storage
 
-All VCS credentials are Fernet-encrypted at rest:
-- **GitHub**: The App private key (PEM) is stored in the `token_encrypted` column
-- **GitLab**: The access token is stored in the `token_encrypted` column
-
-Encryption requires `TERRAPOD_ENCRYPTION__KEY` to be set. Without it, VCS connections cannot be created.
+All VCS credentials are stored in PostgreSQL and protected by database encryption-at-rest (e.g. RDS encryption, Cloud SQL encryption, Azure Database encryption):
+- **GitHub**: The App private key (PEM) is stored in the `token` column
+- **GitLab**: The access token is stored in the `token` column
 
 Credentials are never returned in API responses.
 
@@ -509,7 +582,7 @@ No inbound connections are required for basic operation. The poller makes outbou
 3. **Check workspace config**: Ensure `vcs-repo-url` and the `vcs-connection` relationship are both set
 4. **Check permissions**: The VCS provider credentials must have read access to the repository
 5. **Check logs**: Look for "VCS poll cycle" or error messages in the API server logs
-6. **Check encryption key**: VCS connections require `TERRAPOD_ENCRYPTION__KEY` to be set
+6. **Check database encryption**: Ensure your managed database has encryption-at-rest enabled
 
 ### GitHub authentication errors
 

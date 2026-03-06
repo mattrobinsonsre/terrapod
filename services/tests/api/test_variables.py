@@ -28,6 +28,7 @@ def _mock_workspace(ws_id=None):
     ws = MagicMock()
     ws.id = ws_id or uuid.uuid4()
     ws.name = "test-ws"
+    ws.execution_backend = "tofu"
     return ws
 
 
@@ -36,8 +37,7 @@ def _mock_var(key="region", value="us-east-1", sensitive=False, ws_id=None, var_
     var.id = var_id or uuid.uuid4()
     var.workspace_id = ws_id or uuid.uuid4()
     var.key = key
-    var.value = value if not sensitive else ""
-    var.encrypted_value = "ENC:secret" if sensitive else None
+    var.value = value
     var.sensitive = sensitive
     var.category = "terraform"
     var.hcl = False

@@ -20,8 +20,10 @@ from datetime import UTC
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
 from fastapi.responses import JSONResponse
+import sqlalchemy as sa
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_admin
 from terrapod.db.models import (
@@ -210,6 +212,32 @@ async def delete_workspace_var(
 
 def _varset_json(vs: VariableSet) -> dict:
     """Serialize a VariableSet to TFE V2 JSON:API format."""
+    # Count variables and workspaces from eagerly loaded relationships
+    var_count = len(vs.variables) if "variables" in sa.inspect(vs).dict else 0
+    ws_assignments = vs.workspace_assignments if "workspace_assignments" in sa.inspect(vs).dict else []
+    ws_count = len(ws_assignments)
+
+    relationships: dict = {
+        "organization": {
+            "data": {"id": "default", "type": "organizations"},
+        },
+    }
+
+    # Include workspace relationship data when loaded
+    if ws_assignments:
+        relationships["workspaces"] = {
+            "data": [
+                {
+                    "id": f"ws-{a.workspace_id}",
+                    "type": "workspaces",
+                    "attributes": {"name": a.workspace.name if a.workspace else str(a.workspace_id)},
+                }
+                for a in ws_assignments
+            ],
+        }
+    else:
+        relationships["workspaces"] = {"data": []}
+
     return {
         "id": f"varset-{vs.id}",
         "type": "varsets",
@@ -218,14 +246,12 @@ def _varset_json(vs: VariableSet) -> dict:
             "description": vs.description,
             "global": vs.global_set,
             "priority": vs.priority,
+            "var-count": var_count,
+            "workspace-count": ws_count,
             "created-at": _rfc3339(vs.created_at),
             "updated-at": _rfc3339(vs.updated_at),
         },
-        "relationships": {
-            "organization": {
-                "data": {"id": "default", "type": "organizations"},
-            },
-        },
+        "relationships": relationships,
     }
 
 
@@ -236,7 +262,11 @@ async def list_varsets(
 ) -> JSONResponse:
     """List all variable sets."""
 
-    result = await db.execute(select(VariableSet).order_by(VariableSet.name))
+    result = await db.execute(
+        select(VariableSet)
+        .options(selectinload(VariableSet.variables), selectinload(VariableSet.workspace_assignments))
+        .order_by(VariableSet.name)
+    )
     varsets = result.scalars().all()
     return JSONResponse(content={"data": [_varset_json(vs) for vs in varsets]})
 
@@ -269,7 +299,11 @@ async def create_varset(
 
 async def _get_varset(varset_id: str, db: AsyncSession) -> VariableSet:
     vs_uuid = uuid.UUID(varset_id.removeprefix("varset-"))
-    result = await db.execute(select(VariableSet).where(VariableSet.id == vs_uuid))
+    result = await db.execute(
+        select(VariableSet)
+        .where(VariableSet.id == vs_uuid)
+        .options(selectinload(VariableSet.variables), selectinload(VariableSet.workspace_assignments))
+    )
     vs = result.scalar_one_or_none()
     if vs is None:
         raise HTTPException(status_code=404, detail="Variable set not found")
@@ -381,22 +415,10 @@ async def create_varset_var(
     value = attrs.get("value", "")
     sensitive = attrs.get("sensitive", False)
 
-    if sensitive:
-        from terrapod.services.encryption_service import encrypt_value, is_encryption_available
-
-        if not is_encryption_available():
-            raise HTTPException(status_code=422, detail="Encryption not configured")
-        encrypted = encrypt_value(value)
-        value_store = ""
-    else:
-        encrypted = None
-        value_store = value
-
     vsv = VariableSetVariable(
         variable_set_id=vs.id,
         key=key,
-        value=value_store,
-        encrypted_value=encrypted,
+        value=value,
         description=attrs.get("description", ""),
         category=attrs.get("category", "terraform"),
         hcl=attrs.get("hcl", False),
@@ -442,17 +464,7 @@ async def update_varset_var(
     if "hcl" in attrs:
         vsv.hcl = attrs["hcl"]
     if "value" in attrs:
-        new_sensitive = attrs.get("sensitive", vsv.sensitive)
-        if new_sensitive:
-            from terrapod.services.encryption_service import encrypt_value, is_encryption_available
-
-            if not is_encryption_available():
-                raise HTTPException(status_code=422, detail="Encryption not configured")
-            vsv.value = ""
-            vsv.encrypted_value = encrypt_value(attrs["value"])
-        else:
-            vsv.value = attrs["value"]
-            vsv.encrypted_value = None
+        vsv.value = attrs["value"]
         vsv.version_id = variable_service._version_hash(vsv.key, attrs["value"], vsv.category)
     if "sensitive" in attrs:
         vsv.sensitive = attrs["sensitive"]

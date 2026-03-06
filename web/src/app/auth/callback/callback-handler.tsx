@@ -4,38 +4,45 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { setAuth } from '@/lib/auth'
 
+type CallbackParams =
+  | { error: string; code?: undefined; verifier?: undefined }
+  | { error?: undefined; code: string; verifier: string }
+
+function getCallbackParams(): CallbackParams | null {
+  if (typeof window === 'undefined') return null
+  const params = new URLSearchParams(window.location.search)
+  const code = params.get('code')
+  const returnedState = params.get('state')
+  const errorParam = params.get('error')
+
+  if (errorParam) {
+    return { error: params.get('error_description') || errorParam }
+  }
+  if (!code || !returnedState) {
+    return { error: 'Missing authorization code or state' }
+  }
+
+  const savedState = sessionStorage.getItem('terrapod_auth_state')
+  const verifier = sessionStorage.getItem('terrapod_pkce_verifier')
+
+  if (!savedState || returnedState !== savedState) {
+    return { error: 'State mismatch — possible CSRF attack' }
+  }
+  if (!verifier) {
+    return { error: 'Missing PKCE verifier — please try logging in again' }
+  }
+
+  return { code, verifier }
+}
+
 export default function CallbackHandler() {
   const router = useRouter()
-  const [error, setError] = useState('')
+  const [callbackParams] = useState(getCallbackParams)
+  const [error, setError] = useState(() => callbackParams?.error ?? '')
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const code = params.get('code')
-    const returnedState = params.get('state')
-    const errorParam = params.get('error')
-
-    if (errorParam) {
-      setError(params.get('error_description') || errorParam)
-      return
-    }
-
-    if (!code || !returnedState) {
-      setError('Missing authorization code or state')
-      return
-    }
-
-    const savedState = sessionStorage.getItem('terrapod_auth_state')
-    const verifier = sessionStorage.getItem('terrapod_pkce_verifier')
-
-    if (!savedState || returnedState !== savedState) {
-      setError('State mismatch — possible CSRF attack')
-      return
-    }
-
-    if (!verifier) {
-      setError('Missing PKCE verifier — please try logging in again')
-      return
-    }
+    if (!callbackParams || callbackParams.error) return
+    const { code, verifier } = callbackParams as { code: string; verifier: string }
 
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -70,7 +77,7 @@ export default function CallbackHandler() {
       .catch((err) => {
         setError(err.message)
       })
-  }, [router])
+  }, [router, callbackParams])
 
   if (error) {
     return (

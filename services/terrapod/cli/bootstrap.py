@@ -1,5 +1,5 @@
 """
-Bootstrap script for creating the initial admin user.
+Bootstrap script for creating the initial admin user and optional agent pool.
 
 Idempotent: skips if resources already exist.
 Run via: python -m terrapod.cli.bootstrap
@@ -8,9 +8,12 @@ Reads configuration from environment variables:
   TERRAPOD_BOOTSTRAP_ADMIN_EMAIL    - Admin email (required)
   TERRAPOD_BOOTSTRAP_ADMIN_PASSWORD - Admin password (optional; generated if omitted)
   DATABASE_URL                       - PostgreSQL connection URL (from Helm)
+  TERRAPOD_BOOTSTRAP_POOL_NAME      - Agent pool name (optional; creates pool + join token)
+  TERRAPOD_BOOTSTRAP_POOL_TOKEN     - Raw join token value (optional; generated if pool name set)
 """
 
 import asyncio
+import hashlib
 import logging
 import os
 import secrets
@@ -20,7 +23,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from terrapod.auth.passwords import hash_password
-from terrapod.db.models import PlatformRoleAssignment, User
+from terrapod.db.models import AgentPool, AgentPoolToken, PlatformRoleAssignment, User
 
 # Use stdlib logging — structlog isn't configured yet during bootstrap
 logger = logging.getLogger("terrapod.bootstrap")
@@ -57,7 +60,7 @@ async def bootstrap() -> None:
 
     async with AsyncSession(engine, expire_on_commit=False) as session:
         async with session.begin():
-            # Check if user already exists
+            # ── Admin user ──────────────────────────────────────────
             result = await session.execute(select(User).where(User.email == admin_email))
             existing_user = result.scalar_one_or_none()
 
@@ -74,9 +77,11 @@ async def bootstrap() -> None:
                 logger.info("Created user: %s", admin_email)
                 if generated:
                     logger.info("Generated password: %s", admin_password)
-                    logger.warning("IMPORTANT: Save this password now. It will not be shown again.")
+                    logger.warning(
+                        "IMPORTANT: Save this password now. It will not be shown again."
+                    )
 
-            # Check if admin role assignment exists
+            # ── Admin role ──────────────────────────────────────────
             result = await session.execute(
                 select(PlatformRoleAssignment).where(
                     PlatformRoleAssignment.provider_name == "local",
@@ -97,8 +102,61 @@ async def bootstrap() -> None:
                 session.add(assignment)
                 logger.info("Assigned admin role to %s (provider: local)", admin_email)
 
+            # ── Agent pool (optional) ───────────────────────────────
+            pool_name = os.environ.get("TERRAPOD_BOOTSTRAP_POOL_NAME", "").strip()
+            if pool_name:
+                await _bootstrap_pool(session, pool_name)
+
     await engine.dispose()
     logger.info("Bootstrap complete")
+
+
+async def _bootstrap_pool(session: AsyncSession, pool_name: str) -> None:
+    """Create an agent pool and join token if they don't already exist."""
+    raw_token = os.environ.get("TERRAPOD_BOOTSTRAP_POOL_TOKEN", "").strip()
+    token_generated = False
+    if not raw_token:
+        raw_token = secrets.token_urlsafe(48)
+        token_generated = True
+
+    # Check if pool already exists
+    result = await session.execute(select(AgentPool).where(AgentPool.name == pool_name))
+    pool = result.scalar_one_or_none()
+
+    if pool:
+        logger.info("Agent pool '%s' already exists, skipping pool creation", pool_name)
+    else:
+        pool = AgentPool(name=pool_name, description=f"Bootstrapped pool: {pool_name}")
+        session.add(pool)
+        await session.flush()
+        logger.info("Created agent pool: %s (id: %s)", pool_name, pool.id)
+
+    # Check if a token already exists for this pool
+    result = await session.execute(
+        select(AgentPoolToken).where(
+            AgentPoolToken.pool_id == pool.id,
+            AgentPoolToken.is_revoked.is_(False),
+        )
+    )
+    existing_token = result.scalar_one_or_none()
+
+    if existing_token:
+        logger.info("Join token already exists for pool '%s', skipping", pool_name)
+    else:
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        token = AgentPoolToken(
+            pool_id=pool.id,
+            token_hash=token_hash,
+            description="Bootstrap token",
+            created_by="bootstrap",
+        )
+        session.add(token)
+        logger.info("Created join token for pool '%s'", pool_name)
+        if token_generated:
+            logger.info("Generated join token: %s", raw_token)
+            logger.warning("IMPORTANT: Save this token now. It will not be shown again.")
+        else:
+            logger.info("Join token created from TERRAPOD_BOOTSTRAP_POOL_TOKEN")
 
 
 if __name__ == "__main__":

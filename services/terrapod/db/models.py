@@ -170,10 +170,11 @@ class APIToken(Base):
 
 
 class AgentPool(Base):
-    """Named group of remote runner listeners.
+    """Named group of runner listeners.
 
-    Workspaces are assigned to an agent pool for remote execution.
-    The default pool (name='default') is the local in-cluster listener.
+    Workspaces are assigned to an agent pool for execution.
+    Pools are created by admins via the API. Listeners join pools
+    using join tokens and receive X.509 certificates for auth.
     """
 
     __tablename__ = "agent_pools"
@@ -197,7 +198,7 @@ class AgentPool(Base):
 
 
 class AgentPoolToken(Base):
-    """Join token for remote listener registration.
+    """Join token for listener registration.
 
     SHA-256 hashed at rest. The raw token is only returned once at creation.
     Supports expiry and optional max_uses.
@@ -278,7 +279,10 @@ class Workspace(Base):
         String(20), nullable=False, default="local"
     )  # local, remote, agent
     auto_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    terraform_version: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    execution_backend: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="tofu"
+    )  # tofu, terraform
+    terraform_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.9")
     working_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     lock_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -287,6 +291,7 @@ class Workspace(Base):
         ForeignKey("agent_pools.id", ondelete="SET NULL"),
         nullable=True,
     )
+    agent_pool: Mapped["AgentPool | None"] = relationship("AgentPool", foreign_keys=[agent_pool_id], lazy="joined")
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
 
@@ -435,6 +440,8 @@ class RegistryModuleVersion(Base):
     )
     version: Mapped[str] = mapped_column(String(63), nullable=False)
     upload_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    vcs_commit_sha: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    vcs_tag: Mapped[str] = mapped_column(String(255), nullable=False, default="")
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
@@ -489,7 +496,7 @@ class GPGKey(Base):
     ascii_armor: Mapped[str] = mapped_column(Text, nullable=False)
     source: Mapped[str] = mapped_column(String(63), nullable=False, default="terrapod")
     source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    private_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    private_key: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
@@ -612,37 +619,6 @@ class CachedProviderPackage(Base):
     )
 
 
-class CachedModule(Base):
-    """Cached upstream module tarball from a public registry."""
-
-    __tablename__ = "cached_modules"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
-    )
-    hostname: Mapped[str] = mapped_column(String(255), nullable=False)
-    namespace: Mapped[str] = mapped_column(String(63), nullable=False)
-    name: Mapped[str] = mapped_column(String(63), nullable=False)
-    provider: Mapped[str] = mapped_column(String(63), nullable=False)
-    version: Mapped[str] = mapped_column(String(63), nullable=False)
-    shasum: Mapped[str] = mapped_column(String(64), nullable=False, default="")
-    cached_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
-    )
-
-    __table_args__ = (
-        sa.UniqueConstraint(
-            "hostname",
-            "namespace",
-            "name",
-            "provider",
-            "version",
-            name="uq_cached_modules",
-        ),
-        Index("ix_cached_modules_lookup", "hostname", "namespace", "name", "provider"),
-    )
-
-
 class CachedBinary(Base):
     """Cached terraform/tofu CLI binary."""
 
@@ -712,9 +688,9 @@ class VCSConnection(Base):
     server_url: Mapped[str] = mapped_column(
         String(500), nullable=False, default=""
     )  # e.g. https://gitlab.example.com, https://github.example.com
-    token_encrypted: Mapped[str | None] = mapped_column(
+    token: Mapped[str | None] = mapped_column(
         Text, nullable=True
-    )  # Fernet-encrypted PAT (GitLab), not used for GitHub App auth
+    )  # PAT (GitLab) or PEM private key (GitHub App)
 
     # GitHub-specific
     github_app_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -748,8 +724,8 @@ class VCSConnection(Base):
 class Variable(Base):
     """Workspace-scoped variable (terraform or env).
 
-    Sensitive values are Fernet-encrypted in encrypted_value; the plaintext
-    value column is empty for sensitive variables.
+    Sensitive values are stored in the value column with the sensitive flag
+    set to True. API responses mask sensitive values.
     """
 
     __tablename__ = "variables"
@@ -764,7 +740,6 @@ class Variable(Base):
     )
     key: Mapped[str] = mapped_column(String(255), nullable=False)
     value: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    encrypted_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     category: Mapped[str] = mapped_column(
         String(20), nullable=False, default="terraform"
@@ -811,6 +786,9 @@ class VariableSet(Base):
     variables: Mapped[list["VariableSetVariable"]] = relationship(
         back_populates="variable_set", cascade="all, delete-orphan"
     )
+    workspace_assignments: Mapped[list["VariableSetWorkspace"]] = relationship(
+        cascade="all, delete-orphan"
+    )
 
     __table_args__ = (sa.UniqueConstraint("name", name="uq_variable_sets"),)
 
@@ -830,7 +808,6 @@ class VariableSetVariable(Base):
     )
     key: Mapped[str] = mapped_column(String(255), nullable=False)
     value: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    encrypted_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     category: Mapped[str] = mapped_column(String(20), nullable=False, default="terraform")
     hcl: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -867,6 +844,8 @@ class VariableSetWorkspace(Base):
         ForeignKey("workspaces.id", ondelete="CASCADE"),
         primary_key=True,
     )
+
+    workspace: Mapped["Workspace"] = relationship(lazy="joined")
 
 
 # --- Configuration Versions ---
@@ -932,6 +911,9 @@ class Run(Base):
     auto_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     plan_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     source: Mapped[str] = mapped_column(String(30), nullable=False, default="tfe-api")
+    execution_backend: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="tofu"
+    )  # tofu, terraform
     terraform_version: Mapped[str] = mapped_column(String(20), nullable=False, default="")
     resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
     resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
@@ -1089,7 +1071,7 @@ class NotificationConfiguration(Base):
         String(20), nullable=False
     )  # generic, slack, email
     url: Mapped[str] = mapped_column(String(2000), nullable=False, default="")
-    token_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token: Mapped[str | None] = mapped_column(Text, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     triggers: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=list)
     email_addresses: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=list)
@@ -1129,7 +1111,7 @@ class RunTask(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     url: Mapped[str] = mapped_column(String(2000), nullable=False)
-    hmac_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hmac_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     stage: Mapped[str] = mapped_column(String(20), nullable=False)  # pre_plan, post_plan, pre_apply
     enforcement_level: Mapped[str] = mapped_column(

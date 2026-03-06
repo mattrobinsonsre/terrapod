@@ -1,4 +1,4 @@
-"""Listener identity management — local vs remote registration."""
+"""Listener identity management — join via token exchange."""
 
 import os
 import uuid
@@ -12,8 +12,9 @@ logger = get_logger(__name__)
 class ListenerIdentity:
     """Identity for a runner listener.
 
-    Local listeners auto-register with the default pool (no join token).
-    Remote listeners join via token exchange and use certificate auth.
+    All listeners join a pool via the API using a join token.
+    The join flow issues an X.509 certificate used for subsequent API calls.
+    Certificates are saved to disk for restart persistence.
     """
 
     def __init__(
@@ -21,126 +22,188 @@ class ListenerIdentity:
         listener_id: uuid.UUID,
         name: str,
         pool_id: uuid.UUID,
-        mode: str,  # "local" or "remote"
-        api_url: str = "",
-        certificate_pem: str = "",
-        private_key_pem: str = "",
-        ca_cert_pem: str = "",
+        api_url: str,
+        certificate_pem: str,
+        private_key_pem: str,
+        ca_cert_pem: str,
     ):
         self.listener_id = listener_id
         self.name = name
         self.pool_id = pool_id
-        self.mode = mode
         self.api_url = api_url
         self.certificate_pem = certificate_pem
         self.private_key_pem = private_key_pem
         self.ca_cert_pem = ca_cert_pem
 
-    @property
-    def is_local(self) -> bool:
-        return self.mode == "local"
-
 
 async def establish_identity() -> ListenerIdentity:
-    """Establish listener identity based on environment.
+    """Establish listener identity.
 
-    TERRAPOD_LISTENER_MODE=local → auto-register with default pool via DB.
-    TERRAPOD_LISTENER_MODE=remote → join via token from TERRAPOD_JOIN_TOKEN env.
+    1. Check for saved certificates from a previous join → resume if valid
+    2. Otherwise join via TERRAPOD_JOIN_TOKEN → save certs for next restart
     """
-    mode = os.environ.get("TERRAPOD_LISTENER_MODE", "local")
-    name = os.environ.get("TERRAPOD_LISTENER_NAME", "local")
-
-    if mode == "local":
-        return await _establish_local_identity(name)
-    else:
-        return await _establish_remote_identity(name)
-
-
-async def _establish_local_identity(name: str) -> ListenerIdentity:
-    """Register as a local listener with direct DB access."""
-    from terrapod.db.session import get_db_session
-    from terrapod.services.agent_pool_service import register_local_listener
-
-    runner_config = load_runner_config()
-    runner_defs = [d.name for d in runner_config.definitions]
-
-    async with get_db_session() as db:
-        listener = await register_local_listener(
-            db, listener_name=name, runner_definitions=runner_defs
-        )
-
-    logger.info(
-        "Established local listener identity",
-        listener_id=str(listener.id),
-        name=listener.name,
-        pool_id=str(listener.pool_id),
-    )
-
-    return ListenerIdentity(
-        listener_id=listener.id,
-        name=listener.name,
-        pool_id=listener.pool_id,
-        mode="local",
-    )
-
-
-async def _establish_remote_identity(name: str) -> ListenerIdentity:
-    """Join via token exchange with the API server."""
-    import httpx
-
+    name = os.environ.get("TERRAPOD_LISTENER_NAME", "listener")
     api_url = os.environ.get("TERRAPOD_API_URL", "http://localhost:8000")
-    join_token = os.environ.get("TERRAPOD_JOIN_TOKEN", "")
-    pool_id = os.environ.get("TERRAPOD_POOL_ID", "")
 
-    if not join_token or not pool_id:
-        raise RuntimeError("Remote mode requires TERRAPOD_JOIN_TOKEN and TERRAPOD_POOL_ID")
-
-    runner_config = load_runner_config()
-    runner_defs = [d.name for d in runner_config.definitions]
-
-    async with httpx.AsyncClient(base_url=api_url, timeout=30) as client:
-        response = await client.post(
-            f"/api/v2/agent-pools/{pool_id}/listeners/join",
-            json={
-                "join_token": join_token,
-                "name": name,
-                "runner_definitions": runner_defs,
-            },
+    # Try to resume from saved certificates
+    identity = _try_resume(name, api_url)
+    if identity:
+        logger.info(
+            "Resumed from saved certificate",
+            listener_id=str(identity.listener_id),
+            name=identity.name,
         )
-        response.raise_for_status()
-        data = response.json()["data"]
+        return identity
 
-    listener_id = uuid.UUID(data["listener_id"])
+    # Join via token exchange
+    return await _join_via_token(name, api_url)
 
-    # Save certificate to filesystem for restart persistence
+
+def _try_resume(name: str, api_url: str) -> ListenerIdentity | None:
+    """Try to resume from saved certificates on disk."""
     cert_dir = os.environ.get("TERRAPOD_CERT_DIR", "/var/lib/terrapod/certs")
-    os.makedirs(cert_dir, exist_ok=True)
-
     cert_path = os.path.join(cert_dir, "listener.crt")
     key_path = os.path.join(cert_dir, "listener.key")
     ca_path = os.path.join(cert_dir, "ca.crt")
+    meta_path = os.path.join(cert_dir, "identity.txt")
 
-    with open(cert_path, "w") as f:
-        f.write(data["certificate"])
+    if not all(os.path.exists(p) for p in [cert_path, key_path, ca_path, meta_path]):
+        return None
+
+    try:
+        with open(cert_path) as f:
+            cert_pem = f.read()
+        with open(key_path) as f:
+            key_pem = f.read()
+        with open(ca_path) as f:
+            ca_pem = f.read()
+        with open(meta_path) as f:
+            lines = f.read().strip().splitlines()
+            meta = dict(line.split("=", 1) for line in lines if "=" in line)
+
+        listener_id = uuid.UUID(meta["listener_id"])
+        pool_id = uuid.UUID(meta["pool_id"])
+
+        return ListenerIdentity(
+            listener_id=listener_id,
+            name=name,
+            pool_id=pool_id,
+            api_url=api_url,
+            certificate_pem=cert_pem,
+            private_key_pem=key_pem,
+            ca_cert_pem=ca_pem,
+        )
+    except Exception as e:
+        logger.warning("Failed to resume from saved certs, will rejoin", error=str(e))
+        return None
+
+
+async def _join_via_token(name: str, api_url: str) -> ListenerIdentity:
+    """Join a pool via token exchange with the API server.
+
+    Retries with exponential backoff if the API is not yet available.
+    """
+    import asyncio
+
+    import httpx
+
+    join_token = os.environ.get("TERRAPOD_JOIN_TOKEN", "")
+    if not join_token:
+        raise RuntimeError(
+            "TERRAPOD_JOIN_TOKEN is required. "
+            "Create an agent pool and generate a join token via the API, "
+            "then set the token as TERRAPOD_JOIN_TOKEN."
+        )
+
+    runner_config = load_runner_config()
+    runner_defs = [d.name for d in runner_config.definitions]
+
+    max_retries = 30
+    backoff = 2
+
+    for attempt in range(max_retries):
+        try:
+            async with httpx.AsyncClient(base_url=api_url, timeout=30) as client:
+                response = await client.post(
+                    "/api/v2/agent-pools/join",
+                    json={
+                        "join_token": join_token,
+                        "name": name,
+                        "runner_definitions": runner_defs,
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()["data"]
+
+            listener_id = uuid.UUID(data["listener_id"])
+            pool_id = uuid.UUID(data["pool_id"])
+
+            # Save certificates and metadata to disk for restart persistence
+            _save_certs(
+                listener_id=listener_id,
+                pool_id=pool_id,
+                certificate=data["certificate"],
+                private_key=data["private_key"],
+                ca_certificate=data["ca_certificate"],
+            )
+
+            logger.info(
+                "Joined pool via token exchange",
+                listener_id=str(listener_id),
+                name=name,
+                pool_id=str(pool_id),
+            )
+
+            return ListenerIdentity(
+                listener_id=listener_id,
+                name=name,
+                pool_id=pool_id,
+                api_url=api_url,
+                certificate_pem=data["certificate"],
+                private_key_pem=data["private_key"],
+                ca_cert_pem=data["ca_certificate"],
+            )
+
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait = min(backoff * (2**attempt), 60)
+                logger.warning(
+                    "Join failed, retrying",
+                    attempt=attempt + 1,
+                    wait_seconds=wait,
+                    error=str(e),
+                )
+                await asyncio.sleep(wait)
+            else:
+                raise RuntimeError(
+                    f"Failed to join pool after {max_retries} attempts: {e}"
+                ) from e
+
+    raise RuntimeError("Unreachable")
+
+
+def _save_certs(
+    listener_id: uuid.UUID,
+    pool_id: uuid.UUID,
+    certificate: str,
+    private_key: str,
+    ca_certificate: str,
+) -> None:
+    """Save certificate material to disk for restart persistence."""
+    cert_dir = os.environ.get("TERRAPOD_CERT_DIR", "/var/lib/terrapod/certs")
+    os.makedirs(cert_dir, exist_ok=True)
+
+    with open(os.path.join(cert_dir, "listener.crt"), "w") as f:
+        f.write(certificate)
+
+    key_path = os.path.join(cert_dir, "listener.key")
     with open(key_path, "w") as f:
-        f.write(data["private_key"])
+        f.write(private_key)
     os.chmod(key_path, 0o600)
-    with open(ca_path, "w") as f:
-        f.write(data["ca_certificate"])
 
-    logger.info(
-        "Joined via token exchange",
-        listener_id=str(listener_id),
-        name=name,
-    )
+    with open(os.path.join(cert_dir, "ca.crt"), "w") as f:
+        f.write(ca_certificate)
 
-    return ListenerIdentity(
-        listener_id=listener_id,
-        name=name,
-        pool_id=uuid.UUID(pool_id.removeprefix("apool-")),
-        mode="remote",
-        api_url=api_url,
-        certificate_pem=data["certificate"],
-        private_key_pem=data["private_key"],
-        ca_cert_pem=data["ca_certificate"],
-    )
+    with open(os.path.join(cert_dir, "identity.txt"), "w") as f:
+        f.write(f"listener_id={listener_id}\n")
+        f.write(f"pool_id={pool_id}\n")
