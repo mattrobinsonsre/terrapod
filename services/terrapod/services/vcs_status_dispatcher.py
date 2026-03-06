@@ -6,7 +6,7 @@ commit statuses and PR/MR comments back to the VCS provider.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from terrapod.config import settings
 from terrapod.db.models import Run, VCSConnection, Workspace
@@ -78,7 +78,7 @@ def _build_comment_body(
         else:
             has_changes_line = "No changes detected."
 
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     lines = [
         f"<!-- terrapod:ws:{workspace_id} -->",
