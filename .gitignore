@@ -65,3 +65,4 @@ reports/
 *.tfstate.backup
 terraform.tfvars
 ANNOUNCEMENT.md
+helm/terrapod/templates/NOTES.txt
