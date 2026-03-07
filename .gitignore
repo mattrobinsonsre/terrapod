@@ -64,3 +64,4 @@ reports/
 *.tfstate
 *.tfstate.backup
 terraform.tfvars
+ANNOUNCEMENT.md
