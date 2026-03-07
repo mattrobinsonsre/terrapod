@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   pull_request:
     branches: [main]
 
@@ -10,58 +11,352 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  REGISTRY: ghcr.io/mattrobinsonsre
+
 jobs:
-  # ── Python ──────────────────────────────────────────────
+  # ── Prepare ────────────────────────────────────────────
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+    outputs:
+      sha_short: ${{ steps.meta.outputs.sha_short }}
+      images_exist: ${{ steps.check.outputs.images_exist }}
+      is_tag: ${{ steps.meta.outputs.is_tag }}
+      is_pr: ${{ steps.meta.outputs.is_pr }}
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute metadata
+        id: meta
+        run: |
+          sha_short="${GITHUB_SHA::7}"
+          echo "sha_short=$sha_short" >> "$GITHUB_OUTPUT"
+
+          is_tag=false
+          is_pr=false
+          version=""
+
+          if [[ "$GITHUB_REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            is_tag=true
+            version="${GITHUB_REF#refs/tags/}"
+          fi
+
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            is_pr=true
+          fi
+
+          echo "is_tag=$is_tag" >> "$GITHUB_OUTPUT"
+          echo "is_pr=$is_pr" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if images exist
+        id: check
+        run: |
+          sha_short="${GITHUB_SHA::7}"
+          images_exist=true
+
+          for image in terrapod-api terrapod-web terrapod-runner; do
+            if ! docker manifest inspect "$REGISTRY/$image:sha-$sha_short" > /dev/null 2>&1; then
+              echo "$image:sha-$sha_short not found"
+              images_exist=false
+              break
+            fi
+          done
+
+          echo "images_exist=$images_exist" >> "$GITHUB_OUTPUT"
+          echo "Images exist: $images_exist"
+
+  # ── Python Lint ────────────────────────────────────────
   python-lint:
     name: Python Lint
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - run: scripts/lint.sh python
 
+  # ── Python Test ────────────────────────────────────────
   python-test:
     name: Python Test
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - run: scripts/test.sh python
 
-  # ── Helm ────────────────────────────────────────────────
+  # ── Helm Lint ──────────────────────────────────────────
   helm-lint:
     name: Helm Lint
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - name: Helm lint (containerized)
+      - uses: actions/checkout@v4
+      - name: Helm lint
         run: |
           docker run --rm -v "$PWD:/chart" -w /chart \
             alpine/helm:3.17.2 \
             lint helm/terrapod --values helm/terrapod/values.yaml
 
-  # ── Docker Build ────────────────────────────────────────
-  docker-build:
-    name: Docker Build
-    runs-on: ubuntu-latest
+  # ── Build Images ───────────────────────────────────────
+  build-images:
+    name: Build ${{ matrix.image }} (${{ matrix.arch }})
+    needs: [prepare, python-lint, python-test, helm-lint]
+    if: |
+      always()
+      && needs.prepare.outputs.images_exist != 'true'
+      && needs.prepare.outputs.is_pr != 'true'
+      && needs.prepare.result == 'success'
+      && (needs.python-lint.result == 'success' || needs.python-lint.result == 'skipped')
+      && (needs.python-test.result == 'success' || needs.python-test.result == 'skipped')
+      && (needs.helm-lint.result == 'success' || needs.helm-lint.result == 'skipped')
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    permissions:
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        arch: [amd64, arm64]
+        image: [terrapod-api, terrapod-web, terrapod-runner]
+        include:
+          - image: terrapod-api
+            dockerfile: docker/Dockerfile.api
+          - image: terrapod-web
+            dockerfile: docker/Dockerfile.web
+          - image: terrapod-runner
+            dockerfile: docker/Dockerfile.runner
     steps:
-      - uses: actions/checkout@v6
-      - name: Build API image
-        run: docker build -f docker/Dockerfile.api -t terrapod-api:ci .
+      - uses: actions/checkout@v4
 
-  # ── Gate ────────────────────────────────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+
+  # ── Create Multi-Arch Manifests ────────────────────────
+  create-manifests:
+    name: Create Manifests
+    needs: [prepare, build-images]
+    if: needs.build-images.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create multi-arch manifests
+        run: |
+          sha_short="${{ needs.prepare.outputs.sha_short }}"
+
+          for image in terrapod-api terrapod-web terrapod-runner; do
+            echo "Creating manifest for $image:sha-$sha_short"
+            docker buildx imagetools create -t "$REGISTRY/$image:sha-$sha_short" \
+              "$REGISTRY/$image:sha-${sha_short}-amd64" \
+              "$REGISTRY/$image:sha-${sha_short}-arm64"
+          done
+
+  # ── Release ────────────────────────────────────────────
+  release:
+    name: Release
+    needs: [prepare, create-manifests]
+    if: |
+      always()
+      && needs.prepare.outputs.is_tag == 'true'
+      && needs.prepare.result == 'success'
+      && (needs.create-manifests.result == 'success' || needs.create-manifests.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Retag images with version
+        run: |
+          sha_short="${{ needs.prepare.outputs.sha_short }}"
+          version="${{ needs.prepare.outputs.version }}"
+
+          for image in terrapod-api terrapod-web terrapod-runner; do
+            echo "Retagging $image:sha-$sha_short -> $version + latest"
+            docker buildx imagetools create \
+              -t "$REGISTRY/$image:$version" \
+              -t "$REGISTRY/$image:latest" \
+              "$REGISTRY/$image:sha-$sha_short"
+          done
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Publish Helm chart
+        run: |
+          version="${{ needs.prepare.outputs.version }}"
+          chart_version="${version#v}"
+
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+          helm package helm/terrapod --destination dist/ \
+            --version "$chart_version" --app-version "$chart_version"
+
+          helm push "dist/terrapod-${chart_version}.tgz" "oci://$REGISTRY"
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          version="${{ needs.prepare.outputs.version }}"
+
+          prev_tag=$(git describe --tags --abbrev=0 "${version}^" 2>/dev/null || echo "")
+
+          if [[ -n "$prev_tag" ]]; then
+            range="${prev_tag}..${version}"
+          else
+            range="$version"
+          fi
+
+          feats="" fixes="" docs="" refactors="" tests="" chores="" others=""
+
+          while IFS= read -r line; do
+            msg=$(echo "$line" | sed -E 's/^[a-z]+(\([^)]*\))?[!]?:[[:space:]]*//')
+
+            case "$line" in
+              feat:*|feat\(*)     feats+="- ${msg}"$'\n' ;;
+              fix:*|fix\(*)       fixes+="- ${msg}"$'\n' ;;
+              docs:*|docs\(*)     docs+="- ${msg}"$'\n' ;;
+              refactor:*|refactor\(*) refactors+="- ${msg}"$'\n' ;;
+              test:*|test\(*)     tests+="- ${msg}"$'\n' ;;
+              chore:*|chore\(*|ci:*|ci\(*) chores+="- ${msg}"$'\n' ;;
+              *)                  others+="- ${line}"$'\n' ;;
+            esac
+          done < <(git log --format='%s' "$range" 2>/dev/null)
+
+          notes=""
+          [[ -n "$feats" ]] && notes+="### Features"$'\n\n'"$feats"$'\n'
+          [[ -n "$fixes" ]] && notes+="### Bug Fixes"$'\n\n'"$fixes"$'\n'
+          [[ -n "$docs" ]] && notes+="### Documentation"$'\n\n'"$docs"$'\n'
+          [[ -n "$refactors" ]] && notes+="### Refactoring"$'\n\n'"$refactors"$'\n'
+          [[ -n "$tests" ]] && notes+="### Tests"$'\n\n'"$tests"$'\n'
+          [[ -n "$chores" ]] && notes+="### Maintenance"$'\n\n'"$chores"$'\n'
+          [[ -n "$others" ]] && notes+="### Other Changes"$'\n\n'"$others"$'\n'
+
+          if [[ -n "$prev_tag" ]]; then
+            notes+="**Full Changelog**: https://github.com/mattrobinsonsre/terrapod/compare/${prev_tag}...${version}"$'\n'
+          fi
+
+          # Write to file to preserve newlines
+          echo "$notes" > /tmp/release-notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ needs.prepare.outputs.version }}"
+          chart_version="${version#v}"
+
+          # Generate checksums
+          (cd dist && sha256sum -- *.tgz > checksums.txt)
+
+          gh release create "$version" \
+            dist/terrapod-${chart_version}.tgz \
+            dist/checksums.txt \
+            --title "$version" \
+            --notes-file /tmp/release-notes.md
+
+  # ── Cleanup Tag on Failure ─────────────────────────────
+  cleanup-tag:
+    name: Cleanup Tag
+    needs: [prepare, build-images, create-manifests, release]
+    if: |
+      always()
+      && needs.prepare.outputs.is_tag == 'true'
+      && (needs.build-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release.result == 'failure')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Delete tag and release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ needs.prepare.outputs.version }}"
+          echo "Cleaning up failed release $version"
+
+          gh release delete "$version" --cleanup-tag --yes 2>/dev/null || true
+          git push origin ":refs/tags/$version" 2>/dev/null || true
+
+  # ── Gate ───────────────────────────────────────────────
   ci-pass:
     name: CI
     if: always()
     needs:
+      - prepare
       - python-lint
       - python-test
       - helm-lint
-      - docker-build
+      - build-images
+      - create-manifests
+      - release
     runs-on: ubuntu-latest
     steps:
       - name: Check results
         run: |
-          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
-            echo "One or more jobs failed"
-            exit 1
-          fi
+          results=(
+            "${{ needs.prepare.result }}"
+            "${{ needs.python-lint.result }}"
+            "${{ needs.python-test.result }}"
+            "${{ needs.helm-lint.result }}"
+            "${{ needs.build-images.result }}"
+            "${{ needs.create-manifests.result }}"
+            "${{ needs.release.result }}"
+          )
+
+          for r in "${results[@]}"; do
+            if [[ "$r" == "failure" ]]; then
+              echo "One or more jobs failed"
+              exit 1
+            fi
+          done
           echo "All checks passed"

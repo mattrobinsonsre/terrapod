@@ -1,0 +1,25 @@
+name: GHCR Cleanup
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'   # Weekly, Sunday 03:00 UTC
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    name: Clean ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    strategy:
+      matrix:
+        image: [terrapod-api, terrapod-web, terrapod-runner]
+    steps:
+      - uses: snok/container-retention-policy@v3
+        with:
+          account: user
+          token: ${{ secrets.GITHUB_TOKEN }}
+          image-names: ${{ matrix.image }}
+          cut-off: 30 days ago UTC
+          keep-n-most-recent: 5
+          skip-tags: v*

@@ -1,16 +1,13 @@
 # Terrapod Makefile
 # Thin wrapper around scripts/*.sh — all build logic lives in scripts.
 #
-# Docker-first: lint, test, build, and publish all run in containers.
-#
-# Release workflow:
-#   make release VERSION=v0.1.0    # tag, images, chart, GitHub release — one command
+# Docker-first: lint, test, and local builds all run in containers.
+# Releases are automated via GitHub Actions (push a semver tag).
 
 .PHONY: lint lint-python \
 	test test-python \
 	build images \
 	pentest pentest-sast pentest-images pentest-dast \
-	release publish publish-images publish-chart publish-release \
 	dev dev-down \
 	clean test-down \
 	help
@@ -46,29 +43,6 @@ pentest-images:     ## Scan container images for CVEs (Trivy)
 
 pentest-dast:       ## Run DAST analysis (Nuclei, requires running stack)
 	scripts/pentest.sh dast
-
-# ── Release ──────────────────────────────────────────────
-release:            ## Full release: tag + images + chart + GitHub release (VERSION required)
-	@if [ -z "$(VERSION)" ]; then \
-		echo "\033[1;31m==> ERROR: VERSION is required.\033[0m"; \
-		echo "Usage: make release VERSION=v0.1.0"; \
-		exit 1; \
-	fi
-	VERSION=$(VERSION) scripts/publish.sh
-
-# ── Publish (individual targets) ─────────────────────────
-publish:            ## Publish images + chart (VERSION required)
-	VERSION=$(VERSION) scripts/publish.sh images
-	VERSION=$(VERSION) scripts/publish.sh chart
-
-publish-images:     ## Push multi-arch images to GHCR (VERSION required)
-	VERSION=$(VERSION) scripts/publish.sh images
-
-publish-chart:      ## Push Helm chart to OCI registry (VERSION required)
-	VERSION=$(VERSION) scripts/publish.sh chart
-
-publish-release:    ## Create GitHub Release (VERSION required)
-	VERSION=$(VERSION) scripts/publish.sh release
 
 # ── Development ──────────────────────────────────────────
 dev:                ## Start Tilt development environment (port 10352)
