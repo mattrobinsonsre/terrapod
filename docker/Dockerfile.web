@@ -25,6 +25,7 @@ RUN npm run build
 
 # Production image — standalone mode (minimal, no full node_modules)
 FROM node:24-alpine
+LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
 WORKDIR /app
 
