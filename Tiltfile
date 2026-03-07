@@ -1,10 +1,5 @@
 # Terrapod Tiltfile - Local Kubernetes Development
 # Run with: tilt up --port 10352
-#
-# Does NOT conflict with ~/code/bamf or ~/code/kubamf:
-#   - Different namespace (terrapod vs bamf vs kubamf)
-#   - Different Tilt UI port (10352 vs 10350)
-#   - Different hostname (terrapod.local vs bamf.local)
 
 # Safety: Only allow local Kubernetes contexts. Never deploy to production.
 allow_k8s_contexts([

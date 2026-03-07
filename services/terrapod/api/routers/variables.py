@@ -2,7 +2,8 @@
 
 UX CONTRACT: Variable endpoints are consumed by the web frontend:
   - web/src/app/workspaces/[id]/page.tsx (variables tab)
-  - web/src/app/admin/variable-sets/ (variable set CRUD)
+  - web/src/app/admin/variable-sets/page.tsx (variable set list + create)
+  - web/src/app/admin/variable-sets/[id]/page.tsx (variable set detail + edit)
   Changes to response shapes, attribute names, or status codes here MUST be
   matched by corresponding updates to those frontend pages.
 

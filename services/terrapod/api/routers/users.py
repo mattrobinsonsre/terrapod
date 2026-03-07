@@ -1,4 +1,10 @@
-"""User management endpoints (admin or audit role required)."""
+"""User management endpoints (admin or audit role required).
+
+UX CONTRACT: User management endpoints are consumed by the web frontend:
+  - web/src/app/admin/users/page.tsx (user list, create, edit, deactivate, password reset)
+  Changes to response shapes, attribute names, or status codes here MUST be
+  matched by corresponding updates to that frontend page.
+"""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field

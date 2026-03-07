@@ -14,6 +14,10 @@ api:
     tag: ""  # Defaults to appVersion
     pullPolicy: IfNotPresent
 
+  # Override the container command (e.g., for hot reload in dev):
+  # command: ["uvicorn", "terrapod.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+  command: []
+
   resources:
     requests:
       cpu: 250m
@@ -121,6 +125,8 @@ api:
 
         # ── SAML Providers ────────────────────────────────────────────
         saml: []
+        # Note: SAML providers authenticate via metadata URL exchange — no client
+        # secret is needed. Unlike OIDC, there is no secretKeyRef injection for SAML.
         # Example (Azure AD SAML):
         # - name: azure-ad
         #   display_name: "Azure AD"
@@ -223,6 +229,9 @@ web:
     tag: ""  # Defaults to appVersion
     pullPolicy: IfNotPresent
 
+  # Probe overrides — template provides sensible defaults for all probe timings.
+  # Set individual fields to override (e.g., startupProbe.failureThreshold: 20).
+  startupProbe: {}
   livenessProbe: {}
   readinessProbe: {}
 
@@ -387,13 +396,15 @@ tls:
 migrations:
   enabled: true
 
-# ── Bootstrap (initial admin user) ───────────────────────────────────────────
+# ── Bootstrap (initial admin user + optional pool) ─────────────────────────
 # bootstrap:
 #   adminEmail: admin@example.com
 #   adminPassword: ""  # Required when enabled
 #   existingSecret: ""  # Alternative: reference an existing K8s Secret
 #   emailKey: email
 #   passwordKey: password
+#   poolName: ""       # Optional: auto-create an agent pool with this name
+#   poolToken: ""      # Optional: auto-create a join token for the pool
 
 # ── Database (PostgreSQL) ─────────────────────────────────────────────────────
 # External PostgreSQL URL. The password should be injected via env var

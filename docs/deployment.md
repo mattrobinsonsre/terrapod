@@ -42,7 +42,7 @@ helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
 To install a specific version:
 
 ```zsh
-helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod --version 0.0.0 \
+helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod --version 0.1.2 \
   --namespace terrapod \
   --create-namespace
 ```

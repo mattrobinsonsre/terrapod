@@ -280,7 +280,7 @@ curl -X POST https://terrapod.local/api/v2/workspaces/ws-{id}/vars \
 
 ### Sensitive Variables
 
-Set `"sensitive": true` for secrets. The value is Fernet-encrypted at rest and never returned in API responses:
+Set `"sensitive": true` for secrets. The value is protected by database encryption-at-rest and never returned in API responses:
 
 ```zsh
 curl -X POST https://terrapod.local/api/v2/workspaces/ws-{id}/vars \

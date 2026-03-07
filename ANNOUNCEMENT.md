@@ -4,7 +4,7 @@ The motivation is straightforward. HashiCorp moved from per-user pricing to Reso
 
 What it covers:
 
-- Workspaces with remote state management, locking, and Fernet encryption at rest
+- Workspaces with remote state management, locking, and encryption at rest
 - Remote execution via K8s Jobs (ARC pattern — ephemeral runners, not persistent agents)
 - VCS integration (GitHub App, GitLab) with polling-first design — no inbound webhook dependency
 - Label-based RBAC with hierarchical workspace permissions

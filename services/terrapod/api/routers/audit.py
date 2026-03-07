@@ -1,4 +1,10 @@
-"""Audit log query endpoint (admin or audit role required)."""
+"""Audit log query endpoint (admin or audit role required).
+
+UX CONTRACT: Audit log endpoints are consumed by the web frontend:
+  - web/src/app/admin/audit-log/page.tsx (audit log query and display)
+  Changes to response shapes, attribute names, or status codes here MUST be
+  matched by corresponding updates to that frontend page.
+"""
 
 from datetime import datetime
 

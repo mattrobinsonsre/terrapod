@@ -1,0 +1,29 @@
+Terrapod has been installed.
+
+{{- if .Values.ingress.enabled }}
+
+Access the UI:
+  https://{{ .Values.ingress.hostname }}
+
+{{- else }}
+
+To access the UI, set up port forwarding:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "terrapod.fullname" . }}-web 3000:80
+  Then open: http://localhost:3000
+
+{{- end }}
+
+{{- if .Values.bootstrap }}
+
+An admin user has been bootstrapped. Log in with the credentials from your
+bootstrap configuration.
+
+{{- end }}
+
+Next steps:
+  1. Log in and create your first workspace
+  2. Configure VCS connections (Admin > VCS Connections)
+  3. Set up runner pools (Admin > Agent Pools)
+  4. Connect your CLI: terraform login {{ .Values.ingress.hostname | default "terrapod.example.com" }}
+
+Documentation: https://github.com/mattrobinsonsre/terrapod

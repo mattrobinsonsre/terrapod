@@ -814,8 +814,7 @@ async def upload_state_content(
     if not state_data:
         raise HTTPException(status_code=422, detail="State data is required")
 
-    # Encrypt state at rest (Fernet envelope)
-    # Store in object storage
+    # Store in object storage (encryption at rest delegated to storage backend)
     storage = get_storage()
     key = state_key(str(sv.workspace_id), str(sv.id))
     await storage.put(key, state_data, content_type="application/octet-stream")
