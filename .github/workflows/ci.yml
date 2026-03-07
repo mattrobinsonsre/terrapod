@@ -20,6 +20,7 @@ jobs:
     name: Prepare
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       packages: read
     outputs:
       sha_short: ${{ steps.meta.outputs.sha_short }}
@@ -118,13 +119,13 @@ jobs:
     if: |
       always()
       && needs.prepare.outputs.images_exist != 'true'
-      && needs.prepare.outputs.is_pr != 'true'
       && needs.prepare.result == 'success'
       && (needs.python-lint.result == 'success' || needs.python-lint.result == 'skipped')
       && (needs.python-test.result == 'success' || needs.python-test.result == 'skipped')
       && (needs.helm-lint.result == 'success' || needs.helm-lint.result == 'skipped')
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     permissions:
+      contents: read
       packages: write
     strategy:
       fail-fast: true
@@ -145,6 +146,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
+        if: needs.prepare.outputs.is_pr != 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -157,7 +159,7 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           platforms: linux/${{ matrix.arch }}
-          push: true
+          push: ${{ needs.prepare.outputs.is_pr != 'true' }}
           tags: ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-${{ matrix.arch }}
           cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
@@ -166,9 +168,12 @@ jobs:
   create-manifests:
     name: Create Manifests
     needs: [prepare, build-images]
-    if: needs.build-images.result == 'success'
+    if: |
+      needs.build-images.result == 'success'
+      && needs.prepare.outputs.is_pr != 'true'
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       packages: write
     steps:
       - name: Log in to GHCR
