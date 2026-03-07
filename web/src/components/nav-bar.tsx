@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Users, Shield, Server, Variable, HeartPulse, FileText, BookOpen, LogOut, Menu, X } from 'lucide-react'
+import { Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Users, Shield, Server, Variable, HeartPulse, FileText, BookOpen, Code, LogOut, Menu, X } from 'lucide-react'
 import { clearAuth, isAdmin, isAdminOrAudit } from '@/lib/auth'
 import { SessionExpiryBanner } from '@/components/session-expiry-banner'
 
@@ -124,16 +124,20 @@ export default function NavBar() {
             </Link>
             <div className="flex items-center gap-1 flex-wrap flex-1">
               {navLinks}
+              <NavLink href="/api-docs">
+                <Code size={16} />
+                API
+              </NavLink>
+              <a
+                href="https://github.com/mattrobinsonsre/terrapod/tree/main/docs"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors whitespace-nowrap"
+              >
+                <BookOpen size={16} />
+                Docs
+              </a>
             </div>
-            <a
-              href="https://github.com/mattrobinsonsre/terrapod/tree/main/docs"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors flex-shrink-0 ml-2"
-            >
-              <BookOpen size={16} />
-              Docs
-            </a>
             <button
               onClick={handleLogout}
               className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors flex-shrink-0"
@@ -176,6 +180,10 @@ export default function NavBar() {
           {menuOpen && (
             <div className="md:hidden flex flex-col gap-1 pb-3">
               {navLinks}
+              <NavLink href="/api-docs" onClick={closeMenu}>
+                <Code size={16} />
+                API Reference
+              </NavLink>
             </div>
           )}
         </div>

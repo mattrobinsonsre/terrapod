@@ -103,6 +103,8 @@ GitHub integration uses a **GitHub App** for fine-grained permissions and org-le
    - For an organization: `https://github.com/organizations/{org}/settings/apps/new`
    - For a personal account: `https://github.com/settings/apps/new`
 
+![GitHub Apps List](images/github-app-list.png)
+
 2. Fill in the form:
 
    | Field | Value |
@@ -117,8 +119,11 @@ GitHub integration uses a **GitHub App** for fine-grained permissions and org-le
    |---|---|---|
    | **Contents** | Read-only | Download repository archives |
    | **Metadata** | Read-only (auto-selected) | Repository metadata |
+   | **Checks** | Read & write | Post check runs on commits |
    | **Commit statuses** | Read & write | Post plan/apply status to commits |
    | **Pull requests** | Read & write | Post and update PR comments |
+
+   ![GitHub App Permissions](images/github-app-permissions.png)
 
 4. Under **Where can this GitHub App be installed?**, choose based on your needs:
    - **Only on this account** -- if all repos are in one org/account
@@ -128,7 +133,11 @@ GitHub integration uses a **GitHub App** for fine-grained permissions and org-le
 
 6. Note the **App ID** shown on the app settings page
 
+![GitHub App General Settings](images/github-app-general.png)
+
 7. Scroll down to **Private keys** and click **Generate a private key**. A `.pem` file will download -- keep this safe.
+
+![GitHub App Private Key](images/github-app-private-key.png)
 
 ### Step 2: Install the GitHub App
 
@@ -137,6 +146,8 @@ GitHub integration uses a **GitHub App** for fine-grained permissions and org-le
 3. Select **All repositories** or **Only select repositories** (pick the repos you want Terrapod to access)
 4. Click **Install**
 5. Note the **Installation ID** from the URL: `https://github.com/settings/installations/{installation_id}`
+
+![GitHub App Installation](images/github-app-installation.png)
 
 ### Step 3: Create a GitHub VCS Connection
 
@@ -472,6 +483,8 @@ If Terrapod is accessible from GitHub (not behind a firewall), you can add webho
 4. Set a **Webhook secret** (a random string)
 5. Subscribe to events: **Push**, **Pull request**
 6. Save
+
+![GitHub App Webhook Settings](images/github-app-webhook.png)
 
 Then set the webhook secret in Terrapod:
 

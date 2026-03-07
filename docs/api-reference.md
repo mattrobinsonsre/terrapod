@@ -2,6 +2,10 @@
 
 Terrapod implements the TFE V2 API for compatibility with the `terraform` CLI, `go-tfe` client, and existing CI/CD integrations. All endpoints use JSON:API format.
 
+The interactive API documentation is also available in the web UI under **API** in the navigation bar, offering both ReDoc and Swagger UI views.
+
+![API Documentation (ReDoc)](images/api-docs-redoc.png)
+
 ---
 
 ## Base URL and Authentication

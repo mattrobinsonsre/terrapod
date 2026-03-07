@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from terrapod.auth.connectors import init_connectors
 from terrapod.config import settings
@@ -170,6 +170,79 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     await close_db()
 
 
+_REDOC_HTML = """<!DOCTYPE html>
+<html><head>
+<title>Terrapod API</title>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>body{margin:0;padding:0;}</style>
+</head><body>
+<redoc spec-url="/api/openapi.json" theme='{
+  "colors":{"primary":{"main":"#a78bfa"},"text":{"primary":"#e2e8f0","secondary":"#94a3b8"},
+  "responses":{"success":{"color":"#4ade80","backgroundColor":"rgba(74,222,128,0.1)"},
+  "error":{"color":"#f87171","backgroundColor":"rgba(248,113,113,0.1)"}},
+  "http":{"get":"#4ade80","post":"#60a5fa","put":"#fbbf24","delete":"#f87171","patch":"#c084fc"}},
+  "typography":{"fontSize":"14px","fontFamily":"Inter, sans-serif",
+  "headings":{"fontFamily":"Inter, sans-serif","fontWeight":"700"},
+  "code":{"fontSize":"13px","fontFamily":"JetBrains Mono, monospace","backgroundColor":"#1e293b"}},
+  "sidebar":{"backgroundColor":"#0f172a","textColor":"#e2e8f0","activeTextColor":"#a78bfa",
+  "groupItems":{"activeBackgroundColor":"#1e293b","activeTextColor":"#a78bfa","textColor":"#94a3b8"}},
+  "rightPanel":{"backgroundColor":"#1e293b"},
+  "schema":{"nestedBackground":"#0f172a","typeNameColor":"#a78bfa","labelsTextSize":"12px"}
+}'></redoc>
+<script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+</body></html>"""
+
+_SWAGGER_HTML = """<!DOCTYPE html>
+<html><head>
+<title>Terrapod API</title>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css"/>
+<style>
+body{margin:0;background:#0f172a;color:#e2e8f0;}
+.swagger-ui{background:#0f172a;}
+.swagger-ui .topbar{display:none;}
+.swagger-ui .info .title,.swagger-ui .info .title small{color:#e2e8f0;}
+.swagger-ui .info .description p,.swagger-ui .info .description,.swagger-ui .info li,
+.swagger-ui .info a{color:#94a3b8;}
+.swagger-ui .info a{color:#a78bfa;}
+.swagger-ui .scheme-container{background:#1e293b;box-shadow:none;border-bottom:1px solid #334155;}
+.swagger-ui .opblock-tag{color:#e2e8f0;border-bottom-color:#334155;}
+.swagger-ui .opblock-tag:hover{color:#f1f5f9;}
+.swagger-ui .opblock{border-color:#334155;background:rgba(30,41,59,0.5);}
+.swagger-ui .opblock .opblock-summary{border-bottom-color:#334155;}
+.swagger-ui .opblock .opblock-summary-description{color:#94a3b8;}
+.swagger-ui .opblock .opblock-section-header{background:#1e293b;box-shadow:none;}
+.swagger-ui .opblock .opblock-section-header h4{color:#e2e8f0;}
+.swagger-ui .opblock-description-wrapper p,.swagger-ui .opblock-external-docs-wrapper p,
+.swagger-ui table thead tr th,.swagger-ui table thead tr td,.swagger-ui .parameter__name,
+.swagger-ui .parameter__type,.swagger-ui .response-col_status,.swagger-ui .response-col_description,
+.swagger-ui label,.swagger-ui .btn{color:#e2e8f0;}
+.swagger-ui .model-title,.swagger-ui .model{color:#e2e8f0;}
+.swagger-ui .model-toggle::after{filter:invert(1);}
+.swagger-ui section.models{border-color:#334155;}
+.swagger-ui section.models .model-container{background:#1e293b;border-color:#334155;}
+.swagger-ui .response-col_description__inner p{color:#94a3b8;}
+.swagger-ui .btn.authorize{color:#a78bfa;border-color:#a78bfa;}
+.swagger-ui .btn.authorize svg{fill:#a78bfa;}
+.swagger-ui select{background:#1e293b;color:#e2e8f0;border-color:#334155;}
+.swagger-ui input[type=text]{background:#1e293b;color:#e2e8f0;border-color:#334155;}
+.swagger-ui .dialog-ux .modal-ux{background:#0f172a;border-color:#334155;}
+.swagger-ui .dialog-ux .modal-ux-header h3{color:#e2e8f0;}
+.swagger-ui .dialog-ux .modal-ux-content p{color:#94a3b8;}
+.swagger-ui .model-box{background:#1e293b;}
+.swagger-ui .prop-type{color:#a78bfa;}
+.swagger-ui .renderedMarkdown p{color:#94a3b8;}
+</style>
+</head><body>
+<div id="swagger-ui"></div>
+<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>SwaggerUIBundle({url:"/api/openapi.json",dom_id:"#swagger-ui",
+deepLinking:true,presets:[SwaggerUIBundle.presets.apis,SwaggerUIBundle.SwaggerUIStandalonePreset],
+layout:"BaseLayout"});</script>
+</body></html>"""
+
+
 def create_application() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
@@ -177,10 +250,19 @@ def create_application() -> FastAPI:
         description="Terrapod - Open-source Terraform Enterprise replacement",
         version="0.1.0",
         lifespan=lifespan,
-        docs_url="/api/docs",
-        redoc_url="/api/redoc",
+        docs_url=None,
+        redoc_url=None,
         openapi_url="/api/openapi.json",
     )
+
+    # Custom themed API docs endpoints
+    @app.get("/api/docs", include_in_schema=False)
+    async def custom_swagger_ui() -> HTMLResponse:
+        return HTMLResponse(_SWAGGER_HTML)
+
+    @app.get("/api/redoc", include_in_schema=False)
+    async def custom_redoc() -> HTMLResponse:
+        return HTMLResponse(_REDOC_HTML)
 
     # CORS middleware
     if settings.cors.allow_origins:
@@ -211,7 +293,11 @@ def create_application() -> FastAPI:
         """Add security headers to every response."""
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
+        # Allow same-origin framing for built-in API docs (ReDoc, Swagger UI)
+        if request.url.path in ("/api/docs", "/api/redoc"):
+            response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        else:
+            response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
         return response
