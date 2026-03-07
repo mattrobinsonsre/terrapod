@@ -28,6 +28,12 @@ interface VCSConnection {
   }
 }
 
+interface ModulePermissions {
+  'can-update': boolean
+  'can-destroy': boolean
+  'can-create-version': boolean
+}
+
 interface ModuleDetail {
   id: string
   attributes: {
@@ -46,6 +52,7 @@ interface ModuleDetail {
     'version-statuses': VersionStatus[]
     'created-at': string | null
     'updated-at': string | null
+    permissions: ModulePermissions
   }
 }
 
@@ -170,6 +177,9 @@ export default function ModuleDetailPage() {
 
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+
+  // Label lockout warning
+  const [lockoutWarning, setLockoutWarning] = useState('')
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
@@ -390,18 +400,25 @@ export default function ModuleDetailPage() {
     setEditingMeta(true)
   }
 
-  async function handleSaveMeta() {
+  async function handleSaveMeta(force = false) {
     if (!module) return
     setSavingMeta(true)
     setError('')
+    setLockoutWarning('')
     try {
       const res = await apiFetch(`/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
-          data: { type: 'registry-modules', attributes: { labels: editLabels, ...(isAdmin() ? { 'owner-email': editOwner } : {}) } },
+          data: { type: 'registry-modules', attributes: { labels: editLabels, ...(isAdmin() ? { 'owner-email': editOwner } : {}), ...(force ? { force: true } : {}) } },
         }),
       })
+      if (res.status === 409) {
+        const errData = await res.json()
+        const detail = errData.errors?.[0]?.detail || 'This label change would reduce your access.'
+        setLockoutWarning(detail)
+        return
+      }
       if (!res.ok) throw new Error('Failed to update module')
       const data = await res.json()
       setModule(data.data)
@@ -414,6 +431,7 @@ export default function ModuleDetailPage() {
   }
 
   const isVcsSource = module?.attributes.source === 'vcs'
+  const modPerms = module?.attributes.permissions || {} as ModulePermissions
 
   return (
     <>
@@ -430,30 +448,36 @@ export default function ModuleDetailPage() {
               description={`Provider: ${module.attributes.provider}`}
               actions={
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => { setShowUpload(!showUpload); setShowVcs(false) }}
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors flex items-center gap-2"
-                  >
-                    <Upload size={16} />
-                    {showUpload ? 'Cancel' : 'Upload Version'}
-                  </button>
-                  <button
-                    onClick={() => { setShowVcs(!showVcs); setShowUpload(false); if (!showVcs) loadVcsConnections() }}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                      isVcsSource
-                        ? 'bg-green-900/50 text-green-300 border border-green-800/50 hover:bg-green-800/50'
-                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                    }`}
-                  >
-                    <GitBranch size={16} />
-                    {showVcs ? 'Cancel' : (isVcsSource ? 'VCS Connected' : 'Connect VCS')}
-                  </button>
-                  <button
-                    onClick={() => setDeleteTarget('module')}
-                    className="px-4 py-2 rounded-lg text-sm font-medium bg-red-900/50 hover:bg-red-800/50 text-red-300 border border-red-800/50 transition-colors"
-                  >
-                    Delete Module
-                  </button>
+                  {modPerms['can-create-version'] && (
+                    <button
+                      onClick={() => { setShowUpload(!showUpload); setShowVcs(false) }}
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors flex items-center gap-2"
+                    >
+                      <Upload size={16} />
+                      {showUpload ? 'Cancel' : 'Upload Version'}
+                    </button>
+                  )}
+                  {modPerms['can-update'] && (
+                    <button
+                      onClick={() => { setShowVcs(!showVcs); setShowUpload(false); if (!showVcs) loadVcsConnections() }}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                        isVcsSource
+                          ? 'bg-green-900/50 text-green-300 border border-green-800/50 hover:bg-green-800/50'
+                          : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                      }`}
+                    >
+                      <GitBranch size={16} />
+                      {showVcs ? 'Cancel' : (isVcsSource ? 'VCS Connected' : 'Connect VCS')}
+                    </button>
+                  )}
+                  {modPerms['can-destroy'] && (
+                    <button
+                      onClick={() => setDeleteTarget('module')}
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-red-900/50 hover:bg-red-800/50 text-red-300 border border-red-800/50 transition-colors"
+                    >
+                      Delete Module
+                    </button>
+                  )}
                 </div>
               }
             />
@@ -615,11 +639,11 @@ export default function ModuleDetailPage() {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium text-slate-300">Metadata</h3>
                 {!editingMeta ? (
-                  <button onClick={startEditingMeta} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
+                  modPerms['can-update'] && <button onClick={startEditingMeta} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
                 ) : (
                   <div className="flex gap-2">
-                    <button onClick={() => setEditingMeta(false)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
-                    <button onClick={handleSaveMeta} disabled={savingMeta} className="text-xs text-brand-400 hover:text-brand-300">{savingMeta ? 'Saving...' : 'Save'}</button>
+                    <button onClick={() => { setEditingMeta(false); setLockoutWarning('') }} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
+                    <button onClick={() => handleSaveMeta()} disabled={savingMeta} className="text-xs text-brand-400 hover:text-brand-300">{savingMeta ? 'Saving...' : 'Save'}</button>
                   </div>
                 )}
               </div>
@@ -641,6 +665,26 @@ export default function ModuleDetailPage() {
                   )}
                 </div>
               </dl>
+              {lockoutWarning && (
+                <div className="mt-4 p-3 bg-amber-900/30 border border-amber-700/50 rounded-lg">
+                  <p className="text-sm text-amber-300 mb-2">{lockoutWarning}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setLockoutWarning(''); setEditLabels(module.attributes.labels || {}); }}
+                      className="px-3 py-1 rounded text-xs text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600"
+                    >
+                      Revert Labels
+                    </button>
+                    <button
+                      onClick={() => handleSaveMeta(true)}
+                      disabled={savingMeta}
+                      className="px-3 py-1 rounded text-xs text-amber-200 hover:text-white bg-amber-700 hover:bg-amber-600"
+                    >
+                      {savingMeta ? 'Saving...' : 'Save Anyway'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <h2 className="text-lg font-semibold text-slate-200 mb-3">Versions</h2>
@@ -688,14 +732,16 @@ export default function ModuleDetailPage() {
                             )}
                           </td>
                         )}
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => setDeleteTarget(v.version)}
-                            className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </td>
+                        {modPerms['can-destroy'] && (
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => setDeleteTarget(v.version)}
+                              className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

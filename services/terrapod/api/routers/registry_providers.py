@@ -53,6 +53,7 @@ from terrapod.services.registry_provider_service import (
     upload_provider_binary,
 )
 from terrapod.services.registry_rbac_service import (
+    REGISTRY_PERMISSION_HIERARCHY,
     has_registry_permission,
     resolve_registry_permission,
 )
@@ -107,7 +108,8 @@ class CreateProviderPlatformRequest(BaseModel):
 # --- JSON:API serialization ---
 
 
-def _provider_to_jsonapi(provider) -> dict:  # type: ignore[no-untyped-def]
+def _provider_to_jsonapi(provider, effective_permission: str | None = None) -> dict:  # type: ignore[no-untyped-def]
+    perm = effective_permission
     return {
         "id": str(provider.id),
         "type": "registry-providers",
@@ -118,6 +120,11 @@ def _provider_to_jsonapi(provider) -> dict:  # type: ignore[no-untyped-def]
             "owner-email": provider.owner_email,
             "created-at": provider.created_at.isoformat() if provider.created_at else None,
             "updated-at": provider.updated_at.isoformat() if provider.updated_at else None,
+            "permissions": {
+                "can-update": has_registry_permission(perm, "admin"),
+                "can-destroy": has_registry_permission(perm, "admin"),
+                "can-create-version": has_registry_permission(perm, "write"),
+            },
         },
     }
 
@@ -284,7 +291,7 @@ async def list_providers_endpoint(
             db, user.email, user.roles, p.name, p.labels or {}, p.owner_email
         )
         if perm is not None:
-            visible.append(_provider_to_jsonapi(p))
+            visible.append(_provider_to_jsonapi(p, perm))
     return JSONResponse(content={"data": visible})
 
 
@@ -305,7 +312,7 @@ async def show_provider_endpoint(
     if not has_registry_permission(perm, "read"):
         raise HTTPException(status_code=404, detail="Provider not found")
 
-    return JSONResponse(content={"data": _provider_to_jsonapi(provider)})
+    return JSONResponse(content={"data": _provider_to_jsonapi(provider, perm)})
 
 
 @router.delete(_ORG_PREFIX + "/private/default/{name}")
@@ -342,7 +349,14 @@ async def update_provider_endpoint(
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
-    await _require_provider_permission(db, user, provider, "admin")
+    perm = await resolve_registry_permission(
+        db, user.email, user.roles, provider.name, provider.labels or {}, provider.owner_email
+    )
+    if not has_registry_permission(perm, "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires admin permission on provider",
+        )
 
     attrs = body.get("data", {}).get("attributes", {})
 
@@ -355,11 +369,42 @@ async def update_provider_endpoint(
         provider.owner_email = attrs["owner-email"]
 
     if "labels" in attrs:
-        provider.labels = attrs["labels"]
+        new_labels = attrs["labels"]
+        # Self-lockout check: warn if label change would reduce user's access
+        if (
+            new_labels != (provider.labels or {})
+            and not attrs.get("force")
+            and "admin" not in user.roles
+            and provider.owner_email != user.email
+        ):
+            new_perm = await resolve_registry_permission(
+                db, user.email, user.roles, provider.name, new_labels, provider.owner_email
+            )
+            if new_perm is None or REGISTRY_PERMISSION_HIERARCHY.get(
+                new_perm, -1
+            ) < REGISTRY_PERMISSION_HIERARCHY.get(perm, -1):
+                new_level = new_perm or "none"
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "errors": [
+                            {
+                                "status": "409",
+                                "title": "Label change would reduce your access",
+                                "detail": (
+                                    f"This label change would reduce your access from "
+                                    f"{perm} to {new_level} on this provider. "
+                                    f'Re-submit with "force": true to confirm.'
+                                ),
+                            }
+                        ]
+                    },
+                )
+        provider.labels = new_labels
 
     await db.commit()
     await db.refresh(provider)
-    return JSONResponse(content={"data": _provider_to_jsonapi(provider)})
+    return JSONResponse(content={"data": _provider_to_jsonapi(provider, perm)})
 
 
 # --- Version Management ---

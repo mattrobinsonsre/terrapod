@@ -244,6 +244,29 @@ Same body format as create. Only include attributes to change.
 
 **Required permission:** `admin` on the workspace.
 
+**Self-lockout protection:** If the request changes `labels` and the new labels would reduce the caller's own access level, the API returns **409 Conflict** with a descriptive error. Re-submit with `"force": true` in the attributes to confirm the change. Platform admins and workspace owners are immune (their access doesn't depend on labels).
+
+### Workspace Permissions Block
+
+All workspace responses (show and list) include a `permissions` object reflecting the authenticated user's effective permissions:
+
+```json
+{
+  "permissions": {
+    "can-update": true,
+    "can-destroy": true,
+    "can-queue-run": true,
+    "can-read-state-versions": true,
+    "can-create-state-versions": true,
+    "can-read-variable": true,
+    "can-update-variable": true,
+    "can-lock": true,
+    "can-unlock": true,
+    "can-force-unlock": true,
+    "can-read-settings": true
+  }
+}
+
 ### Delete Workspace
 
 ```
@@ -718,6 +741,30 @@ POST /api/v2/organizations/{org}/registry-modules/{namespace}/{name}/{provider}/
 GET  /api/v2/organizations/{org}/registry-modules/{namespace}/{name}/{provider}/{version}
 ```
 
+### Update Module
+
+```
+PATCH /api/v2/organizations/{org}/registry-modules/private/{org}/{name}/{provider}
+```
+
+**Required permission:** `admin` on the module.
+
+**Self-lockout protection:** If the request changes `labels` and the new labels would reduce the caller's own access level, the API returns **409 Conflict**. Re-submit with `"force": true` in the attributes to confirm.
+
+### Module Permissions Block
+
+All module responses (show and list) include a `permissions` object:
+
+```json
+{
+  "permissions": {
+    "can-update": true,
+    "can-destroy": true,
+    "can-create-version": true
+  }
+}
+```
+
 ### Version Upload
 
 Create a version, then upload the tarball to the presigned URL returned in the response.
@@ -742,6 +789,30 @@ GET  /api/v2/organizations/{org}/registry-providers/{namespace}/{name}
 DELETE /api/v2/organizations/{org}/registry-providers/{namespace}/{name}
 POST /api/v2/organizations/{org}/registry-providers/{namespace}/{name}/versions
 POST /api/v2/organizations/{org}/registry-providers/{namespace}/{name}/versions/{version}/platforms
+```
+
+### Update Provider
+
+```
+PATCH /api/v2/organizations/{org}/registry-providers/private/{org}/{name}
+```
+
+**Required permission:** `admin` on the provider.
+
+**Self-lockout protection:** If the request changes `labels` and the new labels would reduce the caller's own access level, the API returns **409 Conflict**. Re-submit with `"force": true` in the attributes to confirm.
+
+### Provider Permissions Block
+
+All provider responses (show and list) include a `permissions` object:
+
+```json
+{
+  "permissions": {
+    "can-update": true,
+    "can-destroy": true,
+    "can-create-version": true
+  }
+}
 ```
 
 ### GPG Keys
@@ -1397,6 +1468,6 @@ Sends a test payload to the configured destination and returns the delivery resp
 | 401 | Unauthorized (missing or invalid token) |
 | 403 | Forbidden (insufficient permissions) |
 | 404 | Not found |
-| 409 | Conflict (lock conflict, duplicate resource) |
+| 409 | Conflict (lock conflict, duplicate resource, label change would reduce your access) |
 | 422 | Unprocessable entity (semantic validation error) |
 | 503 | Service unavailable (readiness check failed) |

@@ -133,6 +133,10 @@ Modules follow the same owner + label RBAC model as workspaces:
 - Label-based roles grant read/write/admin
 - The `workspace_permission` on a role maps to registry permissions: `plan` maps to `read`
 
+Module API responses include a `permissions` block (`can-update`, `can-destroy`, `can-create-version`) reflecting the caller's effective access. The web UI uses these to gate editing, deletion, and version upload controls.
+
+**Self-lockout protection:** If a label change on a module or provider would reduce the caller's own access, the API returns 409 Conflict. The UI shows a warning banner with Revert / Save Anyway options. See the [RBAC docs](rbac.md#self-lockout-protection-on-label-changes) for details.
+
 ---
 
 ## VCS-Driven Module Publishing

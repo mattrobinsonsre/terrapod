@@ -13,6 +13,12 @@ import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { LabelsEditor } from '@/components/labels-editor'
 
+interface ProviderPermissions {
+  'can-update': boolean
+  'can-destroy': boolean
+  'can-create-version': boolean
+}
+
 interface ProviderMeta {
   id: string
   attributes: {
@@ -22,6 +28,7 @@ interface ProviderMeta {
     'owner-email': string
     'created-at': string | null
     'updated-at': string | null
+    permissions: ProviderPermissions
   }
 }
 
@@ -99,6 +106,9 @@ export default function ProviderDetailPage() {
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<{ type: string; version?: string; os?: string; arch?: string } | null>(null)
 
+  // Label lockout warning
+  const [lockoutWarning, setLockoutWarning] = useState('')
+
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
     loadVersions()
@@ -138,17 +148,24 @@ export default function ProviderDetailPage() {
     setEditingMeta(true)
   }
 
-  async function handleSaveMeta() {
+  async function handleSaveMeta(force = false) {
     setSavingMeta(true)
     setError('')
+    setLockoutWarning('')
     try {
       const res = await apiFetch(basePath, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
-          data: { type: 'registry-providers', attributes: { labels: editLabels, ...(isAdmin() ? { 'owner-email': editOwner } : {}) } },
+          data: { type: 'registry-providers', attributes: { labels: editLabels, ...(isAdmin() ? { 'owner-email': editOwner } : {}), ...(force ? { force: true } : {}) } },
         }),
       })
+      if (res.status === 409) {
+        const errData = await res.json()
+        const detail = errData.errors?.[0]?.detail || 'This label change would reduce your access.'
+        setLockoutWarning(detail)
+        return
+      }
       if (!res.ok) throw new Error('Failed to update provider')
       const data = await res.json()
       setProviderMeta(data.data)
@@ -312,6 +329,8 @@ export default function ProviderDetailPage() {
     return acc
   }, {})
 
+  const provPerms = providerMeta?.attributes.permissions || {} as ProviderPermissions
+
   return (
     <>
       <NavBar />
@@ -323,19 +342,23 @@ export default function ProviderDetailPage() {
           description="Provider registry"
           actions={
             <div className="flex gap-2">
-              <button
-                onClick={() => { setShowUpload(!showUpload); setShowAdvanced(false) }}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors flex items-center gap-2"
-              >
-                <Upload size={16} />
-                {showUpload ? 'Cancel' : 'Upload Binaries'}
-              </button>
-              <button
-                onClick={() => setDeleteTarget({ type: 'provider' })}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-900/50 hover:bg-red-800/50 text-red-300 border border-red-800/50 transition-colors"
-              >
-                Delete Provider
-              </button>
+              {provPerms['can-create-version'] && (
+                <button
+                  onClick={() => { setShowUpload(!showUpload); setShowAdvanced(false) }}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors flex items-center gap-2"
+                >
+                  <Upload size={16} />
+                  {showUpload ? 'Cancel' : 'Upload Binaries'}
+                </button>
+              )}
+              {provPerms['can-destroy'] && (
+                <button
+                  onClick={() => setDeleteTarget({ type: 'provider' })}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-red-900/50 hover:bg-red-800/50 text-red-300 border border-red-800/50 transition-colors"
+                >
+                  Delete Provider
+                </button>
+              )}
             </div>
           }
         />
@@ -474,11 +497,11 @@ export default function ProviderDetailPage() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-medium text-slate-300">Metadata</h3>
               {!editingMeta ? (
-                <button onClick={startEditingMeta} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
+                provPerms['can-update'] && <button onClick={startEditingMeta} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
               ) : (
                 <div className="flex gap-2">
-                  <button onClick={() => setEditingMeta(false)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
-                  <button onClick={handleSaveMeta} disabled={savingMeta} className="text-xs text-brand-400 hover:text-brand-300">{savingMeta ? 'Saving...' : 'Save'}</button>
+                  <button onClick={() => { setEditingMeta(false); setLockoutWarning('') }} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
+                  <button onClick={() => handleSaveMeta()} disabled={savingMeta} className="text-xs text-brand-400 hover:text-brand-300">{savingMeta ? 'Saving...' : 'Save'}</button>
                 </div>
               )}
             </div>
@@ -500,6 +523,26 @@ export default function ProviderDetailPage() {
                 )}
               </div>
             </dl>
+            {lockoutWarning && (
+              <div className="mt-4 p-3 bg-amber-900/30 border border-amber-700/50 rounded-lg">
+                <p className="text-sm text-amber-300 mb-2">{lockoutWarning}</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setLockoutWarning(''); setEditLabels(providerMeta.attributes.labels || {}); }}
+                    className="px-3 py-1 rounded text-xs text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600"
+                  >
+                    Revert Labels
+                  </button>
+                  <button
+                    onClick={() => handleSaveMeta(true)}
+                    disabled={savingMeta}
+                    className="px-3 py-1 rounded text-xs text-amber-200 hover:text-white bg-amber-700 hover:bg-amber-600"
+                  >
+                    {savingMeta ? 'Saving...' : 'Save Anyway'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -526,18 +569,22 @@ export default function ProviderDetailPage() {
                       <span className="text-xs text-slate-500">{v.attributes.platforms?.length || 0} platform(s)</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setPlatformForVersion(v.attributes.version) }}
-                        className="text-xs text-brand-400 hover:text-brand-300 transition-colors"
-                      >
-                        Add Platform
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setDeleteTarget({ type: 'version', version: v.attributes.version }) }}
-                        className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                      >
-                        Delete
-                      </button>
+                      {provPerms['can-create-version'] && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setPlatformForVersion(v.attributes.version) }}
+                          className="text-xs text-brand-400 hover:text-brand-300 transition-colors"
+                        >
+                          Add Platform
+                        </button>
+                      )}
+                      {provPerms['can-destroy'] && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeleteTarget({ type: 'version', version: v.attributes.version }) }}
+                          className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                   {isExpanded && v.attributes.platforms && v.attributes.platforms.length > 0 && (
@@ -557,14 +604,16 @@ export default function ProviderDetailPage() {
                               <td className="py-1.5 text-slate-300">{p.os}</td>
                               <td className="py-1.5 text-slate-300">{p.arch}</td>
                               <td className="py-1.5 text-slate-400 font-mono text-xs">{p.filename}</td>
-                              <td className="py-1.5 text-right">
-                                <button
-                                  onClick={() => setDeleteTarget({ type: 'platform', version: v.attributes.version, os: p.os, arch: p.arch })}
-                                  className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                                >
-                                  Delete
-                                </button>
-                              </td>
+                              {provPerms['can-destroy'] && (
+                                <td className="py-1.5 text-right">
+                                  <button
+                                    onClick={() => setDeleteTarget({ type: 'platform', version: v.attributes.version, os: p.os, arch: p.arch })}
+                                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                                  >
+                                    Delete
+                                  </button>
+                                </td>
+                              )}
                             </tr>
                           ))}
                         </tbody>

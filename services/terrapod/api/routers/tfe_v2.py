@@ -47,6 +47,7 @@ from terrapod.db.models import StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.workspace_rbac_service import (
+    PERMISSION_HIERARCHY,
     has_permission,
     resolve_workspace_permission,
 )
@@ -546,7 +547,40 @@ async def update_workspace(
     if "resource-memory" in attrs:
         ws.resource_memory = attrs["resource-memory"]
     if "labels" in attrs:
-        ws.labels = attrs["labels"]
+        new_labels = attrs["labels"]
+        # Self-lockout check: warn if label change would reduce user's access
+        # Platform admins and owners are immune (their access doesn't depend on labels)
+        if (
+            new_labels != (ws.labels or {})
+            and not attrs.get("force")
+            and "admin" not in user.roles
+            and ws.owner_email != user.email
+        ):
+            old_labels = ws.labels
+            ws.labels = new_labels
+            new_perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+            ws.labels = old_labels  # revert before deciding
+            if new_perm is None or PERMISSION_HIERARCHY.get(
+                new_perm, -1
+            ) < PERMISSION_HIERARCHY.get(perm, -1):
+                new_level = new_perm or "none"
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "errors": [
+                            {
+                                "status": "409",
+                                "title": "Label change would reduce your access",
+                                "detail": (
+                                    f"This label change would reduce your access from "
+                                    f"{perm} to {new_level} on this workspace. "
+                                    f'Re-submit with "force": true to confirm.'
+                                ),
+                            }
+                        ]
+                    },
+                )
+        ws.labels = new_labels
     if "vcs-repo-url" in attrs:
         ws.vcs_repo_url = attrs["vcs-repo-url"]
     if "vcs-branch" in attrs:

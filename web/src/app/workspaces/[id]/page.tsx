@@ -14,6 +14,20 @@ import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { useRunEvents } from '@/lib/use-run-events'
 
+interface WorkspacePermissions {
+  'can-update': boolean
+  'can-destroy': boolean
+  'can-queue-run': boolean
+  'can-read-state-versions': boolean
+  'can-create-state-versions': boolean
+  'can-read-variable': boolean
+  'can-update-variable': boolean
+  'can-lock': boolean
+  'can-unlock': boolean
+  'can-force-unlock': boolean
+  'can-read-settings': boolean
+}
+
 interface WorkspaceAttrs {
   name: string
   'execution-mode': string
@@ -34,6 +48,7 @@ interface WorkspaceAttrs {
   'drift-status': string
   'created-at': string
   'updated-at': string
+  permissions: WorkspacePermissions
 }
 
 interface AgentPool {
@@ -216,6 +231,9 @@ function WorkspaceDetailContent() {
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // Label lockout warning
+  const [lockoutWarning, setLockoutWarning] = useState('')
 
   // Notifications
   const [notifications, setNotifications] = useState<NotificationConfig[]>([])
@@ -482,9 +500,10 @@ function WorkspaceDetailContent() {
     }
   }
 
-  async function handleSave() {
+  async function handleSave(force = false) {
     setSaving(true)
     setError('')
+    setLockoutWarning('')
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
         method: 'PATCH',
@@ -502,10 +521,17 @@ function WorkspaceDetailContent() {
               'agent-pool-id': editPoolId,
               labels: editLabels,
               ...(isAdmin() ? { 'owner-email': editOwner } : {}),
+              ...(force ? { force: true } : {}),
             },
           },
         }),
       })
+      if (res.status === 409) {
+        const errData = await res.json()
+        const detail = errData.errors?.[0]?.detail || 'This label change would reduce your access.'
+        setLockoutWarning(detail)
+        return
+      }
       if (!res.ok) throw new Error('Failed to update workspace')
       const data = await res.json()
       setWorkspace(data.data)
@@ -901,6 +927,7 @@ function WorkspaceDetailContent() {
   if (!workspace) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><ErrorBanner message="Workspace not found" /></main></>
 
   const attrs = workspace.attributes
+  const perms = attrs.permissions || {} as WorkspacePermissions
 
   return (
     <>
@@ -948,13 +975,13 @@ function WorkspaceDetailContent() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-slate-300">Settings</h3>
                 {!editing ? (
-                  <button onClick={startEditing} className="text-xs text-brand-400 hover:text-brand-300">
+                  perms['can-update'] && <button onClick={startEditing} className="text-xs text-brand-400 hover:text-brand-300">
                     Edit
                   </button>
                 ) : (
                   <div className="flex gap-2">
                     <button onClick={() => setEditing(false)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
-                    <button onClick={handleSave} disabled={saving} className="text-xs text-brand-400 hover:text-brand-300">
+                    <button onClick={() => handleSave()} disabled={saving} className="text-xs text-brand-400 hover:text-brand-300">
                       {saving ? 'Saving...' : 'Save'}
                     </button>
                   </div>
@@ -1058,7 +1085,7 @@ function WorkspaceDetailContent() {
                 </div>
                 <div className="sm:col-span-2">
                   <dt className="text-xs text-slate-500 mb-1">Labels</dt>
-                  {editing ? (
+                  {editing && perms['can-update'] ? (
                     <LabelsEditor labels={editLabels} onChange={setEditLabels} />
                   ) : (
                     <dd className="mt-1">
@@ -1067,6 +1094,26 @@ function WorkspaceDetailContent() {
                   )}
                 </div>
               </dl>
+              {lockoutWarning && (
+                <div className="mt-4 p-3 bg-amber-900/30 border border-amber-700/50 rounded-lg">
+                  <p className="text-sm text-amber-300 mb-2">{lockoutWarning}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setLockoutWarning(''); setEditLabels(attrs.labels || {}); }}
+                      className="px-3 py-1 rounded text-xs text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600"
+                    >
+                      Revert Labels
+                    </button>
+                    <button
+                      onClick={() => handleSave(true)}
+                      disabled={saving}
+                      className="px-3 py-1 rounded text-xs text-amber-200 hover:text-white bg-amber-700 hover:bg-amber-600"
+                    >
+                      {saving ? 'Saving...' : 'Save Anyway'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Lock / Unlock */}
@@ -1078,16 +1125,18 @@ function WorkspaceDetailContent() {
                     {attrs.locked ? 'This workspace is locked. No plans or applies can run.' : 'This workspace is unlocked and ready for runs.'}
                   </p>
                 </div>
-                <button
-                  onClick={handleLockToggle}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    attrs.locked
-                      ? 'bg-amber-600 hover:bg-amber-500 text-white'
-                      : 'bg-slate-600 hover:bg-slate-500 text-slate-200'
-                  }`}
-                >
-                  {attrs.locked ? 'Unlock' : 'Lock'}
-                </button>
+                {perms['can-lock'] && (
+                  <button
+                    onClick={handleLockToggle}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      attrs.locked
+                        ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                        : 'bg-slate-600 hover:bg-slate-500 text-slate-200'
+                    }`}
+                  >
+                    {attrs.locked ? 'Unlock' : 'Lock'}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1095,17 +1144,25 @@ function WorkspaceDetailContent() {
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-slate-300">Drift Detection</h3>
-                <button
-                  onClick={handleDriftToggle}
-                  disabled={savingDrift}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    attrs['drift-detection-enabled']
-                      ? 'bg-green-600 hover:bg-green-500 text-white'
-                      : 'bg-slate-600 hover:bg-slate-500 text-slate-200'
-                  }`}
-                >
-                  {savingDrift ? 'Saving...' : attrs['drift-detection-enabled'] ? 'Enabled' : 'Disabled'}
-                </button>
+                {perms['can-update'] ? (
+                  <button
+                    onClick={handleDriftToggle}
+                    disabled={savingDrift}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      attrs['drift-detection-enabled']
+                        ? 'bg-green-600 hover:bg-green-500 text-white'
+                        : 'bg-slate-600 hover:bg-slate-500 text-slate-200'
+                    }`}
+                  >
+                    {savingDrift ? 'Saving...' : attrs['drift-detection-enabled'] ? 'Enabled' : 'Disabled'}
+                  </button>
+                ) : (
+                  <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                    attrs['drift-detection-enabled'] ? 'bg-green-900/50 text-green-300' : 'bg-slate-700 text-slate-400'
+                  }`}>
+                    {attrs['drift-detection-enabled'] ? 'Enabled' : 'Disabled'}
+                  </span>
+                )}
               </div>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -1137,63 +1194,69 @@ function WorkspaceDetailContent() {
                     {attrs['drift-last-checked-at'] ? new Date(attrs['drift-last-checked-at']).toLocaleString() : 'Never'}
                   </dd>
                 </div>
-                <div className="flex items-end">
-                  <button
-                    onClick={handleCheckDriftNow}
-                    disabled={checkingDrift || attrs.locked || !attrs['drift-detection-enabled']}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
-                    title={!attrs['drift-detection-enabled'] ? 'Enable drift detection first' : attrs.locked ? 'Workspace is locked' : 'Queue a plan-only run to check for drift'}
-                  >
-                    {checkingDrift ? 'Queuing...' : 'Check Now'}
-                  </button>
-                </div>
+                {perms['can-queue-run'] && (
+                  <div className="flex items-end">
+                    <button
+                      onClick={handleCheckDriftNow}
+                      disabled={checkingDrift || attrs.locked || !attrs['drift-detection-enabled']}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+                      title={!attrs['drift-detection-enabled'] ? 'Enable drift detection first' : attrs.locked ? 'Workspace is locked' : 'Queue a plan-only run to check for drift'}
+                    >
+                      {checkingDrift ? 'Queuing...' : 'Check Now'}
+                    </button>
+                  </div>
+                )}
               </dl>
             </div>
 
             {/* Delete */}
-            <div className="bg-slate-800/50 rounded-lg border border-red-900/30 p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-medium text-red-400">Delete Workspace</h3>
-                  <p className="text-sm text-slate-400 mt-1">Permanently delete this workspace and all associated state, variables, and runs.</p>
-                </div>
-                {!showDeleteConfirm ? (
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 text-red-400 transition-colors"
-                  >
-                    Delete
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button onClick={() => setShowDeleteConfirm(false)} className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200">
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleDelete}
-                      disabled={deleting}
-                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors"
-                    >
-                      {deleting ? 'Deleting...' : 'Confirm Delete'}
-                    </button>
+            {perms['can-destroy'] && (
+              <div className="bg-slate-800/50 rounded-lg border border-red-900/30 p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-red-400">Delete Workspace</h3>
+                    <p className="text-sm text-slate-400 mt-1">Permanently delete this workspace and all associated state, variables, and runs.</p>
                   </div>
-                )}
+                  {!showDeleteConfirm ? (
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 text-red-400 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button onClick={() => setShowDeleteConfirm(false)} className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200">
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors"
+                      >
+                        {deleting ? 'Deleting...' : 'Confirm Delete'}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
         {/* Variables Tab */}
         {activeTab === 'variables' && (
           <div>
-            <div className="flex justify-end mb-4">
-              <button
-                onClick={() => setShowAddVar(!showAddVar)}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
-              >
-                {showAddVar ? 'Cancel' : 'Add Variable'}
-              </button>
-            </div>
+            {perms['can-update-variable'] && (
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={() => setShowAddVar(!showAddVar)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
+                >
+                  {showAddVar ? 'Cancel' : 'Add Variable'}
+                </button>
+              </div>
+            )}
 
             {showAddVar && (
               <form onSubmit={handleAddVariable} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
@@ -1299,12 +1362,14 @@ function WorkspaceDetailContent() {
                               {v.attributes.category}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex justify-end gap-2">
-                              <button onClick={() => startEditingVar(v)} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
-                              <button onClick={() => handleDeleteVariable(v.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
-                            </div>
-                          </td>
+                          {perms['can-update-variable'] && (
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex justify-end gap-2">
+                                <button onClick={() => startEditingVar(v)} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
+                                <button onClick={() => handleDeleteVariable(v.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       )
                     )}
@@ -1318,16 +1383,18 @@ function WorkspaceDetailContent() {
         {/* Runs Tab */}
         {activeTab === 'runs' && (
           <div>
-            <div className="flex justify-end mb-4">
-              <button
-                onClick={handleQueuePlan}
-                disabled={queueingPlan || attrs.locked}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
-                title={attrs.locked ? 'Workspace is locked' : undefined}
-              >
-                {queueingPlan ? 'Queuing...' : 'Queue Plan'}
-              </button>
-            </div>
+            {perms['can-queue-run'] && (
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={handleQueuePlan}
+                  disabled={queueingPlan || attrs.locked}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+                  title={attrs.locked ? 'Workspace is locked' : undefined}
+                >
+                  {queueingPlan ? 'Queuing...' : 'Queue Plan'}
+                </button>
+              </div>
+            )}
             {runsLoading ? (
               <LoadingSpinner />
             ) : runs.length === 0 ? (
@@ -1429,14 +1496,16 @@ function WorkspaceDetailContent() {
         {/* Notifications Tab */}
         {activeTab === 'notifications' && (
           <div>
-            <div className="flex justify-end mb-4">
-              <button
-                onClick={() => setShowAddNotif(!showAddNotif)}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
-              >
-                {showAddNotif ? 'Cancel' : 'Add Notification'}
-              </button>
-            </div>
+            {perms['can-update'] && (
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={() => setShowAddNotif(!showAddNotif)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
+                >
+                  {showAddNotif ? 'Cancel' : 'Add Notification'}
+                </button>
+              </div>
+            )}
 
             {showAddNotif && (
               <form onSubmit={handleAddNotification} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
@@ -1537,26 +1606,32 @@ function WorkspaceDetailContent() {
                               {lastResponse.success ? 'OK' : `Err ${lastResponse.status}`}
                             </span>
                           )}
-                          <button onClick={() => handleToggleNotif(nc)} className="text-xs text-brand-400 hover:text-brand-300 px-1">
-                            {a.enabled ? 'Disable' : 'Enable'}
-                          </button>
-                          <button onClick={() => handleVerifyNotif(nc.id)} disabled={verifyingId === nc.id}
-                            className="text-xs text-brand-400 hover:text-brand-300 px-1">
-                            {verifyingId === nc.id ? 'Sending...' : 'Verify'}
-                          </button>
+                          {perms['can-update'] && (
+                            <>
+                              <button onClick={() => handleToggleNotif(nc)} className="text-xs text-brand-400 hover:text-brand-300 px-1">
+                                {a.enabled ? 'Disable' : 'Enable'}
+                              </button>
+                              <button onClick={() => handleVerifyNotif(nc.id)} disabled={verifyingId === nc.id}
+                                className="text-xs text-brand-400 hover:text-brand-300 px-1">
+                                {verifyingId === nc.id ? 'Sending...' : 'Verify'}
+                              </button>
+                            </>
+                          )}
                           {responses.length > 0 && (
                             <button onClick={() => setExpandedNotifId(isExpanded ? null : nc.id)}
                               className="text-xs text-slate-400 hover:text-slate-200 px-1">
                               {isExpanded ? 'Hide' : 'History'}
                             </button>
                           )}
-                          {deleteNotifId === nc.id ? (
-                            <>
-                              <button onClick={() => setDeleteNotifId(null)} className="text-xs text-slate-400 hover:text-slate-200 px-1">Cancel</button>
-                              <button onClick={() => handleDeleteNotif(nc.id)} className="text-xs text-red-400 hover:text-red-300 px-1">Confirm</button>
-                            </>
-                          ) : (
-                            <button onClick={() => setDeleteNotifId(nc.id)} className="text-xs text-red-400 hover:text-red-300 px-1">Delete</button>
+                          {perms['can-update'] && (
+                            deleteNotifId === nc.id ? (
+                              <>
+                                <button onClick={() => setDeleteNotifId(null)} className="text-xs text-slate-400 hover:text-slate-200 px-1">Cancel</button>
+                                <button onClick={() => handleDeleteNotif(nc.id)} className="text-xs text-red-400 hover:text-red-300 px-1">Confirm</button>
+                              </>
+                            ) : (
+                              <button onClick={() => setDeleteNotifId(nc.id)} className="text-xs text-red-400 hover:text-red-300 px-1">Delete</button>
+                            )
                           )}
                         </div>
                       </div>
@@ -1587,14 +1662,16 @@ function WorkspaceDetailContent() {
         {/* Run Tasks Tab */}
         {activeTab === 'run-tasks' && (
           <div>
-            <div className="flex justify-end mb-4">
-              <button
-                onClick={() => setShowAddRunTask(!showAddRunTask)}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
-              >
-                {showAddRunTask ? 'Cancel' : 'Add Run Task'}
-              </button>
-            </div>
+            {perms['can-update'] && (
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={() => setShowAddRunTask(!showAddRunTask)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
+                >
+                  {showAddRunTask ? 'Cancel' : 'Add Run Task'}
+                </button>
+              </div>
+            )}
 
             {showAddRunTask && (
               <form onSubmit={handleAddRunTask} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
@@ -1668,19 +1745,21 @@ function WorkspaceDetailContent() {
                         </div>
                         <div className="text-xs text-slate-500 truncate">{a.url}</div>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button onClick={() => handleToggleRunTask(rt)} className="text-xs text-brand-400 hover:text-brand-300 px-1">
-                          {a.enabled ? 'Disable' : 'Enable'}
-                        </button>
-                        {deleteRtId === rt.id ? (
-                          <>
-                            <button onClick={() => setDeleteRtId(null)} className="text-xs text-slate-400 hover:text-slate-200 px-1">Cancel</button>
-                            <button onClick={() => handleDeleteRunTask(rt.id)} className="text-xs text-red-400 hover:text-red-300 px-1">Confirm</button>
-                          </>
-                        ) : (
-                          <button onClick={() => setDeleteRtId(rt.id)} className="text-xs text-red-400 hover:text-red-300 px-1">Delete</button>
-                        )}
-                      </div>
+                      {perms['can-update'] && (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button onClick={() => handleToggleRunTask(rt)} className="text-xs text-brand-400 hover:text-brand-300 px-1">
+                            {a.enabled ? 'Disable' : 'Enable'}
+                          </button>
+                          {deleteRtId === rt.id ? (
+                            <>
+                              <button onClick={() => setDeleteRtId(null)} className="text-xs text-slate-400 hover:text-slate-200 px-1">Cancel</button>
+                              <button onClick={() => handleDeleteRunTask(rt.id)} className="text-xs text-red-400 hover:text-red-300 px-1">Confirm</button>
+                            </>
+                          ) : (
+                            <button onClick={() => setDeleteRtId(rt.id)} className="text-xs text-red-400 hover:text-red-300 px-1">Delete</button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}

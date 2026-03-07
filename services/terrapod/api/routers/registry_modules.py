@@ -42,6 +42,7 @@ from terrapod.services.registry_module_service import (
     upload_module_tarball,
 )
 from terrapod.services.registry_rbac_service import (
+    REGISTRY_PERMISSION_HIERARCHY,
     has_registry_permission,
     resolve_registry_permission,
 )
@@ -82,7 +83,7 @@ class CreateModuleVersionRequest(BaseModel):
 # --- JSON:API serialization ---
 
 
-def _module_to_jsonapi(module) -> dict:  # type: ignore[no-untyped-def]
+def _module_to_jsonapi(module, effective_permission: str | None = None) -> dict:  # type: ignore[no-untyped-def]
     versions = [
         {
             "version": v.version,
@@ -92,6 +93,7 @@ def _module_to_jsonapi(module) -> dict:  # type: ignore[no-untyped-def]
         }
         for v in (module.versions or [])
     ]
+    perm = effective_permission
     return {
         "id": str(module.id),
         "type": "registry-modules",
@@ -113,6 +115,11 @@ def _module_to_jsonapi(module) -> dict:  # type: ignore[no-untyped-def]
             "version-statuses": versions,
             "created-at": module.created_at.isoformat() if module.created_at else None,
             "updated-at": module.updated_at.isoformat() if module.updated_at else None,
+            "permissions": {
+                "can-update": has_registry_permission(perm, "admin"),
+                "can-destroy": has_registry_permission(perm, "admin"),
+                "can-create-version": has_registry_permission(perm, "write"),
+            },
         },
     }
 
@@ -220,7 +227,7 @@ async def list_modules_endpoint(
             db, user.email, user.roles, m.name, m.labels or {}, m.owner_email
         )
         if perm is not None:
-            visible.append(_module_to_jsonapi(m))
+            visible.append(_module_to_jsonapi(m, perm))
     return JSONResponse(content={"data": visible})
 
 
@@ -242,7 +249,7 @@ async def show_module_endpoint(
     if not has_registry_permission(perm, "read"):
         raise HTTPException(status_code=404, detail="Module not found")
 
-    return JSONResponse(content={"data": _module_to_jsonapi(module)})
+    return JSONResponse(content={"data": _module_to_jsonapi(module, perm)})
 
 
 @router.delete("/api/v2/organizations/default/registry-modules/private/default/{name}/{provider}")
@@ -308,11 +315,42 @@ async def update_module_endpoint(
         module.owner_email = attrs["owner-email"]
 
     if "labels" in attrs:
-        module.labels = attrs["labels"]
+        new_labels = attrs["labels"]
+        # Self-lockout check: warn if label change would reduce user's access
+        if (
+            new_labels != (module.labels or {})
+            and not attrs.get("force")
+            and "admin" not in user.roles
+            and module.owner_email != user.email
+        ):
+            new_perm = await resolve_registry_permission(
+                db, user.email, user.roles, module.name, new_labels, module.owner_email
+            )
+            if new_perm is None or REGISTRY_PERMISSION_HIERARCHY.get(
+                new_perm, -1
+            ) < REGISTRY_PERMISSION_HIERARCHY.get(perm, -1):
+                new_level = new_perm or "none"
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "errors": [
+                            {
+                                "status": "409",
+                                "title": "Label change would reduce your access",
+                                "detail": (
+                                    f"This label change would reduce your access from "
+                                    f"{perm} to {new_level} on this module. "
+                                    f'Re-submit with "force": true to confirm.'
+                                ),
+                            }
+                        ]
+                    },
+                )
+        module.labels = new_labels
 
     await db.commit()
     await db.refresh(module)
-    return JSONResponse(content={"data": _module_to_jsonapi(module)})
+    return JSONResponse(content={"data": _module_to_jsonapi(module, perm)})
 
 
 @router.post(

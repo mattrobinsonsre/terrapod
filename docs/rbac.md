@@ -271,6 +271,150 @@ curl -X PATCH https://terrapod.example.com/api/v2/workspaces/ws-{id} \
 
 ---
 
+## Self-Lockout Protection on Label Changes
+
+When a user updates labels on a workspace, module, or provider, the API checks whether the new labels would reduce or remove the user's own access. If they would, the API returns **409 Conflict** instead of applying the change, giving the user a chance to reconsider.
+
+### How It Works
+
+1. User submits label changes via `PATCH` on a workspace/module/provider
+2. API simulates permission resolution with the proposed new labels
+3. If the user's access would drop (e.g. from `write` to `read`, or from `read` to none): **409 Conflict**
+4. User can re-submit with `"force": true` in the attributes to confirm the change
+
+### Who Is Immune
+
+- **Platform admins** — their access doesn't depend on labels (always `admin`)
+- **Resource owners** — ownership check precedes label check (always `admin`)
+
+The lockout check only fires for users whose access comes from label-based role matching.
+
+### 409 Response Format
+
+```json
+{
+  "errors": [{
+    "status": "409",
+    "title": "Label change would reduce your access",
+    "detail": "This label change would reduce your access from write to read on this workspace. Re-submit with \"force\": true to confirm."
+  }]
+}
+```
+
+### Force Override
+
+To proceed despite the warning, include `"force": true` in the attributes:
+
+```zsh
+curl -X PATCH https://terrapod.example.com/api/v2/workspaces/ws-{id} \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{
+    "data": {
+      "type": "workspaces",
+      "attributes": {
+        "labels": {"team": "other-team"},
+        "force": true
+      }
+    }
+  }'
+```
+
+### UX Behavior
+
+In the web UI, when a label change would trigger a lockout warning:
+1. A warning banner appears explaining the access reduction
+2. The user can choose **Revert Labels** (undo the change) or **Save Anyway** (submit with `force: true`)
+
+---
+
+## Permissions Block in API Responses
+
+Workspace, module, and provider API responses include a `permissions` block that reflects the authenticated user's effective permissions on that resource. The web UI uses this to hide or disable actions the user cannot perform.
+
+### Workspace Permissions
+
+Included in workspace show/list responses:
+
+```json
+{
+  "permissions": {
+    "can-update": true,
+    "can-destroy": true,
+    "can-queue-run": true,
+    "can-read-state-versions": true,
+    "can-create-state-versions": true,
+    "can-read-variable": true,
+    "can-update-variable": true,
+    "can-lock": true,
+    "can-unlock": true,
+    "can-force-unlock": true,
+    "can-read-settings": true
+  }
+}
+```
+
+### Registry Module Permissions
+
+Included in module show/list responses:
+
+```json
+{
+  "permissions": {
+    "can-update": false,
+    "can-destroy": false,
+    "can-create-version": true
+  }
+}
+```
+
+### Registry Provider Permissions
+
+Included in provider show/list responses (same shape as modules):
+
+```json
+{
+  "permissions": {
+    "can-update": false,
+    "can-destroy": false,
+    "can-create-version": true
+  }
+}
+```
+
+### Permission-to-Level Mapping
+
+| Permission | Workspace Level | Registry Level |
+|---|---|---|
+| `can-update` | `admin` | `admin` |
+| `can-destroy` | `admin` | `admin` |
+| `can-queue-run` | `plan` | — |
+| `can-lock` / `can-unlock` | `plan` | — |
+| `can-update-variable` | `write` | — |
+| `can-create-version` | — | `write` |
+| `can-read-*` | `read` | `read` |
+
+### UX Permission Gating
+
+The web UI hides or disables controls based on these permission flags:
+
+| UI Element | Permission | When False |
+|---|---|---|
+| Delete Workspace/Module/Provider | `can-destroy` | Hidden |
+| Lock/Unlock button | `can-lock` | Hidden |
+| Queue Plan button | `can-queue-run` | Hidden |
+| Add/Edit/Delete Variable | `can-update-variable` | Hidden |
+| Settings edit fields | `can-update` | Read-only |
+| Add/Edit/Delete Notification | `can-update` | Hidden |
+| Add/Delete Run Task | `can-update` | Hidden |
+| Labels editor | `can-update` | Read-only |
+| Drift detection toggle | `can-update` | Read-only badge |
+| Check Drift Now | `can-queue-run` | Hidden |
+| Upload Version / Add Platform | `can-create-version` | Hidden |
+| Edit metadata | `can-update` | Hidden |
+
+---
+
 ## API Token Role Resolution
 
 When an API token is used for authentication, the user's roles are resolved from:
