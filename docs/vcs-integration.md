@@ -142,6 +142,8 @@ GitHub integration uses a **GitHub App** for fine-grained permissions and org-le
 
 No platform-level GitHub configuration is needed beyond enabling VCS. The App ID, private key, and installation ID are all stored on the VCS connection itself (encrypted at rest).
 
+![VCS Connections](images/admin-vcs-connections.png)
+
 ```zsh
 curl -X POST https://terrapod.example.com/api/v2/organizations/default/vcs-connections \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
@@ -362,6 +364,8 @@ curl https://terrapod.example.com/api/v2/workspaces/ws-{id}/runs \
 ```
 
 You should see a new run with `"source": "vcs"` and `"vcs-commit-sha"` set to your commit hash.
+
+![VCS-Triggered Runs](images/workspace-runs-populated.png)
 
 ---
 

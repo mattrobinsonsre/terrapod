@@ -44,6 +44,8 @@ A role's `workspace_permission` maps to registry permissions: `plan` maps to `re
 
 ---
 
+![Roles](images/admin-roles.png)
+
 ## Built-in Roles
 
 Terrapod has three built-in roles that cannot be modified or deleted:
@@ -234,6 +236,10 @@ curl -X DELETE https://terrapod.example.com/api/v2/role-assignments/local/alice@
 ---
 
 ## Workspace Labels and Ownership
+
+Labels are visible in the workspace overview and can be managed from the workspace settings.
+
+![Workspace Overview with Labels](images/workspace-overview.png)
 
 ### Setting Labels on a Workspace
 

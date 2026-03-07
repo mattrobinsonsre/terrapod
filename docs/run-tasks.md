@@ -35,6 +35,8 @@ Run tasks can be attached to three lifecycle boundaries:
 
 ---
 
+![Run Tasks](images/workspace-run-tasks.png)
+
 ## API
 
 ### Task Management

@@ -2,6 +2,8 @@
 
 Terrapod maintains an immutable audit log of all API requests for compliance and operational visibility. Every API call is recorded with the actor, action, resource, status code, and timing.
 
+![Audit Log](images/admin-audit-log.png)
+
 ---
 
 ## What Gets Logged

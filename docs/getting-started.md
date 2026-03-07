@@ -67,11 +67,15 @@ Open the Tilt UI at http://localhost:10352 to monitor the deployment.
 
 Open https://terrapod.local in your browser.
 
+![Login](images/login.png)
+
 The bootstrap job creates an initial admin user. Check the Tilt logs for the `terrapod-bootstrap-1` resource to find the credentials, or check the Helm `values-local.yaml` for the configured bootstrap email and password.
 
 ### Step 5: Get an API Token
 
 After logging in to the web UI, navigate to **Settings > API Tokens** and create a new token. Copy the token value -- it is only shown once.
+
+![API Tokens](images/api-tokens.png)
 
 ```zsh
 export TERRAPOD_TOKEN="<your-token-value>"
@@ -115,6 +119,8 @@ Note the workspace ID from the response (e.g., `ws-abc123...`).
 3. Enter a name (e.g., `demo`)
 4. Optionally enable auto-apply
 5. Click **Create**
+
+![Workspaces](images/workspaces.png)
 
 ---
 
@@ -239,6 +245,8 @@ curl -s https://terrapod.local/api/v2/workspaces/ws-{id}/runs \
 
 Variables can be set per-workspace via the API or web UI.
 
+![Workspace Variables](images/workspace-variables.png)
+
 ### Terraform Variables
 
 ```zsh
@@ -299,11 +307,17 @@ curl -X POST https://terrapod.local/api/v2/workspaces/ws-{id}/vars \
   }'
 ```
 
-Note: Sensitive variables require `TERRAPOD_ENCRYPTION__KEY` to be set on the API server.
+Note: Sensitive variables are protected by database encryption-at-rest and never returned in API responses.
+
+For managing variables across multiple workspaces, see variable sets (admin-only) in the web UI under **Admin > Variable Sets**.
+
+![Variable Sets](images/admin-variable-sets.png)
 
 ---
 
 ## Setting Up the Private Registry
+
+![Module Registry](images/registry-modules.png)
 
 ### Publishing a Module
 

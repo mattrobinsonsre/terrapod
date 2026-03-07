@@ -9,7 +9,7 @@ Terrapod provides the collaboration, governance, state management, and UI layer 
 
 Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
-![Dashboard](docs/images/dashboard.png)
+![Workspaces](docs/images/workspaces.png)
 
 ---
 
@@ -37,6 +37,32 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | Run Tasks | Implemented | Pre/post-plan webhook hooks for external validation |
 | Health Dashboard | Implemented | Workspace health scores, drift status, staleness metrics |
 | Cloud Credentials | Implemented | Dynamic provider credentials via K8s workload identity (AWS IRSA, GCP WIF, Azure WI) |
+
+### Screenshots
+
+<details>
+<summary>Workspace overview with VCS integration, drift detection, and labels</summary>
+
+![Workspace Overview](docs/images/workspace-overview.png)
+</details>
+
+<details>
+<summary>Run detail with plan output and VCS metadata</summary>
+
+![Run Detail](docs/images/run-detail.png)
+</details>
+
+<details>
+<summary>Health dashboard with drift status and workspace staleness</summary>
+
+![Health Dashboard](docs/images/admin-health.png)
+</details>
+
+<details>
+<summary>Audit log with filtering and pagination</summary>
+
+![Audit Log](docs/images/admin-audit-log.png)
+</details>
 
 ---
 

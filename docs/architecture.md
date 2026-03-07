@@ -202,6 +202,8 @@ The entrypoint script is at `docker/runner-entrypoint.sh`.
 
 ### Agent Pools and Listeners
 
+![Agent Pools](images/admin-agent-pools.png)
+
 All listeners follow the same flow — there is no "local" vs "remote" distinction:
 
 1. An admin creates an **agent pool** via the API (e.g. "production", "dev")
@@ -214,6 +216,8 @@ All listeners follow the same flow — there is no "local" vs "remote" distincti
 8. Heartbeats every 60s (180s TTL in Redis)
 
 A listener can be deployed in the same cluster as the API or in a completely separate cluster — the join flow is identical. The Helm chart deploys a listener as a Deployment using the same Docker image as the API (`python -m terrapod.runner.listener`) with RBAC to create/watch/delete Jobs and Pods in the runner namespace.
+
+![Agent Pool Detail](images/admin-agent-pool-detail.png)
 
 Pools are never auto-created. For initial deployment, the bootstrap job can optionally create a pool and join token when `TERRAPOD_BOOTSTRAP_POOL_NAME` is configured. For local development, Tilt automates this via a `setup-dev-pool` resource.
 
@@ -474,6 +478,8 @@ pending -----> queued -----> planning -----> planned -----> confirmed -----> app
 
 Any non-terminal state -----> canceled (user action)
 ```
+
+![Run Detail](images/run-detail.png)
 
 **Terminal states:** `applied`, `errored`, `discarded`, `canceled`
 

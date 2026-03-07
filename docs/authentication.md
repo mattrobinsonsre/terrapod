@@ -17,6 +17,8 @@ The unified auth dependency tries API token first, then session. Both return the
 
 ---
 
+![Login](images/login.png)
+
 ## Local Password Authentication
 
 Local auth is the simplest authentication method, suitable for development and small deployments.
@@ -56,6 +58,10 @@ bootstrap:
   emailKey: email
   passwordKey: password
 ```
+
+Users can be managed from the admin panel at **Admin > Users**.
+
+![User Management](images/admin-users.png)
 
 ### Password Requirements
 
@@ -355,6 +361,8 @@ The response includes the raw token value in `attributes.token`. Store it secure
 3. Enter a description
 4. Copy the token value immediately
 
+![API Tokens](images/api-tokens.png)
+
 ### Listing Tokens
 
 ```zsh
@@ -404,6 +412,8 @@ api:
 ### Viewing Active Sessions
 
 Via the web UI: **Settings > Sessions**
+
+![Active Sessions](images/sessions.png)
 
 Via the API:
 

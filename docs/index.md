@@ -6,7 +6,7 @@ Terrapod provides the collaboration, governance, state management, and UI layer 
 
 Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
-![Dashboard](images/dashboard.png)
+![Workspaces](images/workspaces.png)
 
 ---
 

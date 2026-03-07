@@ -29,6 +29,8 @@ Both caching layers (providers and binaries) sit in front of the Terrapod API, s
 
 Publish, version, and share Terraform modules internally.
 
+![Module Registry](images/registry-modules.png)
+
 ### Creating a Module
 
 ```zsh
@@ -230,6 +232,8 @@ Each version exposes VCS metadata in the API response:
 ## Private Provider Registry
 
 Publish, version, and share Terraform providers internally with GPG signing.
+
+![Provider Registry](images/registry-providers.png)
 
 ### GPG Key Management
 
@@ -472,6 +476,8 @@ cache/binaries/{tool}/{version}/{os}_{arch}
 ### Admin UI
 
 The web UI includes a binary cache admin page at `/admin/binary-cache` (admin-only) for viewing, warming, and purging cached binaries.
+
+![Binary Cache Admin](images/admin-binary-cache.png)
 
 ---
 
