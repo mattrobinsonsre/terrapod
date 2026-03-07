@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Users, Shield, Server, Variable, HeartPulse, FileText, LogOut, Menu, X } from 'lucide-react'
+import { Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Users, Shield, Server, Variable, HeartPulse, FileText, BookOpen, LogOut, Menu, X } from 'lucide-react'
 import { clearAuth, isAdmin, isAdminOrAudit } from '@/lib/auth'
 import { SessionExpiryBanner } from '@/components/session-expiry-banner'
 
@@ -125,9 +125,18 @@ export default function NavBar() {
             <div className="flex items-center gap-1 flex-wrap flex-1">
               {navLinks}
             </div>
+            <a
+              href="https://github.com/mattrobinsonsre/terrapod/tree/main/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors flex-shrink-0 ml-2"
+            >
+              <BookOpen size={16} />
+              Docs
+            </a>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors flex-shrink-0 ml-2"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors flex-shrink-0"
             >
               <LogOut size={16} />
               Logout
@@ -141,6 +150,14 @@ export default function NavBar() {
               <span className="font-bold text-lg text-slate-100">Terrapod</span>
             </Link>
             <div className="flex items-center gap-1">
+              <a
+                href="https://github.com/mattrobinsonsre/terrapod/tree/main/docs"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              >
+                <BookOpen size={20} />
+              </a>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
                 className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
