@@ -81,6 +81,9 @@ data:
         oidc:
           {{- range .Values.api.config.auth.sso.oidc }}
           - name: {{ .name | quote }}
+            {{- if .display_name }}
+            display_name: {{ .display_name | quote }}
+            {{- end }}
             issuer_url: {{ .issuer_url | quote }}
             client_id: {{ .client_id | quote }}
             {{- if .scopes }}
@@ -88,6 +91,9 @@ data:
               {{- range .scopes }}
               - {{ . | quote }}
               {{- end }}
+            {{- end }}
+            {{- if .audience }}
+            audience: {{ .audience | quote }}
             {{- end }}
             {{- if .groups_claim }}
             groups_claim: {{ .groups_claim | quote }}
@@ -104,9 +110,18 @@ data:
         saml:
           {{- range .Values.api.config.auth.sso.saml }}
           - name: {{ .name | quote }}
+            {{- if .display_name }}
+            display_name: {{ .display_name | quote }}
+            {{- end }}
             metadata_url: {{ .metadata_url | quote }}
             {{- if .entity_id }}
             entity_id: {{ .entity_id | quote }}
+            {{- end }}
+            {{- if .role_prefixes }}
+            role_prefixes:
+              {{- range .role_prefixes }}
+              - {{ . | quote }}
+              {{- end }}
             {{- end }}
           {{- end }}
         {{- end }}

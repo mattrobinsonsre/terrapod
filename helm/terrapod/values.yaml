@@ -82,21 +82,51 @@ api:
     # Authentication
     auth:
       local_enabled: true
-      callback_base_url: ""  # Must be set to externally-reachable URL
+
+      # Public callback URL for SSO redirects. Required when SSO is enabled.
+      # Must be the externally-reachable URL of your Terrapod instance.
+      # The IDP callback lands at {callback_base_url}/api/v2/auth/callback.
+      callback_base_url: ""
+
       session_ttl_hours: 12
       api_token_max_ttl_hours: 168  # 7 days; 0 = no limit
       require_external_sso_for_roles: []
+
+      # ── SSO / Identity Providers ──────────────────────────────────────
+      # Client secrets are NEVER stored in this config or the ConfigMap.
+      # For each OIDC provider, the deployment template injects an env var
+      # TERRAPOD_{NAME}_CLIENT_SECRET from a K8s Secret via secretKeyRef.
+      # Create the secret before deploying:
+      #   kubectl create secret generic <existingSecret> \
+      #     --from-literal=client_secret=<your-client-secret>
       sso:
+        # Name of the default SSO provider (used when no provider is specified).
+        # Must match the "name" of one of the providers below.
         default_provider: ""
+
+        # ── OIDC Providers ────────────────────────────────────────────
         oidc: []
-        # Example:
+        # Example (Auth0):
         # - name: auth0
+        #   display_name: "Auth0"           # Label shown on login button
         #   issuer_url: https://myorg.auth0.com/
-        #   client_id: ""
+        #   client_id: "your-client-id"
         #   scopes: ["openid", "profile", "email"]
-        #   groups_claim: groups
-        #   role_prefixes: ["terrapod:", "terrapod-"]
+        #   audience: ""                     # API audience (Auth0/Okta); omit if unused
+        #   groups_claim: groups             # Claim name containing user groups
+        #   role_prefixes: ["terrapod:", "terrapod-"]  # Stripped from group names
+        #   # K8s Secret containing the client_secret:
+        #   existingSecret: "terrapod-auth0"
+        #   existingSecretKey: "client_secret"   # Key within the Secret
+
+        # ── SAML Providers ────────────────────────────────────────────
         saml: []
+        # Example (Azure AD SAML):
+        # - name: azure-ad
+        #   display_name: "Azure AD"
+        #   metadata_url: https://login.microsoftonline.com/<tenant>/federationmetadata/2007-06/federationmetadata.xml
+        #   entity_id: "https://terrapod.example.com"
+        #   role_prefixes: ["terrapod:", "terrapod-"]
 
     # Private Registry & Caching
     registry:
