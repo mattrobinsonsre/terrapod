@@ -7,6 +7,7 @@ UX CONTRACT: Role assignment endpoints are consumed by the web frontend:
 
 Endpoints:
     GET    /api/v2/role-assignments                       — list all assignments
+    GET    /api/v2/role-assignments/identities             — list known identities (for autocomplete)
     PUT    /api/v2/role-assignments                       — set roles for (provider, email)
     DELETE /api/v2/role-assignments/{provider}/{email}/{role} — remove single assignment
 """
@@ -20,7 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, require_admin, require_admin_or_audit
 from terrapod.auth.builtin_roles import is_builtin_role, is_platform_role
-from terrapod.db.models import PlatformRoleAssignment, Role, RoleAssignment
+from terrapod.auth.recent_users import list_recent_users
+from terrapod.db.models import PlatformRoleAssignment, Role, RoleAssignment, User
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 
@@ -71,6 +73,81 @@ async def list_role_assignments(
         data.append(_assignment_json(ra.provider_name, ra.email, ra.role_name, ra.created_at))
 
     return JSONResponse(content={"data": data})
+
+
+@router.get("/role-assignments/identities")
+async def list_identities(
+    user: AuthenticatedUser = Depends(require_admin_or_audit),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """List known identities for role assignment autocomplete.
+
+    Merges three sources:
+    1. Local users from the users table (provider_name="local")
+    2. Recent SSO logins from Redis (any provider)
+    3. (provider, email) pairs with existing DB assignments not in 1 or 2
+
+    Each identity includes its current role list. Deduplicated by (provider, email).
+    """
+    seen: dict[tuple[str, str], dict] = {}
+
+    # 1. Local users
+    result = await db.execute(select(User).where(User.is_active.is_(True)).order_by(User.email))
+    for u in result.scalars().all():
+        key = ("local", u.email)
+        seen[key] = {
+            "provider-name": "local",
+            "email": u.email,
+            "display-name": u.display_name,
+            "roles": [],
+        }
+
+    # 2. Recent SSO logins from Redis
+    try:
+        recent = await list_recent_users()
+    except Exception:
+        logger.debug("Failed to load recent users from Redis", exc_info=True)
+        recent = []
+
+    for ru in recent:
+        key = (ru.provider_name, ru.email)
+        if key not in seen:
+            seen[key] = {
+                "provider-name": ru.provider_name,
+                "email": ru.email,
+                "display-name": ru.display_name,
+                "roles": [],
+            }
+
+    # 3. Existing assignments not yet seen (pre-provisioned or stale)
+    all_assignments: list[tuple[str, str, str]] = []
+
+    pra_result = await db.execute(select(PlatformRoleAssignment))
+    for pra in pra_result.scalars().all():
+        all_assignments.append((pra.provider_name, pra.email, pra.role_name))
+
+    ra_result = await db.execute(select(RoleAssignment))
+    for ra in ra_result.scalars().all():
+        all_assignments.append((ra.provider_name, ra.email, ra.role_name))
+
+    for provider, email, role_name in all_assignments:
+        key = (provider, email)
+        if key not in seen:
+            seen[key] = {
+                "provider-name": provider,
+                "email": email,
+                "display-name": None,
+                "roles": [],
+            }
+        seen[key]["roles"].append(role_name)
+
+    # Sort: local first, then by email
+    identities = sorted(
+        seen.values(),
+        key=lambda i: (0 if i["provider-name"] == "local" else 1, i["email"]),
+    )
+
+    return JSONResponse(content={"data": identities})
 
 
 @router.put("/role-assignments")

@@ -54,6 +54,13 @@ spec:
             - name: TERRAPOD_REDIS_URL
               value: {{ .Values.redis.url | quote }}
             {{- end }}
+            {{- range .Values.api.config.auth.sso.oidc }}
+            - name: TERRAPOD_{{ .name | upper }}_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .existingSecret | default (printf "%s-%s" (include "terrapod.fullname" $) .name) }}
+                  key: {{ .existingSecretKey | default "client_secret" }}
+            {{- end }}
           volumeMounts:
             - name: config
               mountPath: /etc/terrapod

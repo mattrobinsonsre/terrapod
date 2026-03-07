@@ -145,7 +145,7 @@ class OIDCConnector(SSOConnector):
                     "aud": {"essential": True, "value": self._config.client_id},
                 },
             )
-            claims.validate()
+            claims.validate(leeway=30)
         except JoseError as e:
             raise ValueError(f"ID token validation failed for {self.name}: {e}") from e
 
@@ -258,7 +258,7 @@ class OIDCConnector(SSOConnector):
                     "aud": {"essential": True, "value": self._config.audience},
                 },
             )
-            at_claims.validate()
+            at_claims.validate(leeway=30)
             permissions = at_claims.get("permissions", [])
             if isinstance(permissions, str):
                 permissions = [permissions]

@@ -29,11 +29,18 @@ interface Role {
 interface RoleAssignment {
   id: string
   attributes: {
-    provider: string
+    'provider-name': string
     email: string
     'role-name': string
     'created-at': string
   }
+}
+
+interface Identity {
+  'provider-name': string
+  email: string
+  'display-name': string | null
+  roles: string[]
 }
 
 type Tab = 'roles' | 'assignments'
@@ -75,6 +82,7 @@ export default function RolesPage() {
   // Assignments
   const [assignments, setAssignments] = useState<RoleAssignment[]>([])
   const [assignmentsLoading, setAssignmentsLoading] = useState(false)
+  const [identities, setIdentities] = useState<Identity[]>([])
 
   // Create assignment form
   const [showCreateAssignment, setShowCreateAssignment] = useState(false)
@@ -86,7 +94,7 @@ export default function RolesPage() {
   type AssignmentSortKey = 'provider' | 'email' | 'role' | 'created'
   const assignmentAccessor = useCallback((item: RoleAssignment, key: AssignmentSortKey) => {
     switch (key) {
-      case 'provider': return item.attributes.provider
+      case 'provider': return item.attributes['provider-name']
       case 'email': return item.attributes.email
       case 'role': return item.attributes['role-name']
       case 'created': return item.attributes['created-at']
@@ -123,10 +131,17 @@ export default function RolesPage() {
   async function loadAssignments() {
     setAssignmentsLoading(true)
     try {
-      const res = await apiFetch('/api/v2/role-assignments')
-      if (!res.ok) throw new Error('Failed to load assignments')
-      const data = await res.json()
-      setAssignments(data.data || [])
+      const [assignRes, identRes] = await Promise.all([
+        apiFetch('/api/v2/role-assignments'),
+        apiFetch('/api/v2/role-assignments/identities'),
+      ])
+      if (!assignRes.ok) throw new Error('Failed to load assignments')
+      const assignData = await assignRes.json()
+      setAssignments(assignData.data || [])
+      if (identRes.ok) {
+        const identData = await identRes.json()
+        setIdentities(identData.data || [])
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load assignments')
     } finally {
@@ -260,7 +275,7 @@ export default function RolesPage() {
           data: {
             type: 'role-assignments',
             attributes: {
-              provider: assignProvider,
+              'provider-name': assignProvider,
               email: assignEmail,
               roles: assignRoles,
             },
@@ -547,15 +562,23 @@ export default function RolesPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label htmlFor="a-provider" className="block text-sm font-medium text-slate-300 mb-1">Provider</label>
-                    <input id="a-provider" type="text" value={assignProvider} onChange={(e) => setAssignProvider(e.target.value)} required
-                      placeholder="local"
-                      className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                    <select id="a-provider" value={assignProvider} onChange={(e) => { setAssignProvider(e.target.value); setAssignEmail('') }} required
+                      className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                      {Array.from(new Set(identities.map((i) => i['provider-name']))).sort((a, b) => a === 'local' ? -1 : b === 'local' ? 1 : a.localeCompare(b)).map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label htmlFor="a-email" className="block text-sm font-medium text-slate-300 mb-1">Email</label>
-                    <input id="a-email" type="email" value={assignEmail} onChange={(e) => setAssignEmail(e.target.value)} required
+                    <input id="a-email" type="text" list="email-suggestions" value={assignEmail} onChange={(e) => setAssignEmail(e.target.value)} required
                       placeholder="user@example.com"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                    <datalist id="email-suggestions">
+                      {identities.filter((i) => i['provider-name'] === assignProvider).map((i) => (
+                        <option key={i.email} value={i.email}>{i['display-name'] ? `${i['display-name']} (${i.email})` : i.email}</option>
+                      ))}
+                    </datalist>
                   </div>
                 </div>
                 <div>
@@ -599,8 +622,8 @@ export default function RolesPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
                     {sortedAssignments.map((a) => (
-                      <tr key={a.id} className="hover:bg-slate-700/20 transition-colors">
-                        <td className="px-4 py-3 text-sm text-slate-400">{a.attributes.provider}</td>
+                      <tr key={`${a.attributes['provider-name']}:${a.attributes.email}:${a.attributes['role-name']}`} className="hover:bg-slate-700/20 transition-colors">
+                        <td className="px-4 py-3 text-sm text-slate-400">{a.attributes['provider-name']}</td>
                         <td className="px-4 py-3 text-sm text-slate-200">{a.attributes.email}</td>
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand-900/50 text-brand-300">
@@ -612,7 +635,7 @@ export default function RolesPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button
-                            onClick={() => handleDeleteAssignment(a.attributes.provider, a.attributes.email, a.attributes['role-name'])}
+                            onClick={() => handleDeleteAssignment(a.attributes['provider-name'], a.attributes.email, a.attributes['role-name'])}
                             className="text-xs text-red-400 hover:text-red-300"
                           >
                             Remove

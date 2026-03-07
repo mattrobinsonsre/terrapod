@@ -36,6 +36,18 @@ api:
       local_enabled: true
       callback_base_url: "https://terrapod.local"
       session_ttl_hours: 12
+      sso:
+        default_provider: "auth0"
+        oidc:
+          - name: "auth0"
+            issuer_url: "https://dev-zqwrse0xlal03qiu.us.auth0.com/"
+            client_id: "AymR3SnEXQAdKE0t5NUPezczpcgpcXK5"
+            scopes:
+              - openid
+              - profile
+              - email
+            existingSecret: "terrapod-auth0"
+            existingSecretKey: "client_secret"
 
   serviceAccount:
     create: true
