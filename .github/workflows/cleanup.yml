@@ -5,6 +5,9 @@ on:
     - cron: '0 3 * * 0'   # Weekly, Sunday 03:00 UTC
   workflow_dispatch:
 
+env:
+  REGISTRY: ghcr.io/mattrobinsonsre
+
 jobs:
   cleanup:
     name: Clean ${{ matrix.image }}
@@ -15,11 +18,50 @@ jobs:
       matrix:
         image: [terrapod-api, terrapod-web, terrapod-runner]
     steps:
-      - uses: snok/container-retention-policy@v3.0.1
-        with:
-          account: user
-          token: ${{ secrets.GITHUB_TOKEN }}
-          image-names: ${{ matrix.image }}
-          cut-off: 30 days ago UTC
-          keep-n-most-recent: 5
-          skip-tags: v*
+      - name: Delete old SHA-tagged versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Delete untagged and sha-* tagged versions older than 30 days,
+          # keeping all semver-tagged (v*) versions indefinitely.
+          cutoff=$(date -u -d '30 days ago' +%Y-%m-%dT%H:%M:%SZ)
+          echo "Cutoff: $cutoff"
+          echo "Image: ${{ matrix.image }}"
+
+          # List all versions
+          versions=$(gh api --paginate \
+            "users/mattrobinsonsre/packages/container/${{ matrix.image }}/versions" \
+            --jq '.[]') || { echo "No versions found"; exit 0; }
+
+          echo "$versions" | jq -c '.' | while read -r version; do
+            id=$(echo "$version" | jq -r '.id')
+            tags=$(echo "$version" | jq -r '.metadata.container.tags[]?' 2>/dev/null)
+            updated=$(echo "$version" | jq -r '.updated_at')
+
+            # Skip versions with any semver tag (v*)
+            has_semver=false
+            while IFS= read -r tag; do
+              if [[ "$tag" =~ ^v[0-9] ]]; then
+                has_semver=true
+                break
+              fi
+            done <<< "$tags"
+
+            if [[ "$has_semver" == "true" ]]; then
+              echo "KEEP $id (semver tagged: $tags)"
+              continue
+            fi
+
+            # Skip if newer than cutoff
+            if [[ "$updated" > "$cutoff" ]]; then
+              echo "KEEP $id (recent: $updated, tags: $tags)"
+              continue
+            fi
+
+            echo "DELETE $id (old: $updated, tags: $tags)"
+            gh api -X DELETE \
+              "users/mattrobinsonsre/packages/container/${{ matrix.image }}/versions/$id" \
+              2>/dev/null || echo "  Failed to delete $id"
+          done
+
+          echo "Cleanup complete for ${{ matrix.image }}"
