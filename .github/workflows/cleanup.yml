@@ -15,7 +15,7 @@ jobs:
       matrix:
         image: [terrapod-api, terrapod-web, terrapod-runner]
     steps:
-      - uses: snok/container-retention-policy@v3
+      - uses: snok/container-retention-policy@v3.0.1
         with:
           account: user
           token: ${{ secrets.GITHUB_TOKEN }}
