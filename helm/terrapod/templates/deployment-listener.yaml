@@ -93,10 +93,7 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.listener.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "terrapod.podAntiAffinity" (dict "enabled" .Values.listener.podAntiAffinity.enabled "affinity" .Values.listener.affinity "labels" (include "terrapod.listener.selectorLabels" .)) }}
       {{- if .Values.listener.priorityClassName }}
       priorityClassName: {{ .Values.listener.priorityClassName | quote }}
       {{- end }}

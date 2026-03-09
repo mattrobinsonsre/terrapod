@@ -131,6 +131,35 @@ Get the web image tag, defaulting to appVersion
 {{- end }}
 
 {{/*
+Pod anti-affinity block.
+Usage: {{ include "terrapod.podAntiAffinity" (dict "enabled" .Values.api.podAntiAffinity.enabled "affinity" .Values.api.affinity "labels" (include "terrapod.api.selectorLabels" .)) }}
+When .affinity is non-empty it is used as a full override. Otherwise, if
+.enabled is true, auto-generates required node anti-affinity + preferred AZ
+anti-affinity using the provided selector labels.
+*/}}
+{{- define "terrapod.podAntiAffinity" -}}
+{{- if .affinity }}
+      affinity:
+        {{- toYaml .affinity | nindent 8 }}
+{{- else if .enabled }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  {{- .labels | nindent 18 }}
+              topologyKey: kubernetes.io/hostname
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    {{- .labels | nindent 20 }}
+                topologyKey: topology.kubernetes.io/zone
+{{- end }}
+{{- end -}}
+
+{{/*
 Validate storage configuration — exactly one backend must be configured.
 */}}
 {{- define "terrapod.validateStorageConfig" -}}

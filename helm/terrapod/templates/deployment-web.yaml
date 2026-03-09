@@ -72,10 +72,7 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.web.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "terrapod.podAntiAffinity" (dict "enabled" .Values.web.podAntiAffinity.enabled "affinity" .Values.web.affinity "labels" (include "terrapod.web.selectorLabels" .)) }}
       {{- if .Values.web.priorityClassName }}
       priorityClassName: {{ .Values.web.priorityClassName | quote }}
       {{- end }}

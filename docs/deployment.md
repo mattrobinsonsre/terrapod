@@ -642,6 +642,51 @@ listener:
   replicas: 2
 ```
 
+### Pod Anti-Affinity
+
+By default, all three Deployments (API, listener, web) are configured with pod anti-affinity rules to spread replicas for high availability:
+
+- **Required node anti-affinity** — pods of the same component must be scheduled on different nodes (`kubernetes.io/hostname`)
+- **Preferred AZ anti-affinity** — pods of the same component should be spread across availability zones (`topology.kubernetes.io/zone`)
+
+This is controlled per component via `podAntiAffinity.enabled` (default: `true`):
+
+```yaml
+api:
+  podAntiAffinity:
+    enabled: true   # default
+
+web:
+  podAntiAffinity:
+    enabled: true   # default
+
+listener:
+  podAntiAffinity:
+    enabled: true   # default
+```
+
+**Disable** on single-node clusters (e.g. local development):
+
+```yaml
+api:
+  podAntiAffinity:
+    enabled: false
+```
+
+**Override** with custom affinity rules by setting the `affinity` field. When `affinity` is non-empty, it completely replaces the auto-generated anti-affinity:
+
+```yaml
+api:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-role
+                operator: In
+                values: ["api"]
+```
+
 ### Runner Jobs
 
 Runner Jobs are ephemeral and scale naturally. Configure workspace-level resource limits:

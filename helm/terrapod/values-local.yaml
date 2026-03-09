@@ -12,6 +12,8 @@ api:
 
   pdb:
     enabled: false
+  podAntiAffinity:
+    enabled: false
 
   resources:
     requests:
@@ -58,6 +60,8 @@ web:
   replicas: 1
   pdb:
     enabled: false
+  podAntiAffinity:
+    enabled: false
 
   # next dev compiles on first request — startup probe gives it time
   startupProbe:
@@ -95,6 +99,8 @@ tls:
 listener:
   replicas: 2
   name: "dev-listener"
+  podAntiAffinity:
+    enabled: false
   joinToken: "dev-join-token-do-not-use-in-prod"
   pdb:
     enabled: false

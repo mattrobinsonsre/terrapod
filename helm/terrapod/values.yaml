@@ -195,6 +195,11 @@ api:
     cors:
       allow_origins: []
 
+  # Pod anti-affinity spreads replicas across nodes (required) and AZs (preferred).
+  # Disable on single-node clusters. Set 'affinity' to override with custom rules.
+  podAntiAffinity:
+    enabled: true
+
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -252,6 +257,11 @@ web:
   pdb:
     enabled: true
     maxUnavailable: 1
+
+  # Pod anti-affinity spreads replicas across nodes (required) and AZs (preferred).
+  # Disable on single-node clusters. Set 'affinity' to override with custom rules.
+  podAntiAffinity:
+    enabled: true
 
   nodeSelector: {}
   tolerations: []
@@ -392,6 +402,11 @@ listener:
   pdb:
     enabled: true
     maxUnavailable: 1
+
+  # Pod anti-affinity spreads replicas across nodes (required) and AZs (preferred).
+  # Disable on single-node clusters. Set 'affinity' to override with custom rules.
+  podAntiAffinity:
+    enabled: true
 
   nodeSelector: {}
   tolerations: []
