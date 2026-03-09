@@ -246,15 +246,25 @@ jobs:
 
   # ── Create Multi-Arch Manifests ────────────────────────
   create-manifests:
-    name: Create Manifests
-    needs: [prepare, build-images]
+    name: Manifest ${{ matrix.image }}
+    needs: [prepare, build-images, python-lint, python-test, helm-lint, sast, scan-images]
     if: |
-      needs.build-images.result == 'success'
+      always()
+      && needs.build-images.result == 'success'
       && needs.prepare.outputs.is_pr != 'true'
+      && (needs.python-lint.result == 'success' || needs.python-lint.result == 'skipped')
+      && (needs.python-test.result == 'success' || needs.python-test.result == 'skipped')
+      && (needs.helm-lint.result == 'success' || needs.helm-lint.result == 'skipped')
+      && (needs.sast.result == 'success' || needs.sast.result == 'skipped')
+      && (needs.scan-images.result == 'success' || needs.scan-images.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [terrapod-api, terrapod-web, terrapod-runner]
     steps:
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -263,16 +273,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create multi-arch manifests
+      - name: Create multi-arch manifest
         run: |
           sha_short="${{ needs.prepare.outputs.sha_short }}"
-
-          for image in terrapod-api terrapod-web terrapod-runner; do
-            echo "Creating manifest for $image:sha-$sha_short"
-            docker buildx imagetools create -t "$REGISTRY/$image:sha-$sha_short" \
-              "$REGISTRY/$image:sha-${sha_short}-amd64" \
-              "$REGISTRY/$image:sha-${sha_short}-arm64"
-          done
+          echo "Creating manifest for ${{ matrix.image }}:sha-$sha_short"
+          docker buildx imagetools create -t "$REGISTRY/${{ matrix.image }}:sha-$sha_short" \
+            "$REGISTRY/${{ matrix.image }}:sha-${sha_short}-amd64" \
+            "$REGISTRY/${{ matrix.image }}:sha-${sha_short}-arm64"
 
   # ── Release ────────────────────────────────────────────
   release:
