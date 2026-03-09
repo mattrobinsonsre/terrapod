@@ -264,6 +264,13 @@ def create_application() -> FastAPI:
     async def custom_redoc() -> HTMLResponse:
         return HTMLResponse(_REDOC_HTML)
 
+    # Prometheus metrics middleware + endpoint
+    if settings.metrics.enabled:
+        from terrapod.api.metrics import metrics_endpoint, metrics_middleware
+
+        app.middleware("http")(metrics_middleware)
+        app.add_api_route("/metrics", metrics_endpoint, methods=["GET"], include_in_schema=False)
+
     # CORS middleware
     if settings.cors.allow_origins:
         app.add_middleware(

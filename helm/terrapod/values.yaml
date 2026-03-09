@@ -213,6 +213,18 @@ api:
         from_address: "notifications@terrapod.local"
         use_tls: true
 
+    # Prometheus metrics
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: false
+        interval: 30s
+        labels: {}
+      podMonitor:
+        enabled: false
+        interval: 30s
+        labels: {}
+
     # CORS
     cors:
       allow_origins: []

@@ -44,6 +44,26 @@ class RunnerListener:
         self._identity_ready = False
         self._last_heartbeat_at: float | None = None
 
+        # Prometheus metrics — separate registry to avoid colliding with API metrics
+        from prometheus_client import CollectorRegistry, Gauge
+
+        self._metrics_registry = CollectorRegistry()
+        self._metric_active_runs = Gauge(
+            "terrapod_listener_active_runs",
+            "Number of currently active runs",
+            registry=self._metrics_registry,
+        )
+        self._metric_identity_ready = Gauge(
+            "terrapod_listener_identity_ready",
+            "Whether listener identity is established (1=yes, 0=no)",
+            registry=self._metrics_registry,
+        )
+        self._metric_heartbeat_age = Gauge(
+            "terrapod_listener_heartbeat_age_seconds",
+            "Seconds since last successful heartbeat",
+            registry=self._metrics_registry,
+        )
+
     def _auth_headers(self) -> dict[str, str]:
         """Build authentication headers for API calls."""
         headers = {}
@@ -109,6 +129,7 @@ class RunnerListener:
             if path == "/health":
                 body = json.dumps({"status": "ok"})
                 status = "200 OK"
+                content_type = "application/json"
             elif path == "/ready":
                 ready, reason = self._check_readiness()
                 if ready:
@@ -117,13 +138,18 @@ class RunnerListener:
                 else:
                     body = json.dumps({"status": "not_ready", "reason": reason})
                     status = "503 Service Unavailable"
+                content_type = "application/json"
+            elif path == "/metrics":
+                body, content_type = self._generate_metrics()
+                status = "200 OK"
             else:
                 body = json.dumps({"error": "not found"})
                 status = "404 Not Found"
+                content_type = "application/json"
 
             response = (
                 f"HTTP/1.1 {status}\r\n"
-                f"Content-Type: application/json\r\n"
+                f"Content-Type: {content_type}\r\n"
                 f"Content-Length: {len(body)}\r\n"
                 f"Connection: close\r\n"
                 f"\r\n"
@@ -153,6 +179,21 @@ class RunnerListener:
             return False, f"heartbeat stale ({heartbeat_age:.0f}s > {max_age}s)"
 
         return True, ""
+
+    def _generate_metrics(self) -> tuple[str, str]:
+        """Generate Prometheus metrics for the listener."""
+        from prometheus_client import generate_latest
+
+        self._metric_active_runs.set(len(self.active_tasks))
+        self._metric_identity_ready.set(1 if self._identity_ready else 0)
+
+        if self._last_heartbeat_at is not None:
+            self._metric_heartbeat_age.set(time.monotonic() - self._last_heartbeat_at)
+        else:
+            self._metric_heartbeat_age.set(-1)
+
+        body = generate_latest(self._metrics_registry).decode("utf-8")
+        return body, "text/plain; version=0.0.4; charset=utf-8"
 
     async def _shutdown_waiter(self) -> None:
         """Wait for shutdown signal."""

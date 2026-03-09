@@ -554,6 +554,32 @@
           }
         },
 
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "serviceMonitor": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "interval": { "type": "string" },
+                "labels": { "type": "object" }
+              }
+            },
+            "podMonitor": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "interval": { "type": "string" },
+                "labels": { "type": "object" }
+              }
+            }
+          }
+        },
+
         "cors": {
           "type": "object",
           "additionalProperties": false,

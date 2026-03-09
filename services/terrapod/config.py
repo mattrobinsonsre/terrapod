@@ -438,6 +438,17 @@ class CORSConfig(BaseModel):
     )
 
 
+# --- Metrics Configuration ---
+
+
+class MetricsConfig(BaseModel):
+    """Prometheus metrics configuration."""
+
+    enabled: bool = Field(
+        default=True, description="Expose /metrics endpoint and instrument requests"
+    )
+
+
 # --- Main Settings ---
 
 
@@ -496,6 +507,9 @@ class Settings(BaseSettings):
 
     # CORS
     cors: CORSConfig = Field(default_factory=CORSConfig)
+
+    # Metrics
+    metrics: MetricsConfig = Field(default_factory=MetricsConfig)
 
     # Workspace defaults
     default_execution_backend: str = Field(

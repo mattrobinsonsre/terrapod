@@ -19,6 +19,7 @@ logger = get_logger(__name__)
 _EXCLUDED_PREFIXES = (
     "/health",
     "/ready",
+    "/metrics",
     "/api/docs",
     "/api/redoc",
     "/api/openapi.json",

@@ -182,6 +182,10 @@ data:
         use_tls: {{ .Values.api.config.notifications.smtp.use_tls | default true }}
       {{- end }}
     {{- end }}
+    {{- if .Values.api.config.metrics }}
+    metrics:
+      enabled: {{ .Values.api.config.metrics.enabled }}
+    {{- end }}
     default_execution_backend: {{ .Values.api.config.default_execution_backend | default "tofu" | quote }}
     default_terraform_version: {{ .Values.api.config.default_terraform_version | default "1.9" | quote }}
     {{- if .Values.api.config.cors.allow_origins }}
