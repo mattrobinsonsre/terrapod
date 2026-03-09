@@ -13,6 +13,8 @@ global:
   # imagePullSecrets:
   #   - name: myregistrykey
   imagePullSecrets: []
+  # Extra labels applied to all resources (Deployments, Services, Ingress, etc.)
+  commonLabels: {}
 
 # ── API Server (Python/FastAPI) ───────────────────────────────────────────────
 api:
@@ -28,6 +30,11 @@ api:
   # Override the container command (e.g., for hot reload in dev):
   # command: ["uvicorn", "terrapod.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
   command: []
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    annotations: {}
 
   resources:
     requests:
@@ -243,11 +250,17 @@ api:
     seccompProfile:
       type: RuntimeDefault
 
+  # Extra labels added to pod metadata (e.g. for Istio, Linkerd, etc.)
+  podLabels: {}
+
   # Extra environment variables, volumes, and mounts for the API container.
   extraEnv: []
   extraEnvFrom: []
   extraVolumes: []
   extraVolumeMounts: []
+  # Extra init and sidecar containers
+  extraInitContainers: []
+  extraContainers: []
 
   serviceAccount:
     create: true
@@ -274,6 +287,11 @@ web:
     repository: ghcr.io/mattrobinsonsre/terrapod-web
     tag: ""  # Defaults to appVersion
     pullPolicy: IfNotPresent
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    annotations: {}
 
   # Probe overrides — template provides sensible defaults for all probe timings.
   # Set individual fields to override (e.g., startupProbe.failureThreshold: 20).
@@ -332,11 +350,17 @@ web:
     seccompProfile:
       type: RuntimeDefault
 
+  # Extra labels added to pod metadata (e.g. for Istio, Linkerd, etc.)
+  podLabels: {}
+
   # Extra environment variables, volumes, and mounts for the web container.
   extraEnv: []
   extraEnvFrom: []
   extraVolumes: []
   extraVolumeMounts: []
+  # Extra init and sidecar containers
+  extraInitContainers: []
+  extraContainers: []
 
   serviceAccount:
     create: true
@@ -437,6 +461,8 @@ listener:
   # Base name for listener identity. Each pod appends its pod name,
   # so the registered name becomes "{name}-{pod-name}".
   name: "listener"
+  # Port for /health and /ready HTTP probe endpoints
+  healthPort: 8081
 
   # Join token for pool registration.
   # Either set joinToken directly or reference an existing K8s Secret (recommended).
@@ -508,11 +534,17 @@ listener:
     seccompProfile:
       type: RuntimeDefault
 
+  # Extra labels added to pod metadata (e.g. for Istio, Linkerd, etc.)
+  podLabels: {}
+
   # Extra environment variables, volumes, and mounts for the listener container.
   extraEnv: []
   extraEnvFrom: []
   extraVolumes: []
   extraVolumeMounts: []
+  # Extra init and sidecar containers
+  extraInitContainers: []
+  extraContainers: []
 
 # ── Ingress ───────────────────────────────────────────────────────────────────
 # BFF pattern: all traffic enters through the web frontend (Next.js).
@@ -524,7 +556,18 @@ ingress:
   className: ""
   hostname: ""  # Required: e.g., terrapod.example.com
   tls: true
+  pathType: Prefix
   annotations: {}
+  # Extra paths prepended before the default catch-all path.
+  # Useful for custom backends (e.g. SSL redirect, health check ALB target).
+  extraPaths: []
+  # - path: /healthz
+  #   pathType: Exact
+  #   backend:
+  #     service:
+  #       name: my-health-service
+  #       port:
+  #         name: http
 
 # ── TLS ───────────────────────────────────────────────────────────────────────
 tls:

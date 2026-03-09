@@ -8,10 +8,12 @@ The listener:
 3. Polls for queued runs (every 5s)
 4. Spawns K8s Jobs for claimed runs
 5. Watches Jobs to completion and reports status back
+6. Serves /health and /ready HTTP endpoints for K8s probes
 """
 
 import asyncio
 import base64
+import json
 import os
 import signal
 import time
@@ -38,6 +40,9 @@ class RunnerListener:
         self._poll_interval = int(os.environ.get("TERRAPOD_POLL_INTERVAL", "5"))
         self._heartbeat_interval = int(os.environ.get("TERRAPOD_HEARTBEAT_INTERVAL", "60"))
         self._max_concurrent = int(os.environ.get("TERRAPOD_MAX_CONCURRENT", "3"))
+        self._health_port = int(os.environ.get("TERRAPOD_HEALTH_PORT", "8081"))
+        self._identity_ready = False
+        self._last_heartbeat_at: float | None = None
 
     def _auth_headers(self) -> dict[str, str]:
         """Build authentication headers for API calls."""
@@ -56,6 +61,7 @@ class RunnerListener:
 
         # Establish identity via join token
         self.identity = await establish_identity()
+        self._identity_ready = True
         logger.info(
             "Listener started",
             listener_id=str(self.identity.listener_id),
@@ -65,10 +71,88 @@ class RunnerListener:
 
         # Start concurrent loops
         await asyncio.gather(
+            self._health_server(),
             self._heartbeat_loop(),
             self._poll_loop(),
             self._shutdown_waiter(),
         )
+
+    # ── Health server ────────────────────────────────────────────────
+
+    async def _health_server(self) -> None:
+        """Lightweight HTTP health server for K8s probes (stdlib only)."""
+        server = await asyncio.start_server(
+            self._handle_health_request,
+            "0.0.0.0",
+            self._health_port,
+        )
+        logger.info("Health server listening", port=self._health_port)
+
+        try:
+            await _shutdown.wait()
+        finally:
+            server.close()
+            await server.wait_closed()
+
+    async def _handle_health_request(
+        self,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+    ) -> None:
+        """Handle a single HTTP request on the health port."""
+        try:
+            data = await asyncio.wait_for(reader.read(1024), timeout=5)
+            request_line = data.decode("utf-8", errors="replace").split("\r\n")[0]
+            parts = request_line.split(" ")
+            path = parts[1] if len(parts) > 1 else "/"
+
+            if path == "/health":
+                body = json.dumps({"status": "ok"})
+                status = "200 OK"
+            elif path == "/ready":
+                ready, reason = self._check_readiness()
+                if ready:
+                    body = json.dumps({"status": "ready"})
+                    status = "200 OK"
+                else:
+                    body = json.dumps({"status": "not_ready", "reason": reason})
+                    status = "503 Service Unavailable"
+            else:
+                body = json.dumps({"error": "not found"})
+                status = "404 Not Found"
+
+            response = (
+                f"HTTP/1.1 {status}\r\n"
+                f"Content-Type: application/json\r\n"
+                f"Content-Length: {len(body)}\r\n"
+                f"Connection: close\r\n"
+                f"\r\n"
+                f"{body}"
+            )
+            writer.write(response.encode())
+            await writer.drain()
+        except Exception:
+            pass  # Don't crash on malformed probe requests
+        finally:
+            writer.close()
+
+    def _check_readiness(self) -> tuple[bool, str]:
+        """Check if the listener is ready to accept work.
+
+        Ready when: identity established + last heartbeat within 3x interval.
+        """
+        if not self._identity_ready:
+            return False, "identity not established"
+
+        if self._last_heartbeat_at is None:
+            return False, "no heartbeat sent yet"
+
+        heartbeat_age = time.monotonic() - self._last_heartbeat_at
+        max_age = self._heartbeat_interval * 3
+        if heartbeat_age > max_age:
+            return False, f"heartbeat stale ({heartbeat_age:.0f}s > {max_age}s)"
+
+        return True, ""
 
     async def _shutdown_waiter(self) -> None:
         """Wait for shutdown signal."""
@@ -116,6 +200,7 @@ class RunnerListener:
                 },
                 headers=self._auth_headers(),
             )
+        self._last_heartbeat_at = time.monotonic()
 
     async def _poll_loop(self) -> None:
         """Poll for queued runs every 5 seconds."""

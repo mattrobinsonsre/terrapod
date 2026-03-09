@@ -15,7 +15,8 @@
         "imagePullSecrets": {
           "type": "array",
           "items": { "type": "object" }
-        }
+        },
+        "commonLabels": { "type": "object" }
       }
     },
 
@@ -45,6 +46,10 @@
         "extraEnvFrom": { "type": "array", "items": { "type": "object" } },
         "extraVolumes": { "type": "array", "items": { "type": "object" } },
         "extraVolumeMounts": { "type": "array", "items": { "type": "object" } },
+        "extraInitContainers": { "type": "array", "items": { "type": "object" } },
+        "extraContainers": { "type": "array", "items": { "type": "object" } },
+        "podLabels": { "type": "object" },
+        "service": { "$ref": "#/$defs/serviceSpec" },
         "serviceAccount": { "$ref": "#/$defs/serviceAccountSpec" }
       }
     },
@@ -77,6 +82,10 @@
         "extraEnvFrom": { "type": "array", "items": { "type": "object" } },
         "extraVolumes": { "type": "array", "items": { "type": "object" } },
         "extraVolumeMounts": { "type": "array", "items": { "type": "object" } },
+        "extraInitContainers": { "type": "array", "items": { "type": "object" } },
+        "extraContainers": { "type": "array", "items": { "type": "object" } },
+        "podLabels": { "type": "object" },
+        "service": { "$ref": "#/$defs/serviceSpec" },
         "serviceAccount": { "$ref": "#/$defs/serviceAccountSpec" }
       }
     },
@@ -123,6 +132,7 @@
         "enabled": { "type": "boolean" },
         "replicas": { "type": "integer", "minimum": 1 },
         "name": { "type": "string" },
+        "healthPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
         "joinToken": { "type": "string" },
         "existingSecret": { "type": "string" },
         "joinTokenKey": { "type": "string" },
@@ -145,7 +155,10 @@
         "extraEnv": { "type": "array", "items": { "type": "object" } },
         "extraEnvFrom": { "type": "array", "items": { "type": "object" } },
         "extraVolumes": { "type": "array", "items": { "type": "object" } },
-        "extraVolumeMounts": { "type": "array", "items": { "type": "object" } }
+        "extraVolumeMounts": { "type": "array", "items": { "type": "object" } },
+        "extraInitContainers": { "type": "array", "items": { "type": "object" } },
+        "extraContainers": { "type": "array", "items": { "type": "object" } },
+        "podLabels": { "type": "object" }
       }
     },
 
@@ -157,7 +170,9 @@
         "className": { "type": "string" },
         "hostname": { "type": "string" },
         "tls": { "type": "boolean" },
-        "annotations": { "type": "object" }
+        "pathType": { "type": "string", "enum": ["Prefix", "Exact", "ImplementationSpecific"] },
+        "annotations": { "type": "object" },
+        "extraPaths": { "type": "array", "items": { "type": "object" } }
       }
     },
 
@@ -283,6 +298,15 @@
         "minReplicas": { "type": "integer", "minimum": 1 },
         "maxReplicas": { "type": "integer", "minimum": 1 },
         "targetCPUUtilizationPercentage": { "type": "integer", "minimum": 1, "maximum": 100 }
+      }
+    },
+
+    "serviceSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+        "annotations": { "type": "object" }
       }
     },
 

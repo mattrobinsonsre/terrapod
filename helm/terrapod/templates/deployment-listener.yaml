@@ -27,11 +27,18 @@ spec:
         {{- end }}
       labels:
         {{- include "terrapod.listener.selectorLabels" . | nindent 8 }}
+        {{- with .Values.listener.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       serviceAccountName: {{ include "terrapod.listenerServiceAccountName" . }}
       terminationGracePeriodSeconds: {{ .Values.listener.terminationGracePeriodSeconds }}
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.listener.extraInitContainers }}
+      initContainers:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
@@ -42,11 +49,17 @@ spec:
             - python
             - -m
             - terrapod.runner.listener
+          ports:
+            - name: health
+              containerPort: {{ .Values.listener.healthPort | default 8081 }}
+              protocol: TCP
           env:
             - name: TERRAPOD_RUNNER_NAMESPACE
               value: {{ include "terrapod.runnerNamespace" . | quote }}
             - name: TERRAPOD_LISTENER_NAME
               value: {{ .Values.listener.name | default "listener" | quote }}
+            - name: TERRAPOD_HEALTH_PORT
+              value: {{ .Values.listener.healthPort | default 8081 | quote }}
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -82,18 +95,21 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           startupProbe:
-            exec:
-              command: ["python", "-c", "import os; os.kill(0, 0)"]
+            httpGet:
+              path: /health
+              port: health
             failureThreshold: 30
             periodSeconds: 2
           livenessProbe:
-            exec:
-              command: ["python", "-c", "import os; os.kill(0, 0)"]
+            httpGet:
+              path: /health
+              port: health
             initialDelaySeconds: 10
             periodSeconds: 30
           readinessProbe:
-            exec:
-              command: ["python", "-c", "import os; os.kill(0, 0)"]
+            httpGet:
+              path: /ready
+              port: health
             initialDelaySeconds: 5
             periodSeconds: 10
           lifecycle:
@@ -106,6 +122,9 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+        {{- with .Values.listener.extraContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       volumes:
         - name: runner-config
           configMap:
