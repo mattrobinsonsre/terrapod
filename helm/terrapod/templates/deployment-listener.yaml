@@ -10,6 +10,11 @@ spec:
   {{- if not .Values.listener.autoscaling.enabled }}
   replicas: {{ .Values.listener.replicas }}
   {{- end }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: {{ .Values.listener.strategy.maxSurge }}
+      maxUnavailable: {{ .Values.listener.strategy.maxUnavailable }}
   selector:
     matchLabels:
       {{- include "terrapod.listener.selectorLabels" . | nindent 6 }}

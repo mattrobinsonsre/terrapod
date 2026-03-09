@@ -195,6 +195,11 @@ api:
     cors:
       allow_origins: []
 
+  # Rolling update strategy — surge before killing to avoid downtime at any replica count.
+  strategy:
+    maxSurge: 1
+    maxUnavailable: 0
+
   # Pod anti-affinity spreads replicas across nodes (required) and AZs (preferred).
   # Disable on single-node clusters. Set 'affinity' to override with custom rules.
   podAntiAffinity:
@@ -257,6 +262,11 @@ web:
   pdb:
     enabled: true
     maxUnavailable: 1
+
+  # Rolling update strategy — surge before killing to avoid downtime at any replica count.
+  strategy:
+    maxSurge: 1
+    maxUnavailable: 0
 
   # Pod anti-affinity spreads replicas across nodes (required) and AZs (preferred).
   # Disable on single-node clusters. Set 'affinity' to override with custom rules.
@@ -402,6 +412,11 @@ listener:
   pdb:
     enabled: true
     maxUnavailable: 1
+
+  # Rolling update strategy — surge before killing to avoid downtime at any replica count.
+  strategy:
+    maxSurge: 1
+    maxUnavailable: 0
 
   # Pod anti-affinity spreads replicas across nodes (required) and AZs (preferred).
   # Disable on single-node clusters. Set 'affinity' to override with custom rules.
