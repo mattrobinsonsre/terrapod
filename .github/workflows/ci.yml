@@ -117,10 +117,47 @@ jobs:
             alpine/helm:3.17.2 \
             lint helm/terrapod --values helm/terrapod/values.yaml --values helm/terrapod/values-local.yaml
 
+  # ── SAST (Semgrep) ─────────────────────────────────────
+  sast:
+    name: SAST
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run Semgrep
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            semgrep/semgrep:1.117 \
+            semgrep scan /src \
+              --config "p/python" \
+              --config "p/owasp-top-ten" \
+              --config "p/secrets" \
+              --config "/src/pentest/semgrep/.semgrep.yml" \
+              --exclude "web/node_modules" \
+              --exclude ".next" \
+              --exclude "dist" \
+              --exclude "alembic/versions" \
+              --exclude "reports" \
+              --sarif \
+              --output "/src/semgrep-results.sarif"
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep-results.sarif
+          category: semgrep
+
   # ── Build Images ───────────────────────────────────────
   build-images:
     name: Build ${{ matrix.image }} (${{ matrix.arch }})
-    needs: [prepare, python-lint, python-test, helm-lint]
+    needs: [prepare, python-lint, python-test, helm-lint, sast]
     if: |
       always()
       && needs.prepare.outputs.images_exist != 'true'
@@ -128,6 +165,7 @@ jobs:
       && (needs.python-lint.result == 'success' || needs.python-lint.result == 'skipped')
       && (needs.python-test.result == 'success' || needs.python-test.result == 'skipped')
       && (needs.helm-lint.result == 'success' || needs.helm-lint.result == 'skipped')
+      && (needs.sast.result == 'success' || needs.sast.result == 'skipped')
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     permissions:
       contents: read
@@ -168,6 +206,52 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-${{ matrix.arch }}
           cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+
+  # ── Scan Images (Trivy) ────────────────────────────────
+  scan-images:
+    name: Scan ${{ matrix.image }}
+    needs: [prepare, build-images]
+    if: |
+      always()
+      && needs.build-images.result == 'success'
+      && needs.prepare.outputs.images_exist != 'true'
+      && needs.prepare.outputs.is_pr != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [terrapod-api, terrapod-web, terrapod-runner]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan with Trivy
+        uses: aquasecurity/trivy-action@0.31.0
+        with:
+          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64
+          format: sarif
+          output: trivy-${{ matrix.image }}.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: pentest/trivy/.trivyignore
+          exit-code: '1'
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.image }}.sarif
+          category: trivy-${{ matrix.image }}
 
   # ── Create Multi-Arch Manifests ────────────────────────
   create-manifests:
@@ -316,11 +400,11 @@ jobs:
   # ── Cleanup Tag on Failure ─────────────────────────────
   cleanup-tag:
     name: Cleanup Tag
-    needs: [prepare, build-images, create-manifests, release]
+    needs: [prepare, build-images, scan-images, create-manifests, release]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
-      && (needs.build-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release.result == 'failure')
+      && (needs.build-images.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -346,7 +430,9 @@ jobs:
       - python-lint
       - python-test
       - helm-lint
+      - sast
       - build-images
+      - scan-images
       - create-manifests
       - release
     runs-on: ubuntu-latest
@@ -358,7 +444,9 @@ jobs:
             "${{ needs.python-lint.result }}"
             "${{ needs.python-test.result }}"
             "${{ needs.helm-lint.result }}"
+            "${{ needs.sast.result }}"
             "${{ needs.build-images.result }}"
+            "${{ needs.scan-images.result }}"
             "${{ needs.create-manifests.result }}"
             "${{ needs.release.result }}"
           )
