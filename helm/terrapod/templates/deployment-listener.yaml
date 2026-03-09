@@ -29,6 +29,7 @@ spec:
         {{- include "terrapod.listener.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "terrapod.listenerServiceAccountName" . }}
+      terminationGracePeriodSeconds: {{ .Values.listener.terminationGracePeriodSeconds }}
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -62,12 +63,29 @@ spec:
             - name: TERRAPOD_JOIN_TOKEN
               value: {{ .Values.listener.joinToken | quote }}
             {{- end }}
+            {{- with .Values.listener.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.listener.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - name: runner-config
               mountPath: /etc/terrapod
               readOnly: true
             - name: certs
               mountPath: /var/lib/terrapod/certs
+            - name: tmp
+              mountPath: /tmp
+            {{- with .Values.listener.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          startupProbe:
+            exec:
+              command: ["python", "-c", "import os; os.kill(0, 0)"]
+            failureThreshold: 30
+            periodSeconds: 2
           livenessProbe:
             exec:
               command: ["python", "-c", "import os; os.kill(0, 0)"]
@@ -84,12 +102,21 @@ spec:
                 command: ["sleep", "5"]
           resources:
             {{- toYaml .Values.listener.resources | nindent 12 }}
+          {{- with .Values.listener.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       volumes:
         - name: runner-config
           configMap:
             name: {{ include "terrapod.fullname" . }}-runner-config
         - name: certs
           emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        {{- with .Values.listener.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- with .Values.listener.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -27,6 +27,9 @@ spec:
       labels:
         {{- include "terrapod.web.selectorLabels" . | nindent 8 }}
     spec:
+      serviceAccountName: {{ include "terrapod.webServiceAccountName" . }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ .Values.web.terminationGracePeriodSeconds }}
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -42,6 +45,13 @@ spec:
           env:
             - name: API_URL
               value: "http://{{ include "terrapod.fullname" . }}-api:8000"
+            {{- with .Values.web.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.web.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.web.startupProbe }}
           startupProbe:
             httpGet:
@@ -67,8 +77,20 @@ spec:
             preStop:
               exec:
                 command: ["sleep", "5"]
+          {{- with .Values.web.extraVolumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml .Values.web.resources | nindent 12 }}
+          {{- with .Values.web.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.web.extraVolumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.web.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

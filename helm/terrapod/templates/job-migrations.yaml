@@ -11,6 +11,7 @@ metadata:
     "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
+  backoffLimit: 3
   ttlSecondsAfterFinished: 600
   template:
     metadata:
@@ -22,6 +23,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      automountServiceAccountToken: false
       restartPolicy: OnFailure
       containers:
         - name: migrations
@@ -32,7 +34,13 @@ spec:
             - upgrade
             - head
           env:
-            {{- if .Values.postgresql.url }}
+            {{- if .Values.postgresql.existingSecret }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.existingSecret }}
+                  key: {{ .Values.postgresql.existingSecretKey | default "url" }}
+            {{- else if .Values.postgresql.url }}
             - name: DATABASE_URL
               value: {{ .Values.postgresql.url | quote }}
             {{- end }}
@@ -43,4 +51,12 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
 {{- end }}

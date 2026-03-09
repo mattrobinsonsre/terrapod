@@ -1,13 +1,20 @@
 # Terrapod Helm Chart Values
 # Default configuration for production deployment
 
+nameOverride: ""
+fullnameOverride: ""
+
 # Global settings
 global:
+  # imagePullSecrets:
+  #   - name: myregistrykey
   imagePullSecrets: []
 
 # ── API Server (Python/FastAPI) ───────────────────────────────────────────────
 api:
-  replicas: 2
+  # Filesystem storage (default) only supports a single replica.
+  # For multi-replica HA, configure a cloud storage backend (s3, azure, gcs).
+  replicas: 1
 
   image:
     repository: ghcr.io/mattrobinsonsre/terrapod-api
@@ -27,7 +34,9 @@ api:
       memory: 1Gi
 
   autoscaling:
-    enabled: true
+    # Disabled by default — filesystem storage does not support multi-replica.
+    # Enable after configuring a cloud storage backend (s3, azure, gcs).
+    enabled: false
     minReplicas: 2
     maxReplicas: 10
     targetCPUUtilizationPercentage: 70
@@ -50,6 +59,8 @@ api:
     default_terraform_version: "1.9"
 
     # Storage configuration — exactly one backend must be configured.
+    # IMPORTANT: Filesystem storage is for dev/single-instance only.
+    # For multi-replica HA, use a cloud backend (s3, azure, gcs).
     storage:
       # Backend: s3 | azure | gcs | filesystem
       backend: filesystem
@@ -200,6 +211,8 @@ api:
     maxSurge: 1
     maxUnavailable: 0
 
+  terminationGracePeriodSeconds: 120
+
   # Pod anti-affinity spreads replicas across nodes (required) and AZs (preferred).
   # Disable on single-node clusters. Set 'affinity' to override with custom rules.
   podAntiAffinity:
@@ -211,7 +224,26 @@ api:
   podAnnotations: {}
   priorityClassName: ""
   topologySpreadConstraints: []
-  podSecurityContext: {}
+
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+
+  containerSecurityContext:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: RuntimeDefault
+
+  # Extra environment variables, volumes, and mounts for the API container.
+  extraEnv: []
+  extraEnvFrom: []
+  extraVolumes: []
+  extraVolumeMounts: []
 
   serviceAccount:
     create: true
@@ -248,10 +280,10 @@ web:
   resources:
     requests:
       cpu: 100m
-      memory: 128Mi
+      memory: 256Mi
     limits:
-      cpu: 200m
-      memory: 128Mi
+      cpu: 500m
+      memory: 512Mi
 
   autoscaling:
     enabled: false
@@ -268,6 +300,8 @@ web:
     maxSurge: 1
     maxUnavailable: 0
 
+  terminationGracePeriodSeconds: 30
+
   # Pod anti-affinity spreads replicas across nodes (required) and AZs (preferred).
   # Disable on single-node clusters. Set 'affinity' to override with custom rules.
   podAntiAffinity:
@@ -279,9 +313,33 @@ web:
   podAnnotations: {}
   priorityClassName: ""
   topologySpreadConstraints: []
-  podSecurityContext: {}
 
-# ── Runner Definitions ────────────────────────────────────────────────────────
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+
+  containerSecurityContext:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: RuntimeDefault
+
+  # Extra environment variables, volumes, and mounts for the web container.
+  extraEnv: []
+  extraEnvFrom: []
+  extraVolumes: []
+  extraVolumeMounts: []
+
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+
+# ── Runner Definitions ──────────────────────────────────────────────────────── ────────────────────────────────────────────────────────
 runners:
   # Default runner definition name (must match a name below)
   default: standard
@@ -377,7 +435,7 @@ listener:
   name: "listener"
 
   # Join token for pool registration.
-  # Either set joinToken directly or reference an existing K8s Secret.
+  # Either set joinToken directly or reference an existing K8s Secret (recommended).
   # The token is obtained by creating an agent pool + join token via the API.
   joinToken: ""
   # existingSecret: "my-listener-credentials"
@@ -418,6 +476,8 @@ listener:
     maxSurge: 1
     maxUnavailable: 0
 
+  terminationGracePeriodSeconds: 120
+
   # Pod anti-affinity spreads replicas across nodes (required) and AZs (preferred).
   # Disable on single-node clusters. Set 'affinity' to override with custom rules.
   podAntiAffinity:
@@ -429,12 +489,32 @@ listener:
   podAnnotations: {}
   priorityClassName: ""
   topologySpreadConstraints: []
-  podSecurityContext: {}
+
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+
+  containerSecurityContext:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: RuntimeDefault
+
+  # Extra environment variables, volumes, and mounts for the listener container.
+  extraEnv: []
+  extraEnvFrom: []
+  extraVolumes: []
+  extraVolumeMounts: []
 
 # ── Ingress ───────────────────────────────────────────────────────────────────
 # BFF pattern: all traffic enters through the web frontend (Next.js).
 # Next.js rewrites proxy /api/* and /.well-known/* to the API service
 # internally via the API_URL env var on the web deployment.
+# NOTE: Requires web.enabled=true — the Ingress routes to the web frontend.
 ingress:
   enabled: false
   className: ""
@@ -462,16 +542,18 @@ migrations:
 #   poolToken: ""      # Optional: auto-create a join token for the pool
 
 # ── Database (PostgreSQL) ─────────────────────────────────────────────────────
-# External PostgreSQL URL. The password should be injected via env var
-# TERRAPOD_DATABASE_URL or a Kubernetes Secret.
+# Provide credentials via existingSecret (recommended) or url (dev only).
 postgresql:
-  # URL for external PostgreSQL (set via env/secret in production)
   url: ""
+  # existingSecret: "terrapod-db-credentials"
+  # existingSecretKey: "url"  # key within the Secret (default: url)
 
 # ── Redis ─────────────────────────────────────────────────────────────────
-# External Redis URL. Set via env var TERRAPOD_REDIS_URL or a Secret.
+# Provide credentials via existingSecret (recommended) or url (dev only).
 redis:
   url: ""
+  # existingSecret: "terrapod-redis-credentials"
+  # existingSecretKey: "url"  # key within the Secret (default: url)
 
 # ── Storage ─────────────────────────────────────────────────────────────────
 # Filesystem PVC — only created when storage.backend=filesystem

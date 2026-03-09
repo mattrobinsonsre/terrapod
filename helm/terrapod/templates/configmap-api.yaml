@@ -56,9 +56,6 @@ data:
         {{- if .Values.api.config.storage.filesystem.base_url }}
         base_url: {{ .Values.api.config.storage.filesystem.base_url | quote }}
         {{- end }}
-        {{- if .Values.api.config.storage.filesystem.hmac_secret }}
-        hmac_secret: {{ .Values.api.config.storage.filesystem.hmac_secret | quote }}
-        {{- end }}
       {{- end }}
     {{- if .Values.api.config.auth }}
     auth:
@@ -156,10 +153,6 @@ data:
     vcs:
       enabled: {{ .Values.api.config.vcs.enabled }}
       poll_interval_seconds: {{ .Values.api.config.vcs.poll_interval_seconds | default 60 }}
-      {{- if and .Values.api.config.vcs.github .Values.api.config.vcs.github.webhook_secret }}
-      github:
-        webhook_secret: {{ .Values.api.config.vcs.github.webhook_secret | quote }}
-      {{- end }}
     {{- end }}
     {{- if .Values.api.config.audit }}
     audit:

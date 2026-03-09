@@ -1,5 +1,7 @@
 Terrapod has been installed.
 
+{{- if .Values.web.enabled }}
+
 {{- if .Values.ingress.enabled }}
 
 Access the UI:
@@ -10,6 +12,13 @@ Access the UI:
 To access the UI, set up port forwarding:
   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "terrapod.fullname" . }}-web 3000:80
   Then open: http://localhost:3000
+
+{{- end }}
+
+{{- else }}
+
+The web UI is disabled. Terrapod is running in API-only mode.
+To enable the UI, set web.enabled=true and optionally configure ingress.
 
 {{- end }}
 

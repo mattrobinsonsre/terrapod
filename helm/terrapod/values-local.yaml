@@ -15,6 +15,11 @@ api:
   podAntiAffinity:
     enabled: false
 
+  # Dev overrides — relax security for hot reload (writable filesystem for __pycache__, .pyc)
+  podSecurityContext: {}
+  containerSecurityContext:
+    readOnlyRootFilesystem: false
+
   resources:
     requests:
       cpu: 100m
@@ -31,7 +36,6 @@ api:
       filesystem:
         root_dir: /var/lib/terrapod/storage
         base_url: "https://terrapod.local"
-        hmac_secret: "terrapod-local-dev-hmac-secret-do-not-use-in-prod"
     audit:
       retention_days: 90
     auth:
@@ -62,6 +66,11 @@ web:
     enabled: false
   podAntiAffinity:
     enabled: false
+
+  # Dev overrides — relax security for hot reload (writable filesystem for Next.js cache)
+  podSecurityContext: {}
+  containerSecurityContext:
+    readOnlyRootFilesystem: false
 
   # next dev compiles on first request — startup probe gives it time
   startupProbe:
@@ -101,6 +110,9 @@ listener:
   name: "dev-listener"
   podAntiAffinity:
     enabled: false
+  podSecurityContext: {}
+  containerSecurityContext:
+    readOnlyRootFilesystem: false
   joinToken: "dev-join-token-do-not-use-in-prod"
   pdb:
     enabled: false

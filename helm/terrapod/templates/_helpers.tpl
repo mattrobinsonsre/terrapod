@@ -160,6 +160,17 @@ anti-affinity using the provided selector labels.
 {{- end -}}
 
 {{/*
+Web service account name.
+*/}}
+{{- define "terrapod.webServiceAccountName" -}}
+{{- if .Values.web.serviceAccount.create }}
+{{- default (printf "%s-web" (include "terrapod.fullname" .)) .Values.web.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.web.serviceAccount.name }}
+{{- end }}
+{{- end }}
+
+{{/*
 Validate storage configuration — exactly one backend must be configured.
 */}}
 {{- define "terrapod.validateStorageConfig" -}}
@@ -184,5 +195,19 @@ Validate storage configuration — exactly one backend must be configured.
   {{- if not .Values.api.config.storage.gcs.bucket -}}
   {{- fail "storage.gcs.bucket is required when backend is gcs" -}}
   {{- end -}}
+{{- end -}}
+{{- if eq $backend "filesystem" -}}
+  {{- if or (gt (int .Values.api.replicas) 1) .Values.api.autoscaling.enabled -}}
+  {{- fail "Filesystem storage backend does not support multiple API replicas. Set api.replicas=1 and api.autoscaling.enabled=false, or use a cloud storage backend (s3, azure, gcs)." -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Validate ingress requires web UI to be enabled.
+*/}}
+{{- define "terrapod.validateIngressWeb" -}}
+{{- if and .Values.ingress.enabled (not .Values.web.enabled) -}}
+{{- fail "Ingress is enabled but web.enabled is false. The Ingress routes to the web frontend — set web.enabled=true or disable the Ingress." -}}
 {{- end -}}
 {{- end -}}
