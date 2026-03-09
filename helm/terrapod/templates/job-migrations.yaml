@@ -25,6 +25,8 @@ spec:
       {{- end }}
       automountServiceAccountToken: false
       restartPolicy: OnFailure
+      securityContext:
+        {{- toYaml .Values.api.podSecurityContext | nindent 8 }}
       containers:
         - name: migrations
           image: {{ include "terrapod.api.image" . }}
@@ -52,11 +54,5 @@ spec:
               cpu: 500m
               memory: 512Mi
           securityContext:
-            runAsNonRoot: true
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
-            seccompProfile:
-              type: RuntimeDefault
+            {{- toYaml .Values.api.containerSecurityContext | nindent 12 }}
 {{- end }}

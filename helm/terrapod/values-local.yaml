@@ -16,8 +16,11 @@ api:
     enabled: false
 
   # Dev overrides — relax security for hot reload (writable filesystem for __pycache__, .pyc)
-  podSecurityContext: {}
+  # Dev images use string usernames (terrapod/nextjs) which k8s can't verify as non-root
+  podSecurityContext:
+    runAsNonRoot: false
   containerSecurityContext:
+    runAsNonRoot: false
     readOnlyRootFilesystem: false
 
   resources:
@@ -68,8 +71,10 @@ web:
     enabled: false
 
   # Dev overrides — relax security for hot reload (writable filesystem for Next.js cache)
-  podSecurityContext: {}
+  podSecurityContext:
+    runAsNonRoot: false
   containerSecurityContext:
+    runAsNonRoot: false
     readOnlyRootFilesystem: false
 
   # next dev compiles on first request — startup probe gives it time
@@ -110,8 +115,10 @@ listener:
   name: "dev-listener"
   podAntiAffinity:
     enabled: false
-  podSecurityContext: {}
+  podSecurityContext:
+    runAsNonRoot: false
   containerSecurityContext:
+    runAsNonRoot: false
     readOnlyRootFilesystem: false
   joinToken: "dev-join-token-do-not-use-in-prod"
   pdb:
