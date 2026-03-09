@@ -189,7 +189,6 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        if: needs.prepare.outputs.is_pr != 'true'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -202,7 +201,7 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           platforms: linux/${{ matrix.arch }}
-          push: ${{ needs.prepare.outputs.is_pr != 'true' }}
+          push: true
           tags: ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-${{ matrix.arch }}
           cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
@@ -215,7 +214,6 @@ jobs:
       always()
       && needs.build-images.result == 'success'
       && needs.prepare.outputs.images_exist != 'true'
-      && needs.prepare.outputs.is_pr != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
