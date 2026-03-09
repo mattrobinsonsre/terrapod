@@ -9,7 +9,7 @@ Terrapod includes a private module and provider registry, plus pull-through cach
 ```
 terraform init
     |
-    +-- Module sources (e.g., "terrapod.local/myorg/vpc/aws")
+    +-- Module sources (e.g., "terrapod.local/default/vpc/aws")
     |       |
     |       +-- Terrapod Module Registry (private modules only)
     |
@@ -42,7 +42,6 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-
       "type": "registry-modules",
       "attributes": {
         "name": "vpc",
-        "namespace": "myorg",
         "provider": "aws"
       }
     }
@@ -52,7 +51,7 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-
 ### Creating a Version
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-modules/myorg/vpc/aws/versions \
+curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-modules/private/default/vpc/aws/versions \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -83,7 +82,7 @@ In your Terraform configuration:
 
 ```hcl
 module "vpc" {
-  source  = "terrapod.example.com/myorg/vpc/aws"
+  source  = "terrapod.example.com/default/vpc/aws"
   version = "1.0.0"
 
   # module variables...
@@ -103,18 +102,18 @@ curl https://terrapod.example.com/api/v2/organizations/default/registry-modules 
 
 ```zsh
 # List versions (CLI protocol)
-curl https://terrapod.example.com/api/v2/registry/modules/myorg/vpc/aws/versions \
+curl https://terrapod.example.com/api/v2/registry/modules/default/vpc/aws/versions \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 
-# Show specific version (TFE V2 API)
-curl https://terrapod.example.com/api/v2/organizations/default/registry-modules/myorg/vpc/aws/1.0.0 \
+# Show module details (TFE V2 API)
+curl https://terrapod.example.com/api/v2/organizations/default/registry-modules/private/default/vpc/aws \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
 ### Deleting a Module
 
 ```zsh
-curl -X DELETE https://terrapod.example.com/api/v2/organizations/default/registry-modules/myorg/vpc/aws \
+curl -X DELETE https://terrapod.example.com/api/v2/organizations/default/registry-modules/private/default/vpc/aws \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -255,7 +254,7 @@ curl -X POST https://terrapod.example.com/api/registry/private/v2/gpg-keys \
     \"data\": {
       \"type\": \"gpg-keys\",
       \"attributes\": {
-        \"namespace\": \"myorg\",
+        \"namespace\": \"default\",
         \"ascii-armor\": \"$(cat public-key.asc)\"
       }
     }
@@ -281,8 +280,7 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-
     "data": {
       "type": "registry-providers",
       "attributes": {
-        "name": "mycloud",
-        "namespace": "myorg"
+        "name": "mycloud"
       }
     }
   }'
@@ -291,7 +289,7 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-
 ### Creating a Version
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-providers/myorg/mycloud/versions \
+curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-providers/private/default/mycloud/versions \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -310,7 +308,7 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-
 For each OS/architecture combination:
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-providers/myorg/mycloud/versions/1.0.0/platforms \
+curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-providers/private/default/mycloud/versions/1.0.0/platforms \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -334,7 +332,7 @@ Upload the binary, SHA256SUMS, and SHA256SUMS.sig files to the presigned URLs re
 terraform {
   required_providers {
     mycloud = {
-      source  = "terrapod.example.com/myorg/mycloud"
+      source  = "terrapod.example.com/default/mycloud"
       version = "1.0.0"
     }
   }
@@ -467,7 +465,7 @@ curl -X POST https://terrapod.example.com/api/v2/admin/binary-cache/warm \
 
 **Purge cached binary (admin):**
 ```zsh
-curl -X DELETE https://terrapod.example.com/api/v2/admin/binary-cache/terraform/1.9.8/linux/amd64 \
+curl -X DELETE https://terrapod.example.com/api/v2/admin/binary-cache/terraform/1.9.8 \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 

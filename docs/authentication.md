@@ -70,8 +70,7 @@ Passwords are hashed with PBKDF2-SHA256 and validated with [zxcvbn](https://gith
 ### Login Flow
 
 ```
-POST /api/v2/auth/authorize
-  provider=local
+POST /api/v2/auth/local/authorize
   email=admin@example.com
   password=xxx
     |
@@ -82,7 +81,7 @@ Verify PBKDF2-SHA256 hash
 Create session in Redis (tp:session:{token}, 12h sliding TTL)
     |
     v
-Return session token
+Return session token + redirect URL
 ```
 
 ---
@@ -339,7 +338,7 @@ Example: `abc123def456.tpod.ghijklmnopqrstuvwxyz0123456789`
 ### Creating Tokens via API
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/authentication-tokens \
+curl -X POST https://terrapod.example.com/api/v2/users/{user_id}/authentication-tokens \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -383,7 +382,7 @@ curl -X DELETE https://terrapod.example.com/api/v2/authentication-tokens/{token-
 api:
   config:
     auth:
-      api_token_max_ttl_hours: 8760  # 1 year (0 = no limit)
+      api_token_max_ttl_hours: 168  # 7 days (default). Set 0 for no limit
 ```
 
 The TTL is computed at validation time as `created_at + max_ttl`. Tokens older than this are rejected.
@@ -397,7 +396,7 @@ The TTL is computed at validation time as `created_at + max_ttl`. Tokens older t
 | Property | Value |
 |---|---|
 | Storage | Redis (`tp:session:{token}`) |
-| TTL | 12 hours (sliding -- refreshed on each request) |
+| TTL | 12 hours (sliding -- refreshed on activity, rate-limited to once per 5 minutes) |
 | Scope | Web UI only |
 
 ### Configuration

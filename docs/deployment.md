@@ -132,24 +132,27 @@ helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
 
 ## Configuration Reference
 
+The chart ships with a `values.schema.json` that validates all values at `helm install`/`helm lint` time. Unknown keys are rejected (`additionalProperties: false` on Terrapod-specific objects), so typos and stale values are caught before deployment.
+
 ### Global
 
 | Value | Default | Description |
 |---|---|---|
 | `global.imagePullSecrets` | `[]` | Image pull secrets for private registries |
+| `global.commonLabels` | `{}` | Extra labels applied to all resources |
 
 ### API Server
 
 | Value | Default | Description |
 |---|---|---|
-| `api.replicas` | `2` | Number of API server replicas |
+| `api.replicas` | `1` | Number of API server replicas |
 | `api.image.repository` | `ghcr.io/mattrobinsonsre/terrapod-api` | API Docker image |
 | `api.image.tag` | `""` (appVersion) | Image tag |
 | `api.resources.requests.cpu` | `250m` | CPU request |
 | `api.resources.requests.memory` | `512Mi` | Memory request |
 | `api.resources.limits.cpu` | `1` | CPU limit |
 | `api.resources.limits.memory` | `1Gi` | Memory limit |
-| `api.autoscaling.enabled` | `true` | Enable HPA |
+| `api.autoscaling.enabled` | `false` | Enable HPA (requires cloud storage backend) |
 | `api.autoscaling.minReplicas` | `2` | HPA minimum replicas |
 | `api.autoscaling.maxReplicas` | `10` | HPA maximum replicas |
 | `api.autoscaling.targetCPUUtilizationPercentage` | `70` | HPA target CPU |
@@ -167,7 +170,7 @@ helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
 | `web.replicas` | `2` | Number of web replicas |
 | `web.image.repository` | `ghcr.io/mattrobinsonsre/terrapod-web` | Web Docker image |
 | `web.resources.requests.cpu` | `100m` | CPU request |
-| `web.resources.requests.memory` | `128Mi` | Memory request |
+| `web.resources.requests.memory` | `256Mi` | Memory request |
 | `web.autoscaling.enabled` | `false` | Enable HPA for web |
 | `web.autoscaling.minReplicas` | `1` | HPA minimum replicas |
 | `web.autoscaling.maxReplicas` | `5` | HPA maximum replicas |
@@ -217,7 +220,7 @@ helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
 
 | Value | Default | Description |
 |---|---|---|
-| `api.config.vcs.enabled` | `false` | Enable VCS integration |
+| `api.config.vcs.enabled` | `true` | Enable VCS integration |
 | `api.config.vcs.poll_interval_seconds` | `60` | Poll interval |
 | `api.config.vcs.github.webhook_secret` | `""` | GitHub webhook HMAC secret |
 
@@ -241,6 +244,47 @@ api:
 ```
 
 When enabled, the drift detection scheduler runs as a periodic task (via the distributed scheduler) and creates plan-only runs with `-detailed-exitcode` for workspaces that have drift detection enabled and are past their check interval. The scheduler respects the per-workspace `drift-detection-interval-seconds` attribute, subject to the `min_workspace_interval_seconds` floor.
+
+### Metrics
+
+| Value | Default | Description |
+|---|---|---|
+| `api.config.metrics.enabled` | `true` | Expose `/metrics` endpoint and instrument HTTP requests |
+| `api.config.metrics.serviceMonitor.enabled` | `false` | Create a Prometheus ServiceMonitor for the API (requires Prometheus Operator) |
+| `api.config.metrics.serviceMonitor.interval` | `30s` | Scrape interval |
+| `api.config.metrics.serviceMonitor.labels` | `{}` | Extra labels for Prometheus selector matching |
+| `api.config.metrics.podMonitor.enabled` | `false` | Create a Prometheus PodMonitor for the listener (requires Prometheus Operator) |
+| `api.config.metrics.podMonitor.interval` | `30s` | Scrape interval |
+| `api.config.metrics.podMonitor.labels` | `{}` | Extra labels for Prometheus selector matching |
+
+When `metrics.enabled` is true, the API server exposes:
+- `terrapod_http_requests_total` — Counter (method, path_template, status)
+- `terrapod_http_request_duration_seconds` — Histogram (method, path_template, status)
+- Process metrics (CPU, memory, file descriptors)
+
+The listener exposes on its health port (`8081`):
+- `terrapod_listener_active_runs` — Gauge
+- `terrapod_listener_identity_ready` — Gauge (1 or 0)
+- `terrapod_listener_heartbeat_age_seconds` — Gauge
+
+The ServiceMonitor and PodMonitor are **double-gated** — they require both `metrics.enabled: true` AND the respective monitor's `enabled: true`. This avoids CRD errors on clusters without the Prometheus Operator.
+
+Example for a cluster with Prometheus Operator:
+
+```yaml
+api:
+  config:
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        labels:
+          release: kube-prometheus-stack  # match your Prometheus instance selector
+      podMonitor:
+        enabled: true
+        labels:
+          release: kube-prometheus-stack
+```
 
 ### Encryption at Rest
 
@@ -314,7 +358,9 @@ listener:
 | `ingress.className` | `""` | Ingress class |
 | `ingress.hostname` | `""` | Hostname (required) |
 | `ingress.tls` | `true` | Enable TLS |
+| `ingress.pathType` | `Prefix` | Ingress path type (`Prefix`, `Exact`, `ImplementationSpecific`) |
 | `ingress.annotations` | `{}` | Ingress annotations |
+| `ingress.extraPaths` | `[]` | Extra paths prepended before the default catch-all |
 | `tls.existingSecret` | `""` | Existing TLS secret name |
 
 ### Database & Redis
@@ -743,14 +789,20 @@ The admin health dashboard endpoint (`GET /api/v2/admin/health-dashboard`) provi
 
 Requires `admin` or `audit` role. See the [API Reference](api-reference.md#health-dashboard) for the full response schema.
 
+### Prometheus Metrics
+
+When `api.config.metrics.enabled` is true (default), the API server exposes a `/metrics` endpoint in Prometheus exposition format. The listener also serves `/metrics` on its health port. See the [Metrics](#metrics) configuration reference for available metrics and ServiceMonitor/PodMonitor setup.
+
 ### Key Metrics to Monitor
 
 | Metric | Where to Find |
 |---|---|
-| API request latency | Ingress controller metrics or application logs |
+| API request latency | `terrapod_http_request_duration_seconds` (Prometheus) or ingress controller metrics |
+| API request rate | `terrapod_http_requests_total` (Prometheus) |
+| Listener active runs | `terrapod_listener_active_runs` (Prometheus) |
+| Listener heartbeat age | `terrapod_listener_heartbeat_age_seconds` (Prometheus) |
 | Run queue depth | Count runs in `queued` state via API or health dashboard |
 | Drift status | Health dashboard `workspaces.by-drift-status` |
-| Listener heartbeat | Redis keys `tp:listener:{id}:status` or health dashboard |
 | Database connections | PostgreSQL `pg_stat_activity` |
 | Storage operations | Cloud provider metrics (S3/Blob/GCS) |
 | Job success/failure | Kubernetes Job status in runner namespace |
@@ -773,6 +825,8 @@ The chart includes these templates in `helm/terrapod/templates/`:
 | `ingress.yaml` | Ingress (BFF pattern) |
 | `rbac-listener.yaml` | Listener ServiceAccount, Role, RoleBinding |
 | `serviceaccount.yaml` | API ServiceAccount |
+| `serviceaccount-web.yaml` | Web UI ServiceAccount |
+| `serviceaccount-runner.yaml` | Runner ServiceAccount |
 | `job-migrations.yaml` | Alembic migrations (pre-install/pre-upgrade hook) |
 | `job-bootstrap.yaml` | Admin user bootstrap (post-install hook) |
 | `pvc-storage.yaml` | PVC for filesystem backend |
@@ -782,4 +836,5 @@ The chart includes these templates in `helm/terrapod/templates/`:
 | `hpa-api.yaml` | API HorizontalPodAutoscaler |
 | `hpa-listener.yaml` | Listener HorizontalPodAutoscaler |
 | `hpa-web.yaml` | Web HorizontalPodAutoscaler |
-| `serviceaccount-runner.yaml` | Runner ServiceAccount |
+| `servicemonitor-api.yaml` | Prometheus ServiceMonitor (disabled by default) |
+| `podmonitor-listener.yaml` | Prometheus PodMonitor (disabled by default) |

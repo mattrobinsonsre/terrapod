@@ -69,7 +69,7 @@ Open https://terrapod.local in your browser.
 
 ![Login](images/login.png)
 
-The bootstrap job creates an initial admin user. Check the Tilt logs for the `terrapod-bootstrap-1` resource to find the credentials, or check the Helm `values-local.yaml` for the configured bootstrap email and password.
+The bootstrap job creates an initial admin user. The default credentials are `admin` / `admin` (configured in `values-local.yaml`). Check the Tilt logs for the `terrapod-bootstrap-1` resource to confirm.
 
 ### Step 5: Get an API Token
 
@@ -332,7 +332,6 @@ curl -X POST https://terrapod.local/api/v2/organizations/default/registry-module
       "type": "registry-modules",
       "attributes": {
         "name": "vpc",
-        "namespace": "myorg",
         "provider": "aws"
       }
     }
@@ -342,7 +341,7 @@ curl -X POST https://terrapod.local/api/v2/organizations/default/registry-module
 2. Create a version:
 
 ```zsh
-curl -X POST https://terrapod.local/api/v2/organizations/default/registry-modules/myorg/vpc/aws/versions \
+curl -X POST https://terrapod.local/api/v2/organizations/default/registry-modules/private/default/vpc/aws/versions \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -361,7 +360,7 @@ curl -X POST https://terrapod.local/api/v2/organizations/default/registry-module
 
 ```hcl
 module "vpc" {
-  source  = "terrapod.local/myorg/vpc/aws"
+  source  = "terrapod.local/default/vpc/aws"
   version = "1.0.0"
 }
 ```

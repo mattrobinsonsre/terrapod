@@ -19,6 +19,7 @@ Requires `admin` or `audit` role.
 ```json
 {
   "data": {
+    "id": "health-dashboard",
     "type": "health-dashboards",
     "attributes": {
       "workspaces": {
@@ -40,6 +41,34 @@ Requires `admin` or `audit` role.
             "drift-status": "drifted"
           }
         ]
+      },
+      "runs": {
+        "queued": 3,
+        "in-progress": 1,
+        "recent-24h": {
+          "total": 42,
+          "applied": 35,
+          "errored": 5,
+          "canceled": 2
+        },
+        "average-plan-duration-seconds": 45,
+        "average-apply-duration-seconds": 120
+      },
+      "listeners": {
+        "total": 3,
+        "online": 2,
+        "offline": 1,
+        "details": [
+          {
+            "id": "listener-uuid",
+            "name": "pool-listener-pod-abc",
+            "pool-name": "default",
+            "status": "online",
+            "capacity": 5,
+            "active-runs": 1,
+            "last-heartbeat": "2025-03-09T12:00:00Z"
+          }
+        ]
       }
     }
   }
@@ -48,13 +77,34 @@ Requires `admin` or `audit` role.
 
 ### Data Points
 
+**Workspaces:**
+
 | Metric | Description |
 |---|---|
-| `total` | Total number of workspaces |
-| `locked` | Workspaces currently locked |
-| `drift-enabled` | Workspaces with drift detection enabled |
-| `by-drift-status` | Breakdown of workspaces by drift status |
-| `stale` | Top 20 workspaces sorted by days since last apply (workspaces that have never been applied appear first) |
+| `workspaces.total` | Total number of workspaces |
+| `workspaces.locked` | Workspaces currently locked |
+| `workspaces.drift-enabled` | Workspaces with drift detection enabled |
+| `workspaces.by-drift-status` | Breakdown of workspaces by drift status |
+| `workspaces.stale` | Top 20 workspaces sorted by days since last apply (never-applied appear first) |
+
+**Runs:**
+
+| Metric | Description |
+|---|---|
+| `runs.queued` | Number of runs currently in the queue |
+| `runs.in-progress` | Number of runs currently planning or applying |
+| `runs.recent-24h` | Breakdown of runs in the last 24 hours (total, applied, errored, canceled) |
+| `runs.average-plan-duration-seconds` | Average plan duration in the last 24 hours |
+| `runs.average-apply-duration-seconds` | Average apply duration in the last 24 hours |
+
+**Listeners:**
+
+| Metric | Description |
+|---|---|
+| `listeners.total` | Total registered listeners |
+| `listeners.online` | Listeners with active heartbeats |
+| `listeners.offline` | Listeners with expired heartbeats |
+| `listeners.details` | Per-listener status including pool, capacity, and active runs |
 
 ---
 

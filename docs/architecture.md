@@ -532,6 +532,50 @@ The database schema is managed by Alembic migrations in `alembic/versions/`. Key
 
 ---
 
+## Observability
+
+Both the API server and runner listener expose Prometheus metrics on their existing HTTP ports (no separate metrics ports). Metrics are feature-gated via `settings.metrics.enabled` (default: `true`).
+
+### API Server Metrics
+
+Exposed at `GET /metrics` on port 8000 (same FastAPI app). A middleware records request-level metrics for every HTTP request:
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `terrapod_http_requests_total` | Counter | method, path_template, status | Total HTTP requests |
+| `terrapod_http_request_duration_seconds` | Histogram | method, path_template, status | Request latency |
+
+Path templates use FastAPI route patterns (`/api/v2/workspaces/{workspace_id}`) to avoid high-cardinality raw paths. The `/metrics` endpoint itself is excluded from instrumentation. Built-in process metrics (CPU, memory, file descriptors, threads) are included automatically by `prometheus-client`.
+
+When `metrics.enabled` is `false`, no middleware is registered and `/metrics` returns 404.
+
+### Listener Metrics
+
+Exposed at `GET /metrics` on port 8081 (same health HTTP server). Uses a separate `CollectorRegistry` to avoid conflicting with the API server's default registry:
+
+| Metric | Type | Description |
+|---|---|---|
+| `terrapod_listener_active_runs` | Gauge | Number of currently active runner Jobs |
+| `terrapod_listener_identity_ready` | Gauge | 1 if identity established, 0 otherwise |
+| `terrapod_listener_heartbeat_age_seconds` | Gauge | Seconds since last successful heartbeat (-1 if never) |
+
+### Prometheus Operator Integration
+
+The Helm chart includes ServiceMonitor (API) and PodMonitor (listener) resources for Prometheus Operator. Both are disabled by default and independently gated:
+
+- **ServiceMonitor** requires `metrics.enabled` AND `metrics.serviceMonitor.enabled`
+- **PodMonitor** requires `metrics.enabled` AND `metrics.podMonitor.enabled` AND `listener.enabled`
+
+See [Deployment -- Metrics](deployment.md#metrics) for Helm values.
+
+**Source files:**
+- `services/terrapod/api/metrics.py` -- API metrics middleware and endpoint
+- `services/terrapod/runner/listener.py` -- listener metrics (CollectorRegistry)
+- `helm/terrapod/templates/servicemonitor-api.yaml` -- ServiceMonitor
+- `helm/terrapod/templates/podmonitor-listener.yaml` -- PodMonitor
+
+---
+
 ## Configuration
 
 Terrapod uses a layered configuration system:

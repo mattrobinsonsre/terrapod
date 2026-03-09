@@ -26,6 +26,7 @@ Each audit entry captures:
 | `status-code` | HTTP response status code |
 | `request-id` | Unique request identifier |
 | `duration-ms` | Request execution time in milliseconds |
+| `detail` | Additional context (e.g. resource name, action detail) |
 
 Logging is asynchronous — it does not block the API response.
 
@@ -86,7 +87,8 @@ page[size]=50" \
         "resource-id": "ws-abc123",
         "status-code": 201,
         "request-id": "req-xyz789",
-        "duration-ms": 145
+        "duration-ms": 145,
+        "detail": "Created workspace prod-infrastructure"
       }
     }
   ],

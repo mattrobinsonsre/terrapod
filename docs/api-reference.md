@@ -735,16 +735,16 @@ GET /api/v2/registry/modules/{namespace}/{name}/{provider}/{version}/download
 ```
 GET  /api/v2/organizations/{org}/registry-modules
 POST /api/v2/organizations/{org}/registry-modules
-GET  /api/v2/organizations/{org}/registry-modules/{namespace}/{name}/{provider}
-DELETE /api/v2/organizations/{org}/registry-modules/{namespace}/{name}/{provider}
-POST /api/v2/organizations/{org}/registry-modules/{namespace}/{name}/{provider}/versions
-GET  /api/v2/organizations/{org}/registry-modules/{namespace}/{name}/{provider}/{version}
+GET  /api/v2/organizations/{org}/registry-modules/private/default/{name}/{provider}
+DELETE /api/v2/organizations/{org}/registry-modules/private/default/{name}/{provider}
+POST /api/v2/organizations/{org}/registry-modules/private/default/{name}/{provider}/versions
+DELETE /api/v2/organizations/{org}/registry-modules/private/default/{name}/{provider}/versions/{version}
 ```
 
 ### Update Module
 
 ```
-PATCH /api/v2/organizations/{org}/registry-modules/private/{org}/{name}/{provider}
+PATCH /api/v2/organizations/{org}/registry-modules/private/default/{name}/{provider}
 ```
 
 **Required permission:** `admin` on the module.
@@ -785,16 +785,18 @@ GET /api/v2/registry/providers/{namespace}/{type}/{version}/download/{os}/{arch}
 ```
 GET  /api/v2/organizations/{org}/registry-providers
 POST /api/v2/organizations/{org}/registry-providers
-GET  /api/v2/organizations/{org}/registry-providers/{namespace}/{name}
-DELETE /api/v2/organizations/{org}/registry-providers/{namespace}/{name}
-POST /api/v2/organizations/{org}/registry-providers/{namespace}/{name}/versions
-POST /api/v2/organizations/{org}/registry-providers/{namespace}/{name}/versions/{version}/platforms
+GET  /api/v2/organizations/{org}/registry-providers/private/default/{name}
+DELETE /api/v2/organizations/{org}/registry-providers/private/default/{name}
+POST /api/v2/organizations/{org}/registry-providers/private/default/{name}/versions
+GET  /api/v2/organizations/{org}/registry-providers/private/default/{name}/versions
+DELETE /api/v2/organizations/{org}/registry-providers/private/default/{name}/versions/{version}
+POST /api/v2/organizations/{org}/registry-providers/private/default/{name}/versions/{version}/platforms
 ```
 
 ### Update Provider
 
 ```
-PATCH /api/v2/organizations/{org}/registry-providers/private/{org}/{name}
+PATCH /api/v2/organizations/{org}/registry-providers/private/default/{name}
 ```
 
 **Required permission:** `admin` on the provider.
@@ -1109,13 +1111,13 @@ DELETE /api/v2/role-assignments/{provider}/{email}/{role}
 ### Create Token
 
 ```
-POST /api/v2/authentication-tokens
+POST /api/v2/users/{user_id}/authentication-tokens
 ```
 
 ### List Tokens
 
 ```
-GET /api/v2/authentication-tokens
+GET /api/v2/users/{user_id}/authentication-tokens
 ```
 
 ### Show Token
@@ -1159,7 +1161,7 @@ Pre-cache a specific tool version.
 ### Purge Cache (Admin)
 
 ```
-DELETE /api/v2/admin/binary-cache/{tool}/{version}/{os}/{arch}
+DELETE /api/v2/admin/binary-cache/{tool}/{version}
 ```
 
 ---
@@ -1183,28 +1185,33 @@ Returns platform-wide health data including workspace status summaries, recent r
     "attributes": {
       "workspaces": {
         "total": 42,
+        "locked": 2,
+        "drift-enabled": 15,
         "by-drift-status": {
-          "no_drift": 30,
+          "unchecked": 5,
+          "no-drift": 30,
           "drifted": 5,
-          "errored": 2,
-          "unknown": 5
+          "errored": 2
         },
-        "drift-detection-enabled-count": 37
+        "stale": [{"id": "ws-uuid", "name": "prod-infra", "last-applied-at": "...", "days-since-apply": 18, "drift-status": "drifted"}]
       },
       "runs": {
-        "total-last-24h": 18,
-        "by-status": {
+        "queued": 4,
+        "in-progress": 2,
+        "recent-24h": {
+          "total": 18,
           "applied": 12,
           "errored": 3,
-          "canceled": 1,
-          "planning": 2
+          "canceled": 1
         },
-        "queue-depth": 4
+        "average-plan-duration-seconds": 45,
+        "average-apply-duration-seconds": 120
       },
       "listeners": {
         "total": 3,
         "online": 2,
-        "offline": 1
+        "offline": 1,
+        "details": [{"id": "listener-uuid", "name": "pool-listener-pod", "pool-name": "default", "status": "online", "capacity": 5, "active-runs": 1, "last-heartbeat": "..."}]
       }
     }
   }
@@ -1214,14 +1221,19 @@ Returns platform-wide health data including workspace status summaries, recent r
 | Attribute | Description |
 |---|---|
 | `workspaces.total` | Total number of workspaces |
-| `workspaces.by-drift-status` | Breakdown of workspaces by their current drift status |
-| `workspaces.drift-detection-enabled-count` | Number of workspaces with drift detection enabled |
-| `runs.total-last-24h` | Runs created in the last 24 hours |
-| `runs.by-status` | Breakdown of recent runs by current status |
-| `runs.queue-depth` | Number of runs currently in `queued` state |
+| `workspaces.locked` | Workspaces currently locked |
+| `workspaces.drift-enabled` | Number of workspaces with drift detection enabled |
+| `workspaces.by-drift-status` | Breakdown of workspaces by drift status |
+| `workspaces.stale` | Top 20 workspaces by staleness (never-applied first) |
+| `runs.queued` | Runs currently in `queued` state |
+| `runs.in-progress` | Runs currently planning or applying |
+| `runs.recent-24h` | 24-hour breakdown (total, applied, errored, canceled) |
+| `runs.average-plan-duration-seconds` | Average plan duration (last 24h) |
+| `runs.average-apply-duration-seconds` | Average apply duration (last 24h) |
 | `listeners.total` | Total registered listeners |
 | `listeners.online` | Listeners with a recent heartbeat (within 180s) |
 | `listeners.offline` | Listeners with no recent heartbeat |
+| `listeners.details` | Per-listener status, pool, capacity, and active runs |
 
 ---
 

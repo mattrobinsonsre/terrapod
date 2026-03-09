@@ -135,7 +135,7 @@ curl -X POST https://terrapod.example.com/api/v2/roles \
 
 ### Label Matching Rules
 
-- **Allow labels**: A workspace must have ALL specified label key-value pairs to match
+- **Allow labels**: A workspace matches if ANY specified label key-value pair matches (OR across keys)
 - **Allow names**: A workspace name must appear in the list to match
 - **A workspace matches if it matches allow-labels OR allow-names**
 - **Deny labels**: If a workspace has ANY specified deny label, access is denied regardless of allow rules
@@ -390,6 +390,7 @@ Included in provider show/list responses (same shape as modules):
 | `can-destroy` | `admin` | `admin` |
 | `can-queue-run` | `plan` | — |
 | `can-lock` / `can-unlock` | `plan` | — |
+| `can-force-unlock` | `admin` | — |
 | `can-update-variable` | `write` | — |
 | `can-create-version` | — | `write` |
 | `can-read-*` | `read` | `read` |
