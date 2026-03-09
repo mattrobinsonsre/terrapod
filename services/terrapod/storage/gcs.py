@@ -96,7 +96,7 @@ class GCSStore:
                 raise ObjectStorePermissionError(str(e)) from e
             raise ObjectStoreError(str(e)) from e
 
-        etag = hashlib.md5(data).hexdigest()  # noqa: S324
+        etag = hashlib.md5(data).hexdigest()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
 
         return ObjectMeta(
             key=key,

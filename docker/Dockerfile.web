@@ -38,7 +38,8 @@ COPY --from=builder /app/public ./public
 
 # Remove npm and its bundled dependencies (not needed at runtime;
 # eliminates CVEs in npm-internal minimatch, tar, etc.)
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+RUN apk upgrade --no-cache \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
     && addgroup -g 1001 -S nodejs \
     && adduser -S nextjs -u 1001 -G nodejs \
     && chown -R nextjs:nodejs /app
