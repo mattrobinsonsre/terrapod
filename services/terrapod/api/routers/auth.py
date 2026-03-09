@@ -24,6 +24,7 @@ Consumers:
 import base64
 import hashlib
 from datetime import datetime
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -257,7 +258,7 @@ async def local_login_submit(
             detail="Invalid or expired auth state",
         )
 
-    if auth_state.provider_name != "local":
+    if auth_state.provider_name not in ("local", "pending"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Auth state is not for local provider",
@@ -300,13 +301,75 @@ async def local_login_submit(
     )
     await store_auth_code(code, auth_code)
 
-    separator = "&" if "?" in auth_state.client_redirect_uri else "?"
-    redirect_url = (
-        f"{auth_state.client_redirect_uri}{separator}code={code}&state={auth_state.client_state}"
-    )
+    if auth_state.credential_type == "api_token":
+        redirect_url = _build_cli_complete_url(
+            code, auth_state.client_state, auth_state.client_redirect_uri
+        )
+    else:
+        separator = "&" if "?" in auth_state.client_redirect_uri else "?"
+        redirect_url = f"{auth_state.client_redirect_uri}{separator}code={code}&state={auth_state.client_state}"
 
     logger.info("Local login: redirecting to client", email=login.email)
     return RedirectResponse(url=redirect_url, status_code=302)
+
+
+@router.get("/cli-sso-redirect")
+async def cli_sso_redirect(
+    provider: str = Query(...),
+    cli_state: str = Query(...),
+) -> RedirectResponse:
+    """Redirect CLI login to chosen SSO provider.
+
+    The login page redirects here when a user clicks an SSO button during
+    a CLI login flow. Consumes the pending auth state, starts the chosen
+    IDP flow, and stores new auth state with the selected provider.
+    """
+    auth_state = await consume_auth_state(cli_state)
+    if auth_state is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired auth state",
+        )
+    if auth_state.credential_type != "api_token":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Not a CLI login flow",
+        )
+
+    connector = get_connector(provider)
+    if connector is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Provider not found: {provider}",
+        )
+
+    idp_state = generate_state()
+    callback_url = f"{settings.auth.callback_base_url}{settings.api_prefix}/auth/callback"
+
+    auth_request = await connector.build_authorization_request(
+        callback_url=callback_url,
+        state=idp_state,
+    )
+
+    # New AuthState with chosen provider, carrying over CLI params
+    new_state = AuthState(
+        provider_name=connector.name,
+        client_redirect_uri=auth_state.client_redirect_uri,
+        client_state=auth_state.client_state,
+        code_challenge=auth_state.code_challenge,
+        code_challenge_method=auth_state.code_challenge_method,
+        idp_state=idp_state,
+        nonce=auth_request.nonce,
+        credential_type="api_token",
+    )
+    await store_auth_state(new_state)
+
+    logger.info(
+        "CLI SSO redirect: redirecting to provider",
+        provider=connector.name,
+    )
+
+    return RedirectResponse(url=auth_request.authorize_url, status_code=302)
 
 
 @router.get("/callback")
@@ -365,11 +428,16 @@ async def callback(
     )
     await store_auth_code(terrapod_code, auth_code)
 
-    separator = "&" if "?" in auth_state.client_redirect_uri else "?"
-    redirect_url = (
-        f"{auth_state.client_redirect_uri}{separator}"
-        f"code={terrapod_code}&state={auth_state.client_state}"
-    )
+    if auth_state.credential_type == "api_token":
+        redirect_url = _build_cli_complete_url(
+            terrapod_code, auth_state.client_state, auth_state.client_redirect_uri
+        )
+    else:
+        separator = "&" if "?" in auth_state.client_redirect_uri else "?"
+        redirect_url = (
+            f"{auth_state.client_redirect_uri}{separator}"
+            f"code={terrapod_code}&state={auth_state.client_state}"
+        )
 
     logger.info(
         "Callback: redirecting to client",
@@ -442,11 +510,16 @@ async def saml_acs(
     )
     await store_auth_code(terrapod_code, auth_code)
 
-    separator = "&" if "?" in auth_state.client_redirect_uri else "?"
-    redirect_url = (
-        f"{auth_state.client_redirect_uri}{separator}"
-        f"code={terrapod_code}&state={auth_state.client_state}"
-    )
+    if auth_state.credential_type == "api_token":
+        redirect_url = _build_cli_complete_url(
+            terrapod_code, auth_state.client_state, auth_state.client_redirect_uri
+        )
+    else:
+        separator = "&" if "?" in auth_state.client_redirect_uri else "?"
+        redirect_url = (
+            f"{auth_state.client_redirect_uri}{separator}"
+            f"code={terrapod_code}&state={auth_state.client_state}"
+        )
 
     return RedirectResponse(url=redirect_url, status_code=302)
 
@@ -594,6 +667,13 @@ async def logout_all(request: Request) -> JSONResponse:
 
 
 # --- Helpers ---
+
+
+def _build_cli_complete_url(code: str, state: str, redirect_uri: str) -> str:
+    """Build redirect URL to the CLI completion page."""
+    return (
+        f"/auth/cli-complete?code={code}&state={state}&redirect_uri={quote(redirect_uri, safe='')}"
+    )
 
 
 async def _require_session(request: Request):  # type: ignore[no-untyped-def]

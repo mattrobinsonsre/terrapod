@@ -63,24 +63,13 @@ class TestOAuthAuthorize:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.oauth.store_auth_state")
-    @patch("terrapod.api.routers.oauth.get_default_connector")
-    async def test_authorize_redirects_to_provider(
+    async def test_authorize_redirects_to_login_page(
         self,
-        mock_get_connector,
         mock_store_state,
         mock_init_db,
         mock_init_redis,
         mock_init_storage,
     ):
-        mock_connector = AsyncMock()
-        mock_connector.name = "test-oidc"
-        mock_connector.build_authorization_request.return_value = MagicMock(
-            authorize_url="https://idp.example.com/authorize?state=xyz",
-            state="xyz",
-            nonce="nonce-123",
-        )
-        mock_get_connector.return_value = mock_connector
-
         app = create_app()
         async with AsyncClient(
             transport=ASGITransport(app=app),
@@ -99,21 +88,21 @@ class TestOAuthAuthorize:
             )
 
         assert response.status_code == 302
-        assert "idp.example.com" in response.headers["location"]
+        location = response.headers["location"]
+        assert location.startswith("/login?cli_state=")
         mock_store_state.assert_called_once()
 
-        # Verify stored state has credential_type="api_token"
+        # Verify stored state has credential_type="api_token" and provider="pending"
         stored_state = mock_store_state.call_args[0][0]
         assert stored_state.credential_type == "api_token"
+        assert stored_state.provider_name == "pending"
         assert stored_state.code_challenge == "challenge123"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.oauth.get_default_connector")
     async def test_authorize_rejects_non_code_response_type(
         self,
-        mock_get_connector,
         mock_init_db,
         mock_init_redis,
         mock_init_storage,
@@ -133,45 +122,19 @@ class TestOAuthAuthorize:
 
         assert response.status_code == 400
 
-    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
-    @patch("terrapod.api.app.init_redis")
-    @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.oauth.get_default_connector")
-    async def test_authorize_rejects_no_provider(
-        self,
-        mock_get_connector,
-        mock_init_db,
-        mock_init_redis,
-        mock_init_storage,
-    ):
-        mock_get_connector.return_value = None
-
-        app = create_app()
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.get(
-                "/oauth/authorize",
-                params={
-                    "client_id": "terraform-cli",
-                    "redirect_uri": "http://localhost:10000/login",
-                    "code_challenge": "challenge123",
-                    "code_challenge_method": "S256",
-                },
-            )
-
-        assert response.status_code == 400
-        assert "No auth provider" in response.json()["detail"]
-
 
 class TestOAuthToken:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.oauth.get_redis_client")
     @patch("terrapod.api.routers.oauth.create_api_token")
     @patch("terrapod.api.routers.oauth.consume_auth_code")
     async def test_token_exchange_creates_api_token(
         self,
         mock_consume_code,
         mock_create_token,
+        mock_get_redis,
         mock_init_db,
         mock_init_redis,
         mock_init_storage,
@@ -191,6 +154,9 @@ class TestOAuthToken:
 
         mock_token = MagicMock(id="at-test123")
         mock_create_token.return_value = (mock_token, "raw-token.tpod.secret")
+
+        mock_redis = AsyncMock()
+        mock_get_redis.return_value = mock_redis
 
         # Mock db dependency
         app = create_app()

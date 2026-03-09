@@ -23,10 +23,9 @@ from terrapod.auth.auth_state import (
     generate_state,
     store_auth_state,
 )
-from terrapod.auth.connectors import get_default_connector
-from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.redis.client import get_redis_client
 
 router = APIRouter(tags=["oauth"])
 logger = get_logger(__name__)
@@ -84,45 +83,27 @@ async def oauth_authorize(
             detail="Only S256 code_challenge_method is supported",
         )
 
-    # Use default connector for terraform login
-    connector = get_default_connector()
-    if connector is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No auth provider configured",
-        )
-
     # Generate IDP-facing state
     idp_state = generate_state()
 
-    # Build callback URL (shared with web UI)
-    callback_url = f"{settings.auth.callback_base_url}{settings.api_prefix}/auth/callback"
-
-    auth_request = await connector.build_authorization_request(
-        callback_url=callback_url,
-        state=idp_state,
-    )
-
-    # Store auth state — credential_type="api_token" distinguishes terraform flow
+    # Store auth state without a provider — user will choose on the login page
     auth_state = AuthState(
-        provider_name=connector.name,
+        provider_name="pending",
         client_redirect_uri=redirect_uri,
         client_state=state,
         code_challenge=code_challenge,
         code_challenge_method=code_challenge_method,
         idp_state=idp_state,
-        nonce=auth_request.nonce,
         credential_type="api_token",
     )
     await store_auth_state(auth_state)
 
     logger.info(
-        "OAuth authorize: redirecting to provider for terraform login",
-        provider=connector.name,
+        "OAuth authorize: redirecting to login page for provider selection",
         redirect_uri=redirect_uri,
     )
 
-    return RedirectResponse(url=auth_request.authorize_url, status_code=302)
+    return RedirectResponse(url=f"/login?cli_state={idp_state}", status_code=302)
 
 
 @router.post("/oauth/token")
@@ -172,6 +153,10 @@ async def oauth_token(
     )
     await db.commit()
 
+    # Set completion flag so the CLI success page can confirm the round-trip
+    redis = get_redis_client()
+    await redis.set(f"tp:cli_complete:{code}", "1", ex=300)
+
     logger.info(
         "API token created via terraform login",
         email=auth_code.email,
@@ -185,6 +170,14 @@ async def oauth_token(
             "token_type": "bearer",
         }
     )
+
+
+@router.get("/api/v2/auth/cli-login-status")
+async def cli_login_status(code: str = Query(...)) -> JSONResponse:
+    """Check if a CLI login flow completed (token was created)."""
+    redis = get_redis_client()
+    result = await redis.get(f"tp:cli_complete:{code}")
+    return JSONResponse(content={"complete": result is not None})
 
 
 def _verify_pkce(code_verifier: str, code_challenge: str, method: str) -> bool:

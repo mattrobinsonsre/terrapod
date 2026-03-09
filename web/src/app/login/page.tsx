@@ -128,6 +128,13 @@ function LoginContent() {
   }
 
   const startExternalLogin = async (providerName: string) => {
+    // CLI login flow: redirect to the CLI SSO endpoint which carries
+    // over the pending auth state from /oauth/authorize
+    if (cliState) {
+      window.location.href = `/api/v2/auth/cli-sso-redirect?provider=${encodeURIComponent(providerName)}&cli_state=${encodeURIComponent(cliState)}`
+      return
+    }
+
     try {
       const { verifier, challenge } = await generatePKCE()
       const state = generateState()
