@@ -7,7 +7,11 @@ metadata:
     {{- include "terrapod.labels" . | nindent 4 }}
     app.kubernetes.io/component: api
 spec:
+  {{- if .Values.api.pdb.minAvailable }}
   minAvailable: {{ .Values.api.pdb.minAvailable }}
+  {{- else }}
+  maxUnavailable: {{ .Values.api.pdb.maxUnavailable | default 1 }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "terrapod.api.selectorLabels" . | nindent 6 }}

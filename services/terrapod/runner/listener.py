@@ -60,6 +60,7 @@ class RunnerListener:
             "Listener started",
             listener_id=str(self.identity.listener_id),
             name=self.identity.name,
+            pod_name=os.environ.get("POD_NAME", ""),
         )
 
         # Start concurrent loops

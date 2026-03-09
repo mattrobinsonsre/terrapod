@@ -1,0 +1,18 @@
+{{- if .Values.listener.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "terrapod.fullname" . }}-listener
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: listener
+spec:
+  {{- if .Values.listener.pdb.minAvailable }}
+  minAvailable: {{ .Values.listener.pdb.minAvailable }}
+  {{- else }}
+  maxUnavailable: {{ .Values.listener.pdb.maxUnavailable | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "terrapod.listener.selectorLabels" . | nindent 6 }}
+{{- end }}

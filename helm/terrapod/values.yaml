@@ -34,7 +34,7 @@ api:
 
   pdb:
     enabled: true
-    minAvailable: 1
+    maxUnavailable: 1
 
   # Configuration mounted as /etc/terrapod/config.yaml
   config:
@@ -243,6 +243,16 @@ web:
       cpu: 200m
       memory: 128Mi
 
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+  pdb:
+    enabled: true
+    maxUnavailable: 1
+
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -336,9 +346,14 @@ runners:
   azureWorkloadIdentity: false
 
 # ── Runner Listener ──────────────────────────────────────────────────────────
+# Multiple replicas are supported. Each pod registers as an independent
+# listener with a unique name derived from its pod hostname. All replicas
+# in a pool compete for queued runs via atomic Postgres locking.
 listener:
   enabled: true
   replicas: 1
+  # Base name for listener identity. Each pod appends its pod name,
+  # so the registered name becomes "{name}-{pod-name}".
   name: "listener"
 
   # Join token for pool registration.
@@ -367,6 +382,16 @@ listener:
     # Annotations for cloud workload identity (if listener needs
     # direct cloud access, e.g. for object storage):
     annotations: {}
+
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+  pdb:
+    enabled: true
+    maxUnavailable: 1
 
   nodeSelector: {}
   tolerations: []

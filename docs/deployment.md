@@ -154,7 +154,7 @@ helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
 | `api.autoscaling.maxReplicas` | `10` | HPA maximum replicas |
 | `api.autoscaling.targetCPUUtilizationPercentage` | `70` | HPA target CPU |
 | `api.pdb.enabled` | `true` | Enable PodDisruptionBudget |
-| `api.pdb.minAvailable` | `1` | PDB minimum available |
+| `api.pdb.maxUnavailable` | `1` | PDB max unavailable (default) |
 | `api.config.log_level` | `info` | Log level |
 | `api.serviceAccount.create` | `true` | Create ServiceAccount |
 | `api.serviceAccount.annotations` | `{}` | SA annotations (for cloud identity) |
@@ -168,6 +168,12 @@ helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
 | `web.image.repository` | `ghcr.io/mattrobinsonsre/terrapod-web` | Web Docker image |
 | `web.resources.requests.cpu` | `100m` | CPU request |
 | `web.resources.requests.memory` | `128Mi` | Memory request |
+| `web.autoscaling.enabled` | `false` | Enable HPA for web |
+| `web.autoscaling.minReplicas` | `1` | HPA minimum replicas |
+| `web.autoscaling.maxReplicas` | `5` | HPA maximum replicas |
+| `web.autoscaling.targetCPUUtilizationPercentage` | `70` | HPA CPU target |
+| `web.pdb.enabled` | `true` | Enable PodDisruptionBudget |
+| `web.pdb.maxUnavailable` | `1` | PDB max unavailable (default) |
 
 ### Storage
 
@@ -260,6 +266,12 @@ Enable encryption on your managed database and object storage services. For file
 | `listener.runnerNamespace` | `""` | Namespace for runner Jobs (defaults to release namespace) |
 | `listener.resources.requests.cpu` | `100m` | CPU request |
 | `listener.resources.requests.memory` | `256Mi` | Memory request |
+| `listener.autoscaling.enabled` | `false` | Enable HPA for listener |
+| `listener.autoscaling.minReplicas` | `1` | HPA minimum replicas |
+| `listener.autoscaling.maxReplicas` | `5` | HPA maximum replicas |
+| `listener.autoscaling.targetCPUUtilizationPercentage` | `70` | HPA CPU target |
+| `listener.pdb.enabled` | `true` | Enable PodDisruptionBudget |
+| `listener.pdb.maxUnavailable` | `1` | PDB maxUnavailable (default) |
 
 The listener joins an agent pool on startup using the join token. The pool must already exist (created by an admin via the API). To set up the listener:
 
@@ -603,13 +615,13 @@ api:
     targetCPUUtilizationPercentage: 70
 ```
 
-The PodDisruptionBudget ensures at least one replica is available during rolling updates:
+PodDisruptionBudgets are enabled by default for all Deployments (API, listener, web) with `maxUnavailable: 1`:
 
 ```yaml
 api:
   pdb:
     enabled: true
-    minAvailable: 1
+    maxUnavailable: 1
 ```
 
 ### Web UI
@@ -623,11 +635,11 @@ web:
 
 ### Runner Listener
 
-A single listener replica is typically sufficient. It polls for queued runs and creates K8s Jobs -- the heavy work happens in the Jobs themselves.
+Multiple replicas are supported for high availability. Each pod registers independently with a unique name derived from its pod hostname and competes for queued runs via atomic Postgres locking. A single replica is sufficient for small deployments.
 
 ```yaml
 listener:
-  replicas: 1
+  replicas: 2
 ```
 
 ### Runner Jobs
@@ -719,4 +731,10 @@ The chart includes these templates in `helm/terrapod/templates/`:
 | `job-migrations.yaml` | Alembic migrations (pre-install/pre-upgrade hook) |
 | `job-bootstrap.yaml` | Admin user bootstrap (post-install hook) |
 | `pvc-storage.yaml` | PVC for filesystem backend |
-| `pdb-api.yaml` | PodDisruptionBudget |
+| `pdb-api.yaml` | API PodDisruptionBudget |
+| `pdb-listener.yaml` | Listener PodDisruptionBudget |
+| `pdb-web.yaml` | Web PodDisruptionBudget |
+| `hpa-api.yaml` | API HorizontalPodAutoscaler |
+| `hpa-listener.yaml` | Listener HorizontalPodAutoscaler |
+| `hpa-web.yaml` | Web HorizontalPodAutoscaler |
+| `serviceaccount-runner.yaml` | Runner ServiceAccount |

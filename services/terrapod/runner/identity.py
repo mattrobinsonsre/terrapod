@@ -42,7 +42,9 @@ async def establish_identity() -> ListenerIdentity:
     1. Check for saved certificates from a previous join → resume if valid
     2. Otherwise join via TERRAPOD_JOIN_TOKEN → save certs for next restart
     """
-    name = os.environ.get("TERRAPOD_LISTENER_NAME", "listener")
+    base_name = os.environ.get("TERRAPOD_LISTENER_NAME", "listener")
+    pod_name = os.environ.get("POD_NAME", "")
+    name = f"{base_name}-{pod_name}" if pod_name else base_name
     api_url = os.environ.get("TERRAPOD_API_URL", "http://localhost:8000")
 
     # Try to resume from saved certificates

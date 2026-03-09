@@ -56,6 +56,8 @@ api:
 web:
   enabled: true
   replicas: 1
+  pdb:
+    enabled: false
 
   # next dev compiles on first request — startup probe gives it time
   startupProbe:
@@ -91,8 +93,11 @@ tls:
 
 # Listener join token for local dev (must match pool token created by setup-dev-pool)
 listener:
+  replicas: 2
   name: "dev-listener"
   joinToken: "dev-join-token-do-not-use-in-prod"
+  pdb:
+    enabled: false
 
 # Bootstrap admin user for local dev
 bootstrap:

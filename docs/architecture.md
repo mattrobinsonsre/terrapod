@@ -217,6 +217,8 @@ All listeners follow the same flow — there is no "local" vs "remote" distincti
 
 A listener can be deployed in the same cluster as the API or in a completely separate cluster — the join flow is identical. The Helm chart deploys a listener as a Deployment using the same Docker image as the API (`python -m terrapod.runner.listener`) with RBAC to create/watch/delete Jobs and Pods in the runner namespace.
 
+**Multiple listener replicas** are supported for high availability. Set `listener.replicas > 1` — each pod derives a unique name by appending its Kubernetes pod name to the configured base name (`{base_name}-{pod_name}`). All replicas in a pool compete for queued runs via atomic Postgres locking (`SELECT ... FOR UPDATE SKIP LOCKED`). No leader election is required — Redis heartbeats track each listener independently, and stale records from terminated pods go offline after the 180s heartbeat TTL.
+
 ![Agent Pool Detail](images/admin-agent-pool-detail.png)
 
 Pools are never auto-created. For initial deployment, the bootstrap job can optionally create a pool and join token when `TERRAPOD_BOOTSTRAP_POOL_NAME` is configured. For local development, Tilt automates this via a `setup-dev-pool` resource.

@@ -7,7 +7,9 @@ metadata:
     {{- include "terrapod.labels" . | nindent 4 }}
     app.kubernetes.io/component: web
 spec:
+  {{- if not .Values.web.autoscaling.enabled }}
   replicas: {{ .Values.web.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "terrapod.web.selectorLabels" . | nindent 6 }}

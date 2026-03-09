@@ -7,7 +7,9 @@ metadata:
     {{- include "terrapod.labels" . | nindent 4 }}
     app.kubernetes.io/component: listener
 spec:
+  {{- if not .Values.listener.autoscaling.enabled }}
   replicas: {{ .Values.listener.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "terrapod.listener.selectorLabels" . | nindent 6 }}
@@ -39,6 +41,10 @@ spec:
               value: {{ include "terrapod.runnerNamespace" . | quote }}
             - name: TERRAPOD_LISTENER_NAME
               value: {{ .Values.listener.name | default "listener" | quote }}
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: TERRAPOD_API_URL
               value: "http://{{ include "terrapod.fullname" . }}-api:8000"
             {{- if .Values.listener.existingSecret }}
