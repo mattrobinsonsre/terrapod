@@ -29,7 +29,7 @@ jobs:
       is_pr: ${{ steps.meta.outputs.is_pr }}
       version: ${{ steps.meta.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Compute metadata
         id: meta
@@ -85,7 +85,7 @@ jobs:
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: scripts/lint.sh python
 
   # ── Python Test ────────────────────────────────────────
@@ -95,7 +95,7 @@ jobs:
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: scripts/test.sh python
 
   # ── Helm Lint ──────────────────────────────────────────
@@ -105,7 +105,7 @@ jobs:
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Helm lint
         run: |
           docker run --rm -v "$PWD:/chart" -w /chart \
@@ -140,7 +140,7 @@ jobs:
           - image: terrapod-runner
             dockerfile: docker/Dockerfile.runner
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -208,7 +208,7 @@ jobs:
       contents: write
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -320,7 +320,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Delete tag and release
         env:
