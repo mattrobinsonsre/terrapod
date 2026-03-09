@@ -106,11 +106,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Helm lint
+      - name: Helm lint (default values)
         run: |
           docker run --rm -v "$PWD:/chart" -w /chart \
             alpine/helm:3.17.2 \
             lint helm/terrapod --values helm/terrapod/values.yaml
+      - name: Helm lint (local dev values)
+        run: |
+          docker run --rm -v "$PWD:/chart" -w /chart \
+            alpine/helm:3.17.2 \
+            lint helm/terrapod --values helm/terrapod/values.yaml --values helm/terrapod/values-local.yaml
 
   # ── Build Images ───────────────────────────────────────
   build-images:

@@ -1,5 +1,9 @@
 # Terrapod Helm Chart Values
 # Default configuration for production deployment
+#
+# SCHEMA CONTRACT: This file is validated against values.schema.json.
+# When adding or renaming a key here, update values.schema.json to match.
+# CI enforces this via `helm lint` (which validates against the schema).
 
 nameOverride: ""
 fullnameOverride: ""
