@@ -24,11 +24,14 @@ spec:
     - host: {{ .Values.ingress.hostname }}
       http:
         paths:
+          {{- with .Values.ingress.extraPaths }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
           # BFF: all traffic enters through the web frontend.
           # Next.js rewrites proxy /api/* and /.well-known/* to the API
           # service internally (via API_URL env var).
           - path: /
-            pathType: Prefix
+            pathType: {{ .Values.ingress.pathType | default "Prefix" }}
             backend:
               service:
                 name: {{ include "terrapod.fullname" . }}-web

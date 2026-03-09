@@ -26,11 +26,18 @@ spec:
         {{- end }}
       labels:
         {{- include "terrapod.api.selectorLabels" . | nindent 8 }}
+        {{- with .Values.api.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       serviceAccountName: {{ include "terrapod.serviceAccountName" . }}
       terminationGracePeriodSeconds: {{ .Values.api.terminationGracePeriodSeconds }}
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.extraInitContainers }}
+      initContainers:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
@@ -127,6 +134,9 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+        {{- with .Values.api.extraContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       volumes:
         - name: config
           configMap:

@@ -5,8 +5,12 @@ metadata:
   labels:
     {{- include "terrapod.labels" . | nindent 4 }}
     app.kubernetes.io/component: api
+  {{- with .Values.api.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  type: ClusterIP
+  type: {{ .Values.api.service.type | default "ClusterIP" }}
   ports:
     - port: 8000
       targetPort: http

@@ -26,12 +26,19 @@ spec:
       {{- end }}
       labels:
         {{- include "terrapod.web.selectorLabels" . | nindent 8 }}
+        {{- with .Values.web.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       serviceAccountName: {{ include "terrapod.webServiceAccountName" . }}
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: {{ .Values.web.terminationGracePeriodSeconds }}
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.web.extraInitContainers }}
+      initContainers:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
@@ -87,6 +94,9 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+        {{- with .Values.web.extraContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- with .Values.web.extraVolumes }}
       volumes:
         {{- toYaml . | nindent 8 }}
