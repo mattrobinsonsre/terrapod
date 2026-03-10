@@ -1,3 +1,4 @@
+{{- if ne .Values.api.enabled false }}
 {{- if and (eq .Values.api.config.storage.backend "filesystem") .Values.storage.filesystem.persistence.enabled }}
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -15,4 +16,5 @@ spec:
   {{- if .Values.storage.filesystem.persistence.storageClass }}
   storageClassName: {{ .Values.storage.filesystem.persistence.storageClass | quote }}
   {{- end }}
+{{- end }}
 {{- end }}

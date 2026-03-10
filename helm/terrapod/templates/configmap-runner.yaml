@@ -13,7 +13,7 @@ data:
       repository: {{ .Values.runners.image.repository | quote }}
       tag: {{ .Values.runners.image.tag | default .Chart.AppVersion | quote }}
       pull_policy: {{ .Values.runners.image.pullPolicy | quote }}
-    server_url: {{ .Values.runners.serverUrl | default (printf "http://%s-api:8000" (include "terrapod.fullname" .)) | quote }}
+    server_url: {{ .Values.runners.serverUrl | default .Values.listener.apiUrl | default (printf "http://%s-api:8000" (include "terrapod.fullname" .)) | quote }}
     service_account_name: {{ include "terrapod.runnerServiceAccountName" . | quote }}
     azure_workload_identity: {{ .Values.runners.azureWorkloadIdentity | default false }}
     ttl_seconds_after_finished: {{ .Values.runners.ttlSecondsAfterFinished }}

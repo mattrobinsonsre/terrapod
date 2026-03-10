@@ -1,3 +1,4 @@
+{{- if ne .Values.api.enabled false }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -175,3 +176,4 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+{{- end }}

@@ -1,3 +1,4 @@
+{{- if ne .Values.api.enabled false }}
 {{- if .Values.bootstrap }}
 {{- if or (and .Values.bootstrap.adminEmail .Values.bootstrap.adminPassword) .Values.bootstrap.existingSecret }}
 apiVersion: batch/v1
@@ -80,5 +81,6 @@ spec:
               memory: 512Mi
           securityContext:
             {{- toYaml .Values.api.containerSecurityContext | nindent 12 }}
+{{- end }}
 {{- end }}
 {{- end }}
