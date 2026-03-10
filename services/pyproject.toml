@@ -47,7 +47,7 @@ aiosmtplib = "^5.1.0"
 # SSE (Server-Sent Events) for real-time run status updates
 sse-starlette = "^3.3.2"
 # Prometheus metrics exposition
-prometheus-client = "^0.22"
+prometheus-client = "^0.24"
 # imghdr removed in Python 3.13; pgpy still imports it
 standard-imghdr = "^3.13"
 
