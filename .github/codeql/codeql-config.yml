@@ -13,6 +13,7 @@
 # py/weak-sensitive-data-hashing       — SHA-256 on high-entropy secrets.token_urlsafe() output, not passwords
 # py/unnecessary-lambda                — FastAPI dependency overrides need fresh mock per request
 # py/multiple-definition               — intentional re-fetch after DB mutation
+# py/empty-except                      — intentional fail-open patterns (Redis, K8s, URL parsing)
 
 query-filters:
   - exclude:
@@ -33,3 +34,5 @@ query-filters:
       id: py/unnecessary-lambda
   - exclude:
       id: py/multiple-definition
+  - exclude:
+      id: py/empty-except
