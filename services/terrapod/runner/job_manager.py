@@ -153,7 +153,7 @@ async def _check_pod_stuck(job_name: str, namespace: str) -> str | None:
                     reason = cs.state.waiting.reason or ""
                     if reason in _STUCK_POD_REASONS:
                         return reason
-    except Exception:  # codeql[py/empty-except]
+    except Exception:
         pass
 
     return None

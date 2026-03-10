@@ -157,7 +157,7 @@ class RunnerListener:
             )
             writer.write(response.encode())
             await writer.drain()
-        except Exception:  # codeql[py/empty-except]
+        except Exception:
             pass  # Don't crash on malformed probe requests
         finally:
             writer.close()
@@ -457,7 +457,7 @@ class RunnerListener:
                 # Clean up previous Job before retry
                 try:
                     await delete_job(job_name)
-                except Exception:  # codeql[py/empty-except]
+                except Exception:
                     pass
                 for _ in range(15):
                     if await get_job_status(job_name) is None:

@@ -149,7 +149,6 @@ async def _fetch_upstream_versions(hostname: str, namespace: str, type_: str) ->
     """Fetch available versions from upstream registry."""
     url = f"https://{hostname}/v1/providers/{namespace}/{type_}/versions"
     async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
-        # codeql[py/full-ssrf]
         resp = await client.get(url)
         if resp.status_code != 200:
             logger.warning(
@@ -180,7 +179,6 @@ async def _fetch_and_cache_platforms(
     async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
         # Get the list of platforms for this version
         url = f"https://{hostname}/v1/providers/{namespace}/{type_}/versions"
-        # codeql[py/full-ssrf]
         resp = await client.get(url)
         if resp.status_code != 200:
             return {"archives": {}}
@@ -273,7 +271,6 @@ async def _fetch_platform_download(
 ) -> dict | None:
     """Fetch download info for a specific platform from upstream."""
     url = f"https://{hostname}/v1/providers/{namespace}/{type_}/{version}/download/{os_}/{arch}"
-    # codeql[py/full-ssrf]
     resp = await client.get(url)
     if resp.status_code != 200:
         return None

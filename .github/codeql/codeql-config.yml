@@ -1,13 +1,18 @@
 # CodeQL configuration — suppress triaged false positives.
 #
 # All alerts below were reviewed in PR #40 and confirmed as false positives.
-# The inline suppression comment format (# codeql[rule-id]) does not work
-# for these specific rules, so we exclude them at the query level.
+# Inline suppression comments (# codeql[rule-id]) do not reliably close
+# pre-existing alerts, so we exclude queries at the config level.
 #
-# py/ineffectual-statement  — PEP 544 Protocol stubs use `...` (Ellipsis)
-# py/path-injection         — filesystem keys are HMAC-signed; traversal check is defense-in-depth
-# py/stack-trace-exposure   — verify endpoint returns fixed strings, not exception text
+# py/ineffectual-statement             — PEP 544 Protocol stubs use `...` (Ellipsis)
+# py/path-injection                    — filesystem keys are HMAC-signed; traversal check is defense-in-depth
+# py/stack-trace-exposure              — verify endpoint returns fixed strings, not exception text
 # py/clear-text-logging-sensitive-data — bootstrap prints one-time credential via print(), not logger
+# py/full-ssrf                         — provider cache: hostname validated against admin-configured allowlist
+# py/partial-ssrf                      — binary cache: base URLs are admin-configured mirror URLs
+# py/weak-sensitive-data-hashing       — SHA-256 on high-entropy secrets.token_urlsafe() output, not passwords
+# py/unnecessary-lambda                — FastAPI dependency overrides need fresh mock per request
+# py/multiple-definition               — intentional re-fetch after DB mutation
 
 query-filters:
   - exclude:
@@ -18,3 +23,13 @@ query-filters:
       id: py/stack-trace-exposure
   - exclude:
       id: py/clear-text-logging-sensitive-data
+  - exclude:
+      id: py/full-ssrf
+  - exclude:
+      id: py/partial-ssrf
+  - exclude:
+      id: py/weak-sensitive-data-hashing
+  - exclude:
+      id: py/unnecessary-lambda
+  - exclude:
+      id: py/multiple-definition

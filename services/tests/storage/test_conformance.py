@@ -162,7 +162,7 @@ async def conformance_s3_store() -> AsyncGenerator[None]:
     client = await store._get_client()
     try:
         await client.create_bucket(Bucket=bucket)
-    except Exception:  # codeql[py/empty-except]
+    except Exception:
         pass
 
     yield store  # type: ignore[misc]

@@ -39,7 +39,6 @@ def _generate_raw_token() -> str:
 
 def hash_token(raw_token: str) -> str:
     """SHA-256 hash a raw token for storage."""
-    # codeql[py/weak-sensitive-data-hashing]
     return hashlib.sha256(raw_token.encode()).hexdigest()
 
 
