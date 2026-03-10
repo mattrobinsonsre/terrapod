@@ -74,9 +74,7 @@ class FilesystemStore:
         content_type: str = "application/octet-stream",
         metadata: dict[str, str] | None = None,
     ) -> ObjectMeta:
-        # codeql[py/path-injection]
         path = self._full_path(key)
-        # codeql[py/path-injection]
         path.parent.mkdir(parents=True, exist_ok=True)
 
         async with aiofiles.open(path, "wb") as f:
@@ -87,7 +85,6 @@ class FilesystemStore:
         meta_content = content_type
         if metadata:
             meta_content += "\n" + "\n".join(f"{k}={v}" for k, v in metadata.items())
-        # codeql[py/path-injection]
         async with aiofiles.open(meta_path, "w") as f:
             await f.write(meta_content)
 
@@ -104,12 +101,10 @@ class FilesystemStore:
         )
 
     async def get(self, key: str) -> bytes:
-        # codeql[py/path-injection]
         path = self._full_path(key)
         if not path.exists():
             raise ObjectNotFoundError(key)
 
-        # codeql[py/path-injection]
         async with aiofiles.open(path, "rb") as f:
             return await f.read()
 
@@ -123,11 +118,9 @@ class FilesystemStore:
             await aiofiles.os.remove(meta_path)
 
     async def exists(self, key: str) -> bool:
-        # codeql[py/path-injection]
         return self._full_path(key).exists()
 
     async def head(self, key: str) -> ObjectMeta:
-        # codeql[py/path-injection]
         path = self._full_path(key)
         if not path.exists():
             raise ObjectNotFoundError(key)
@@ -139,7 +132,6 @@ class FilesystemStore:
         metadata: dict[str, str] = {}
         meta_path = Path(str(path) + ".meta")
         if meta_path.exists():
-            # codeql[py/path-injection]
             async with aiofiles.open(meta_path) as f:
                 lines = (await f.read()).strip().split("\n")
                 if lines:
@@ -150,7 +142,6 @@ class FilesystemStore:
                         metadata[k] = v
 
         # Compute etag from file content
-        # codeql[py/path-injection]
         async with aiofiles.open(path, "rb") as f:
             data = await f.read()
         etag = hashlib.md5(data).hexdigest()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
