@@ -126,10 +126,13 @@ jobs:
     container: python:3.14-slim
     steps:
       - uses: actions/checkout@v6
-      - name: Install tools
-        run: pip install pip-audit
+      - name: Install Poetry and export plugin
+        run: pip install poetry poetry-plugin-export
+      - name: Export requirements
+        run: poetry export -f requirements.txt -o requirements.txt --without-hashes
+        working-directory: services
       - name: Run pip-audit
-        run: pip-audit services/ --strict --desc
+        run: pip install pip-audit && pip-audit -r services/requirements.txt --strict --desc
 
   # ── Dependency Audit (npm) ────────────────────────────
   npm-audit:
