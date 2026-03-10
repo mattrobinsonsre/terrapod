@@ -76,10 +76,8 @@ async def bootstrap() -> None:
                 session.add(user)
                 logger.info("Created user: %s", admin_email)
                 if generated:
-                    logger.info(
-                        "Generated password: %s", admin_password
-                    )  # nosemgrep: python-logger-credential-disclosure
-                    logger.warning("IMPORTANT: Save this password now. It will not be shown again.")
+                    print(f"Generated password: {admin_password}")  # noqa: T201 — intentional one-time credential output
+                    print("IMPORTANT: Save this password now. It will not be shown again.")  # noqa: T201
 
             # ── Admin role ──────────────────────────────────────────
             result = await session.execute(
@@ -141,9 +139,7 @@ async def _bootstrap_pool(session: AsyncSession, pool_name: str) -> None:
     existing_token = result.scalar_one_or_none()
 
     if existing_token:
-        logger.info(
-            "Join token already exists for pool '%s', skipping", pool_name
-        )  # nosemgrep: python-logger-credential-disclosure
+        logger.info("Join token already exists for pool '%s', skipping", pool_name)
     else:
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
         token = AgentPoolToken(
@@ -153,14 +149,10 @@ async def _bootstrap_pool(session: AsyncSession, pool_name: str) -> None:
             created_by="bootstrap",
         )
         session.add(token)
-        logger.info(
-            "Created join token for pool '%s'", pool_name
-        )  # nosemgrep: python-logger-credential-disclosure
+        logger.info("Created join token for pool '%s'", pool_name)
         if token_generated:
-            logger.info(
-                "Generated join token: %s", raw_token
-            )  # nosemgrep: python-logger-credential-disclosure
-            logger.warning("IMPORTANT: Save this token now. It will not be shown again.")
+            print(f"Generated join token: {raw_token}")  # noqa: T201 — intentional one-time credential output
+            print("IMPORTANT: Save this token now. It will not be shown again.")  # noqa: T201
         else:
             logger.info("Join token created from TERRAPOD_BOOTSTRAP_POOL_TOKEN")
 
