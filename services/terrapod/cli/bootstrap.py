@@ -139,6 +139,7 @@ async def _bootstrap_pool(session: AsyncSession, pool_name: str) -> None:
     existing_token = result.scalar_one_or_none()
 
     if existing_token:
+        # nosemgrep: python-logger-credential-disclosure
         logger.info("Join token already exists for pool '%s', skipping", pool_name)
     else:
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
@@ -149,6 +150,7 @@ async def _bootstrap_pool(session: AsyncSession, pool_name: str) -> None:
             created_by="bootstrap",
         )
         session.add(token)
+        # nosemgrep: python-logger-credential-disclosure
         logger.info("Created join token for pool '%s'", pool_name)
         if token_generated:
             print(f"Generated join token: {raw_token}")  # noqa: T201 — intentional one-time credential output

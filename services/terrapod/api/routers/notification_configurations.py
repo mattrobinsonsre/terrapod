@@ -308,4 +308,12 @@ async def verify_notification_configuration(
     )
     await db.commit()
 
-    return JSONResponse(content={"data": {"type": "verification", "attributes": response}})
+    # Sanitize response — strip raw exception details from failed deliveries
+    # to avoid leaking internal stack traces to API clients.
+    # codeql[py/stack-trace-exposure]
+    safe_response = {
+        "status": response.get("status", 0),
+        "success": response.get("success", False),
+        "body": response.get("body", "") if response.get("success") else "Delivery failed",
+    }
+    return JSONResponse(content={"data": {"type": "verification", "attributes": safe_response}})

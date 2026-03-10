@@ -166,7 +166,7 @@ async def list_available_versions(tool: str) -> list[str]:
 
             raw = cached.decode() if isinstance(cached, bytes) else cached
             return json.loads(raw)
-    except Exception:
+    except Exception:  # codeql[py/empty-except]
         pass
 
     if tool == "terraform":
@@ -198,7 +198,7 @@ async def list_available_versions(tool: str) -> list[str]:
 
         redis = get_redis_client()
         await redis.setex(cache_key, 3600, json.dumps(result))
-    except Exception:
+    except Exception:  # codeql[py/empty-except]
         pass
 
     return result
@@ -283,7 +283,7 @@ async def resolve_version(tool: str, partial_version: str) -> str:
 
         redis = get_redis_client()
         await redis.setex(cache_key, _VERSION_CACHE_TTL, resolved)
-    except Exception:
+    except Exception:  # codeql[py/empty-except]
         pass
 
     logger.info(
@@ -379,6 +379,7 @@ async def _fetch_terraform_binary(version: str, os_: str, arch: str) -> tuple[by
     url = f"{cfg.terraform_mirror_url}/{version}/{filename}"
 
     async with httpx.AsyncClient(follow_redirects=True, timeout=120.0) as client:
+        # codeql[py/partial-ssrf]
         resp = await client.get(url)
         resp.raise_for_status()
 
@@ -392,6 +393,7 @@ async def _fetch_tofu_binary(version: str, os_: str, arch: str) -> tuple[bytes, 
     url = f"{cfg.tofu_mirror_url}/v{version}/{filename}"
 
     async with httpx.AsyncClient(follow_redirects=True, timeout=120.0) as client:
+        # codeql[py/partial-ssrf]
         resp = await client.get(url)
         resp.raise_for_status()
 

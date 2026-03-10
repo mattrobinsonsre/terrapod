@@ -65,7 +65,7 @@ class TestAuditLogRequiresAuth:
     async def test_no_auth_returns_401(self, *mocks):
         """GET /api/v2/admin/audit-log without auth → 401."""
         app = create_app()
-        app.dependency_overrides[get_db] = lambda: AsyncMock()
+        app.dependency_overrides[get_db] = lambda: AsyncMock()  # codeql[py/unnecessary-lambda]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get("/api/v2/admin/audit-log")

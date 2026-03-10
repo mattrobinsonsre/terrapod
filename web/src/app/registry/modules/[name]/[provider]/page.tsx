@@ -57,7 +57,7 @@ interface ModuleDetail {
 }
 
 async function buildTarGz(files: File[]): Promise<Uint8Array> {
-  const { strToU8, gzipSync } = await import('fflate')
+  const { gzipSync } = await import('fflate')
 
   // Build tar archive manually (512-byte header + file data per entry)
   const entries: Uint8Array[] = []
@@ -163,11 +163,6 @@ export default function ModuleDetailPage() {
   const [vcsBranch, setVcsBranch] = useState('')
   const [vcsTagPattern, setVcsTagPattern] = useState('v*')
   const [savingVcs, setSavingVcs] = useState(false)
-
-  // Legacy create version
-  const [showCreateVersion, setShowCreateVersion] = useState(false)
-  const [newVersion, setNewVersion] = useState('')
-  const [creating, setCreating] = useState(false)
 
   // Metadata editing (labels/owner)
   const [editingMeta, setEditingMeta] = useState(false)
@@ -333,38 +328,6 @@ export default function ModuleDetailPage() {
       setError(err instanceof Error ? err.message : 'Failed to disable VCS')
     } finally {
       setSavingVcs(false)
-    }
-  }
-
-  async function handleCreateVersion(e: React.FormEvent) {
-    e.preventDefault()
-    setCreating(true)
-    setError('')
-    try {
-      const res = await apiFetch(
-        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/versions`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/vnd.api+json' },
-          body: JSON.stringify({
-            data: {
-              type: 'registry-module-versions',
-              attributes: { version: newVersion },
-            },
-          }),
-        }
-      )
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to create version (${res.status})`)
-      }
-      setNewVersion('')
-      setShowCreateVersion(false)
-      await loadModule()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create version')
-    } finally {
-      setCreating(false)
     }
   }
 

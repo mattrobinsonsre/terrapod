@@ -223,8 +223,6 @@ function WorkspaceDetailContent() {
   const [savingVar, setSavingVar] = useState(false)
 
   // Drift detection
-  const [driftEnabled, setDriftEnabled] = useState(false)
-  const [driftInterval, setDriftInterval] = useState(86400)
   const [savingDrift, setSavingDrift] = useState(false)
   const [checkingDrift, setCheckingDrift] = useState(false)
 

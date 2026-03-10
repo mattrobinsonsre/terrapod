@@ -287,7 +287,7 @@ async def _get_listener_health(db: AsyncSession) -> dict:
             try:
                 ts = int(heartbeat_val)
                 heartbeat_ts = datetime.fromtimestamp(ts, tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-            except (ValueError, TypeError):
+            except (ValueError, TypeError):  # codeql[py/empty-except]
                 pass
 
         details.append(

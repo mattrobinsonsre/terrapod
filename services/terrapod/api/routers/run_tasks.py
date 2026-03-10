@@ -420,8 +420,8 @@ async def override_task_stage(
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
 
-    # Re-fetch with results
-    ts = await get_task_stage(db, ts_uuid)
+    # Re-fetch with results (intentional re-assignment after mutation)
+    ts = await get_task_stage(db, ts_uuid)  # codeql[py/multiple-definition]
     return JSONResponse(content={"data": _task_stage_json(ts)})
 
 

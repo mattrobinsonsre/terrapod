@@ -422,7 +422,7 @@ async def listener_heartbeat(
                 }
             ),
         )
-    except Exception:
+    except Exception:  # codeql[py/empty-except]
         pass  # Never break heartbeat for SSE
 
     return JSONResponse(content={"status": "ok"})
