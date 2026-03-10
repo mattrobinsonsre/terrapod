@@ -275,7 +275,7 @@ async def _run_trigger_consumer(shutdown: asyncio.Event) -> None:
             try:
                 await asyncio.wait_for(shutdown.wait(), timeout=1)
                 break
-            except TimeoutError:
+            except TimeoutError:  # codeql[py/empty-except]
                 pass
 
     logger.info("Trigger consumer stopped")

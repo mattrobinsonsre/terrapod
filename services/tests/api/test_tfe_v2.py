@@ -131,6 +131,7 @@ class TestAccountDetails:
         from terrapod.db.session import get_db
 
         app = create_app()
+        # codeql[py/unnecessary-lambda]
         app.dependency_overrides[get_db] = lambda: AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

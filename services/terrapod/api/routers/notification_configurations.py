@@ -308,4 +308,11 @@ async def verify_notification_configuration(
     )
     await db.commit()
 
-    return JSONResponse(content={"data": {"type": "verification", "attributes": response}})
+    # Sanitize — never expose raw exception text from failed deliveries.
+    success = bool(response.get("success"))
+    safe_response = {
+        "status": response.get("status", 0),
+        "success": success,
+        "body": "OK" if success else "Delivery failed",
+    }
+    return JSONResponse(content={"data": {"type": "verification", "attributes": safe_response}})

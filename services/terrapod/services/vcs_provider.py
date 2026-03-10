@@ -32,26 +32,32 @@ class VCSProvider(Protocol):
         self, conn: VCSConnection, owner: str, repo: str, branch: str
     ) -> str | None:
         """Get HEAD commit SHA for a branch. Returns None if not found."""
+        # codeql[py/ineffectual-statement]
         ...
 
     async def get_default_branch(self, conn: VCSConnection, owner: str, repo: str) -> str | None:
         """Get the repository's default branch name."""
+        # codeql[py/ineffectual-statement]
         ...
 
     async def download_archive(self, conn: VCSConnection, owner: str, repo: str, ref: str) -> bytes:
         """Download repository tarball at a given ref."""
+        # codeql[py/ineffectual-statement]
         ...
 
     async def list_open_prs(
         self, conn: VCSConnection, owner: str, repo: str, base_branch: str
     ) -> list[PullRequest]:
         """List open PRs/MRs targeting the given base branch."""
+        # codeql[py/ineffectual-statement]
         ...
 
     async def list_tags(self, conn: VCSConnection, owner: str, repo: str) -> list[dict[str, str]]:
         """List repository tags. Returns [{"name": str, "sha": str}]."""
+        # codeql[py/ineffectual-statement]
         ...
 
     def parse_repo_url(self, repo_url: str) -> tuple[str, str] | None:
         """Parse a repo URL into (owner/namespace, repo). Returns None if unparseable."""
+        # codeql[py/ineffectual-statement]
         ...

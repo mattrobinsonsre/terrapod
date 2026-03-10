@@ -60,12 +60,11 @@ export function useRunEvents(
           const lines = buffer.split('\n')
           buffer = lines.pop() || ''
 
-          let currentEvent = ''
           let currentData = ''
 
           for (const line of lines) {
             if (line.startsWith('event:')) {
-              currentEvent = line.slice(6).trim()
+              // Event type parsed but not needed — data payload contains all info
             } else if (line.startsWith('data:')) {
               currentData = line.slice(5).trim()
             } else if (line === '' && currentData) {
@@ -76,7 +75,6 @@ export function useRunEvents(
               } catch {
                 // Ignore malformed events
               }
-              currentEvent = ''
               currentData = ''
             }
             // Ignore comment lines (keepalives start with ':')
