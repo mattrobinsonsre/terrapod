@@ -308,12 +308,11 @@ async def verify_notification_configuration(
     )
     await db.commit()
 
-    # Sanitize response — strip raw exception details from failed deliveries
-    # to avoid leaking internal stack traces to API clients.
+    # Sanitize — never expose raw exception text from failed deliveries.
+    success = bool(response.get("success"))
     safe_response = {
         "status": response.get("status", 0),
-        "success": response.get("success", False),
-        "body": response.get("body", "") if response.get("success") else "Delivery failed",
+        "success": success,
+        "body": "OK" if success else "Delivery failed",
     }
-    # codeql[py/stack-trace-exposure]
     return JSONResponse(content={"data": {"type": "verification", "attributes": safe_response}})
