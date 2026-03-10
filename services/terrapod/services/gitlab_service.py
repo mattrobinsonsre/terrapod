@@ -253,7 +253,7 @@ def parse_repo_url(repo_url: str) -> tuple[str, str] | None:
             parts = path.rsplit("/", 1)
             if len(parts) == 2:
                 return parts[0], parts[1]
-        except ValueError:  # codeql[py/empty-except]
+        except ValueError:
             pass
         return None
 

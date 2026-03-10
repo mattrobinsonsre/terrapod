@@ -167,7 +167,7 @@ class GCSStore:
         if updated:
             try:
                 last_modified = datetime.fromisoformat(updated.replace("Z", "+00:00"))
-            except ValueError:  # codeql[py/empty-except]
+            except ValueError:
                 pass
 
         user_metadata = metadata.get("metadata", {})
@@ -203,7 +203,7 @@ class GCSStore:
             if updated:
                 try:
                     last_modified = datetime.fromisoformat(updated.replace("Z", "+00:00"))
-                except ValueError:  # codeql[py/empty-except]
+                except ValueError:
                     pass
 
             results.append(
