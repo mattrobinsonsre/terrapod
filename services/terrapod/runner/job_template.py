@@ -177,6 +177,11 @@ def build_job_spec(
                 "spec": {
                     "terminationGracePeriodSeconds": 120,
                     "restartPolicy": "Never",
+                    "automountServiceAccountToken": bool(service_account_name),
+                    "volumes": [
+                        {"name": "workspace", "emptyDir": {}},
+                        {"name": "tmp", "emptyDir": {}},
+                    ],
                     "containers": [
                         {
                             "name": "runner",
@@ -193,6 +198,19 @@ def build_job_spec(
                                     "memory": limit_memory,
                                 },
                             },
+                            "securityContext": {
+                                "runAsNonRoot": True,
+                                "runAsUser": 1000,
+                                "runAsGroup": 1000,
+                                "readOnlyRootFilesystem": True,
+                                "allowPrivilegeEscalation": False,
+                                "capabilities": {"drop": ["ALL"]},
+                                "seccompProfile": {"type": "RuntimeDefault"},
+                            },
+                            "volumeMounts": [
+                                {"name": "workspace", "mountPath": "/workspace"},
+                                {"name": "tmp", "mountPath": "/tmp"},
+                            ],
                         }
                     ],
                 },

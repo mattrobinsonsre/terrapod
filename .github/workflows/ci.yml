@@ -88,6 +88,25 @@ jobs:
       - uses: actions/checkout@v6
       - run: scripts/lint.sh python
 
+  # ── Frontend Lint ─────────────────────────────────────
+  frontend-lint:
+    name: Frontend Lint
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    container: node:24-alpine
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: npm ci
+      - name: ESLint
+        run: npm run lint
+      - name: TypeScript type-check
+        run: npm run type-check
+
   # ── Python Test ────────────────────────────────────────
   python-test:
     name: Python Test
@@ -97,6 +116,102 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: scripts/test.sh python
+
+  # ── Dependency Audit (Python) ─────────────────────────
+  python-audit:
+    name: Python Audit
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    container: python:3.14-slim
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Poetry and export plugin
+        run: pip install poetry poetry-plugin-export
+      - name: Export requirements
+        run: poetry export -f requirements.txt -o requirements.txt --without-hashes
+        working-directory: services
+      - name: Run pip-audit
+        run: pip install pip-audit && pip-audit -r services/requirements.txt --strict --desc
+
+  # ── Dependency Audit (npm) ────────────────────────────
+  npm-audit:
+    name: npm Audit
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    container: node:24-alpine
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: npm ci
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+
+  # ── Secret Scanning (gitleaks) ────────────────────────
+  secret-scan:
+    name: Secret Scan
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    container: zricethezav/gitleaks:latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run gitleaks
+        run: gitleaks detect --source . --no-git --config .gitleaks.toml
+
+  # ── CodeQL (GitHub Advanced Security) ──────────────────
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+        include:
+          - language: python
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-and-quality
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: codeql-${{ matrix.language }}
+
+  # ── Dependency Review (PR only) ───────────────────────
+  # Requires "Dependency graph" enabled in repo Settings > Code security
+  dependency-review:
+    name: Dependency Review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
 
   # ── Helm Lint ──────────────────────────────────────────
   helm-lint:
@@ -117,17 +232,48 @@ jobs:
             alpine/helm:3.17.2 \
             lint helm/terrapod --values helm/terrapod/values.yaml --values helm/terrapod/values-local.yaml
 
+  # ── SAST (Semgrep) ─────────────────────────────────────
+  sast:
+    name: SAST
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run Semgrep
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            semgrep/semgrep:1.117 \
+            semgrep scan /src \
+              --config "p/python" \
+              --config "p/owasp-top-ten" \
+              --config "p/secrets" \
+              --config "/src/pentest/semgrep/.semgrep.yml" \
+              --exclude "web/node_modules" \
+              --exclude ".next" \
+              --exclude "dist" \
+              --exclude "alembic/versions" \
+              --exclude "reports" \
+              --sarif \
+              --output "/src/semgrep-results.sarif"
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: semgrep-results.sarif
+          category: semgrep
+
   # ── Build Images ───────────────────────────────────────
   build-images:
     name: Build ${{ matrix.image }} (${{ matrix.arch }})
-    needs: [prepare, python-lint, python-test, helm-lint]
-    if: |
-      always()
-      && needs.prepare.outputs.images_exist != 'true'
-      && needs.prepare.result == 'success'
-      && (needs.python-lint.result == 'success' || needs.python-lint.result == 'skipped')
-      && (needs.python-test.result == 'success' || needs.python-test.result == 'skipped')
-      && (needs.helm-lint.result == 'success' || needs.helm-lint.result == 'skipped')
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     permissions:
       contents: read
@@ -151,7 +297,6 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        if: needs.prepare.outputs.is_pr != 'true'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -164,22 +309,83 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           platforms: linux/${{ matrix.arch }}
-          push: ${{ needs.prepare.outputs.is_pr != 'true' }}
+          push: true
           tags: ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-${{ matrix.arch }}
           cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
 
-  # ── Create Multi-Arch Manifests ────────────────────────
-  create-manifests:
-    name: Create Manifests
+  # ── Scan Images (Trivy) ────────────────────────────────
+  scan-images:
+    name: Scan ${{ matrix.image }}
     needs: [prepare, build-images]
     if: |
-      needs.build-images.result == 'success'
+      always()
+      && needs.build-images.result == 'success'
+      && needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [terrapod-api, terrapod-web, terrapod-runner]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan with Trivy
+        uses: aquasecurity/trivy-action@0.34.2
+        with:
+          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64
+          format: sarif
+          output: trivy-${{ matrix.image }}.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: pentest/trivy/.trivyignore
+          exit-code: '1'
+          limit-severities-for-sarif: true
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-${{ matrix.image }}.sarif
+          category: trivy-${{ matrix.image }}
+
+  # ── Create Multi-Arch Manifests ────────────────────────
+  create-manifests:
+    name: Manifest ${{ matrix.image }}
+    needs: [prepare, build-images, python-lint, frontend-lint, python-test, python-audit, npm-audit, secret-scan, codeql, helm-lint, sast, scan-images]
+    if: |
+      always()
+      && needs.build-images.result == 'success'
       && needs.prepare.outputs.is_pr != 'true'
+      && (needs.python-lint.result == 'success' || needs.python-lint.result == 'skipped')
+      && (needs.frontend-lint.result == 'success' || needs.frontend-lint.result == 'skipped')
+      && (needs.python-test.result == 'success' || needs.python-test.result == 'skipped')
+      && (needs.python-audit.result == 'success' || needs.python-audit.result == 'skipped')
+      && (needs.npm-audit.result == 'success' || needs.npm-audit.result == 'skipped')
+      && (needs.secret-scan.result == 'success' || needs.secret-scan.result == 'skipped')
+      && (needs.codeql.result == 'success' || needs.codeql.result == 'skipped')
+      && (needs.helm-lint.result == 'success' || needs.helm-lint.result == 'skipped')
+      && (needs.sast.result == 'success' || needs.sast.result == 'skipped')
+      && (needs.scan-images.result == 'success' || needs.scan-images.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [terrapod-api, terrapod-web, terrapod-runner]
     steps:
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -188,16 +394,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create multi-arch manifests
+      - name: Create multi-arch manifest
         run: |
           sha_short="${{ needs.prepare.outputs.sha_short }}"
-
-          for image in terrapod-api terrapod-web terrapod-runner; do
-            echo "Creating manifest for $image:sha-$sha_short"
-            docker buildx imagetools create -t "$REGISTRY/$image:sha-$sha_short" \
-              "$REGISTRY/$image:sha-${sha_short}-amd64" \
-              "$REGISTRY/$image:sha-${sha_short}-arm64"
-          done
+          echo "Creating manifest for ${{ matrix.image }}:sha-$sha_short"
+          docker buildx imagetools create -t "$REGISTRY/${{ matrix.image }}:sha-$sha_short" \
+            "$REGISTRY/${{ matrix.image }}:sha-${sha_short}-amd64" \
+            "$REGISTRY/${{ matrix.image }}:sha-${sha_short}-arm64"
 
   # ── Release ────────────────────────────────────────────
   release:
@@ -297,6 +500,18 @@ jobs:
           # Write to file to preserve newlines
           echo "$notes" > /tmp/release-notes.md
 
+      - name: Generate SBOMs
+        run: |
+          version="${{ needs.prepare.outputs.version }}"
+
+          # Install syft
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+          for image in terrapod-api terrapod-web terrapod-runner; do
+            echo "Generating SBOM for $image:$version"
+            syft "$REGISTRY/$image:$version" -o spdx-json="dist/sbom-${image}.spdx.json"
+          done
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -305,10 +520,13 @@ jobs:
           chart_version="${version#v}"
 
           # Generate checksums
-          (cd dist && sha256sum -- *.tgz > checksums.txt)
+          (cd dist && sha256sum -- *.tgz *.spdx.json > checksums.txt)
 
           gh release create "$version" \
             dist/terrapod-${chart_version}.tgz \
+            dist/sbom-terrapod-api.spdx.json \
+            dist/sbom-terrapod-web.spdx.json \
+            dist/sbom-terrapod-runner.spdx.json \
             dist/checksums.txt \
             --title "$version" \
             --notes-file /tmp/release-notes.md
@@ -316,11 +534,11 @@ jobs:
   # ── Cleanup Tag on Failure ─────────────────────────────
   cleanup-tag:
     name: Cleanup Tag
-    needs: [prepare, build-images, create-manifests, release]
+    needs: [prepare, build-images, scan-images, create-manifests, release]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
-      && (needs.build-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release.result == 'failure')
+      && (needs.build-images.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -344,9 +562,17 @@ jobs:
     needs:
       - prepare
       - python-lint
+      - frontend-lint
       - python-test
+      - python-audit
+      - npm-audit
+      - secret-scan
+      - codeql
+      - dependency-review
       - helm-lint
+      - sast
       - build-images
+      - scan-images
       - create-manifests
       - release
     runs-on: ubuntu-latest
@@ -356,9 +582,17 @@ jobs:
           results=(
             "${{ needs.prepare.result }}"
             "${{ needs.python-lint.result }}"
+            "${{ needs.frontend-lint.result }}"
             "${{ needs.python-test.result }}"
+            "${{ needs.python-audit.result }}"
+            "${{ needs.npm-audit.result }}"
+            "${{ needs.secret-scan.result }}"
+            "${{ needs.codeql.result }}"
+            "${{ needs.dependency-review.result }}"
             "${{ needs.helm-lint.result }}"
+            "${{ needs.sast.result }}"
             "${{ needs.build-images.result }}"
+            "${{ needs.scan-images.result }}"
             "${{ needs.create-manifests.result }}"
             "${{ needs.release.result }}"
           )

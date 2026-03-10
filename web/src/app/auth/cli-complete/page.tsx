@@ -14,7 +14,7 @@ function CliCompleteInner() {
   const [status, setStatus] = useState<Status>('delivering')
   const [fetchFailed, setFetchFailed] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const startRef = useRef(Date.now())
+  const startRef = useRef(0)
   const deliveredRef = useRef(false)
 
   const localhostUrl = `${redirectUri}?code=${code}&state=${state}`

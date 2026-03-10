@@ -84,7 +84,7 @@ class FilesystemStore:
             await f.write(meta_content)
 
         stat = await aiofiles.os.stat(path)
-        etag = hashlib.md5(data).hexdigest()  # noqa: S324
+        etag = hashlib.md5(data).hexdigest()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
 
         return ObjectMeta(
             key=key,
@@ -139,7 +139,7 @@ class FilesystemStore:
         # Compute etag from file content
         async with aiofiles.open(path, "rb") as f:
             data = await f.read()
-        etag = hashlib.md5(data).hexdigest()  # noqa: S324
+        etag = hashlib.md5(data).hexdigest()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
 
         return ObjectMeta(
             key=key,

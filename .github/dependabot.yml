@@ -17,6 +17,10 @@ updates:
     labels: [dependencies, web]
     commit-message:
       prefix: "deps(web):"
+    ignore:
+      # eslint-plugin-react (via eslint-config-next) doesn't support ESLint 10 yet
+      - dependency-name: eslint
+        versions: [">=10"]
 
   - package-ecosystem: docker
     directory: /docker

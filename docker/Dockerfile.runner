@@ -6,7 +6,8 @@
 FROM alpine:3.23
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
-RUN apk add --no-cache \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache \
     curl \
     tar \
     jq \

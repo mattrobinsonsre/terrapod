@@ -1,0 +1,38 @@
+{{- if and .Values.networkPolicies.enabled .Values.listener.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "terrapod.fullname" . }}-listener
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: listener
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "terrapod.name" . }}
+      app.kubernetes.io/component: listener
+  policyTypes:
+    - Egress
+  egress:
+    # API server
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ include "terrapod.name" . }}
+              app.kubernetes.io/component: api
+      ports:
+        - protocol: TCP
+          port: 8000
+    # Kubernetes API (for Job creation)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+    # DNS
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+{{- end }}

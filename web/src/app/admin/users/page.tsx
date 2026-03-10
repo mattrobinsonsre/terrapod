@@ -37,16 +37,13 @@ interface UserRecord {
   }
 }
 
+const emptyResult = { score: 0, warning: '', suggestions: [] as string[] }
+
 function usePasswordStrength(password: string) {
-  const [result, setResult] = useState<{ score: number; warning: string; suggestions: string[] }>({
-    score: 0, warning: '', suggestions: [],
-  })
+  const [result, setResult] = useState(emptyResult)
 
   useEffect(() => {
-    if (!password) {
-      setResult({ score: 0, warning: '', suggestions: [] })
-      return
-    }
+    if (!password) return
     let cancelled = false
     zxcvbnAsync(password).then((r) => {
       if (!cancelled) {
@@ -59,6 +56,8 @@ function usePasswordStrength(password: string) {
     })
     return () => { cancelled = true }
   }, [password])
+
+  if (!password) return emptyResult
 
   return result
 }

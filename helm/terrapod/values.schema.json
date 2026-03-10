@@ -250,6 +250,23 @@
           }
         }
       }
+    },
+
+    "networkPolicies": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+
+    "namespace": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "create": { "type": "boolean" },
+        "labels": { "type": "object" }
+      }
     }
   },
 
@@ -551,6 +568,16 @@
                 "use_tls": { "type": "boolean" }
               }
             }
+          }
+        },
+
+        "rate_limit": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "requests_per_minute": { "type": "integer", "minimum": 1 },
+            "auth_requests_per_minute": { "type": "integer", "minimum": 1 }
           }
         },
 

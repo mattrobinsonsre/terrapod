@@ -213,6 +213,12 @@ api:
         from_address: "notifications@terrapod.local"
         use_tls: true
 
+    # Rate limiting
+    rate_limit:
+      enabled: false
+      requests_per_minute: 100
+      auth_requests_per_minute: 10
+
     # Prometheus metrics
     metrics:
       enabled: true
@@ -624,3 +630,19 @@ storage:
       storageClass: ""
       accessModes:
         - ReadWriteOnce
+
+# ── Network Policies ────────────────────────────────────────────────────────
+# Restrict pod-to-pod and pod-to-external traffic.
+# Requires a CNI plugin that supports NetworkPolicy (Calico, Cilium, etc.).
+networkPolicies:
+  enabled: false
+
+# ── Namespace ───────────────────────────────────────────────────────────────
+# Optionally create the namespace with Pod Security Standards labels.
+# Example labels for PSS restricted profile:
+#   pod-security.kubernetes.io/enforce: restricted
+#   pod-security.kubernetes.io/audit: restricted
+#   pod-security.kubernetes.io/warn: restricted
+namespace:
+  create: false
+  labels: {}

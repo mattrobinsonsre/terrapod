@@ -1,0 +1,57 @@
+{{- if .Values.networkPolicies.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "terrapod.fullname" . }}-api
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "terrapod.name" . }}
+      app.kubernetes.io/component: api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from web frontend, listener, and runner pods
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ include "terrapod.name" . }}
+              app.kubernetes.io/component: web
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ include "terrapod.name" . }}
+              app.kubernetes.io/component: listener
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: terrapod-runner
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    # PostgreSQL
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Redis
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 6379
+    # HTTPS (VCS providers, OIDC issuers, upstream registries)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+    # DNS
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+{{- end }}

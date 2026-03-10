@@ -855,7 +855,7 @@ async def upload_state_content(
 
     # Update metadata
     sv.state_size = len(state_data)
-    sv.md5 = hashlib.md5(state_data).hexdigest()
+    sv.md5 = hashlib.md5(state_data).hexdigest()  # nosemgrep: insecure-hash-algorithm-md5
     await db.commit()
 
     logger.info("State content uploaded", sv_id=str(sv.id), size=len(state_data))

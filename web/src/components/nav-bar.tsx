@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Users, Shield, Server, Variable, HeartPulse, FileText, BookOpen, Code, LogOut, Menu, X } from 'lucide-react'
@@ -36,9 +36,7 @@ function NavLink({
 
 export default function NavBar() {
   const router = useRouter()
-  const [admin, setAdmin] = useState(false)
-  const [adminOrAudit, setAdminOrAudit] = useState(false)
-  useEffect(() => { setAdmin(isAdmin()); setAdminOrAudit(isAdminOrAudit()) }, [])
+  const [roles] = useState(() => ({ admin: isAdmin(), adminOrAudit: isAdminOrAudit() }))
   const [menuOpen, setMenuOpen] = useState(false)
 
   const handleLogout = () => {
@@ -70,7 +68,7 @@ export default function NavBar() {
         <Activity size={16} />
         Sessions
       </NavLink>
-      {admin && (
+      {roles.admin && (
         <>
           <NavLink href="/admin/binary-cache" onClick={closeMenu}>
             <HardDrive size={16} />
@@ -102,7 +100,7 @@ export default function NavBar() {
           </NavLink>
         </>
       )}
-      {adminOrAudit && (
+      {roles.adminOrAudit && (
         <NavLink href="/admin/audit-log" onClick={closeMenu}>
           <FileText size={16} />
           Audit Log

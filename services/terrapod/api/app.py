@@ -264,6 +264,16 @@ def create_application() -> FastAPI:
     async def custom_redoc() -> HTMLResponse:
         return HTMLResponse(_REDOC_HTML)
 
+    # Rate limiting middleware (before metrics so 429 responses are counted)
+    if settings.rate_limit.enabled:
+        from terrapod.api.rate_limit import RateLimitMiddleware
+
+        app.add_middleware(
+            RateLimitMiddleware,
+            requests_per_minute=settings.rate_limit.requests_per_minute,
+            auth_requests_per_minute=settings.rate_limit.auth_requests_per_minute,
+        )
+
     # Prometheus metrics middleware + endpoint
     if settings.metrics.enabled:
         from terrapod.api.metrics import metrics_endpoint, metrics_middleware
