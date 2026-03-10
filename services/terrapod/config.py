@@ -438,6 +438,21 @@ class CORSConfig(BaseModel):
     )
 
 
+# --- Rate Limiting Configuration ---
+
+
+class RateLimitConfig(BaseModel):
+    """API rate limiting configuration."""
+
+    enabled: bool = Field(default=False, description="Enable rate limiting")
+    requests_per_minute: int = Field(
+        default=100, description="Max requests per minute for general API endpoints"
+    )
+    auth_requests_per_minute: int = Field(
+        default=10, description="Max requests per minute for auth endpoints"
+    )
+
+
 # --- Metrics Configuration ---
 
 
@@ -507,6 +522,9 @@ class Settings(BaseSettings):
 
     # CORS
     cors: CORSConfig = Field(default_factory=CORSConfig)
+
+    # Rate Limiting
+    rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
 
     # Metrics
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)

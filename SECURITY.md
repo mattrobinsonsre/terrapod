@@ -11,10 +11,20 @@ We recommend always running the latest release.
 
 ## Reporting a Vulnerability
 
-To report a security vulnerability, please
-[open a GitHub issue](https://github.com/mattrobinsonsre/terrapod/issues/new).
-Include a description of the vulnerability, steps to reproduce, and affected
-versions if known.
+**Do not open a public issue for security vulnerabilities.**
+
+To report a security vulnerability, please use GitHub's private vulnerability
+reporting:
+
+1. Go to the [Security Advisories page](https://github.com/mattrobinsonsre/terrapod/security/advisories/new)
+2. Click **"Report a vulnerability"**
+3. Fill in the description, steps to reproduce, and affected versions
+
+This ensures the vulnerability is disclosed privately to maintainers and can be
+fixed before public disclosure. You will receive updates on the advisory as it
+is triaged and resolved.
+
+If you are unable to use GitHub's reporting, email the maintainer directly.
 
 ## Security Design
 
@@ -71,11 +81,19 @@ make pentest          # All three layers
 
 ## Security-Related Configuration
 
-See [Deployment Guide](docs/deployment.md) for production hardening, including:
+See the [Security Hardening Guide](docs/security-hardening.md) for production
+hardening, including:
 
-- TLS configuration
-- Encryption at rest (database and object storage)
-- SSO provider setup (OIDC / SAML)
-- Network policies
-- Audit log retention
-- RBAC role configuration
+- TLS configuration (database, Redis, ingress)
+- Authentication hardening (disable local auth, token TTL, SSO enforcement)
+- Secrets management (Kubernetes Secrets, External Secrets Operator)
+- Network policies (pod-to-pod traffic restriction)
+- Pod Security Standards (namespace-level enforcement)
+- Rate limiting (API and auth endpoint protection)
+- Audit log retention and SIEM export
+- Database and object storage hardening
+- Runner isolation (dedicated nodes, security contexts)
+- Backup strategy
+
+See also the [Deployment Guide](docs/deployment.md) for general production
+deployment guidance.

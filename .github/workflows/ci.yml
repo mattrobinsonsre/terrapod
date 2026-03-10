@@ -127,12 +127,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install tools
-        run: pip install pip-audit poetry
-      - name: Export requirements
-        run: poetry export -f requirements.txt -o requirements.txt --without-hashes
-        working-directory: services
+        run: pip install pip-audit
       - name: Run pip-audit
-        run: pip-audit -r services/requirements.txt --strict --desc
+        run: pip-audit services/ --strict --desc
 
   # ── Dependency Audit (npm) ────────────────────────────
   npm-audit:
@@ -197,6 +194,7 @@ jobs:
           category: codeql-${{ matrix.language }}
 
   # ── Dependency Review (PR only) ───────────────────────
+  # Requires "Dependency graph" enabled in repo Settings > Code security
   dependency-review:
     name: Dependency Review
     if: github.event_name == 'pull_request'
@@ -362,7 +360,7 @@ jobs:
   # ── Create Multi-Arch Manifests ────────────────────────
   create-manifests:
     name: Manifest ${{ matrix.image }}
-    needs: [prepare, build-images, python-lint, frontend-lint, python-test, python-audit, npm-audit, secret-scan, codeql, dependency-review, helm-lint, sast, scan-images]
+    needs: [prepare, build-images, python-lint, frontend-lint, python-test, python-audit, npm-audit, secret-scan, codeql, helm-lint, sast, scan-images]
     if: |
       always()
       && needs.build-images.result == 'success'
@@ -374,7 +372,6 @@ jobs:
       && (needs.npm-audit.result == 'success' || needs.npm-audit.result == 'skipped')
       && (needs.secret-scan.result == 'success' || needs.secret-scan.result == 'skipped')
       && (needs.codeql.result == 'success' || needs.codeql.result == 'skipped')
-      && (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped')
       && (needs.helm-lint.result == 'success' || needs.helm-lint.result == 'skipped')
       && (needs.sast.result == 'success' || needs.sast.result == 'skipped')
       && (needs.scan-images.result == 'success' || needs.scan-images.result == 'skipped')
