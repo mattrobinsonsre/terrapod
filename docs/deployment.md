@@ -14,6 +14,49 @@ Terrapod is deployed exclusively via Helm chart on Kubernetes. This guide covers
 - TLS certificate for the ingress hostname
 - DNS record pointing to the ingress
 
+### Don't Have Kubernetes?
+
+Terrapod requires Kubernetes because the runner infrastructure uses the Jobs API to schedule ephemeral plan/apply executions. However, you don't need a managed cloud cluster — [k3s](https://k3s.io/) runs a fully conformant Kubernetes distribution on a single VM with minimal overhead (~512MB RAM).
+
+**What works identically on k3s:**
+
+- All Terrapod features (workspaces, runs, state management, registry, VCS integration, RBAC, SSO, drift detection, notifications, run tasks)
+- Runner Job scheduling and execution
+- Helm chart installation (k3s includes Traefik ingress and local-path storage by default)
+- Multi-replica API and listener deployments (on the same node)
+- Filesystem storage backend with PVC
+
+**What you lose without a managed cloud cluster:**
+
+- **Horizontal Pod Autoscaling** — no additional nodes to scale onto (but you can still run multiple replicas within a single node's capacity)
+- **Spot/preemptible instances** — single VM, no cost optimization via instance lifecycle
+- **Multi-AZ redundancy** — single failure domain (mitigate with VM-level backups)
+- **Cloud workload identity** — IRSA (AWS), Workload Identity Federation (GCP), and Azure Workload Identity require managed Kubernetes. Use static credentials or run cloud CLIs with environment variables instead
+
+**Quick start (Ubuntu/Debian VM):**
+
+```zsh
+# Install k3s (single-node cluster)
+curl -sfL https://get.k3s.io | sh -
+
+# Verify
+sudo k3s kubectl get nodes
+
+# Install Helm
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+# Set kubeconfig
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+# Install Terrapod (filesystem storage, local PostgreSQL + Redis)
+helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
+  --namespace terrapod \
+  --create-namespace \
+  -f values-production.yaml
+```
+
+For production use on k3s, run PostgreSQL and Redis as external services (managed or on a separate VM) rather than in-cluster, so database state survives cluster recreation.
+
 ---
 
 ## Helm Chart Installation
