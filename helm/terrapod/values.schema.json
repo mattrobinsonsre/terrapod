@@ -24,6 +24,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "enabled": { "type": "boolean" },
         "replicas": { "type": "integer", "minimum": 1 },
         "image": { "$ref": "#/$defs/imageSpec" },
         "command": { "type": "array", "items": { "type": "string" } },
@@ -133,6 +134,7 @@
         "replicas": { "type": "integer", "minimum": 1 },
         "name": { "type": "string" },
         "healthPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "apiUrl": { "type": "string" },
         "joinToken": { "type": "string" },
         "existingSecret": { "type": "string" },
         "joinTokenKey": { "type": "string" },

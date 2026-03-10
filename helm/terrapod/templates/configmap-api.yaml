@@ -1,3 +1,4 @@
+{{- if ne .Values.api.enabled false }}
 {{- include "terrapod.validateStorageConfig" . -}}
 apiVersion: v1
 kind: ConfigMap
@@ -195,3 +196,4 @@ data:
         - {{ . | quote }}
         {{- end }}
     {{- end }}
+{{- end }}

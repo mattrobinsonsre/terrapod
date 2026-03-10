@@ -18,6 +18,11 @@ global:
 
 # ── API Server (Python/FastAPI) ───────────────────────────────────────────────
 api:
+  # Set to false for agent-only deployments (listener + runners in a remote
+  # cluster, API running elsewhere). When false, the API Deployment, Service,
+  # ConfigMap, ServiceAccount, and storage PVC are not rendered.
+  enabled: true
+
   # Filesystem storage (default) only supports a single replica.
   # For multi-replica HA, configure a cloud storage backend (s3, azure, gcs).
   replicas: 1
@@ -481,6 +486,13 @@ listener:
   name: "listener"
   # Port for /health and /ready HTTP probe endpoints
   healthPort: 8081
+
+  # API URL for the listener to connect to. Leave empty when the API runs in
+  # the same release (auto-detected as http://<release>-api:8000).
+  # Set for agent-only deployments where the API is in a different cluster:
+  #   apiUrl: "https://terrapod.example.com"
+  # Also used as the default for runners.serverUrl when that value is empty.
+  apiUrl: ""
 
   # Join token for pool registration.
   # Either set joinToken directly or reference an existing K8s Secret (recommended).

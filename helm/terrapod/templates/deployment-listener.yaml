@@ -65,7 +65,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: TERRAPOD_API_URL
-              value: "http://{{ include "terrapod.fullname" . }}-api:8000"
+              value: {{ .Values.listener.apiUrl | default (printf "http://%s-api:8000" (include "terrapod.fullname" .)) | quote }}
             {{- if .Values.listener.existingSecret }}
             - name: TERRAPOD_JOIN_TOKEN
               valueFrom:

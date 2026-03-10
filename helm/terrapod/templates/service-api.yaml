@@ -1,3 +1,4 @@
+{{- if ne .Values.api.enabled false }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -18,3 +19,4 @@ spec:
       name: http
   selector:
     {{- include "terrapod.api.selectorLabels" . | nindent 4 }}
+{{- end }}
