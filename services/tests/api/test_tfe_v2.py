@@ -131,7 +131,8 @@ class TestAccountDetails:
         from terrapod.db.session import get_db
 
         app = create_app()
-        app.dependency_overrides[get_db] = lambda: AsyncMock()  # codeql[py/unnecessary-lambda]
+        # codeql[py/unnecessary-lambda]
+        app.dependency_overrides[get_db] = lambda: AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/api/v2/account/details")

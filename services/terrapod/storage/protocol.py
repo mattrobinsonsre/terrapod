@@ -85,7 +85,8 @@ class ObjectStore(Protocol):
         Returns:
             Metadata of the stored object.
         """
-        ...  # codeql[py/ineffectual-statement]
+        # codeql[py/ineffectual-statement]
+        ...
 
     async def get(self, key: str) -> bytes:
         """Retrieve an object's content.
@@ -99,7 +100,8 @@ class ObjectStore(Protocol):
         Raises:
             ObjectNotFoundError: If the object does not exist.
         """
-        ...  # codeql[py/ineffectual-statement]
+        # codeql[py/ineffectual-statement]
+        ...
 
     async def delete(self, key: str) -> None:
         """Delete an object.
@@ -109,7 +111,8 @@ class ObjectStore(Protocol):
         Args:
             key: Object key.
         """
-        ...  # codeql[py/ineffectual-statement]
+        # codeql[py/ineffectual-statement]
+        ...
 
     async def exists(self, key: str) -> bool:
         """Check if an object exists.
@@ -120,7 +123,8 @@ class ObjectStore(Protocol):
         Returns:
             True if the object exists.
         """
-        ...  # codeql[py/ineffectual-statement]
+        # codeql[py/ineffectual-statement]
+        ...
 
     async def head(self, key: str) -> ObjectMeta:
         """Get object metadata without downloading the content.
@@ -134,7 +138,8 @@ class ObjectStore(Protocol):
         Raises:
             ObjectNotFoundError: If the object does not exist.
         """
-        ...  # codeql[py/ineffectual-statement]
+        # codeql[py/ineffectual-statement]
+        ...
 
     async def list_prefix(self, prefix: str) -> list[ObjectMeta]:
         """List objects matching a key prefix.
@@ -145,7 +150,8 @@ class ObjectStore(Protocol):
         Returns:
             List of object metadata entries matching the prefix.
         """
-        ...  # codeql[py/ineffectual-statement]
+        # codeql[py/ineffectual-statement]
+        ...
 
     async def presigned_get_url(
         self,
@@ -161,7 +167,8 @@ class ObjectStore(Protocol):
         Returns:
             Presigned URL with expiry and any required headers.
         """
-        ...  # codeql[py/ineffectual-statement]
+        # codeql[py/ineffectual-statement]
+        ...
 
     async def presigned_put_url(
         self,
@@ -179,8 +186,10 @@ class ObjectStore(Protocol):
         Returns:
             Presigned URL with expiry and any required headers.
         """
-        ...  # codeql[py/ineffectual-statement]
+        # codeql[py/ineffectual-statement]
+        ...
 
     async def close(self) -> None:
         """Release any resources held by the backend."""
-        ...  # codeql[py/ineffectual-statement]
+        # codeql[py/ineffectual-statement]
+        ...
