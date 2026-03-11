@@ -24,7 +24,7 @@ type vcsConnectionDataSource struct {
 type vcsConnectionDataSourceModel struct {
 	ID                    types.String `tfsdk:"id"`
 	Name                  types.String `tfsdk:"name"`
-	Provider              types.String `tfsdk:"provider"`
+	Provider              types.String `tfsdk:"vcs_provider"`
 	ServerURL             types.String `tfsdk:"server_url"`
 	Status                types.String `tfsdk:"status"`
 	HasToken              types.Bool   `tfsdk:"has_token"`
@@ -50,7 +50,7 @@ func (d *vcsConnectionDataSource) Schema(_ context.Context, _ datasource.SchemaR
 		Attributes: map[string]schema.Attribute{
 			"id":                      schema.StringAttribute{Computed: true, Description: "VCS connection ID."},
 			"name":                    schema.StringAttribute{Required: true, Description: "Connection name."},
-			"provider":                schema.StringAttribute{Computed: true, Description: "VCS provider (github/gitlab)."},
+			"vcs_provider":            schema.StringAttribute{Computed: true, Description: "VCS provider (github/gitlab)."},
 			"server_url":              schema.StringAttribute{Computed: true, Description: "Server URL."},
 			"status":                  schema.StringAttribute{Computed: true, Description: "Connection status."},
 			"has_token":               schema.BoolAttribute{Computed: true, Description: "Whether a token is configured."},

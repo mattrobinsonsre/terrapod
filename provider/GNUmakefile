@@ -1,8 +1,8 @@
 BINARY    = terraform-provider-terrapod
-HOSTNAME  = registry.terraform.io
-NAMESPACE = mattrobinsonsre
+HOSTNAME  = terrapod.local
+NAMESPACE = default
 TYPE      = terrapod
-VERSION  ?= 0.0.1-dev
+VERSION  ?= 0.0.1
 OS_ARCH  ?= $(shell go env GOOS)_$(shell go env GOARCH)
 
 default: build

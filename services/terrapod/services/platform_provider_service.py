@@ -20,6 +20,8 @@ API ↔ Provider Contract:
 """
 
 import hashlib
+from functools import lru_cache
+from pathlib import Path
 
 import httpx
 
@@ -34,12 +36,42 @@ from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
 
-GITHUB_RELEASE_BASE = (
-    "https://github.com/mattrobinsonsre/terrapod/releases/download"
-)
+GITHUB_RELEASE_BASE = "https://github.com/mattrobinsonsre/terrapod/releases/download"
 
 VALID_OS = {"linux", "darwin"}
 VALID_ARCH = {"amd64", "arm64"}
+
+# Baked into the image at /etc/terrapod/signing-key.asc
+_SIGNING_KEY_PATH = Path("/app/signing-key.asc")
+
+
+@lru_cache(maxsize=1)
+def _load_signing_key() -> list[dict]:
+    """Load the provider signing public key from disk (cached)."""
+    if not _SIGNING_KEY_PATH.exists():
+        logger.warning("Provider signing key not found at %s", _SIGNING_KEY_PATH)
+        return []
+    ascii_armor = _SIGNING_KEY_PATH.read_text().strip()
+    if not ascii_armor:
+        return []
+    # Extract key_id: last 16 hex chars of the fingerprint.
+    # For simplicity, use pgpy if available, otherwise return without key_id.
+    key_id = ""
+    try:
+        import pgpy
+
+        key, _ = pgpy.PGPKey.from_blob(ascii_armor)
+        key_id = str(key.fingerprint)[-16:].upper()
+    except Exception:
+        pass
+    return [
+        {
+            "ascii_armor": ascii_armor,
+            "key_id": key_id,
+            "source": "terrapod",
+            "source_url": "https://github.com/mattrobinsonsre/terrapod",
+        }
+    ]
 
 
 def _release_url(version: str, filename: str) -> str:
@@ -52,7 +84,7 @@ def get_platform_version() -> str:
 
     Falls back to '0.0.0-dev' if the version is not set in config.
     """
-    version = getattr(settings, "version", None) or "0.0.0-dev"
+    version = getattr(settings, "version", None) or "0.0.1"
     return version.lstrip("v")
 
 
@@ -141,12 +173,10 @@ async def get_download_info(
         "filename": filename,
         "download_url": presigned.url,
         "shasums_url": (await storage.presigned_get_url(shasums_key)).url,
-        "shasums_signature_url": (
-            await storage.presigned_get_url(shasums_sig_key)
-        ).url,
+        "shasums_signature_url": (await storage.presigned_get_url(shasums_sig_key)).url,
         "shasum": shasum,
         "signing_keys": {
-            "gpg_public_keys": [],
+            "gpg_public_keys": _load_signing_key(),
         },
     }
 
@@ -162,9 +192,7 @@ async def _fetch_and_cache_binary(
     async with httpx.AsyncClient(follow_redirects=True, timeout=120.0) as http:
         resp = await http.get(url)
         if resp.status_code != 200:
-            raise RuntimeError(
-                f"Failed to fetch {url}: HTTP {resp.status_code}"
-            )
+            raise RuntimeError(f"Failed to fetch {url}: HTTP {resp.status_code}")
         data = resp.content
 
     sha256 = hashlib.sha256(data).hexdigest()
@@ -219,9 +247,7 @@ async def _fetch_and_cache_shasums_sig(
             # Create empty so we don't retry
             await storage.put(key, b"", content_type="application/octet-stream")
             return
-        await storage.put(
-            key, resp.content, content_type="application/octet-stream"
-        )
+        await storage.put(key, resp.content, content_type="application/octet-stream")
 
 
 async def _get_shasum_for_file(

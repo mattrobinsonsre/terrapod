@@ -60,7 +60,7 @@ type vcsConnectionModel struct {
 
 	// Writable attributes (all force replacement — resource is immutable)
 	Name                 types.String `tfsdk:"name"`
-	Provider             types.String `tfsdk:"provider"`
+	Provider             types.String `tfsdk:"vcs_provider"`
 	ServerURL            types.String `tfsdk:"server_url"`
 	GithubAppID          types.Int64  `tfsdk:"github_app_id"`
 	GithubInstallationID types.Int64  `tfsdk:"github_installation_id"`
@@ -107,7 +107,7 @@ func (r *vcsConnectionResource) Schema(_ context.Context, _ resource.SchemaReque
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"provider": schema.StringAttribute{
+			"vcs_provider": schema.StringAttribute{
 				Description: `The VCS provider type: "github" or "gitlab". Changing this forces a new resource.`,
 				Required:    true,
 				PlanModifiers: []planmodifier.String{

@@ -95,7 +95,9 @@ def binary_cache_key(tool: str, version: str, os_: str, arch: str) -> str:
 
 def platform_provider_binary_key(version: str, os_: str, arch: str) -> str:
     """Key for a cached Terrapod platform provider binary."""
-    return f"cache/provider/terrapod/{version}/terraform-provider-terrapod_{version}_{os_}_{arch}.zip"
+    return (
+        f"cache/provider/terrapod/{version}/terraform-provider-terrapod_{version}_{os_}_{arch}.zip"
+    )
 
 
 def platform_provider_shasums_key(version: str) -> str:

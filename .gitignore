@@ -59,6 +59,14 @@ htmlcov/
 # Pen test reports
 reports/
 
+# Secrets / private keys — NEVER commit
+*.priv.asc
+*.priv.pem
+*.private-key.pem
+
+# Provider build artifacts
+provider/terraform-provider-terrapod
+
 # Terraform (local dev testing)
 .terraform/
 *.tfstate

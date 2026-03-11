@@ -52,6 +52,9 @@ COPY services/terrapod ./terrapod
 COPY alembic.ini ./alembic.ini
 COPY alembic ./alembic
 
+# Copy provider signing public key
+COPY provider/signing-key.asc /app/signing-key.asc
+
 # Create non-root user and data directories
 RUN useradd --create-home --shell /bin/bash terrapod \
     && mkdir -p /var/lib/terrapod/storage \

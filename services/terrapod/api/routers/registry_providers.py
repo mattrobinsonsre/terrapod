@@ -37,6 +37,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services.platform_provider_service import (
+    get_download_info as platform_get_download_info,
+)
+from terrapod.services.platform_provider_service import (
+    get_version_list as platform_get_version_list,
+)
 from terrapod.services.registry_provider_service import (
     create_provider,
     create_provider_platform,
@@ -51,10 +57,6 @@ from terrapod.services.registry_provider_service import (
     list_provider_versions,
     list_providers,
     upload_provider_binary,
-)
-from terrapod.services.platform_provider_service import (
-    get_download_info as platform_get_download_info,
-    get_version_list as platform_get_version_list,
 )
 from terrapod.services.registry_rbac_service import (
     REGISTRY_PERMISSION_HIERARCHY,
@@ -259,9 +261,9 @@ async def download_provider_cli(
             info = await platform_get_download_info(storage, version, os, arch)
             return JSONResponse(content=info)
         except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e))
+            raise HTTPException(status_code=404, detail=str(e)) from e
         except RuntimeError as e:
-            raise HTTPException(status_code=502, detail=str(e))
+            raise HTTPException(status_code=502, detail=str(e)) from e
 
     provider = await get_provider(db, namespace, name)
     if provider is not None:
