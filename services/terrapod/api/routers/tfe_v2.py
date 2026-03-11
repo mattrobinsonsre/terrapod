@@ -261,6 +261,7 @@ def _workspace_json(ws: Workspace, effective_permission: str | None = None) -> d
                 "vcs-repo-url": ws.vcs_repo_url,
                 "vcs-branch": ws.vcs_branch,
                 "vcs-working-directory": ws.vcs_working_directory,
+                "var-files": ws.var_files or [],
                 "drift-detection-enabled": ws.drift_detection_enabled,
                 "drift-detection-interval-seconds": ws.drift_detection_interval_seconds,
                 "drift-last-checked-at": _rfc3339(ws.drift_last_checked_at),
@@ -406,6 +407,7 @@ async def create_workspace(
         vcs_repo_url=attrs.get("vcs-repo-url", ""),
         vcs_branch=attrs.get("vcs-branch", ""),
         vcs_working_directory=attrs.get("vcs-working-directory", ""),
+        var_files=attrs.get("var-files", []),
         drift_detection_enabled=attrs.get("drift-detection-enabled", False),
         drift_detection_interval_seconds=_clamp_drift_interval(
             attrs.get("drift-detection-interval-seconds", 86400)
@@ -587,6 +589,8 @@ async def update_workspace(
         ws.vcs_branch = attrs["vcs-branch"]
     if "vcs-working-directory" in attrs:
         ws.vcs_working_directory = attrs["vcs-working-directory"]
+    if "var-files" in attrs:
+        ws.var_files = attrs["var-files"]
     if "agent-pool-id" in attrs:
         import uuid as _uuid
 

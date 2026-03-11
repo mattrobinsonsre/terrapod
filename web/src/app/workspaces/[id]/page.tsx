@@ -42,6 +42,7 @@ interface WorkspaceAttrs {
   'agent-pool-name': string | null
   labels: Record<string, string>
   'owner-email': string
+  'var-files': string[]
   'drift-detection-enabled': boolean
   'drift-detection-interval-seconds': number
   'drift-last-checked-at': string
@@ -183,6 +184,8 @@ function WorkspaceDetailContent() {
   const [editPoolId, setEditPoolId] = useState<string | null>(null)
   const [editLabels, setEditLabels] = useState<Record<string, string>>({})
   const [editOwner, setEditOwner] = useState('')
+  const [editVarFiles, setEditVarFiles] = useState<string[]>([])
+  const [newVarFile, setNewVarFile] = useState('')
   const [saving, setSaving] = useState(false)
 
   // Agent pools
@@ -479,6 +482,8 @@ function WorkspaceDetailContent() {
     setEditPoolId(workspace.attributes['agent-pool-id'])
     setEditLabels(workspace.attributes.labels || {})
     setEditOwner(workspace.attributes['owner-email'] || '')
+    setEditVarFiles(workspace.attributes['var-files'] || [])
+    setNewVarFile('')
     setEditing(true)
     if (!poolsLoaded) {
       apiFetch('/api/v2/organizations/default/agent-pools').then(res => res.ok ? res.json() : { data: [] }).then(data => {
@@ -517,6 +522,7 @@ function WorkspaceDetailContent() {
               'execution-backend': editBackend,
               'terraform-version': editVersion,
               'agent-pool-id': editPoolId,
+              'var-files': editVarFiles,
               labels: editLabels,
               ...(isAdmin() ? { 'owner-email': editOwner } : {}),
               ...(force ? { force: true } : {}),
@@ -1088,6 +1094,59 @@ function WorkspaceDetailContent() {
                   ) : (
                     <dd className="mt-1">
                       <LabelsEditor labels={attrs.labels || {}} readOnly />
+                    </dd>
+                  )}
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-slate-500 mb-1">Var Files</dt>
+                  {editing && perms['can-update'] ? (
+                    <div className="space-y-2">
+                      {editVarFiles.map((f, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <code className="text-sm text-slate-200 bg-slate-700 px-2 py-0.5 rounded flex-1 truncate">{f}</code>
+                          <button
+                            onClick={() => setEditVarFiles(editVarFiles.filter((_, j) => j !== i))}
+                            className="text-xs text-red-400 hover:text-red-300"
+                          >Remove</button>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={newVarFile}
+                          onChange={(e) => setNewVarFile(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newVarFile.trim()) {
+                              e.preventDefault()
+                              setEditVarFiles([...editVarFiles, newVarFile.trim()])
+                              setNewVarFile('')
+                            }
+                          }}
+                          placeholder="e.g. envs/dev.tfvars"
+                          className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
+                        <button
+                          onClick={() => {
+                            if (newVarFile.trim()) {
+                              setEditVarFiles([...editVarFiles, newVarFile.trim()])
+                              setNewVarFile('')
+                            }
+                          }}
+                          className="text-xs text-brand-400 hover:text-brand-300"
+                        >Add</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">
+                      {(attrs['var-files'] || []).length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {attrs['var-files'].map((f, i) => (
+                            <code key={i} className="bg-slate-700 px-2 py-0.5 rounded text-xs">{f}</code>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-500">None</span>
+                      )}
                     </dd>
                   )}
                 </div>

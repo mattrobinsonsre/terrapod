@@ -99,6 +99,13 @@ fi
 echo "[entrypoint] Running $TP_BACKEND init..."
 "$TP_BIN" init -input=false 2>&1
 
+# --- Build -var-file arguments from TP_VAR_FILES JSON ---
+VAR_FILE_ARGS=""
+if [ -n "$TP_VAR_FILES" ] && [ "$TP_VAR_FILES" != "[]" ]; then
+    VAR_FILE_ARGS=$(echo "$TP_VAR_FILES" | jq -r '.[] | "-var-file=" + .')
+    echo "[entrypoint] Using var files: $TP_VAR_FILES"
+fi
+
 # --- Execute phase ---
 EXIT_CODE=0
 
@@ -111,7 +118,7 @@ if [ "$TP_PHASE" = "plan" ]; then
     if [ "${TP_PLAN_ONLY:-false}" != "true" ]; then
         PLAN_ARGS="$PLAN_ARGS -out=tfplan"
     fi
-    "$TP_BIN" plan $PLAN_ARGS > /tmp/plan.log 2>&1 &
+    "$TP_BIN" plan $PLAN_ARGS $VAR_FILE_ARGS > /tmp/plan.log 2>&1 &
     CHILD_PID=$!
     wait "$CHILD_PID" || EXIT_CODE=$?
     CHILD_PID=""
@@ -146,9 +153,10 @@ elif [ "$TP_PHASE" = "apply" ]; then
 
     echo "[entrypoint] Running $TP_BACKEND apply..."
     if [ -f tfplan ]; then
+        # Plan file already includes var-file inputs — no need to re-specify
         "$TP_BIN" apply -input=false tfplan > /tmp/apply.log 2>&1 &
     else
-        "$TP_BIN" apply -input=false -auto-approve > /tmp/apply.log 2>&1 &
+        "$TP_BIN" apply -input=false -auto-approve $VAR_FILE_ARGS > /tmp/apply.log 2>&1 &
     fi
     CHILD_PID=$!
     wait "$CHILD_PID" || EXIT_CODE=$?

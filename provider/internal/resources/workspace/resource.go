@@ -115,6 +115,11 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description: "Agent pool ID for agent execution mode.",
 				Optional:    true,
 			},
+			"var_files": schema.ListAttribute{
+				Description: "List of .tfvars file paths passed as -var-file arguments to plan/apply.",
+				Optional:    true,
+				ElementType: types.StringType,
+			},
 			"drift_detection_enabled": schema.BoolAttribute{
 				Description: "Enable drift detection for this workspace.",
 				Optional:    true,
@@ -342,6 +347,13 @@ func buildWorkspaceAttrs(m *workspaceModel) map[string]any {
 	if !m.AgentPoolID.IsNull() {
 		attrs["agent-pool-id"] = m.AgentPoolID.ValueString()
 	}
+	if !m.VarFiles.IsNull() && !m.VarFiles.IsUnknown() {
+		varFiles := []string{}
+		for _, v := range m.VarFiles.Elements() {
+			varFiles = append(varFiles, v.(types.String).ValueString())
+		}
+		attrs["var-files"] = varFiles
+	}
 	if !m.DriftDetectionEnabled.IsNull() && !m.DriftDetectionEnabled.IsUnknown() {
 		attrs["drift-detection-enabled"] = m.DriftDetectionEnabled.ValueBool()
 	}
@@ -435,6 +447,15 @@ func readResourceIntoModel(ctx context.Context, res *client.Resource, m *workspa
 		m.DriftLastCheckedAt = types.StringValue(v)
 	} else {
 		m.DriftLastCheckedAt = types.StringNull()
+	}
+
+	// Var files
+	if varFiles := client.GetListAttr(res, "var-files"); len(varFiles) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, varFiles)
+		diags.Append(d...)
+		m.VarFiles = val
+	} else {
+		m.VarFiles = types.ListNull(types.StringType)
 	}
 
 	// Labels

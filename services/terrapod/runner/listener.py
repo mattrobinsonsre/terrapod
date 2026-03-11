@@ -308,6 +308,7 @@ class RunnerListener:
                     execution_backend=attrs.get("execution-backend", "tofu"),
                     service_account_name=attrs.get("service-account-name", ""),
                     plan_only=attrs.get("plan-only", False),
+                    var_files=attrs.get("var-files", []),
                 )
             )
             self.active_tasks[run_id] = task
@@ -350,6 +351,7 @@ class RunnerListener:
         execution_backend: str = "",
         service_account_name: str = "",
         plan_only: bool = False,
+        var_files: list[str] | None = None,
     ) -> None:
         """Execute a run by creating a K8s Job and watching it (plan + apply)."""
         from terrapod.runner.job_template import build_job_spec
@@ -372,6 +374,7 @@ class RunnerListener:
             execution_backend=execution_backend,
             service_account_name=service_account_name,
             plan_only=plan_only,
+            var_files=var_files,
         )
 
         job_name, result = await self._create_and_watch_job(plan_spec, run_id, "plan")
@@ -421,6 +424,7 @@ class RunnerListener:
             terraform_version=terraform_version,
             execution_backend=execution_backend,
             service_account_name=service_account_name,
+            var_files=var_files,
         )
 
         apply_job_name, apply_result = await self._create_and_watch_job(apply_spec, run_id, "apply")

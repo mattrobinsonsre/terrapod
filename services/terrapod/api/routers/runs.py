@@ -630,6 +630,10 @@ async def next_run(
     run_data["data"]["attributes"]["env-vars"] = env_vars
     run_data["data"]["attributes"]["terraform-vars"] = terraform_vars
 
+    # Include workspace var_files for -var-file injection
+    ws = await db.get(Workspace, run.workspace_id)
+    run_data["data"]["attributes"]["var-files"] = ws.var_files if ws and ws.var_files else []
+
     return JSONResponse(content=run_data)
 
 
