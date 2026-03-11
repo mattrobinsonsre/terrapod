@@ -236,6 +236,30 @@ async def list_repo_tags(conn: VCSConnection, owner: str, repo: str) -> list[dic
     return [{"name": tag["name"], "sha": tag["commit"]["sha"]} for tag in resp.json()]
 
 
+async def get_changed_files(
+    conn: VCSConnection, owner: str, repo: str, base_sha: str, head_sha: str
+) -> list[str]:
+    """Get list of file paths changed between two commits.
+
+    Uses the compare endpoint: GET /repos/{owner}/{repo}/compare/{base}...{head}
+    """
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{api_url}/repos/{owner}/{repo}/compare/{base_sha}...{head_sha}",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        resp.raise_for_status()
+
+    return [f["filename"] for f in resp.json().get("files", [])]
+
+
 async def create_commit_status(
     conn: VCSConnection,
     owner: str,
