@@ -498,15 +498,23 @@ jobs:
           go-version-file: provider/go.mod
           cache-dependency-path: provider/go.sum
 
+      - name: Import GPG signing key
+        id: gpg
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          fingerprint=$(gpg --list-keys --keyid-format long security@terrapod.dev | grep -E "^      " | head -1 | tr -d ' ')
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+
       - name: Build provider binaries with GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean --skip=sign
+          args: release --clean
           workdir: provider
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_FINGERPRINT: ${{ steps.gpg.outputs.fingerprint }}
 
       - name: Generate release notes
         id: notes
