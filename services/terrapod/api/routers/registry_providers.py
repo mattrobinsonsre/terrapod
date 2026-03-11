@@ -37,6 +37,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services.platform_provider_service import (
+    get_download_info as platform_get_download_info,
+)
+from terrapod.services.platform_provider_service import (
+    get_version_list as platform_get_version_list,
+)
 from terrapod.services.registry_provider_service import (
     create_provider,
     create_provider_platform,
@@ -197,7 +203,16 @@ async def list_provider_versions_cli(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """List available versions for a provider (CLI protocol). Requires read."""
+    """List available versions for a provider (CLI protocol). Requires read.
+
+    Special case: namespace=default, name=terrapod serves the built-in
+    platform provider from the running instance version (pull-through cache
+    from GitHub Releases).
+    """
+    # Built-in platform provider — no DB lookup needed
+    if namespace == "default" and name == "terrapod":
+        return JSONResponse(content=await platform_get_version_list())
+
     provider = await get_provider(db, namespace, name)
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
@@ -235,7 +250,21 @@ async def download_provider_cli(
     db: AsyncSession = Depends(get_db),
     storage: ObjectStore = Depends(get_storage),
 ) -> JSONResponse:
-    """Get download info for a provider version (CLI protocol). Requires read."""
+    """Get download info for a provider version (CLI protocol). Requires read.
+
+    Special case: namespace=default, name=terrapod delegates to the
+    platform provider service (pull-through cache from GitHub Releases).
+    """
+    # Built-in platform provider
+    if namespace == "default" and name == "terrapod":
+        try:
+            info = await platform_get_download_info(storage, version, os, arch)
+            return JSONResponse(content=info)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        except RuntimeError as e:
+            raise HTTPException(status_code=502, detail=str(e)) from e
+
     provider = await get_provider(db, namespace, name)
     if provider is not None:
         perm = await resolve_registry_permission(

@@ -107,6 +107,41 @@ jobs:
       - name: TypeScript type-check
         run: npm run type-check
 
+  # ── Provider Lint ─────────────────────────────────────
+  provider-lint:
+    name: Provider Lint
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: provider/go.mod
+          cache-dependency-path: provider/go.sum
+      - name: Vet
+        run: go vet ./...
+        working-directory: provider
+      - name: Build
+        run: go build ./...
+        working-directory: provider
+
+  # ── Provider Test ────────────────────────────────────
+  provider-test:
+    name: Provider Test
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: provider/go.mod
+          cache-dependency-path: provider/go.sum
+      - name: Test
+        run: go test ./... -v -count=1 -timeout 120s
+        working-directory: provider
+
   # ── Python Test ────────────────────────────────────────
   python-test:
     name: Python Test
@@ -458,6 +493,29 @@ jobs:
 
           helm push "dist/terrapod-${chart_version}.tgz" "oci://$REGISTRY"
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: provider/go.mod
+          cache-dependency-path: provider/go.sum
+
+      - name: Import GPG signing key
+        id: gpg
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          fingerprint=$(gpg --with-colons --import-options show-only --import <<< "${{ secrets.GPG_PRIVATE_KEY }}" | awk -F: '/^fpr:/{print $10; exit}')
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+
+      - name: Build provider binaries with GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+          workdir: provider
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_FINGERPRINT: ${{ steps.gpg.outputs.fingerprint }}
+
       - name: Generate release notes
         id: notes
         run: |
@@ -566,6 +624,8 @@ jobs:
       - prepare
       - python-lint
       - frontend-lint
+      - provider-lint
+      - provider-test
       - python-test
       - python-audit
       - npm-audit
@@ -586,6 +646,8 @@ jobs:
             "${{ needs.prepare.result }}"
             "${{ needs.python-lint.result }}"
             "${{ needs.frontend-lint.result }}"
+            "${{ needs.provider-lint.result }}"
+            "${{ needs.provider-test.result }}"
             "${{ needs.python-test.result }}"
             "${{ needs.python-audit.result }}"
             "${{ needs.npm-audit.result }}"

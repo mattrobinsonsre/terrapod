@@ -88,3 +88,23 @@ def provider_cache_key(
 def binary_cache_key(tool: str, version: str, os_: str, arch: str) -> str:
     """Key for a cached terraform/tofu CLI binary."""
     return f"cache/binaries/{tool}/{version}/{os_}_{arch}"
+
+
+# --- Platform Provider Cache ---
+
+
+def platform_provider_binary_key(version: str, os_: str, arch: str) -> str:
+    """Key for a cached Terrapod platform provider binary."""
+    return (
+        f"cache/provider/terrapod/{version}/terraform-provider-terrapod_{version}_{os_}_{arch}.zip"
+    )
+
+
+def platform_provider_shasums_key(version: str) -> str:
+    """Key for a cached Terrapod platform provider SHA256SUMS."""
+    return f"cache/provider/terrapod/{version}/terraform-provider-terrapod_{version}_SHA256SUMS"
+
+
+def platform_provider_shasums_sig_key(version: str) -> str:
+    """Key for a cached Terrapod platform provider SHA256SUMS.sig."""
+    return f"cache/provider/terrapod/{version}/terraform-provider-terrapod_{version}_SHA256SUMS.sig"
