@@ -10,7 +10,7 @@
 
     "global": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "imagePullSecrets": {
           "type": "array",
