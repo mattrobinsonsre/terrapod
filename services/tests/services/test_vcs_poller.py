@@ -105,9 +105,7 @@ class TestPollWorkspaceBranchFiltering:
     @patch("terrapod.services.vcs_poller._create_vcs_run")
     @patch("terrapod.services.vcs_poller._get_changed_files")
     @patch("terrapod.services.vcs_poller._get_branch_sha")
-    async def test_creates_run_when_changes_in_directory(
-        self, mock_sha, mock_changed, mock_create
-    ):
+    async def test_creates_run_when_changes_in_directory(self, mock_sha, mock_changed, mock_create):
         """When changes are in working_directory, create a run."""
         from terrapod.services.vcs_poller import _poll_workspace_branch
 
@@ -152,9 +150,7 @@ class TestPollWorkspaceBranchFiltering:
     @patch("terrapod.services.vcs_poller._create_vcs_run")
     @patch("terrapod.services.vcs_poller._get_changed_files")
     @patch("terrapod.services.vcs_poller._get_branch_sha")
-    async def test_no_filtering_on_first_poll(
-        self, mock_sha, mock_changed, mock_create
-    ):
+    async def test_no_filtering_on_first_poll(self, mock_sha, mock_changed, mock_create):
         """First poll (no previous SHA) always creates run."""
         from terrapod.services.vcs_poller import _poll_workspace_branch
 
@@ -177,9 +173,7 @@ class TestPollWorkspaceBranchFiltering:
     @patch("terrapod.services.vcs_poller._create_vcs_run")
     @patch("terrapod.services.vcs_poller._get_changed_files")
     @patch("terrapod.services.vcs_poller._get_branch_sha")
-    async def test_falls_through_on_api_error(
-        self, mock_sha, mock_changed, mock_create
-    ):
+    async def test_falls_through_on_api_error(self, mock_sha, mock_changed, mock_create):
         """If get_changed_files fails, create the run anyway."""
         from terrapod.services.vcs_poller import _poll_workspace_branch
 
