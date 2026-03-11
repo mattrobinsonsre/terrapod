@@ -11,6 +11,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
@@ -119,11 +120,13 @@ func (d *workspaceDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	readDataSourceModel(res, &config)
+	resp.Diagnostics.Append(readDataSourceModel(ctx, res, &config)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
 }
 
-func readDataSourceModel(res *client.Resource, m *workspaceDataSourceModel) {
+func readDataSourceModel(ctx context.Context, res *client.Resource, m *workspaceDataSourceModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+
 	m.ID = types.StringValue(res.ID)
 	m.Name = types.StringValue(client.GetStringAttr(res, "name"))
 	m.ExecutionMode = types.StringValue(client.GetStringAttr(res, "execution-mode"))
@@ -158,12 +161,15 @@ func readDataSourceModel(res *client.Resource, m *workspaceDataSourceModel) {
 		m.DriftDetectionIntervalSeconds = types.Int64Null()
 	}
 
-	labels := client.GetMapAttr(res, "labels")
-	if labels != nil && len(labels) > 0 {
-		m.Labels, _ = types.MapValueFrom(context.Background(), types.StringType, labels)
+	if labels := client.GetMapAttr(res, "labels"); len(labels) > 0 {
+		val, d := types.MapValueFrom(ctx, types.StringType, labels)
+		diags.Append(d...)
+		m.Labels = val
 	} else {
 		m.Labels = types.MapNull(types.StringType)
 	}
+
+	return diags
 }
 
 func setOptionalString(target *types.String, value string) {

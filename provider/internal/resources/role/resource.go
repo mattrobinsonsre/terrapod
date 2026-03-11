@@ -38,6 +38,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -189,7 +190,7 @@ func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	readRoleIntoModel(res, &plan)
+	resp.Diagnostics.Append(readRoleIntoModel(ctx, res, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -216,7 +217,7 @@ func (r *roleResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	readRoleIntoModel(res, &state)
+	resp.Diagnostics.Append(readRoleIntoModel(ctx, res, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -252,7 +253,7 @@ func (r *roleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	readRoleIntoModel(res, &plan)
+	resp.Diagnostics.Append(readRoleIntoModel(ctx, res, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -367,7 +368,9 @@ func parseRoleResponse(data []byte) (*roleResponseData, error) {
 }
 
 // readRoleIntoModel populates the Terraform model from a parsed role response.
-func readRoleIntoModel(res *roleResponseData, m *roleModel) {
+func readRoleIntoModel(ctx context.Context, res *roleResponseData, m *roleModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+
 	m.ID = types.StringValue(res.Name)
 	m.Name = types.StringValue(res.Name)
 
@@ -389,7 +392,9 @@ func readRoleIntoModel(res *roleResponseData, m *roleModel) {
 			for k, v := range labels {
 				strLabels[k] = fmt.Sprintf("%v", v)
 			}
-			m.AllowLabels, _ = types.MapValueFrom(context.Background(), types.StringType, strLabels)
+			val, d := types.MapValueFrom(ctx, types.StringType, strLabels)
+			diags.Append(d...)
+			m.AllowLabels = val
 		} else {
 			m.AllowLabels = types.MapNull(types.StringType)
 		}
@@ -404,7 +409,9 @@ func readRoleIntoModel(res *roleResponseData, m *roleModel) {
 			for _, v := range names {
 				strNames = append(strNames, fmt.Sprintf("%v", v))
 			}
-			m.AllowNames, _ = types.ListValueFrom(context.Background(), types.StringType, strNames)
+			val, d := types.ListValueFrom(ctx, types.StringType, strNames)
+			diags.Append(d...)
+			m.AllowNames = val
 		} else {
 			m.AllowNames = types.ListNull(types.StringType)
 		}
@@ -419,7 +426,9 @@ func readRoleIntoModel(res *roleResponseData, m *roleModel) {
 			for k, v := range labels {
 				strLabels[k] = fmt.Sprintf("%v", v)
 			}
-			m.DenyLabels, _ = types.MapValueFrom(context.Background(), types.StringType, strLabels)
+			val, d := types.MapValueFrom(ctx, types.StringType, strLabels)
+			diags.Append(d...)
+			m.DenyLabels = val
 		} else {
 			m.DenyLabels = types.MapNull(types.StringType)
 		}
@@ -434,13 +443,17 @@ func readRoleIntoModel(res *roleResponseData, m *roleModel) {
 			for _, v := range names {
 				strNames = append(strNames, fmt.Sprintf("%v", v))
 			}
-			m.DenyNames, _ = types.ListValueFrom(context.Background(), types.StringType, strNames)
+			val, d := types.ListValueFrom(ctx, types.StringType, strNames)
+			diags.Append(d...)
+			m.DenyNames = val
 		} else {
 			m.DenyNames = types.ListNull(types.StringType)
 		}
 	} else {
 		m.DenyNames = types.ListNull(types.StringType)
 	}
+
+	return diags
 }
 
 // getStringFromMap reads a string value from a map[string]any.

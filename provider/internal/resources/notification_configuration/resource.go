@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -115,7 +116,7 @@ func (r *notificationConfigResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	readIntoModel(ctx, res, &plan)
+	resp.Diagnostics.Append(readIntoModel(ctx, res, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -142,7 +143,7 @@ func (r *notificationConfigResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
-	readIntoModel(ctx, res, &state)
+	resp.Diagnostics.Append(readIntoModel(ctx, res, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -178,7 +179,7 @@ func (r *notificationConfigResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	readIntoModel(ctx, res, &plan)
+	resp.Diagnostics.Append(readIntoModel(ctx, res, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -226,7 +227,9 @@ func buildAttrs(ctx context.Context, m *notificationConfigModel) map[string]any 
 	return attrs
 }
 
-func readIntoModel(ctx context.Context, res *client.Resource, m *notificationConfigModel) {
+func readIntoModel(ctx context.Context, res *client.Resource, m *notificationConfigModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+
 	m.ID = types.StringValue(res.ID)
 	m.Name = types.StringValue(client.GetStringAttr(res, "name"))
 	m.DestinationType = types.StringValue(client.GetStringAttr(res, "destination-type"))
@@ -242,17 +245,21 @@ func readIntoModel(ctx context.Context, res *client.Resource, m *notificationCon
 	}
 
 	// Token is write-only — preserve from config
-	triggers := client.GetListAttr(res, "triggers")
-	if len(triggers) > 0 {
-		m.Triggers, _ = types.ListValueFrom(ctx, types.StringType, triggers)
+	if triggers := client.GetListAttr(res, "triggers"); len(triggers) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, triggers)
+		diags.Append(d...)
+		m.Triggers = val
 	} else {
 		m.Triggers = types.ListNull(types.StringType)
 	}
 
-	emails := client.GetListAttr(res, "email-addresses")
-	if len(emails) > 0 {
-		m.EmailAddresses, _ = types.ListValueFrom(ctx, types.StringType, emails)
+	if emails := client.GetListAttr(res, "email-addresses"); len(emails) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, emails)
+		diags.Append(d...)
+		m.EmailAddresses = val
 	} else {
 		m.EmailAddresses = types.ListNull(types.StringType)
 	}
+
+	return diags
 }

@@ -69,6 +69,19 @@ func MarshalResourceWithID(id, resourceType string, attributes map[string]interf
 	return json.Marshal(body)
 }
 
+// MarshalResourceWithIDAndRels builds a JSON:API request body with ID and relationships (for PATCH).
+func MarshalResourceWithIDAndRels(id, resourceType string, attributes map[string]interface{}, relationships map[string]interface{}) ([]byte, error) {
+	data := map[string]interface{}{
+		"id":         id,
+		"type":       resourceType,
+		"attributes": attributes,
+	}
+	if relationships != nil {
+		data["relationships"] = relationships
+	}
+	return json.Marshal(map[string]interface{}{"data": data})
+}
+
 // ParseResource extracts a Resource from a JSON:API document.
 func ParseResource(data []byte) (*Resource, error) {
 	var doc Document

@@ -13,7 +13,7 @@
 //
 // Attribute mapping (JSON:API attribute → Terraform schema attribute):
 //
-//	"name"                              → name                (string, required, forces new)
+//	"name"                              → name                (string, required, supports rename)
 //	"execution-mode"                    → execution_mode      (string, optional, default "local")
 //	"auto-apply"                        → auto_apply          (bool,   optional, default false)
 //	"execution-backend"                 → execution_backend   (string, optional, default "terraform")

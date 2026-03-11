@@ -5,9 +5,11 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -82,8 +84,13 @@ func (c *Client) do(ctx context.Context, method, path string, body []byte) ([]by
 
 		resp, err := c.HTTPClient.Do(req)
 		if err != nil {
-			lastErr = err
-			continue
+			// Only retry transient network errors (timeouts, temporary failures).
+			// Non-transient errors (DNS lookup failure, refused) should fail immediately.
+			if isTransientNetError(err) {
+				lastErr = err
+				continue
+			}
+			return nil, 0, err
 		}
 
 		respBody, err := io.ReadAll(resp.Body)
@@ -215,4 +222,18 @@ func (c *Client) Put(ctx context.Context, path string, payload []byte) ([]byte, 
 func IsNotFound(err error) bool {
 	_, ok := err.(*NotFoundError)
 	return ok
+}
+
+// isTransientNetError returns true for network errors that are worth retrying
+// (timeouts, temporary DNS failures). Returns false for permanent failures
+// like connection refused or unknown host.
+func isTransientNetError(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return netErr.Timeout()
+	}
+	return false
 }

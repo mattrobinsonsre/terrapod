@@ -36,6 +36,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -157,7 +158,7 @@ func (r *registryModuleResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	readModuleIntoModel(ctx, res, &plan)
+	resp.Diagnostics.Append(readModuleIntoModel(ctx, res, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -184,7 +185,7 @@ func (r *registryModuleResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	readModuleIntoModel(ctx, res, &state)
+	resp.Diagnostics.Append(readModuleIntoModel(ctx, res, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -214,7 +215,7 @@ func (r *registryModuleResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	readModuleIntoModel(ctx, res, &plan)
+	resp.Diagnostics.Append(readModuleIntoModel(ctx, res, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -268,7 +269,9 @@ func buildModuleAttrs(m *registryModuleModel) map[string]any {
 	return attrs
 }
 
-func readModuleIntoModel(ctx context.Context, res *client.Resource, m *registryModuleModel) {
+func readModuleIntoModel(ctx context.Context, res *client.Resource, m *registryModuleModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+
 	m.ID = types.StringValue(res.ID)
 	m.Name = types.StringValue(client.GetStringAttr(res, "name"))
 	m.ProviderName = types.StringValue(client.GetStringAttr(res, "provider"))
@@ -285,10 +288,14 @@ func readModuleIntoModel(ctx context.Context, res *client.Resource, m *registryM
 	setOptStr(&m.VCSTagPattern, client.GetStringAttr(res, "vcs-tag-pattern"))
 
 	if labels := client.GetMapAttr(res, "labels"); len(labels) > 0 {
-		m.Labels, _ = types.MapValueFrom(ctx, types.StringType, labels)
+		val, d := types.MapValueFrom(ctx, types.StringType, labels)
+		diags.Append(d...)
+		m.Labels = val
 	} else {
 		m.Labels = types.MapNull(types.StringType)
 	}
+
+	return diags
 }
 
 func setOptStr(target *types.String, value string) {

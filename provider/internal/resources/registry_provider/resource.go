@@ -28,6 +28,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -131,7 +132,7 @@ func (r *registryProviderResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	readProviderIntoModel(ctx, res, &plan)
+	resp.Diagnostics.Append(readProviderIntoModel(ctx, res, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -158,7 +159,7 @@ func (r *registryProviderResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	readProviderIntoModel(ctx, res, &state)
+	resp.Diagnostics.Append(readProviderIntoModel(ctx, res, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -188,7 +189,7 @@ func (r *registryProviderResource) Update(ctx context.Context, req resource.Upda
 		return
 	}
 
-	readProviderIntoModel(ctx, res, &plan)
+	resp.Diagnostics.Append(readProviderIntoModel(ctx, res, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -223,7 +224,9 @@ func buildProviderAttrs(m *registryProviderModel) map[string]any {
 	return attrs
 }
 
-func readProviderIntoModel(ctx context.Context, res *client.Resource, m *registryProviderModel) {
+func readProviderIntoModel(ctx context.Context, res *client.Resource, m *registryProviderModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+
 	m.ID = types.StringValue(res.ID)
 	m.Name = types.StringValue(client.GetStringAttr(res, "name"))
 	m.Namespace = types.StringValue(client.GetStringAttr(res, "namespace"))
@@ -232,8 +235,12 @@ func readProviderIntoModel(ctx context.Context, res *client.Resource, m *registr
 	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
 
 	if labels := client.GetMapAttr(res, "labels"); len(labels) > 0 {
-		m.Labels, _ = types.MapValueFrom(ctx, types.StringType, labels)
+		val, d := types.MapValueFrom(ctx, types.StringType, labels)
+		diags.Append(d...)
+		m.Labels = val
 	} else {
 		m.Labels = types.MapNull(types.StringType)
 	}
+
+	return diags
 }

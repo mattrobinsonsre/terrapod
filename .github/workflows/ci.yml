@@ -502,7 +502,7 @@ jobs:
         id: gpg
         run: |
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
-          fingerprint=$(gpg --list-keys --keyid-format long security@terrapod.dev | grep -E "^      " | head -1 | tr -d ' ')
+          fingerprint=$(gpg --with-colons --import-options show-only --import <<< "${{ secrets.GPG_PRIVATE_KEY }}" | awk -F: '/^fpr:/{print $10; exit}')
           echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
 
       - name: Build provider binaries with GoReleaser

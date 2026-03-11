@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -46,11 +47,8 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "The workspace name. Changing this forces a new resource.",
+				Description: "The workspace name.",
 				Required:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"execution_mode": schema.StringAttribute{
 				Description: "Execution mode: local, remote, or agent.",
@@ -198,7 +196,7 @@ func (r *workspaceResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	readResourceIntoModel(res, &plan)
+	resp.Diagnostics.Append(readResourceIntoModel(ctx, res, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -225,7 +223,7 @@ func (r *workspaceResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	readResourceIntoModel(res, &state)
+	resp.Diagnostics.Append(readResourceIntoModel(ctx, res, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -243,7 +241,8 @@ func (r *workspaceResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	attrs := buildWorkspaceAttrs(&plan)
-	body, err := client.MarshalResourceWithID(state.ID.ValueString(), "workspaces", attrs)
+	rels := buildWorkspaceRels(&plan)
+	body, err := client.MarshalResourceWithIDAndRels(state.ID.ValueString(), "workspaces", attrs, rels)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to marshal request", err.Error())
 		return
@@ -261,7 +260,7 @@ func (r *workspaceResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	readResourceIntoModel(res, &plan)
+	resp.Diagnostics.Append(readResourceIntoModel(ctx, res, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -369,7 +368,9 @@ func buildWorkspaceRels(m *workspaceModel) map[string]any {
 }
 
 // readResourceIntoModel populates the Terraform model from a JSON:API resource.
-func readResourceIntoModel(res *client.Resource, m *workspaceModel) {
+func readResourceIntoModel(ctx context.Context, res *client.Resource, m *workspaceModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+
 	m.ID = types.StringValue(res.ID)
 	m.Name = types.StringValue(client.GetStringAttr(res, "name"))
 	m.ExecutionMode = types.StringValue(client.GetStringAttr(res, "execution-mode"))
@@ -437,15 +438,13 @@ func readResourceIntoModel(res *client.Resource, m *workspaceModel) {
 	}
 
 	// Labels
-	labels := client.GetMapAttr(res, "labels")
-	if labels != nil && len(labels) > 0 {
-		elems := make(map[string]types.String, len(labels))
-		for k, v := range labels {
-			elems[k] = types.StringValue(v)
-		}
-		// This is a simplified approach; in production you'd use types.MapValueFrom
-		m.Labels, _ = types.MapValueFrom(context.Background(), types.StringType, labels)
+	if labels := client.GetMapAttr(res, "labels"); len(labels) > 0 {
+		val, d := types.MapValueFrom(ctx, types.StringType, labels)
+		diags.Append(d...)
+		m.Labels = val
 	} else {
 		m.Labels = types.MapNull(types.StringType)
 	}
+
+	return diags
 }
