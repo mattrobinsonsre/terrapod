@@ -38,7 +38,8 @@ signs:
 
 release:
   disable: false
-  extra_files: []
+  extra_files:
+    - glob: signing-key.asc
 
 changelog:
   disable: true
