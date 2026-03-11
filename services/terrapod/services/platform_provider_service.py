@@ -38,7 +38,7 @@ logger = get_logger(__name__)
 
 GITHUB_RELEASE_BASE = "https://github.com/mattrobinsonsre/terrapod/releases/download"
 
-VALID_OS = {"linux", "darwin"}
+VALID_OS = {"linux", "darwin", "windows"}
 VALID_ARCH = {"amd64", "arm64"}
 
 # Baked into the image at /etc/terrapod/signing-key.asc
