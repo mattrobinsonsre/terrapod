@@ -193,8 +193,12 @@ class AgentPool(Base):
         DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
     )
 
-    tokens: Mapped[list["AgentPoolToken"]] = relationship(back_populates="pool")
-    listeners: Mapped[list["RunnerListener"]] = relationship(back_populates="pool")
+    tokens: Mapped[list["AgentPoolToken"]] = relationship(
+        back_populates="pool", passive_deletes=True
+    )
+    listeners: Mapped[list["RunnerListener"]] = relationship(
+        back_populates="pool", passive_deletes=True
+    )
 
 
 class AgentPoolToken(Base):
