@@ -261,11 +261,15 @@ api:
 
   podSecurityContext:
     runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
     seccompProfile:
       type: RuntimeDefault
 
   containerSecurityContext:
     runAsNonRoot: true
+    runAsUser: 1000
     readOnlyRootFilesystem: true
     allowPrivilegeEscalation: false
     capabilities:
@@ -361,11 +365,15 @@ web:
 
   podSecurityContext:
     runAsNonRoot: true
+    runAsUser: 1001
+    runAsGroup: 1001
+    fsGroup: 1001
     seccompProfile:
       type: RuntimeDefault
 
   containerSecurityContext:
     runAsNonRoot: true
+    runAsUser: 1001
     readOnlyRootFilesystem: true
     allowPrivilegeEscalation: false
     capabilities:
@@ -552,11 +560,15 @@ listener:
 
   podSecurityContext:
     runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
     seccompProfile:
       type: RuntimeDefault
 
   containerSecurityContext:
     runAsNonRoot: true
+    runAsUser: 1000
     readOnlyRootFilesystem: true
     allowPrivilegeEscalation: false
     capabilities:
