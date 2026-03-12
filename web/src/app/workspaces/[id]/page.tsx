@@ -1102,7 +1102,7 @@ function WorkspaceDetailContent() {
                   {editing && perms['can-update'] ? (
                     <div className="space-y-2">
                       {editVarFiles.map((f, i) => (
-                        <div key={i} className="flex items-center gap-2">
+                        <div key={f} className="flex items-center gap-2">
                           <code className="text-sm text-slate-200 bg-slate-700 px-2 py-0.5 rounded flex-1 truncate">{f}</code>
                           <button
                             onClick={() => setEditVarFiles(editVarFiles.filter((_, j) => j !== i))}
@@ -1118,7 +1118,10 @@ function WorkspaceDetailContent() {
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && newVarFile.trim()) {
                               e.preventDefault()
-                              setEditVarFiles([...editVarFiles, newVarFile.trim()])
+                              const v = newVarFile.trim()
+                              if (!editVarFiles.includes(v)) {
+                                setEditVarFiles([...editVarFiles, v])
+                              }
                               setNewVarFile('')
                             }
                           }}
@@ -1128,7 +1131,10 @@ function WorkspaceDetailContent() {
                         <button
                           onClick={() => {
                             if (newVarFile.trim()) {
-                              setEditVarFiles([...editVarFiles, newVarFile.trim()])
+                              const v = newVarFile.trim()
+                              if (!editVarFiles.includes(v)) {
+                                setEditVarFiles([...editVarFiles, v])
+                              }
                               setNewVarFile('')
                             }
                           }}
@@ -1140,8 +1146,8 @@ function WorkspaceDetailContent() {
                     <dd className="mt-1 text-sm text-slate-200">
                       {(attrs['var-files'] || []).length > 0 ? (
                         <div className="flex flex-wrap gap-1">
-                          {attrs['var-files'].map((f, i) => (
-                            <code key={i} className="bg-slate-700 px-2 py-0.5 rounded text-xs">{f}</code>
+                          {attrs['var-files'].map((f) => (
+                            <code key={f} className="bg-slate-700 px-2 py-0.5 rounded text-xs">{f}</code>
                           ))}
                         </div>
                       ) : (

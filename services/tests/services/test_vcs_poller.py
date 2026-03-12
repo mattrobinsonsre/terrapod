@@ -192,3 +192,26 @@ class TestPollWorkspaceBranchFiltering:
         await _poll_workspace_branch(mock_db, ws, conn, "org", "repo", "main")
 
         mock_create.assert_called_once()
+
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    @patch("terrapod.services.vcs_poller._get_changed_files")
+    @patch("terrapod.services.vcs_poller._get_branch_sha")
+    async def test_creates_run_when_truncated(self, mock_sha, mock_changed, mock_create):
+        """When get_changed_files returns None (truncated), create run anyway."""
+        from terrapod.services.vcs_poller import _poll_workspace_branch
+
+        ws = _mock_workspace(
+            vcs_working_directory="infra",
+            vcs_last_commit_sha="aaa111",
+        )
+        conn = _mock_connection()
+        mock_sha.return_value = "bbb222"
+        mock_changed.return_value = None  # truncated response
+        mock_run = MagicMock()
+        mock_run.id = uuid.uuid4()
+        mock_create.return_value = mock_run
+
+        mock_db = AsyncMock()
+        await _poll_workspace_branch(mock_db, ws, conn, "org", "repo", "main")
+
+        mock_create.assert_called_once()

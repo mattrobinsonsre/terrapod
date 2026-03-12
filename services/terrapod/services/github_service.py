@@ -238,10 +238,12 @@ async def list_repo_tags(conn: VCSConnection, owner: str, repo: str) -> list[dic
 
 async def get_changed_files(
     conn: VCSConnection, owner: str, repo: str, base_sha: str, head_sha: str
-) -> list[str]:
+) -> list[str] | None:
     """Get list of file paths changed between two commits.
 
     Uses the compare endpoint: GET /repos/{owner}/{repo}/compare/{base}...{head}
+    Returns None if the response is truncated (GitHub caps at 300 files),
+    signaling that the caller should not filter and should create the run.
     """
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
@@ -257,7 +259,16 @@ async def get_changed_files(
         )
         resp.raise_for_status()
 
-    return [f["filename"] for f in resp.json().get("files", [])]
+    data = resp.json()
+    files = data.get("files", [])
+    if len(files) >= 300:
+        logger.warning(
+            "GitHub compare truncated (300+ files), skipping subdirectory filter",
+            owner=owner,
+            repo=repo,
+        )
+        return None
+    return [f["filename"] for f in files]
 
 
 async def create_commit_status(

@@ -611,6 +611,9 @@ async def next_run(
     if run is None:
         return Response(status_code=204)
 
+    # Fetch workspace once for variables + var_files
+    ws = await db.get(Workspace, run.workspace_id)
+
     # Generate presigned URLs for the run
     urls = await run_service.get_run_presigned_urls(db, run)
 
@@ -629,9 +632,6 @@ async def next_run(
     run_data["data"]["attributes"]["presigned-urls"] = urls
     run_data["data"]["attributes"]["env-vars"] = env_vars
     run_data["data"]["attributes"]["terraform-vars"] = terraform_vars
-
-    # Include workspace var_files for -var-file injection
-    ws = await db.get(Workspace, run.workspace_id)
     run_data["data"]["attributes"]["var-files"] = ws.var_files if ws and ws.var_files else []
 
     return JSONResponse(content=run_data)

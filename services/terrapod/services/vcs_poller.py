@@ -67,8 +67,12 @@ async def _download_archive(conn: VCSConnection, owner: str, repo: str, ref: str
 
 async def _get_changed_files(
     conn: VCSConnection, owner: str, repo: str, base_sha: str, head_sha: str
-) -> list[str]:
-    """Get changed files between two commits via the appropriate provider."""
+) -> list[str] | None:
+    """Get changed files between two commits via the appropriate provider.
+
+    Returns None if the response is truncated (too many files), signaling
+    the caller should skip filtering and create the run unconditionally.
+    """
     if conn.provider == "gitlab":
         return await gitlab_service.get_changed_files(conn, owner, repo, base_sha, head_sha)
     return await github_service.get_changed_files(conn, owner, repo, base_sha, head_sha)
@@ -81,7 +85,7 @@ def _changes_affect_directory(changed_files: list[str], working_directory: str) 
     are considered relevant. Root-level files don't trigger subdirectory workspaces.
     """
     prefix = working_directory.rstrip("/") + "/"
-    return any(f.startswith(prefix) or f == working_directory for f in changed_files)
+    return any(f.startswith(prefix) for f in changed_files)
 
 
 async def _list_open_prs(
@@ -267,7 +271,10 @@ async def _poll_workspace_branch(
     if ws.vcs_working_directory and ws.vcs_last_commit_sha:
         try:
             changed = await _get_changed_files(conn, owner, repo, ws.vcs_last_commit_sha, sha)
-            if not _changes_affect_directory(changed, ws.vcs_working_directory):
+            # None means truncated — create run unconditionally
+            if changed is not None and not _changes_affect_directory(
+                changed, ws.vcs_working_directory
+            ):
                 logger.info(
                     "Skipping run — no changes in working directory",
                     workspace=ws.name,
@@ -381,7 +388,10 @@ async def _poll_workspace_prs(
                 changed = await _get_changed_files(
                     conn, owner, repo, ws.vcs_last_commit_sha, pr.head_sha
                 )
-                if not _changes_affect_directory(changed, ws.vcs_working_directory):
+                # None means truncated — create run unconditionally
+                if changed is not None and not _changes_affect_directory(
+                    changed, ws.vcs_working_directory
+                ):
                     logger.info(
                         "Skipping PR run — no changes in working directory",
                         workspace=ws.name,
