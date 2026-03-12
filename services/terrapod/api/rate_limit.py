@@ -92,7 +92,7 @@ class RateLimitMiddleware:
         key = f"tp:ratelimit:{prefix}:{client_ip}:{window_id}"
 
         try:
-            pipe = redis.pipeline()
+            pipe = redis.pipeline(transaction=False)
             pipe.incr(key)
             pipe.expire(key, 120)  # 2 minutes TTL for cleanup
             results = await pipe.execute()

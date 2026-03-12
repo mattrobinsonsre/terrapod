@@ -82,7 +82,7 @@ async def consume_auth_state(idp_state: str) -> AuthState | None:
     key = AUTH_STATE_PREFIX + idp_state
 
     # Atomic get-and-delete via pipeline
-    async with redis.pipeline(transaction=True) as pipe:
+    async with redis.pipeline(transaction=False) as pipe:
         pipe.get(key)
         pipe.delete(key)
         results = await pipe.execute()
@@ -109,7 +109,7 @@ async def consume_auth_code(code: str) -> AuthCode | None:
     redis = get_redis_client()
     key = AUTH_CODE_PREFIX + code
 
-    async with redis.pipeline(transaction=True) as pipe:
+    async with redis.pipeline(transaction=False) as pipe:
         pipe.get(key)
         pipe.delete(key)
         results = await pipe.execute()

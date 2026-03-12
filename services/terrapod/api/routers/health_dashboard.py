@@ -259,7 +259,7 @@ async def _get_listener_health(db: AsyncSession) -> dict:
         prefix = f"tp:listener:{listener.id}"
 
         # Read Redis keys (pipeline for efficiency)
-        pipe = redis.pipeline()
+        pipe = redis.pipeline(transaction=False)
         pipe.get(f"{prefix}:status")
         pipe.get(f"{prefix}:heartbeat")
         pipe.get(f"{prefix}:capacity")
