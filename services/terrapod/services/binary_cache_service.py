@@ -250,10 +250,24 @@ async def _fetch_tofu_versions() -> list[str]:
 async def resolve_version(tool: str, partial_version: str) -> str:
     """Resolve a partial version (e.g. '1.9') to the latest exact version (e.g. '1.9.8').
 
-    If the version already has 3+ components (x.y.z), returns as-is.
-    For 2-component versions (x.y), queries upstream for the latest patch.
+    Handles:
+    - Empty/None/"latest" → latest stable version
+    - Two-component (x.y) → latest x.y.z patch
+    - Three-component (x.y.z) → returned as-is
+
     Results are cached in Redis for 1 hour.
     """
+    # Normalize empty, None, or "latest" to the latest stable release
+    if not partial_version or partial_version.strip().lower() == "latest":
+        partial_version = "latest"
+        versions = await list_available_versions(tool)
+        # list_available_versions returns shortcuts first, then full versions
+        # Find the first full x.y.z version
+        for v in versions:
+            if len(v.split(".")) >= 3:
+                return v
+        raise ValueError(f"No stable versions found for {tool}")
+
     parts = partial_version.split(".")
     if len(parts) >= 3:
         return partial_version  # Already exact

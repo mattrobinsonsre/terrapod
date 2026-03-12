@@ -30,6 +30,7 @@ from terrapod.services.binary_cache_service import (
     list_available_versions,
     list_cached_binaries,
     purge_binary,
+    resolve_version,
     warm_binary,
 )
 from terrapod.storage import get_storage
@@ -98,7 +99,8 @@ async def download_binary(
         )
 
     try:
-        url = await get_or_cache_binary(db, storage, tool, version, os, arch)
+        resolved = await resolve_version(tool, version)
+        url = await get_or_cache_binary(db, storage, tool, resolved, os, arch)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except Exception as e:
