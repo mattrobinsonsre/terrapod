@@ -318,9 +318,14 @@ class RunnerListener:
     def _rewrite_urls(self, urls: dict[str, str]) -> dict[str, str]:
         """Rewrite presigned URL hostnames to the runner server_url.
 
-        Storage backends generate URLs with the external base URL (e.g.
-        https://terrapod.local) but runner Jobs need to reach the API via
-        the internal K8s service URL (e.g. http://terrapod-api:8000).
+        Filesystem storage generates URLs pointing at the external API
+        (e.g. https://terrapod.local/api/v2/storage/...) but runner Jobs
+        need to reach the API via the internal K8s service URL (e.g.
+        http://terrapod-api:8000). Cloud storage URLs (S3, Azure, GCS)
+        already point at the correct endpoint and must not be rewritten.
+
+        Heuristic: only rewrite URLs whose path starts with /api/ — those
+        are Terrapod API endpoints. Cloud presigned URLs never have /api/ paths.
         """
         server_url = self.runner_config.server_url or os.environ.get("TERRAPOD_API_URL", "")
         if not server_url:
@@ -330,12 +335,15 @@ class RunnerListener:
         rewritten = {}
         for key, url in urls.items():
             parsed = urlparse(url)
-            rewritten[key] = urlunparse(
-                parsed._replace(
-                    scheme=target.scheme,
-                    netloc=target.netloc,
+            if parsed.path.startswith("/api/"):
+                rewritten[key] = urlunparse(
+                    parsed._replace(
+                        scheme=target.scheme,
+                        netloc=target.netloc,
+                    )
                 )
-            )
+            else:
+                rewritten[key] = url
         return rewritten
 
     async def _execute_run(
