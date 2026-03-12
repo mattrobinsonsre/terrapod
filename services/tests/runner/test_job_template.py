@@ -40,14 +40,14 @@ class TestVarFilesInjection:
             run_id="abc123",
             phase="plan",
             runner_config=_runner_config(),
-            presigned_urls={},
+            auth_secret_name="tprun-abc12345-auth",
             env_vars=[],
             terraform_vars=[],
             var_files=["envs/dev.tfvars", "secrets.tfvars"],
         )
 
         container = spec["spec"]["template"]["spec"]["containers"][0]
-        env_dict = {e["name"]: e["value"] for e in container["env"]}
+        env_dict = {e["name"]: e.get("value") for e in container["env"] if "value" in e}
         assert "TP_VAR_FILES" in env_dict
         parsed = json.loads(env_dict["TP_VAR_FILES"])
         assert parsed == ["envs/dev.tfvars", "secrets.tfvars"]
@@ -60,7 +60,7 @@ class TestVarFilesInjection:
             run_id="abc123",
             phase="plan",
             runner_config=_runner_config(),
-            presigned_urls={},
+            auth_secret_name="tprun-abc12345-auth",
             env_vars=[],
             terraform_vars=[],
             var_files=[],
@@ -78,7 +78,7 @@ class TestVarFilesInjection:
             run_id="abc123",
             phase="plan",
             runner_config=_runner_config(),
-            presigned_urls={},
+            auth_secret_name="tprun-abc12345-auth",
             env_vars=[],
             terraform_vars=[],
             var_files=None,
@@ -96,7 +96,7 @@ class TestVarFilesInjection:
             run_id="abc123",
             phase="plan",
             runner_config=_runner_config(),
-            presigned_urls={},
+            auth_secret_name="tprun-abc12345-auth",
             env_vars=[],
             terraform_vars=[],
         )
@@ -104,3 +104,22 @@ class TestVarFilesInjection:
         container = spec["spec"]["template"]["spec"]["containers"][0]
         env_names = {e["name"] for e in container["env"]}
         assert "TP_VAR_FILES" not in env_names
+
+    def test_auth_token_from_secret_ref(self):
+        """TP_AUTH_TOKEN should use secretKeyRef, not a plain value."""
+        from terrapod.runner.job_template import build_job_spec
+
+        spec = build_job_spec(
+            run_id="abc123",
+            phase="plan",
+            runner_config=_runner_config(),
+            auth_secret_name="tprun-abc12345-auth",
+            env_vars=[],
+            terraform_vars=[],
+        )
+
+        container = spec["spec"]["template"]["spec"]["containers"][0]
+        auth_env = next(e for e in container["env"] if e["name"] == "TP_AUTH_TOKEN")
+        assert "valueFrom" in auth_env
+        assert auth_env["valueFrom"]["secretKeyRef"]["name"] == "tprun-abc12345-auth"
+        assert auth_env["valueFrom"]["secretKeyRef"]["key"] == "token"

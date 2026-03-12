@@ -33,7 +33,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.dependencies import AuthenticatedUser, get_current_user, get_listener_identity
 from terrapod.db.models import Run, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -614,9 +614,6 @@ async def next_run(
     # Fetch workspace once for variables + var_files
     ws = await db.get(Workspace, run.workspace_id)
 
-    # Generate presigned URLs for the run
-    urls = await run_service.get_run_presigned_urls(db, run)
-
     # Resolve workspace variables for injection into the runner Job
     from terrapod.services.variable_service import resolve_variables
 
@@ -629,7 +626,6 @@ async def next_run(
     await db.commit()
 
     run_data = _run_json(run)
-    run_data["data"]["attributes"]["presigned-urls"] = urls
     run_data["data"]["attributes"]["env-vars"] = env_vars
     run_data["data"]["attributes"]["terraform-vars"] = terraform_vars
     run_data["data"]["attributes"]["var-files"] = ws.var_files if ws and ws.var_files else []
@@ -690,6 +686,43 @@ async def update_run_status(
         raise HTTPException(status_code=409, detail=str(e)) from e
 
     return JSONResponse(content=_run_json(run))
+
+
+# ── Runner Token ──────────────────────────────────────────────────────
+
+
+@router.post("/listeners/{listener_id}/runs/{run_id}/runner-token")
+async def create_runner_token(
+    listener_id: str = Path(...),
+    run_id: str = Path(...),
+    body: dict = Body(default={}),
+    listener: object = Depends(get_listener_identity),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Generate a short-lived runner token for a run.
+
+    Called by the listener after claiming a run. The token authenticates
+    runner Job API calls (binary cache, provider mirror, artifact upload/download).
+    """
+    from terrapod.auth.runner_tokens import generate_runner_token
+    from terrapod.config import load_runner_config
+
+    run = await _get_run(run_id, db)
+
+    # Verify this listener owns the run
+    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    if run.listener_id != l_uuid:
+        raise HTTPException(status_code=403, detail="Run not assigned to this listener")
+
+    config = load_runner_config()
+    requested_ttl = body.get("ttl", config.token_ttl_seconds)
+    token = generate_runner_token(run.id, ttl=requested_ttl)
+
+    # Compute actual TTL (may have been clamped)
+    max_ttl = config.max_token_ttl_seconds
+    actual_ttl = min(requested_ttl, max_ttl) if max_ttl > 0 else requested_ttl
+
+    return JSONResponse(content={"token": token, "expires_in": actual_ttl})
 
 
 # ── Log Streaming Endpoints ──────────────────────────────────────────────
@@ -798,40 +831,3 @@ async def _serve_log(
     if phase_done and offset + limit >= len(data):
         result += _ETX
     return Response(content=result, media_type="text/plain")
-
-
-# ── Presigned URLs for Listeners ────────────────────────────────────────
-
-
-@router.get("/listeners/{listener_id}/runs/{run_id}/plan-urls")
-async def get_plan_urls(
-    listener_id: str = Path(...),
-    run_id: str = Path(...),
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    """Get presigned URLs for the plan phase."""
-    run = await _get_run(run_id, db)
-
-    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
-    if run.listener_id != l_uuid:
-        raise HTTPException(status_code=403, detail="Run not assigned to this listener")
-
-    urls = await run_service.get_run_presigned_urls(db, run)
-    return JSONResponse(content=urls)
-
-
-@router.get("/listeners/{listener_id}/runs/{run_id}/apply-urls")
-async def get_apply_urls(
-    listener_id: str = Path(...),
-    run_id: str = Path(...),
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    """Get presigned URLs for the apply phase."""
-    run = await _get_run(run_id, db)
-
-    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
-    if run.listener_id != l_uuid:
-        raise HTTPException(status_code=403, detail="Run not assigned to this listener")
-
-    urls = await run_service.get_apply_presigned_urls(db, run)
-    return JSONResponse(content=urls)

@@ -457,6 +457,8 @@ runners:
   topologySpreadConstraints: []
   podSecurityContext: {}
   ttlSecondsAfterFinished: 600  # Clean up completed Jobs after 10 min
+  tokenTTLSeconds: 3600         # Runner token TTL (default 1 hour)
+  maxTokenTTLSeconds: 7200      # Runner token max TTL (default 2 hours)
 
   # ServiceAccount for runner Jobs (cloud workload identity)
   serviceAccount:

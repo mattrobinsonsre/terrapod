@@ -40,8 +40,7 @@ async def provider_versions_mirror(
     """List cached versions for a provider (network mirror protocol).
 
     Returns the index.json format expected by terraform's network mirror.
-    On cache miss with warm_on_first_request enabled, fetches version list
-    from the upstream registry.
+    Requires authentication (runner token, API token, or session).
     """
     if not settings.registry.provider_cache.enabled:
         raise HTTPException(
@@ -66,8 +65,7 @@ async def provider_platforms_mirror(
     """Get platform archives for a provider version (network mirror protocol).
 
     Returns the {version}.json format with download URLs and hashes.
-    On cache miss with warm_on_first_request enabled, fetches and caches
-    all platform binaries from the upstream registry.
+    Requires authentication (runner token, API token, or session).
     """
     if not settings.registry.provider_cache.enabled:
         raise HTTPException(

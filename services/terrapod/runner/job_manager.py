@@ -225,6 +225,20 @@ async def get_job_status(job_name: str, namespace: str = "") -> str | None:
         raise
 
 
+async def get_job_uid(job_name: str, namespace: str = "") -> str:
+    """Get the UID of a Job. Used for ownerReference on auth Secrets."""
+    if not namespace:
+        namespace = _default_namespace()
+
+    batch_api = _get_batch_api()
+    loop = asyncio.get_event_loop()
+    job = await loop.run_in_executor(
+        None,
+        lambda: batch_api.read_namespaced_job(name=job_name, namespace=namespace),
+    )
+    return str(job.metadata.uid)
+
+
 async def get_pod_logs(
     job_name: str,
     namespace: str = "",
