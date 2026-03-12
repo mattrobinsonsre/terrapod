@@ -190,10 +190,10 @@ api:
       enabled: true
       poll_interval_seconds: 60
       github:
-        # Optional: webhook secret for HMAC signature validation.
+        # Optional: K8s Secret containing the webhook HMAC secret.
         # Only needed if GitHub webhooks are enabled for faster feedback.
-        # Inject via env var: TERRAPOD_VCS__GITHUB__WEBHOOK_SECRET
-        webhook_secret: ""
+        existingSecret: ""
+        existingSecretKey: "webhook_secret"
 
     # Audit logging
     audit:

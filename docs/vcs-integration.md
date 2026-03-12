@@ -486,20 +486,22 @@ If Terrapod is accessible from GitHub (not behind a firewall), you can add webho
 
 ![GitHub App Webhook Settings](images/github-app-webhook.png)
 
-Then set the webhook secret in Terrapod:
+Then set the webhook secret in Terrapod. Create a K8s Secret:
 
 ```zsh
-TERRAPOD_VCS__GITHUB__WEBHOOK_SECRET=your-webhook-secret-here
+kubectl -n terrapod create secret generic terrapod-github-webhook \
+  --from-literal=webhook_secret=your-webhook-secret-here
 ```
 
-Or in Helm values:
+Then reference it in Helm values:
 
 ```yaml
 api:
   config:
     vcs:
       github:
-        webhook_secret: ""  # Inject via TERRAPOD_VCS__GITHUB__WEBHOOK_SECRET env var
+        existingSecret: "terrapod-github-webhook"
+        existingSecretKey: "webhook_secret"
 ```
 
 When a push event arrives, the webhook handler validates the HMAC-SHA256 signature and triggers an immediate poll for the affected repository. The poller still does all the work -- the webhook just makes it faster.
