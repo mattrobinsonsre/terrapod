@@ -88,7 +88,7 @@ async def create_session(
     session_key = SESSION_PREFIX + token
     user_key = USER_SESSIONS_PREFIX + email
 
-    async with redis.pipeline(transaction=True) as pipe:
+    async with redis.pipeline(transaction=False) as pipe:
         pipe.set(session_key, json.dumps(data), ex=ttl)
         pipe.sadd(user_key, token)
         pipe.expire(user_key, ttl)
@@ -135,7 +135,7 @@ async def refresh_session(token: str, session: Session) -> None:
 
     user_key = USER_SESSIONS_PREFIX + session.email
 
-    async with redis.pipeline(transaction=True) as pipe:
+    async with redis.pipeline(transaction=False) as pipe:
         pipe.set(session_key, json.dumps(data), ex=ttl)
         pipe.expire(user_key, ttl)
         await pipe.execute()
@@ -161,7 +161,7 @@ async def revoke_session(token: str) -> bool:
     # Get the session first to find the email for cleanup
     data = await redis.get(session_key)
 
-    async with redis.pipeline(transaction=True) as pipe:
+    async with redis.pipeline(transaction=False) as pipe:
         pipe.delete(session_key)
         if data is not None:
             parsed = json.loads(data)
@@ -236,7 +236,7 @@ async def revoke_all_user_sessions(email: str) -> int:
     if not tokens:
         return 0
 
-    async with redis.pipeline(transaction=True) as pipe:
+    async with redis.pipeline(transaction=False) as pipe:
         for token_bytes in tokens:
             token = token_bytes if isinstance(token_bytes, str) else token_bytes.decode()
             pipe.delete(SESSION_PREFIX + token)
