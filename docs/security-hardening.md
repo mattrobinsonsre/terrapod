@@ -210,6 +210,9 @@ Integrate with your log aggregator (Elasticsearch, Splunk, Datadog) by polling t
 
 Runner Jobs execute untrusted Terraform/Tofu code. Harden them:
 
+- **Short-lived runner tokens**: Each runner Job receives an HMAC-signed token scoped to its specific `run_id` with a configurable TTL (default 1h, max 2h). The token is stored in a K8s Secret with `ownerReference` to the Job — automatically garbage-collected when the Job is cleaned up. The raw token never appears in the Job spec (injected via `secretKeyRef`)
+- **Principle of least privilege**: Runner tokens carry only the `everyone` role. They can access binary cache downloads, provider mirror, and artifact endpoints for their own run — nothing else. Admin, write, and CRUD endpoints are inaccessible
+- **Authenticated API access**: All runner-facing endpoints (binary cache, provider mirror, artifact upload/download) require authentication. There are no unauthenticated endpoints that serve cached binaries or provider packages
 - **Read-only root filesystem**: Enabled by default. Writable directories (`/workspace`, `/tmp`) use emptyDir volumes
 - **No service account token**: `automountServiceAccountToken: false` by default (unless CSP identity is needed)
 - **Non-root execution**: Runs as UID 1000
@@ -217,6 +220,18 @@ Runner Jobs execute untrusted Terraform/Tofu code. Harden them:
 - **Seccomp profile**: RuntimeDefault
 - **Resource limits**: CPU and memory limits prevent noisy-neighbor issues
 - **Network isolation**: NetworkPolicies deny access to Postgres and Redis
+
+### Runner Token TTL
+
+Tune token lifetimes based on your typical run duration:
+
+```yaml
+runners:
+  tokenTTLSeconds: 3600       # Default token lifetime (1 hour)
+  maxTokenTTLSeconds: 7200    # Hard ceiling — API rejects requests above this
+```
+
+For environments with fast runs, reduce the TTL to minimize the window of token validity. For long-running applies (large infrastructure), increase as needed.
 
 For additional isolation, use:
 

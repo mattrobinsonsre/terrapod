@@ -132,7 +132,9 @@ cache/binaries/{tool}/{ver}/{os}_{arch}                  # Cached CLI binaries
 
 ### Presigned URLs
 
-All file uploads and downloads use presigned URLs. The API generates time-limited URLs; clients upload/download directly to/from storage. This keeps large files off the API server.
+File uploads and downloads for the **registry** (module tarballs, provider binaries, state version content) use presigned URLs. The API generates time-limited URLs; clients upload/download directly to/from storage. This keeps large files off the API server.
+
+**Runner artifacts** (config archives, state files, plan files, logs) use a different pattern: authenticated API endpoints at `/api/v2/runs/{run_id}/artifacts/*` that require a runner token. Downloads return 302 redirects to presigned storage URLs; uploads are received directly by the API and written to storage. This eliminates the need for presigned URL env vars in runner Jobs.
 
 For the filesystem backend, URLs are HMAC-signed and served by `storage/filesystem_routes.py` endpoints on the API server itself.
 
@@ -151,26 +153,38 @@ Terrapod's execution layer follows the Actions Runner Controller (ARC) pattern: 
         |
 3. Listener polls: GET /api/v2/listeners/{id}/runs/next
         |
-4. Listener creates K8s Job in runner namespace
+4. Listener claims run and requests a runner token:
+   POST /api/v2/listeners/{id}/runs/{run_id}/runner-token
+   - Returns short-lived HMAC-signed token scoped to run_id
+        |
+5. Listener creates K8s Job in runner namespace
    - Image: terrapod-runner (minimal Alpine)
    - Resources: from workspace config (cpu/memory requests + 2x limits)
    - Env vars: workspace variables + Terraform vars
-   - Service account: per-pool SA > global runner config SA > K8s default (for cloud identity)
+   - TP_AUTH_TOKEN via secretKeyRef (token never in Job spec)
+   - Service account: per-pool SA > global runner config SA > K8s default
    - Azure Workload Identity pod label added when `runners.azureWorkloadIdentity: true`
         |
-5. Runner Job starts:
-   a. Fetches terraform/tofu binary from binary cache
-   b. Downloads configuration tarball
-   c. Runs terraform init (providers via network mirror)
-   d. Runs terraform plan (streams logs to object storage)
-   e. Reports plan status to API
+6. Listener creates K8s Secret (tprun-{run_short}-auth)
+   - Contains the runner token
+   - ownerReference → Job (K8s GC deletes Secret when Job is cleaned up)
         |
-6. If auto_apply or user confirms:
+7. Runner Job starts (authenticates all API calls with TP_AUTH_TOKEN):
+   a. Fetches terraform/tofu binary from binary cache (authenticated)
+   b. Downloads config tarball via artifact endpoint (GET → 302 redirect)
+   c. Downloads current state via artifact endpoint (GET → 302 redirect)
+   d. Runs terraform init (providers via authenticated network mirror)
+   e. Runs terraform plan
+   f. Uploads plan log + plan file via artifact endpoints (PUT)
+   g. Reports plan status to API
+        |
+8. If auto_apply or user confirms:
    a. Runs terraform apply
-   b. Streams apply logs to object storage
+   b. Uploads apply log + new state via artifact endpoints (PUT)
    c. Reports apply status to API
         |
-7. Job completes, TTL controller cleans up after 10 minutes
+9. Job completes, TTL controller cleans up after 10 minutes
+   Secret is GC'd via ownerReference when Job is deleted
 ```
 
 ### Signal Forwarding and Graceful Termination
@@ -334,19 +348,23 @@ terraform login terrapod.local
 
 ### Unified Auth Dependency
 
-The API uses a single auth dependency (`api/dependencies.py:get_current_user`) for all endpoints. Two authentication methods are evaluated in priority order:
+The API uses a single auth dependency (`api/dependencies.py:get_current_user`) for all endpoints. Three authentication methods are evaluated in priority order:
 
 ```
 Incoming request
   |
   v
 1. If Authorization: Bearer <token> header present:
-   a. Try API token lookup:
+   a. Try runner token (fast, no I/O):
+      - Token starts with "runtok:" prefix?
+      - Verify HMAC-SHA256 signature + check expiry
+      - Return AuthenticatedUser with auth_method="runner_token", run_id={scoped_run_id}
+   b. Try API token lookup:
       - SHA-256 hash the token
       - Query api_tokens table by hash
       - Check max TTL (created_at + config TTL)
       - Resolve roles from role_assignments + platform_role_assignments
-   b. Try session lookup:
+   c. Try session lookup:
       - Query Redis: tp:session:{token}
       - Slide TTL on hit (12h)
       - Return cached user + roles
@@ -354,6 +372,8 @@ Incoming request
   v (no Bearer, or Bearer didn't match)
 2. Return 401 Unauthorized
 ```
+
+Runner tokens are checked first because verification is purely computational (HMAC comparison) with no database or Redis calls, making it the fastest path for the high-volume runner traffic.
 
 ---
 

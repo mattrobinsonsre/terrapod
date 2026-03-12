@@ -356,18 +356,23 @@ The provider cache implements the Terraform network mirror protocol. Runner Jobs
 
 ### How It Works
 
-1. Runner Job has `TF_CLI_CONFIG_FILE` pointing to a config with:
+1. Runner Job has a CLI config file with a `credentials` block and network mirror:
    ```hcl
+   credentials "terrapod.example.com" {
+     token = "<runner-token>"
+   }
    provider_installation {
      network_mirror {
-       url = "https://terrapod-api:8000/v1/providers/"
+       url = "https://terrapod.example.com/v1/providers/"
      }
    }
    ```
-2. Terraform requests provider binaries from the mirror URL
+2. Terraform requests provider binaries from the mirror URL (authenticated via credentials block)
 3. Terrapod checks the cache (`cached_provider_packages` table)
 4. Cache hit: redirect to presigned URL in object storage
 5. Cache miss: fetch from upstream (`registry.terraform.io` or `registry.opentofu.org`), store, serve
+
+**Note:** Provider mirror endpoints require authentication. Runner Jobs authenticate via the `credentials` block in the CLI config, which sends the runner token as a Bearer token to the Terrapod host.
 
 ### Configuration
 
@@ -418,10 +423,12 @@ The binary cache stores terraform and tofu CLI binaries so runner Jobs can fetch
 ### How It Works
 
 1. Runner Job starts with a generic image (no baked-in terraform/tofu binary)
-2. Runner entrypoint calls `GET /api/v2/binary-cache/{tool}/{version}/{os}/{arch}`
-3. API returns 302 redirect to presigned URL in object storage
+2. Runner entrypoint calls `GET /api/v2/binary-cache/{tool}/{version}/{os}/{arch}` with auth header (`Authorization: Bearer <runner-token>`)
+3. API validates authentication, returns 302 redirect to presigned URL in object storage
 4. Cache miss: API fetches from upstream (`releases.hashicorp.com` for terraform, GitHub releases for tofu), stores, redirects
 5. Runner downloads binary and begins execution
+
+**Note:** The binary cache download endpoint requires authentication. Unauthenticated requests return 401.
 
 ### Configuration
 
@@ -440,9 +447,10 @@ api:
 **Download binary (used by runners):**
 ```
 GET /api/v2/binary-cache/{tool}/{version}/{os}/{arch}
+Authorization: Bearer <token>
 ```
 
-Returns 302 redirect to presigned URL.
+Returns 302 redirect to presigned URL. Authentication required.
 
 **List cached binaries (admin):**
 ```zsh
