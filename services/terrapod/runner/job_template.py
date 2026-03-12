@@ -106,13 +106,11 @@ def build_job_spec(
     if var_files:
         container_env.append({"name": "TP_VAR_FILES", "value": json.dumps(var_files)})
 
-    # Binary cache URL
-    container_env.append(
-        {
-            "name": "TP_BINARY_URL",
-            "value": presigned_urls.get("binary_url", ""),
-        }
-    )
+    # Binary download: runner entrypoint detects OS/arch and downloads from
+    # the API binary cache endpoint using TP_API_URL + TP_BACKEND + TP_VERSION.
+    # Legacy TP_BINARY_URL is passed through if the API still provides it.
+    if presigned_urls.get("binary_url"):
+        container_env.append({"name": "TP_BINARY_URL", "value": presigned_urls["binary_url"]})
 
     # Presigned URLs for artifacts
     url_mappings = {

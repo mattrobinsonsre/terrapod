@@ -478,16 +478,9 @@ async def get_run_presigned_urls(
         await storage.presigned_put_url(state_key(ws_id, f"{run_id}-new"))
     ).url
 
-    # Binary cache URL (resolve partial version → exact)
-    try:
-        from terrapod.services.binary_cache_service import get_or_cache_binary, resolve_version
-
-        resolved_version = await resolve_version(run.execution_backend, run.terraform_version)
-        urls["binary_url"] = await get_or_cache_binary(
-            db, storage, run.execution_backend, resolved_version, "linux", "amd64"
-        )
-    except Exception as e:
-        logger.warning("Failed to resolve binary URL", error=str(e))
+    # Binary URL: runners detect their own OS/arch at runtime and download
+    # from the API binary cache endpoint directly (no pre-generated URL needed).
+    # TP_API_URL + TP_BACKEND + TP_VERSION are passed as Job env vars.
 
     return urls
 

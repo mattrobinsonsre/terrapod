@@ -61,13 +61,13 @@ async def github_webhook(request: Request) -> Response:
     full_name = repo.get("full_name", "")
 
     if not full_name:
-        logger.debug("Webhook event without repository", event=event_type)
+        logger.debug("Webhook event without repository", event_type=event_type)
         return JSONResponse(content={"message": "ignored"})
 
     if event_type in ("push", "pull_request"):
         logger.info(
             "Webhook event received",
-            event=event_type,
+            event_type=event_type,
             repo=full_name,
         )
         # Enqueue via scheduler — any replica can pick this up.

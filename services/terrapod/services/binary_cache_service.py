@@ -43,6 +43,10 @@ async def get_or_cache_binary(
     """
     if tool not in VALID_TOOLS:
         raise ValueError(f"Invalid tool: {tool}. Must be one of {VALID_TOOLS}")
+    if os_ not in VALID_OS:
+        raise ValueError(f"Invalid OS: {os_}. Must be one of {VALID_OS}")
+    if arch not in VALID_ARCH:
+        raise ValueError(f"Invalid arch: {arch}. Must be one of {VALID_ARCH}")
 
     # Check cache
     cached = await _get_cached(db, tool, version, os_, arch)
@@ -250,10 +254,23 @@ async def _fetch_tofu_versions() -> list[str]:
 async def resolve_version(tool: str, partial_version: str) -> str:
     """Resolve a partial version (e.g. '1.9') to the latest exact version (e.g. '1.9.8').
 
-    If the version already has 3+ components (x.y.z), returns as-is.
-    For 2-component versions (x.y), queries upstream for the latest patch.
+    Handles:
+    - Empty/None/"latest" → latest stable version
+    - Two-component (x.y) → latest x.y.z patch
+    - Three-component (x.y.z) → returned as-is
+
     Results are cached in Redis for 1 hour.
     """
+    # Normalize empty, None, or "latest" to the latest stable release
+    if not partial_version or partial_version.strip().lower() == "latest":
+        versions = await list_available_versions(tool)
+        # list_available_versions returns shortcuts first, then full versions
+        # Find the first full x.y.z version
+        for v in versions:
+            if len(v.split(".")) >= 3:
+                return v
+        raise ValueError(f"No stable versions found for {tool}")
+
     parts = partial_version.split(".")
     if len(parts) >= 3:
         return partial_version  # Already exact
