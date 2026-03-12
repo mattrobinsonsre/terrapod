@@ -121,6 +121,8 @@
         "topologySpreadConstraints": { "type": "array", "items": { "type": "object" } },
         "podSecurityContext": { "type": "object" },
         "ttlSecondsAfterFinished": { "type": "integer", "minimum": 0 },
+        "tokenTTLSeconds": { "type": "integer", "minimum": 1 },
+        "maxTokenTTLSeconds": { "type": "integer", "minimum": 1 },
         "serviceAccount": { "$ref": "#/$defs/serviceAccountSpec" },
         "azureWorkloadIdentity": { "type": "boolean" }
       }

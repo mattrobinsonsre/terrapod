@@ -54,7 +54,8 @@ class AuthenticatedUser:
     display_name: str | None
     roles: list[str]
     provider_name: str
-    auth_method: str  # "session" or "api_token"
+    auth_method: str  # "session", "api_token", or "runner_token"
+    run_id: str | None = None  # Set only for runner_token auth
 
 
 async def _resolve_user_roles(db: AsyncSession, email: str) -> list[str]:
@@ -112,7 +113,23 @@ async def get_current_user(
     if credentials is not None:
         token = credentials.credentials
 
-        # Try API token first (fast hash + indexed DB lookup)
+        # Try runner token first (fast HMAC check, no DB/Redis)
+        if token.startswith("runtok:"):
+            from terrapod.auth.runner_tokens import verify_runner_token
+
+            run_id = verify_runner_token(token)
+            if run_id is not None:
+                request.state.user_email = "runner"  # for audit middleware
+                return AuthenticatedUser(
+                    email="runner",
+                    display_name="Runner Job",
+                    roles=["everyone"],
+                    provider_name="runner_token",
+                    auth_method="runner_token",
+                    run_id=run_id,
+                )
+
+        # Try API token (fast hash + indexed DB lookup)
         api_token = await validate_api_token(db, token)
         if api_token is not None:
             # Resolve roles from DB (cached in Redis for 60s)
@@ -150,6 +167,22 @@ async def get_current_user(
         detail="Invalid or expired token",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+
+def require_non_runner(
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> AuthenticatedUser:
+    """Reject runner tokens — use on endpoints runners must not access.
+
+    Runner tokens are scoped to artifact/cache operations only. This
+    dependency blocks them from resource creation and management endpoints.
+    """
+    if user.auth_method == "runner_token":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Runner tokens cannot access this endpoint",
+        )
+    return user
 
 
 async def get_current_session(

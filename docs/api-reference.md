@@ -922,6 +922,35 @@ GET /api/v2/listeners/{id}/runs/next
 
 Returns the next queued run for this listener.
 
+### Listener Runner Token
+
+```
+POST /api/v2/listeners/{id}/runs/{run_id}/runner-token
+```
+
+Generates a short-lived HMAC-signed runner token scoped to the specified run. Called by the listener after claiming a run.
+
+**Request body (optional):**
+```json
+{
+  "ttl": 3600
+}
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `ttl` | integer | `runners.tokenTTLSeconds` (default 3600) | Requested token lifetime in seconds. Clamped to `runners.maxTokenTTLSeconds` (default 7200) |
+
+**Response:**
+```json
+{
+  "token": "runtok:{run_id}:{ttl}:{timestamp}:{hmac_sig}",
+  "expires_in": 3600
+}
+```
+
+**Auth:** Listener certificate.
+
 ### Listener Status Update
 
 ```
@@ -1134,6 +1163,72 @@ DELETE /api/v2/authentication-tokens/{id}
 
 ---
 
+## Run Artifacts (Runner)
+
+Authenticated endpoints for runner Jobs to download inputs and upload outputs. All endpoints require a runner token (`Authorization: Bearer runtok:...`) scoped to the specified `run_id`.
+
+### Download Config Archive
+
+```
+GET /api/v2/runs/{run_id}/artifacts/config
+```
+
+Returns 302 redirect to presigned storage URL for the configuration tarball.
+
+### Download State
+
+```
+GET /api/v2/runs/{run_id}/artifacts/state
+```
+
+Returns 302 redirect to presigned storage URL for the current workspace state.
+
+### Download Plan File
+
+```
+GET /api/v2/runs/{run_id}/artifacts/plan-file
+```
+
+Returns 302 redirect to presigned storage URL for the plan binary file.
+
+### Upload Plan Log
+
+```
+PUT /api/v2/runs/{run_id}/artifacts/plan-log
+Content-Type: application/octet-stream
+```
+
+Upload raw plan log bytes. Returns 204 on success.
+
+### Upload Plan File
+
+```
+PUT /api/v2/runs/{run_id}/artifacts/plan-file
+Content-Type: application/octet-stream
+```
+
+Upload plan binary file. Returns 204 on success.
+
+### Upload Apply Log
+
+```
+PUT /api/v2/runs/{run_id}/artifacts/apply-log
+Content-Type: application/octet-stream
+```
+
+Upload raw apply log bytes. Returns 204 on success.
+
+### Upload State
+
+```
+PUT /api/v2/runs/{run_id}/artifacts/state
+Content-Type: application/octet-stream
+```
+
+Upload new state after apply. Returns 204 on success.
+
+---
+
 ## Binary Cache
 
 ### Download Binary
@@ -1143,6 +1238,8 @@ GET /api/v2/binary-cache/{tool}/{version}/{os}/{arch}
 ```
 
 Returns a 302 redirect to a presigned URL for the binary. `tool` is `terraform` or `tofu`.
+
+**Required:** Authentication (runner token, API token, or session).
 
 ### List Cached Binaries (Admin)
 
@@ -1238,6 +1335,8 @@ Returns platform-wide health data including workspace status summaries, recent r
 ---
 
 ## Provider Cache (Network Mirror)
+
+All provider mirror endpoints require authentication (runner token, API token, or session).
 
 ### Provider Version Index
 
@@ -1475,7 +1574,7 @@ Sends a test payload to the configured destination and returns the delivery resp
 | 200 | Success |
 | 201 | Created |
 | 204 | Deleted (no content) |
-| 302 | Redirect (presigned URLs, OAuth flows) |
+| 302 | Redirect (presigned URLs, binary cache, artifact downloads, OAuth flows) |
 | 400 | Bad request (validation error) |
 | 401 | Unauthorized (missing or invalid token) |
 | 403 | Forbidden (insufficient permissions) |

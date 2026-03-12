@@ -87,6 +87,8 @@ class RunnerConfig(BaseModel):
     definitions: list[RunnerDefinition] = Field(
         default_factory=lambda: [RunnerDefinition(name="standard", description="Standard runner")]
     )
+    token_ttl_seconds: int = Field(default=3600, description="Default runner token TTL")
+    max_token_ttl_seconds: int = Field(default=7200, description="Maximum runner token TTL")
     node_selector: dict[str, str] = Field(default_factory=dict)
     tolerations: list[dict] = Field(default_factory=list)
     affinity: dict = Field(default_factory=dict)

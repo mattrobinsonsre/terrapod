@@ -41,7 +41,7 @@ def build_job_spec(
     run_id: str,
     phase: str,  # "plan" or "apply"
     runner_config: RunnerConfig,
-    presigned_urls: dict[str, str],
+    auth_secret_name: str,
     env_vars: list[dict[str, str]],
     terraform_vars: list[dict[str, str]],
     resource_cpu: str = "1",
@@ -59,7 +59,7 @@ def build_job_spec(
         run_id: The run UUID.
         phase: "plan" or "apply".
         runner_config: Global runner config (image, defaults, etc.).
-        presigned_urls: Download/upload URLs for artifacts.
+        auth_secret_name: K8s Secret name containing the runner token.
         env_vars: Workspace env vars [{key, value}].
         terraform_vars: Terraform vars [{key, value}] → TF_VAR_*.
         resource_cpu: CPU request (e.g. "1", "500m").
@@ -89,6 +89,15 @@ def build_job_spec(
             "name": "TP_API_URL",
             "value": os.environ.get("TERRAPOD_API_URL", "http://terrapod-api:8000"),
         },
+        {
+            "name": "TP_AUTH_TOKEN",
+            "valueFrom": {
+                "secretKeyRef": {
+                    "name": auth_secret_name,
+                    "key": "token",
+                }
+            },
+        },
     ]
 
     # Setup script (runs before terraform init)
@@ -105,26 +114,6 @@ def build_job_spec(
         container_env.append({"name": "TP_PLAN_ONLY", "value": "true"})
     if var_files:
         container_env.append({"name": "TP_VAR_FILES", "value": json.dumps(var_files)})
-
-    # Binary download: runner entrypoint detects OS/arch and downloads from
-    # the API binary cache endpoint using TP_API_URL + TP_BACKEND + TP_VERSION.
-    # Legacy TP_BINARY_URL is passed through if the API still provides it.
-    if presigned_urls.get("binary_url"):
-        container_env.append({"name": "TP_BINARY_URL", "value": presigned_urls["binary_url"]})
-
-    # Presigned URLs for artifacts
-    url_mappings = {
-        "TP_CONFIG_URL": "config_download_url",
-        "TP_STATE_URL": "state_download_url",
-        "TP_PLAN_LOG_UPLOAD_URL": "plan_log_upload_url",
-        "TP_PLAN_FILE_UPLOAD_URL": "plan_file_upload_url",
-        "TP_APPLY_LOG_UPLOAD_URL": "apply_log_upload_url",
-        "TP_STATE_UPLOAD_URL": "state_upload_url",
-        "TP_PLAN_FILE_DOWNLOAD_URL": "plan_file_download_url",
-    }
-    for env_name, url_key in url_mappings.items():
-        if url_key in presigned_urls:
-            container_env.append({"name": env_name, "value": presigned_urls[url_key]})
 
     # Workspace env vars (category=env)
     for var in env_vars:

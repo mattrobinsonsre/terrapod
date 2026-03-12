@@ -17,7 +17,6 @@ import json
 import os
 import signal
 import time
-from urllib.parse import urlparse, urlunparse
 
 import httpx
 
@@ -284,10 +283,9 @@ class RunnerListener:
             data = response.json()["data"]
             run_id = data["id"].removeprefix("run-")
             attrs = data.get("attributes", {})
-            urls = attrs.get("presigned-urls", {})
 
-            # Rewrite URLs for internal access
-            urls = self._rewrite_urls(urls)
+            # Request a runner token for this run
+            runner_token = await self._get_runner_token(run_id)
 
             # Extract resolved workspace variables from API response
             env_vars = [{"key": v["key"], "value": v["value"]} for v in attrs.get("env-vars", [])]
@@ -301,7 +299,7 @@ class RunnerListener:
                     phase="plan",
                     resource_cpu=attrs.get("resource-cpu", "1"),
                     resource_memory=attrs.get("resource-memory", "2Gi"),
-                    presigned_urls=urls,
+                    runner_token=runner_token,
                     env_vars=env_vars,
                     terraform_vars=terraform_vars,
                     terraform_version=attrs.get("terraform-version", ""),
@@ -314,36 +312,59 @@ class RunnerListener:
 
         logger.info("Claimed and started run", run_id=run_id)
 
-    def _rewrite_urls(self, urls: dict[str, str]) -> dict[str, str]:
-        """Rewrite presigned URL hostnames to the runner server_url.
+    async def _get_runner_token(self, run_id: str) -> str:
+        """Request a short-lived runner token from the API."""
+        async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
+            response = await client.post(
+                f"/api/v2/listeners/listener-{self.identity.listener_id}"
+                f"/runs/run-{run_id}/runner-token",
+                json={},
+                headers=self._auth_headers(),
+            )
+            response.raise_for_status()
+            return response.json()["token"]
 
-        Filesystem storage generates URLs pointing at the external API
-        (e.g. https://terrapod.local/api/v2/storage/...) but runner Jobs
-        need to reach the API via the internal K8s service URL (e.g.
-        http://terrapod-api:8000). Cloud storage URLs (S3, Azure, GCS)
-        already point at the correct endpoint and must not be rewritten.
+    async def _create_auth_secret(
+        self, run_id: str, token: str, job_name: str, job_uid: str
+    ) -> str:
+        """Create a K8s Secret containing the runner token with ownerReference to the Job.
 
-        Heuristic: only rewrite URLs whose path starts with /api/ — those
-        are Terrapod API endpoints. Cloud presigned URLs never have /api/ paths.
+        Returns the Secret name.
         """
-        server_url = self.runner_config.server_url or os.environ.get("TERRAPOD_API_URL", "")
-        if not server_url:
-            return urls
+        from kubernetes import client as k8s_client
 
-        target = urlparse(server_url)
-        rewritten = {}
-        for key, url in urls.items():
-            parsed = urlparse(url)
-            if parsed.path.startswith("/api/"):
-                rewritten[key] = urlunparse(
-                    parsed._replace(
-                        scheme=target.scheme,
-                        netloc=target.netloc,
+        from terrapod.runner.job_manager import _get_core_api
+
+        namespace = os.environ.get("TERRAPOD_RUNNER_NAMESPACE", "terrapod-runners")
+        run_short = run_id[:8]
+        secret_name = f"tprun-{run_short}-auth"
+
+        secret = k8s_client.V1Secret(
+            metadata=k8s_client.V1ObjectMeta(
+                name=secret_name,
+                namespace=namespace,
+                labels={
+                    "app.kubernetes.io/name": "terrapod-runner",
+                    "terrapod.io/run-id": run_id,
+                },
+                owner_references=[
+                    k8s_client.V1OwnerReference(
+                        api_version="batch/v1",
+                        kind="Job",
+                        name=job_name,
+                        uid=job_uid,
+                        block_owner_deletion=True,
                     )
-                )
-            else:
-                rewritten[key] = url
-        return rewritten
+                ],
+            ),
+            type="Opaque",
+            string_data={"token": token},
+        )
+
+        core_api = _get_core_api()
+        core_api.create_namespaced_secret(namespace=namespace, body=secret)
+        logger.info("Created auth secret", secret=secret_name, job=job_name)
+        return secret_name
 
     async def _execute_run(
         self,
@@ -351,7 +372,7 @@ class RunnerListener:
         phase: str,
         resource_cpu: str,
         resource_memory: str,
-        presigned_urls: dict,
+        runner_token: str,
         env_vars: list,
         terraform_vars: list,
         terraform_version: str = "",
@@ -362,6 +383,9 @@ class RunnerListener:
         """Execute a run by creating a K8s Job and watching it (plan + apply)."""
         from terrapod.runner.job_template import build_job_spec
 
+        run_short = run_id[:8]
+        auth_secret_name = f"tprun-{run_short}-auth"
+
         # ── Pre-plan task stage ─────────────────────────────────────
         if not await self._check_task_stage(run_id, "pre_plan"):
             return
@@ -371,7 +395,7 @@ class RunnerListener:
             run_id=run_id,
             phase="plan",
             runner_config=self.runner_config,
-            presigned_urls=presigned_urls,
+            auth_secret_name=auth_secret_name,
             env_vars=env_vars,
             terraform_vars=terraform_vars,
             resource_cpu=resource_cpu,
@@ -382,7 +406,9 @@ class RunnerListener:
             var_files=var_files,
         )
 
-        job_name, result = await self._create_and_watch_job(plan_spec, run_id, "plan")
+        job_name, result = await self._create_and_watch_job(
+            plan_spec, run_id, "plan", runner_token=runner_token
+        )
 
         if result != "succeeded":
             logger.error("Plan failed", run_id=run_id, result=result)
@@ -415,13 +441,11 @@ class RunnerListener:
         # ── Apply phase ─────────────────────────────────────────────
         await self._report_status(run_id, "applying")
 
-        apply_urls = await self._get_apply_urls(run_id)
-
         apply_spec = build_job_spec(
             run_id=run_id,
             phase="apply",
             runner_config=self.runner_config,
-            presigned_urls=apply_urls,
+            auth_secret_name=auth_secret_name,
             env_vars=env_vars,
             terraform_vars=terraform_vars,
             resource_cpu=resource_cpu,
@@ -431,7 +455,9 @@ class RunnerListener:
             var_files=var_files,
         )
 
-        apply_job_name, apply_result = await self._create_and_watch_job(apply_spec, run_id, "apply")
+        apply_job_name, apply_result = await self._create_and_watch_job(
+            apply_spec, run_id, "apply", runner_token=runner_token
+        )
 
         if apply_result == "succeeded":
             logger.info("Apply succeeded", run_id=run_id)
@@ -446,8 +472,9 @@ class RunnerListener:
         run_id: str,
         phase: str,
         max_retries: int = 2,
+        runner_token: str = "",
     ) -> tuple[str, str]:
-        """Create a K8s Job and watch it, retrying on transient failures.
+        """Create a K8s Job, create auth Secret with ownerRef, and watch.
 
         Retries on: Job deleted externally, pod stuck in image pull errors,
         etc. Does NOT retry on: container ran and exited non-zero (failed),
@@ -455,7 +482,13 @@ class RunnerListener:
 
         Returns (job_name, result).
         """
-        from terrapod.runner.job_manager import create_job, delete_job, get_job_status, watch_job
+        from terrapod.runner.job_manager import (
+            create_job,
+            delete_job,
+            get_job_status,
+            get_job_uid,
+            watch_job,
+        )
 
         job_name = spec.get("metadata", {}).get("name", "unknown")
         result = "timeout"
@@ -485,6 +518,21 @@ class RunnerListener:
                 )
                 result = "create_error"
                 continue
+
+            # Create auth Secret with ownerReference to the Job
+            if runner_token:
+                try:
+                    job_uid = await get_job_uid(job_name)
+                    await self._create_auth_secret(run_id, runner_token, job_name, job_uid)
+                except Exception as e:
+                    logger.error(
+                        "Failed to create auth secret",
+                        run_id=run_id,
+                        phase=phase,
+                        error=str(e),
+                    )
+                    result = "secret_error"
+                    continue
 
             result = await watch_job(job_name, timeout_seconds=60 * 60)
 
@@ -608,17 +656,6 @@ class RunnerListener:
         except Exception as e:
             logger.warning("Error fetching run status", run_id=run_id, error=str(e))
             return "unknown"
-
-    async def _get_apply_urls(self, run_id: str) -> dict[str, str]:
-        """Get presigned URLs for the apply phase."""
-        async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
-            response = await client.get(
-                f"/api/v2/listeners/listener-{self.identity.listener_id}"
-                f"/runs/run-{run_id}/apply-urls",
-                headers=self._auth_headers(),
-            )
-            response.raise_for_status()
-            return self._rewrite_urls(response.json())
 
     async def _check_task_stage(self, run_id: str, stage_name: str) -> bool:
         """Check for applicable run tasks at a stage boundary.

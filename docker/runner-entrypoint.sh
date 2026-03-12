@@ -7,6 +7,8 @@ set -e
 # so it can release state locks and exit cleanly. This is critical for spot
 # instance preemption — K8s sends SIGTERM, and we have 120s
 # (terminationGracePeriodSeconds) before SIGKILL.
+#
+# All API calls use TP_AUTH_TOKEN (short-lived runner token from K8s Secret).
 
 CHILD_PID=""
 
@@ -28,6 +30,9 @@ WORK_DIR="/workspace"
 mkdir -p "$WORK_DIR"
 cd "$WORK_DIR"
 
+# Auth header for all API calls
+AUTH_HEADER="Authorization: Bearer $TP_AUTH_TOKEN"
+
 # --- Download binary from cache ---
 # Detect platform architecture for correct binary download
 TP_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -37,17 +42,12 @@ case "$TP_ARCH" in
     aarch64) TP_ARCH="arm64" ;;
 esac
 
-if [ -n "$TP_BINARY_URL" ]; then
-    # Legacy: pre-generated presigned URL (arch-specific)
-    echo "[entrypoint] Downloading $TP_BACKEND $TP_VERSION from binary cache..."
-    curl -sSfL "$TP_BINARY_URL" -o "/tmp/${TP_BACKEND}.zip"
-elif [ -n "$TP_API_URL" ] && [ -n "$TP_VERSION" ]; then
-    # Detect arch and download from API binary cache endpoint
+if [ -n "$TP_API_URL" ] && [ -n "$TP_VERSION" ]; then
     BINARY_URL="${TP_API_URL}/api/v2/binary-cache/${TP_BACKEND}/${TP_VERSION}/${TP_OS}/${TP_ARCH}"
     echo "[entrypoint] Downloading $TP_BACKEND $TP_VERSION ($TP_OS/$TP_ARCH) from binary cache..."
-    curl -sSfL "$BINARY_URL" -o "/tmp/${TP_BACKEND}.zip"
+    curl -sSfL -H "$AUTH_HEADER" "$BINARY_URL" -o "/tmp/${TP_BACKEND}.zip"
 else
-    echo "[entrypoint] No binary cache URL, expecting $TP_BACKEND on PATH"
+    echo "[entrypoint] No API URL, expecting $TP_BACKEND on PATH"
     TP_BIN="$TP_BACKEND"
 fi
 
@@ -58,31 +58,38 @@ if [ -z "$TP_BIN" ]; then
 fi
 
 # --- Download configuration archive ---
-if [ -n "$TP_CONFIG_URL" ]; then
+if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
     echo "[entrypoint] Downloading configuration..."
-    curl -sSfL "$TP_CONFIG_URL" -o /tmp/config.tar.gz
-    tar xzf /tmp/config.tar.gz -C "$WORK_DIR"
+    HTTP_CODE=$(curl -sSf -o /tmp/config.tar.gz -w "%{http_code}" -L -H "$AUTH_HEADER" \
+        "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/config" 2>/dev/null) || true
+    if [ "$HTTP_CODE" = "200" ] && [ -f /tmp/config.tar.gz ]; then
+        tar xzf /tmp/config.tar.gz -C "$WORK_DIR"
 
-    # Strip cloud {} and backend {} blocks from .tf files.
-    # Uploaded configs have cloud/backend blocks that would cause recursive
-    # backend use when running in remote execution mode.
-    for tf_file in "$WORK_DIR"/*.tf; do
-        [ -f "$tf_file" ] || continue
-        awk '
-        /^[[:space:]]*(cloud|backend)[[:space:]]*(\{|"[^"]*"[[:space:]]*\{)/ { depth=1; next }
-        depth > 0 { if (/\{/) depth++; if (/\}/) depth--; next }
-        { print }
-        ' "$tf_file" > "${tf_file}.tmp" && mv "${tf_file}.tmp" "$tf_file"
-    done
-    # Remove lock file — the runner resolves providers independently
-    rm -f "$WORK_DIR/.terraform.lock.hcl"
-    echo "[entrypoint] Stripped cloud/backend blocks from uploaded config"
+        # Strip cloud {} and backend {} blocks from .tf files.
+        # Uploaded configs have cloud/backend blocks that would cause recursive
+        # backend use when running in remote execution mode.
+        for tf_file in "$WORK_DIR"/*.tf; do
+            [ -f "$tf_file" ] || continue
+            awk '
+            /^[[:space:]]*(cloud|backend)[[:space:]]*(\{|"[^"]*"[[:space:]]*\{)/ { depth=1; next }
+            depth > 0 { if (/\{/) depth++; if (/\}/) depth--; next }
+            { print }
+            ' "$tf_file" > "${tf_file}.tmp" && mv "${tf_file}.tmp" "$tf_file"
+        done
+        # Remove lock file — the runner resolves providers independently
+        rm -f "$WORK_DIR/.terraform.lock.hcl"
+        echo "[entrypoint] Stripped cloud/backend blocks from uploaded config"
+    else
+        echo "[entrypoint] No configuration archive (HTTP $HTTP_CODE)"
+    fi
 fi
 
 # --- Download current state ---
-if [ -n "$TP_STATE_URL" ]; then
+if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
     echo "[entrypoint] Downloading current state..."
-    curl -sSfL "$TP_STATE_URL" -o "$WORK_DIR/terraform.tfstate" || true
+    curl -sSfL -H "$AUTH_HEADER" \
+        "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/state" \
+        -o "$WORK_DIR/terraform.tfstate" 2>/dev/null || true
 fi
 
 # --- Run setup script (if configured) ---
@@ -91,12 +98,18 @@ if [ -n "$TP_SETUP_SCRIPT" ]; then
     eval "$TP_SETUP_SCRIPT"
 fi
 
-# --- Configure provider mirror ---
+# --- Configure provider mirror + credentials ---
 # Only configure network mirror for HTTPS URLs (terraform/tofu require HTTPS)
 if [ -n "$TP_API_URL" ]; then
+    # Extract hostname from API URL for credentials block
+    MIRROR_HOST=$(echo "$TP_API_URL" | sed -n 's|^https\{0,1\}://\([^/:]*\).*|\1|p')
+
     case "$TP_API_URL" in
         https://*)
             cat > /tmp/terraform.rc <<TFEOF
+credentials "$MIRROR_HOST" {
+  token = "$TP_AUTH_TOKEN"
+}
 provider_installation {
   network_mirror {
     url = "${TP_API_URL}/v1/providers/"
@@ -104,10 +117,18 @@ provider_installation {
 }
 TFEOF
             export TF_CLI_CONFIG_FILE="/tmp/terraform.rc"
-            echo "[entrypoint] Provider mirror configured: ${TP_API_URL}/v1/providers/"
+            echo "[entrypoint] Provider mirror + credentials configured: ${TP_API_URL}/v1/providers/"
             ;;
         *)
-            echo "[entrypoint] Skipping provider mirror (requires HTTPS): ${TP_API_URL}"
+            # HTTP — skip network mirror (terraform requires HTTPS) but still
+            # write credentials for private registry access
+            cat > /tmp/terraform.rc <<TFEOF
+credentials "$MIRROR_HOST" {
+  token = "$TP_AUTH_TOKEN"
+}
+TFEOF
+            export TF_CLI_CONFIG_FILE="/tmp/terraform.rc"
+            echo "[entrypoint] Skipping provider mirror (requires HTTPS), credentials configured for: $MIRROR_HOST"
             ;;
     esac
 fi
@@ -159,20 +180,28 @@ if [ "$TP_PHASE" = "plan" ]; then
     fi
 
     # Upload plan log
-    if [ -n "$TP_PLAN_LOG_UPLOAD_URL" ] && [ -f /tmp/plan.log ]; then
-        curl -sSf -X PUT -H "Content-Type: application/octet-stream" --data-binary @/tmp/plan.log "$TP_PLAN_LOG_UPLOAD_URL" || true
+    if [ -n "$TP_API_URL" ] && [ -f /tmp/plan.log ]; then
+        curl -sSf -X PUT -H "$AUTH_HEADER" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @/tmp/plan.log \
+            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-log" || true
     fi
 
     # Upload plan file
-    if [ -n "$TP_PLAN_FILE_UPLOAD_URL" ] && [ -f tfplan ]; then
-        curl -sSf -X PUT -H "Content-Type: application/octet-stream" --data-binary @tfplan "$TP_PLAN_FILE_UPLOAD_URL" || true
+    if [ -n "$TP_API_URL" ] && [ -f tfplan ]; then
+        curl -sSf -X PUT -H "$AUTH_HEADER" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @tfplan \
+            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-file" || true
     fi
 
 elif [ "$TP_PHASE" = "apply" ]; then
-    # Download plan file from plan phase (if available)
-    if [ -n "$TP_PLAN_FILE_DOWNLOAD_URL" ]; then
+    # Download plan file from plan phase
+    if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
         echo "[entrypoint] Downloading plan file from plan phase..."
-        curl -sSfL "$TP_PLAN_FILE_DOWNLOAD_URL" -o tfplan
+        curl -sSfL -H "$AUTH_HEADER" \
+            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-file" \
+            -o tfplan 2>/dev/null || true
     fi
 
     echo "[entrypoint] Running $TP_BACKEND apply..."
@@ -190,13 +219,19 @@ elif [ "$TP_PHASE" = "apply" ]; then
     cat /tmp/apply.log 2>/dev/null || true
 
     # Upload apply log
-    if [ -n "$TP_APPLY_LOG_UPLOAD_URL" ] && [ -f /tmp/apply.log ]; then
-        curl -sSf -X PUT -H "Content-Type: application/octet-stream" --data-binary @/tmp/apply.log "$TP_APPLY_LOG_UPLOAD_URL" || true
+    if [ -n "$TP_API_URL" ] && [ -f /tmp/apply.log ]; then
+        curl -sSf -X PUT -H "$AUTH_HEADER" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @/tmp/apply.log \
+            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/apply-log" || true
     fi
 
     # Upload new state
-    if [ -n "$TP_STATE_UPLOAD_URL" ] && [ -f terraform.tfstate ]; then
-        curl -sSf -X PUT -H "Content-Type: application/octet-stream" --data-binary @terraform.tfstate "$TP_STATE_UPLOAD_URL" || true
+    if [ -n "$TP_API_URL" ] && [ -f terraform.tfstate ]; then
+        curl -sSf -X PUT -H "$AUTH_HEADER" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @terraform.tfstate \
+            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/state" || true
     fi
 fi
 

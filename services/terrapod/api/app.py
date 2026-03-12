@@ -445,6 +445,11 @@ def create_application() -> FastAPI:
 
     app.include_router(runs_router)
 
+    # Run artifact endpoints (runner token auth)
+    from terrapod.api.routers.run_artifacts import router as run_artifacts_router
+
+    app.include_router(run_artifacts_router)
+
     # Configuration version endpoints
     from terrapod.api.routers.config_versions import router as config_versions_router
 
