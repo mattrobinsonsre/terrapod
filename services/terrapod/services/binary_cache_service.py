@@ -259,7 +259,6 @@ async def resolve_version(tool: str, partial_version: str) -> str:
     """
     # Normalize empty, None, or "latest" to the latest stable release
     if not partial_version or partial_version.strip().lower() == "latest":
-        partial_version = "latest"
         versions = await list_available_versions(tool)
         # list_available_versions returns shortcuts first, then full versions
         # Find the first full x.y.z version
