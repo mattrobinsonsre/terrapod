@@ -143,12 +143,12 @@ if [ "$TP_PHASE" = "plan" ]; then
 
     # Upload plan log
     if [ -n "$TP_PLAN_LOG_UPLOAD_URL" ] && [ -f /tmp/plan.log ]; then
-        curl -sSf -X PUT --data-binary @/tmp/plan.log "$TP_PLAN_LOG_UPLOAD_URL" || true
+        curl -sSf -X PUT -H "Content-Type: application/octet-stream" --data-binary @/tmp/plan.log "$TP_PLAN_LOG_UPLOAD_URL" || true
     fi
 
     # Upload plan file
     if [ -n "$TP_PLAN_FILE_UPLOAD_URL" ] && [ -f tfplan ]; then
-        curl -sSf -X PUT --data-binary @tfplan "$TP_PLAN_FILE_UPLOAD_URL" || true
+        curl -sSf -X PUT -H "Content-Type: application/octet-stream" --data-binary @tfplan "$TP_PLAN_FILE_UPLOAD_URL" || true
     fi
 
 elif [ "$TP_PHASE" = "apply" ]; then
@@ -174,12 +174,12 @@ elif [ "$TP_PHASE" = "apply" ]; then
 
     # Upload apply log
     if [ -n "$TP_APPLY_LOG_UPLOAD_URL" ] && [ -f /tmp/apply.log ]; then
-        curl -sSf -X PUT --data-binary @/tmp/apply.log "$TP_APPLY_LOG_UPLOAD_URL" || true
+        curl -sSf -X PUT -H "Content-Type: application/octet-stream" --data-binary @/tmp/apply.log "$TP_APPLY_LOG_UPLOAD_URL" || true
     fi
 
     # Upload new state
     if [ -n "$TP_STATE_UPLOAD_URL" ] && [ -f terraform.tfstate ]; then
-        curl -sSf -X PUT --data-binary @terraform.tfstate "$TP_STATE_UPLOAD_URL" || true
+        curl -sSf -X PUT -H "Content-Type: application/octet-stream" --data-binary @terraform.tfstate "$TP_STATE_UPLOAD_URL" || true
     fi
 fi
 
