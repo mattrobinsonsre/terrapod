@@ -133,7 +133,8 @@ async def get_current_user(
         if session is not None:
             # Sliding window: refresh TTL on activity (rate-limited to every 5 min)
             if _should_refresh_session(session):
-                await refresh_session(token, session)
+                new_expires = await refresh_session(token, session)
+                request.state.session_expires_at = new_expires
 
             request.state.user_email = session.email  # for audit middleware
             return AuthenticatedUser(
