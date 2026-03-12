@@ -598,8 +598,6 @@ migrations:
 
 Terrapod requires Redis 7+. Use a managed service (ElastiCache, Memorystore, Azure Cache) for production.
 
-> **Important:** Do not use Redis Cluster mode. Terrapod uses multi-key pipelines (sessions, auth state) that require all keys to be on the same shard. Use a single-node or single-shard replicated configuration (e.g., ElastiCache with Multi-AZ automatic failover, Memorystore Standard tier, Azure Cache P1+ with replicas). This provides high availability without the cross-slot limitations of cluster mode.
-
 ### Connection URL
 
 ```
@@ -794,7 +792,7 @@ PostgreSQL is the bottleneck for high-concurrency scenarios. Use:
 
 ### Redis
 
-Redis handles sessions, auth state, and listener heartbeats. A single-shard replicated instance is typically sufficient. Do not use Redis Cluster mode — Terrapod's session management uses multi-key pipelines that are incompatible with hash slot distribution.
+Redis handles sessions, auth state, and listener heartbeats. A single Redis instance or small cluster is typically sufficient.
 
 ---
 

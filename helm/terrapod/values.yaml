@@ -639,7 +639,6 @@ postgresql:
 
 # ── Redis ─────────────────────────────────────────────────────────────────
 # Provide credentials via existingSecret (recommended) or url (dev only).
-# IMPORTANT: Do not use Redis Cluster mode — use single-shard with replicas.
 redis:
   url: ""
   # existingSecret: "terrapod-redis-credentials"
