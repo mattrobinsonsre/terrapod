@@ -1,5 +1,6 @@
 """Build K8s Job specs for terraform/tofu plan and apply phases."""
 
+import json
 import os
 import re
 
@@ -51,6 +52,7 @@ def build_job_spec(
     service_account_name: str = "",
     namespace: str = "",
     plan_only: bool = False,
+    var_files: list[str] | None = None,
 ) -> dict:
     """Build a K8s Job spec for a run phase.
 
@@ -103,6 +105,8 @@ def build_job_spec(
     container_env.append({"name": "TP_BACKEND", "value": backend})
     if plan_only:
         container_env.append({"name": "TP_PLAN_ONLY", "value": "true"})
+    if var_files:
+        container_env.append({"name": "TP_VAR_FILES", "value": json.dumps(var_files)})
 
     # Binary cache URL
     container_env.append(

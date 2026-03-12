@@ -48,6 +48,7 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.drift_status = overrides.get("drift_status", "")
     ws.execution_backend = overrides.get("execution_backend", "tofu")
     ws.agent_pool = None
+    ws.var_files = []
     ws.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     ws.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
     return ws

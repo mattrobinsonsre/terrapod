@@ -48,6 +48,16 @@ class VCSProvider(Protocol):
         """List open PRs/MRs targeting the given base branch."""
         ...
 
+    async def get_changed_files(
+        self, conn: VCSConnection, owner: str, repo: str, base_sha: str, head_sha: str
+    ) -> list[str] | None:
+        """Get list of file paths changed between two commits.
+
+        Returns None if the response is truncated, signaling the caller
+        should skip filtering and create the run unconditionally.
+        """
+        ...
+
     async def list_tags(self, conn: VCSConnection, owner: str, repo: str) -> list[dict[str, str]]:
         """List repository tags. Returns [{"name": str, "sha": str}]."""
         ...

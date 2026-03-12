@@ -23,7 +23,7 @@ from sqlalchemy import (
     String,
     Text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -311,6 +311,11 @@ class Workspace(Base):
     vcs_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     vcs_working_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     vcs_last_commit_sha: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+
+    # tfvars files — passed to runner as -var-file arguments
+    var_files: Mapped[list[str]] = mapped_column(
+        ARRAY(String(500)), nullable=False, server_default="{}"
+    )
 
     # Drift detection
     drift_detection_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

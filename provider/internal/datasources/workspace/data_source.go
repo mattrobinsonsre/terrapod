@@ -39,6 +39,7 @@ type workspaceDataSourceModel struct {
 	VCSWorkingDirectory           types.String `tfsdk:"vcs_working_directory"`
 	VCSConnectionID               types.String `tfsdk:"vcs_connection_id"`
 	AgentPoolID                   types.String `tfsdk:"agent_pool_id"`
+	VarFiles                      types.List   `tfsdk:"var_files"`
 	DriftDetectionEnabled         types.Bool   `tfsdk:"drift_detection_enabled"`
 	DriftDetectionIntervalSeconds types.Int64  `tfsdk:"drift_detection_interval_seconds"`
 	OwnerEmail                    types.String `tfsdk:"owner_email"`
@@ -77,6 +78,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"vcs_working_directory":             computedString("VCS working directory."),
 			"vcs_connection_id":                 computedString("VCS connection ID."),
 			"agent_pool_id":                     computedString("Agent pool ID."),
+			"var_files":                         computedList("Var files for -var-file arguments."),
 			"drift_detection_enabled":           computedBool("Drift detection enabled."),
 			"drift_detection_interval_seconds":  computedInt64("Drift detection interval."),
 			"owner_email":                       computedString("Owner email."),
@@ -161,6 +163,14 @@ func readDataSourceModel(ctx context.Context, res *client.Resource, m *workspace
 		m.DriftDetectionIntervalSeconds = types.Int64Null()
 	}
 
+	if varFiles := client.GetListAttr(res, "var-files"); len(varFiles) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, varFiles)
+		diags.Append(d...)
+		m.VarFiles = val
+	} else {
+		m.VarFiles = types.ListNull(types.StringType)
+	}
+
 	if labels := client.GetMapAttr(res, "labels"); len(labels) > 0 {
 		val, d := types.MapValueFrom(ctx, types.StringType, labels)
 		diags.Append(d...)
@@ -192,6 +202,9 @@ func computedBool(desc string) schema.BoolAttribute {
 }
 func computedInt64(desc string) schema.Int64Attribute {
 	return schema.Int64Attribute{Description: desc, Computed: true}
+}
+func computedList(desc string) schema.ListAttribute {
+	return schema.ListAttribute{Description: desc, Computed: true, ElementType: types.StringType}
 }
 func computedMap(desc string) schema.MapAttribute {
 	return schema.MapAttribute{Description: desc, Computed: true, ElementType: types.StringType}

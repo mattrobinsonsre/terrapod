@@ -138,6 +138,43 @@ async def list_tags(conn: VCSConnection, owner: str, repo: str) -> list[dict[str
     return [{"name": tag["name"], "sha": tag["commit"]["id"]} for tag in resp.json()]
 
 
+async def get_changed_files(
+    conn: VCSConnection, owner: str, repo: str, base_sha: str, head_sha: str
+) -> list[str] | None:
+    """Get list of file paths changed between two commits.
+
+    Uses the compare endpoint: GET /projects/{id}/repository/compare
+    Collects both old_path and new_path from diffs to catch renames.
+    Returns None if the response may be truncated (GitLab defaults vary),
+    signaling that the caller should not filter and should create the run.
+    """
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{api}/projects/{project}/repository/compare",
+            params={"from": base_sha, "to": head_sha, "per_page": 500},
+            headers=_headers(conn),
+        )
+        resp.raise_for_status()
+
+    data = resp.json()
+    diffs = data.get("diffs", [])
+    if len(diffs) >= 500:
+        logger.warning(
+            "GitLab compare may be truncated (500+ diffs), skipping subdirectory filter",
+            project=f"{owner}/{repo}",
+        )
+        return None
+
+    files: set[str] = set()
+    for diff in diffs:
+        files.add(diff["new_path"])
+        files.add(diff["old_path"])
+    return list(files)
+
+
 async def create_commit_status(
     conn: VCSConnection,
     owner: str,

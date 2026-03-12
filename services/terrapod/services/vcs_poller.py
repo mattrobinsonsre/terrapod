@@ -65,6 +65,29 @@ async def _download_archive(conn: VCSConnection, owner: str, repo: str, ref: str
     return await github_service.download_repo_archive(conn, owner, repo, ref)
 
 
+async def _get_changed_files(
+    conn: VCSConnection, owner: str, repo: str, base_sha: str, head_sha: str
+) -> list[str] | None:
+    """Get changed files between two commits via the appropriate provider.
+
+    Returns None if the response is truncated (too many files), signaling
+    the caller should skip filtering and create the run unconditionally.
+    """
+    if conn.provider == "gitlab":
+        return await gitlab_service.get_changed_files(conn, owner, repo, base_sha, head_sha)
+    return await github_service.get_changed_files(conn, owner, repo, base_sha, head_sha)
+
+
+def _changes_affect_directory(changed_files: list[str], working_directory: str) -> bool:
+    """Check if any changed files fall within the workspace's working directory.
+
+    Uses strict prefix matching: only files starting with "{working_directory}/"
+    are considered relevant. Root-level files don't trigger subdirectory workspaces.
+    """
+    prefix = working_directory.rstrip("/") + "/"
+    return any(f.startswith(prefix) for f in changed_files)
+
+
 async def _list_open_prs(
     conn: VCSConnection, owner: str, repo: str, base_branch: str
 ) -> list[PullRequest]:
@@ -244,6 +267,30 @@ async def _poll_workspace_branch(
         new_sha=sha[:8],
     )
 
+    # VCS subdirectory filtering: skip runs when changes don't affect the workspace
+    if ws.vcs_working_directory and ws.vcs_last_commit_sha:
+        try:
+            changed = await _get_changed_files(conn, owner, repo, ws.vcs_last_commit_sha, sha)
+            # None means truncated — create run unconditionally
+            if changed is not None and not _changes_affect_directory(
+                changed, ws.vcs_working_directory
+            ):
+                logger.info(
+                    "Skipping run — no changes in working directory",
+                    workspace=ws.name,
+                    working_directory=ws.vcs_working_directory,
+                    changed_files_count=len(changed),
+                )
+                ws.vcs_last_commit_sha = sha
+                await db.commit()
+                return
+        except Exception as e:
+            logger.warning(
+                "Failed to get changed files, creating run anyway",
+                workspace=ws.name,
+                error=str(e),
+            )
+
     run = await _create_vcs_run(
         db,
         ws,
@@ -334,6 +381,31 @@ async def _poll_workspace_prs(
             head_sha=pr.head_sha[:8],
             title=pr.title,
         )
+
+        # VCS subdirectory filtering for PRs: compare PR head against tracked branch
+        if ws.vcs_working_directory and ws.vcs_last_commit_sha:
+            try:
+                changed = await _get_changed_files(
+                    conn, owner, repo, ws.vcs_last_commit_sha, pr.head_sha
+                )
+                # None means truncated — create run unconditionally
+                if changed is not None and not _changes_affect_directory(
+                    changed, ws.vcs_working_directory
+                ):
+                    logger.info(
+                        "Skipping PR run — no changes in working directory",
+                        workspace=ws.name,
+                        pr_number=pr.number,
+                        working_directory=ws.vcs_working_directory,
+                    )
+                    continue
+            except Exception as e:
+                logger.warning(
+                    "Failed to get changed files for PR, creating run anyway",
+                    workspace=ws.name,
+                    pr_number=pr.number,
+                    error=str(e),
+                )
 
         run = await _create_vcs_run(
             db,

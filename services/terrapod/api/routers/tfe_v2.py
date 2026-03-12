@@ -34,6 +34,7 @@ Endpoints:
 import asyncio
 import hashlib
 import json
+import re
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response, status
@@ -75,6 +76,37 @@ def _tfe_headers() -> dict[str, str]:
         "TFP-AppName": TFP_APP_NAME,
         "X-TFE-Version": X_TFE_VERSION,
     }
+
+
+_VAR_FILE_PATTERN = re.compile(r"^[\w./ -]+$")
+
+
+def _validate_var_files(raw: object) -> list[str]:
+    """Validate and sanitize var-files input.
+
+    Rejects non-list types, non-string elements, path traversal, absolute
+    paths, empty strings, and shell-unsafe characters.
+    """
+    if not isinstance(raw, list):
+        raise HTTPException(status_code=422, detail="var-files must be a list of strings")
+    if len(raw) > 20:
+        raise HTTPException(status_code=422, detail="var-files: maximum 20 entries")
+    result: list[str] = []
+    for entry in raw:
+        if not isinstance(entry, str):
+            raise HTTPException(status_code=422, detail="var-files entries must be strings")
+        v = entry.strip()
+        if not v:
+            raise HTTPException(status_code=422, detail="var-files entries must be non-empty")
+        if ".." in v or v.startswith("/"):
+            raise HTTPException(status_code=422, detail=f"var-files: invalid path '{v}'")
+        if not _VAR_FILE_PATTERN.match(v):
+            raise HTTPException(
+                status_code=422,
+                detail=f"var-files: path contains invalid characters '{v}'",
+            )
+        result.append(v)
+    return result
 
 
 def _clamp_drift_interval(value: int) -> int:
@@ -261,6 +293,7 @@ def _workspace_json(ws: Workspace, effective_permission: str | None = None) -> d
                 "vcs-repo-url": ws.vcs_repo_url,
                 "vcs-branch": ws.vcs_branch,
                 "vcs-working-directory": ws.vcs_working_directory,
+                "var-files": ws.var_files or [],
                 "drift-detection-enabled": ws.drift_detection_enabled,
                 "drift-detection-interval-seconds": ws.drift_detection_interval_seconds,
                 "drift-last-checked-at": _rfc3339(ws.drift_last_checked_at),
@@ -406,6 +439,7 @@ async def create_workspace(
         vcs_repo_url=attrs.get("vcs-repo-url", ""),
         vcs_branch=attrs.get("vcs-branch", ""),
         vcs_working_directory=attrs.get("vcs-working-directory", ""),
+        var_files=_validate_var_files(attrs.get("var-files", [])),
         drift_detection_enabled=attrs.get("drift-detection-enabled", False),
         drift_detection_interval_seconds=_clamp_drift_interval(
             attrs.get("drift-detection-interval-seconds", 86400)
@@ -587,6 +621,8 @@ async def update_workspace(
         ws.vcs_branch = attrs["vcs-branch"]
     if "vcs-working-directory" in attrs:
         ws.vcs_working_directory = attrs["vcs-working-directory"]
+    if "var-files" in attrs:
+        ws.var_files = _validate_var_files(attrs["var-files"])
     if "agent-pool-id" in attrs:
         import uuid as _uuid
 
