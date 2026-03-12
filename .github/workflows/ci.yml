@@ -573,7 +573,7 @@ jobs:
             syft "$REGISTRY/$image:$version" -o spdx-json="dist/sbom-${image}.spdx.json"
           done
 
-      - name: Create GitHub Release
+      - name: Upload release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -583,14 +583,19 @@ jobs:
           # Generate checksums
           (cd dist && sha256sum -- *.tgz *.spdx.json > checksums.txt)
 
-          gh release create "$version" \
+          # GoReleaser already created the release with provider binaries.
+          # Update title/notes and upload remaining assets.
+          gh release edit "$version" \
+            --title "$version" \
+            --notes-file /tmp/release-notes.md
+
+          gh release upload "$version" \
             dist/terrapod-${chart_version}.tgz \
             dist/sbom-terrapod-api.spdx.json \
             dist/sbom-terrapod-web.spdx.json \
             dist/sbom-terrapod-runner.spdx.json \
             dist/checksums.txt \
-            --title "$version" \
-            --notes-file /tmp/release-notes.md
+            --clobber
 
   # ── Cleanup Tag on Failure ─────────────────────────────
   cleanup-tag:
