@@ -28,7 +28,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_non_runner
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.registry_module_service import (
@@ -189,7 +189,7 @@ async def download_module_cli(
 @router.post("/api/v2/organizations/default/registry-modules")
 async def create_module_endpoint(
     body: CreateModuleRequest,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_non_runner),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Create a new registry module. Any authenticated user; creator becomes owner."""

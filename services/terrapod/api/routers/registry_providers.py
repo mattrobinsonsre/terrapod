@@ -34,7 +34,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_non_runner
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.platform_provider_service import (
@@ -288,7 +288,7 @@ _ORG_PREFIX = "/api/v2/organizations/default/registry-providers"
 @router.post(_ORG_PREFIX)
 async def create_provider_endpoint(
     body: CreateProviderRequest,
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_non_runner),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Create a new registry provider. Any authenticated user; creator becomes owner."""

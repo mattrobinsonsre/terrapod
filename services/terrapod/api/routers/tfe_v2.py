@@ -43,7 +43,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
-from terrapod.api.dependencies import DEFAULT_ORG, AuthenticatedUser, get_current_user
+from terrapod.api.dependencies import (
+    DEFAULT_ORG,
+    AuthenticatedUser,
+    get_current_user,
+    require_non_runner,
+)
 from terrapod.db.models import StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -396,7 +401,7 @@ async def show_workspace(
 @router.post("/organizations/default/workspaces")
 async def create_workspace(
     body: dict = Body(...),
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_non_runner),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Create a workspace. Any authenticated user can create."""

@@ -169,6 +169,22 @@ async def get_current_user(
     )
 
 
+def require_non_runner(
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> AuthenticatedUser:
+    """Reject runner tokens — use on endpoints runners must not access.
+
+    Runner tokens are scoped to artifact/cache operations only. This
+    dependency blocks them from resource creation and management endpoints.
+    """
+    if user.auth_method == "runner_token":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Runner tokens cannot access this endpoint",
+        )
+    return user
+
+
 async def get_current_session(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> Session:
