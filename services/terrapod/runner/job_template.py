@@ -222,7 +222,9 @@ def build_job_spec(
 
     # Service account (CSP identity) — from global runner config (Helm values)
     if runner_config.service_account_name:
-        job_spec["spec"]["template"]["spec"]["serviceAccountName"] = runner_config.service_account_name
+        job_spec["spec"]["template"]["spec"]["serviceAccountName"] = (
+            runner_config.service_account_name
+        )
 
     # Scheduling and placement from runner config
     pod_spec = job_spec["spec"]["template"]["spec"]
