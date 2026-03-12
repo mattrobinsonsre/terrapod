@@ -176,12 +176,8 @@ async def create_run(
 
     ws = await _get_workspace(ws_id, db)
 
-    # CLI-initiated runs in remote mode are always plan-only.
-    # Only VCS-sourced runs are allowed to apply.
     plan_only = attrs.get("plan-only", False)
     source = attrs.get("source", "tfe-api")
-    if ws.execution_mode == "remote" and source not in ("vcs", "drift-detection"):
-        plan_only = True
 
     # Check permission: plan-only requires plan, apply requires write
     required = "plan" if plan_only else "write"
@@ -270,15 +266,6 @@ async def confirm_run(
     """Confirm a planned run for apply. Requires write."""
     run = await _get_run(run_id, db)
     await _require_run_ws_permission(run, "write", user, db)
-
-    # Block apply for CLI-uploaded code in remote execution mode
-    if run.source not in ("vcs", "drift-detection"):
-        ws = await db.get(Workspace, run.workspace_id)
-        if ws and ws.execution_mode == "remote":
-            raise HTTPException(
-                status_code=422,
-                detail="Apply is not supported for CLI-uploaded code in remote execution mode. Only VCS-managed code can be applied.",
-            )
 
     try:
         run = await run_service.confirm_run(db, run)
