@@ -83,7 +83,6 @@ async def download_binary(
     version: str,
     os: str,
     arch: str,
-    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     storage: ObjectStore = Depends(get_storage),
 ) -> RedirectResponse:
@@ -91,6 +90,10 @@ async def download_binary(
 
     Returns a redirect to a presigned download URL. Used by runner Jobs
     to fetch the exact binary version needed for a workspace.
+
+    No authentication required — this is a pull-through cache of public
+    open-source binaries (terraform, tofu). Runner Jobs call this endpoint
+    directly, detecting their own OS/arch at runtime.
     """
     if not settings.registry.binary_cache.enabled:
         raise HTTPException(

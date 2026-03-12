@@ -29,15 +29,32 @@ mkdir -p "$WORK_DIR"
 cd "$WORK_DIR"
 
 # --- Download binary from cache ---
+# Detect platform architecture for correct binary download
+TP_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+TP_ARCH=$(uname -m)
+case "$TP_ARCH" in
+    x86_64)  TP_ARCH="amd64" ;;
+    aarch64) TP_ARCH="arm64" ;;
+esac
+
 if [ -n "$TP_BINARY_URL" ]; then
+    # Legacy: pre-generated presigned URL (arch-specific)
     echo "[entrypoint] Downloading $TP_BACKEND $TP_VERSION from binary cache..."
     curl -sSfL "$TP_BINARY_URL" -o "/tmp/${TP_BACKEND}.zip"
-    unzip -o -q "/tmp/${TP_BACKEND}.zip" -d /tmp/bin
-    chmod +x "/tmp/bin/${TP_BACKEND}"
-    TP_BIN="/tmp/bin/${TP_BACKEND}"
+elif [ -n "$TP_API_URL" ] && [ -n "$TP_VERSION" ]; then
+    # Detect arch and download from API binary cache endpoint
+    BINARY_URL="${TP_API_URL}/api/v2/binary-cache/${TP_BACKEND}/${TP_VERSION}/${TP_OS}/${TP_ARCH}"
+    echo "[entrypoint] Downloading $TP_BACKEND $TP_VERSION ($TP_OS/$TP_ARCH) from binary cache..."
+    curl -sSfL "$BINARY_URL" -o "/tmp/${TP_BACKEND}.zip"
 else
     echo "[entrypoint] No binary cache URL, expecting $TP_BACKEND on PATH"
     TP_BIN="$TP_BACKEND"
+fi
+
+if [ -z "$TP_BIN" ]; then
+    unzip -o -q "/tmp/${TP_BACKEND}.zip" -d /tmp/bin
+    chmod +x "/tmp/bin/${TP_BACKEND}"
+    TP_BIN="/tmp/bin/${TP_BACKEND}"
 fi
 
 # --- Download configuration archive ---

@@ -43,6 +43,10 @@ async def get_or_cache_binary(
     """
     if tool not in VALID_TOOLS:
         raise ValueError(f"Invalid tool: {tool}. Must be one of {VALID_TOOLS}")
+    if os_ not in VALID_OS:
+        raise ValueError(f"Invalid OS: {os_}. Must be one of {VALID_OS}")
+    if arch not in VALID_ARCH:
+        raise ValueError(f"Invalid arch: {arch}. Must be one of {VALID_ARCH}")
 
     # Check cache
     cached = await _get_cached(db, tool, version, os_, arch)
