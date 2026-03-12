@@ -36,9 +36,11 @@ func NewClient(hostname, token string, skipTLSVerify bool) *Client {
 	}
 	baseURL = strings.TrimSuffix(baseURL, "/")
 
-	transport := &http.Transport{}
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13}, //nolint:gosec
+	}
 	if skipTLSVerify {
-		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
+		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
 	return &Client{
