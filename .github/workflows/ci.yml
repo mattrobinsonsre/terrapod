@@ -493,17 +493,6 @@ jobs:
 
           helm push "dist/terrapod-${chart_version}.tgz" "oci://$REGISTRY"
 
-      - name: Ensure GHCR packages are public
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          for pkg in terrapod terrapod-api terrapod-web terrapod-runner; do
-            vis=$(gh api '/user/packages/container/'"$pkg" --jq '.visibility' 2>/dev/null || echo "unknown")
-            if [ "$vis" = "private" ]; then
-              echo "::warning::Package $pkg is private — set to public at https://github.com/users/${{ github.actor }}/packages/container/$pkg/settings"
-            fi
-          done
-
       - uses: actions/setup-go@v5
         with:
           go-version-file: provider/go.mod
