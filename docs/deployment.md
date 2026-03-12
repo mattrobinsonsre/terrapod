@@ -265,7 +265,8 @@ The chart ships with a `values.schema.json` that validates all values at `helm i
 |---|---|---|
 | `api.config.vcs.enabled` | `true` | Enable VCS integration |
 | `api.config.vcs.poll_interval_seconds` | `60` | Poll interval |
-| `api.config.vcs.github.webhook_secret` | `""` | GitHub webhook HMAC secret |
+| `api.config.vcs.github.existingSecret` | `""` | K8s Secret containing the GitHub webhook HMAC secret |
+| `api.config.vcs.github.existingSecretKey` | `"webhook_secret"` | Key within the Secret |
 
 ### Drift Detection
 

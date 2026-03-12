@@ -528,7 +528,8 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "webhook_secret": { "type": "string" }
+                "existingSecret": { "type": "string" },
+                "existingSecretKey": { "type": "string" }
               }
             }
           }

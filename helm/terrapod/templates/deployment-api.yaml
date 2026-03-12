@@ -87,6 +87,13 @@ spec:
                   name: {{ .existingSecret | default (printf "%s-%s" (include "terrapod.fullname" $) .name) }}
                   key: {{ .existingSecretKey | default "client_secret" }}
             {{- end }}
+            {{- if .Values.api.config.vcs.github.existingSecret }}
+            - name: TERRAPOD_VCS__GITHUB__WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.config.vcs.github.existingSecret }}
+                  key: {{ .Values.api.config.vcs.github.existingSecretKey | default "webhook_secret" }}
+            {{- end }}
             {{- with .Values.api.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
