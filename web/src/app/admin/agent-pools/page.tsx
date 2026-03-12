@@ -18,13 +18,12 @@ interface AgentPool {
   attributes: {
     name: string
     description: string
-    'service-account-name': string
     'is-default': boolean
     'created-at': string
   }
 }
 
-type PoolSortKey = 'name' | 'description' | 'sa' | 'created'
+type PoolSortKey = 'name' | 'description' | 'created'
 
 export default function AgentPoolsPage() {
   const router = useRouter()
@@ -36,14 +35,12 @@ export default function AgentPoolsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [serviceAccount, setServiceAccount] = useState('')
   const [creating, setCreating] = useState(false)
 
   const poolAccessor = useCallback((item: AgentPool, key: PoolSortKey) => {
     switch (key) {
       case 'name': return item.attributes.name
       case 'description': return item.attributes.description
-      case 'sa': return item.attributes['service-account-name']
       case 'created': return item.attributes['created-at']
     }
   }, [])
@@ -79,7 +76,6 @@ export default function AgentPoolsPage() {
     try {
       const attrs: Record<string, unknown> = { name }
       if (description) attrs.description = description
-      if (serviceAccount) attrs['service-account-name'] = serviceAccount
 
       const res = await apiFetch('/api/v2/organizations/default/agent-pools', {
         method: 'POST',
@@ -92,7 +88,6 @@ export default function AgentPoolsPage() {
       }
       setName('')
       setDescription('')
-      setServiceAccount('')
       setShowCreate(false)
       await loadPools()
     } catch (err) {
@@ -123,7 +118,7 @@ export default function AgentPoolsPage() {
 
         {showCreate && (
           <form onSubmit={handleCreate} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label htmlFor="pool-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
                 <input id="pool-name" type="text" value={name} onChange={(e) => setName(e.target.value)} required
@@ -134,12 +129,6 @@ export default function AgentPoolsPage() {
                 <label htmlFor="pool-desc" className="block text-sm font-medium text-slate-300 mb-1">Description</label>
                 <input id="pool-desc" type="text" value={description} onChange={(e) => setDescription(e.target.value)}
                   placeholder="Production AWS runners"
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
-              </div>
-              <div>
-                <label htmlFor="pool-sa" className="block text-sm font-medium text-slate-300 mb-1">Service Account</label>
-                <input id="pool-sa" type="text" value={serviceAccount} onChange={(e) => setServiceAccount(e.target.value)}
-                  placeholder="terrapod-runner"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
               </div>
             </div>
@@ -161,7 +150,6 @@ export default function AgentPoolsPage() {
                 <tr className="border-b border-slate-700/50">
                   <SortableHeader label="Name" sortKey="name" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label="Description" sortKey="description" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
-                  <SortableHeader label="Service Account" sortKey="sa" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
                   <SortableHeader label="Created" sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
                 </tr>
               </thead>
@@ -182,9 +170,6 @@ export default function AgentPoolsPage() {
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-400 hidden sm:table-cell">
                       {pool.attributes.description || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-400 font-mono hidden md:table-cell">
-                      {pool.attributes['service-account-name'] || '-'}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500 hidden lg:table-cell">
                       {pool.attributes['created-at'] ? new Date(pool.attributes['created-at']).toLocaleDateString() : ''}

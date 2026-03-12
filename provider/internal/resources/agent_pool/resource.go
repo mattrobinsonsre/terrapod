@@ -13,7 +13,6 @@
 //
 //	"name"                 -> name                 (string, required)
 //	"description"          -> description          (string, optional)
-//	"service-account-name" -> service_account_name (string, optional)
 //
 // Read-only attributes:
 //
@@ -47,9 +46,8 @@ type agentPoolModel struct {
 	ID types.String `tfsdk:"id"`
 
 	// Writable attributes
-	Name               types.String `tfsdk:"name"`
-	Description        types.String `tfsdk:"description"`
-	ServiceAccountName types.String `tfsdk:"service_account_name"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
 
 	// Read-only attributes
 	CreatedAt types.String `tfsdk:"created_at"`
@@ -86,11 +84,6 @@ func (r *agentPoolResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 			"description": schema.StringAttribute{
 				Description: "A description of the agent pool.",
-				Optional:    true,
-				Computed:    true,
-			},
-			"service_account_name": schema.StringAttribute{
-				Description: "The Kubernetes service account name for runner Jobs in this pool.",
 				Optional:    true,
 				Computed:    true,
 			},
@@ -241,9 +234,6 @@ func buildAgentPoolAttrs(m *agentPoolModel) map[string]any {
 	if !m.Description.IsNull() && !m.Description.IsUnknown() {
 		attrs["description"] = m.Description.ValueString()
 	}
-	if !m.ServiceAccountName.IsNull() && !m.ServiceAccountName.IsUnknown() {
-		attrs["service-account-name"] = m.ServiceAccountName.ValueString()
-	}
 
 	return attrs
 }
@@ -257,12 +247,6 @@ func readAgentPoolIntoModel(res *client.Resource, m *agentPoolModel) {
 		m.Description = types.StringValue(v)
 	} else {
 		m.Description = types.StringNull()
-	}
-
-	if v := client.GetStringAttr(res, "service-account-name"); v != "" {
-		m.ServiceAccountName = types.StringValue(v)
-	} else {
-		m.ServiceAccountName = types.StringNull()
 	}
 
 	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))

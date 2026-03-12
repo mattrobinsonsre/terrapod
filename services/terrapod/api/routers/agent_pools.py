@@ -52,7 +52,6 @@ def _pool_json(pool) -> dict:
         "attributes": {
             "name": pool.name,
             "description": pool.description or "",
-            "service-account-name": pool.service_account_name,
             "created-at": _rfc3339(pool.created_at),
             "updated-at": _rfc3339(pool.updated_at),
         },
@@ -141,7 +140,6 @@ async def create_pool(
         db,
         name=name,
         description=attrs.get("description", ""),
-        service_account_name=attrs.get("service-account-name", ""),
     )
     await db.commit()
     await db.refresh(pool)
@@ -176,7 +174,6 @@ async def update_pool(
         pool,
         name=attrs.get("name"),
         description=attrs.get("description"),
-        service_account_name=attrs.get("service-account-name"),
     )
     await db.commit()
     await db.refresh(pool)

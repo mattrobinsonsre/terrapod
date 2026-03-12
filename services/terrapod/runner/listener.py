@@ -306,7 +306,6 @@ class RunnerListener:
                     terraform_vars=terraform_vars,
                     terraform_version=attrs.get("terraform-version", ""),
                     execution_backend=attrs.get("execution-backend", "tofu"),
-                    service_account_name=attrs.get("service-account-name", ""),
                     plan_only=attrs.get("plan-only", False),
                     var_files=attrs.get("var-files", []),
                 )
@@ -357,7 +356,6 @@ class RunnerListener:
         terraform_vars: list,
         terraform_version: str = "",
         execution_backend: str = "",
-        service_account_name: str = "",
         plan_only: bool = False,
         var_files: list[str] | None = None,
     ) -> None:
@@ -380,7 +378,6 @@ class RunnerListener:
             resource_memory=resource_memory,
             terraform_version=terraform_version,
             execution_backend=execution_backend,
-            service_account_name=service_account_name,
             plan_only=plan_only,
             var_files=var_files,
         )
@@ -431,7 +428,6 @@ class RunnerListener:
             resource_memory=resource_memory,
             terraform_version=terraform_version,
             execution_backend=execution_backend,
-            service_account_name=service_account_name,
             var_files=var_files,
         )
 

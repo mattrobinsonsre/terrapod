@@ -49,7 +49,6 @@ def build_job_spec(
     timeout_minutes: int = 60,
     terraform_version: str = "",
     execution_backend: str = "",
-    service_account_name: str = "",
     namespace: str = "",
     plan_only: bool = False,
     var_files: list[str] | None = None,
@@ -68,7 +67,6 @@ def build_job_spec(
         timeout_minutes: Job timeout in minutes.
         terraform_version: Terraform/tofu version to use.
         execution_backend: Execution backend (terraform or tofu).
-        service_account_name: K8s SA for the Job (CSP identity).
         namespace: Target namespace for the Job.
     """
     if not namespace:
@@ -181,7 +179,7 @@ def build_job_spec(
                 "spec": {
                     "terminationGracePeriodSeconds": 120,
                     "restartPolicy": "Never",
-                    "automountServiceAccountToken": bool(service_account_name),
+                    "automountServiceAccountToken": bool(runner_config.service_account_name),
                     "volumes": [
                         {"name": "workspace", "emptyDir": {}},
                         {"name": "tmp", "emptyDir": {}},
@@ -222,9 +220,11 @@ def build_job_spec(
         },
     }
 
-    # Service account (CSP identity)
-    if service_account_name:
-        job_spec["spec"]["template"]["spec"]["serviceAccountName"] = service_account_name
+    # Service account (CSP identity) — from global runner config (Helm values)
+    if runner_config.service_account_name:
+        job_spec["spec"]["template"]["spec"]["serviceAccountName"] = (
+            runner_config.service_account_name
+        )
 
     # Scheduling and placement from runner config
     pod_spec = job_spec["spec"]["template"]["spec"]

@@ -18,17 +18,16 @@ When a runner Job starts, the cloud provider's mutating admission webhook inject
 
 ---
 
-## ServiceAccount Precedence
+## ServiceAccount Configuration
 
-Runner Jobs use the following precedence chain to determine which ServiceAccount to use (highest wins):
+Runner Jobs use the ServiceAccount configured in Helm values:
 
 | Priority | Source | Configured Via |
 |---|---|---|
-| 1 | **Agent pool SA** | `AgentPool.service_account_name` (API: per-pool setting) |
-| 2 | **Global runner SA** | `runners.serviceAccount.name` in Helm values |
-| 3 | **K8s default SA** | Implicit namespace default |
+| 1 | **Global runner SA** | `runners.serviceAccount.name` in Helm values |
+| 2 | **K8s default SA** | Implicit namespace default |
 
-This allows different agent pools to use different cloud identities. For example, an `aws-prod` pool can use a production IAM role while an `aws-dev` pool uses a development role.
+For multi-cloud or multi-account setups, deploy separate listener Deployments (agent pools) in different clusters or namespaces, each with their own Helm-configured ServiceAccount.
 
 ---
 
@@ -154,42 +153,6 @@ runners:
 ```
 
 Azure Workload Identity requires a pod label (`azure.workload.identity/use: "true"`) in addition to the SA annotation. Setting `runners.azureWorkloadIdentity: true` in Helm values adds this label to all runner Job pods.
-
----
-
-## Per-Pool ServiceAccounts
-
-For multi-cloud or multi-account setups, configure different ServiceAccounts per agent pool:
-
-1. Create the pool via the API with a `service-account-name`:
-
-    ```bash
-    curl -X POST https://terrapod.local/api/v2/organizations/default/agent-pools \
-      -H "Authorization: Bearer $TOKEN" \
-      -H "Content-Type: application/vnd.api+json" \
-      -d '{
-        "data": {
-          "attributes": {
-            "name": "aws-prod",
-            "service-account-name": "terrapod-runner-prod"
-          }
-        }
-      }'
-    ```
-
-2. Pre-create the ServiceAccount in the runner namespace with the appropriate annotations:
-
-    ```yaml
-    apiVersion: v1
-    kind: ServiceAccount
-    metadata:
-      name: terrapod-runner-prod
-      namespace: terrapod
-      annotations:
-        eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/terrapod-runner-prod"
-    ```
-
-3. Set `runners.serviceAccount.create: false` if you're bringing your own ServiceAccounts.
 
 ---
 
