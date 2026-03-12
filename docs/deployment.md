@@ -140,7 +140,7 @@ listener:
   enabled: true
   replicas: 1
   name: "production-listener"
-  existingSecret: terrapod-listener-credentials  # K8s Secret with join-token key
+  existingSecret: terrapod-listener-credentials  # K8s Secret with join_token key
 
 ingress:
   enabled: true
@@ -350,7 +350,7 @@ Enable encryption on your managed database and object storage services. For file
 | `listener.name` | `"listener"` | Listener name (registered in the pool) |
 | `listener.joinToken` | `""` | Raw join token (use `existingSecret` for production) |
 | `listener.existingSecret` | `""` | K8s Secret containing the join token |
-| `listener.joinTokenKey` | `"join-token"` | Key within the Secret for the join token |
+| `listener.joinTokenKey` | `"join_token"` | Key within the Secret for the join token |
 | `listener.runnerNamespace` | `""` | Namespace for runner Jobs (defaults to release namespace) |
 | `listener.resources.requests.cpu` | `100m` | CPU request |
 | `listener.resources.requests.memory` | `256Mi` | Memory request |
@@ -370,7 +370,7 @@ The listener joins an agent pool on startup using the join token. The pool must 
 ```zsh
 kubectl create secret generic terrapod-listener-credentials \
   --namespace terrapod \
-  --from-literal=join-token="<raw-token-from-step-2>"
+  --from-literal=join_token="<raw-token-from-step-2>"
 ```
 
 4. Configure the listener in values:

@@ -71,7 +71,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.listener.existingSecret }}
-                  key: {{ .Values.listener.joinTokenKey | default "join-token" }}
+                  key: {{ .Values.listener.joinTokenKey | default "join_token" }}
             {{- else if .Values.listener.joinToken }}
             - name: TERRAPOD_JOIN_TOKEN
               value: {{ .Values.listener.joinToken | quote }}
