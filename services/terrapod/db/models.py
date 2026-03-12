@@ -184,7 +184,6 @@ class AgentPool(Base):
     )
     name: Mapped[str] = mapped_column(String(63), unique=True, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    service_account_name: Mapped[str] = mapped_column(String(63), nullable=False, default="")
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False

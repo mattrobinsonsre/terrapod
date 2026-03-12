@@ -14,7 +14,6 @@ import { apiFetch } from '@/lib/api'
 interface PoolAttrs {
   name: string
   description: string
-  'service-account-name': string
   'is-default': boolean
   'created-at': string
 }
@@ -66,7 +65,6 @@ export default function AgentPoolDetailPage() {
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editDesc, setEditDesc] = useState('')
-  const [editSa, setEditSa] = useState('')
   const [saving, setSaving] = useState(false)
 
   // Delete pool
@@ -144,7 +142,6 @@ export default function AgentPoolDetailPage() {
     if (!pool) return
     setEditName(pool.attributes.name)
     setEditDesc(pool.attributes.description || '')
-    setEditSa(pool.attributes['service-account-name'] || '')
     setEditing(true)
   }
 
@@ -162,7 +159,6 @@ export default function AgentPoolDetailPage() {
             attributes: {
               name: editName,
               description: editDesc,
-              'service-account-name': editSa,
             },
           },
         }),
@@ -359,15 +355,6 @@ export default function AgentPoolDetailPage() {
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{pool.attributes.description || '-'}</dd>
-                  )}
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">Service Account</dt>
-                  {editing ? (
-                    <input type="text" value={editSa} onChange={(e) => setEditSa(e.target.value)}
-                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                  ) : (
-                    <dd className="mt-1 text-sm text-slate-200 font-mono">{pool.attributes['service-account-name'] || '-'}</dd>
                   )}
                 </div>
                 <div>

@@ -849,7 +849,7 @@ POST /api/v2/organizations/{org}/agent-pools
     "type": "agent-pools",
     "attributes": {
       "name": "aws-prod",
-      "service-account-name": "terrapod-runner-aws"
+      "description": "Production AWS runners"
     }
   }
 }

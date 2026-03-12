@@ -22,12 +22,11 @@ type agentPoolDataSource struct {
 }
 
 type agentPoolDataSourceModel struct {
-	ID                 types.String `tfsdk:"id"`
-	Name               types.String `tfsdk:"name"`
-	Description        types.String `tfsdk:"description"`
-	ServiceAccountName types.String `tfsdk:"service_account_name"`
-	CreatedAt          types.String `tfsdk:"created_at"`
-	UpdatedAt          types.String `tfsdk:"updated_at"`
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
+	CreatedAt   types.String `tfsdk:"created_at"`
+	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
 func NewDataSource() datasource.DataSource {
@@ -42,12 +41,11 @@ func (d *agentPoolDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 	resp.Schema = schema.Schema{
 		Description: "Look up a Terrapod agent pool by name.",
 		Attributes: map[string]schema.Attribute{
-			"id":                   schema.StringAttribute{Computed: true, Description: "Agent pool ID."},
-			"name":                 schema.StringAttribute{Required: true, Description: "Agent pool name."},
-			"description":          schema.StringAttribute{Computed: true, Description: "Description."},
-			"service_account_name": schema.StringAttribute{Computed: true, Description: "K8s service account name."},
-			"created_at":           schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
-			"updated_at":           schema.StringAttribute{Computed: true, Description: "Update timestamp."},
+			"id":          schema.StringAttribute{Computed: true, Description: "Agent pool ID."},
+			"name":        schema.StringAttribute{Required: true, Description: "Agent pool name."},
+			"description": schema.StringAttribute{Computed: true, Description: "Description."},
+			"created_at":  schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
+			"updated_at":  schema.StringAttribute{Computed: true, Description: "Update timestamp."},
 		},
 	}
 }
@@ -89,11 +87,6 @@ func (d *agentPoolDataSource) Read(ctx context.Context, req datasource.ReadReque
 			config.ID = types.StringValue(r.ID)
 			config.Name = types.StringValue(client.GetStringAttr(&r, "name"))
 			config.Description = types.StringValue(client.GetStringAttr(&r, "description"))
-			if v := client.GetStringAttr(&r, "service-account-name"); v != "" {
-				config.ServiceAccountName = types.StringValue(v)
-			} else {
-				config.ServiceAccountName = types.StringNull()
-			}
 			config.CreatedAt = types.StringValue(client.GetStringAttr(&r, "created-at"))
 			config.UpdatedAt = types.StringValue(client.GetStringAttr(&r, "updated-at"))
 			resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
