@@ -195,7 +195,21 @@ State is uploaded to Terrapod after a successful apply. You can view state versi
 
 ### Remote Execution Mode
 
-For remote execution, the runner listener creates a K8s Job that runs terraform on the server:
+For remote execution, the runner listener creates a K8s Job that runs terraform on the server.
+
+**Important:** In remote mode, CLI-initiated runs are always **plan-only**. This is a deliberate security policy — CLI-uploaded code hasn't been through VCS review. To apply changes in remote mode, use one of:
+
+- **VCS-triggered runs** — push to the tracked branch to trigger a full plan+apply cycle
+- **UI confirmation** — confirm a VCS-triggered planned run in the web UI
+
+| Source | Plan | Apply |
+|---|---|---|
+| `terraform plan` (CLI) | Plan-only on server | N/A |
+| `terraform apply` (CLI) | Plan-only on server | Not permitted |
+| VCS push to tracked branch | Full plan on server | Apply (auto or manual confirm) |
+| VCS pull request / merge request | Speculative plan-only | N/A |
+
+If you need `terraform apply` from the CLI, use **local execution mode** instead.
 
 1. Set the workspace execution mode to `remote`:
 
@@ -232,7 +246,7 @@ curl -X PUT "$UPLOAD_URL" \
   --data-binary @config.tar.gz
 ```
 
-3. A run is automatically queued. Monitor it:
+3. A run is automatically queued (plan-only). Monitor it:
 
 ```zsh
 curl -s https://terrapod.local/api/v2/workspaces/ws-{id}/runs \
