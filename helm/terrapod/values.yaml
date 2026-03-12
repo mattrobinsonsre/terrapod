@@ -507,7 +507,7 @@ listener:
   # The token is obtained by creating an agent pool + join token via the API.
   joinToken: ""
   # existingSecret: "my-listener-credentials"
-  # joinTokenKey: "join-token"  # key within the Secret (default: join-token)
+  # joinTokenKey: "join_token"  # key within the Secret (default: join_token)
 
   resources:
     requests:
