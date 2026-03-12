@@ -317,6 +317,11 @@ def create_application() -> FastAPI:
             response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+
+        # Propagate refreshed session expiry to frontend
+        if hasattr(request.state, "session_expires_at"):
+            response.headers["X-Session-Expires"] = request.state.session_expires_at
+
         return response
 
     # Audit logging middleware

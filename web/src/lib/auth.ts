@@ -53,6 +53,15 @@ export function isAdminOrAudit(): boolean {
   return auth.roles.includes('admin') || auth.roles.includes('audit')
 }
 
+export function updateExpiresAt(expiresAt: string): void {
+  const auth = loadAuth()
+  if (!auth) return
+  auth.expiresAt = expiresAt
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(AUTH_KEY, JSON.stringify(auth))
+  }
+}
+
 export function getExpiresAt(): Date | null {
   const auth = loadAuth()
   if (!auth?.expiresAt) return null

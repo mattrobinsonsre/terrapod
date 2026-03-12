@@ -5,7 +5,7 @@
  * and redirects to login.
  */
 
-import { clearAuth, getAuthState, loginRedirectUrl } from '@/lib/auth'
+import { clearAuth, getAuthState, loginRedirectUrl, updateExpiresAt } from '@/lib/auth'
 
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const auth = getAuthState()
@@ -22,6 +22,12 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
     if (typeof window !== 'undefined') {
       window.location.href = loginRedirectUrl()
     }
+  }
+
+  // Update local session expiry when server refreshes it (sliding window)
+  const newExpiry = res.headers.get('X-Session-Expires')
+  if (newExpiry) {
+    updateExpiresAt(newExpiry)
   }
 
   return res

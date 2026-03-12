@@ -113,12 +113,14 @@ async def get_session(token: str) -> Session | None:
 SESSION_REFRESH_INTERVAL = 300  # 5 minutes
 
 
-async def refresh_session(token: str, session: Session) -> None:
+async def refresh_session(token: str, session: Session) -> str:
     """Extend session TTL on activity (sliding window).
 
     Called by get_current_session when last_active_at is older than
     SESSION_REFRESH_INTERVAL. Updates last_active_at, recalculates
     expires_at, and resets the Redis TTL.
+
+    Returns the new expires_at ISO 8601 timestamp.
     """
     redis = get_redis_client()
     ttl = _session_ttl()
@@ -127,11 +129,12 @@ async def refresh_session(token: str, session: Session) -> None:
     session_key = SESSION_PREFIX + token
     raw = await redis.get(session_key)
     if raw is None:
-        return  # Session vanished between check and refresh — harmless
+        return session.expires_at  # Session vanished — return original
 
+    new_expires_at = (now + timedelta(seconds=ttl)).isoformat()
     data = json.loads(raw)
     data["last_active_at"] = now.isoformat()
-    data["expires_at"] = (now + timedelta(seconds=ttl)).isoformat()
+    data["expires_at"] = new_expires_at
 
     user_key = USER_SESSIONS_PREFIX + session.email
 
@@ -139,6 +142,8 @@ async def refresh_session(token: str, session: Session) -> None:
         pipe.set(session_key, json.dumps(data), ex=ttl)
         pipe.expire(user_key, ttl)
         await pipe.execute()
+
+    return new_expires_at
 
 
 def _should_refresh_session(session: Session) -> bool:
