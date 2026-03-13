@@ -19,6 +19,10 @@ RUN npm ci
 # Copy source code
 COPY web/ .
 
+# Ensure /app is writable when running as UID 1001 (Tilt dev runs `next dev`
+# which writes .next/, next-env.d.ts, etc.)
+RUN chown -R 1001:1001 /app
+
 # Build the application
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
