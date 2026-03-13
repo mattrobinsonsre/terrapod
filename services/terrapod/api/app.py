@@ -140,6 +140,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Check workspaces for infrastructure drift",
         )
 
+    # Run reconciler (drives run state transitions based on Job outcomes)
+    from terrapod.services.run_reconciler import reconcile_runs
+
+    register_periodic_task(
+        "run_reconciler",
+        interval_seconds=30,
+        handler=reconcile_runs,
+        description="Drive run state transitions based on Job outcomes",
+    )
+
     # Audit log retention (daily)
     async def _audit_retention() -> None:
         from terrapod.services.audit_service import purge_old_entries

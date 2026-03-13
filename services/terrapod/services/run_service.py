@@ -112,6 +112,24 @@ async def _enqueue_drift_completed(run: Run) -> None:
         logger.warning("Failed to enqueue drift completion", error=str(e))
 
 
+async def _publish_run_available(run: Run) -> None:
+    """Publish a run_available event to the pool's listener SSE channel.
+
+    Called when a run transitions to queued or confirmed, notifying listeners
+    that there is claimable work.
+    """
+    try:
+        from terrapod.redis.client import publish_listener_event
+
+        await publish_listener_event(
+            str(run.pool_id),
+            {"event": "run_available", "pool_id": str(run.pool_id)},
+        )
+    except Exception as e:
+        # Never let SSE publishing break the state machine
+        logger.debug("Failed to publish run_available", error=str(e))
+
+
 async def _publish_run_event(run: Run, old_status: str, new_status: str) -> None:
     """Publish a run status change event via Redis pub/sub for SSE streaming."""
     try:
@@ -252,6 +270,10 @@ async def transition_run(
 
     # Publish SSE event
     await _publish_run_event(run, old_status, target_status)
+
+    # Notify listeners when a run becomes claimable
+    if target_status in ("queued", "confirmed") and run.pool_id:
+        await _publish_run_available(run)
 
     # Fire run triggers when a non-speculative run completes apply
     if target_status == "applied" and not run.plan_only:

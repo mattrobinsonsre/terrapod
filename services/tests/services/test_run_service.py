@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.services.run_service import (
     TERMINAL_STATES,
     VALID_TRANSITIONS,
+    _publish_run_available,
     _publish_run_event,
     can_transition,
     cancel_run,
@@ -395,3 +396,32 @@ class TestPublishRunEvent:
         assert f"tp:run_events:{workspace_id}" in channels
         assert "tp:admin_events" in channels
         assert "tp:workspace_list_events" in channels
+
+
+# ── _publish_run_available ────────────────────────────────────────────
+
+
+class TestPublishRunAvailable:
+    @patch("terrapod.redis.client.publish_listener_event", new_callable=AsyncMock)
+    async def test_publishes_to_pool_channel(self, mock_publish):
+        """run_available event is published to the pool's listener channel."""
+        pool_id = uuid.uuid4()
+        run = _mock_run(status="queued")
+        run.pool_id = pool_id
+
+        await _publish_run_available(run)
+
+        mock_publish.assert_called_once()
+        assert mock_publish.call_args.args[0] == str(pool_id)
+        event = mock_publish.call_args.args[1]
+        assert event["event"] == "run_available"
+
+    @patch("terrapod.redis.client.publish_listener_event", new_callable=AsyncMock)
+    async def test_handles_publish_failure_gracefully(self, mock_publish):
+        """Publishing failure does not raise — the state machine must not break."""
+        mock_publish.side_effect = Exception("Redis down")
+        run = _mock_run(status="queued")
+        run.pool_id = uuid.uuid4()
+
+        # Should not raise
+        await _publish_run_available(run)

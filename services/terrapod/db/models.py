@@ -944,6 +944,10 @@ class Run(Base):
     is_drift_detection: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     has_changes: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
+    # Job tracking (populated by listener after launching K8s Job)
+    job_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    job_namespace: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     # VCS metadata
     vcs_commit_sha: Mapped[str] = mapped_column(String(40), nullable=False, default="")
     vcs_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")

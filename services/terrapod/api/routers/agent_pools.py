@@ -13,17 +13,21 @@ Endpoints:
     DELETE     /api/v2/agent-pools/{pool_id}/tokens/{token_id}
     GET        /api/v2/agent-pools/{pool_id}/listeners
     POST       /api/v2/agent-pools/{pool_id}/listeners/join
+    GET        /api/v2/listeners/{id}/events                   (SSE channel)
     POST       /api/v2/listeners/{id}/heartbeat
     POST       /api/v2/listeners/{id}/renew
     DELETE     /api/v2/listeners/{id}
 """
 
+import asyncio
+import json
 import uuid
 from datetime import UTC
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sse_starlette.sse import EventSourceResponse
 
 from terrapod.api.dependencies import (
     DEFAULT_ORG,
@@ -364,6 +368,58 @@ async def delete_listener(
         raise HTTPException(status_code=404, detail="Listener not found")
     await agent_pool_service.delete_listener(db, listener)
     await db.commit()
+
+
+# ── SSE Event Channel ────────────────────────────────────────────────────
+
+
+@router.get("/listeners/{listener_id}/events")
+async def listener_events(
+    request: Request,
+    listener_id: str = Path(...),
+    db: AsyncSession = Depends(get_db),
+) -> EventSourceResponse:
+    """SSE channel for API → listener communication.
+
+    The listener opens a persistent connection here. The API pushes events:
+    - run_available: a run is queued for this pool
+    - check_job_status: reconciler wants Job status
+    - stream_logs: reconciler wants live pod logs
+    - cancel_job: user canceled a run, delete the Job
+    """
+    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    listener = await agent_pool_service.get_listener(db, l_uuid)
+    if listener is None:
+        raise HTTPException(status_code=404, detail="Listener not found")
+
+    from terrapod.redis.client import LISTENER_EVENTS_PREFIX, subscribe_channel
+
+    channel = f"{LISTENER_EVENTS_PREFIX}{listener.pool_id}"
+    pubsub = await subscribe_channel(channel)
+
+    async def event_generator():
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                if message and message["type"] == "message":
+                    data = message["data"]
+                    if isinstance(data, bytes):
+                        data = data.decode()
+                    payload = json.loads(data)
+                    yield {
+                        "event": payload.get("event", "message"),
+                        "data": data,
+                    }
+                else:
+                    yield {"comment": "keepalive"}
+                    await asyncio.sleep(1)
+        finally:
+            await pubsub.unsubscribe(channel)
+            await pubsub.aclose()
+
+    return EventSourceResponse(event_generator())
 
 
 # ── Heartbeat & Renewal ─────────────────────────────────────────────────
