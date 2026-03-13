@@ -516,6 +516,7 @@ Any non-terminal state -----> canceled (user action)
 - Workspace is locked during an active run and unlocked on terminal state
 - Queue dispatch uses `SELECT ... FOR UPDATE SKIP LOCKED` (PostgreSQL job queue pattern)
 - Plan-only (speculative) runs skip the apply phase entirely
+- **Run options** — runs can carry optional CLI flags: `-target` (resource targeting), `-replace` (force resource replacement), `-refresh-only`, `-refresh=false`, `-allow-empty-apply`. These are stored on the run, passed through the listener to the runner Job as env vars (`TP_TARGET_ADDRS`, `TP_REPLACE_ADDRS`, `TP_REFRESH_ONLY`, `TP_REFRESH`, `TP_ALLOW_EMPTY_APPLY`), and applied as CLI arguments by the entrypoint
 - **Drift detection** runs are plan-only runs created by the `drift_check` scheduler task. They detect out-of-band infrastructure changes without applying anything. See [Drift Detection](drift-detection.md)
 - **Run tasks** can gate transitions at `pre_plan`, `post_plan`, and `pre_apply` boundaries. A mandatory task failure blocks the run until an admin overrides. See [Run Tasks](run-tasks.md)
 - **Run triggers** fire when a non-speculative run reaches `applied` — downstream workspaces automatically get new runs queued. See [Run Triggers](run-triggers.md)

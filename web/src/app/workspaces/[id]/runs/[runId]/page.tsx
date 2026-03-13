@@ -28,6 +28,11 @@ interface RunAttrs {
   'created-at': string
   'auto-apply': boolean
   'plan-only': boolean
+  'target-addrs': string[]
+  'replace-addrs': string[]
+  'refresh-only': boolean
+  'refresh': boolean
+  'allow-empty-apply': boolean
   'vcs-commit-sha': string | null
   'vcs-branch': string | null
   'vcs-pull-request-number': number | null
@@ -451,6 +456,40 @@ export default function RunDetailPage() {
               </div>
             )}
           </dl>
+
+          {/* Run options (only show when non-default) */}
+          {(attrs['target-addrs']?.length > 0 || attrs['replace-addrs']?.length > 0 || attrs['refresh-only'] || !attrs['refresh'] || attrs['allow-empty-apply']) && (
+            <div className="mt-4 pt-4 border-t border-slate-700/50">
+              <h4 className="text-xs text-slate-500 mb-2">Run Options</h4>
+              <div className="flex flex-wrap gap-2">
+                {attrs['target-addrs']?.map((addr: string) => (
+                  <span key={addr} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-amber-900/40 text-amber-300 border border-amber-800/50">
+                    -target={addr}
+                  </span>
+                ))}
+                {attrs['replace-addrs']?.map((addr: string) => (
+                  <span key={addr} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-orange-900/40 text-orange-300 border border-orange-800/50">
+                    -replace={addr}
+                  </span>
+                ))}
+                {attrs['refresh-only'] && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-purple-900/40 text-purple-300 border border-purple-800/50">
+                    -refresh-only
+                  </span>
+                )}
+                {!attrs['refresh'] && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-700 text-slate-300 border border-slate-600">
+                    -refresh=false
+                  </span>
+                )}
+                {attrs['allow-empty-apply'] && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-teal-900/40 text-teal-300 border border-teal-800/50">
+                    -allow-empty-apply
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Status timeline */}

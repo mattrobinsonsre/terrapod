@@ -56,6 +56,11 @@ def _mock_run(
     run.apply_started_at = None
     run.apply_finished_at = None
     run.listener_id = None
+    run.target_addrs = None
+    run.replace_addrs = None
+    run.refresh_only = False
+    run.refresh = True
+    run.allow_empty_apply = False
     return run
 
 

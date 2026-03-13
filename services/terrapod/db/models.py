@@ -940,6 +940,13 @@ class Run(Base):
     )
     error_message: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
+    # Run options (CLI flags)
+    target_addrs: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    replace_addrs: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    refresh_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    refresh: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    allow_empty_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
     # Drift detection
     is_drift_detection: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     has_changes: Mapped[bool | None] = mapped_column(Boolean, nullable=True)

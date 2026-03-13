@@ -52,6 +52,11 @@ def build_job_spec(
     namespace: str = "",
     plan_only: bool = False,
     var_files: list[str] | None = None,
+    target_addrs: list[str] | None = None,
+    replace_addrs: list[str] | None = None,
+    refresh_only: bool = False,
+    refresh: bool = True,
+    allow_empty_apply: bool = False,
 ) -> dict:
     """Build a K8s Job spec for a run phase.
 
@@ -114,6 +119,16 @@ def build_job_spec(
         container_env.append({"name": "TP_PLAN_ONLY", "value": "true"})
     if var_files:
         container_env.append({"name": "TP_VAR_FILES", "value": json.dumps(var_files)})
+    if target_addrs:
+        container_env.append({"name": "TP_TARGET_ADDRS", "value": json.dumps(target_addrs)})
+    if replace_addrs:
+        container_env.append({"name": "TP_REPLACE_ADDRS", "value": json.dumps(replace_addrs)})
+    if refresh_only:
+        container_env.append({"name": "TP_REFRESH_ONLY", "value": "true"})
+    if not refresh:
+        container_env.append({"name": "TP_REFRESH", "value": "false"})
+    if allow_empty_apply:
+        container_env.append({"name": "TP_ALLOW_EMPTY_APPLY", "value": "true"})
 
     # Workspace env vars (category=env)
     for var in env_vars:
