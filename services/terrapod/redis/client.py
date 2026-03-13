@@ -76,6 +76,9 @@ async def get_redis_health() -> bool:
 RUN_EVENTS_PREFIX = "tp:run_events:"
 ADMIN_EVENTS_CHANNEL = "tp:admin_events"
 WORKSPACE_LIST_EVENTS_CHANNEL = "tp:workspace_list_events"
+LISTENER_EVENTS_PREFIX = "tp:listener_events:"  # per-pool channel
+JOB_STATUS_PREFIX = "tp:job_status:"  # per-run job status cache
+LOG_STREAM_PREFIX = "tp:log_stream:"  # per-run live log cache
 
 
 async def publish_event(channel: str, data: str) -> None:
@@ -90,3 +93,32 @@ async def subscribe_channel(channel: str) -> aioredis.client.PubSub:
     pubsub = client.pubsub()
     await pubsub.subscribe(channel)
     return pubsub
+
+
+async def publish_listener_event(pool_id: str, event: dict) -> None:
+    """Publish an event to a pool's listener SSE channel."""
+    import json
+
+    channel = f"{LISTENER_EVENTS_PREFIX}{pool_id}"
+    await publish_event(channel, json.dumps(event))
+
+
+async def set_job_status(run_id: str, status: str) -> None:
+    """Store a Job status report in Redis for the reconciler."""
+    import json
+    import time
+
+    client = get_redis_client()
+    data = json.dumps({"status": status, "reported_at": time.time()})
+    await client.setex(f"{JOB_STATUS_PREFIX}{run_id}", 120, data)
+
+
+async def get_job_status_from_redis(run_id: str) -> str | None:
+    """Get the most recent Job status report for a run."""
+    import json
+
+    client = get_redis_client()
+    data = await client.get(f"{JOB_STATUS_PREFIX}{run_id}")
+    if data is None:
+        return None
+    return json.loads(data).get("status")

@@ -293,8 +293,8 @@ class AuthConfig(BaseSettings):
         description="Session TTL in hours",
     )
     api_token_max_ttl_hours: int = Field(
-        default=168,
-        description="Maximum API token lifetime in hours (default: 168 = 7 days). "
+        default=8760,
+        description="Maximum API token lifetime in hours (default: 8760 = 1 year). "
         "0 = no limit. Computed at validation time as created_at + this value.",
     )
     require_external_sso_for_roles: list[str] = Field(

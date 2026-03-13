@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.services.run_service import (
     TERMINAL_STATES,
     VALID_TRANSITIONS,
+    _publish_run_available,
     _publish_run_event,
     can_transition,
     cancel_run,
@@ -324,7 +325,7 @@ class TestQueueRun:
 
 
 class TestClaimNextRun:
-    async def test_claims_run_and_transitions_to_planning(self):
+    async def test_claims_queued_run_for_plan_phase(self):
         db = AsyncMock(spec=AsyncSession)
         run = _mock_run(status="queued")
         mock_result = MagicMock()
@@ -338,8 +339,32 @@ class TestClaimNextRun:
 
         result = await claim_next_run(db, listener)
         assert result is not None
-        assert result.status == "planning"
-        assert result.listener_id == listener.id
+        claimed_run, phase = result
+        assert phase == "plan"
+        assert claimed_run.status == "planning"
+        assert claimed_run.listener_id == listener.id
+
+    async def test_claims_confirmed_run_for_apply_phase(self):
+        db = AsyncMock(spec=AsyncSession)
+        # First call (queued query) returns None, second (confirmed query) returns run
+        confirmed_run = _mock_run(status="confirmed")
+        mock_empty = MagicMock()
+        mock_empty.scalar_one_or_none.return_value = None
+        mock_confirmed = MagicMock()
+        mock_confirmed.scalar_one_or_none.return_value = confirmed_run
+        db.execute.side_effect = [mock_empty, mock_confirmed]
+
+        listener = MagicMock()
+        listener.id = uuid.uuid4()
+        listener.pool_id = uuid.uuid4()
+        listener.name = "listener-1"
+
+        result = await claim_next_run(db, listener)
+        assert result is not None
+        claimed_run, phase = result
+        assert phase == "apply"
+        assert claimed_run.status == "applying"
+        assert claimed_run.listener_id == listener.id
 
     async def test_returns_none_when_queue_empty(self):
         db = AsyncMock(spec=AsyncSession)
@@ -371,3 +396,32 @@ class TestPublishRunEvent:
         assert f"tp:run_events:{workspace_id}" in channels
         assert "tp:admin_events" in channels
         assert "tp:workspace_list_events" in channels
+
+
+# ── _publish_run_available ────────────────────────────────────────────
+
+
+class TestPublishRunAvailable:
+    @patch("terrapod.redis.client.publish_listener_event", new_callable=AsyncMock)
+    async def test_publishes_to_pool_channel(self, mock_publish):
+        """run_available event is published to the pool's listener channel."""
+        pool_id = uuid.uuid4()
+        run = _mock_run(status="queued")
+        run.pool_id = pool_id
+
+        await _publish_run_available(run)
+
+        mock_publish.assert_called_once()
+        assert mock_publish.call_args.args[0] == str(pool_id)
+        event = mock_publish.call_args.args[1]
+        assert event["event"] == "run_available"
+
+    @patch("terrapod.redis.client.publish_listener_event", new_callable=AsyncMock)
+    async def test_handles_publish_failure_gracefully(self, mock_publish):
+        """Publishing failure does not raise — the state machine must not break."""
+        mock_publish.side_effect = Exception("Redis down")
+        run = _mock_run(status="queued")
+        run.pool_id = uuid.uuid4()
+
+        # Should not raise
+        await _publish_run_available(run)

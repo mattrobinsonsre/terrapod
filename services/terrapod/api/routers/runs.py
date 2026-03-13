@@ -613,9 +613,11 @@ async def next_run(
     if listener is None:
         raise HTTPException(status_code=404, detail="Listener not found")
 
-    run = await run_service.claim_next_run(db, listener)
-    if run is None:
+    claim = await run_service.claim_next_run(db, listener)
+    if claim is None:
         return Response(status_code=204)
+
+    run, phase = claim
 
     # Fetch workspace once for variables + var_files
     ws = await db.get(Workspace, run.workspace_id)
@@ -635,6 +637,7 @@ async def next_run(
     run_data["data"]["attributes"]["env-vars"] = env_vars
     run_data["data"]["attributes"]["terraform-vars"] = terraform_vars
     run_data["data"]["attributes"]["var-files"] = ws.var_files if ws and ws.var_files else []
+    run_data["data"]["attributes"]["phase"] = phase
 
     return JSONResponse(content=run_data)
 
@@ -731,6 +734,113 @@ async def create_runner_token(
     return JSONResponse(content={"token": token, "expires_in": actual_ttl})
 
 
+# ── Job Lifecycle Callbacks ───────────────────────────────────────────────
+
+
+@router.post("/listeners/{listener_id}/runs/{run_id}/job-launched")
+async def report_job_launched(
+    listener_id: str = Path(...),
+    run_id: str = Path(...),
+    body: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Listener reports Job creation for a run.
+
+    After the listener creates a K8s Job + auth Secret, it calls this endpoint
+    to register the Job name and namespace. The API uses this to track the Job
+    and query its status via the reconciler.
+    """
+    run = await _get_run(run_id, db)
+
+    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    if run.listener_id != l_uuid:
+        raise HTTPException(status_code=403, detail="Run not assigned to this listener")
+
+    job_name = body.get("job_name", "")
+    job_namespace = body.get("job_namespace", "")
+    if not job_name:
+        raise HTTPException(status_code=422, detail="job_name is required")
+
+    run.job_name = job_name
+    run.job_namespace = job_namespace
+    await db.commit()
+
+    return JSONResponse(content={"status": "ok"})
+
+
+@router.post("/listeners/{listener_id}/runs/{run_id}/job-status")
+async def report_job_status(
+    listener_id: str = Path(...),
+    run_id: str = Path(...),
+    body: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Listener reports Job status in response to a check_job_status event.
+
+    The reconciler publishes check_job_status events via SSE. The listener
+    queries K8s for the Job status and POSTs the result here. The reconciler
+    picks up the status from Redis on its next cycle.
+    """
+    run = await _get_run(run_id, db)
+
+    job_status = body.get("status", "")
+    if not job_status:
+        raise HTTPException(status_code=422, detail="status is required")
+
+    from terrapod.redis.client import set_job_status
+
+    await set_job_status(str(run.id), job_status)
+
+    return JSONResponse(content={"status": "ok"})
+
+
+@router.put("/listeners/{listener_id}/runs/{run_id}/log-stream")
+async def upload_log_stream(
+    listener_id: str = Path(...),
+    run_id: str = Path(...),
+    request: Request = ...,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Listener uploads live pod log data for an in-progress run.
+
+    The reconciler publishes stream_logs events via SSE. The listener reads
+    pod logs from K8s and PUTs them here. The API stores the data in Redis
+    and serves it from the log endpoints until the final log is uploaded to
+    object storage by the runner Job.
+    """
+    run = await _get_run(run_id, db)
+    phase = "plan" if run.status == "planning" else "apply"
+    body_bytes = await request.body()
+
+    from terrapod.redis.client import LOG_STREAM_PREFIX, get_redis_client
+
+    redis = get_redis_client()
+    await redis.setex(f"{LOG_STREAM_PREFIX}{run.id}:{phase}", 300, body_bytes)
+
+    return Response(status_code=204)
+
+
+@router.post("/runs/{run_id}/plan-result")
+async def report_plan_result(
+    run_id: str = Path(...),
+    body: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Runner Job reports plan has_changes result.
+
+    Called by the runner entrypoint after plan completes. The has_changes
+    value is used by the reconciler to set the run's has_changes field.
+    """
+    run = await _get_run(run_id, db)
+
+    has_changes = body.get("has_changes")
+    if has_changes is not None:
+        run.has_changes = has_changes
+        await db.commit()
+
+    return JSONResponse(content={"status": "ok"})
+
+
 # ── Log Streaming Endpoints ──────────────────────────────────────────────
 
 # These endpoints serve raw log content compatible with the go-tfe LogReader
@@ -812,7 +922,13 @@ async def _serve_log(
     limit: int,
     strip_ansi: bool = False,
 ) -> Response:
-    """Shared log serving logic with STX/ETX framing."""
+    """Shared log serving logic with STX/ETX framing.
+
+    Data source priority:
+    1. Object storage (authoritative — final log uploaded by Job on completion)
+    2. Redis live stream (live-streamed data from listener during execution)
+    3. Empty response (no data available yet — client retries)
+    """
     storage = get_storage()
     phase_done = run.status in phase_complete_states
 
@@ -822,8 +938,23 @@ async def _serve_log(
         if phase_done:
             # Phase finished but no log — return empty complete stream
             return Response(content=_STX + _ETX, media_type="text/plain")
-        # Still running, no log yet — return empty (client retries)
-        return Response(content=b"", media_type="text/plain")
+
+        # Try live-streamed data from Redis
+        try:
+            from terrapod.redis.client import LOG_STREAM_PREFIX, get_redis_client
+
+            redis = get_redis_client()
+            phase = "plan" if run.status in ("planning", "queued") else "apply"
+            live_data = await redis.get(f"{LOG_STREAM_PREFIX}{run.id}:{phase}")
+            if live_data is not None:
+                if isinstance(live_data, str):
+                    live_data = live_data.encode()
+                data = live_data
+            else:
+                # Still running, no log yet — return empty (client retries)
+                return Response(content=b"", media_type="text/plain")
+        except Exception:
+            return Response(content=b"", media_type="text/plain")
 
     if strip_ansi:
         data = _ANSI_RE.sub(b"", data)

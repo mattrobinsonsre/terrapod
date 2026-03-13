@@ -120,7 +120,7 @@ api:
       callback_base_url: ""
 
       session_ttl_hours: 12
-      api_token_max_ttl_hours: 168  # 7 days; 0 = no limit
+      api_token_max_ttl_hours: 8760  # 1 year; 0 = no limit
       require_external_sso_for_roles: []
 
       # ── SSO / Identity Providers ──────────────────────────────────────

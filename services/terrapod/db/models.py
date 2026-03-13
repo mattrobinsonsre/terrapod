@@ -165,6 +165,7 @@ class APIToken(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
+    lifespan_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (Index("ix_api_tokens_user_email", "user_email"),)
 
@@ -942,6 +943,10 @@ class Run(Base):
     # Drift detection
     is_drift_detection: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     has_changes: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+
+    # Job tracking (populated by listener after launching K8s Job)
+    job_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    job_namespace: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # VCS metadata
     vcs_commit_sha: Mapped[str] = mapped_column(String(40), nullable=False, default="")

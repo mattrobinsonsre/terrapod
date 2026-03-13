@@ -429,6 +429,14 @@ async def create_workspace(
 
     from terrapod.config import settings
 
+    # Resolve agent pool ID from attributes
+    agent_pool_id = None
+    pool_val = attrs.get("agent-pool-id")
+    if pool_val:
+        import uuid as _uuid
+
+        agent_pool_id = _uuid.UUID(str(pool_val).removeprefix("apool-"))
+
     ws = Workspace(
         name=name,
         execution_mode=attrs.get("execution-mode", "local"),
@@ -440,6 +448,7 @@ async def create_workspace(
         resource_memory=attrs.get("resource-memory", "2Gi"),
         labels=attrs.get("labels", {}),
         owner_email=user.email,
+        agent_pool_id=agent_pool_id,
         vcs_connection_id=vcs_connection_id,
         vcs_repo_url=attrs.get("vcs-repo-url", ""),
         vcs_branch=attrs.get("vcs-branch", ""),

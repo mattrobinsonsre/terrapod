@@ -112,6 +112,24 @@ async def _enqueue_drift_completed(run: Run) -> None:
         logger.warning("Failed to enqueue drift completion", error=str(e))
 
 
+async def _publish_run_available(run: Run) -> None:
+    """Publish a run_available event to the pool's listener SSE channel.
+
+    Called when a run transitions to queued or confirmed, notifying listeners
+    that there is claimable work.
+    """
+    try:
+        from terrapod.redis.client import publish_listener_event
+
+        await publish_listener_event(
+            str(run.pool_id),
+            {"event": "run_available", "pool_id": str(run.pool_id)},
+        )
+    except Exception as e:
+        # Never let SSE publishing break the state machine
+        logger.debug("Failed to publish run_available", error=str(e))
+
+
 async def _publish_run_event(run: Run, old_status: str, new_status: str) -> None:
     """Publish a run status change event via Redis pub/sub for SSE streaming."""
     try:
@@ -253,6 +271,10 @@ async def transition_run(
     # Publish SSE event
     await _publish_run_event(run, old_status, target_status)
 
+    # Notify listeners when a run becomes claimable
+    if target_status in ("queued", "confirmed") and run.pool_id:
+        await _publish_run_available(run)
+
     # Fire run triggers when a non-speculative run completes apply
     if target_status == "applied" and not run.plan_only:
         await fire_run_triggers(db, run.workspace_id)
@@ -383,40 +405,52 @@ async def list_workspace_runs(
 async def claim_next_run(
     db: AsyncSession,
     listener: RunnerListener,
-) -> Run | None:
-    """Claim the next queued run for a listener.
+) -> tuple[Run, str] | None:
+    """Claim the next available run for a listener.
+
+    Returns (run, phase) where phase is "plan" or "apply", or None if
+    no runs are available.
+
+    Looks for both queued runs (plan phase) and confirmed runs (apply phase).
+    This ensures apply phases are picked up even if the original listener
+    that ran the plan is no longer available — listeners are stateless.
 
     Uses SELECT ... FOR UPDATE SKIP LOCKED for Postgres job queue pattern.
     """
-    query = (
-        select(Run)
-        .where(
-            Run.status == "queued",
-            Run.pool_id == listener.pool_id,
+    # Try queued runs first (plan phase), then confirmed runs (apply phase)
+    for target_status, phase, next_status in [
+        ("queued", "plan", "planning"),
+        ("confirmed", "apply", "applying"),
+    ]:
+        query = (
+            select(Run)
+            .where(
+                Run.status == target_status,
+                Run.pool_id == listener.pool_id,
+            )
+            .order_by(Run.created_at.asc())
+            .limit(1)
+            .with_for_update(skip_locked=True)
         )
-        .order_by(Run.created_at.asc())
-        .limit(1)
-        .with_for_update(skip_locked=True)
-    )
 
-    result = await db.execute(query)
-    run = result.scalar_one_or_none()
+        result = await db.execute(query)
+        run = result.scalar_one_or_none()
 
-    if run is None:
-        return None
+        if run is not None:
+            run.listener_id = listener.id
+            run = await transition_run(db, run, next_status)
+            await db.flush()
 
-    # Claim the run
-    run.listener_id = listener.id
-    run = await transition_run(db, run, "planning")
-    await db.flush()
+            logger.info(
+                "Run claimed by listener",
+                run_id=str(run.id),
+                listener=listener.name,
+                phase=phase,
+            )
 
-    logger.info(
-        "Run claimed by listener",
-        run_id=str(run.id),
-        listener=listener.name,
-    )
+            return run, phase
 
-    return run
+    return None
 
 
 # --- Configuration Versions ---

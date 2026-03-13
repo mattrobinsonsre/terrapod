@@ -33,6 +33,53 @@ cd "$WORK_DIR"
 # Auth header for all API calls
 AUTH_HEADER="Authorization: Bearer $TP_AUTH_TOKEN"
 
+# --- Redirect-aware curl wrapper ---
+# API endpoints return 302 redirects to presigned URLs. For cloud storage
+# (S3, Azure, GCS) the redirect URL is directly reachable. For the filesystem
+# storage backend the redirect points at the public hostname (e.g.
+# terrapod.local) which may not resolve from inside the cluster. In that case
+# we rewrite the URL to use TP_API_URL (the internal service name) so the
+# download works.
+tp_curl_download() {
+    # $1 = output file, remaining args = curl options (URL last)
+    _out="$1"; shift
+    # First request: don't follow redirects, capture Location header
+    _headers=$(curl -sSf -D - -o /dev/null "$@" 2>/dev/null)
+    _code=$(echo "$_headers" | head -1 | awk '{print $2}')
+    case "$_code" in
+        301|302|303|307|308)
+            _location=$(echo "$_headers" | grep -i '^location:' | sed 's/^[Ll]ocation:[[:space:]]*//' | tr -d '\r')
+            if [ -n "$_location" ] && [ -n "$TP_API_URL" ]; then
+                # Extract host from redirect URL and from TP_API_URL
+                _redir_host=$(echo "$_location" | sed -n 's|^https\{0,1\}://\([^/:]*\).*|\1|p')
+                _api_host=$(echo "$TP_API_URL" | sed -n 's|^https\{0,1\}://\([^/:]*\).*|\1|p')
+                # Only rewrite if the redirect points at the same logical
+                # server but with a different hostname (filesystem backend).
+                # Cloud storage URLs (*.amazonaws.com, *.blob.core.windows.net,
+                # *.storage.googleapis.com) are left untouched.
+                if [ "$_redir_host" != "$_api_host" ]; then
+                    _path=$(echo "$_location" | sed 's|^https\{0,1\}://[^/]*||')
+                    # Check if path is a filesystem presigned URL (/api/v2/storage/...)
+                    case "$_path" in
+                        /api/v2/storage/*)
+                            _location="${TP_API_URL}${_path}"
+                            ;;
+                    esac
+                fi
+            fi
+            curl -sSf -o "$_out" "$_location"
+            ;;
+        200)
+            # No redirect — re-fetch with output (rare, but handle it)
+            curl -sSf -o "$_out" "$@"
+            ;;
+        *)
+            echo "[entrypoint] Unexpected HTTP $_code" >&2
+            return 1
+            ;;
+    esac
+}
+
 # --- Download binary from cache ---
 # Detect platform architecture for correct binary download
 TP_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -45,7 +92,7 @@ esac
 if [ -n "$TP_API_URL" ] && [ -n "$TP_VERSION" ]; then
     BINARY_URL="${TP_API_URL}/api/v2/binary-cache/${TP_BACKEND}/${TP_VERSION}/${TP_OS}/${TP_ARCH}"
     echo "[entrypoint] Downloading $TP_BACKEND $TP_VERSION ($TP_OS/$TP_ARCH) from binary cache..."
-    curl -sSfL -H "$AUTH_HEADER" "$BINARY_URL" -o "/tmp/${TP_BACKEND}.zip"
+    tp_curl_download "/tmp/${TP_BACKEND}.zip" -H "$AUTH_HEADER" "$BINARY_URL"
 else
     echo "[entrypoint] No API URL, expecting $TP_BACKEND on PATH"
     TP_BIN="$TP_BACKEND"
@@ -60,10 +107,14 @@ fi
 # --- Download configuration archive ---
 if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
     echo "[entrypoint] Downloading configuration..."
-    HTTP_CODE=$(curl -sSf -o /tmp/config.tar.gz -w "%{http_code}" -L -H "$AUTH_HEADER" \
-        "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/config" 2>/dev/null) || true
-    if [ "$HTTP_CODE" = "200" ] && [ -f /tmp/config.tar.gz ]; then
-        tar xzf /tmp/config.tar.gz -C "$WORK_DIR"
+    tp_curl_download /tmp/config.tar.gz -H "$AUTH_HEADER" \
+        "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/config" 2>/dev/null || true
+    if [ -f /tmp/config.tar.gz ] && [ -s /tmp/config.tar.gz ]; then
+        # --no-same-owner: don't try to restore original UIDs (we run as non-root)
+        # BusyBox tar returns non-zero on harmless utime/chmod warnings for "."
+        # entry when running as non-root — suppress and let terraform fail later
+        # if extraction actually failed
+        tar xzf /tmp/config.tar.gz --no-same-owner --no-same-permissions -C "$WORK_DIR" 2>/dev/null || true
 
         # Strip cloud {} and backend {} blocks from .tf files.
         # Uploaded configs have cloud/backend blocks that would cause recursive
@@ -87,9 +138,8 @@ fi
 # --- Download current state ---
 if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
     echo "[entrypoint] Downloading current state..."
-    curl -sSfL -H "$AUTH_HEADER" \
-        "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/state" \
-        -o "$WORK_DIR/terraform.tfstate" 2>/dev/null || true
+    tp_curl_download "$WORK_DIR/terraform.tfstate" -H "$AUTH_HEADER" \
+        "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/state" 2>/dev/null || true
 fi
 
 # --- Run setup script (if configured) ---
@@ -189,11 +239,22 @@ if [ "$TP_PHASE" = "plan" ]; then
     cat /tmp/plan.log 2>/dev/null || true
 
     # -detailed-exitcode: 0=no changes, 1=error, 2=changes present
+    PLAN_HAS_CHANGES="false"
     if [ "$EXIT_CODE" = "2" ]; then
+        PLAN_HAS_CHANGES="true"
         echo "[entrypoint] PLAN_HAS_CHANGES=true"
         EXIT_CODE=0
     elif [ "$EXIT_CODE" = "0" ]; then
         echo "[entrypoint] PLAN_HAS_CHANGES=false"
+    fi
+
+    # Report has_changes to API (used by reconciler for drift detection)
+    if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ] && [ "$EXIT_CODE" = "0" ]; then
+        HAS_CHANGES_JSON="$PLAN_HAS_CHANGES"
+        curl -sSf -X POST -H "$AUTH_HEADER" \
+            -H "Content-Type: application/json" \
+            -d "{\"has_changes\": $HAS_CHANGES_JSON}" \
+            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/plan-result" || true
     fi
 
     # Upload plan log
@@ -216,9 +277,8 @@ elif [ "$TP_PHASE" = "apply" ]; then
     # Download plan file from plan phase
     if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
         echo "[entrypoint] Downloading plan file from plan phase..."
-        curl -sSfL -H "$AUTH_HEADER" \
-            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-file" \
-            -o tfplan 2>/dev/null || true
+        tp_curl_download tfplan -H "$AUTH_HEADER" \
+            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-file" 2>/dev/null || true
     fi
 
     echo "[entrypoint] Running $TP_BACKEND apply..."

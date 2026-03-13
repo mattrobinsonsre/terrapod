@@ -15,6 +15,8 @@ Endpoints:
     DELETE /api/v2/authentication-tokens/:id — revoke token
 """
 
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -27,6 +29,7 @@ from terrapod.auth.api_tokens import (
     list_user_tokens,
     revoke_token,
 )
+from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 
@@ -40,6 +43,7 @@ class CreateTokenRequest(BaseModel):
     class Data(BaseModel):
         class Attributes(BaseModel):
             description: str = ""
+            lifespan_hours: int | None = None
 
         type: str = "authentication-tokens"
         attributes: Attributes = Attributes()
@@ -49,11 +53,20 @@ class CreateTokenRequest(BaseModel):
 
 def _token_to_jsonapi(token, raw_value: str | None = None) -> dict:  # type: ignore[no-untyped-def]
     """Convert an APIToken model to JSON:API format."""
+    # Compute expiry from per-token lifespan or global max
+    effective_ttl = token.lifespan_hours or settings.auth.api_token_max_ttl_hours
+    if effective_ttl > 0 and token.created_at:
+        expires_at = (token.created_at + timedelta(hours=effective_ttl)).isoformat()
+    else:
+        expires_at = None
+
     attributes: dict = {
         "description": token.description,
         "token-type": token.token_type,
         "created-at": token.created_at.isoformat() if token.created_at else None,
         "last-used-at": token.last_used_at.isoformat() if token.last_used_at else None,
+        "expires-at": expires_at,
+        "lifespan-hours": token.lifespan_hours,
         # The raw token value is only included at creation time
         "token": raw_value,
     }
@@ -88,6 +101,7 @@ async def create_user_token(
         user_email=user.email,
         description=body.data.attributes.description,
         token_type="user",
+        lifespan_hours=body.data.attributes.lifespan_hours,
     )
 
     return JSONResponse(

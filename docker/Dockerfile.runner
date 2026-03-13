@@ -16,6 +16,8 @@ RUN apk upgrade --no-cache \
 COPY docker/runner-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+RUN mkdir -p /workspace /tmp/bin && chown -R 1000:1000 /workspace /tmp/bin
+
 USER 1000:1000
 WORKDIR /workspace
 
