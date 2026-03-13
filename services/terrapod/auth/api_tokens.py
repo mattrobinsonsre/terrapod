@@ -47,13 +47,22 @@ async def create_api_token(
     user_email: str,
     description: str = "",
     token_type: str = "user",
+    lifespan_hours: int | None = None,
 ) -> tuple[APIToken, str]:
     """Create an API token. Returns (model, raw_token_value).
 
     The raw token value is only available at creation time.
+
+    If lifespan_hours is provided, it is clamped to the global max TTL.
+    If None, the token uses the global max TTL at validation time.
     """
     raw_token = _generate_raw_token()
     token_id = _generate_token_id()
+
+    # Clamp lifespan to global max if set
+    max_ttl = settings.auth.api_token_max_ttl_hours
+    if lifespan_hours is not None and max_ttl > 0:
+        lifespan_hours = min(lifespan_hours, max_ttl)
 
     api_token = APIToken(
         id=token_id,
@@ -61,6 +70,7 @@ async def create_api_token(
         description=description,
         user_email=user_email,
         token_type=token_type,
+        lifespan_hours=lifespan_hours,
     )
 
     db.add(api_token)
@@ -71,6 +81,7 @@ async def create_api_token(
         token_id=token_id,
         user_email=user_email,
         token_type=token_type,
+        lifespan_hours=lifespan_hours,
     )
 
     return api_token, raw_token
@@ -90,13 +101,17 @@ async def validate_api_token(db: AsyncSession, raw_token: str) -> APIToken | Non
     if api_token is None:
         return None
 
-    # Check config-driven max lifetime
+    # Check token lifetime: per-token lifespan takes precedence, else global max
     now = utc_now()
-    max_ttl = settings.auth.api_token_max_ttl_hours
-    if max_ttl > 0:
-        expiry = api_token.created_at + timedelta(hours=max_ttl)
+    effective_ttl = (
+        api_token.lifespan_hours
+        if api_token.lifespan_hours is not None
+        else settings.auth.api_token_max_ttl_hours
+    )
+    if effective_ttl > 0:
+        expiry = api_token.created_at + timedelta(hours=effective_ttl)
         if now > expiry:
-            logger.debug("API token expired (max TTL)", token_id=api_token.id)
+            logger.debug("API token expired", token_id=api_token.id, ttl_hours=effective_ttl)
             return None
 
     # Update last_used_at (rate-limited)

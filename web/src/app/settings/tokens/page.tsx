@@ -19,9 +19,18 @@ interface Token {
     'token-type': string
     'created-at': string | null
     'last-used-at': string | null
+    'expires-at': string | null
+    'lifespan-hours': number | null
     token: string | null
   }
 }
+
+const LIFESPAN_OPTIONS = [
+  { label: '30 days', hours: 720 },
+  { label: '90 days', hours: 2160 },
+  { label: '180 days', hours: 4320 },
+  { label: '1 year', hours: 8760 },
+]
 
 export default function TokensPage() {
   const router = useRouter()
@@ -31,12 +40,13 @@ export default function TokensPage() {
 
   const [showCreate, setShowCreate] = useState(false)
   const [description, setDescription] = useState('')
+  const [lifespanHours, setLifespanHours] = useState<number>(8760)
   const [creating, setCreating] = useState(false)
   const [createdToken, setCreatedToken] = useState<string | null>(null)
 
   const userId = getUserId()
 
-  type TokenSortKey = 'description' | 'created-at' | 'last-used-at'
+  type TokenSortKey = 'description' | 'created-at' | 'last-used-at' | 'expires-at'
   const { sortedItems: sortedTokens, sortState, toggleSort } = useSortable<Token, TokenSortKey>(
     tokens, 'created-at', 'desc',
     useCallback((item: Token, key: TokenSortKey) => {
@@ -44,6 +54,7 @@ export default function TokensPage() {
         case 'description': return item.attributes.description
         case 'created-at': return item.attributes['created-at']
         case 'last-used-at': return item.attributes['last-used-at']
+        case 'expires-at': return item.attributes['expires-at']
       }
     }, []),
   )
@@ -79,7 +90,10 @@ export default function TokensPage() {
         body: JSON.stringify({
           data: {
             type: 'authentication-tokens',
-            attributes: { description },
+            attributes: {
+              description,
+              lifespan_hours: lifespanHours,
+            },
           },
         }),
       })
@@ -90,6 +104,7 @@ export default function TokensPage() {
       const data = await res.json()
       setCreatedToken(data.data?.attributes?.token || null)
       setDescription('')
+      setLifespanHours(8760)
       setShowCreate(false)
       await loadTokens()
     } catch (err) {
@@ -118,6 +133,15 @@ export default function TokensPage() {
       year: 'numeric', month: 'short', day: 'numeric',
       hour: '2-digit', minute: '2-digit',
     })
+  }
+
+  function expiryColor(iso: string | null): string {
+    if (!iso) return 'text-slate-400'
+    const now = Date.now()
+    const expires = new Date(iso).getTime()
+    if (expires <= now) return 'text-red-400'
+    if (expires - now < 30 * 24 * 60 * 60 * 1000) return 'text-amber-400'
+    return 'text-slate-400'
   }
 
   return (
@@ -170,6 +194,19 @@ export default function TokensPage() {
                 className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
               />
             </div>
+            <div className="w-40">
+              <label htmlFor="tok-lifespan" className="block text-sm font-medium text-slate-300 mb-1">Lifespan</label>
+              <select
+                id="tok-lifespan"
+                value={lifespanHours}
+                onChange={(e) => setLifespanHours(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+              >
+                {LIFESPAN_OPTIONS.map((opt) => (
+                  <option key={opt.hours} value={opt.hours}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
             <button
               type="submit"
               disabled={creating}
@@ -192,6 +229,7 @@ export default function TokensPage() {
                   <SortableHeader label="Description" sortKey="description" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label="Created" sortKey="created-at" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label="Last Used" sortKey="last-used-at" sortState={sortState} onSort={toggleSort} />
+                  <SortableHeader label="Expires" sortKey="expires-at" sortState={sortState} onSort={toggleSort} />
                   <th className="text-right px-4 py-3 text-slate-400 font-medium">Actions</th>
                 </tr>
               </thead>
@@ -206,6 +244,9 @@ export default function TokensPage() {
                     </td>
                     <td className="px-4 py-3 text-slate-400 text-xs">
                       {formatDate(tok.attributes['last-used-at'])}
+                    </td>
+                    <td className={`px-4 py-3 text-xs ${expiryColor(tok.attributes['expires-at'])}`}>
+                      {formatDate(tok.attributes['expires-at'])}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button

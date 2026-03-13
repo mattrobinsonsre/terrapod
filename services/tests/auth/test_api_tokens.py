@@ -100,6 +100,7 @@ class TestValidateAPIToken:
         mock_token.last_used_at = None
         mock_token.id = "at-test"
         mock_token.created_at = datetime.now(UTC)
+        mock_token.lifespan_hours = None
 
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_token
@@ -126,6 +127,7 @@ class TestValidateAPIToken:
         mock_token = MagicMock()
         mock_token.created_at = datetime.now(UTC) - timedelta(hours=2)
         mock_token.id = "at-expired"
+        mock_token.lifespan_hours = None
 
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_token
@@ -142,6 +144,7 @@ class TestValidateAPIToken:
         mock_token.created_at = datetime.now(UTC) - timedelta(hours=1)
         mock_token.last_used_at = None
         mock_token.id = "at-valid"
+        mock_token.lifespan_hours = None
 
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_token
@@ -158,6 +161,7 @@ class TestValidateAPIToken:
         mock_token.created_at = datetime(2020, 1, 1, tzinfo=UTC)
         mock_token.last_used_at = None
         mock_token.id = "at-ancient"
+        mock_token.lifespan_hours = None
 
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_token
@@ -175,6 +179,7 @@ class TestValidateAPIToken:
         mock_token.created_at = now
         mock_token.last_used_at = now - timedelta(seconds=30)
         mock_token.id = "at-test"
+        mock_token.lifespan_hours = None
 
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_token

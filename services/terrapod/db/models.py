@@ -165,6 +165,7 @@ class APIToken(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
+    lifespan_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (Index("ix_api_tokens_user_email", "user_email"),)
 

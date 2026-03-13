@@ -159,6 +159,7 @@ class TestTokenCRUD:
         mock_token.token_type = "user"
         mock_token.created_at = datetime(2026, 1, 1, tzinfo=UTC)
         mock_token.last_used_at = None
+        mock_token.lifespan_hours = None
         mock_create.return_value = (mock_token, "raw.tpod.secret")
 
         user = AuthenticatedUser(
@@ -208,6 +209,7 @@ class TestTokenCRUD:
         mock_token.token_type = "user"
         mock_token.created_at = datetime(2026, 1, 1, tzinfo=UTC)
         mock_token.last_used_at = None
+        mock_token.lifespan_hours = None
         mock_list.return_value = [mock_token]
 
         user = AuthenticatedUser(
