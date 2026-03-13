@@ -46,10 +46,10 @@ This document describes the internal architecture of Terrapod, covering system c
 |---|---|---|
 | **Next.js Web** | Single ingress entry point; serves UI pages and proxies API calls | Next.js 15, React 19, Tailwind CSS, Radix UI |
 | **FastAPI API** | All business logic, TFE V2 API, auth, registry, VCS polling | Python 3.13+, FastAPI, SQLAlchemy async, Pydantic |
-| **Runner Listener** | Polls for queued runs, creates K8s Jobs, streams logs | Same Python codebase as API, different entrypoint |
+| **Runner Listener** | Receives run events via SSE, creates K8s Jobs, reports status, streams logs | Same Python codebase as API, different entrypoint |
 | **Runner Jobs** | Ephemeral containers that execute `terraform` or `tofu` | Minimal Alpine image with curl/tar/jq |
 | **PostgreSQL** | Relational data: users, workspaces, state metadata, runs, registry | PostgreSQL 14+ |
-| **Redis** | Sessions, auth state, listener heartbeats, API token role cache | Redis 7+ |
+| **Redis** | Sessions, auth state, listener heartbeats, SSE event channels, Job status cache, API token role cache | Redis 7+ |
 | **Object Storage** | State files, config tarballs, plan outputs, logs, registry artifacts, cache | S3, Azure Blob, GCS, or filesystem |
 
 ---
@@ -142,18 +142,18 @@ For the filesystem backend, URLs are HMAC-signed and served by `storage/filesyst
 
 ## Runner Architecture (ARC Pattern)
 
-Terrapod's execution layer follows the Actions Runner Controller (ARC) pattern: a long-lived controller (the runner listener) watches for queued runs and creates ephemeral Kubernetes Jobs.
+Terrapod's execution layer follows the Actions Runner Controller (ARC) pattern: a long-lived controller (the runner listener) receives events via SSE and creates ephemeral Kubernetes Jobs. The API owns all run lifecycle state via a periodic reconciler.
 
 ### Execution Flow
 
 ```
-1. User/VCS creates a Run (status: pending)
+1. User/VCS creates a Run (status: pending → queued)
         |
-2. Run transitions to "queued"
+2. API publishes "run_available" event to pool's SSE channel (Redis pub/sub)
         |
-3. Listener polls: GET /api/v2/listeners/{id}/runs/next
+3. Listener receives SSE event → claims run: GET /api/v2/listeners/{id}/runs/next
         |
-4. Listener claims run and requests a runner token:
+4. Listener requests a runner token:
    POST /api/v2/listeners/{id}/runs/{run_id}/runner-token
    - Returns short-lived HMAC-signed token scoped to run_id
         |
@@ -169,22 +169,25 @@ Terrapod's execution layer follows the Actions Runner Controller (ARC) pattern: 
    - Contains the runner token
    - ownerReference → Job (K8s GC deletes Secret when Job is cleaned up)
         |
-7. Runner Job starts (authenticates all API calls with TP_AUTH_TOKEN):
+7. Listener reports Job name/namespace back to API ← LISTENER IS DONE
+        |
+8. Runner Job starts (authenticates all API calls with TP_AUTH_TOKEN):
    a. Fetches terraform/tofu binary from binary cache (authenticated)
-   b. Downloads config tarball via artifact endpoint (GET → 302 redirect)
-   c. Downloads current state via artifact endpoint (GET → 302 redirect)
+   b. Downloads config tarball via artifact endpoint (redirect-aware)
+   c. Downloads current state via artifact endpoint (redirect-aware)
    d. Runs terraform init (providers via authenticated network mirror)
-   e. Runs terraform plan
+   e. Runs terraform plan (or apply)
    f. Uploads plan log + plan file via artifact endpoints (PUT)
-   g. Reports plan status to API
+   g. Reports has_changes to API (plan phase only)
         |
-8. If auto_apply or user confirms:
-   a. Runs terraform apply
-   b. Uploads apply log + new state via artifact endpoints (PUT)
-   c. Reports apply status to API
+9. Run reconciler (30s periodic task) drives state transitions:
+   a. Publishes "check_job_status" event via SSE → listener queries K8s
+   b. Listener POSTs Job status to Redis
+   c. Reconciler reads status from Redis → transitions run state
+   d. On plan success + auto_apply: transitions to confirmed → apply phase
         |
-9. Job completes, TTL controller cleans up after 10 minutes
-   Secret is GC'd via ownerReference when Job is deleted
+10. Job completes, TTL controller cleans up after 10 minutes
+    Secret is GC'd via ownerReference when Job is deleted
 ```
 
 ### Signal Forwarding and Graceful Termination
@@ -227,9 +230,10 @@ All listeners follow the same flow — there is no "local" vs "remote" distincti
 5. The API validates the token, issues an X.509 certificate (Ed25519), and returns the listener ID, cert, and pool ID
 6. Certificates are saved to disk for restart persistence (avoiding unnecessary re-joins)
 7. The listener authenticates subsequent API calls via `X-Terrapod-Client-Cert` header (base64-encoded PEM)
-8. Heartbeats every 60s (180s TTL in Redis)
+8. The listener connects to the SSE endpoint (`GET /api/v2/listeners/{id}/events`) — a persistent outbound HTTP stream for receiving events from the API
+9. Heartbeats every 60s (180s TTL in Redis), SSE event loop handles run claims, Job status queries, log streaming, and cancellation
 
-A listener can be deployed in the same cluster as the API or in a completely separate cluster — the join flow is identical. The Helm chart deploys a listener as a Deployment using the same Docker image as the API (`python -m terrapod.runner.listener`) with RBAC to create/watch/delete Jobs and Pods in the runner namespace.
+A listener can be deployed in the same cluster as the API or in a completely separate cluster — the join flow is identical. The SSE connection is outbound from the listener to the API, which works through firewalls without requiring inbound access. The Helm chart deploys a listener as a Deployment using the same Docker image as the API (`python -m terrapod.runner.listener`) with RBAC to create/watch/delete Jobs and Pods in the runner namespace.
 
 **Multiple listener replicas** are supported for high availability. Set `listener.replicas > 1` — each pod derives a unique name by appending its Kubernetes pod name to the configured base name (`{base_name}-{pod_name}`). All replicas in a pool compete for queued runs via atomic Postgres locking (`SELECT ... FOR UPDATE SKIP LOCKED`). No leader election is required — Redis heartbeats track each listener independently, and stale records from terminated pods go offline after the 180s heartbeat TTL.
 
@@ -451,6 +455,7 @@ Currently registered periodic tasks:
 | `registry_vcs_poll` | 60s (configurable) | `registry_vcs_poller.poll_cycle` | Poll VCS for new module version tags |
 | `audit_retention` | 86400s (daily) | `audit_service.purge_old_entries` | Purge audit log entries older than retention period |
 | `drift_check` | 300s (configurable) | `drift_detection_service.drift_check_cycle` | Check workspaces for infrastructure drift |
+| `run_reconciler` | 10s | `run_reconciler.reconcile_runs` | Drive run state transitions based on Job outcomes |
 
 ### Triggered Tasks
 

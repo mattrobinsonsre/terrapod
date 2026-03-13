@@ -55,8 +55,9 @@ Browser / CLI  ──▶  Ingress  ──▶  Next.js (BFF)  ──▶  FastAPI 
                             ┌──────────┬──────────┬───────┘
                             ▼          ▼          ▼
                        PostgreSQL    Redis    Object Storage
-                                                  ▲
-                              Runner Listener ────┘
+                                    ▲  ▲             ▲
+                          SSE events│  │Job status    │
+                             Runner Listener ─────────┘
                                     │
                               K8s Jobs (terraform/tofu)
 ```
@@ -64,7 +65,7 @@ Browser / CLI  ──▶  Ingress  ──▶  Next.js (BFF)  ──▶  FastAPI 
 - **API-first** -- every UI action is backed by a public API endpoint
 - **BFF pattern** -- Next.js is the single ingress entry point; browser never talks to the API directly
 - **Kubernetes-native** -- deployed exclusively via Helm chart
-- **ARC-pattern execution** -- listener creates ephemeral K8s Jobs on demand
+- **ARC-pattern execution** -- listener receives events via SSE, creates ephemeral K8s Jobs; API reconciler owns all run state
 
 See [Architecture](architecture.md) for the full breakdown.
 

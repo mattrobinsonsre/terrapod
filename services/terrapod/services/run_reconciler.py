@@ -8,7 +8,7 @@ The API owns all run lifecycle state. The reconciler:
 5. Publishes stream_logs events for live log streaming
 6. Detects stale runs (>1h with no Job status) and errors them
 
-Registered as a periodic task (30s interval) in app.py.
+Registered as a periodic task (10s interval) in app.py.
 """
 
 import uuid
