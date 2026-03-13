@@ -54,6 +54,8 @@ spec:
               containerPort: 8000
               protocol: TCP
           env:
+            - name: TERRAPOD_VERSION
+              value: {{ .Chart.AppVersion | quote }}
             - name: TERRAPOD_STORAGE__FILESYSTEM__HMAC_SECRET
               valueFrom:
                 secretKeyRef:

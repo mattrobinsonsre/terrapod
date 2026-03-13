@@ -480,6 +480,10 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = Field(default="terrapod-api")
+    version: str = Field(
+        default="",
+        description="Platform version (injected from Chart.AppVersion at deploy time)",
+    )
     debug: bool = Field(default=False)
     log_level: str = Field(default="INFO")
     json_logs: bool = Field(default=True, description="JSON logging in production")
