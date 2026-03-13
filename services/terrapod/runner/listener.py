@@ -1,4 +1,4 @@
-"""Runner listener — stateless fire-and-forget Job launcher with SSE.
+"""Runner listener — stateless fire-and-forget Job launcher with SSE + polling.
 
 Entrypoint: python -m terrapod.runner.listener
 
@@ -6,11 +6,16 @@ The listener:
 1. Establishes identity (join pool via token exchange)
 2. Starts heartbeat loop (every 60s)
 3. Connects to the API via SSE for event-driven work
-4. On run_available: claims run, launches K8s Job, reports Job name — DONE
-5. On check_job_status: queries K8s, POSTs result back
-6. On stream_logs: reads pod logs, PUTs log bytes back
-7. On cancel_job: deletes K8s Job
-8. Serves /health and /ready HTTP endpoints for K8s probes
+4. Runs a polling fallback loop (every 30s) alongside SSE
+5. On run_available: claims run, launches K8s Job, reports Job name — DONE
+6. On check_job_status: queries K8s, POSTs result back
+7. On stream_logs: reads pod logs, PUTs log bytes back
+8. On cancel_job: deletes K8s Job
+9. Serves /health and /ready HTTP endpoints for K8s probes
+
+SSE provides sub-second responsiveness for run claiming. The polling
+fallback ensures bounded worst-case latency (~30s) even if SSE is
+disrupted by proxies, CDNs, or network interruptions.
 
 The listener holds ZERO run state. If it dies, another listener in the
 pool can answer Job status queries. The API reconciler owns all run
@@ -45,6 +50,7 @@ class RunnerListener:
         self._max_concurrent = int(os.environ.get("TERRAPOD_MAX_CONCURRENT", "3"))
         self._health_port = int(os.environ.get("TERRAPOD_HEALTH_PORT", "8081"))
         self._sse_retry_interval = int(os.environ.get("TERRAPOD_SSE_RETRY_INTERVAL", "5"))
+        self._poll_interval = int(os.environ.get("TERRAPOD_POLL_INTERVAL", "30"))
         self._identity_ready = False
         self._last_heartbeat_at: float | None = None
         self._active_launches = 0  # count of concurrent launch operations
@@ -94,11 +100,13 @@ class RunnerListener:
             pod_name=os.environ.get("POD_NAME", ""),
         )
 
-        # Start concurrent loops
+        # Start concurrent loops — SSE for sub-second responsiveness,
+        # poll loop as reliability fallback (~30s worst-case latency)
         await asyncio.gather(
             self._health_server(),
             self._heartbeat_loop(),
             self._sse_loop(),
+            self._poll_loop(),
             self._shutdown_waiter(),
         )
 
@@ -284,12 +292,37 @@ class RunnerListener:
                         event_data = ""
                     # Ignore comment lines (keepalives start with ":")
 
+    # ── Poll Fallback Loop ─────────────────────────────────────────
+
+    async def _poll_loop(self) -> None:
+        """Poll for claimable runs as a fallback alongside SSE.
+
+        SSE delivers run_available events with sub-second latency, but any
+        layer in the proxy chain (Cloudflare, CDN, ingress, BFF) can silently
+        drop or buffer the connection. This loop ensures bounded worst-case
+        latency (~30s) by periodically checking for available work regardless
+        of SSE state.
+        """
+        while not _shutdown.is_set():
+            try:
+                await asyncio.wait_for(_shutdown.wait(), timeout=self._poll_interval)
+                return  # Shutdown signaled
+            except TimeoutError:
+                pass
+
+            try:
+                await self._handle_run_available()
+            except Exception as e:
+                logger.warning("Poll fallback failed", error=str(e))
+
+    # ── SSE Event Dispatch ────────────────────────────────────────
+
     async def _dispatch_event(self, event_type: str, raw_data: str) -> None:
         """Dispatch an SSE event to the appropriate handler."""
         try:
             data = json.loads(raw_data)
         except json.JSONDecodeError:
-            logger.warning("Invalid SSE event data", event=event_type)
+            logger.warning("Invalid SSE event data", event_type=event_type)
             return
 
         if event_type == "run_available":
@@ -301,7 +334,7 @@ class RunnerListener:
         elif event_type == "cancel_job":
             await self._handle_cancel_job(data)
         else:
-            logger.debug("Unknown SSE event", event=event_type)
+            logger.debug("Unknown SSE event", event_type=event_type)
 
     # ── Event Handlers ───────────────────────────────────────────────
 
