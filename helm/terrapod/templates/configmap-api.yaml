@@ -65,7 +65,7 @@ data:
       callback_base_url: {{ .Values.api.config.auth.callback_base_url | quote }}
       {{- end }}
       session_ttl_hours: {{ .Values.api.config.auth.session_ttl_hours | default 12 }}
-      api_token_max_ttl_hours: {{ .Values.api.config.auth.api_token_max_ttl_hours | default 168 }}
+      api_token_max_ttl_hours: {{ .Values.api.config.auth.api_token_max_ttl_hours | default 8760 }}
       {{- if .Values.api.config.auth.require_external_sso_for_roles }}
       require_external_sso_for_roles:
         {{- range .Values.api.config.auth.require_external_sso_for_roles }}
