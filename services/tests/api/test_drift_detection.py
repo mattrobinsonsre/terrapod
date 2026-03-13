@@ -281,6 +281,11 @@ class TestRunDriftAttributes:
         run.apply_finished_at = None
         run.execution_backend = "tofu"
         run.listener_id = None
+        run.target_addrs = None
+        run.replace_addrs = None
+        run.refresh_only = False
+        run.refresh = True
+        run.allow_empty_apply = False
 
         ws = _mock_workspace(ws_id=ws_id)
 

@@ -211,6 +211,13 @@ function WorkspaceDetailContent() {
   const [runs, setRuns] = useState<RunItem[]>([])
   const [runsLoading, setRunsLoading] = useState(false)
   const [queueingPlan, setQueueingPlan] = useState(false)
+  const [showPlanOptions, setShowPlanOptions] = useState(false)
+  const [planTargets, setPlanTargets] = useState('')
+  const [planReplaces, setPlanReplaces] = useState('')
+  const [planRefreshOnly, setPlanRefreshOnly] = useState(false)
+  const [planRefresh, setPlanRefresh] = useState(true)
+  const [planAllowEmpty, setPlanAllowEmpty] = useState(false)
+  const [planOnly, setPlanOnly] = useState(true)
 
   // State versions
   const [stateVersions, setStateVersions] = useState<StateVersionItem[]>([])
@@ -700,16 +707,25 @@ function WorkspaceDetailContent() {
     setQueueingPlan(true)
     setError('')
     try {
+      const attrs: Record<string, unknown> = {
+        'plan-only': planOnly,
+        message: planOnly ? 'Queued from UI (speculative)' : 'Queued from UI',
+      }
+      const targets = planTargets.split(',').map(s => s.trim()).filter(Boolean)
+      const replaces = planReplaces.split(',').map(s => s.trim()).filter(Boolean)
+      if (targets.length) attrs['target-addrs'] = targets
+      if (replaces.length) attrs['replace-addrs'] = replaces
+      if (planRefreshOnly) attrs['refresh-only'] = true
+      if (!planRefresh) attrs['refresh'] = false
+      if (planAllowEmpty) attrs['allow-empty-apply'] = true
+
       const res = await apiFetch(`/api/v2/runs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
           data: {
             type: 'runs',
-            attributes: {
-              'plan-only': true,
-              message: 'Queued from UI (speculative)',
-            },
+            attributes: attrs,
             relationships: {
               workspace: { data: { type: 'workspaces', id: workspaceId } },
             },
@@ -720,6 +736,13 @@ function WorkspaceDetailContent() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.detail || `Failed to queue plan (${res.status})`)
       }
+      setShowPlanOptions(false)
+      setPlanTargets('')
+      setPlanReplaces('')
+      setPlanRefreshOnly(false)
+      setPlanRefresh(true)
+      setPlanAllowEmpty(false)
+      setPlanOnly(true)
       await loadRuns()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to queue plan')
@@ -1447,15 +1470,94 @@ function WorkspaceDetailContent() {
         {activeTab === 'runs' && (
           <div>
             {perms['can-queue-run'] && (
-              <div className="flex justify-end mb-4">
-                <button
-                  onClick={handleQueuePlan}
-                  disabled={queueingPlan || attrs.locked}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
-                  title={attrs.locked ? 'Workspace is locked' : undefined}
-                >
-                  {queueingPlan ? 'Queuing...' : 'Queue Plan'}
-                </button>
+              <div className="mb-4">
+                <div className="flex justify-end items-center gap-2">
+                  <button
+                    onClick={() => setShowPlanOptions(!showPlanOptions)}
+                    className="px-3 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
+                  >
+                    {showPlanOptions ? 'Hide Options' : 'Options'}
+                  </button>
+                  <button
+                    onClick={handleQueuePlan}
+                    disabled={queueingPlan || attrs.locked}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+                    title={attrs.locked ? 'Workspace is locked' : undefined}
+                  >
+                    {queueingPlan ? 'Queuing...' : planOnly ? 'Queue Plan' : 'Queue Run'}
+                  </button>
+                </div>
+                {showPlanOptions && (
+                  <div className="mt-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                    <h4 className="text-sm font-medium text-slate-300 mb-3">Plan Options</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Target resources <span className="text-slate-500">(comma-separated)</span></label>
+                        <input
+                          type="text"
+                          value={planTargets}
+                          onChange={e => setPlanTargets(e.target.value)}
+                          placeholder="e.g. aws_instance.web, aws_s3_bucket.data"
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Replace resources <span className="text-slate-500">(comma-separated)</span></label>
+                        <input
+                          type="text"
+                          value={planReplaces}
+                          onChange={e => setPlanReplaces(e.target.value)}
+                          placeholder="e.g. aws_instance.web"
+                          className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-4 mt-3">
+                      <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={planOnly}
+                          onChange={e => setPlanOnly(e.target.checked)}
+                          className="rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500"
+                        />
+                        Plan Only
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={planRefreshOnly}
+                          onChange={e => {
+                            setPlanRefreshOnly(e.target.checked)
+                            if (e.target.checked) setPlanRefresh(true)
+                          }}
+                          className="rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500"
+                        />
+                        Refresh Only
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!planRefresh}
+                          onChange={e => {
+                            setPlanRefresh(!e.target.checked)
+                            if (e.target.checked) setPlanRefreshOnly(false)
+                          }}
+                          className="rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500"
+                        />
+                        Skip Refresh
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={planAllowEmpty}
+                          onChange={e => setPlanAllowEmpty(e.target.checked)}
+                          className="rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500"
+                        />
+                        Allow Empty Apply
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {runsLoading ? (

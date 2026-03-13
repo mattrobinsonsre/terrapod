@@ -393,6 +393,11 @@ class RunnerListener:
             execution_backend=attrs.get("execution-backend", "tofu"),
             plan_only=attrs.get("plan-only", False),
             var_files=attrs.get("var-files", []),
+            target_addrs=attrs.get("target-addrs"),
+            replace_addrs=attrs.get("replace-addrs"),
+            refresh_only=attrs.get("refresh-only", False),
+            refresh=attrs.get("refresh", True),
+            allow_empty_apply=attrs.get("allow-empty-apply", False),
         )
 
         namespace = os.environ.get("TERRAPOD_RUNNER_NAMESPACE", "terrapod-runners")

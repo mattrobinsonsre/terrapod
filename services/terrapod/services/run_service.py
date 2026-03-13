@@ -179,6 +179,11 @@ async def create_run(
     configuration_version_id: uuid.UUID | None = None,
     created_by: str = "",
     is_drift_detection: bool = False,
+    target_addrs: list[str] | None = None,
+    replace_addrs: list[str] | None = None,
+    refresh_only: bool = False,
+    refresh: bool = True,
+    allow_empty_apply: bool = False,
 ) -> Run:
     """Create a new run for a workspace.
 
@@ -206,6 +211,11 @@ async def create_run(
         pool_id=pool_id,
         created_by=created_by,
         is_drift_detection=is_drift_detection,
+        target_addrs=target_addrs or None,
+        replace_addrs=replace_addrs or None,
+        refresh_only=refresh_only,
+        refresh=refresh,
+        allow_empty_apply=allow_empty_apply,
     )
     db.add(run)
     await db.flush()

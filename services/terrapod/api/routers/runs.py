@@ -71,6 +71,11 @@ def _run_json(run: Run) -> dict:
                 "execution-backend": run.execution_backend,
                 "terraform-version": run.terraform_version,
                 "error-message": run.error_message,
+                "target-addrs": run.target_addrs or [],
+                "replace-addrs": run.replace_addrs or [],
+                "refresh-only": run.refresh_only,
+                "refresh": run.refresh,
+                "allow-empty-apply": run.allow_empty_apply,
                 "is-drift-detection": run.is_drift_detection,
                 "has-changes": run.has_changes,
                 "vcs-commit-sha": run.vcs_commit_sha,
@@ -176,11 +181,15 @@ async def create_run(
 
     ws = await _get_workspace(ws_id, db)
 
-    # CLI-initiated runs in remote mode: plan is allowed, apply is not.
-    # Only VCS-sourced runs are allowed to apply.
+    # CLI-initiated runs in remote mode with uploaded config: plan is allowed,
+    # apply is not. The guard only applies when a configuration version is being
+    # uploaded (CLI workflow). Runs without a config version (UI-queued, VCS, drift)
+    # get their code from VCS, so apply is safe.
     plan_only = attrs.get("plan-only", False)
     source = attrs.get("source", "tfe-api")
-    if ws.execution_mode == "remote" and source not in ("vcs", "drift-detection"):
+    cv_data = relationships.get("configuration-version", {}).get("data", {})
+    has_cv = bool(cv_data.get("id", "") if cv_data else "")
+    if ws.execution_mode == "remote" and source not in ("vcs", "drift-detection") and has_cv:
         if not plan_only:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -217,6 +226,11 @@ async def create_run(
         configuration_version_id=cv_uuid,
         created_by=user.email,
         is_drift_detection=attrs.get("is-drift-detection", False),
+        target_addrs=attrs.get("target-addrs"),
+        replace_addrs=attrs.get("replace-addrs"),
+        refresh_only=attrs.get("refresh-only", False),
+        refresh=attrs.get("refresh", True),
+        allow_empty_apply=attrs.get("allow-empty-apply", False),
     )
 
     # Queue immediately if no config needed, or config already uploaded
@@ -362,6 +376,11 @@ async def retry_run(
         plan_only=run.plan_only,
         configuration_version_id=run.configuration_version_id,
         created_by=user.email,
+        target_addrs=run.target_addrs,
+        replace_addrs=run.replace_addrs,
+        refresh_only=run.refresh_only,
+        refresh=run.refresh,
+        allow_empty_apply=run.allow_empty_apply,
     )
 
     # Copy VCS metadata from the original run

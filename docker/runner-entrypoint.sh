@@ -218,6 +218,26 @@ if [ -n "$TP_VAR_FILES" ] && [ "$TP_VAR_FILES" != "[]" ]; then
     echo "[entrypoint] Using var files: $TP_VAR_FILES"
 fi
 
+# --- Build -target arguments from TP_TARGET_ADDRS JSON ---
+if [ -n "$TP_TARGET_ADDRS" ] && [ "$TP_TARGET_ADDRS" != "[]" ]; then
+    echo "$TP_TARGET_ADDRS" | jq -r '.[]' > /tmp/targets.txt
+    while IFS= read -r tgt; do
+        set -- "$@" "-target=$tgt"
+    done < /tmp/targets.txt
+    rm -f /tmp/targets.txt
+    echo "[entrypoint] Using targets: $TP_TARGET_ADDRS"
+fi
+
+# --- Build -replace arguments from TP_REPLACE_ADDRS JSON (plan phase only) ---
+if [ "$TP_PHASE" = "plan" ] && [ -n "$TP_REPLACE_ADDRS" ] && [ "$TP_REPLACE_ADDRS" != "[]" ]; then
+    echo "$TP_REPLACE_ADDRS" | jq -r '.[]' > /tmp/replaces.txt
+    while IFS= read -r rpl; do
+        set -- "$@" "-replace=$rpl"
+    done < /tmp/replaces.txt
+    rm -f /tmp/replaces.txt
+    echo "[entrypoint] Using replace addrs: $TP_REPLACE_ADDRS"
+fi
+
 # --- Execute phase ---
 EXIT_CODE=0
 
@@ -229,6 +249,12 @@ if [ "$TP_PHASE" = "plan" ]; then
     # Only save plan file if not plan-only (plan file is discarded for plan-only runs)
     if [ "${TP_PLAN_ONLY:-false}" != "true" ]; then
         PLAN_ARGS="$PLAN_ARGS -out=tfplan"
+    fi
+    if [ "${TP_REFRESH_ONLY:-false}" = "true" ]; then
+        PLAN_ARGS="$PLAN_ARGS -refresh-only"
+    fi
+    if [ "${TP_REFRESH:-true}" = "false" ]; then
+        PLAN_ARGS="$PLAN_ARGS -refresh=false"
     fi
     "$TP_BIN" plan $PLAN_ARGS "$@" > /tmp/plan.log 2>&1 &
     CHILD_PID=$!

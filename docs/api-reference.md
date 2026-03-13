@@ -400,7 +400,12 @@ POST /api/v2/runs
       "message": "Triggered from API",
       "is-destroy": false,
       "auto-apply": false,
-      "plan-only": false
+      "plan-only": false,
+      "target-addrs": ["aws_instance.web"],
+      "replace-addrs": [],
+      "refresh-only": false,
+      "refresh": true,
+      "allow-empty-apply": false
     },
     "relationships": {
       "workspace": {
@@ -415,6 +420,16 @@ POST /api/v2/runs
 ```
 
 **Required permission:** `plan` for plan-only runs, `write` for apply runs.
+
+#### Optional Run Attributes
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `target-addrs` | array of strings | `[]` | Resource addresses to target (equivalent to `-target` CLI flag) |
+| `replace-addrs` | array of strings | `[]` | Resource addresses to force replacement (equivalent to `-replace` CLI flag, plan phase only) |
+| `refresh-only` | boolean | `false` | Refresh-only plan — reconcile state without planning changes (equivalent to `-refresh-only`) |
+| `refresh` | boolean | `true` | Whether to refresh state before planning. Set to `false` to skip refresh (equivalent to `-refresh=false`) |
+| `allow-empty-apply` | boolean | `false` | Allow apply even when the plan has no changes (equivalent to `-allow-empty-apply`) |
 
 ### Run Response Attributes (Drift Detection)
 
