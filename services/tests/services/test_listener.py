@@ -7,7 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 import terrapod.runner.listener as listener_module
-from terrapod.runner.listener import RunnerListener
+
+RunnerListener = listener_module.RunnerListener
 
 
 @pytest.fixture(autouse=True)
@@ -203,9 +204,7 @@ class TestDispatchEvent:
 class TestConcurrentSafety:
     async def test_sse_and_poll_can_both_trigger_claims(self, fresh_shutdown_event):
         """Both SSE and poll can trigger _handle_run_available concurrently."""
-        listener = _make_listener(
-            fresh_shutdown_event, _poll_interval=0.05, _max_concurrent=5
-        )
+        listener = _make_listener(fresh_shutdown_event, _poll_interval=0.05, _max_concurrent=5)
         claims = []
 
         async def mock_handle():
