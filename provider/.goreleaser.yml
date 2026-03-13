@@ -1,5 +1,7 @@
 version: 2
 
+project_name: terraform-provider-terrapod
+
 builds:
   - env:
       - CGO_ENABLED=0
