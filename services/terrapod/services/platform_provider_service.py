@@ -84,7 +84,7 @@ def get_platform_version() -> str:
 
     Falls back to '0.0.0-dev' if the version is not set in config.
     """
-    version = getattr(settings, "version", None) or "0.0.1"
+    version = settings.version or "0.0.1"
     return version.lstrip("v")
 
 

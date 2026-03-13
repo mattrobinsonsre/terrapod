@@ -113,6 +113,10 @@ credentials "$MIRROR_HOST" {
 provider_installation {
   network_mirror {
     url = "${TP_API_URL}/v1/providers/"
+    exclude = ["${MIRROR_HOST}/*/*"]
+  }
+  direct {
+    include = ["${MIRROR_HOST}/*/*"]
   }
 }
 TFEOF
@@ -135,7 +139,20 @@ fi
 
 # --- Initialize ---
 echo "[entrypoint] Running $TP_BACKEND init..."
-"$TP_BIN" init -input=false 2>&1
+INIT_EXIT=0
+"$TP_BIN" init -input=false > /tmp/init.log 2>&1 || INIT_EXIT=$?
+cat /tmp/init.log
+if [ "$INIT_EXIT" != "0" ]; then
+    echo "[entrypoint] Init failed with exit code $INIT_EXIT"
+    # Upload init output as plan log so it's visible in the UI
+    if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
+        curl -sSf -X PUT -H "$AUTH_HEADER" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @/tmp/init.log \
+            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-log" || true
+    fi
+    exit "$INIT_EXIT"
+fi
 
 # --- Build -var-file arguments from TP_VAR_FILES JSON ---
 # Uses a temp file + line-by-line read to safely handle paths with spaces.

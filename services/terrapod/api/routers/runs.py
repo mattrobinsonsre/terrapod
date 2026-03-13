@@ -176,11 +176,17 @@ async def create_run(
 
     ws = await _get_workspace(ws_id, db)
 
-    # CLI-initiated runs in remote mode are always plan-only.
+    # CLI-initiated runs in remote mode: plan is allowed, apply is not.
     # Only VCS-sourced runs are allowed to apply.
     plan_only = attrs.get("plan-only", False)
     source = attrs.get("source", "tfe-api")
     if ws.execution_mode == "remote" and source not in ("vcs", "drift-detection"):
+        if not plan_only:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Apply is not allowed from the CLI on remote execution workspaces. "
+                "Use 'terraform plan' for speculative plans, or trigger applies using VCS integration and/or the UX.",
+            )
         plan_only = True
 
     # Check permission: plan-only requires plan, apply requires write
