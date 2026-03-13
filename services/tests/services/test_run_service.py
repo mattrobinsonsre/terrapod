@@ -324,7 +324,7 @@ class TestQueueRun:
 
 
 class TestClaimNextRun:
-    async def test_claims_run_and_transitions_to_planning(self):
+    async def test_claims_queued_run_for_plan_phase(self):
         db = AsyncMock(spec=AsyncSession)
         run = _mock_run(status="queued")
         mock_result = MagicMock()
@@ -338,8 +338,32 @@ class TestClaimNextRun:
 
         result = await claim_next_run(db, listener)
         assert result is not None
-        assert result.status == "planning"
-        assert result.listener_id == listener.id
+        claimed_run, phase = result
+        assert phase == "plan"
+        assert claimed_run.status == "planning"
+        assert claimed_run.listener_id == listener.id
+
+    async def test_claims_confirmed_run_for_apply_phase(self):
+        db = AsyncMock(spec=AsyncSession)
+        # First call (queued query) returns None, second (confirmed query) returns run
+        confirmed_run = _mock_run(status="confirmed")
+        mock_empty = MagicMock()
+        mock_empty.scalar_one_or_none.return_value = None
+        mock_confirmed = MagicMock()
+        mock_confirmed.scalar_one_or_none.return_value = confirmed_run
+        db.execute.side_effect = [mock_empty, mock_confirmed]
+
+        listener = MagicMock()
+        listener.id = uuid.uuid4()
+        listener.pool_id = uuid.uuid4()
+        listener.name = "listener-1"
+
+        result = await claim_next_run(db, listener)
+        assert result is not None
+        claimed_run, phase = result
+        assert phase == "apply"
+        assert claimed_run.status == "applying"
+        assert claimed_run.listener_id == listener.id
 
     async def test_returns_none_when_queue_empty(self):
         db = AsyncMock(spec=AsyncSession)

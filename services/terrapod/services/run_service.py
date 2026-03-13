@@ -383,40 +383,52 @@ async def list_workspace_runs(
 async def claim_next_run(
     db: AsyncSession,
     listener: RunnerListener,
-) -> Run | None:
-    """Claim the next queued run for a listener.
+) -> tuple[Run, str] | None:
+    """Claim the next available run for a listener.
+
+    Returns (run, phase) where phase is "plan" or "apply", or None if
+    no runs are available.
+
+    Looks for both queued runs (plan phase) and confirmed runs (apply phase).
+    This ensures apply phases are picked up even if the original listener
+    that ran the plan is no longer available — listeners are stateless.
 
     Uses SELECT ... FOR UPDATE SKIP LOCKED for Postgres job queue pattern.
     """
-    query = (
-        select(Run)
-        .where(
-            Run.status == "queued",
-            Run.pool_id == listener.pool_id,
+    # Try queued runs first (plan phase), then confirmed runs (apply phase)
+    for target_status, phase, next_status in [
+        ("queued", "plan", "planning"),
+        ("confirmed", "apply", "applying"),
+    ]:
+        query = (
+            select(Run)
+            .where(
+                Run.status == target_status,
+                Run.pool_id == listener.pool_id,
+            )
+            .order_by(Run.created_at.asc())
+            .limit(1)
+            .with_for_update(skip_locked=True)
         )
-        .order_by(Run.created_at.asc())
-        .limit(1)
-        .with_for_update(skip_locked=True)
-    )
 
-    result = await db.execute(query)
-    run = result.scalar_one_or_none()
+        result = await db.execute(query)
+        run = result.scalar_one_or_none()
 
-    if run is None:
-        return None
+        if run is not None:
+            run.listener_id = listener.id
+            run = await transition_run(db, run, next_status)
+            await db.flush()
 
-    # Claim the run
-    run.listener_id = listener.id
-    run = await transition_run(db, run, "planning")
-    await db.flush()
+            logger.info(
+                "Run claimed by listener",
+                run_id=str(run.id),
+                listener=listener.name,
+                phase=phase,
+            )
 
-    logger.info(
-        "Run claimed by listener",
-        run_id=str(run.id),
-        listener=listener.name,
-    )
+            return run, phase
 
-    return run
+    return None
 
 
 # --- Configuration Versions ---

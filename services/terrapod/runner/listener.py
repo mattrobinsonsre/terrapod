@@ -293,24 +293,31 @@ class RunnerListener:
                 {"key": v["key"], "value": v["value"]} for v in attrs.get("terraform-vars", [])
             ]
 
-            task = asyncio.create_task(
-                self._execute_run(
-                    run_id=run_id,
-                    phase="plan",
-                    resource_cpu=attrs.get("resource-cpu", "1"),
-                    resource_memory=attrs.get("resource-memory", "2Gi"),
-                    runner_token=runner_token,
-                    env_vars=env_vars,
-                    terraform_vars=terraform_vars,
-                    terraform_version=attrs.get("terraform-version", ""),
-                    execution_backend=attrs.get("execution-backend", "tofu"),
-                    plan_only=attrs.get("plan-only", False),
-                    var_files=attrs.get("var-files", []),
-                )
+            phase = attrs.get("phase", "plan")
+            common_kwargs = dict(
+                run_id=run_id,
+                resource_cpu=attrs.get("resource-cpu", "1"),
+                resource_memory=attrs.get("resource-memory", "2Gi"),
+                runner_token=runner_token,
+                env_vars=env_vars,
+                terraform_vars=terraform_vars,
+                terraform_version=attrs.get("terraform-version", ""),
+                execution_backend=attrs.get("execution-backend", "tofu"),
+                var_files=attrs.get("var-files", []),
             )
+
+            if phase == "apply":
+                coro = self._execute_apply(**common_kwargs)
+            else:
+                coro = self._execute_plan(
+                    **common_kwargs,
+                    plan_only=attrs.get("plan-only", False),
+                )
+
+            task = asyncio.create_task(coro)
             self.active_tasks[run_id] = task
 
-        logger.info("Claimed and started run", run_id=run_id)
+        logger.info("Claimed and started run", run_id=run_id, phase=phase)
 
     async def _get_runner_token(self, run_id: str) -> str:
         """Request a short-lived runner token from the API."""
@@ -366,10 +373,9 @@ class RunnerListener:
         logger.info("Created auth secret", secret=secret_name, job=job_name)
         return secret_name
 
-    async def _execute_run(
+    async def _execute_plan(
         self,
         run_id: str,
-        phase: str,
         resource_cpu: str,
         resource_memory: str,
         runner_token: str,
@@ -380,7 +386,12 @@ class RunnerListener:
         plan_only: bool = False,
         var_files: list[str] | None = None,
     ) -> None:
-        """Execute a run by creating a K8s Job and watching it (plan + apply)."""
+        """Execute the plan phase of a run.
+
+        After plan completes, reports 'planned' status. The API handles
+        auto-confirm → 'confirmed'. A subsequent poll cycle (this or another
+        listener) picks up the confirmed run for the apply phase.
+        """
         from terrapod.runner.job_template import build_job_spec
 
         run_short = run_id[:8]
@@ -423,24 +434,35 @@ class RunnerListener:
             return
 
         await self._report_status(run_id, "planned", has_changes=has_changes)
+        logger.info("Plan phase completed", run_id=run_id, plan_only=plan_only)
 
-        # Plan-only runs stop here — no confirmation or apply phase
-        if plan_only:
-            logger.info("Plan-only run completed", run_id=run_id)
-            return
+    async def _execute_apply(
+        self,
+        run_id: str,
+        resource_cpu: str,
+        resource_memory: str,
+        runner_token: str,
+        env_vars: list,
+        terraform_vars: list,
+        terraform_version: str = "",
+        execution_backend: str = "",
+        var_files: list[str] | None = None,
+    ) -> None:
+        """Execute the apply phase of a confirmed run.
 
-        # ── Wait for confirmation ───────────────────────────────────
-        confirmed = await self._wait_for_confirmation(run_id, timeout=3600)
-        if not confirmed:
-            return  # Run was discarded or canceled
+        Claimed independently from plan — any listener can pick up a
+        confirmed run, making the system resilient to listener restarts.
+        """
+        from terrapod.runner.job_template import build_job_spec
+
+        run_short = run_id[:8]
+        auth_secret_name = f"tprun-{run_short}-auth"
 
         # ── Pre-apply task stage ────────────────────────────────────
         if not await self._check_task_stage(run_id, "pre_apply"):
             return
 
         # ── Apply phase ─────────────────────────────────────────────
-        await self._report_status(run_id, "applying")
-
         apply_spec = build_job_spec(
             run_id=run_id,
             phase="apply",
@@ -602,60 +624,6 @@ class RunnerListener:
         except Exception as e:
             logger.warning("Failed to parse has_changes from pod logs", error=str(e))
         return None
-
-    async def _wait_for_confirmation(self, run_id: str, timeout: int = 3600) -> bool:
-        """Wait for a run to reach 'confirmed' status.
-
-        Returns True if confirmed, False if discarded/canceled/errored or timeout.
-        """
-        deadline = time.monotonic() + timeout
-        terminal = {"discarded", "canceled", "errored"}
-
-        while time.monotonic() < deadline:
-            if _shutdown.is_set():
-                return False
-
-            current_status = await self._get_run_status(run_id)
-            if current_status == "confirmed":
-                return True
-            if current_status in terminal:
-                logger.info(
-                    "Run reached terminal state while waiting for confirmation",
-                    run_id=run_id,
-                    status=current_status,
-                )
-                return False
-
-            try:
-                await asyncio.wait_for(_shutdown.wait(), timeout=5)
-                return False  # Shutdown signaled
-            except TimeoutError:
-                pass
-
-        logger.warning("Timed out waiting for run confirmation", run_id=run_id)
-        return False
-
-    async def _get_run_status(self, run_id: str) -> str:
-        """Get current run status via API.
-
-        Returns "unknown" on transient errors so callers don't mistake
-        a failed API call for the run actually being in errored state.
-        """
-        try:
-            async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=10) as client:
-                response = await client.get(
-                    f"/api/v2/runs/run-{run_id}",
-                    headers=self._auth_headers(),
-                )
-                if response.status_code != 200:
-                    logger.warning(
-                        "Failed to fetch run status", run_id=run_id, status=response.status_code
-                    )
-                    return "unknown"
-                return response.json()["data"]["attributes"]["status"]
-        except Exception as e:
-            logger.warning("Error fetching run status", run_id=run_id, error=str(e))
-            return "unknown"
 
     async def _check_task_stage(self, run_id: str, stage_name: str) -> bool:
         """Check for applicable run tasks at a stage boundary.

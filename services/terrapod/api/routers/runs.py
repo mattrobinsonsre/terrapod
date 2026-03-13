@@ -613,9 +613,11 @@ async def next_run(
     if listener is None:
         raise HTTPException(status_code=404, detail="Listener not found")
 
-    run = await run_service.claim_next_run(db, listener)
-    if run is None:
+    claim = await run_service.claim_next_run(db, listener)
+    if claim is None:
         return Response(status_code=204)
+
+    run, phase = claim
 
     # Fetch workspace once for variables + var_files
     ws = await db.get(Workspace, run.workspace_id)
@@ -635,6 +637,7 @@ async def next_run(
     run_data["data"]["attributes"]["env-vars"] = env_vars
     run_data["data"]["attributes"]["terraform-vars"] = terraform_vars
     run_data["data"]["attributes"]["var-files"] = ws.var_files if ws and ws.var_files else []
+    run_data["data"]["attributes"]["phase"] = phase
 
     return JSONResponse(content=run_data)
 
