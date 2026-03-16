@@ -16,6 +16,8 @@ Endpoints:
     PUT  /api/v2/runs/{run_id}/artifacts/state        — upload new state
 """
 
+import hashlib
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -190,12 +192,49 @@ async def upload_state(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Upload new state after apply."""
+    """Upload new state after apply.
+
+    Parses the uploaded state JSON, creates a StateVersion record, and
+    stores the state at the canonical key so that subsequent plans can
+    find it via the standard state download path.
+    """
     _require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
     body = await request.body()
+
+    # Parse state JSON to extract metadata
+    try:
+        state_data = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid state JSON") from exc
+
+    serial = state_data.get("serial", 0)
+    lineage = state_data.get("lineage", "")
+    md5 = hashlib.md5(body).hexdigest()
+
+    # Create StateVersion record
+    sv = StateVersion(
+        workspace_id=run.workspace_id,
+        serial=serial,
+        lineage=lineage,
+        md5=md5,
+        state_size=len(body),
+    )
+    db.add(sv)
+    await db.flush()
+
+    # Store at canonical key (same format used by download_state)
     storage = get_storage()
-    key = state_key(str(run.workspace_id), f"{run.id}-new")
+    key = state_key(str(run.workspace_id), str(sv.id))
     await storage.put(key, body)
+
+    await db.commit()
+    logger.info(
+        "state_version_created_from_runner",
+        run_id=run_id,
+        workspace_id=str(run.workspace_id),
+        state_version_id=str(sv.id),
+        serial=serial,
+    )
     return Response(status_code=204)
