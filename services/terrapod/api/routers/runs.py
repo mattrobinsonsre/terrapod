@@ -34,7 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, get_listener_identity
-from terrapod.db.models import Run, Workspace
+from terrapod.db.models import Run, VCSConnection, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service, run_service
@@ -164,6 +164,60 @@ async def _require_run_ws_permission(
         )
 
 
+async def _fetch_vcs_config(db: AsyncSession, ws: Workspace) -> tuple[uuid.UUID, str, str]:
+    """Download code from VCS and create a ConfigurationVersion.
+
+    Used when the UI queues a run on a VCS-connected workspace without
+    uploading code (no CLI config version). Replicates the same flow
+    the VCS poller uses: resolve branch → get HEAD SHA → download
+    tarball → create CV → upload → mark uploaded.
+
+    Returns (cv_id, commit_sha, branch).
+    """
+    from terrapod.services.vcs_poller import (
+        _download_archive,
+        _get_branch_sha,
+        _parse_repo_url,
+        _resolve_branch,
+        _strip_top_level_dir,
+    )
+    from terrapod.storage import get_storage
+    from terrapod.storage.keys import config_version_key
+
+    conn = await db.get(VCSConnection, ws.vcs_connection_id)
+    if not conn or conn.status != "active":
+        raise HTTPException(status_code=422, detail="VCS connection is not active")
+
+    parsed = _parse_repo_url(conn, ws.vcs_repo_url)
+    if not parsed:
+        raise HTTPException(status_code=422, detail="Cannot parse VCS repo URL")
+    owner, repo = parsed
+
+    branch = await _resolve_branch(conn, ws, owner, repo)
+    if not branch:
+        raise HTTPException(status_code=422, detail="Cannot determine VCS branch")
+
+    sha = await _get_branch_sha(conn, owner, repo, branch)
+    if not sha:
+        raise HTTPException(status_code=422, detail="Cannot get branch HEAD SHA")
+
+    archive = await _download_archive(conn, owner, repo, sha)
+    archive = _strip_top_level_dir(archive)
+
+    cv = await run_service.create_configuration_version(
+        db, workspace_id=ws.id, source="tfe-api", auto_queue_runs=False
+    )
+    await db.flush()
+
+    storage = get_storage()
+    key = config_version_key(str(ws.id), str(cv.id))
+    await storage.put(key, archive, content_type="application/x-tar")
+
+    cv = await run_service.mark_configuration_uploaded(db, cv)
+
+    return cv.id, sha, branch
+
+
 @router.post("/runs", status_code=201)
 async def create_run(
     body: dict = Body(...),
@@ -207,12 +261,18 @@ async def create_run(
             detail=f"Requires {required} permission on workspace",
         )
 
-    # Configuration version (optional)
+    # Configuration version (optional — provided by CLI uploads)
     cv_data = relationships.get("configuration-version", {}).get("data", {})
     cv_id = cv_data.get("id", "") if cv_data else ""
     cv_uuid = None
     if cv_id:
         cv_uuid = uuid.UUID(cv_id.removeprefix("cv-"))
+
+    # If no config version provided and workspace has VCS, fetch code from VCS
+    vcs_sha = ""
+    vcs_branch = ""
+    if cv_uuid is None and ws.vcs_connection_id and ws.vcs_repo_url:
+        cv_uuid, vcs_sha, vcs_branch = await _fetch_vcs_config(db, ws)
 
     run = await run_service.create_run(
         db,
@@ -232,6 +292,11 @@ async def create_run(
         refresh=attrs.get("refresh", True),
         allow_empty_apply=attrs.get("allow-empty-apply", False),
     )
+
+    # Attach VCS metadata if we fetched code from VCS
+    if vcs_sha:
+        run.vcs_commit_sha = vcs_sha
+        run.vcs_branch = vcs_branch
 
     # Queue immediately if no config needed, or config already uploaded
     if cv_uuid is None:
