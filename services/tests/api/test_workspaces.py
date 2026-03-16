@@ -164,9 +164,11 @@ class TestShowWorkspace:
         ws = _mock_workspace(name="test-ws")
         user = _user()
         app, mock_db = _make_app(user)
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        no_run_result = MagicMock()
+        no_run_result.scalar_one_or_none.return_value = None
+        mock_db.execute.side_effect = [ws_result, no_run_result]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
@@ -225,9 +227,11 @@ class TestShowWorkspaceById:
         mock_resolve.return_value = "read"
         ws = _mock_workspace()
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        no_run_result = MagicMock()
+        no_run_result.scalar_one_or_none.return_value = None
+        mock_db.execute.side_effect = [ws_result, no_run_result]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
@@ -478,9 +482,11 @@ class TestPermissionsBlock:
         mock_resolve.return_value = "read"
         ws = _mock_workspace()
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        no_run_result = MagicMock()
+        no_run_result.scalar_one_or_none.return_value = None
+        mock_db.execute.side_effect = [ws_result, no_run_result]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
@@ -501,9 +507,11 @@ class TestPermissionsBlock:
         mock_resolve.return_value = "admin"
         ws = _mock_workspace()
         app, mock_db = _make_app(_user(roles=["admin"]))
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        no_run_result = MagicMock()
+        no_run_result.scalar_one_or_none.return_value = None
+        mock_db.execute.side_effect = [ws_result, no_run_result]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)

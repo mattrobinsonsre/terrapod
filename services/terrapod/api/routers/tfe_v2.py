@@ -49,7 +49,7 @@ from terrapod.api.dependencies import (
     get_current_user,
     require_non_runner,
 )
-from terrapod.db.models import StateVersion, Workspace
+from terrapod.db.models import Run, StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.workspace_rbac_service import (
@@ -271,7 +271,11 @@ async def organization_entitlements(
 # ── Workspaces ───────────────────────────────────────────────────────────────
 
 
-def _workspace_json(ws: Workspace, effective_permission: str | None = None) -> dict:
+def _workspace_json(
+    ws: Workspace,
+    effective_permission: str | None = None,
+    latest_run: Run | None = None,
+) -> dict:
     """Serialize a Workspace to TFE V2 JSON:API format.
 
     When effective_permission is provided, the permissions block reflects
@@ -279,6 +283,15 @@ def _workspace_json(ws: Workspace, effective_permission: str | None = None) -> d
     (for backwards compat with internal callers).
     """
     perm = effective_permission
+
+    latest_run_attr = None
+    if latest_run is not None:
+        latest_run_attr = {
+            "id": f"run-{latest_run.id}",
+            "status": latest_run.status,
+            "plan-only": latest_run.plan_only,
+            "created-at": _rfc3339(latest_run.created_at),
+        }
 
     return {
         "data": {
@@ -303,6 +316,7 @@ def _workspace_json(ws: Workspace, effective_permission: str | None = None) -> d
                 "drift-detection-interval-seconds": ws.drift_detection_interval_seconds,
                 "drift-last-checked-at": _rfc3339(ws.drift_last_checked_at),
                 "drift-status": ws.drift_status,
+                "latest-run": latest_run_attr,
                 "agent-pool-id": f"apool-{ws.agent_pool_id}" if ws.agent_pool_id else None,
                 "agent-pool-name": ws.agent_pool.name if ws.agent_pool else None,
                 "labels": ws.labels or {},
@@ -365,12 +379,26 @@ async def list_workspaces(
     result = await db.execute(query)
     workspaces = result.scalars().all()
 
+    # Batch-load latest run per workspace using DISTINCT ON
+    ws_ids = [ws.id for ws in workspaces]
+    latest_runs: dict = {}
+    if ws_ids:
+        latest_run_q = (
+            select(Run)
+            .where(Run.workspace_id.in_(ws_ids))
+            .order_by(Run.workspace_id, Run.created_at.desc())
+            .distinct(Run.workspace_id)
+        )
+        run_result = await db.execute(latest_run_q)
+        for run in run_result.scalars().all():
+            latest_runs[run.workspace_id] = run
+
     # Filter to workspaces user has at least read access to
     visible = []
     for ws in workspaces:
         perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
         if perm is not None:
-            visible.append(_workspace_json(ws, perm)["data"])
+            visible.append(_workspace_json(ws, perm, latest_run=latest_runs.get(ws.id))["data"])
 
     return JSONResponse(
         content={"data": visible},
@@ -395,7 +423,16 @@ async def show_workspace(
     if perm is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    return JSONResponse(content=_workspace_json(ws, perm), headers=_tfe_headers())
+    # Load latest run for this workspace
+    run_result = await db.execute(
+        select(Run).where(Run.workspace_id == ws.id).order_by(Run.created_at.desc()).limit(1)
+    )
+    latest_run = run_result.scalar_one_or_none()
+
+    return JSONResponse(
+        content=_workspace_json(ws, perm, latest_run=latest_run),
+        headers=_tfe_headers(),
+    )
 
 
 @router.post("/organizations/default/workspaces")
@@ -550,7 +587,17 @@ async def show_workspace_by_id(
 ) -> JSONResponse:
     """Show a workspace by its ID."""
     ws, perm = await _require_ws_permission(workspace_id, "read", user, db)
-    return JSONResponse(content=_workspace_json(ws, perm), headers=_tfe_headers())
+
+    # Load latest run for this workspace
+    run_result = await db.execute(
+        select(Run).where(Run.workspace_id == ws.id).order_by(Run.created_at.desc()).limit(1)
+    )
+    latest_run = run_result.scalar_one_or_none()
+
+    return JSONResponse(
+        content=_workspace_json(ws, perm, latest_run=latest_run),
+        headers=_tfe_headers(),
+    )
 
 
 @router.patch("/workspaces/{workspace_id}")
