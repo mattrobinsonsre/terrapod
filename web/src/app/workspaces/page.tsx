@@ -14,6 +14,13 @@ import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { useWorkspaceListEvents } from '@/lib/use-workspace-list-events'
 
+interface LatestRun {
+  id: string
+  status: string
+  'plan-only': boolean
+  'created-at': string
+}
+
 interface Workspace {
   id: string
   attributes: {
@@ -26,6 +33,7 @@ interface Workspace {
     'resource-memory': string
     'drift-detection-enabled': boolean
     'drift-status': string
+    'latest-run': LatestRun | null
     'created-at': string
   }
 }
@@ -52,6 +60,39 @@ export default function WorkspacesPage() {
   const [versionsBackend, setVersionsBackend] = useState('')
 
   type WsSortKey = 'name' | 'mode' | 'resources' | 'status' | 'created'
+
+  function resolveStatus(ws: Workspace): { label: string; color: string; priority: number } {
+    const drift = ws.attributes['drift-status']
+    const run = ws.attributes['latest-run']
+
+    if (drift === 'drifted') return { label: 'Drifted', color: 'amber', priority: 1 }
+    if (run) {
+      const s = run.status
+      const planOnly = run['plan-only']
+      if (s === 'errored') return { label: 'Errored', color: 'red', priority: 2 }
+      if (s === 'planned' && !planOnly) return { label: 'Needs Confirm', color: 'amber', priority: 3 }
+      if (s === 'planning') return { label: 'Planning', color: 'blue', priority: 4 }
+      if (s === 'applying') return { label: 'Applying', color: 'blue', priority: 4 }
+      if (s === 'confirmed') return { label: 'Confirmed', color: 'blue', priority: 4 }
+      if (s === 'queued') return { label: 'Queued', color: 'blue', priority: 4 }
+      if (s === 'pending') return { label: 'Pending', color: 'slate', priority: 5 }
+      if (s === 'applied') return { label: 'Applied', color: 'green', priority: 6 }
+      if (s === 'planned' && planOnly) return { label: 'Planned', color: 'green', priority: 7 }
+      if (s === 'canceled') return { label: 'Canceled', color: 'slate', priority: 8 }
+      if (s === 'discarded') return { label: 'Discarded', color: 'slate', priority: 8 }
+    }
+    return { label: '\u2014', color: 'gray', priority: 9 }
+  }
+
+  const badgeColors: Record<string, string> = {
+    amber: 'bg-amber-900/50 text-amber-300',
+    red: 'bg-red-900/50 text-red-300',
+    blue: 'bg-blue-900/50 text-blue-300',
+    green: 'bg-green-900/50 text-green-300',
+    slate: 'bg-slate-700/50 text-slate-400',
+    gray: 'text-slate-500',
+  }
+
   const { sortedItems: sortedWorkspaces, sortState, toggleSort } = useSortable<Workspace, WsSortKey>(
     workspaces, 'name', 'asc',
     useCallback((item: Workspace, key: WsSortKey) => {
@@ -59,7 +100,7 @@ export default function WorkspacesPage() {
         case 'name': return item.attributes.name
         case 'mode': return item.attributes['execution-mode']
         case 'resources': return item.attributes['resource-cpu']
-        case 'status': return item.attributes.locked ? 'locked' : 'unlocked'
+        case 'status': return resolveStatus(item).label
         case 'created': return item.attributes['created-at']
       }
     }, []),
@@ -280,28 +321,17 @@ export default function WorkspacesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/30">
-                {sortedWorkspaces.map((ws) => (
+                {sortedWorkspaces.map((ws) => {
+                  const status = resolveStatus(ws)
+                  return (
                   <tr key={ws.id} className="hover:bg-slate-700/20 transition-colors">
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/workspaces/${ws.id}`}
-                          className="text-sm font-medium text-brand-400 hover:text-brand-300"
-                        >
-                          {ws.attributes.name}
-                        </Link>
-                        {ws.attributes['drift-detection-enabled'] && ws.attributes['drift-status'] && (
-                          <span
-                            className={`inline-block w-2 h-2 rounded-full ${
-                              ws.attributes['drift-status'] === 'no_drift' ? 'bg-green-400' :
-                              ws.attributes['drift-status'] === 'drifted' ? 'bg-amber-400' :
-                              ws.attributes['drift-status'] === 'errored' ? 'bg-red-400' :
-                              'bg-slate-500'
-                            }`}
-                            title={`Drift: ${ws.attributes['drift-status'].replace('_', ' ')}`}
-                          />
-                        )}
-                      </div>
+                      <Link
+                        href={`/workspaces/${ws.id}`}
+                        className="text-sm font-medium text-brand-400 hover:text-brand-300"
+                      >
+                        {ws.attributes.name}
+                      </Link>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
                       <span className="text-xs text-slate-400">{ws.attributes['execution-mode']}</span>
@@ -312,13 +342,13 @@ export default function WorkspacesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        ws.attributes.locked
-                          ? 'bg-amber-900/50 text-amber-300'
-                          : 'bg-green-900/50 text-green-300'
-                      }`}>
-                        {ws.attributes.locked ? 'Locked' : 'Unlocked'}
-                      </span>
+                      {status.color === 'gray' ? (
+                        <span className="text-xs text-slate-500">{status.label}</span>
+                      ) : (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColors[status.color]}`}>
+                          {status.label}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
                       <span className="text-xs text-slate-500">
@@ -326,7 +356,8 @@ export default function WorkspacesPage() {
                       </span>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

@@ -77,9 +77,11 @@ class TestWorkspaceDriftAttributes:
         ws = _mock_workspace(drift_detection_enabled=True, drift_status="no_drift")
 
         app, mock_db = _make_app(_user())
-        mock_result = MagicMock()
-        mock_result.scalar_one_or_none.return_value = ws
-        mock_db.execute.return_value = mock_result
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        no_run_result = MagicMock()
+        no_run_result.scalar_one_or_none.return_value = None
+        mock_db.execute.side_effect = [ws_result, no_run_result]
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
