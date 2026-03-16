@@ -169,6 +169,168 @@ async def get_current_user(
     )
 
 
+async def authenticate_request(request: Request) -> AuthenticatedUser:
+    """Authenticate a request using a short-lived DB session.
+
+    Unlike get_current_user (which uses Depends(get_db) and holds the session
+    for the request lifetime), this function creates and closes its own session.
+    Use this in SSE endpoints to avoid holding DB connections for the entire
+    stream duration.
+    """
+    from terrapod.db.session import get_db_session
+
+    # Extract bearer token from Authorization header
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    token = auth_header[7:]  # strip "Bearer "
+
+    # Try runner token first (no DB needed)
+    if token.startswith("runtok:"):
+        from terrapod.auth.runner_tokens import verify_runner_token
+
+        run_id = verify_runner_token(token)
+        if run_id is not None:
+            request.state.user_email = "runner"
+            return AuthenticatedUser(
+                email="runner",
+                display_name="Runner Job",
+                roles=["everyone"],
+                provider_name="runner_token",
+                auth_method="runner_token",
+                run_id=run_id,
+            )
+
+    # Try API token and session with a short-lived DB session
+    async with get_db_session() as db:
+        api_token = await validate_api_token(db, token)
+        if api_token is not None:
+            email = api_token.user_email or ""
+            roles = await _resolve_user_roles(db, email) if email else []
+            request.state.user_email = email
+            return AuthenticatedUser(
+                email=email,
+                display_name=None,
+                roles=roles,
+                provider_name="api_token",
+                auth_method="api_token",
+            )
+
+    # Try session (Redis only — no DB needed)
+    session = await get_session(token)
+    if session is not None:
+        if _should_refresh_session(session):
+            new_expires = await refresh_session(token, session)
+            request.state.session_expires_at = new_expires
+        request.state.user_email = session.email
+        return AuthenticatedUser(
+            email=session.email,
+            display_name=session.display_name,
+            roles=session.roles,
+            provider_name=session.provider_name,
+            auth_method="session",
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or expired token",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+async def authenticate_listener(request: Request) -> "ListenerIdentity":
+    """Authenticate a listener using a short-lived DB session.
+
+    Like authenticate_request but for certificate-based listener auth.
+    Used in SSE endpoints to avoid holding DB connections.
+    """
+    import base64
+    import datetime as dt
+
+    from cryptography import x509
+    from cryptography.exceptions import InvalidSignature
+
+    from terrapod.auth.ca import get_ca, get_certificate_fingerprint
+    from terrapod.db.models import RunnerListener
+    from terrapod.db.session import get_db_session
+
+    cert_header = request.headers.get("x-terrapod-client-cert")
+    if not cert_header:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="X-Terrapod-Client-Cert header required",
+        )
+
+    try:
+        cert_pem = base64.b64decode(cert_header)
+        cert = x509.load_pem_x509_certificate(cert_pem)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid certificate encoding",
+        ) from None
+
+    # Verify CA signature
+    ca = get_ca()
+    try:
+        ca.ca_cert.public_key().verify(cert.signature, cert.tbs_certificate_bytes)
+    except (InvalidSignature, Exception):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Certificate not signed by this CA",
+        ) from None
+
+    # Check expiry
+    now = dt.datetime.now(dt.UTC)
+    if now > cert.not_valid_after_utc or now < cert.not_valid_before_utc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Certificate expired or not yet valid",
+        )
+
+    # Extract CN
+    cn = cert.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
+    if not cn:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Certificate has no Common Name",
+        )
+    listener_name = cn[0].value
+
+    # Short-lived DB session for listener lookup
+    async with get_db_session() as db:
+        from sqlalchemy import select
+
+        result = await db.execute(
+            select(RunnerListener).where(RunnerListener.name == listener_name)
+        )
+        listener = result.scalar_one_or_none()
+        if listener is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"No listener registered with name '{listener_name}'",
+            )
+
+        fingerprint = get_certificate_fingerprint(cert)
+        if listener.certificate_fingerprint and fingerprint != listener.certificate_fingerprint:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Certificate fingerprint mismatch",
+            )
+
+        return ListenerIdentity(
+            listener_id=listener.id,
+            name=listener.name,
+            pool_id=listener.pool_id,
+            certificate_fingerprint=fingerprint,
+            certificate_expires_at=listener.certificate_expires_at,
+        )
+
+
 def require_non_runner(
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> AuthenticatedUser:

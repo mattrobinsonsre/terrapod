@@ -303,6 +303,13 @@ async def join_listener(
     result = await agent_pool_service.join_listener(db, pool, token, name, runner_definitions)
     await db.commit()
 
+    from terrapod.redis.client import POOL_EVENTS_PREFIX, publish_event
+
+    await publish_event(
+        f"{POOL_EVENTS_PREFIX}{pool.id}",
+        json.dumps({"event": "listener_joined", "listener_name": name}),
+    )
+
     return JSONResponse(content={"data": result}, status_code=201)
 
 
@@ -337,6 +344,13 @@ async def join_listener_by_token(
     result["pool_id"] = str(pool.id)
     await db.commit()
 
+    from terrapod.redis.client import POOL_EVENTS_PREFIX, publish_event
+
+    await publish_event(
+        f"{POOL_EVENTS_PREFIX}{pool.id}",
+        json.dumps({"event": "listener_joined", "listener_name": name}),
+    )
+
     return JSONResponse(content={"data": result}, status_code=201)
 
 
@@ -353,6 +367,56 @@ async def list_pool_listeners(
     pool = await _get_pool(pool_id, db)
     listeners = await agent_pool_service.list_listeners(db, pool.id)
     return JSONResponse(content={"data": [_listener_json(lis) for lis in listeners]})
+
+
+@router.get("/agent-pools/{pool_id}/events")
+async def pool_events(
+    request: Request,
+    pool_id: str = Path(...),
+) -> EventSourceResponse:
+    """Stream pool events via SSE for real-time admin updates.
+
+    Uses short-lived DB session for auth and pool lookup, then releases
+    before SSE streaming. Events: listener_heartbeat, listener_joined.
+    """
+    from terrapod.api.dependencies import authenticate_request
+    from terrapod.db.session import get_db_session
+    from terrapod.redis.client import POOL_EVENTS_PREFIX, subscribe_channel
+
+    user = await authenticate_request(request)
+    if "admin" not in user.roles:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    async with get_db_session() as db:
+        pool = await _get_pool(pool_id, db)
+        pool_uuid = str(pool.id)
+
+    channel = f"{POOL_EVENTS_PREFIX}{pool_uuid}"
+    pubsub = await subscribe_channel(channel)
+
+    async def event_generator():
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                if message and message["type"] == "message":
+                    data = message["data"]
+                    if isinstance(data, bytes):
+                        data = data.decode()
+                    payload = json.loads(data)
+                    yield {
+                        "event": payload.get("event", "update"),
+                        "data": json.dumps(payload),
+                    }
+                else:
+                    yield {"comment": "keepalive"}
+                    await asyncio.sleep(1)
+        finally:
+            await pubsub.unsubscribe(channel)
+            await pubsub.aclose()
+
+    return EventSourceResponse(event_generator())
 
 
 @router.delete("/listeners/{listener_id}", status_code=204)
@@ -377,24 +441,20 @@ async def delete_listener(
 async def listener_events(
     request: Request,
     listener_id: str = Path(...),
-    db: AsyncSession = Depends(get_db),
 ) -> EventSourceResponse:
     """SSE channel for API → listener communication.
 
-    The listener opens a persistent connection here. The API pushes events:
-    - run_available: a run is queued for this pool
-    - check_job_status: reconciler wants Job status
-    - stream_logs: reconciler wants live pod logs
-    - cancel_job: user canceled a run, delete the Job
+    Uses short-lived DB session for auth and listener lookup, then releases
+    before SSE streaming. The listener opens a persistent connection here.
+    Events: run_available, check_job_status, stream_logs, cancel_job.
     """
-    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
-    listener = await agent_pool_service.get_listener(db, l_uuid)
-    if listener is None:
-        raise HTTPException(status_code=404, detail="Listener not found")
-
+    from terrapod.api.dependencies import authenticate_listener
     from terrapod.redis.client import LISTENER_EVENTS_PREFIX, subscribe_channel
 
-    channel = f"{LISTENER_EVENTS_PREFIX}{listener.pool_id}"
+    identity = await authenticate_listener(request)
+    pool_id = str(identity.pool_id)
+
+    channel = f"{LISTENER_EVENTS_PREFIX}{pool_id}"
     pubsub = await subscribe_channel(channel)
 
     async def event_generator():
@@ -457,22 +517,21 @@ async def listener_heartbeat(
     await redis.setex(f"{prefix}:active_runs", ttl, str(active_runs))
     await redis.setex(f"{prefix}:runner_defs", ttl, json.dumps(runner_defs))
 
-    # Publish heartbeat event to admin dashboard SSE
+    # Publish heartbeat event to admin dashboard + pool SSE channels
     try:
-        from terrapod.redis.client import ADMIN_EVENTS_CHANNEL, publish_event
+        from terrapod.redis.client import ADMIN_EVENTS_CHANNEL, POOL_EVENTS_PREFIX, publish_event
 
-        await publish_event(
-            ADMIN_EVENTS_CHANNEL,
-            json.dumps(
-                {
-                    "event": "listener_heartbeat",
-                    "listener_id": str(listener.id),
-                    "listener_name": listener.name,
-                    "capacity": capacity,
-                    "active_runs": active_runs,
-                }
-            ),
+        heartbeat_payload = json.dumps(
+            {
+                "event": "listener_heartbeat",
+                "listener_id": str(listener.id),
+                "listener_name": listener.name,
+                "capacity": capacity,
+                "active_runs": active_runs,
+            }
         )
+        await publish_event(ADMIN_EVENTS_CHANNEL, heartbeat_payload)
+        await publish_event(f"{POOL_EVENTS_PREFIX}{listener.pool_id}", heartbeat_payload)
     except Exception:
         pass  # Never break heartbeat for SSE
 

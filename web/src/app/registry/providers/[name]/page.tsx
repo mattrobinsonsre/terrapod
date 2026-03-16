@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/empty-state'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { LabelsEditor } from '@/components/labels-editor'
+import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface ProviderPermissions {
   'can-update': boolean
@@ -114,6 +115,8 @@ export default function ProviderDetailPage() {
     loadVersions()
     loadProviderMeta()
   }, [router, name])
+
+  usePollingInterval(!loading, 60_000, loadVersions)
 
   const basePath = `/api/v2/organizations/default/registry-providers/private/default/${name}`
 

@@ -129,6 +129,18 @@ A workspace is considered stale based on how long ago its last successful apply 
 
 ---
 
+## Real-Time Updates
+
+The health dashboard page receives real-time updates via Server-Sent Events (SSE):
+
+```
+GET /api/v2/admin/health-dashboard/events
+```
+
+Requires `admin` or `audit` role. The stream emits events when workspace or run health data changes, allowing the dashboard to refresh automatically. See [Architecture — Real-Time Updates](architecture.md#real-time-updates-sse--polling) for details on the SSE implementation.
+
+---
+
 ## See Also
 
 - [Drift Detection](drift-detection.md) — how drift status is tracked

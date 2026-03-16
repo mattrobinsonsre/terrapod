@@ -44,6 +44,10 @@ interface RunAttrs {
 interface Run {
   id: string
   attributes: RunAttrs
+  relationships?: {
+    'configuration-version'?: { data: { id: string; type: string } | null }
+    [key: string]: unknown
+  }
 }
 
 interface PlanApply {
@@ -218,9 +222,11 @@ export default function RunDetailPage() {
     loadRun()
   }, [router, loadRun])
 
-  // Real-time updates via SSE
+  // Real-time updates via SSE — reload on any workspace event for this run
   useRunEvents(workspaceId, useCallback((event) => {
-    if (event.run_id === runId.replace(/^run-/, '')) {
+    // Reload on run_status_change for this run, or on reconnect (catch-up)
+    const bareId = runId.replace(/^run-/, '')
+    if (event.event === 'reconnect' || event.run_id === bareId) {
       loadRun()
     }
   }, [runId, loadRun]))
@@ -354,8 +360,8 @@ export default function RunDetailPage() {
 
         {error && <ErrorBanner message={error} />}
 
-        {/* Remote plan-only indicator for CLI-sourced runs */}
-        {attrs['plan-only'] && attrs.source === 'tfe-api' && (
+        {/* Remote plan-only indicator for CLI-sourced runs (has uploaded config version) */}
+        {attrs['plan-only'] && attrs.source === 'tfe-api' && run.relationships?.['configuration-version']?.data && (
           <div className="mb-6 p-4 bg-cyan-900/20 rounded-lg border border-cyan-800/50">
             <p className="text-sm text-cyan-300">
               This is a <strong>plan-only</strong> remote run initiated from the CLI. Apply is not available for CLI-uploaded code &mdash; only VCS-managed code can be applied.

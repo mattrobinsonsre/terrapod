@@ -77,6 +77,7 @@ RUN_EVENTS_PREFIX = "tp:run_events:"
 ADMIN_EVENTS_CHANNEL = "tp:admin_events"
 WORKSPACE_LIST_EVENTS_CHANNEL = "tp:workspace_list_events"
 LISTENER_EVENTS_PREFIX = "tp:listener_events:"  # per-pool channel
+POOL_EVENTS_PREFIX = "tp:pool_events:"  # per-pool admin channel
 JOB_STATUS_PREFIX = "tp:job_status:"  # per-run job status cache
 LOG_STREAM_PREFIX = "tp:log_stream:"  # per-run live log cache
 
@@ -93,6 +94,25 @@ async def subscribe_channel(channel: str) -> aioredis.client.PubSub:
     pubsub = client.pubsub()
     await pubsub.subscribe(channel)
     return pubsub
+
+
+async def publish_workspace_event(
+    workspace_id: str, event_type: str, extra: dict | None = None
+) -> None:
+    """Publish a workspace-scoped event to both the per-workspace and workspace-list SSE channels.
+
+    Silently catches errors — SSE notifications are best-effort and must never
+    break the originating API request.
+    """
+    try:
+        import json
+
+        payload = {"event": event_type, "workspace_id": str(workspace_id), **(extra or {})}
+        data = json.dumps(payload)
+        await publish_event(f"{RUN_EVENTS_PREFIX}{workspace_id}", data)
+        await publish_event(WORKSPACE_LIST_EVENTS_CHANNEL, data)
+    except Exception:
+        pass
 
 
 async def publish_listener_event(pool_id: str, event: dict) -> None:

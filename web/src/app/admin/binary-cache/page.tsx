@@ -9,6 +9,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { useSortable } from '@/lib/use-sortable'
+import { usePollingInterval } from '@/lib/use-polling-interval'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
@@ -59,6 +60,8 @@ export default function BinaryCachePage() {
     if (!isAdmin()) { router.push('/'); return }
     loadEntries()
   }, [router])
+
+  usePollingInterval(!loading, 60_000, loadEntries)
 
   async function loadEntries() {
     setLoading(true)

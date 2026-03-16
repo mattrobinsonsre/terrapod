@@ -9,6 +9,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { useSortable } from '@/lib/use-sortable'
+import { usePollingInterval } from '@/lib/use-polling-interval'
 import { getAuthState, isAdminOrAudit } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
@@ -82,6 +83,8 @@ export default function AuditLogPage() {
     loadEntries()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page])
+
+  usePollingInterval(!loading, 30_000, loadEntries)
 
   async function loadEntries() {
     setLoading(true)

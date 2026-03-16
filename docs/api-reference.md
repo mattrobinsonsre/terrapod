@@ -488,15 +488,36 @@ Creates a new run from a terminal run (applied, errored, canceled, discarded) us
 
 **Required permission:** `plan` on the workspace (or `write` for apply runs).
 
-### Run Events (SSE)
+### Workspace Events (SSE)
 
 ```
 GET /api/v2/workspaces/{workspace_id}/runs/events
 ```
 
-Server-Sent Events stream for real-time run status updates. The stream emits `run_update` events whenever a run in the workspace changes state. Used by the web UI for live updates without polling.
+Server-Sent Events stream for real-time workspace updates. The stream emits events whenever a run changes state, the workspace is locked/unlocked, workspace settings are updated, or a new state version is created. Used by the web UI workspace detail page for live updates without polling.
+
+**Event types:**
+
+| Event | Trigger |
+|---|---|
+| `run_status_change` | Run transitions to a new state |
+| `workspace_lock_change` | Workspace is locked or unlocked (includes `locked` boolean) |
+| `workspace_updated` | Workspace settings are modified |
+| `state_version_created` | New state version is uploaded |
+
+The stream sends `: keepalive` comments every ~1 second. Events are JSON-encoded in `data:` fields.
 
 **Required permission:** `read` on the workspace.
+
+### Workspace List Events (SSE)
+
+```
+GET /api/v2/workspace-events
+```
+
+Server-Sent Events stream for the workspace list page. Emits events whenever any workspace changes (run status, lock, settings, state). The web UI uses this to refresh the workspace list without polling.
+
+**Required permission:** Any authenticated user.
 
 ### Plan Details
 
@@ -1346,6 +1367,35 @@ Returns platform-wide health data including workspace status summaries, recent r
 | `listeners.online` | Listeners with a recent heartbeat (within 180s) |
 | `listeners.offline` | Listeners with no recent heartbeat |
 | `listeners.details` | Per-listener status, pool, capacity, and active runs |
+
+### Health Dashboard Events (SSE)
+
+```
+GET /api/v2/admin/health-dashboard/events
+```
+
+Server-Sent Events stream for real-time admin health dashboard updates. The stream emits events whenever workspace or run health data changes.
+
+**Required permission:** Platform `admin` or `audit`.
+
+---
+
+## Agent Pool Events (SSE)
+
+```
+GET /api/v2/agent-pools/{pool_id}/events
+```
+
+Server-Sent Events stream for real-time agent pool updates. Emits events when listeners heartbeat or join the pool. Used by the agent pool detail page for live listener status updates.
+
+**Event types:**
+
+| Event | Trigger |
+|---|---|
+| `listener_heartbeat` | A listener sends its periodic heartbeat |
+| `listener_joined` | A new listener joins the pool |
+
+**Required permission:** Platform `admin` or `audit`.
 
 ---
 

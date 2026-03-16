@@ -10,6 +10,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface Module {
   id: string
@@ -42,6 +43,8 @@ export default function ModulesPage() {
     if (!getAuthState()) { router.push('/login'); return }
     loadModules()
   }, [router])
+
+  usePollingInterval(!loading, 60_000, loadModules)
 
   async function loadModules() {
     setLoading(true)

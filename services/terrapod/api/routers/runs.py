@@ -119,6 +119,16 @@ def _run_json(run: Run) -> dict:
                 "workspace": {
                     "data": {"id": f"ws-{run.workspace_id}", "type": "workspaces"},
                 },
+                "configuration-version": {
+                    "data": (
+                        {
+                            "id": f"cv-{run.configuration_version_id}",
+                            "type": "configuration-versions",
+                        }
+                        if run.configuration_version_id
+                        else None
+                    ),
+                },
                 "plan": {
                     "data": {"id": f"plan-{run.id}", "type": "plans"},
                 },
@@ -641,21 +651,30 @@ async def show_apply(
 async def run_events_stream(
     request: Request,
     workspace_id: str = Path(...),
-    user: AuthenticatedUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
 ) -> EventSourceResponse:
-    """Stream run status change events via SSE for real-time UI updates."""
-    ws = await _get_workspace(workspace_id, db)
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
-    if not has_permission(perm, "read"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Requires read permission on workspace",
-        )
+    """Stream run status change events via SSE for real-time UI updates.
 
+    Uses short-lived DB session for auth/RBAC check, then releases it
+    before entering the long-lived SSE streaming loop. This prevents
+    holding a DB pool connection for the entire SSE connection lifetime.
+    """
+    from terrapod.api.dependencies import authenticate_request
+    from terrapod.db.session import get_db_session
     from terrapod.redis.client import RUN_EVENTS_PREFIX, subscribe_channel
 
-    channel = f"{RUN_EVENTS_PREFIX}{ws.id}"
+    user = await authenticate_request(request)
+
+    async with get_db_session() as db:
+        ws = await _get_workspace(workspace_id, db)
+        perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+        if not has_permission(perm, "read"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Requires read permission on workspace",
+            )
+        ws_id = str(ws.id)
+
+    channel = f"{RUN_EVENTS_PREFIX}{ws_id}"
     pubsub = await subscribe_channel(channel)
 
     async def event_generator():

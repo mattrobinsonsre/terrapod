@@ -16,11 +16,15 @@ const nextConfig = {
         headers: [{ key: 'Content-Encoding', value: 'none' }],
       },
       {
-        source: '/api/v2/workspaces/events',
+        source: '/api/v2/workspace-events',
         headers: [{ key: 'Content-Encoding', value: 'none' }],
       },
       {
-        source: '/api/v2/admin/health/events',
+        source: '/api/v2/admin/health-dashboard/events',
+        headers: [{ key: 'Content-Encoding', value: 'none' }],
+      },
+      {
+        source: '/api/v2/agent-pools/:path*/events',
         headers: [{ key: 'Content-Encoding', value: 'none' }],
       },
     ]
