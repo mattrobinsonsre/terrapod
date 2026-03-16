@@ -68,6 +68,8 @@ def _mock_workspace(ws_id=None, name="test-ws"):
     ws = MagicMock()
     ws.id = ws_id or uuid.uuid4()
     ws.name = name
+    ws.vcs_connection_id = None
+    ws.vcs_repo_url = ""
     return ws
 
 
