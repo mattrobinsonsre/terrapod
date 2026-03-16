@@ -85,6 +85,51 @@ Browser                Next.js (port 3000)         FastAPI API (port 8000)
 
 ---
 
+## Real-Time Updates (SSE + Polling)
+
+The frontend uses two strategies for keeping data fresh without manual page reloads:
+
+### Server-Sent Events (SSE)
+
+High-priority pages that users watch actively use SSE for instant updates. The API publishes events to Redis pub/sub channels; SSE endpoints subscribe and forward events to the browser through the BFF proxy.
+
+**SSE channels:**
+
+| Redis Channel | SSE Endpoint | Frontend Hook | Used By |
+|---|---|---|---|
+| `tp:run_events:{ws_id}` | `GET /api/v2/workspaces/{id}/runs/events` | `useRunEvents` | Workspace detail page |
+| `tp:workspace_list_events` | `GET /api/v2/workspace-events` | `useWorkspaceListEvents` | Workspace list page |
+| `tp:pool_events:{pool_id}` | `GET /api/v2/agent-pools/{id}/events` | `usePoolEvents` | Agent pool detail page |
+| `tp:admin_events` | `GET /api/v2/admin/health-dashboard/events` | `useAdminEvents` | Health dashboard |
+| `tp:listener_events:{pool_id}` | `GET /api/v2/listeners/{id}/events` | (listener code) | Runner listeners |
+
+**Shared SSE engine (`use-sse.ts`):**
+
+All frontend SSE hooks are thin wrappers around a shared `useSSE` hook that provides:
+
+- **Read timeout** (10s default) — if no data arrives (including keepalives sent every ~1s), the connection is assumed dead and reconnected. Catches NAT timeouts, load balancer idle disconnects, and hung backends.
+- **Reconnect-triggered reload** — `onReconnect` callback fires after a successful reconnect (not initial connect), letting each page do a full data reload to catch events missed during the gap.
+- **Exponential backoff** — 1s → 30s cap, resets on successful connection.
+- **Visibility-aware** — pauses reconnection in background tabs, resumes on tab focus.
+- **Connection status** — returns `connected` boolean for optional "Reconnecting..." UI indicator.
+
+**BFF compression bypass:** SSE endpoints MUST have `Content-Encoding: none` headers configured in `web/next.config.js`. Without this, Next.js gzip compression buffers small SSE messages (keepalives, events) indefinitely because the encoder waits for enough data to fill a compression block.
+
+**DB pool safety:** SSE endpoints MUST NOT use `Depends(get_current_user)` or `Depends(get_db)` — these hold database connections for the entire request lifetime, which for SSE means forever. Instead, SSE endpoints use `authenticate_request()` or `authenticate_listener()` which create short-lived sessions that are released before streaming begins.
+
+### Polling
+
+Medium-priority admin and registry pages use `usePollingInterval` for periodic data refresh:
+
+| Page Category | Interval | Examples |
+|---|---|---|
+| Admin lists | 30s | Agent pools list, audit log |
+| Admin/registry detail | 60s | Variable sets, users, roles, VCS, binary cache, modules, providers |
+
+The polling hook is visibility-aware — it skips intervals when the tab is backgrounded.
+
+---
+
 ## Storage Abstraction
 
 Terrapod uses a protocol-based storage abstraction that supports four backends through their native SDKs. There is no S3 compatibility shim or MinIO dependency.
