@@ -99,14 +99,18 @@ def _run_json(run: Run) -> dict:
                     and not run.auto_apply
                     and not run.plan_only,
                     "is-discardable": run.status == "planned" and not run.plan_only,
-                    "is-cancelable": run.status not in run_service.TERMINAL_STATES,
-                    "is-retryable": run.status in run_service.TERMINAL_STATES,
+                    "is-cancelable": run.status not in run_service.TERMINAL_STATES
+                    and not (run.plan_only and run.status == "planned"),
+                    "is-retryable": run.status in run_service.TERMINAL_STATES
+                    or (run.plan_only and run.status == "planned"),
                 },
                 "permissions": {
                     "can-apply": run.status == "planned" and not run.plan_only,
-                    "can-cancel": run.status not in run_service.TERMINAL_STATES,
+                    "can-cancel": run.status not in run_service.TERMINAL_STATES
+                    and not (run.plan_only and run.status == "planned"),
                     "can-discard": run.status == "planned" and not run.plan_only,
-                    "can-retry": run.status in run_service.TERMINAL_STATES,
+                    "can-retry": run.status in run_service.TERMINAL_STATES
+                    or (run.plan_only and run.status == "planned"),
                     "can-force-execute": False,
                     "can-force-cancel": False,
                 },
