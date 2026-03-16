@@ -451,8 +451,6 @@ async def listener_heartbeat(
     active_runs = body.get("active_runs", 0)
     runner_defs = body.get("runner_definitions", [])
 
-    import json
-
     await redis.setex(f"{prefix}:status", ttl, "online")
     await redis.setex(f"{prefix}:heartbeat", ttl, str(int(__import__("time").time())))
     await redis.setex(f"{prefix}:capacity", ttl, str(capacity))
