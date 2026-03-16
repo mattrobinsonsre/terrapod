@@ -11,6 +11,7 @@ import { SortableHeader } from '@/components/sortable-header'
 import { useSortable } from '@/lib/use-sortable'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface Role {
   name: string
@@ -109,6 +110,8 @@ export default function RolesPage() {
     if (!isAdmin()) { router.push('/'); return }
     loadRoles()
   }, [router])
+
+  usePollingInterval(!rolesLoading, 60_000, loadRoles)
 
   useEffect(() => {
     if (activeTab === 'assignments') loadAssignments()

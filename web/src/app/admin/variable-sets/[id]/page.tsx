@@ -10,6 +10,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface VarsetAttrs {
   name: string
@@ -116,6 +117,8 @@ export default function VariableSetDetailPage() {
     if (!isAdmin()) { router.push('/'); return }
     loadVarset()
   }, [router, loadVarset])
+
+  usePollingInterval(!loading, 60_000, loadVarset)
 
   useEffect(() => {
     if (!varset) return

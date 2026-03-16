@@ -237,4 +237,9 @@ async def upload_state(
         state_version_id=str(sv.id),
         serial=serial,
     )
+
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(run.workspace_id), "state_version_created")
+
     return Response(status_code=204)

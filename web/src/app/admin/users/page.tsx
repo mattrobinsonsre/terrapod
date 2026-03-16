@@ -13,6 +13,7 @@ import { SortableHeader } from '@/components/sortable-header'
 import { useSortable } from '@/lib/use-sortable'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { usePollingInterval } from '@/lib/use-polling-interval'
 
 zxcvbnOptions.setOptions({
   dictionary: { ...zxcvbnCommonPackage.dictionary },
@@ -282,6 +283,8 @@ export default function UsersPage() {
     if (!isAdmin()) { router.push('/'); return }
     loadUsers()
   }, [router])
+
+  usePollingInterval(!loading, 60_000, loadUsers)
 
   async function loadUsers() {
     setLoading(true)

@@ -12,6 +12,7 @@ import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
+import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface VariableSet {
   id: string
@@ -61,6 +62,8 @@ export default function VariableSetsPage() {
     if (!isAdmin()) { router.push('/'); return }
     loadVarsets()
   }, [router])
+
+  usePollingInterval(!loading, 60_000, loadVarsets)
 
   async function loadVarsets() {
     setLoading(true)

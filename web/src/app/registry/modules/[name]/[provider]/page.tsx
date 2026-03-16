@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/empty-state'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { LabelsEditor } from '@/components/labels-editor'
+import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface VersionStatus {
   version: string
@@ -180,6 +181,8 @@ export default function ModuleDetailPage() {
     if (!getAuthState()) { router.push('/login'); return }
     loadModule()
   }, [router, name, provider])
+
+  usePollingInterval(!loading, 60_000, loadModule)
 
   async function loadModule() {
     setLoading(true)

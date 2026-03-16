@@ -8,8 +8,11 @@ import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
+import { ConnectionStatus } from '@/components/connection-status'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { usePoolEvents } from '@/lib/use-pool-events'
+import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface PoolAttrs {
   name: string
@@ -124,7 +127,7 @@ export default function AgentPoolDetailPage() {
     }
   }
 
-  async function loadListeners() {
+  const loadListeners = useCallback(async () => {
     setListenersLoading(true)
     try {
       const res = await apiFetch(`/api/v2/agent-pools/${poolId}/listeners`)
@@ -136,7 +139,15 @@ export default function AgentPoolDetailPage() {
     } finally {
       setListenersLoading(false)
     }
-  }
+  }, [poolId])
+
+  // Real-time listener updates via SSE (heartbeats, joins)
+  const { connected: poolConnected } = usePoolEvents(poolId, useCallback(() => {
+    loadListeners()
+  }, [loadListeners]))
+
+  // 60s polling fallback for listener offline detection (Redis TTL expiry doesn't generate events)
+  usePollingInterval(activeTab === 'listeners', 60_000, loadListeners)
 
   function startEditing() {
     if (!pool) return
@@ -277,6 +288,7 @@ export default function AgentPoolDetailPage() {
         <PageHeader
           title={pool.attributes.name}
           description={pool.attributes.description || 'Agent pool'}
+          actions={<ConnectionStatus connected={poolConnected} />}
         />
 
         {error && <ErrorBanner message={error} />}

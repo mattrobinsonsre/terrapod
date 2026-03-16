@@ -12,6 +12,7 @@ import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
+import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface AgentPool {
   id: string
@@ -54,6 +55,8 @@ export default function AgentPoolsPage() {
     if (!isAdmin()) { router.push('/'); return }
     loadPools()
   }, [router])
+
+  usePollingInterval(!loading, 30_000, loadPools)
 
   async function loadPools() {
     setLoading(true)

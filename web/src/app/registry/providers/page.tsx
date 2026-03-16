@@ -10,6 +10,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
+import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface Provider {
   id: string
@@ -35,6 +36,8 @@ export default function ProvidersPage() {
     if (!getAuthState()) { router.push('/login'); return }
     loadProviders()
   }, [router])
+
+  usePollingInterval(!loading, 60_000, loadProviders)
 
   async function loadProviders() {
     setLoading(true)

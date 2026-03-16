@@ -11,6 +11,7 @@ import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
+import { usePollingInterval } from '@/lib/use-polling-interval'
 
 interface VCSConnection {
   id: string
@@ -73,6 +74,8 @@ export default function VCSConnectionsPage() {
     if (!isAdmin()) { router.push('/'); return }
     loadConnections()
   }, [router])
+
+  usePollingInterval(!loading, 60_000, loadConnections)
 
   async function loadConnections() {
     setLoading(true)

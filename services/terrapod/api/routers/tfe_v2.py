@@ -543,14 +543,16 @@ async def _require_ws_permission(
 @router.get("/workspace-events")
 async def workspace_list_events(
     request: Request,
-    user: AuthenticatedUser = Depends(get_current_user),
 ) -> EventSourceResponse:
     """Stream workspace list events via SSE for real-time updates.
 
-    Any authenticated user can subscribe. Publishes run_status_change
-    and drift_status_change events for all workspaces.
+    Any authenticated user can subscribe. Uses short-lived DB session
+    for auth, then releases before SSE streaming.
     """
+    from terrapod.api.dependencies import authenticate_request
     from terrapod.redis.client import WORKSPACE_LIST_EVENTS_CHANNEL, subscribe_channel
+
+    await authenticate_request(request)
 
     pubsub = await subscribe_channel(WORKSPACE_LIST_EVENTS_CHANNEL)
 
@@ -714,6 +716,11 @@ async def update_workspace(
 
     await db.commit()
     await db.refresh(ws)
+
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(ws.id), "workspace_updated")
+
     return JSONResponse(content=_workspace_json(ws, perm), headers=_tfe_headers())
 
 
@@ -915,6 +922,10 @@ async def create_state_version(
 
     logger.info("State version created", workspace=ws.name, serial=serial, sv_id=str(sv.id))
 
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(ws.id), "state_version_created")
+
     return JSONResponse(
         content=_state_version_json(sv),
         status_code=201,
@@ -956,6 +967,10 @@ async def upload_state_content(
     await db.commit()
 
     logger.info("State content uploaded", sv_id=str(sv.id), size=len(state_data))
+
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(sv.workspace_id), "state_version_created")
 
     return Response(status_code=200)
 
@@ -1006,6 +1021,10 @@ async def lock_workspace(
     await db.commit()
     await db.refresh(ws)
 
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(ws.id), "workspace_lock_change", {"locked": True})
+
     return JSONResponse(content=_workspace_json(ws, perm), headers=_tfe_headers())
 
 
@@ -1038,5 +1057,9 @@ async def unlock_workspace(
     ws.lock_id = None
     await db.commit()
     await db.refresh(ws)
+
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(ws.id), "workspace_lock_change", {"locked": False})
 
     return JSONResponse(content=_workspace_json(ws, perm), headers=_tfe_headers())

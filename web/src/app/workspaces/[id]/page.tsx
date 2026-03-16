@@ -172,6 +172,7 @@ function WorkspaceDetailContent() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [lastQueuedRunId, setLastQueuedRunId] = useState<string | null>(null)
 
   // Overview editing
   const [editing, setEditing] = useState(false)
@@ -354,10 +355,11 @@ function WorkspaceDetailContent() {
     if (activeTab === 'run-tasks') loadRunTasks()
   }, [activeTab, workspace, loadRuns])
 
-  // Real-time run status updates via SSE
-  useRunEvents(workspaceId, useCallback(() => {
-    if (activeTab === 'runs') loadRuns()
+  // Real-time workspace events via SSE (run status, lock/unlock, state, settings)
+  useRunEvents(workspaceId, useCallback((event) => {
     loadWorkspace()
+    if (activeTab === 'runs') loadRuns()
+    if (activeTab === 'state' && (event.event === 'state_version_created' || event.event === 'reconnect')) loadStateVersions()
   }, [activeTab, loadRuns, loadWorkspace]))
 
   async function loadVariables() {
@@ -635,6 +637,12 @@ function WorkspaceDetailContent() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.detail || `Failed to queue drift check (${res.status})`)
       }
+      const runData = await res.json().catch(() => null)
+      const newRunId = runData?.data?.id as string | undefined
+      if (newRunId) {
+        setLastQueuedRunId(newRunId)
+        setTimeout(() => setLastQueuedRunId((prev) => prev === newRunId ? null : prev), 8000)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to queue drift check')
     } finally {
@@ -735,6 +743,12 @@ function WorkspaceDetailContent() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.detail || `Failed to queue plan (${res.status})`)
+      }
+      const runData = await res.json().catch(() => null)
+      const newRunId = runData?.data?.id as string | undefined
+      if (newRunId) {
+        setLastQueuedRunId(newRunId)
+        setTimeout(() => setLastQueuedRunId((prev) => prev === newRunId ? null : prev), 8000)
       }
       setShowPlanOptions(false)
       setPlanTargets('')
@@ -966,6 +980,20 @@ function WorkspaceDetailContent() {
         />
 
         {error && <ErrorBanner message={error} />}
+
+        {lastQueuedRunId && (
+          <div className="mb-4 p-3 bg-brand-900/30 rounded-lg border border-brand-700/50 flex items-center justify-between">
+            <p className="text-sm text-brand-300">
+              Run queued successfully.
+            </p>
+            <button
+              onClick={() => { setLastQueuedRunId(null); router.push(`/workspaces/${workspaceId}/runs/${lastQueuedRunId}`) }}
+              className="text-sm font-medium text-brand-400 hover:text-brand-300 transition-colors"
+            >
+              View Run &rarr;
+            </button>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="border-b border-slate-700/50 mb-6">

@@ -316,20 +316,21 @@ async def _get_listener_health(db: AsyncSession) -> dict:
 @router.get("/admin/health-dashboard/events")
 async def health_dashboard_events(
     request: Request,
-    user: AuthenticatedUser = Depends(get_current_user),
 ) -> EventSourceResponse:
     """Stream admin health events via SSE for real-time dashboard updates.
 
-    Publishes run_status_change, drift_status_change, and listener_heartbeat events.
+    Uses short-lived DB session for auth, then releases before SSE streaming.
     Requires admin or audit role.
     """
+    from terrapod.api.dependencies import authenticate_request
+    from terrapod.redis.client import ADMIN_EVENTS_CHANNEL, subscribe_channel
+
+    user = await authenticate_request(request)
     if "admin" not in user.roles and "audit" not in user.roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin or audit role required",
         )
-
-    from terrapod.redis.client import ADMIN_EVENTS_CHANNEL, subscribe_channel
 
     pubsub = await subscribe_channel(ADMIN_EVENTS_CHANNEL)
 
