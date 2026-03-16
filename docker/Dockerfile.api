@@ -7,7 +7,8 @@
 FROM python:3.14-slim AS builder
 
 # Install build + runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# apt-get upgrade picks up security patches for base OS packages
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     pkg-config \
     gcc \
     libc6-dev \
@@ -33,7 +34,8 @@ FROM python:3.14-slim
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
 # Runtime-only system libraries (no gcc, no -dev headers)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# apt-get upgrade picks up security patches for base OS packages (e.g. glibc)
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     curl \
     xmlsec1 \
     libxmlsec1-openssl \
