@@ -108,3 +108,11 @@ def platform_provider_shasums_key(version: str) -> str:
 def platform_provider_shasums_sig_key(version: str) -> str:
     """Key for a cached Terrapod platform provider SHA256SUMS.sig."""
     return f"cache/provider/terrapod/{version}/terraform-provider-terrapod_{version}_SHA256SUMS.sig"
+
+
+# --- Module Override (Impact Analysis) ---
+
+
+def module_override_key(commit_sha: str, namespace: str, name: str, provider: str) -> str:
+    """Key for a module override tarball (keyed by commit SHA for reuse across runs)."""
+    return f"module_overrides/{commit_sha}/{namespace}/{name}/{provider}.tar.gz"

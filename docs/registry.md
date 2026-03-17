@@ -232,6 +232,99 @@ Each version exposes VCS metadata in the API response:
 
 ---
 
+## Module Impact Analysis
+
+When a PR is opened against a VCS-connected module, Terrapod can automatically generate **speculative (plan-only) runs** on linked workspaces to show the impact of the module change before it's merged. This is a novel feature with no equivalent in TFE/TFC.
+
+### How It Works
+
+1. An admin **links workspaces** to a module — these are workspaces that consume the module
+2. When a PR is opened or updated on the module's VCS repo, Terrapod's background poller detects it
+3. For each linked workspace, Terrapod creates a **plan-only run** that uses the PR branch code instead of the published module version
+4. The plan results are posted back to the PR as commit statuses and comments
+
+The key insight: the module download endpoint is intercepted at the registry level. When the runner executes `terraform init`, it transparently receives the PR branch tarball instead of the published version — no modification of Terraform code required.
+
+### Linking Workspaces
+
+Link workspaces to a module via the API or the web UI (on the module detail page):
+
+```zsh
+# Link a workspace
+curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-modules/private/default/vpc/aws/workspace-links \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{
+    "data": {
+      "type": "workspace-links",
+      "attributes": {
+        "workspace_id": "<workspace-id>"
+      }
+    }
+  }'
+
+# List linked workspaces
+curl https://terrapod.example.com/api/v2/organizations/default/registry-modules/private/default/vpc/aws/workspace-links \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN"
+
+# Remove a link
+curl -X DELETE https://terrapod.example.com/api/v2/organizations/default/registry-modules/private/default/vpc/aws/workspace-links/<link-id> \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN"
+```
+
+Linking requires **admin** permission on the module.
+
+### Module Override Mechanism
+
+Each speculative run carries a `module_overrides` field — a JSON map of module coordinates to override storage paths:
+
+```json
+{
+  "default/vpc/aws": "module_overrides/abc123def/default/vpc/aws.tar.gz"
+}
+```
+
+When the runner downloads the module during `terraform init`, the download endpoint checks the run's overrides and serves the PR tarball instead of the published version. Override tarballs are keyed by commit SHA, so retries and multiple linked workspaces share the same tarball.
+
+### PR Polling and Deduplication
+
+- The module impact poller runs as a periodic task alongside the registry VCS poller (same interval)
+- For each VCS-connected module with workspace links, it lists open PRs targeting the default branch
+- New commits on a PR trigger new speculative runs; same SHA is skipped (deduplication via `vcs_last_pr_shas`)
+- When a PR is closed or merged, active speculative runs for that PR are cancelled
+
+### Automatic Runs on Version Publish
+
+When a new module version is published — either via manual upload or VCS tag auto-publish — Terrapod automatically queues **standard runs** (not plan-only) on all linked workspaces. This ensures consuming workspaces are updated when a new module version becomes available.
+
+### Run Sources
+
+| Source | Trigger | Run Type |
+|---|---|---|
+| `module-test` | PR opened/updated on module repo | Plan-only (speculative) |
+| `module-publish` | New module version published | Standard (plan + apply) |
+
+### VCS Status Reporting
+
+For `module-test` runs, Terrapod posts commit statuses and PR comments to the module's VCS repository:
+- **Pending** status when the run starts
+- **Success/failure** status when the run completes
+- PR comment with a link to the run detail page and plan summary
+
+### Requirements
+
+- Module must be VCS-connected (source = `vcs` with a configured VCS connection)
+- At least one workspace must be linked to the module
+- The VCS connection must have permissions to list PRs and download archives
+
+### Limitations
+
+- Only works with VCS-connected modules (manual-upload modules don't have a repo to poll)
+- PR polling uses the same interval as the workspace VCS poller (default 60 seconds)
+- Override mechanism works at the module level — if a workspace uses multiple modules from the same PR, each needs its own link
+
+---
+
 ## Private Provider Registry
 
 Publish, version, and share Terraform providers internally with GPG signing.

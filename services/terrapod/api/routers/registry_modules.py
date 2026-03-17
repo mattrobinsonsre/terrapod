@@ -23,12 +23,17 @@ TFE V2 Management:
     DELETE /api/v2/organizations/default/registry-modules/private/default/{name}/{prov}/{ver}
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+import uuid as _uuid
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_non_runner
+from terrapod.db.models import ModuleWorkspaceLink, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.registry_module_service import (
@@ -173,7 +178,15 @@ async def download_module_cli(
         if not has_registry_permission(perm, "read"):
             raise HTTPException(status_code=404, detail="Module version not found")
 
-    url = await get_module_download_url(db, storage, namespace, name, provider, version)
+    url = await get_module_download_url(
+        db,
+        storage,
+        namespace,
+        name,
+        provider,
+        version,
+        run_id=getattr(user, "run_id", None),
+    )
     if url is None:
         raise HTTPException(status_code=404, detail="Module version not found")
 
@@ -555,7 +568,7 @@ async def update_module_vcs_endpoint(
         from terrapod.db.models import VCSConnection
 
         try:
-            conn_id = _uuid.UUID(attrs.vcs_connection_id)
+            conn_id = _uuid.UUID(attrs.vcs_connection_id.removeprefix("vcs-"))
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="Invalid vcs_connection_id") from exc
 
@@ -581,3 +594,167 @@ async def update_module_vcs_endpoint(
     )
 
     return JSONResponse(content={"data": _module_to_jsonapi(module)})
+
+
+# --- Module-Workspace Links (Impact Analysis) ---
+
+
+class CreateWorkspaceLinkRequest(BaseModel):
+    class Data(BaseModel):
+        class Attributes(BaseModel):
+            workspace_id: str
+
+        type: str = "workspace-links"
+        attributes: Attributes
+
+    data: Data
+
+
+def _link_to_jsonapi(link: ModuleWorkspaceLink) -> dict:
+    ws = link.workspace
+    return {
+        "id": str(link.id),
+        "type": "workspace-links",
+        "attributes": {
+            "workspace-id": str(link.workspace_id),
+            "workspace-name": ws.name if ws else "",
+            "created-at": link.created_at.isoformat() if link.created_at else None,
+            "created-by": link.created_by,
+        },
+    }
+
+
+@router.get(
+    "/api/v2/organizations/default/registry-modules/private/default/{name}/{provider}/workspace-links"
+)
+async def list_workspace_links(
+    name: str,
+    provider: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """List workspaces linked to this module. Requires read."""
+    module = await get_module(db, "default", name, provider)
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found")
+
+    perm = await resolve_registry_permission(
+        db, user.email, user.roles, module.name, module.labels or {}, module.owner_email
+    )
+    if not has_registry_permission(perm, "read"):
+        raise HTTPException(status_code=404, detail="Module not found")
+
+    result = await db.execute(
+        select(ModuleWorkspaceLink)
+        .where(ModuleWorkspaceLink.module_id == module.id)
+        .options(selectinload(ModuleWorkspaceLink.workspace))
+    )
+    links = list(result.scalars().all())
+
+    return JSONResponse(content={"data": [_link_to_jsonapi(link) for link in links]})
+
+
+@router.post(
+    "/api/v2/organizations/default/registry-modules/private/default/{name}/{provider}/workspace-links"
+)
+async def create_workspace_link(
+    name: str,
+    provider: str,
+    body: CreateWorkspaceLinkRequest,
+    user: AuthenticatedUser = Depends(require_non_runner),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Link a workspace to this module. Requires admin on module."""
+    module = await get_module(db, "default", name, provider)
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found")
+
+    perm = await resolve_registry_permission(
+        db, user.email, user.roles, module.name, module.labels or {}, module.owner_email
+    )
+    if not has_registry_permission(perm, "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires admin permission on module",
+        )
+
+    ws_id_str = body.data.attributes.workspace_id.removeprefix("ws-")
+    try:
+        ws_uuid = _uuid.UUID(ws_id_str)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid workspace ID") from exc
+
+    ws = await db.get(Workspace, ws_uuid)
+    if ws is None:
+        raise HTTPException(status_code=400, detail="Workspace not found")
+
+    # Check for duplicate
+    existing = await db.execute(
+        select(ModuleWorkspaceLink).where(
+            ModuleWorkspaceLink.module_id == module.id,
+            ModuleWorkspaceLink.workspace_id == ws_uuid,
+        )
+    )
+    if existing.scalars().first() is not None:
+        raise HTTPException(status_code=409, detail="Workspace already linked")
+
+    link = ModuleWorkspaceLink(
+        module_id=module.id,
+        workspace_id=ws_uuid,
+        created_by=user.email,
+    )
+    db.add(link)
+    await db.flush()
+    await db.refresh(link, attribute_names=["workspace"])
+    await db.commit()
+
+    logger.info(
+        "Module-workspace link created",
+        module=name,
+        provider=provider,
+        workspace=ws.name,
+    )
+
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content={"data": _link_to_jsonapi(link)},
+    )
+
+
+@router.delete(
+    "/api/v2/organizations/default/registry-modules/private/default/{name}/{provider}/workspace-links/{link_id}"
+)
+async def delete_workspace_link(
+    name: str,
+    provider: str,
+    link_id: str = Path(...),
+    user: AuthenticatedUser = Depends(require_non_runner),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Remove a workspace link. Requires admin on module."""
+    module = await get_module(db, "default", name, provider)
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found")
+
+    perm = await resolve_registry_permission(
+        db, user.email, user.roles, module.name, module.labels or {}, module.owner_email
+    )
+    if not has_registry_permission(perm, "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires admin permission on module",
+        )
+
+    try:
+        link_uuid = _uuid.UUID(link_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid link ID") from exc
+
+    link = await db.get(ModuleWorkspaceLink, link_uuid)
+    if link is None or link.module_id != module.id:
+        raise HTTPException(status_code=404, detail="Link not found")
+
+    await db.delete(link)
+    await db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

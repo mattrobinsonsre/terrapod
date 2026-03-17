@@ -94,6 +94,24 @@ async def _enqueue_vcs_status(run: Run, target_status: str) -> None:
         logger.warning("Failed to enqueue VCS status", error=str(e))
 
 
+async def _enqueue_module_test_status(run: Run, target_status: str) -> None:
+    """Enqueue a module_test_completed trigger for VCS status posting."""
+    from terrapod.services.scheduler import enqueue_trigger
+
+    try:
+        await enqueue_trigger(
+            "module_test_completed",
+            {
+                "run_id": str(run.id),
+                "target_status": target_status,
+            },
+            dedup_key=f"modtest:{run.id}:{target_status}",
+            dedup_ttl=60,
+        )
+    except Exception as e:
+        logger.warning("Failed to enqueue module test status", error=str(e))
+
+
 async def _enqueue_drift_completed(run: Run) -> None:
     """Enqueue a drift_run_completed trigger when a drift run finishes."""
     from terrapod.services.scheduler import enqueue_trigger
@@ -295,6 +313,10 @@ async def transition_run(
     # Enqueue VCS commit status for VCS-sourced runs
     if run.vcs_commit_sha:
         await _enqueue_vcs_status(run, target_status)
+
+    # Enqueue module test status when a module-test run reaches a meaningful state
+    if run.source == "module-test" and run.module_overrides:
+        await _enqueue_module_test_status(run, target_status)
 
     # Enqueue drift status update when a drift detection run reaches a terminal state.
     # Plan-only drift runs end in "planned" (not in TERMINAL_STATES), so check that too.

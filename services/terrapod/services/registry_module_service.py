@@ -161,6 +161,15 @@ async def upload_module_tarball(
     if module is None:
         raise ValueError(f"Module {namespace}/{name}/{provider} not found")
 
+    is_new = (
+        await db.execute(
+            select(RegistryModuleVersion).where(
+                RegistryModuleVersion.module_id == module.id,
+                RegistryModuleVersion.version == version,
+            )
+        )
+    ).scalars().first() is None
+
     mod_version = await upsert_module_version(db, module.id, version)
 
     key = module_tarball_key(namespace, name, provider, version)
@@ -169,6 +178,20 @@ async def upload_module_tarball(
     mod_version.upload_status = "uploaded"
     module.status = "setup_complete"
     await db.flush()
+
+    # Trigger runs on linked workspaces for new versions
+    if is_new:
+        try:
+            from terrapod.services.module_impact_service import trigger_linked_workspace_runs
+
+            await trigger_linked_workspace_runs(db, module, version)
+        except Exception:
+            logger.warning(
+                "Failed to trigger linked workspace runs on upload",
+                module=name,
+                version=version,
+                exc_info=True,
+            )
 
     return mod_version
 
@@ -228,8 +251,29 @@ async def get_module_download_url(
     name: str,
     provider: str,
     version: str,
+    run_id: str | None = None,
 ) -> str | None:
-    """Get a presigned download URL for a module version tarball."""
+    """Get a presigned download URL for a module version tarball.
+
+    If run_id is provided and the run has module_overrides for this module,
+    the override tarball is returned instead of the published version.
+    """
+    # Check for module override first (module impact analysis)
+    if run_id:
+        from terrapod.db.models import Run
+
+        try:
+            run = await db.get(Run, uuid.UUID(run_id))
+        except (ValueError, AttributeError):
+            run = None
+        if run and run.module_overrides:
+            coord = f"{namespace}/{name}/{provider}"
+            override_path = run.module_overrides.get(coord)
+            if override_path:
+                presigned = await storage.presigned_get_url(override_path)
+                return presigned.url
+
+    # Normal path: look up published version
     module = await get_module(db, namespace, name, provider)
     if module is None:
         return None

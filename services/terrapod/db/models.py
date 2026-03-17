@@ -419,6 +419,7 @@ class RegistryModule(Base):
     vcs_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     vcs_tag_pattern: Mapped[str] = mapped_column(String(255), nullable=False, default="v*")
     vcs_last_tag: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    vcs_last_pr_shas: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
@@ -428,6 +429,9 @@ class RegistryModule(Base):
     )
 
     versions: Mapped[list["RegistryModuleVersion"]] = relationship(
+        back_populates="module", cascade="all, delete-orphan"
+    )
+    workspace_links: Mapped[list["ModuleWorkspaceLink"]] = relationship(
         back_populates="module", cascade="all, delete-orphan"
     )
 
@@ -465,6 +469,44 @@ class RegistryModuleVersion(Base):
 
     __table_args__ = (
         sa.UniqueConstraint("module_id", "version", name="uq_registry_module_versions"),
+    )
+
+
+class ModuleWorkspaceLink(Base):
+    """Links a registry module to a consuming workspace.
+
+    When a PR is opened against the module's VCS repo, speculative plan-only
+    runs are automatically queued on linked workspaces. When a new module
+    version is published, standard runs are queued on linked workspaces.
+    """
+
+    __tablename__ = "module_workspace_links"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    module_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("registry_modules.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    created_by: Mapped[str] = mapped_column(Text, nullable=False)
+
+    module: Mapped["RegistryModule"] = relationship(back_populates="workspace_links")
+    workspace: Mapped["Workspace"] = relationship(lazy="joined")
+
+    __table_args__ = (
+        sa.UniqueConstraint("module_id", "workspace_id", name="uq_module_workspace_links"),
+        Index("ix_module_workspace_links_module_id", "module_id"),
+        Index("ix_module_workspace_links_workspace_id", "workspace_id"),
     )
 
 
@@ -946,6 +988,9 @@ class Run(Base):
     refresh_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     refresh: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     allow_empty_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    # Module impact analysis overrides (maps module coords to override storage paths)
+    module_overrides: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     # Drift detection
     is_drift_detection: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

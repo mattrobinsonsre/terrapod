@@ -146,6 +146,7 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
 
     changed_count = 0
     latest_tag = module.vcs_last_tag
+    new_versions: list[tuple[str, str]] = []  # (version_str, commit_sha) for triggering
 
     for tag in tags:
         tag_name = tag["name"]
@@ -206,6 +207,7 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
             )
             db.add(mod_version)
             existing_versions[version_str] = mod_version
+            new_versions.append((version_str, tag_sha))
             logger.info(
                 "Module version created from VCS tag",
                 module_name=module.name,
@@ -223,6 +225,22 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
         if latest_tag:
             module.vcs_last_tag = latest_tag
         await db.flush()
+
+        # Trigger runs on linked workspaces for newly published versions
+        for ver_str, ver_sha in new_versions:
+            try:
+                from terrapod.services.module_impact_service import (
+                    trigger_linked_workspace_runs,
+                )
+
+                await trigger_linked_workspace_runs(db, module, ver_str, commit_sha=ver_sha)
+            except Exception:
+                logger.warning(
+                    "Failed to trigger linked workspace runs",
+                    module=module.name,
+                    version=ver_str,
+                    exc_info=True,
+                )
 
         logger.info(
             "Module VCS poll complete",

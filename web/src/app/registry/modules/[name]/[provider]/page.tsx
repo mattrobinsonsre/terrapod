@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Upload, FolderOpen, GitBranch } from 'lucide-react'
+import { Upload, FolderOpen, GitBranch, Link2, Plus, Trash2, Search } from 'lucide-react'
 import * as Dialog from '@radix-ui/react-dialog'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
@@ -177,9 +177,27 @@ export default function ModuleDetailPage() {
   // Label lockout warning
   const [lockoutWarning, setLockoutWarning] = useState('')
 
+  // Workspace links (impact analysis)
+  interface WorkspaceLink {
+    id: string
+    attributes: {
+      'workspace-id': string
+      'workspace-name': string
+      'created-at': string | null
+      'created-by': string
+    }
+  }
+  const [workspaceLinks, setWorkspaceLinks] = useState<WorkspaceLink[]>([])
+  const [linksLoading, setLinksLoading] = useState(false)
+  const [showLinkPicker, setShowLinkPicker] = useState(false)
+  const [wsSearchQuery, setWsSearchQuery] = useState('')
+  const [wsSearchResults, setWsSearchResults] = useState<{ id: string; name: string }[]>([])
+  const [linkingWs, setLinkingWs] = useState('')
+
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
     loadModule()
+    loadWorkspaceLinks()
   }, [router, name, provider])
 
   usePollingInterval(!loading, 60_000, loadModule)
@@ -218,6 +236,89 @@ export default function ModuleDetailPage() {
       }
     } catch {
       // VCS connections are optional — ignore errors
+    }
+  }
+
+  async function loadWorkspaceLinks() {
+    setLinksLoading(true)
+    try {
+      const res = await apiFetch(
+        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/workspace-links`
+      )
+      if (res.ok) {
+        const data = await res.json()
+        setWorkspaceLinks(data.data || [])
+      }
+    } catch {
+      // Non-critical
+    } finally {
+      setLinksLoading(false)
+    }
+  }
+
+  async function searchWorkspaces(query: string) {
+    try {
+      const res = await apiFetch('/api/v2/organizations/default/workspaces')
+      if (res.ok) {
+        const data = await res.json()
+        const all = (data.data || []).map((ws: { id: string; attributes: { name: string } }) => ({
+          id: ws.id,
+          name: ws.attributes.name,
+        }))
+        const linked = new Set(workspaceLinks.map(l => l.attributes['workspace-id']))
+        const filtered = all.filter(
+          (ws: { id: string; name: string }) =>
+            !linked.has(ws.id) &&
+            (!query || ws.name.toLowerCase().includes(query.toLowerCase()))
+        )
+        setWsSearchResults(filtered.slice(0, 20))
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function handleLinkWorkspace(wsId: string) {
+    setLinkingWs(wsId)
+    setError('')
+    try {
+      const res = await apiFetch(
+        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/workspace-links`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/vnd.api+json' },
+          body: JSON.stringify({
+            data: { type: 'workspace-links', attributes: { workspace_id: wsId } },
+          }),
+        }
+      )
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `Link failed (${res.status})`)
+      }
+      setShowLinkPicker(false)
+      setWsSearchQuery('')
+      await loadWorkspaceLinks()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to link workspace')
+    } finally {
+      setLinkingWs('')
+    }
+  }
+
+  async function handleUnlinkWorkspace(linkId: string) {
+    setError('')
+    try {
+      const res = await apiFetch(
+        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/workspace-links/${linkId}`,
+        { method: 'DELETE' }
+      )
+      if (!res.ok && res.status !== 204) {
+        throw new Error(`Unlink failed (${res.status})`)
+      }
+      await loadWorkspaceLinks()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to unlink workspace')
     }
   }
 
@@ -597,6 +698,83 @@ export default function ModuleDetailPage() {
                     <span className="text-slate-400 ml-2">Last tag: {module.attributes['vcs-last-tag']}</span>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Linked Workspaces (Impact Analysis) */}
+            {modPerms['can-update'] && (
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-5 mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Link2 size={16} className="text-purple-400" />
+                    <h3 className="text-sm font-medium text-slate-300">Linked Workspaces</h3>
+                  </div>
+                  <button
+                    onClick={() => { setShowLinkPicker(!showLinkPicker); if (!showLinkPicker) searchWorkspaces('') }}
+                    className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1"
+                  >
+                    <Plus size={12} />
+                    Link Workspace
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-500 mb-3">
+                  Linked workspaces receive speculative plans when PRs are opened against this module, and standard runs when new versions are published.
+                </p>
+
+                {showLinkPicker && (
+                  <div className="mb-3 p-3 bg-slate-900/50 rounded-lg border border-slate-700/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Search size={14} className="text-slate-400" />
+                      <input
+                        type="text"
+                        value={wsSearchQuery}
+                        onChange={(e) => { setWsSearchQuery(e.target.value); searchWorkspaces(e.target.value) }}
+                        placeholder="Search workspaces..."
+                        className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      />
+                    </div>
+                    <div className="max-h-40 overflow-y-auto space-y-1">
+                      {wsSearchResults.length === 0 ? (
+                        <p className="text-xs text-slate-500 py-2 text-center">No workspaces found</p>
+                      ) : wsSearchResults.map(ws => (
+                        <button
+                          key={ws.id}
+                          onClick={() => handleLinkWorkspace(ws.id)}
+                          disabled={linkingWs === ws.id}
+                          className="w-full text-left px-2 py-1.5 rounded text-sm text-slate-300 hover:bg-slate-700/50 transition-colors disabled:opacity-50"
+                        >
+                          {ws.name}
+                          {linkingWs === ws.id && <span className="text-xs text-slate-500 ml-2">Linking...</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {workspaceLinks.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic">No workspaces linked yet.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {workspaceLinks.map(link => (
+                      <div key={link.id} className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-slate-700/30">
+                        <a
+                          href={`/workspaces/${link.attributes['workspace-id']}`}
+                          className="text-sm text-brand-400 hover:text-brand-300"
+                        >
+                          {link.attributes['workspace-name']}
+                        </a>
+                        <button
+                          onClick={() => handleUnlinkWorkspace(link.id)}
+                          className="text-slate-500 hover:text-red-400 transition-colors"
+                          title="Unlink workspace"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
