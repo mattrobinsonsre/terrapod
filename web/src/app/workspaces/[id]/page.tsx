@@ -1715,7 +1715,13 @@ function WorkspaceDetailContent() {
                             <span className="text-xs text-slate-500">plan + apply</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">{run.attributes.source}</td>
+                        <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
+                          {run.attributes.source === 'module-test' ? (
+                            <span className="text-purple-400">module test</span>
+                          ) : run.attributes.source === 'module-publish' ? (
+                            <span className="text-purple-400">module publish</span>
+                          ) : run.attributes.source}
+                        </td>
                         <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">
                           {run.attributes['created-at'] ? new Date(run.attributes['created-at']).toLocaleString() : ''}
                         </td>

@@ -36,6 +36,7 @@ interface RunAttrs {
   'vcs-commit-sha': string | null
   'vcs-branch': string | null
   'vcs-pull-request-number': number | null
+  'module-overrides': Record<string, string> | null
   'status-timestamps': Record<string, string>
   actions: RunActions
   permissions: Record<string, boolean>
@@ -365,6 +366,20 @@ export default function RunDetailPage() {
           <div className="mb-6 p-4 bg-cyan-900/20 rounded-lg border border-cyan-800/50">
             <p className="text-sm text-cyan-300">
               This is a <strong>plan-only</strong> remote run initiated from the CLI. Apply is not available for CLI-uploaded code &mdash; only VCS-managed code can be applied.
+            </p>
+          </div>
+        )}
+
+        {/* Module override banner for module-test runs */}
+        {attrs['module-overrides'] && (
+          <div className="mb-6 p-4 bg-purple-900/20 rounded-lg border border-purple-800/50">
+            <p className="text-sm text-purple-300">
+              This run uses <strong>module overrides</strong>
+              {attrs['vcs-pull-request-number'] && <> from PR #{attrs['vcs-pull-request-number']}</>}
+              {' '}&mdash; {Object.keys(attrs['module-overrides']).map(coord => (
+                <code key={coord} className="bg-purple-900/50 px-1.5 py-0.5 rounded text-xs font-mono">{coord}</code>
+              ))}
+              {' '}will be fetched from the PR branch instead of the published registry version.
             </p>
           </div>
         )}

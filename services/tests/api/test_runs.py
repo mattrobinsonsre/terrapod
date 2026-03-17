@@ -63,6 +63,8 @@ def _mock_run(
     run.allow_empty_apply = False
     run.resource_cpu = "1"
     run.resource_memory = "2Gi"
+    run.configuration_version_id = None
+    run.module_overrides = None
     return run
 
 

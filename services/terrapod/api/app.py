@@ -97,6 +97,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Poll VCS providers for new module version tags",
         )
 
+        # Module impact analysis: speculative plans for module PRs
+        from terrapod.services.module_impact_service import (
+            handle_module_test_completed,
+            module_impact_poll_cycle,
+        )
+
+        register_periodic_task(
+            "module_impact_poll",
+            interval_seconds=settings.vcs.poll_interval_seconds,
+            handler=module_impact_poll_cycle,
+            description="Poll VCS-connected modules for open PRs and create speculative runs",
+        )
+
+        register_trigger_handler(
+            "module_test_completed",
+            handler=handle_module_test_completed,
+            description="Post VCS status when module-test run completes",
+        )
+
     # Notification delivery handler (always registered)
     from terrapod.services.notification_dispatcher import handle_notification_delivery
 

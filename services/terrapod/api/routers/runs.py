@@ -80,6 +80,7 @@ def _run_json(run: Run) -> dict:
                 "allow-empty-apply": run.allow_empty_apply,
                 "is-drift-detection": run.is_drift_detection,
                 "has-changes": run.has_changes,
+                "module-overrides": run.module_overrides,
                 "vcs-commit-sha": run.vcs_commit_sha,
                 "vcs-branch": run.vcs_branch,
                 "vcs-pull-request-number": run.vcs_pull_request_number,
@@ -492,10 +493,11 @@ async def retry_run(
         allow_empty_apply=run.allow_empty_apply,
     )
 
-    # Copy VCS metadata from the original run
+    # Copy VCS metadata and module overrides from the original run
     new_run.vcs_commit_sha = run.vcs_commit_sha
     new_run.vcs_branch = run.vcs_branch
     new_run.vcs_pull_request_number = run.vcs_pull_request_number
+    new_run.module_overrides = run.module_overrides
 
     new_run = await run_service.queue_run(db, new_run)
     await db.commit()
