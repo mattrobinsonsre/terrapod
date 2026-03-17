@@ -51,6 +51,8 @@ export function useSSE(options: UseSSEOptions): UseSSEResult {
     const MAX_RETRY = 30000
     let timeoutId: ReturnType<typeof setTimeout> | undefined
     let hasConnectedBefore = false
+    let activeController: AbortController | undefined
+    let generation = 0
 
     async function connect() {
       if (aborted) return
@@ -61,10 +63,13 @@ export function useSSE(options: UseSSEOptions): UseSSEResult {
         return
       }
 
-      let controller: AbortController | undefined
+      // Abort any existing connection before starting a new one
+      activeController?.abort()
+      const myGeneration = ++generation
 
       try {
-        controller = new AbortController()
+        const controller = new AbortController()
+        activeController = controller
         const res = await fetch(url, {
           headers: { Authorization: `Bearer ${auth!.token}` },
           signal: controller.signal,
@@ -87,11 +92,12 @@ export function useSSE(options: UseSSEOptions): UseSSEResult {
         const reader = res.body.getReader()
         const decoder = new TextDecoder()
         let buffer = ''
+        let currentData = ''
 
         while (!aborted) {
           // Read timeout: if no data within readTimeoutMs, assume dead connection
           const readTimeout = setTimeout(() => {
-            controller?.abort()
+            controller.abort()
           }, readTimeoutMs)
 
           const { done, value } = await reader.read()
@@ -102,8 +108,6 @@ export function useSSE(options: UseSSEOptions): UseSSEResult {
           buffer += decoder.decode(value, { stream: true })
           const lines = buffer.split('\n')
           buffer = lines.pop() || ''
-
-          let currentData = ''
 
           for (const rawLine of lines) {
             const line = rawLine.replace(/\r$/, '')
@@ -125,6 +129,10 @@ export function useSSE(options: UseSSEOptions): UseSSEResult {
         // Connection failed, closed, or timed out
       }
 
+      // Only clean up if this is still the active connection (not superseded)
+      if (generation !== myGeneration) return
+
+      activeController = undefined
       setConnected(false)
 
       // Reconnect with exponential backoff
@@ -141,7 +149,8 @@ export function useSSE(options: UseSSEOptions): UseSSEResult {
     // Pause/resume on visibility change
     function onVisibilityChange() {
       if (!document.hidden && !aborted) {
-        // Tab became visible — if not connected, force immediate reconnect
+        // Tab became visible — abort stale connection and reconnect
+        activeController?.abort()
         if (timeoutId !== undefined) {
           clearTimeout(timeoutId)
           timeoutId = undefined
@@ -153,6 +162,7 @@ export function useSSE(options: UseSSEOptions): UseSSEResult {
 
     return () => {
       aborted = true
+      activeController?.abort()
       if (timeoutId !== undefined) clearTimeout(timeoutId)
       document.removeEventListener('visibilitychange', onVisibilityChange)
       setConnected(false)
