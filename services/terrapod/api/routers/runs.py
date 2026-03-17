@@ -70,6 +70,8 @@ def _run_json(run: Run) -> dict:
                 "source": run.source,
                 "execution-backend": run.execution_backend,
                 "terraform-version": run.terraform_version,
+                "resource-cpu": run.resource_cpu,
+                "resource-memory": run.resource_memory,
                 "error-message": run.error_message,
                 "target-addrs": run.target_addrs or [],
                 "replace-addrs": run.replace_addrs or [],

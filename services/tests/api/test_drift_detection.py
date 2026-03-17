@@ -288,6 +288,8 @@ class TestRunDriftAttributes:
         run.refresh_only = False
         run.refresh = True
         run.allow_empty_apply = False
+        run.resource_cpu = "1"
+        run.resource_memory = "2Gi"
 
         ws = _mock_workspace(ws_id=ws_id)
 
