@@ -515,8 +515,8 @@ export default function VariableSetDetailPage() {
                   </div>
                   <div>
                     <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">Value</label>
-                    <input id="var-val" type="text" value={varValue} onChange={(e) => setVarValue(e.target.value)} placeholder="us-east-1"
-                      className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                    <textarea id="var-val" value={varValue} onChange={(e) => setVarValue(e.target.value)} placeholder="us-east-1"
+                      rows={2} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" />
                   </div>
                   <div>
                     <label htmlFor="var-cat" className="block text-sm font-medium text-slate-300 mb-1">Category</label>
@@ -570,9 +570,10 @@ export default function VariableSetDetailPage() {
                               className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500" />
                           </td>
                           <td className="px-4 py-3">
-                            <input type="text" value={editVarValue} onChange={(e) => setEditVarValue(e.target.value)}
+                            <textarea value={editVarValue} onChange={(e) => setEditVarValue(e.target.value)}
                               placeholder={editVarSensitive ? 'Enter new value' : ''}
-                              className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                              rows={2}
+                              className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500 resize-y" />
                           </td>
                           <td className="px-4 py-3 hidden sm:table-cell">
                             <div className="flex items-center gap-3">

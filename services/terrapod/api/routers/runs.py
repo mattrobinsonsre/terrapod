@@ -1002,7 +1002,7 @@ _POST_PLAN_STATES = frozenset(
 async def plan_log(
     plan_id: str = Path(...),
     offset: int = Query(0),
-    limit: int = Query(65536),
+    limit: int = Query(0),
     format: Literal["raw", "plain"] = Query("raw"),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
@@ -1026,7 +1026,7 @@ async def plan_log(
 async def apply_log(
     apply_id: str = Path(...),
     offset: int = Query(0),
-    limit: int = Query(65536),
+    limit: int = Query(0),
     format: Literal["raw", "plain"] = Query("raw"),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
@@ -1094,12 +1094,15 @@ async def _serve_log(
     if strip_ansi:
         data = _ANSI_RE.sub(b"", data)
 
-    chunk = data[offset : offset + limit]
+    if limit > 0:
+        chunk = data[offset : offset + limit]
+    else:
+        chunk = data[offset:]
     result = b""
     if offset == 0:
         result += _STX
     result += chunk
     # Append ETX if phase is done and this is the last chunk
-    if phase_done and offset + limit >= len(data):
+    if phase_done and (limit == 0 or offset + limit >= len(data)):
         result += _ETX
     return Response(content=result, media_type="text/plain")
