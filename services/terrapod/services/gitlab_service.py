@@ -118,6 +118,25 @@ async def list_open_prs(
     ]
 
 
+async def list_branches(conn: VCSConnection, owner: str, repo: str) -> list[dict[str, str]]:
+    """List repository branches.
+
+    Returns a list of dicts with keys: name, sha.
+    """
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{api}/projects/{project}/repository/branches",
+            params={"per_page": 100},
+            headers=_headers(conn),
+        )
+        resp.raise_for_status()
+
+    return [{"name": b["name"], "sha": b["commit"]["id"]} for b in resp.json()]
+
+
 async def list_tags(conn: VCSConnection, owner: str, repo: str) -> list[dict[str, str]]:
     """List repository tags.
 

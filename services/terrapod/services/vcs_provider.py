@@ -58,6 +58,12 @@ class VCSProvider(Protocol):
         """
         ...
 
+    async def list_branches(
+        self, conn: VCSConnection, owner: str, repo: str
+    ) -> list[dict[str, str]]:
+        """List repository branches. Returns [{"name": str, "sha": str}]."""
+        ...
+
     async def list_tags(self, conn: VCSConnection, owner: str, repo: str) -> list[dict[str, str]]:
         """List repository tags. Returns [{"name": str, "sha": str}]."""
         ...

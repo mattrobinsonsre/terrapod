@@ -178,7 +178,9 @@ async def _require_run_ws_permission(
         )
 
 
-async def _fetch_vcs_config(db: AsyncSession, ws: Workspace) -> tuple[uuid.UUID, str, str]:
+async def _fetch_vcs_config(
+    db: AsyncSession, ws: Workspace, *, ref_override: str = ""
+) -> tuple[uuid.UUID, str, str]:
     """Download code from VCS and create a ConfigurationVersion.
 
     Used when the UI queues a run on a VCS-connected workspace without
@@ -186,11 +188,15 @@ async def _fetch_vcs_config(db: AsyncSession, ws: Workspace) -> tuple[uuid.UUID,
     the VCS poller uses: resolve branch → get HEAD SHA → download
     tarball → create CV → upload → mark uploaded.
 
-    Returns (cv_id, commit_sha, branch).
+    When ref_override is set, fetches code from that branch/tag/SHA instead
+    of the workspace's tracked branch.
+
+    Returns (cv_id, commit_sha, ref_name).
     """
     from terrapod.services.vcs_poller import (
         _download_archive,
         _get_branch_sha,
+        _list_tags,
         _parse_repo_url,
         _resolve_branch,
         _strip_top_level_dir,
@@ -207,13 +213,25 @@ async def _fetch_vcs_config(db: AsyncSession, ws: Workspace) -> tuple[uuid.UUID,
         raise HTTPException(status_code=422, detail="Cannot parse VCS repo URL")
     owner, repo = parsed
 
-    branch = await _resolve_branch(conn, ws, owner, repo)
-    if not branch:
-        raise HTTPException(status_code=422, detail="Cannot determine VCS branch")
-
-    sha = await _get_branch_sha(conn, owner, repo, branch)
-    if not sha:
-        raise HTTPException(status_code=422, detail="Cannot get branch HEAD SHA")
+    if ref_override:
+        # Try as branch first, then tag, then treat as raw SHA
+        sha = await _get_branch_sha(conn, owner, repo, ref_override)
+        ref_name = ref_override
+        if not sha:
+            tags = await _list_tags(conn, owner, repo)
+            tag_match = next((t for t in tags if t["name"] == ref_override), None)
+            if tag_match:
+                sha = tag_match["sha"]
+            else:
+                # Treat as raw SHA — download_archive accepts any git ref
+                sha = ref_override
+    else:
+        ref_name = await _resolve_branch(conn, ws, owner, repo) or ""
+        if not ref_name:
+            raise HTTPException(status_code=422, detail="Cannot determine VCS branch")
+        sha = await _get_branch_sha(conn, owner, repo, ref_name)
+        if not sha:
+            raise HTTPException(status_code=422, detail="Cannot get branch HEAD SHA")
 
     archive = await _download_archive(conn, owner, repo, sha)
     archive = _strip_top_level_dir(archive)
@@ -229,7 +247,7 @@ async def _fetch_vcs_config(db: AsyncSession, ws: Workspace) -> tuple[uuid.UUID,
 
     cv = await run_service.mark_configuration_uploaded(db, cv)
 
-    return cv.id, sha, branch
+    return cv.id, sha, ref_name
 
 
 @router.post("/runs", status_code=201)
@@ -282,11 +300,21 @@ async def create_run(
     if cv_id:
         cv_uuid = uuid.UUID(cv_id.removeprefix("cv-"))
 
+    # VCS ref override: plan against an arbitrary branch/tag (always plan-only)
+    vcs_ref = attrs.get("vcs-ref", "")
+    if vcs_ref:
+        if not ws.vcs_connection_id or not ws.vcs_repo_url:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="vcs-ref can only be used on VCS-connected workspaces",
+            )
+        plan_only = True  # Server-side enforcement — non-default refs are always plan-only
+
     # If no config version provided and workspace has VCS, fetch code from VCS
     vcs_sha = ""
     vcs_branch = ""
     if cv_uuid is None and ws.vcs_connection_id and ws.vcs_repo_url:
-        cv_uuid, vcs_sha, vcs_branch = await _fetch_vcs_config(db, ws)
+        cv_uuid, vcs_sha, vcs_branch = await _fetch_vcs_config(db, ws, ref_override=vcs_ref)
 
     run = await run_service.create_run(
         db,
