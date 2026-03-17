@@ -88,6 +88,20 @@ def _changes_affect_directory(changed_files: list[str], working_directory: str) 
     return any(f.startswith(prefix) for f in changed_files)
 
 
+async def _list_branches(conn: VCSConnection, owner: str, repo: str) -> list[dict[str, str]]:
+    """List branches via the appropriate provider."""
+    if conn.provider == "gitlab":
+        return await gitlab_service.list_branches(conn, owner, repo)
+    return await github_service.list_repo_branches(conn, owner, repo)
+
+
+async def _list_tags(conn: VCSConnection, owner: str, repo: str) -> list[dict[str, str]]:
+    """List tags via the appropriate provider."""
+    if conn.provider == "gitlab":
+        return await gitlab_service.list_tags(conn, owner, repo)
+    return await github_service.list_repo_tags(conn, owner, repo)
+
+
 async def _list_open_prs(
     conn: VCSConnection, owner: str, repo: str, base_branch: str
 ) -> list[PullRequest]:

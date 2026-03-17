@@ -307,6 +307,32 @@ The following read-only attributes are included in workspace responses when drif
 | `drift-last-checked-at` | string (RFC3339) or null | Timestamp of the last completed drift detection check |
 | `drift-status` | string | Current drift status: `""` (never checked), `"no_drift"`, `"drifted"`, or `"errored"` |
 
+### List VCS Refs
+
+```
+GET /api/v2/workspaces/{id}/vcs-refs
+```
+
+Returns branches, tags, and the default branch for a VCS-connected workspace. Used by the UI to populate the VCS ref picker when queueing runs.
+
+**Required permission:** `read` on the workspace.
+
+**Response:**
+```json
+{
+  "branches": [
+    {"name": "main", "sha": "abc123..."},
+    {"name": "feature-x", "sha": "def456..."}
+  ],
+  "tags": [
+    {"name": "v1.0.0", "sha": "789abc..."}
+  ],
+  "default-branch": "main"
+}
+```
+
+Returns 422 if the workspace is not VCS-connected or the VCS connection is inactive.
+
 ---
 
 ## State Versions
@@ -430,6 +456,7 @@ POST /api/v2/runs
 | `refresh-only` | boolean | `false` | Refresh-only plan — reconcile state without planning changes (equivalent to `-refresh-only`) |
 | `refresh` | boolean | `true` | Whether to refresh state before planning. Set to `false` to skip refresh (equivalent to `-refresh=false`) |
 | `allow-empty-apply` | boolean | `false` | Allow apply even when the plan has no changes (equivalent to `-allow-empty-apply`) |
+| `vcs-ref` | string | `""` | Branch, tag, or SHA to fetch code from instead of the workspace's tracked branch. Only valid on VCS-connected workspaces. **Runs with a non-default ref are always plan-only** — the server enforces this regardless of the `plan-only` attribute value |
 
 ### Run Response Attributes (Drift Detection)
 

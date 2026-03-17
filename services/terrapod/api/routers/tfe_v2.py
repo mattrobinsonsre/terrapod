@@ -29,6 +29,7 @@ Endpoints:
     GET  /api/v2/state-versions/{id}/download — download raw state
     PUT  /api/v2/state-versions/{id}/content — upload raw state
     PUT  /api/v2/state-versions/{id}/json-content — upload JSON state
+    GET  /api/v2/workspaces/{id}/vcs-refs — list VCS branches/tags for workspace
 """
 
 import asyncio
@@ -1063,3 +1064,54 @@ async def unlock_workspace(
     await publish_workspace_event(str(ws.id), "workspace_lock_change", {"locked": False})
 
     return JSONResponse(content=_workspace_json(ws, perm), headers=_tfe_headers())
+
+
+@router.get("/workspaces/{workspace_id}/vcs-refs")
+async def list_vcs_refs(
+    workspace_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """List branches, tags, and default branch for a VCS-connected workspace.
+
+    Requires read permission on the workspace.
+    """
+    from terrapod.db.models import VCSConnection
+    from terrapod.services.vcs_poller import (
+        _list_branches,
+        _list_tags,
+        _parse_repo_url,
+        _resolve_branch,
+    )
+
+    ws = await _get_workspace_by_id(workspace_id, db)
+    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    if not has_permission(perm, "read"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires read permission on workspace",
+        )
+
+    if not ws.vcs_connection_id or not ws.vcs_repo_url:
+        raise HTTPException(status_code=422, detail="Workspace is not VCS-connected")
+
+    conn = await db.get(VCSConnection, ws.vcs_connection_id)
+    if not conn or conn.status != "active":
+        raise HTTPException(status_code=422, detail="VCS connection is not active")
+
+    parsed = _parse_repo_url(conn, ws.vcs_repo_url)
+    if not parsed:
+        raise HTTPException(status_code=422, detail="Cannot parse VCS repo URL")
+    owner, repo = parsed
+
+    branches = await _list_branches(conn, owner, repo)
+    tags = await _list_tags(conn, owner, repo)
+    default_branch = await _resolve_branch(conn, ws, owner, repo) or ""
+
+    return JSONResponse(
+        content={
+            "branches": branches,
+            "tags": tags,
+            "default-branch": default_branch,
+        }
+    )

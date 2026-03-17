@@ -43,6 +43,8 @@ interface WorkspaceAttrs {
   labels: Record<string, string>
   'owner-email': string
   'var-files': string[]
+  'vcs-repo-url': string
+  'vcs-branch': string
   'drift-detection-enabled': boolean
   'drift-detection-interval-seconds': number
   'drift-last-checked-at': string
@@ -220,6 +222,15 @@ function WorkspaceDetailContent() {
   const [planAllowEmpty, setPlanAllowEmpty] = useState(false)
   const [planOnly, setPlanOnly] = useState(true)
 
+  // VCS ref picker
+  const [vcsRef, setVcsRef] = useState('')
+  const [vcsRefType, setVcsRefType] = useState<'branch' | 'tag'>('branch')
+  const [vcsBranches, setVcsBranches] = useState<{ name: string; sha: string }[]>([])
+  const [vcsTags, setVcsTags] = useState<{ name: string; sha: string }[]>([])
+  const [vcsDefaultBranch, setVcsDefaultBranch] = useState('')
+  const [vcsRefsLoading, setVcsRefsLoading] = useState(false)
+  const [vcsRefsLoaded, setVcsRefsLoaded] = useState(false)
+
   // State versions
   const [stateVersions, setStateVersions] = useState<StateVersionItem[]>([])
   const [stateLoading, setStateLoading] = useState(false)
@@ -345,6 +356,24 @@ function WorkspaceDetailContent() {
     }
   }, [workspaceId])
 
+  const loadVcsRefs = useCallback(async () => {
+    if (vcsRefsLoaded || vcsRefsLoading) return
+    setVcsRefsLoading(true)
+    try {
+      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/vcs-refs`)
+      if (!res.ok) return
+      const data = await res.json()
+      setVcsBranches(data.branches || [])
+      setVcsTags(data.tags || [])
+      setVcsDefaultBranch(data['default-branch'] || '')
+      setVcsRefsLoaded(true)
+    } catch {
+      // Non-critical — picker just won't show refs
+    } finally {
+      setVcsRefsLoading(false)
+    }
+  }, [workspaceId, vcsRefsLoaded, vcsRefsLoading])
+
   // Load tab data when tab changes
   useEffect(() => {
     if (!workspace) return
@@ -354,6 +383,20 @@ function WorkspaceDetailContent() {
     if (activeTab === 'notifications') loadNotifications()
     if (activeTab === 'run-tasks') loadRunTasks()
   }, [activeTab, workspace, loadRuns])
+
+  // Load VCS refs when plan options panel opens on a VCS-connected workspace
+  useEffect(() => {
+    if (showPlanOptions && workspace?.attributes['vcs-repo-url']) {
+      loadVcsRefs()
+    }
+  }, [showPlanOptions, workspace, loadVcsRefs])
+
+  // Force plan-only when a non-default VCS ref is selected
+  useEffect(() => {
+    if (vcsRef) {
+      setPlanOnly(true)
+    }
+  }, [vcsRef])
 
   // Real-time workspace events via SSE (run status, lock/unlock, state, settings)
   useRunEvents(workspaceId, useCallback((event) => {
@@ -726,6 +769,7 @@ function WorkspaceDetailContent() {
       if (planRefreshOnly) attrs['refresh-only'] = true
       if (!planRefresh) attrs['refresh'] = false
       if (planAllowEmpty) attrs['allow-empty-apply'] = true
+      if (vcsRef) attrs['vcs-ref'] = vcsRef
 
       const res = await apiFetch(`/api/v2/runs`, {
         method: 'POST',
@@ -757,6 +801,7 @@ function WorkspaceDetailContent() {
       setPlanRefresh(true)
       setPlanAllowEmpty(false)
       setPlanOnly(true)
+      setVcsRef('')
       await loadRuns()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to queue plan')
@@ -1541,12 +1586,13 @@ function WorkspaceDetailContent() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-4 mt-3">
-                      <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                      <label className={`flex items-center gap-2 text-sm cursor-pointer ${vcsRef ? 'text-slate-500' : 'text-slate-300'}`}>
                         <input
                           type="checkbox"
                           checked={planOnly}
                           onChange={e => setPlanOnly(e.target.checked)}
-                          className="rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500"
+                          disabled={!!vcsRef}
+                          className="rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500 disabled:opacity-50"
                         />
                         Plan Only
                       </label>
@@ -1574,16 +1620,58 @@ function WorkspaceDetailContent() {
                         />
                         Skip Refresh
                       </label>
-                      <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={planAllowEmpty}
-                          onChange={e => setPlanAllowEmpty(e.target.checked)}
-                          className="rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500"
-                        />
-                        Allow Empty Apply
-                      </label>
+                      {!vcsRef && (
+                        <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={planAllowEmpty}
+                            onChange={e => setPlanAllowEmpty(e.target.checked)}
+                            className="rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500"
+                          />
+                          Allow Empty Apply
+                        </label>
+                      )}
                     </div>
+                    {attrs['vcs-repo-url'] && (
+                      <div className="mt-4 pt-3 border-t border-slate-700/50">
+                        <label className="block text-xs text-slate-400 mb-2">VCS Ref</label>
+                        <div className="flex gap-2">
+                          <select
+                            value={vcsRefType}
+                            onChange={e => {
+                              setVcsRefType(e.target.value as 'branch' | 'tag')
+                              setVcsRef('')
+                            }}
+                            className="px-2 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                          >
+                            <option value="branch">Branch</option>
+                            <option value="tag">Tag</option>
+                          </select>
+                          <select
+                            value={vcsRef}
+                            onChange={e => setVcsRef(e.target.value)}
+                            disabled={vcsRefsLoading}
+                            className="flex-1 px-2 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50"
+                          >
+                            <option value="">
+                              {vcsRefsLoading
+                                ? 'Loading...'
+                                : `Default${vcsDefaultBranch ? ` (${vcsDefaultBranch})` : ''}`}
+                            </option>
+                            {(vcsRefType === 'branch' ? vcsBranches : vcsTags).map(ref => (
+                              <option key={ref.name} value={ref.name}>
+                                {ref.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {vcsRef && (
+                          <p className="mt-2 text-xs text-amber-400">
+                            Non-default ref selected — run will be plan-only
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

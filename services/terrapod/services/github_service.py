@@ -213,6 +213,29 @@ async def list_open_pull_requests(
     ]
 
 
+async def list_repo_branches(conn: VCSConnection, owner: str, repo: str) -> list[dict[str, str]]:
+    """List repository branches.
+
+    Returns a list of dicts with keys: name, sha.
+    """
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{api_url}/repos/{owner}/{repo}/branches",
+            params={"per_page": 100},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+        resp.raise_for_status()
+
+    return [{"name": b["name"], "sha": b["commit"]["sha"]} for b in resp.json()]
+
+
 async def list_repo_tags(conn: VCSConnection, owner: str, repo: str) -> list[dict[str, str]]:
     """List repository tags.
 
