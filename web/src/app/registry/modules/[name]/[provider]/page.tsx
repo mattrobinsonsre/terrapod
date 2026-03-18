@@ -188,7 +188,6 @@ export default function ModuleDetailPage() {
     }
   }
   const [workspaceLinks, setWorkspaceLinks] = useState<WorkspaceLink[]>([])
-  const [linksLoading, setLinksLoading] = useState(false)
   const [showLinkPicker, setShowLinkPicker] = useState(false)
   const [wsSearchQuery, setWsSearchQuery] = useState('')
   const [wsSearchResults, setWsSearchResults] = useState<{ id: string; name: string }[]>([])
@@ -240,7 +239,6 @@ export default function ModuleDetailPage() {
   }
 
   async function loadWorkspaceLinks() {
-    setLinksLoading(true)
     try {
       const res = await apiFetch(
         `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/workspace-links`
@@ -251,8 +249,6 @@ export default function ModuleDetailPage() {
       }
     } catch {
       // Non-critical
-    } finally {
-      setLinksLoading(false)
     }
   }
 
