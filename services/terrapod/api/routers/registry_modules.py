@@ -67,6 +67,15 @@ class CreateModuleRequest(BaseModel):
             name: str
             provider: str
             labels: dict = {}
+            vcs_connection_id: str = ""
+            vcs_repo_url: str = ""
+            vcs_branch: str = ""
+            vcs_tag_pattern: str = ""
+
+            model_config = {
+                "alias_generator": lambda f: f.replace("_", "-"),
+                "populate_by_name": True,
+            }
 
         type: str = "registry-modules"
         attributes: Attributes
@@ -110,7 +119,7 @@ def _module_to_jsonapi(module, effective_permission: str | None = None) -> dict:
             "labels": module.labels or {},
             "owner-email": module.owner_email,
             "source": module.source,
-            "vcs-connection-id": str(module.vcs_connection_id)
+            "vcs-connection-id": f"vcs-{module.vcs_connection_id}"
             if module.vcs_connection_id
             else None,
             "vcs-repo-url": module.vcs_repo_url,
@@ -211,6 +220,32 @@ async def create_module_endpoint(
     module = await create_module(db, "default", attrs.name, attrs.provider)
     module.owner_email = user.email
     module.labels = attrs.labels
+
+    # Apply VCS fields if provided
+    if attrs.vcs_connection_id:
+        import uuid as _uuid
+
+        from sqlalchemy import select as sa_select
+
+        from terrapod.db.models import VCSConnection
+
+        try:
+            conn_id = _uuid.UUID(attrs.vcs_connection_id.removeprefix("vcs-"))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid vcs_connection_id") from exc
+
+        result = await db.execute(sa_select(VCSConnection).where(VCSConnection.id == conn_id))
+        if result.scalars().first() is None:
+            raise HTTPException(status_code=400, detail="VCS connection not found")
+        module.vcs_connection_id = conn_id
+        module.source = "vcs"
+    if attrs.vcs_repo_url:
+        module.vcs_repo_url = attrs.vcs_repo_url
+    if attrs.vcs_branch:
+        module.vcs_branch = attrs.vcs_branch
+    if attrs.vcs_tag_pattern:
+        module.vcs_tag_pattern = attrs.vcs_tag_pattern
+
     await db.commit()
     await db.refresh(module, attribute_names=["versions"])
 
@@ -360,6 +395,35 @@ async def update_module_endpoint(
                     },
                 )
         module.labels = new_labels
+
+    # VCS fields
+    if "vcs-connection-id" in attrs:
+        vcs_conn_val = attrs["vcs-connection-id"]
+        if vcs_conn_val:
+            import uuid as _uuid
+
+            from sqlalchemy import select as sa_select
+
+            from terrapod.db.models import VCSConnection
+
+            try:
+                conn_id = _uuid.UUID(str(vcs_conn_val).removeprefix("vcs-"))
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail="Invalid vcs_connection_id") from exc
+
+            result = await db.execute(sa_select(VCSConnection).where(VCSConnection.id == conn_id))
+            if result.scalars().first() is None:
+                raise HTTPException(status_code=400, detail="VCS connection not found")
+            module.vcs_connection_id = conn_id
+            module.source = "vcs"
+        else:
+            module.vcs_connection_id = None
+    if "vcs-repo-url" in attrs:
+        module.vcs_repo_url = attrs["vcs-repo-url"] or ""
+    if "vcs-branch" in attrs:
+        module.vcs_branch = attrs["vcs-branch"] or ""
+    if "vcs-tag-pattern" in attrs:
+        module.vcs_tag_pattern = attrs["vcs-tag-pattern"] or "v*"
 
     await db.commit()
     await db.refresh(module)
