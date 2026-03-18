@@ -26,7 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
-from terrapod.db.models import Run, StateVersion
+from terrapod.db.models import Run, StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.storage import get_storage
@@ -229,6 +229,11 @@ async def upload_state(
     key = state_key(str(run.workspace_id), str(sv.id))
     await storage.put(key, body)
 
+    # Clear state_diverged flag on successful state upload
+    ws = await db.get(Workspace, run.workspace_id)
+    if ws and ws.state_diverged:
+        ws.state_diverged = False
+
     await db.commit()
     logger.info(
         "state_version_created_from_runner",
@@ -241,5 +246,39 @@ async def upload_state(
     from terrapod.redis.client import publish_workspace_event
 
     await publish_workspace_event(str(run.workspace_id), "state_version_created")
+
+    return Response(status_code=204)
+
+
+@router.post("/runs/{run_id}/state-diverged")
+async def mark_state_diverged(
+    run_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Mark a workspace as having diverged state.
+
+    Called by the runner entrypoint when a state upload fails after a
+    successful apply. The workspace is flagged so the UI can warn users.
+    """
+    _require_runner_for_run(user, run_id)
+    run = await _get_run(run_id, db)
+
+    ws = await db.get(Workspace, run.workspace_id)
+    if ws is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    ws.state_diverged = True
+    await db.commit()
+
+    logger.warning(
+        "workspace_state_diverged",
+        run_id=run_id,
+        workspace_id=str(run.workspace_id),
+    )
+
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(run.workspace_id), "state_diverged")
 
     return Response(status_code=204)

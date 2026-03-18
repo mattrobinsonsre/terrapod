@@ -46,6 +46,7 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.drift_detection_interval_seconds = overrides.get("drift_detection_interval_seconds", 86400)
     ws.drift_last_checked_at = overrides.get("drift_last_checked_at", None)
     ws.drift_status = overrides.get("drift_status", "")
+    ws.state_diverged = overrides.get("state_diverged", False)
     ws.execution_backend = overrides.get("execution_backend", "tofu")
     ws.agent_pool = None
     ws.var_files = []

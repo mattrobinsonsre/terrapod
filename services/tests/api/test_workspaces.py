@@ -61,6 +61,7 @@ def _mock_workspace(
     ws.drift_detection_interval_seconds = 86400
     ws.drift_last_checked_at = None
     ws.drift_status = ""
+    ws.state_diverged = False
     ws.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     ws.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
     return ws

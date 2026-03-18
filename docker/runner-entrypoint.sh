@@ -3,23 +3,76 @@ set -e
 
 # Signal-forwarding entrypoint for Terrapod runner Jobs.
 #
-# Traps SIGTERM/SIGQUIT and forwards them to the terraform/tofu child process
-# so it can release state locks and exit cleanly. This is critical for spot
-# instance preemption — K8s sends SIGTERM, and we have 120s
-# (terminationGracePeriodSeconds) before SIGKILL.
+# Time-budgeted graceful shutdown for spot instance preemption:
+#   T=0:       K8s sends SIGTERM → entrypoint forwards SIGINT to terraform
+#   T=0→CHILD_GRACE: Terraform graceful shutdown (writes state, releases lock)
+#   T=CHILD_GRACE: Watchdog sends SIGKILL if terraform is still running
+#   T=CHILD_GRACE→(GRACE-5): Artifact uploads (logs, state) with --max-time
+#   T=GRACE:   K8s SIGKILL deadline
+#
+# SIGINT is used instead of SIGTERM because HashiCorp recommends it for
+# container environments. A second signal triggers ungraceful abort which
+# may skip state writing entirely — so we only send ONE signal, then
+# escalate to SIGKILL via a watchdog.
 #
 # All API calls use TP_AUTH_TOKEN (short-lived runner token from K8s Secret).
 
 CHILD_PID=""
+WATCHDOG_PID=""
+
+# Read the actual grace period from Helm config (passed via job_template.py)
+TERMINATION_GRACE="${TP_TERMINATION_GRACE:-120}"
+UPLOAD_BUDGET=25  # seconds reserved for artifact uploads
+CHILD_GRACE=$((TERMINATION_GRACE - UPLOAD_BUDGET))
+# Ensure CHILD_GRACE is at least 30s
+if [ "$CHILD_GRACE" -lt 30 ]; then
+    CHILD_GRACE=30
+fi
 
 forward_signal() {
     if [ -n "$CHILD_PID" ]; then
-        echo "[entrypoint] Received signal, forwarding to child PID $CHILD_PID"
-        kill -TERM "$CHILD_PID" 2>/dev/null || true
+        echo "[entrypoint] Received signal, forwarding SIGINT to child PID $CHILD_PID (grace=${CHILD_GRACE}s)"
+        # SIGINT triggers terraform's graceful shutdown: finish current API call,
+        # write state, release lock, exit. Do NOT send SIGTERM — while terraform
+        # handles it, SIGINT is HashiCorp's documented recommendation for containers.
+        kill -INT "$CHILD_PID" 2>/dev/null || true
+
+        # Watchdog: SIGKILL after CHILD_GRACE seconds if terraform hangs.
+        # Do NOT send a second INT — terraform treats double-signal as ungraceful
+        # abort which may skip state writing entirely.
+        ( sleep "$CHILD_GRACE" && kill -KILL "$CHILD_PID" 2>/dev/null ) &
+        WATCHDOG_PID=$!
     fi
 }
 
 trap forward_signal TERM QUIT
+
+# Helper: wait for child process, handling signal interruption correctly.
+# After a signal, `wait` returns immediately with 128+signum but the child
+# is still running (it received SIGINT via the trap). We must wait again
+# for the child to actually exit (or be killed by the watchdog).
+wait_for_child() {
+    wait "$CHILD_PID" || EXIT_CODE=$?
+
+    # If wait was interrupted by signal (exit > 128), terraform is still running.
+    # The trap handler already sent SIGINT + started a SIGKILL watchdog.
+    if [ "$EXIT_CODE" -gt 128 ] 2>/dev/null; then
+        echo "[entrypoint] Signal received (exit=$EXIT_CODE), waiting for $TP_BACKEND graceful shutdown..."
+        wait "$CHILD_PID" 2>/dev/null
+        ACTUAL_EXIT=$?
+        # Clean up watchdog if terraform exited before timeout
+        if [ -n "$WATCHDOG_PID" ]; then
+            kill "$WATCHDOG_PID" 2>/dev/null || true
+            wait "$WATCHDOG_PID" 2>/dev/null || true
+        fi
+        WATCHDOG_PID=""
+        # Use terraform's actual exit code if meaningful (< 128)
+        if [ "$ACTUAL_EXIT" -lt 128 ] 2>/dev/null; then
+            EXIT_CODE=$ACTUAL_EXIT
+        fi
+    fi
+    CHILD_PID=""
+}
 
 # --- Configuration ---
 TP_BACKEND="${TP_BACKEND:-terraform}"
@@ -196,7 +249,7 @@ if [ "$INIT_EXIT" != "0" ]; then
     echo "[entrypoint] Init failed with exit code $INIT_EXIT"
     # Upload init output as plan log so it's visible in the UI
     if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
-        curl -sSf -X PUT -H "$AUTH_HEADER" \
+        curl -sSf --max-time 10 -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @/tmp/init.log \
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-log" || true
@@ -258,8 +311,7 @@ if [ "$TP_PHASE" = "plan" ]; then
     fi
     "$TP_BIN" plan $PLAN_ARGS "$@" > /tmp/plan.log 2>&1 &
     CHILD_PID=$!
-    wait "$CHILD_PID" || EXIT_CODE=$?
-    CHILD_PID=""
+    wait_for_child
 
     # Show plan output in pod logs
     cat /tmp/plan.log 2>/dev/null || true
@@ -277,23 +329,23 @@ if [ "$TP_PHASE" = "plan" ]; then
     # Report has_changes to API (used by reconciler for drift detection)
     if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ] && [ "$EXIT_CODE" = "0" ]; then
         HAS_CHANGES_JSON="$PLAN_HAS_CHANGES"
-        curl -sSf -X POST -H "$AUTH_HEADER" \
+        curl -sSf --max-time 10 -X POST -H "$AUTH_HEADER" \
             -H "Content-Type: application/json" \
             -d "{\"has_changes\": $HAS_CHANGES_JSON}" \
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/plan-result" || true
     fi
 
-    # Upload plan log
+    # Upload plan log (best-effort)
     if [ -n "$TP_API_URL" ] && [ -f /tmp/plan.log ]; then
-        curl -sSf -X PUT -H "$AUTH_HEADER" \
+        curl -sSf --max-time 10 -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @/tmp/plan.log \
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-log" || true
     fi
 
-    # Upload plan file
+    # Upload plan file (best-effort)
     if [ -n "$TP_API_URL" ] && [ -f tfplan ]; then
-        curl -sSf -X PUT -H "$AUTH_HEADER" \
+        curl -sSf --max-time 10 -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @tfplan \
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-file" || true
@@ -315,26 +367,31 @@ elif [ "$TP_PHASE" = "apply" ]; then
         "$TP_BIN" apply -input=false -auto-approve "$@" > /tmp/apply.log 2>&1 &
     fi
     CHILD_PID=$!
-    wait "$CHILD_PID" || EXIT_CODE=$?
-    CHILD_PID=""
+    wait_for_child
 
     # Show apply output in pod logs
     cat /tmp/apply.log 2>/dev/null || true
 
-    # Upload apply log
+    # Upload apply log (best-effort, bounded by --max-time)
     if [ -n "$TP_API_URL" ] && [ -f /tmp/apply.log ]; then
-        curl -sSf -X PUT -H "$AUTH_HEADER" \
+        curl -sSf --max-time 10 -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @/tmp/apply.log \
-            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/apply-log" || true
+            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/apply-log" || \
+            echo "[entrypoint] WARNING: apply log upload failed"
     fi
 
-    # Upload new state
+    # Upload new state (FATAL — missing state = infrastructure/state divergence)
     if [ -n "$TP_API_URL" ] && [ -f terraform.tfstate ]; then
-        curl -sSf -X PUT -H "$AUTH_HEADER" \
+        if ! curl -sSf --max-time 15 -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @terraform.tfstate \
-            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/state" || true
+            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/state"; then
+            echo "[entrypoint] FATAL: state upload failed — flagging workspace"
+            curl -sS --max-time 5 -X POST -H "$AUTH_HEADER" \
+                "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/state-diverged" || true
+            EXIT_CODE=1
+        fi
     fi
 fi
 
