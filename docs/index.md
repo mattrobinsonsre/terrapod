@@ -96,3 +96,9 @@ See [Architecture](architecture.md) for the full breakdown.
 ## License
 
 [GPLv3](https://github.com/mattrobinsonsre/terrapod/blob/main/LICENSE) -- strong copyleft ensures Terrapod and all derivative works remain open source.
+
+---
+
+## Trademarks
+
+Terrapod is not affiliated with, endorsed by, or a product of HashiCorp, Inc. or IBM. Terraform is a trademark of HashiCorp, Inc. OpenTofu is a project of the Linux Foundation.

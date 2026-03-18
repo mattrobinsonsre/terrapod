@@ -122,7 +122,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 - **BFF pattern** -- Next.js frontend is the single ingress entry point; browser never talks to the API directly
 - **Kubernetes-native** -- deployed exclusively via Helm chart; runner Jobs are ephemeral K8s Jobs
 - **ARC-pattern execution** -- listener creates Jobs on demand (like GitHub Actions Runner Controller)
-- **OpenTofu-friendly** -- supports both `terraform` and `tofu` as execution backends
+- **OpenTofu-first** -- [OpenTofu](https://opentofu.org/) is the recommended execution backend; `terraform` is also supported
 - **Single organization** -- one org per instance; the TFE V2 API accepts `{org}` in paths for CLI compatibility but only `default` is valid
 - **Native object storage** -- speaks each cloud provider's native SDK (S3, Azure Blob, GCS) with filesystem fallback for dev
 
@@ -171,7 +171,7 @@ curl -X POST https://terrapod.local/api/v2/organizations/default/workspaces \
   }'
 ```
 
-### Configure Terraform CLI
+### Configure OpenTofu (or Terraform)
 
 ```hcl
 # main.tf
@@ -188,10 +188,10 @@ terraform {
 ```
 
 ```zsh
-terraform login terrapod.local
-terraform init
-terraform plan
-terraform apply
+tofu login terrapod.local
+tofu init
+tofu plan
+tofu apply
 ```
 
 For detailed instructions, see [docs/getting-started.md](docs/getting-started.md).
@@ -333,6 +333,12 @@ Terrapod is a single, self-hosted platform covering the full TFE surface (state 
 ## License
 
 [GPLv3](LICENSE) -- strong copyleft ensures Terrapod and all derivative works remain open source.
+
+---
+
+## Trademarks
+
+Terrapod is not affiliated with, endorsed by, or a product of HashiCorp, Inc. or IBM. Terraform is a trademark of HashiCorp, Inc. OpenTofu is a project of the Linux Foundation.
 
 ---
 

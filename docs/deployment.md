@@ -1,5 +1,7 @@
 # Production Deployment
 
+Terrapod is a **self-hosted platform** -- each instance is deployed and operated by the end organisation on its own infrastructure. Terrapod is not a hosted service and does not transmit data to any external party.
+
 Terrapod is deployed exclusively via Helm chart on Kubernetes. This guide covers production installation, configuration, storage backends, and operational considerations.
 
 ---

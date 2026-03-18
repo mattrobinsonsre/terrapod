@@ -1,6 +1,8 @@
 # Getting Started
 
-This guide walks through setting up Terrapod locally, creating your first workspace, and running `terraform plan` and `terraform apply` against it.
+This guide walks through setting up Terrapod locally, creating your first workspace, and running your first plan and apply against it.
+
+> **OpenTofu is the recommended execution backend.** Terrapod supports both [OpenTofu](https://opentofu.org/) (`tofu`) and Terraform (`terraform`) as execution backends. OpenTofu is recommended because it is open-source under the MPL-2.0 license. All CLI examples in this guide use `tofu`, but `terraform` commands work identically.
 
 ---
 
@@ -14,7 +16,7 @@ This guide walks through setting up Terrapod locally, creating your first worksp
 | Kubernetes cluster | Local K8s (any of the below) | See below |
 | Tilt | Local K8s dev environment | `brew install tilt` |
 | mkcert | Local TLS certificates | `brew install mkcert` |
-| terraform or tofu | Infrastructure CLI | [terraform.io](https://www.terraform.io/) or [opentofu.org](https://opentofu.org/) |
+| tofu (recommended) or terraform | Infrastructure CLI | [opentofu.org](https://opentofu.org/) (recommended) or [terraform.io](https://www.terraform.io/) |
 
 ### Supported Local Kubernetes Clusters
 
@@ -124,9 +126,9 @@ Note the workspace ID from the response (e.g., `ws-abc123...`).
 
 ---
 
-## Configuring the Terraform CLI
+## Configuring the CLI
 
-Create a Terraform configuration that uses Terrapod as its backend:
+Create a configuration that uses Terrapod as its backend:
 
 ```hcl
 # main.tf
@@ -153,19 +155,21 @@ resource "null_resource" "hello" {
 }
 ```
 
-If you have not already run `terraform login`:
+> Note: The `terraform {}` block syntax is used by both OpenTofu and Terraform. No changes are needed when switching between them.
+
+If you have not already run `tofu login`:
 
 ```zsh
-terraform login terrapod.local
+tofu login terrapod.local
 ```
 
 Then initialize:
 
 ```zsh
-terraform init
+tofu init
 ```
 
-You should see output confirming that Terraform is using Terrapod as its backend:
+You should see output confirming that OpenTofu is using Terrapod as its backend:
 
 ```
 Initializing Terraform Cloud...
@@ -179,23 +183,23 @@ Terraform Cloud has been successfully initialized!
 
 ### Local Execution Mode
 
-In local execution mode, `terraform` runs on your machine and pushes state to Terrapod:
+In local execution mode, `tofu` runs on your machine and pushes state to Terrapod:
 
 ```zsh
-terraform plan
+tofu plan
 ```
 
 The plan output appears in your terminal as usual. State locking is handled by Terrapod (lock/unlock API calls).
 
 ```zsh
-terraform apply
+tofu apply
 ```
 
 State is uploaded to Terrapod after a successful apply. You can view state versions in the web UI under the workspace's **State** tab.
 
 ### Remote Execution Mode
 
-For remote execution, the runner listener creates a K8s Job that runs terraform on the server.
+For remote execution, the runner listener creates a K8s Job that runs tofu (or terraform) on the server.
 
 **Important:** In remote mode, CLI-initiated runs are always **plan-only**. This is a deliberate security policy — CLI-uploaded code hasn't been through VCS review. To apply changes in remote mode, use one of:
 
@@ -204,12 +208,12 @@ For remote execution, the runner listener creates a K8s Job that runs terraform 
 
 | Source | Plan | Apply |
 |---|---|---|
-| `terraform plan` (CLI) | Plan-only on server | N/A |
-| `terraform apply` (CLI) | Plan-only on server | Not permitted |
+| `tofu plan` (CLI) | Plan-only on server | N/A |
+| `tofu apply` (CLI) | Plan-only on server | Not permitted |
 | VCS push to tracked branch | Full plan on server | Apply (auto or manual confirm) |
 | VCS pull request / merge request | Speculative plan-only | N/A |
 
-If you need `terraform apply` from the CLI, use **local execution mode** instead.
+If you need `tofu apply` from the CLI, use **local execution mode** instead.
 
 1. Set the workspace execution mode to `remote`:
 
