@@ -43,6 +43,22 @@ def _extract_version(tag_name: str, pattern: str) -> str:
     return tag_name
 
 
+def _semver_sort_key(version_str: str) -> tuple[int, ...]:
+    """Parse a version string into a tuple of ints for proper sorting.
+
+    '1.2.3' → (1, 2, 3)
+    '0.0.10' → (0, 0, 10)
+    Non-numeric parts fall back to 0 so sorting never crashes.
+    """
+    parts: list[int] = []
+    for p in version_str.split("."):
+        try:
+            parts.append(int(p))
+        except ValueError:
+            parts.append(0)
+    return tuple(parts)
+
+
 def _dispatch_list_tags(provider: str):  # type: ignore[no-untyped-def]
     """Get the list_tags function for a VCS provider."""
     if provider == "github":
@@ -145,7 +161,10 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
     pattern = module.vcs_tag_pattern or "v*"
 
     changed_count = 0
-    latest_tag = module.vcs_last_tag
+    highest_version: tuple[int, ...] = _semver_sort_key(
+        _extract_version(module.vcs_last_tag, pattern) if module.vcs_last_tag else ""
+    )
+    highest_tag = module.vcs_last_tag
     new_versions: list[tuple[str, str]] = []  # (version_str, commit_sha) for triggering
 
     for tag in tags:
@@ -160,6 +179,12 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
         version_str = _extract_version(tag_name, pattern)
         if not version_str:
             continue
+
+        # Track the highest semver tag (even for existing versions)
+        ver_key = _semver_sort_key(version_str)
+        if ver_key > highest_version:
+            highest_version = ver_key
+            highest_tag = tag_name
 
         existing = existing_versions.get(version_str)
 
@@ -218,12 +243,16 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
             )
 
         changed_count += 1
-        latest_tag = tag_name
+
+    # Always update vcs_last_tag to the highest semver tag (self-corrects stale values)
+    tag_corrected = highest_tag and highest_tag != module.vcs_last_tag
+    if tag_corrected:
+        module.vcs_last_tag = highest_tag
 
     if changed_count > 0:
         module.status = "setup_complete"
-        if latest_tag:
-            module.vcs_last_tag = latest_tag
+
+    if changed_count > 0 or tag_corrected:
         await db.flush()
 
         # Trigger runs on linked workspaces for newly published versions
