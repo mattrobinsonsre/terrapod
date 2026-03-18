@@ -97,7 +97,21 @@ class CreateModuleVersionRequest(BaseModel):
 # --- JSON:API serialization ---
 
 
+def _semver_sort_key(version_str: str) -> tuple[int, ...]:
+    """Parse a version string into a tuple of ints for sorting."""
+    parts: list[int] = []
+    for p in version_str.split("."):
+        try:
+            parts.append(int(p))
+        except ValueError:
+            parts.append(0)
+    return tuple(parts)
+
+
 def _module_to_jsonapi(module, effective_permission: str | None = None) -> dict:  # type: ignore[no-untyped-def]
+    sorted_versions = sorted(
+        module.versions or [], key=lambda v: _semver_sort_key(v.version), reverse=True
+    )
     versions = [
         {
             "version": v.version,
@@ -105,7 +119,7 @@ def _module_to_jsonapi(module, effective_permission: str | None = None) -> dict:
             "vcs-commit-sha": v.vcs_commit_sha or "",
             "vcs-tag": v.vcs_tag or "",
         }
-        for v in (module.versions or [])
+        for v in sorted_versions
     ]
     perm = effective_permission
     return {
@@ -160,7 +174,11 @@ async def list_module_versions_cli(
     if not has_registry_permission(perm, "read"):
         raise HTTPException(status_code=404, detail="Module not found")
 
-    versions = [{"version": v.version} for v in module.versions if v.upload_status == "uploaded"]
+    versions = sorted(
+        [{"version": v.version} for v in module.versions if v.upload_status == "uploaded"],
+        key=lambda v: _semver_sort_key(v["version"]),
+        reverse=True,
+    )
     return JSONResponse(
         content={
             "modules": [{"versions": versions}],
