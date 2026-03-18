@@ -243,7 +243,7 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
 
 
 async def authenticate_listener(request: Request) -> "ListenerIdentity":
-    """Authenticate a listener using a short-lived DB session.
+    """Authenticate a listener via certificate, looking up identity in Redis.
 
     Like authenticate_request but for certificate-based listener auth.
     Used in SSE endpoints to avoid holding DB connections.
@@ -255,8 +255,7 @@ async def authenticate_listener(request: Request) -> "ListenerIdentity":
     from cryptography.exceptions import InvalidSignature
 
     from terrapod.auth.ca import get_ca, get_certificate_fingerprint
-    from terrapod.db.models import RunnerListener
-    from terrapod.db.session import get_db_session
+    from terrapod.services import agent_pool_service
 
     cert_header = request.headers.get("x-terrapod-client-cert")
     if not cert_header:
@@ -301,34 +300,29 @@ async def authenticate_listener(request: Request) -> "ListenerIdentity":
         )
     listener_name = cn[0].value
 
-    # Short-lived DB session for listener lookup
-    async with get_db_session() as db:
-        from sqlalchemy import select
-
-        result = await db.execute(
-            select(RunnerListener).where(RunnerListener.name == listener_name)
+    # Redis lookup (no DB session needed)
+    listener = await agent_pool_service.get_listener_by_name(listener_name)
+    if listener is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"No listener registered with name '{listener_name}'",
         )
-        listener = result.scalar_one_or_none()
-        if listener is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"No listener registered with name '{listener_name}'",
-            )
 
-        fingerprint = get_certificate_fingerprint(cert)
-        if listener.certificate_fingerprint and fingerprint != listener.certificate_fingerprint:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Certificate fingerprint mismatch",
-            )
-
-        return ListenerIdentity(
-            listener_id=listener.id,
-            name=listener.name,
-            pool_id=listener.pool_id,
-            certificate_fingerprint=fingerprint,
-            certificate_expires_at=listener.certificate_expires_at,
+    fingerprint = get_certificate_fingerprint(cert)
+    stored_fp = listener.get("certificate_fingerprint", "")
+    if stored_fp and fingerprint != stored_fp:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Certificate fingerprint mismatch",
         )
+
+    return ListenerIdentity(
+        listener_id=uuid.UUID(listener["id"]),
+        name=listener.get("name", listener_name),
+        pool_id=uuid.UUID(listener["pool_id"]),
+        certificate_fingerprint=fingerprint,
+        certificate_expires_at=None,  # not needed for auth
+    )
 
 
 def require_non_runner(
@@ -418,7 +412,6 @@ class ListenerIdentity:
 
 async def get_listener_identity(
     x_terrapod_client_cert: str = Header(None),
-    db: AsyncSession = Depends(get_db),
 ) -> ListenerIdentity:
     """Authenticate a runner listener via X-Terrapod-Client-Cert header.
 
@@ -426,7 +419,7 @@ async def get_listener_identity(
     1. Decode and parse the certificate
     2. Verify it was signed by our CA
     3. Check it hasn't expired
-    4. Extract the CN and look up the RunnerListener in the DB
+    4. Extract the CN and look up the listener in Redis
     5. Verify the certificate fingerprint matches
     """
     if not x_terrapod_client_cert:
@@ -441,7 +434,7 @@ async def get_listener_identity(
     from cryptography.exceptions import InvalidSignature
 
     from terrapod.auth.ca import get_ca, get_certificate_fingerprint
-    from terrapod.db.models import RunnerListener
+    from terrapod.services import agent_pool_service
 
     try:
         cert_pem = base64.b64decode(x_terrapod_client_cert)
@@ -484,9 +477,8 @@ async def get_listener_identity(
         )
     listener_name = cn[0].value
 
-    # Look up listener by name
-    result = await db.execute(select(RunnerListener).where(RunnerListener.name == listener_name))
-    listener = result.scalar_one_or_none()
+    # Redis lookup (no DB session needed)
+    listener = await agent_pool_service.get_listener_by_name(listener_name)
     if listener is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -495,16 +487,17 @@ async def get_listener_identity(
 
     # Verify fingerprint match
     fingerprint = get_certificate_fingerprint(cert)
-    if listener.certificate_fingerprint and fingerprint != listener.certificate_fingerprint:
+    stored_fp = listener.get("certificate_fingerprint", "")
+    if stored_fp and fingerprint != stored_fp:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Certificate fingerprint mismatch",
         )
 
     return ListenerIdentity(
-        listener_id=listener.id,
-        name=listener.name,
-        pool_id=listener.pool_id,
+        listener_id=uuid.UUID(listener["id"]),
+        name=listener.get("name", listener_name),
+        pool_id=uuid.UUID(listener["pool_id"]),
         certificate_fingerprint=fingerprint,
-        certificate_expires_at=listener.certificate_expires_at,
+        certificate_expires_at=None,  # not needed for auth
     )

@@ -196,9 +196,6 @@ class AgentPool(Base):
     tokens: Mapped[list["AgentPoolToken"]] = relationship(
         back_populates="pool", passive_deletes=True
     )
-    listeners: Mapped[list["RunnerListener"]] = relationship(
-        back_populates="pool", passive_deletes=True
-    )
 
 
 class AgentPoolToken(Base):
@@ -231,40 +228,6 @@ class AgentPoolToken(Base):
     pool: Mapped["AgentPool"] = relationship(back_populates="tokens")
 
     __table_args__ = (Index("ix_agent_pool_tokens_pool_id", "pool_id"),)
-
-
-class RunnerListener(Base):
-    """A registered runner listener (local or remote).
-
-    Durable identity only. Runtime state (online/offline, capacity,
-    heartbeat) lives in Redis with tf:listener:{id}: prefix.
-    """
-
-    __tablename__ = "runner_listeners"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
-    )
-    pool_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("agent_pools.id", ondelete="CASCADE"), nullable=False
-    )
-    name: Mapped[str] = mapped_column(String(63), unique=True, nullable=False)
-    certificate_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    certificate_expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    runner_definitions: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=list)
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
-    )
-
-    pool: Mapped["AgentPool"] = relationship(back_populates="listeners")
-
-    __table_args__ = (Index("ix_runner_listeners_pool_id", "pool_id"),)
 
 
 # --- Workspace Models ---
@@ -977,7 +940,6 @@ class Run(Base):
     )
     listener_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("runner_listeners.id", ondelete="SET NULL"),
         nullable=True,
     )
     error_message: Mapped[str] = mapped_column(Text, nullable=False, default="")

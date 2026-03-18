@@ -86,21 +86,36 @@ def _token_json(token, raw_token: str | None = None) -> dict:
     return result
 
 
-def _listener_json(listener) -> dict:
+def _listener_json(listener: dict) -> dict:
+    """Format a Redis-backed listener dict as JSON:API.
+
+    Accepts a dict with keys: id, name, pool_id, runner_definitions (JSON string),
+    certificate_fingerprint, certificate_expires_at, created_at, last_heartbeat, etc.
+    """
+    # runner_definitions is stored as JSON string in Redis
+    runner_defs = listener.get("runner_definitions", "[]")
+    if isinstance(runner_defs, str):
+        import json as _json
+
+        try:
+            runner_defs = _json.loads(runner_defs)
+        except (ValueError, TypeError):
+            runner_defs = []
+
     return {
-        "id": f"listener-{listener.id}",
+        "id": f"listener-{listener['id']}",
         "type": "runner-listeners",
         "attributes": {
-            "name": listener.name,
-            "runner-definitions": listener.runner_definitions,
-            "certificate-fingerprint": listener.certificate_fingerprint or "",
-            "certificate-expires-at": _rfc3339(listener.certificate_expires_at),
-            "created-at": _rfc3339(listener.created_at),
-            "updated-at": _rfc3339(listener.updated_at),
+            "name": listener.get("name", ""),
+            "runner-definitions": runner_defs,
+            "certificate-fingerprint": listener.get("certificate_fingerprint", ""),
+            "certificate-expires-at": listener.get("certificate_expires_at", ""),
+            "created-at": listener.get("created_at", ""),
+            "updated-at": listener.get("last_heartbeat", listener.get("created_at", "")),
         },
         "relationships": {
             "agent-pool": {
-                "data": {"id": f"apool-{listener.pool_id}", "type": "agent-pools"},
+                "data": {"id": f"apool-{listener.get('pool_id', '')}", "type": "agent-pools"},
             },
         },
     }
@@ -193,6 +208,8 @@ async def delete_pool(
 ) -> None:
     """Delete an agent pool (admin only)."""
     pool = await _get_pool(pool_id, db)
+    # Clean up all listener Redis keys for this pool before DB delete
+    await agent_pool_service.delete_pool_listeners(pool.id)
     await agent_pool_service.delete_pool(db, pool)
     await db.commit()
 
@@ -300,7 +317,7 @@ async def join_listener(
     if token.pool_id != pool.id:
         raise HTTPException(status_code=403, detail="Token does not belong to this pool")
 
-    result = await agent_pool_service.join_listener(db, pool, token, name, runner_definitions)
+    result = await agent_pool_service.join_listener(pool, token, name, runner_definitions, db)
     await db.commit()
 
     from terrapod.redis.client import POOL_EVENTS_PREFIX, publish_event
@@ -340,7 +357,7 @@ async def join_listener_by_token(
     if pool is None:
         raise HTTPException(status_code=404, detail="Pool not found")
 
-    result = await agent_pool_service.join_listener(db, pool, token, name, runner_definitions)
+    result = await agent_pool_service.join_listener(pool, token, name, runner_definitions, db)
     result["pool_id"] = str(pool.id)
     await db.commit()
 
@@ -365,7 +382,7 @@ async def list_pool_listeners(
 ) -> JSONResponse:
     """List listeners for an agent pool."""
     pool = await _get_pool(pool_id, db)
-    listeners = await agent_pool_service.list_listeners(db, pool.id)
+    listeners = await agent_pool_service.list_listeners(pool.id)
     return JSONResponse(content={"data": [_listener_json(lis) for lis in listeners]})
 
 
@@ -423,15 +440,15 @@ async def pool_events(
 async def delete_listener(
     listener_id: str = Path(...),
     user: AuthenticatedUser = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a listener (admin only)."""
     l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
-    listener = await agent_pool_service.get_listener(db, l_uuid)
+    listener = await agent_pool_service.get_listener(l_uuid)
     if listener is None:
         raise HTTPException(status_code=404, detail="Listener not found")
-    await agent_pool_service.delete_listener(db, listener)
-    await db.commit()
+    await agent_pool_service.delete_listener(
+        listener["id"], listener["name"], listener.get("pool_id", "")
+    )
 
 
 # ── SSE Event Channel ────────────────────────────────────────────────────
@@ -489,33 +506,24 @@ async def listener_events(
 async def listener_heartbeat(
     listener_id: str = Path(...),
     body: dict = Body(...),
-    db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Listener heartbeat — updates Redis state.
-
-    Auth: Currently accepts any request with a valid listener ID.
-    Certificate-based auth will be added via X-Terrapod-Client-Cert header.
-    """
+    """Listener heartbeat — refreshes TTL and updates runtime fields in Redis."""
     l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
-    listener = await agent_pool_service.get_listener(db, l_uuid)
+    listener = await agent_pool_service.get_listener(l_uuid)
     if listener is None:
         raise HTTPException(status_code=404, detail="Listener not found")
-
-    from terrapod.redis.client import get_redis_client
-
-    redis = get_redis_client()
-    prefix = f"tp:listener:{listener.id}"
-    ttl = 180  # seconds
 
     capacity = body.get("capacity", 1)
     active_runs = body.get("active_runs", 0)
     runner_defs = body.get("runner_definitions", [])
 
-    await redis.setex(f"{prefix}:status", ttl, "online")
-    await redis.setex(f"{prefix}:heartbeat", ttl, str(int(__import__("time").time())))
-    await redis.setex(f"{prefix}:capacity", ttl, str(capacity))
-    await redis.setex(f"{prefix}:active_runs", ttl, str(active_runs))
-    await redis.setex(f"{prefix}:runner_defs", ttl, json.dumps(runner_defs))
+    await agent_pool_service.heartbeat_listener(
+        listener_id=str(l_uuid),
+        name=listener["name"],
+        capacity=str(capacity),
+        active_runs=str(active_runs),
+        runner_definitions=json.dumps(runner_defs),
+    )
 
     # Publish heartbeat event to admin dashboard + pool SSE channels
     try:
@@ -524,14 +532,14 @@ async def listener_heartbeat(
         heartbeat_payload = json.dumps(
             {
                 "event": "listener_heartbeat",
-                "listener_id": str(listener.id),
-                "listener_name": listener.name,
+                "listener_id": str(l_uuid),
+                "listener_name": listener["name"],
                 "capacity": capacity,
                 "active_runs": active_runs,
             }
         )
         await publish_event(ADMIN_EVENTS_CHANNEL, heartbeat_payload)
-        await publish_event(f"{POOL_EVENTS_PREFIX}{listener.pool_id}", heartbeat_payload)
+        await publish_event(f"{POOL_EVENTS_PREFIX}{listener['pool_id']}", heartbeat_payload)
     except Exception:
         pass  # Never break heartbeat for SSE
 
@@ -546,18 +554,20 @@ async def renew_listener_cert(
     """Renew a listener's certificate.
 
     Auth: Certificate-based (X-Terrapod-Client-Cert). For now accepts
-    any request with a valid listener ID.
+    any request with a valid listener ID. Still needs DB for pool lookup.
     """
     l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
-    listener = await agent_pool_service.get_listener(db, l_uuid)
+    listener = await agent_pool_service.get_listener(l_uuid)
     if listener is None:
         raise HTTPException(status_code=404, detail="Listener not found")
 
-    pool = await agent_pool_service.get_pool(db, listener.pool_id)
+    pool_id = uuid.UUID(listener["pool_id"])
+    pool = await agent_pool_service.get_pool(db, pool_id)
     if pool is None:
         raise HTTPException(status_code=404, detail="Agent pool not found")
 
-    result = await agent_pool_service.renew_listener_certificate(db, listener, pool)
-    await db.commit()
+    result = await agent_pool_service.renew_listener_certificate(
+        listener["id"], listener["name"], pool
+    )
 
     return JSONResponse(content={"data": result})
