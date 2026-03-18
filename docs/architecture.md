@@ -237,28 +237,40 @@ Terrapod's execution layer follows the Actions Runner Controller (ARC) pattern: 
 
 ### Signal Forwarding and Graceful Termination
 
-Runner Jobs handle SIGTERM gracefully for spot instance preemption:
+Runner Jobs use a configurable `terminationGracePeriodSeconds` (default 120, set via `runners.terminationGracePeriodSeconds` in Helm). The entrypoint (`docker/runner-entrypoint.sh`) implements time-budgeted graceful shutdown with a SIGKILL watchdog:
 
 ```
-K8s sends SIGTERM
+T=0: K8s sends SIGTERM to PID 1
     |
     v
 runner-entrypoint.sh (traps SIGTERM/SIGQUIT)
     |
     v
-Forwards signal to terraform/tofu child process
+Forwards SIGINT to terraform/tofu child process
+(SIGINT is HashiCorp's recommended signal for containers)
+    |                                          |
+    v                                          v
+Terraform graceful shutdown            Background watchdog starts
+(finishes API call, writes state,      (sleeps CHILD_GRACE seconds,
+ releases lock, exits)                  then sends SIGKILL if still running)
     |
     v
-Terraform finishes current API call
+T=0→T=95s: Wait for terraform to exit (or be killed by watchdog)
     |
     v
-Releases state lock
+T=95s→T=115s: Upload artifacts with --max-time bounds
+    - Apply/plan log upload (best-effort)
+    - State upload (FATAL — failure flags workspace as state-diverged)
     |
     v
-Exits cleanly
-    |
-    (120s terminationGracePeriodSeconds; SIGKILL if exceeded)
+T=120s: K8s SIGKILL deadline
 ```
+
+**Key design decisions:**
+- **SIGINT, not SIGTERM**: HashiCorp recommends SIGINT for container graceful shutdown. A second signal (INT or TERM) causes ungraceful abort that may skip state writing entirely
+- **SIGKILL watchdog**: Only one signal is ever sent. If terraform hangs, the watchdog escalates to SIGKILL after `CHILD_GRACE` seconds
+- **State upload is fatal**: If state upload fails after a successful apply, the entrypoint calls `POST /api/v2/runs/{run_id}/state-diverged` to flag the workspace and exits with code 1
+- **Time budget**: `TP_TERMINATION_GRACE` env var (from Helm `runners.terminationGracePeriodSeconds`) partitions the K8s grace period between terraform shutdown and artifact uploads (25s reserved for uploads)
 
 The entrypoint script is at `docker/runner-entrypoint.sh`.
 
