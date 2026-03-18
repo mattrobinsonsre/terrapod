@@ -40,7 +40,7 @@ class TestReconcileOne:
     @patch("terrapod.redis.client.get_job_status_from_redis", new_callable=AsyncMock)
     @patch("terrapod.redis.client.publish_listener_event", new_callable=AsyncMock)
     async def test_publishes_check_job_status_and_stream_logs(self, mock_publish, mock_get_status):
-        """Reconciler publishes check_job_status and stream_logs events."""
+        """Reconciler publishes check_job_status and stream_logs events with phase."""
         db = AsyncMock()
         run = _mock_run()
         mock_get_status.return_value = "running"
@@ -51,6 +51,25 @@ class TestReconcileOne:
         events = [call.args[1]["event"] for call in mock_publish.call_args_list]
         assert "check_job_status" in events
         assert "stream_logs" in events
+        # Verify phase is included in events
+        for call in mock_publish.call_args_list:
+            assert "phase" in call.args[1]
+            assert call.args[1]["phase"] == "plan"
+
+    @patch("terrapod.redis.client.get_job_status_from_redis", new_callable=AsyncMock)
+    @patch("terrapod.redis.client.publish_listener_event", new_callable=AsyncMock)
+    async def test_publishes_apply_phase_for_applying_run(self, mock_publish, mock_get_status):
+        """Reconciler passes phase=apply for runs in applying status."""
+        db = AsyncMock()
+        run = _mock_run(status="applying")
+        mock_get_status.return_value = "running"
+
+        await _reconcile_one(db, run)
+
+        for call in mock_publish.call_args_list:
+            assert call.args[1]["phase"] == "apply"
+        # Verify get_job_status_from_redis called with phase
+        mock_get_status.assert_called_once_with(str(run.id), "apply")
 
     @patch("terrapod.services.run_reconciler._handle_succeeded", new_callable=AsyncMock)
     @patch("terrapod.redis.client.get_job_status_from_redis", new_callable=AsyncMock)

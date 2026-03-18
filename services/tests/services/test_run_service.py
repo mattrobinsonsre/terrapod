@@ -147,9 +147,8 @@ class TestTransitionRun:
     async def test_applying_clears_plan_job_state(self, mock_delete_status):
         """Transitioning to 'applying' clears stale plan-phase Job state.
 
-        Without this, the reconciler could read the plan Job's "succeeded"
-        status from Redis and incorrectly transition the run to "applied"
-        before the apply Job is even created.
+        Phase-keyed Redis status (tp:job_status:{run_id}:{phase}) prevents
+        the race condition, but we still clean up the plan key as hygiene.
         """
         db = AsyncMock(spec=AsyncSession)
         run = _mock_run(
@@ -164,8 +163,8 @@ class TestTransitionRun:
         # job_name and job_namespace must be cleared
         assert result.job_name is None
         assert result.job_namespace is None
-        # Redis job status must be deleted
-        mock_delete_status.assert_called_once_with(str(run.id))
+        # Redis plan-phase job status must be deleted
+        mock_delete_status.assert_called_once_with(str(run.id), "plan")
 
     @patch("terrapod.services.run_service.fire_run_triggers", new_callable=AsyncMock)
     async def test_applied_sets_apply_finished_at(self, mock_fire):

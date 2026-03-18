@@ -441,6 +441,7 @@ class RunnerListener:
         job_name = data.get("job_name", "")
         job_namespace = data.get("job_namespace", "")
         run_id = data.get("run_id", "")
+        phase = data.get("phase", "plan")
 
         if not job_name or not run_id:
             return
@@ -458,7 +459,7 @@ class RunnerListener:
                 await client.post(
                     f"/api/v2/listeners/listener-{self.identity.listener_id}"
                     f"/runs/run-{run_id}/job-status",
-                    json={"status": status},
+                    json={"status": status, "phase": phase},
                     headers=self._auth_headers(),
                 )
         except Exception as e:
@@ -472,6 +473,7 @@ class RunnerListener:
         job_namespace = data.get("job_namespace", "")
         run_id = data.get("run_id", "")
         tail_lines = data.get("tail_lines", 500)
+        phase = data.get("phase", "plan")
 
         if not job_name or not run_id:
             return
@@ -488,6 +490,7 @@ class RunnerListener:
                 await client.put(
                     f"/api/v2/listeners/listener-{self.identity.listener_id}"
                     f"/runs/run-{run_id}/log-stream",
+                    params={"phase": phase},
                     content=logs.encode() if isinstance(logs, str) else logs,
                     headers={
                         **self._auth_headers(),

@@ -62,6 +62,8 @@ async def _reconcile_one(db: AsyncSession, run: Run) -> None:
     """Reconcile a single run."""
     from terrapod.redis.client import get_job_status_from_redis, publish_listener_event
 
+    phase = "plan" if run.status == "planning" else "apply"
+
     # Publish check_job_status event to the pool's listener channel
     if run.pool_id:
         await publish_listener_event(
@@ -72,6 +74,7 @@ async def _reconcile_one(db: AsyncSession, run: Run) -> None:
                 "run_id": str(run.id),
                 "job_name": run.job_name,
                 "job_namespace": run.job_namespace or "",
+                "phase": phase,
             },
         )
 
@@ -84,11 +87,13 @@ async def _reconcile_one(db: AsyncSession, run: Run) -> None:
                 "job_name": run.job_name,
                 "job_namespace": run.job_namespace or "",
                 "tail_lines": 500,
+                "phase": phase,
             },
         )
 
-    # Check for recently reported status in Redis
-    status = await get_job_status_from_redis(str(run.id))
+    # Check for recently reported status in Redis (phase-keyed to prevent
+    # stale plan "succeeded" from causing premature apply transitions)
+    status = await get_job_status_from_redis(str(run.id), phase)
     if status is None:
         # No status yet — check for stale runs
         await _check_stale(db, run)
