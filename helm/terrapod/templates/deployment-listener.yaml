@@ -10,6 +10,7 @@ spec:
   {{- if not .Values.listener.autoscaling.enabled }}
   replicas: {{ .Values.listener.replicas }}
   {{- end }}
+  revisionHistoryLimit: 3
   strategy:
     type: RollingUpdate
     rollingUpdate:
