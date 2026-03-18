@@ -142,3 +142,13 @@ async def get_job_status_from_redis(run_id: str) -> str | None:
     if data is None:
         return None
     return json.loads(data).get("status")
+
+
+async def delete_job_status(run_id: str) -> None:
+    """Delete the cached Job status for a run.
+
+    Called when a run transitions between phases (plan → apply) to prevent
+    the reconciler from reading stale status from the previous phase's Job.
+    """
+    client = get_redis_client()
+    await client.delete(f"{JOB_STATUS_PREFIX}{run_id}")
