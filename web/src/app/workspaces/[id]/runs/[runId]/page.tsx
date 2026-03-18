@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Convert from 'ansi-to-html'
 import NavBar from '@/components/nav-bar'
@@ -11,6 +11,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
+import { ChevronsDown, ChevronsUp, ArrowDownToLine } from 'lucide-react'
 
 interface RunActions {
   'is-confirmable': boolean
@@ -90,14 +91,18 @@ function LogPanel({
   emptyMessage,
   phase,
   runId,
+  isStreaming,
 }: {
   log: string | null
   loading: boolean
   emptyMessage: string
   phase: 'plan' | 'apply'
   runId: string
+  isStreaming: boolean
 }) {
   const [colorMode, setColorMode] = useState(true)
+  const [following, setFollowing] = useState(true)
+  const preRef = useRef<HTMLPreElement>(null)
 
   const cleanLog = useMemo(() => (log ? stripStxEtx(log) : null), [log])
 
@@ -111,6 +116,30 @@ function LogPanel({
     if (!cleanLog) return ''
     return stripAnsi(cleanLog)
   }, [cleanLog])
+
+  // Auto-scroll to bottom when following and content changes
+  useEffect(() => {
+    if (following && preRef.current) {
+      preRef.current.scrollTop = preRef.current.scrollHeight
+    }
+  }, [log, following])
+
+  const handleScroll = useCallback(() => {
+    const el = preRef.current
+    if (!el) return
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+    setFollowing(atBottom)
+  }, [])
+
+  const scrollToTop = useCallback(() => {
+    preRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
+
+  const scrollToEnd = useCallback(() => {
+    if (preRef.current) {
+      preRef.current.scrollTo({ top: preRef.current.scrollHeight, behavior: 'smooth' })
+    }
+  }, [])
 
   if (loading) {
     return (
@@ -156,6 +185,41 @@ function LogPanel({
           </button>
         </div>
         <div className="flex items-center gap-2">
+          {isStreaming && (
+            <button
+              onClick={() => {
+                setFollowing(f => !f)
+                if (!following && preRef.current) {
+                  preRef.current.scrollTop = preRef.current.scrollHeight
+                }
+              }}
+              className={`px-2.5 py-1 text-xs rounded font-medium transition-colors inline-flex items-center gap-1 ${
+                following
+                  ? 'bg-brand-600 text-white'
+                  : 'bg-slate-700 text-slate-400 hover:text-slate-200'
+              }`}
+              title={following ? 'Following output — click to stop' : 'Click to follow output'}
+            >
+              <ArrowDownToLine className="w-3 h-3" />
+              Follow
+            </button>
+          )}
+          <button
+            onClick={scrollToEnd}
+            className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
+            title="Jump to end"
+          >
+            <ChevronsDown className="w-3 h-3" />
+            End
+          </button>
+          <button
+            onClick={scrollToTop}
+            className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
+            title="Jump to top"
+          >
+            <ChevronsUp className="w-3 h-3" />
+            Top
+          </button>
           <button
             onClick={() => downloadFile(cleanLog!, `${shortId}-${phase}.log`)}
             className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
@@ -175,11 +239,17 @@ function LogPanel({
 
       {colorMode ? (
         <pre
+          ref={preRef}
+          onScroll={handleScroll}
           className="p-4 text-sm text-slate-300 font-mono overflow-x-auto whitespace-pre-wrap max-h-[600px] overflow-y-auto"
           dangerouslySetInnerHTML={{ __html: htmlContent }}
         />
       ) : (
-        <pre className="p-4 text-sm text-slate-300 font-mono overflow-x-auto whitespace-pre-wrap max-h-[600px] overflow-y-auto">
+        <pre
+          ref={preRef}
+          onScroll={handleScroll}
+          className="p-4 text-sm text-slate-300 font-mono overflow-x-auto whitespace-pre-wrap max-h-[600px] overflow-y-auto"
+        >
           {plainContent}
         </pre>
       )}
@@ -203,7 +273,18 @@ export default function RunDetailPage() {
   const [planLogLoading, setPlanLogLoading] = useState(false)
   const [applyLogLoading, setApplyLogLoading] = useState(false)
 
-  const [activeSection, setActiveSection] = useState<'plan' | 'apply'>('plan')
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const [activeSection, setActiveSection] = useState<'plan' | 'apply'>(
+    tabParam === 'apply' ? 'apply' : 'plan'
+  )
+
+  const switchSection = useCallback((section: 'plan' | 'apply') => {
+    setActiveSection(section)
+    const url = new URL(window.location.href)
+    url.searchParams.set('tab', section)
+    window.history.replaceState({}, '', url.toString())
+  }, [])
 
   const loadRun = useCallback(async () => {
     try {
@@ -543,7 +624,7 @@ export default function RunDetailPage() {
         <div className="border-b border-slate-700/50 mb-4">
           <div className="flex gap-1 -mb-px">
             <button
-              onClick={() => setActiveSection('plan')}
+              onClick={() => switchSection('plan')}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                 activeSection === 'plan'
                   ? 'border-brand-500 text-brand-400'
@@ -554,7 +635,7 @@ export default function RunDetailPage() {
             </button>
             {!attrs['plan-only'] && (
               <button
-                onClick={() => setActiveSection('apply')}
+                onClick={() => switchSection('apply')}
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                   activeSection === 'apply'
                     ? 'border-brand-500 text-brand-400'
@@ -575,6 +656,7 @@ export default function RunDetailPage() {
             emptyMessage="No plan output available yet."
             phase="plan"
             runId={runId}
+            isStreaming={attrs.status === 'planning'}
           />
         )}
 
@@ -586,6 +668,7 @@ export default function RunDetailPage() {
             emptyMessage="No apply output available yet."
             phase="apply"
             runId={runId}
+            isStreaming={attrs.status === 'applying'}
           />
         )}
       </main>

@@ -130,6 +130,14 @@ def build_job_spec(
     if allow_empty_apply:
         container_env.append({"name": "TP_ALLOW_EMPTY_APPLY", "value": "true"})
 
+    # Termination grace period — passed to entrypoint for time-budgeted shutdown
+    container_env.append(
+        {
+            "name": "TP_TERMINATION_GRACE",
+            "value": str(runner_config.termination_grace_period_seconds),
+        }
+    )
+
     # Workspace env vars (category=env)
     for var in env_vars:
         container_env.append({"name": var["key"], "value": var["value"]})
@@ -179,7 +187,7 @@ def build_job_spec(
                     "labels": pod_labels,
                 },
                 "spec": {
-                    "terminationGracePeriodSeconds": 120,
+                    "terminationGracePeriodSeconds": runner_config.termination_grace_period_seconds,
                     "restartPolicy": "Never",
                     "automountServiceAccountToken": bool(runner_config.service_account_name),
                     "volumes": [

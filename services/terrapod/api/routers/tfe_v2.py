@@ -317,6 +317,7 @@ def _workspace_json(
                 "drift-detection-interval-seconds": ws.drift_detection_interval_seconds,
                 "drift-last-checked-at": _rfc3339(ws.drift_last_checked_at),
                 "drift-status": ws.drift_status,
+                "state-diverged": ws.state_diverged,
                 "latest-run": latest_run_attr,
                 "agent-pool-id": f"apool-{ws.agent_pool_id}" if ws.agent_pool_id else None,
                 "agent-pool-name": ws.agent_pool.name if ws.agent_pool else None,
@@ -965,6 +966,12 @@ async def upload_state_content(
     # Update metadata
     sv.state_size = len(state_data)
     sv.md5 = hashlib.md5(state_data).hexdigest()  # nosemgrep: insecure-hash-algorithm-md5
+
+    # Clear state_diverged flag on successful state upload
+    ws = await db.get(Workspace, sv.workspace_id)
+    if ws and ws.state_diverged:
+        ws.state_diverged = False
+
     await db.commit()
 
     logger.info("State content uploaded", sv_id=str(sv.id), size=len(state_data))

@@ -87,6 +87,10 @@ class RunnerConfig(BaseModel):
     definitions: list[RunnerDefinition] = Field(
         default_factory=lambda: [RunnerDefinition(name="standard", description="Standard runner")]
     )
+    termination_grace_period_seconds: int = Field(
+        default=120,
+        description="Time budget for graceful shutdown + artifact uploads (pod terminationGracePeriodSeconds)",
+    )
     token_ttl_seconds: int = Field(default=3600, description="Default runner token TTL")
     max_token_ttl_seconds: int = Field(default=7200, description="Maximum runner token TTL")
     node_selector: dict[str, str] = Field(default_factory=dict)

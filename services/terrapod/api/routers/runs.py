@@ -931,9 +931,11 @@ async def report_job_status(
     if not job_status:
         raise HTTPException(status_code=422, detail="status is required")
 
+    phase = body.get("phase", "plan")
+
     from terrapod.redis.client import set_job_status
 
-    await set_job_status(str(run.id), job_status)
+    await set_job_status(str(run.id), phase, job_status)
 
     return JSONResponse(content={"status": "ok"})
 
@@ -942,6 +944,7 @@ async def report_job_status(
 async def upload_log_stream(
     listener_id: str = Path(...),
     run_id: str = Path(...),
+    phase: str = Query("plan"),
     request: Request = ...,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
@@ -951,9 +954,14 @@ async def upload_log_stream(
     pod logs from K8s and PUTs them here. The API stores the data in Redis
     and serves it from the log endpoints until the final log is uploaded to
     object storage by the runner Job.
+
+    Phase is passed explicitly via query param to prevent late-arriving plan
+    log data from being stored under the apply phase key when the run has
+    already transitioned.
     """
     run = await _get_run(run_id, db)
-    phase = "plan" if run.status == "planning" else "apply"
+    if phase not in ("plan", "apply"):
+        phase = "plan" if run.status == "planning" else "apply"
     body_bytes = await request.body()
 
     from terrapod.redis.client import LOG_STREAM_PREFIX, get_redis_client

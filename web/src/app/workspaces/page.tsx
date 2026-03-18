@@ -33,6 +33,7 @@ interface Workspace {
     'resource-memory': string
     'drift-detection-enabled': boolean
     'drift-status': string
+    'state-diverged': boolean
     'latest-run': LatestRun | null
     'created-at': string
   }
@@ -65,6 +66,7 @@ export default function WorkspacesPage() {
     const drift = ws.attributes['drift-status']
     const run = ws.attributes['latest-run']
 
+    if (ws.attributes['state-diverged']) return { label: 'State Diverged', color: 'red', priority: 0 }
     if (drift === 'drifted') return { label: 'Drifted', color: 'amber', priority: 1 }
     if (run) {
       const s = run.status

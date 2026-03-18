@@ -123,32 +123,33 @@ async def publish_listener_event(pool_id: str, event: dict) -> None:
     await publish_event(channel, json.dumps(event))
 
 
-async def set_job_status(run_id: str, status: str) -> None:
-    """Store a Job status report in Redis for the reconciler."""
+async def set_job_status(run_id: str, phase: str, status: str) -> None:
+    """Store a Job status report in Redis for the reconciler.
+
+    Keyed by {run_id}:{phase} to prevent plan-phase status from leaking
+    into the apply phase (race condition where a late plan "succeeded"
+    response would cause a premature "applied" transition).
+    """
     import json
     import time
 
     client = get_redis_client()
     data = json.dumps({"status": status, "reported_at": time.time()})
-    await client.setex(f"{JOB_STATUS_PREFIX}{run_id}", 120, data)
+    await client.setex(f"{JOB_STATUS_PREFIX}{run_id}:{phase}", 120, data)
 
 
-async def get_job_status_from_redis(run_id: str) -> str | None:
-    """Get the most recent Job status report for a run."""
+async def get_job_status_from_redis(run_id: str, phase: str) -> str | None:
+    """Get the most recent Job status report for a run phase."""
     import json
 
     client = get_redis_client()
-    data = await client.get(f"{JOB_STATUS_PREFIX}{run_id}")
+    data = await client.get(f"{JOB_STATUS_PREFIX}{run_id}:{phase}")
     if data is None:
         return None
     return json.loads(data).get("status")
 
 
-async def delete_job_status(run_id: str) -> None:
-    """Delete the cached Job status for a run.
-
-    Called when a run transitions between phases (plan → apply) to prevent
-    the reconciler from reading stale status from the previous phase's Job.
-    """
+async def delete_job_status(run_id: str, phase: str) -> None:
+    """Delete the cached Job status for a run phase."""
     client = get_redis_client()
-    await client.delete(f"{JOB_STATUS_PREFIX}{run_id}")
+    await client.delete(f"{JOB_STATUS_PREFIX}{run_id}:{phase}")

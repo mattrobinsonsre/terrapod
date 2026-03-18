@@ -272,18 +272,19 @@ async def transition_run(
 
     # Clear stale Job state when entering apply phase.
     # The plan phase's job_name and Redis job_status would otherwise cause
-    # the reconciler to read the plan Job's "succeeded" status and
-    # incorrectly transition the run to "applied" before the apply Job
-    # is even created.
+    # Phase-keyed Redis status prevents stale plan "succeeded" from leaking
+    # into the apply phase (tp:job_status:{run_id}:plan vs :apply). We still
+    # clear the plan key as hygiene and reset job_name so the reconciler
+    # ignores this run until the new apply Job is reported.
     if target_status == "applying":
         run.job_name = None
         run.job_namespace = None
         try:
             from terrapod.redis.client import delete_job_status
 
-            await delete_job_status(str(run.id))
+            await delete_job_status(str(run.id), "plan")
         except Exception:
-            pass  # Best-effort; reconciler will skip runs with no job_name anyway
+            pass  # Best-effort cleanup
 
     # Track phase timestamps
     if target_status == "planning":

@@ -17,6 +17,7 @@ data:
     service_account_name: {{ include "terrapod.runnerServiceAccountName" . | quote }}
     azure_workload_identity: {{ .Values.runners.azureWorkloadIdentity | default false }}
     ttl_seconds_after_finished: {{ .Values.runners.ttlSecondsAfterFinished }}
+    termination_grace_period_seconds: {{ .Values.runners.terminationGracePeriodSeconds }}
     token_ttl_seconds: {{ .Values.runners.tokenTTLSeconds }}
     max_token_ttl_seconds: {{ .Values.runners.maxTokenTTLSeconds }}
     definitions:
