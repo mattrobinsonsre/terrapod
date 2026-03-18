@@ -1,8 +1,10 @@
 """Agent pool, join token, and listener management service."""
 
 import hashlib
+import json
 import secrets
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,8 +15,9 @@ from terrapod.auth.ca import (
     serialize_certificate,
     serialize_private_key,
 )
-from terrapod.db.models import AgentPool, AgentPoolToken, RunnerListener, utc_now
+from terrapod.db.models import AgentPool, AgentPoolToken, utc_now
 from terrapod.logging_config import get_logger
+from terrapod.redis.client import get_redis_client
 
 logger = get_logger(__name__)
 
@@ -152,37 +155,62 @@ async def delete_pool_token(db: AsyncSession, token: AgentPoolToken) -> None:
     await db.flush()
 
 
-# --- Listeners ---
+# --- Listeners (Redis-backed, auto-expiring) ---
+#
+# Listener data is ephemeral — stored in Redis with TTL, not PostgreSQL.
+# Keys:
+#   tp:listener:{id}        HASH   300s TTL  — all listener data
+#   tp:pool_listeners:{pid} SET    no TTL    — pool → listener index (lazily cleaned)
+#   tp:listener_name:{name} STRING 300s TTL  — name → ID lookup
+#
+LISTENER_TTL = 300  # seconds (refreshed on every heartbeat)
+_LISTENER_PREFIX = "tp:listener:"
+_POOL_LISTENERS_PREFIX = "tp:pool_listeners:"
+_LISTENER_NAME_PREFIX = "tp:listener_name:"
 
 
 async def join_listener(
-    db: AsyncSession,
     pool: AgentPool,
     token: AgentPoolToken,
     name: str,
     runner_definitions: list[str],
+    db: AsyncSession,
 ) -> dict:
     """Register or re-register a listener via join token exchange.
 
-    If a listener with the same name already exists, it is updated with a
-    fresh certificate. This handles pod restarts where saved certs were lost.
+    If a listener with the same name already exists (re-join after restart),
+    the existing hash is updated with a fresh certificate.
 
     Returns dict with listener_id, certificate PEM, private key PEM, CA cert PEM.
     """
     ca = get_ca()
+    redis = get_redis_client()
 
     # Issue certificate
     cert, private_key = ca.issue_listener_certificate(name, pool.name)
     fingerprint = get_certificate_fingerprint(cert)
+    now = datetime.now(UTC).isoformat()
 
     # Check if listener already exists (re-join after restart)
-    existing = await get_listener_by_name(db, name)
-    if existing:
-        existing.pool_id = pool.id
-        existing.certificate_fingerprint = fingerprint
-        existing.certificate_expires_at = cert.not_valid_after_utc
-        existing.runner_definitions = runner_definitions
-        listener = existing
+    existing_id = await redis.get(f"{_LISTENER_NAME_PREFIX}{name}")
+    if existing_id:
+        listener_id = existing_id
+        # Update existing hash with fresh cert
+        await redis.hset(
+            f"{_LISTENER_PREFIX}{listener_id}",
+            mapping={
+                "pool_id": str(pool.id),
+                "certificate_fingerprint": fingerprint,
+                "certificate_expires_at": cert.not_valid_after_utc.isoformat(),
+                "runner_definitions": json.dumps(runner_definitions),
+                "status": "online",
+                "last_heartbeat": now,
+            },
+        )
+        await redis.expire(f"{_LISTENER_PREFIX}{listener_id}", LISTENER_TTL)
+        await redis.expire(f"{_LISTENER_NAME_PREFIX}{name}", LISTENER_TTL)
+        # Ensure pool set membership (may have changed pools)
+        await redis.sadd(f"{_POOL_LISTENERS_PREFIX}{pool.id}", listener_id)
         logger.info(
             "Listener re-joined (updated existing)",
             listener=name,
@@ -190,14 +218,27 @@ async def join_listener(
             fingerprint=fingerprint[:16],
         )
     else:
-        listener = RunnerListener(
-            pool_id=pool.id,
-            name=name,
-            certificate_fingerprint=fingerprint,
-            certificate_expires_at=cert.not_valid_after_utc,
-            runner_definitions=runner_definitions,
+        listener_id = str(uuid.uuid4())
+        await redis.hset(
+            f"{_LISTENER_PREFIX}{listener_id}",
+            mapping={
+                "name": name,
+                "pool_id": str(pool.id),
+                "certificate_fingerprint": fingerprint,
+                "certificate_expires_at": cert.not_valid_after_utc.isoformat(),
+                "runner_definitions": json.dumps(runner_definitions),
+                "status": "online",
+                "capacity": "10",
+                "active_runs": "0",
+                "last_heartbeat": now,
+                "created_at": now,
+            },
         )
-        db.add(listener)
+        await redis.expire(f"{_LISTENER_PREFIX}{listener_id}", LISTENER_TTL)
+        # Name → ID lookup
+        await redis.setex(f"{_LISTENER_NAME_PREFIX}{name}", LISTENER_TTL, listener_id)
+        # Pool index
+        await redis.sadd(f"{_POOL_LISTENERS_PREFIX}{pool.id}", listener_id)
         logger.info(
             "Listener joined",
             listener=name,
@@ -205,63 +246,130 @@ async def join_listener(
             fingerprint=fingerprint[:16],
         )
 
-    # Increment token use count
+    # Increment token use count (still DB-backed)
     token.use_count += 1
     await db.flush()
 
     return {
-        "listener_id": str(listener.id),
+        "listener_id": listener_id,
         "certificate": serialize_certificate(cert).decode(),
         "private_key": serialize_private_key(private_key).decode(),
         "ca_certificate": ca.ca_cert_pem,
     }
 
 
-async def get_listener(db: AsyncSession, listener_id: uuid.UUID) -> RunnerListener | None:
-    """Get a listener by ID."""
-    result = await db.execute(select(RunnerListener).where(RunnerListener.id == listener_id))
-    return result.scalar_one_or_none()
+async def get_listener(listener_id: uuid.UUID) -> dict | None:
+    """Get a listener by ID. Returns dict of hash fields or None if expired."""
+    redis = get_redis_client()
+    data = await redis.hgetall(f"{_LISTENER_PREFIX}{listener_id}")
+    if not data:
+        return None
+    data["id"] = str(listener_id)
+    return data
 
 
-async def get_listener_by_name(db: AsyncSession, name: str) -> RunnerListener | None:
-    """Get a listener by name."""
-    result = await db.execute(select(RunnerListener).where(RunnerListener.name == name))
-    return result.scalar_one_or_none()
+async def get_listener_by_name(name: str) -> dict | None:
+    """Get a listener by name. Returns dict of hash fields or None if expired."""
+    redis = get_redis_client()
+    listener_id = await redis.get(f"{_LISTENER_NAME_PREFIX}{name}")
+    if not listener_id:
+        return None
+    data = await redis.hgetall(f"{_LISTENER_PREFIX}{listener_id}")
+    if not data:
+        # Name key exists but hash expired — clean up stale name key
+        await redis.delete(f"{_LISTENER_NAME_PREFIX}{name}")
+        return None
+    data["id"] = listener_id
+    return data
 
 
-async def list_listeners(db: AsyncSession, pool_id: uuid.UUID) -> list[RunnerListener]:
-    """List all listeners for an agent pool."""
-    result = await db.execute(
-        select(RunnerListener)
-        .where(RunnerListener.pool_id == pool_id)
-        .order_by(RunnerListener.name)
-    )
-    return list(result.scalars().all())
+async def list_listeners(pool_id: uuid.UUID) -> list[dict]:
+    """List all listeners for an agent pool. Lazily cleans expired entries."""
+    redis = get_redis_client()
+    set_key = f"{_POOL_LISTENERS_PREFIX}{pool_id}"
+    member_ids = await redis.smembers(set_key)
+    if not member_ids:
+        return []
+
+    # Pipeline HGETALL for all members
+    pipe = redis.pipeline(transaction=False)
+    id_list = list(member_ids)
+    for lid in id_list:
+        pipe.hgetall(f"{_LISTENER_PREFIX}{lid}")
+    results = await pipe.execute()
+
+    listeners = []
+    stale_ids = []
+    for lid, data in zip(id_list, results, strict=True):
+        if not data:
+            stale_ids.append(lid)
+            continue
+        data["id"] = lid
+        listeners.append(data)
+
+    # Lazily remove expired entries from the pool set
+    if stale_ids:
+        await redis.srem(set_key, *stale_ids)
+
+    # Sort by name for consistent ordering
+    listeners.sort(key=lambda d: d.get("name", ""))
+    return listeners
 
 
-async def delete_listener(db: AsyncSession, listener: RunnerListener) -> None:
-    """Delete a listener."""
-    await db.delete(listener)
-    await db.flush()
+async def delete_listener(listener_id: str, name: str, pool_id: str) -> None:
+    """Delete a listener's Redis keys."""
+    redis = get_redis_client()
+    pipe = redis.pipeline(transaction=False)
+    pipe.delete(f"{_LISTENER_PREFIX}{listener_id}")
+    pipe.delete(f"{_LISTENER_NAME_PREFIX}{name}")
+    pipe.srem(f"{_POOL_LISTENERS_PREFIX}{pool_id}", listener_id)
+    await pipe.execute()
+
+
+async def delete_pool_listeners(pool_id: uuid.UUID) -> None:
+    """Delete all listener Redis keys for a pool. Called on pool deletion."""
+    redis = get_redis_client()
+    set_key = f"{_POOL_LISTENERS_PREFIX}{pool_id}"
+    member_ids = await redis.smembers(set_key)
+
+    if member_ids:
+        pipe = redis.pipeline(transaction=False)
+        for lid in member_ids:
+            # Get name for cleanup before deleting
+            name = await redis.hget(f"{_LISTENER_PREFIX}{lid}", "name")
+            pipe.delete(f"{_LISTENER_PREFIX}{lid}")
+            if name:
+                pipe.delete(f"{_LISTENER_NAME_PREFIX}{name}")
+        pipe.delete(set_key)
+        await pipe.execute()
+    else:
+        await redis.delete(set_key)
 
 
 async def renew_listener_certificate(
-    db: AsyncSession,
-    listener: RunnerListener,
+    listener_id: str,
+    listener_name: str,
     pool: AgentPool,
 ) -> dict:
-    """Renew a listener's certificate."""
+    """Renew a listener's certificate. Updates fingerprint and expiry in Redis."""
     ca = get_ca()
-    cert, private_key = ca.issue_listener_certificate(listener.name, pool.name)
+    redis = get_redis_client()
+    cert, private_key = ca.issue_listener_certificate(listener_name, pool.name)
     fingerprint = get_certificate_fingerprint(cert)
 
-    listener.certificate_fingerprint = fingerprint
-    listener.certificate_expires_at = cert.not_valid_after_utc
-    await db.flush()
+    key = f"{_LISTENER_PREFIX}{listener_id}"
+    await redis.hset(
+        key,
+        mapping={
+            "certificate_fingerprint": fingerprint,
+            "certificate_expires_at": cert.not_valid_after_utc.isoformat(),
+        },
+    )
+    # Don't reset TTL here — heartbeat handles that
 
     logger.info(
         "Renewed listener certificate",
-        listener=listener.name,
+        listener=listener_name,
         fingerprint=fingerprint[:16],
     )
 
@@ -270,3 +378,21 @@ async def renew_listener_certificate(
         "private_key": serialize_private_key(private_key).decode(),
         "ca_certificate": ca.ca_cert_pem,
     }
+
+
+async def heartbeat_listener(listener_id: str, name: str, **fields: str) -> None:
+    """Refresh listener TTL and update runtime fields.
+
+    Called by the heartbeat endpoint. Refreshes TTL on both the hash and
+    name lookup keys, and merges any updated runtime fields (status, capacity,
+    active_runs, runner_definitions).
+    """
+    redis = get_redis_client()
+    now = datetime.now(UTC).isoformat()
+    updates: dict[str, str] = {"last_heartbeat": now, "status": "online", **fields}
+
+    pipe = redis.pipeline(transaction=False)
+    pipe.hset(f"{_LISTENER_PREFIX}{listener_id}", mapping=updates)
+    pipe.expire(f"{_LISTENER_PREFIX}{listener_id}", LISTENER_TTL)
+    pipe.expire(f"{_LISTENER_NAME_PREFIX}{name}", LISTENER_TTL)
+    await pipe.execute()

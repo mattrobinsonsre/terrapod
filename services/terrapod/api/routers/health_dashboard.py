@@ -14,11 +14,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 from sse_starlette.sse import EventSourceResponse
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
-from terrapod.db.models import Run, RunnerListener, Workspace
+from terrapod.db.models import AgentPool, Run, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 
@@ -245,67 +244,44 @@ async def _get_run_health(db: AsyncSession) -> dict:
 
 
 async def _get_listener_health(db: AsyncSession) -> dict:
-    """Aggregate listener health data from DB + Redis."""
-    from terrapod.redis.client import get_redis_client
+    """Aggregate listener health data from Redis (listeners are ephemeral).
 
-    result = await db.execute(select(RunnerListener).options(selectinload(RunnerListener.pool)))
-    listeners = list(result.scalars().all())
+    Gets pool IDs + names from the DB, then reads listener data from Redis
+    using the pool_listeners sets and listener hashes.
+    """
+    from terrapod.services import agent_pool_service
 
-    redis = get_redis_client()
+    # Get all pools from DB (for pool names)
+    pool_result = await db.execute(select(AgentPool))
+    pools = list(pool_result.scalars().all())
+    pool_names: dict[str, str] = {str(p.id): p.name for p in pools}
+
     details = []
     online_count = 0
 
-    for listener in listeners:
-        prefix = f"tp:listener:{listener.id}"
+    for pool in pools:
+        listeners = await agent_pool_service.list_listeners(pool.id)
+        for lis in listeners:
+            is_online = lis.get("status") == "online"
+            if is_online:
+                online_count += 1
 
-        # Read Redis keys (pipeline for efficiency)
-        pipe = redis.pipeline(transaction=False)
-        pipe.get(f"{prefix}:status")
-        pipe.get(f"{prefix}:heartbeat")
-        pipe.get(f"{prefix}:capacity")
-        pipe.get(f"{prefix}:active_runs")
-        results = await pipe.execute()
-
-        status_val = results[0]
-        heartbeat_val = results[1]
-        capacity_val = results[2]
-        active_runs_val = results[3]
-
-        is_online = status_val == b"online" or status_val == "online"
-        if is_online:
-            online_count += 1
-
-        # Get pool name
-        pool_name = ""
-        if listener.pool:
-            pool_name = listener.pool.name
-
-        heartbeat_ts = ""
-        if heartbeat_val:
-            from datetime import datetime
-
-            try:
-                ts = int(heartbeat_val)
-                heartbeat_ts = datetime.fromtimestamp(ts, tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-            except (ValueError, TypeError):
-                pass
-
-        details.append(
-            {
-                "id": f"listener-{listener.id}",
-                "name": listener.name,
-                "pool-name": pool_name,
-                "status": "online" if is_online else "offline",
-                "capacity": int(capacity_val) if capacity_val else 0,
-                "active-runs": int(active_runs_val) if active_runs_val else 0,
-                "last-heartbeat": heartbeat_ts,
-            }
-        )
+            details.append(
+                {
+                    "id": f"listener-{lis['id']}",
+                    "name": lis.get("name", ""),
+                    "pool-name": pool_names.get(lis.get("pool_id", ""), ""),
+                    "status": "online" if is_online else "offline",
+                    "capacity": int(lis.get("capacity", 0)),
+                    "active-runs": int(lis.get("active_runs", 0)),
+                    "last-heartbeat": lis.get("last_heartbeat", ""),
+                }
+            )
 
     return {
-        "total": len(listeners),
+        "total": len(details),
         "online": online_count,
-        "offline": len(listeners) - online_count,
+        "offline": len(details) - online_count,
         "details": details,
     }
 

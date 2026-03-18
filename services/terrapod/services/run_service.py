@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.db.models import (
     ConfigurationVersion,
     Run,
-    RunnerListener,
     RunTrigger,
     Workspace,
     utc_now,
@@ -271,6 +270,21 @@ async def transition_run(
     if error_message:
         run.error_message = error_message
 
+    # Clear stale Job state when entering apply phase.
+    # The plan phase's job_name and Redis job_status would otherwise cause
+    # the reconciler to read the plan Job's "succeeded" status and
+    # incorrectly transition the run to "applied" before the apply Job
+    # is even created.
+    if target_status == "applying":
+        run.job_name = None
+        run.job_namespace = None
+        try:
+            from terrapod.redis.client import delete_job_status
+
+            await delete_job_status(str(run.id))
+        except Exception:
+            pass  # Best-effort; reconciler will skip runs with no job_name anyway
+
     # Track phase timestamps
     if target_status == "planning":
         run.plan_started_at = now
@@ -436,7 +450,9 @@ async def list_workspace_runs(
 
 async def claim_next_run(
     db: AsyncSession,
-    listener: RunnerListener,
+    listener_id: uuid.UUID,
+    pool_id: uuid.UUID,
+    listener_name: str = "",
 ) -> tuple[Run, str] | None:
     """Claim the next available run for a listener.
 
@@ -458,7 +474,7 @@ async def claim_next_run(
             select(Run)
             .where(
                 Run.status == target_status,
-                Run.pool_id == listener.pool_id,
+                Run.pool_id == pool_id,
             )
             .order_by(Run.created_at.asc())
             .limit(1)
@@ -469,14 +485,14 @@ async def claim_next_run(
         run = result.scalar_one_or_none()
 
         if run is not None:
-            run.listener_id = listener.id
+            run.listener_id = listener_id
             run = await transition_run(db, run, next_status)
             await db.flush()
 
             logger.info(
                 "Run claimed by listener",
                 run_id=str(run.id),
-                listener=listener.name,
+                listener=listener_name,
                 phase=phase,
             )
 

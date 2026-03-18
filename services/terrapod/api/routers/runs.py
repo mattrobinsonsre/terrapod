@@ -748,11 +748,16 @@ async def next_run(
     Returns 204 No Content if no run is available.
     """
     l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
-    listener = await agent_pool_service.get_listener(db, l_uuid)
+    listener = await agent_pool_service.get_listener(l_uuid)
     if listener is None:
         raise HTTPException(status_code=404, detail="Listener not found")
 
-    claim = await run_service.claim_next_run(db, listener)
+    claim = await run_service.claim_next_run(
+        db,
+        listener_id=l_uuid,
+        pool_id=uuid.UUID(listener["pool_id"]),
+        listener_name=listener.get("name", ""),
+    )
     if claim is None:
         return Response(status_code=204)
 

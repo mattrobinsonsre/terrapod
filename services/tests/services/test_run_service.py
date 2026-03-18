@@ -143,6 +143,30 @@ class TestTransitionRun:
         result = await transition_run(db, run, "applying")
         assert result.apply_started_at is not None
 
+    @patch("terrapod.redis.client.delete_job_status", new_callable=AsyncMock)
+    async def test_applying_clears_plan_job_state(self, mock_delete_status):
+        """Transitioning to 'applying' clears stale plan-phase Job state.
+
+        Without this, the reconciler could read the plan Job's "succeeded"
+        status from Redis and incorrectly transition the run to "applied"
+        before the apply Job is even created.
+        """
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(
+            status="confirmed",
+            # Simulate leftover from plan phase
+        )
+        run.job_name = "tprun-abc12345-plan"
+        run.job_namespace = "terrapod-runners"
+
+        result = await transition_run(db, run, "applying")
+
+        # job_name and job_namespace must be cleared
+        assert result.job_name is None
+        assert result.job_namespace is None
+        # Redis job status must be deleted
+        mock_delete_status.assert_called_once_with(str(run.id))
+
     @patch("terrapod.services.run_service.fire_run_triggers", new_callable=AsyncMock)
     async def test_applied_sets_apply_finished_at(self, mock_fire):
         db = AsyncMock(spec=AsyncSession)
@@ -332,17 +356,15 @@ class TestClaimNextRun:
         mock_result.scalar_one_or_none.return_value = run
         db.execute.return_value = mock_result
 
-        listener = MagicMock()
-        listener.id = uuid.uuid4()
-        listener.pool_id = uuid.uuid4()
-        listener.name = "listener-1"
+        listener_id = uuid.uuid4()
+        pool_id = uuid.uuid4()
 
-        result = await claim_next_run(db, listener)
+        result = await claim_next_run(db, listener_id, pool_id, "listener-1")
         assert result is not None
         claimed_run, phase = result
         assert phase == "plan"
         assert claimed_run.status == "planning"
-        assert claimed_run.listener_id == listener.id
+        assert claimed_run.listener_id == listener_id
 
     async def test_claims_confirmed_run_for_apply_phase(self):
         db = AsyncMock(spec=AsyncSession)
@@ -354,17 +376,15 @@ class TestClaimNextRun:
         mock_confirmed.scalar_one_or_none.return_value = confirmed_run
         db.execute.side_effect = [mock_empty, mock_confirmed]
 
-        listener = MagicMock()
-        listener.id = uuid.uuid4()
-        listener.pool_id = uuid.uuid4()
-        listener.name = "listener-1"
+        listener_id = uuid.uuid4()
+        pool_id = uuid.uuid4()
 
-        result = await claim_next_run(db, listener)
+        result = await claim_next_run(db, listener_id, pool_id, "listener-1")
         assert result is not None
         claimed_run, phase = result
         assert phase == "apply"
         assert claimed_run.status == "applying"
-        assert claimed_run.listener_id == listener.id
+        assert claimed_run.listener_id == listener_id
 
     async def test_returns_none_when_queue_empty(self):
         db = AsyncMock(spec=AsyncSession)
@@ -372,10 +392,9 @@ class TestClaimNextRun:
         mock_result.scalar_one_or_none.return_value = None
         db.execute.return_value = mock_result
 
-        listener = MagicMock()
-        listener.pool_id = uuid.uuid4()
+        pool_id = uuid.uuid4()
 
-        result = await claim_next_run(db, listener)
+        result = await claim_next_run(db, uuid.uuid4(), pool_id)
         assert result is None
 
 
