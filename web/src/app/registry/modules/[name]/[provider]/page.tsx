@@ -611,7 +611,7 @@ export default function ModuleDetailPage() {
             {showVcs && (
               <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-5 mb-6 space-y-4">
                 <p className="text-sm text-slate-300">
-                  Connect this module to a VCS repository. New versions will be published automatically when matching tags are pushed.
+                  Connect this module to a VCS repository. New versions are published automatically when semver tags matching the tag pattern are pushed. Branch commits alone do not create versions.
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -663,6 +663,7 @@ export default function ModuleDetailPage() {
                       placeholder="v*"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                     />
+                    <p className="mt-1 text-xs text-slate-500">Only tags matching this pattern create versions (e.g. v1.0.0)</p>
                   </div>
                 </div>
 
@@ -689,15 +690,22 @@ export default function ModuleDetailPage() {
 
             {/* VCS status info when connected but section not open */}
             {isVcsSource && !showVcs && module.attributes['vcs-repo-url'] && (
-              <div className="bg-green-900/20 rounded-lg border border-green-800/30 px-4 py-3 mb-6 flex items-center gap-3">
-                <GitBranch size={16} className="text-green-400" />
-                <div className="text-sm">
-                  <span className="text-green-300">VCS connected:</span>{' '}
-                  <span className="text-slate-300 font-mono text-xs">{module.attributes['vcs-repo-url']}</span>
-                  {module.attributes['vcs-last-tag'] && (
-                    <span className="text-slate-400 ml-2">Last tag: {module.attributes['vcs-last-tag']}</span>
-                  )}
+              <div className="bg-green-900/20 rounded-lg border border-green-800/30 px-4 py-3 mb-6">
+                <div className="flex items-center gap-3">
+                  <GitBranch size={16} className="text-green-400" />
+                  <div className="text-sm">
+                    <span className="text-green-300">VCS connected:</span>{' '}
+                    <span className="text-slate-300 font-mono text-xs">{module.attributes['vcs-repo-url']}</span>
+                    {module.attributes['vcs-last-tag'] && (
+                      <span className="text-slate-400 ml-2">Last tag: {module.attributes['vcs-last-tag']}</span>
+                    )}
+                  </div>
                 </div>
+                {(module.attributes['version-statuses'] || []).length === 0 && (
+                  <p className="text-xs text-green-400/70 mt-2 ml-7">
+                    Push a semver tag (e.g. <code className="font-mono">v1.0.0</code>) matching the tag pattern to publish the first version.
+                  </p>
+                )}
               </div>
             )}
 
@@ -833,7 +841,11 @@ export default function ModuleDetailPage() {
 
             <h2 className="text-lg font-semibold text-slate-200 mb-3">Versions</h2>
             {(module.attributes['version-statuses'] || []).length === 0 ? (
-              <EmptyState message="No versions yet. Upload a module or connect VCS to get started." />
+              <EmptyState message={
+                isVcsSource
+                  ? `No versions yet. Push a semver tag matching "${module.attributes['vcs-tag-pattern'] || 'v*'}" to the connected repository to publish a version.`
+                  : 'No versions yet. Upload a module or connect VCS to get started.'
+              } />
             ) : (
               <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
                 <table className="w-full text-sm">

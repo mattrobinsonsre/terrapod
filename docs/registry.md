@@ -149,6 +149,10 @@ Instead of uploading tarballs manually, you can connect a module to a VCS reposi
 3. Push semver tags (e.g. `v1.0.0`) to the repository
 4. Terrapod's background poller detects the tag, downloads the archive, and creates the module version
 
+> **Important:** Only git tags trigger version publishing. Commits pushed to branches — including the default branch — do **not** create module versions. You must push a tag matching the configured tag pattern (default `v*`) for a new version to appear in the registry. This matches the Terraform registry convention where module versions correspond to git tags, not branch HEADs.
+>
+> If you want every merge to `main` to produce a new version automatically, set up a CI pipeline on the module repository that creates a semver tag on each merge (see example below).
+
 ### Setup via API
 
 ```zsh
@@ -220,6 +224,47 @@ registry/modules/{namespace}/{name}/{provider}/{version}.tar.gz
 ### Manual Upload Still Works
 
 Even with VCS connected, you can still upload versions directly via the API or web UI. Manually-uploaded versions will have empty `vcs-commit-sha` and `vcs-tag` fields.
+
+### Auto-Tagging via CI
+
+Since only git tags produce module versions, you may want a CI pipeline that automatically creates a semver tag when code is merged to the default branch. Here is a minimal GitHub Actions example that bumps the patch version on every merge:
+
+```yaml
+# .github/workflows/tag.yml
+name: Auto-tag on merge
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Get latest tag
+        id: latest
+        run: |
+          tag=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          echo "tag=${tag:-v0.0.0}" >> "$GITHUB_OUTPUT"
+      - name: Bump patch version
+        id: bump
+        run: |
+          ver="${{ steps.latest.outputs.tag }}"
+          ver="${ver#v}"
+          IFS='.' read -r major minor patch <<< "$ver"
+          echo "new_tag=v${major}.${minor}.$((patch + 1))" >> "$GITHUB_OUTPUT"
+      - name: Create tag
+        run: |
+          git tag "${{ steps.bump.outputs.new_tag }}"
+          git push origin "${{ steps.bump.outputs.new_tag }}"
+```
+
+With this in place, every merge to `main` creates a new patch version tag (e.g. `v0.0.1` → `v0.0.2`), which Terrapod's poller picks up and publishes as a new module version within 60 seconds.
 
 ### Version Metadata
 
