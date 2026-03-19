@@ -29,6 +29,8 @@ Modules and providers use a similar three-level hierarchy (no "plan" concept):
 
 A role's `workspace_permission` maps to registry permissions: `plan` maps to `read`.
 
+**Runner tokens** receive implicit `read` access to all registry modules and providers. This allows runner Jobs to download modules and providers during `terraform init` without requiring explicit label-based permissions on each registry resource.
+
 ### Platform Permissions
 
 | Operation | Required Role |
