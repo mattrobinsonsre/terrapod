@@ -10,8 +10,11 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import queue
+import threading
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import IO, Any
 
 from terrapod.logging_config import get_logger
 from terrapod.storage.protocol import (
@@ -107,6 +110,127 @@ class GCSStore:
             metadata=metadata or {},
         )
 
+    async def put_stream(
+        self,
+        key: str,
+        chunks: AsyncIterator[bytes],
+        content_type: str = "application/octet-stream",
+        metadata: dict[str, str] | None = None,
+    ) -> ObjectMeta:
+        """Store an object via GCS resumable upload, streaming chunks.
+
+        Bridges async→sync using a queue.Queue-backed file reader. The sync
+        GCS client performs a resumable upload in a background thread while
+        the async side feeds chunks to the queue.
+        """
+        blob_name = self._full_key(key)
+        chunk_queue: queue.Queue[bytes | None] = queue.Queue(maxsize=4)
+        md5_hasher = hashlib.md5()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+        total_size = 0
+
+        class _QueueReader(IO[bytes]):
+            """File-like reader backed by a queue for the sync GCS client."""
+
+            def __init__(self) -> None:
+                self._buffer = b""
+                self._done = False
+
+            def read(self, n: int = -1) -> bytes:
+                if self._done and not self._buffer:
+                    return b""
+                while not self._done and (n < 0 or len(self._buffer) < n):
+                    item = chunk_queue.get()
+                    if item is None:
+                        self._done = True
+                        break
+                    self._buffer += item
+                if n < 0:
+                    result = self._buffer
+                    self._buffer = b""
+                else:
+                    result = self._buffer[:n]
+                    self._buffer = self._buffer[n:]
+                return result
+
+            # Stubs required by IO protocol
+            def write(self, s: bytes) -> int:
+                raise NotImplementedError
+
+            def seek(self, offset: int, whence: int = 0) -> int:
+                raise NotImplementedError
+
+            def tell(self) -> int:
+                raise NotImplementedError
+
+            def readable(self) -> bool:
+                return True
+
+            def seekable(self) -> bool:
+                return False
+
+        upload_error: list[Exception] = []
+
+        def _upload_in_thread() -> None:
+            try:
+                client = self._get_sync_client()
+                bucket = client.bucket(self._bucket_name)
+                blob = bucket.blob(blob_name)
+                reader = _QueueReader()
+                blob.upload_from_file(
+                    reader,
+                    content_type=content_type,
+                    num_retries=2,
+                )
+            except Exception as e:
+                upload_error.append(e)
+
+        thread = threading.Thread(target=_upload_in_thread, daemon=True)
+        thread.start()
+
+        try:
+            async for chunk in chunks:
+                md5_hasher.update(chunk)
+                total_size += len(chunk)
+                await asyncio.to_thread(chunk_queue.put, chunk)
+            await asyncio.to_thread(chunk_queue.put, None)  # signal EOF
+        except Exception:
+            # Signal EOF on error so thread exits
+            try:
+                chunk_queue.put_nowait(None)
+            except queue.Full:
+                pass
+            raise
+
+        await asyncio.to_thread(thread.join)
+
+        if upload_error:
+            exc = upload_error[0]
+            if "403" in str(exc):
+                raise ObjectStorePermissionError(str(exc)) from exc
+            raise ObjectStoreError(str(exc)) from exc
+
+        # Update metadata if provided
+        if metadata:
+
+            def _set_metadata() -> None:
+                client = self._get_sync_client()
+                bucket = client.bucket(self._bucket_name)
+                blob = bucket.blob(blob_name)
+                blob.metadata = metadata
+                blob.patch()
+
+            await asyncio.to_thread(_set_metadata)
+
+        etag = md5_hasher.hexdigest()
+        return ObjectMeta(
+            key=key,
+            size_bytes=total_size,
+            content_type=content_type,
+            etag=etag,
+            last_modified=datetime.now(UTC),
+            metadata=metadata or {},
+        )
+
     async def get(self, key: str) -> bytes:
         storage = await self._get_aio_storage()
         blob_name = self._full_key(key)
@@ -119,6 +243,64 @@ class GCSStore:
             if "403" in str(e):
                 raise ObjectStorePermissionError(str(e)) from e
             raise ObjectStoreError(str(e)) from e
+
+    async def get_stream(
+        self,
+        key: str,
+        chunk_size: int = 256 * 1024,
+    ) -> AsyncIterator[bytes]:
+        """Stream an object's content in chunks from GCS.
+
+        Uses the sync client in a thread with a queue bridge.
+        """
+        blob_name = self._full_key(key)
+        chunk_queue: queue.Queue[bytes | None] = queue.Queue(maxsize=4)
+        download_error: list[Exception] = []
+
+        def _download_in_thread() -> None:
+            try:
+                client = self._get_sync_client()
+                bucket = client.bucket(self._bucket_name)
+                blob = bucket.blob(blob_name)
+                if not blob.exists():
+                    download_error.append(ObjectNotFoundError(key))
+                    chunk_queue.put(None)
+                    return
+                with blob.open("rb") as f:
+                    while True:
+                        data = f.read(chunk_size)
+                        if not data:
+                            break
+                        chunk_queue.put(data)
+                chunk_queue.put(None)  # signal EOF
+            except Exception as e:
+                download_error.append(e)
+                try:
+                    chunk_queue.put(None)
+                except queue.Full:
+                    pass
+
+        thread = threading.Thread(target=_download_in_thread, daemon=True)
+        thread.start()
+
+        try:
+            while True:
+                item = await asyncio.to_thread(chunk_queue.get)
+                if item is None:
+                    break
+                yield item
+        finally:
+            await asyncio.to_thread(thread.join)
+
+        if download_error:
+            exc = download_error[0]
+            if isinstance(exc, ObjectNotFoundError):
+                raise exc
+            if "404" in str(exc) or "Not Found" in str(exc):
+                raise ObjectNotFoundError(key) from exc
+            if "403" in str(exc):
+                raise ObjectStorePermissionError(str(exc)) from exc
+            raise ObjectStoreError(str(exc)) from exc
 
     async def delete(self, key: str) -> None:
         storage = await self._get_aio_storage()

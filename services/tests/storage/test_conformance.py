@@ -73,6 +73,32 @@ async def _conformance_list_prefix(store: ObjectStore) -> None:
     assert "conformance/other/gamma.txt" not in keys
 
 
+async def _conformance_put_stream_get_stream(store: ObjectStore) -> None:
+    """Test: put_stream/get_stream roundtrip produces identical data."""
+
+    async def _chunks():
+        yield b"chunk1-"
+        yield b"chunk2-"
+        yield b"chunk3"
+
+    meta = await store.put_stream(
+        "conformance/stream-roundtrip.bin",
+        _chunks(),
+        content_type="application/octet-stream",
+    )
+    assert meta.key == "conformance/stream-roundtrip.bin"
+    assert meta.size_bytes == len(b"chunk1-chunk2-chunk3")
+
+    # Verify via get_stream
+    result = b""
+    async for chunk in store.get_stream("conformance/stream-roundtrip.bin"):
+        result += chunk
+    assert result == b"chunk1-chunk2-chunk3"
+
+    # Also verify via regular get
+    assert await store.get("conformance/stream-roundtrip.bin") == b"chunk1-chunk2-chunk3"
+
+
 async def _conformance_presigned_urls(store: ObjectStore) -> None:
     """Test: presigned URL generation succeeds."""
     get_url = await store.presigned_get_url("conformance/presigned.txt")
@@ -120,6 +146,9 @@ class TestFilesystemConformance:
 
     async def test_list_prefix(self, conformance_fs_store: FilesystemStore) -> None:
         await _conformance_list_prefix(conformance_fs_store)
+
+    async def test_put_stream_get_stream(self, conformance_fs_store: FilesystemStore) -> None:
+        await _conformance_put_stream_get_stream(conformance_fs_store)
 
     async def test_presigned_urls(self, conformance_fs_store: FilesystemStore) -> None:
         await _conformance_presigned_urls(conformance_fs_store)
@@ -181,6 +210,9 @@ class TestS3Conformance:
 
     async def test_list_prefix(self, conformance_s3_store: object) -> None:
         await _conformance_list_prefix(conformance_s3_store)  # type: ignore[arg-type]
+
+    async def test_put_stream_get_stream(self, conformance_s3_store: object) -> None:
+        await _conformance_put_stream_get_stream(conformance_s3_store)  # type: ignore[arg-type]
 
     async def test_presigned_urls(self, conformance_s3_store: object) -> None:
         await _conformance_presigned_urls(conformance_s3_store)  # type: ignore[arg-type]

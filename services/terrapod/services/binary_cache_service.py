@@ -6,8 +6,6 @@ stores it in object storage, and returns a presigned download URL.
 Subsequent requests serve from cache.
 """
 
-import hashlib
-
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.config import settings
 from terrapod.db.models import CachedBinary
 from terrapod.logging_config import get_logger
+from terrapod.services.hashing_stream import HashingStream
 from terrapod.storage.keys import binary_cache_key
 from terrapod.storage.protocol import ObjectStore
 
@@ -65,16 +64,15 @@ async def get_or_cache_binary(
     )
 
     if tool == "terraform":
-        data, download_url = await _fetch_terraform_binary(version, os_, arch)
+        download_url = _terraform_download_url(version, os_, arch)
     else:
-        data, download_url = await _fetch_tofu_binary(version, os_, arch)
+        download_url = _tofu_download_url(version, os_, arch)
 
-    # Store in object storage
+    # Stream directly to object storage
     key = binary_cache_key(tool, version, os_, arch)
-    await storage.put(key, data, content_type="application/zip")
+    shasum, size_bytes = await _fetch_and_store_binary(storage, key, download_url)
 
     # Record in database
-    shasum = hashlib.sha256(data).hexdigest()
     entry = CachedBinary(
         tool=tool,
         version=version,
@@ -92,7 +90,7 @@ async def get_or_cache_binary(
         version=version,
         os=os_,
         arch=arch,
-        size_bytes=len(data),
+        size_bytes=size_bytes,
     )
 
     presigned = await storage.presigned_get_url(key)
@@ -389,27 +387,28 @@ async def _get_cached(
     return result.scalars().first()
 
 
-async def _fetch_terraform_binary(version: str, os_: str, arch: str) -> tuple[bytes, str]:
-    """Download terraform binary from releases.hashicorp.com."""
+def _terraform_download_url(version: str, os_: str, arch: str) -> str:
+    """Build the upstream download URL for a terraform binary."""
     cfg = settings.registry.binary_cache
     filename = f"terraform_{version}_{os_}_{arch}.zip"
-    url = f"{cfg.terraform_mirror_url}/{version}/{filename}"
-
-    async with httpx.AsyncClient(follow_redirects=True, timeout=120.0) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
-
-    return resp.content, url
+    return f"{cfg.terraform_mirror_url}/{version}/{filename}"
 
 
-async def _fetch_tofu_binary(version: str, os_: str, arch: str) -> tuple[bytes, str]:
-    """Download tofu binary from GitHub releases."""
+def _tofu_download_url(version: str, os_: str, arch: str) -> str:
+    """Build the upstream download URL for a tofu binary."""
     cfg = settings.registry.binary_cache
     filename = f"tofu_{version}_{os_}_{arch}.zip"
-    url = f"{cfg.tofu_mirror_url}/v{version}/{filename}"
+    return f"{cfg.tofu_mirror_url}/v{version}/{filename}"
 
-    async with httpx.AsyncClient(follow_redirects=True, timeout=120.0) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
 
-    return resp.content, url
+async def _fetch_and_store_binary(storage: ObjectStore, key: str, url: str) -> tuple[str, int]:
+    """Stream a binary from upstream directly into object storage.
+
+    Returns (sha256_hex, size_bytes).
+    """
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        async with client.stream("GET", url, timeout=300.0) as resp:
+            resp.raise_for_status()
+            stream = HashingStream(resp)
+            await storage.put_stream(key, stream, content_type="application/zip")
+            return stream.sha256_hex, stream.size

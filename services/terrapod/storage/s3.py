@@ -8,6 +8,7 @@ generation (no API call). Auth relies on the SDK credential chain
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
 
@@ -115,6 +116,87 @@ class S3Store:
             metadata=metadata or {},
         )
 
+    async def put_stream(
+        self,
+        key: str,
+        chunks: AsyncIterator[bytes],
+        content_type: str = "application/octet-stream",
+        metadata: dict[str, str] | None = None,
+    ) -> ObjectMeta:
+        """Store an object via S3 multipart upload, streaming chunks."""
+        client = await self._get_client()
+        full_key = self._full_key(key)
+        part_size = 8 * 1024 * 1024  # 8MB parts
+
+        try:
+            mpu = await client.create_multipart_upload(
+                Bucket=self._bucket,
+                Key=full_key,
+                ContentType=content_type,
+                **({"Metadata": metadata} if metadata else {}),
+            )
+            upload_id = mpu["UploadId"]
+        except client.exceptions.ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "")
+            if error_code in ("AccessDenied", "403"):
+                raise ObjectStorePermissionError(str(e)) from e
+            raise ObjectStoreError(str(e)) from e
+
+        parts: list[dict[str, Any]] = []
+        part_number = 1
+        total_size = 0
+        buffer = bytearray()
+
+        try:
+            async for chunk in chunks:
+                buffer.extend(chunk)
+                total_size += len(chunk)
+                while len(buffer) >= part_size:
+                    part_data = bytes(buffer[:part_size])
+                    del buffer[:part_size]
+                    resp = await client.upload_part(
+                        Bucket=self._bucket,
+                        Key=full_key,
+                        UploadId=upload_id,
+                        PartNumber=part_number,
+                        Body=part_data,
+                    )
+                    parts.append({"ETag": resp["ETag"], "PartNumber": part_number})
+                    part_number += 1
+
+            # Upload remaining buffer
+            if buffer or not parts:
+                resp = await client.upload_part(
+                    Bucket=self._bucket,
+                    Key=full_key,
+                    UploadId=upload_id,
+                    PartNumber=part_number,
+                    Body=bytes(buffer),
+                )
+                parts.append({"ETag": resp["ETag"], "PartNumber": part_number})
+
+            complete_resp = await client.complete_multipart_upload(
+                Bucket=self._bucket,
+                Key=full_key,
+                UploadId=upload_id,
+                MultipartUpload={"Parts": parts},
+            )
+        except Exception:
+            await client.abort_multipart_upload(
+                Bucket=self._bucket, Key=full_key, UploadId=upload_id
+            )
+            raise
+
+        etag = complete_resp.get("ETag", "").strip('"')
+        return ObjectMeta(
+            key=key,
+            size_bytes=total_size,
+            content_type=content_type,
+            etag=etag,
+            last_modified=datetime.now(UTC),
+            metadata=metadata or {},
+        )
+
     async def get(self, key: str) -> bytes:
         client = await self._get_client()
         full_key = self._full_key(key)
@@ -131,6 +213,34 @@ class S3Store:
             if error_code in ("AccessDenied", "403"):
                 raise ObjectStorePermissionError(str(e)) from e
             raise ObjectStoreError(str(e)) from e
+
+    async def get_stream(
+        self,
+        key: str,
+        chunk_size: int = 256 * 1024,
+    ) -> AsyncIterator[bytes]:
+        """Stream an object's content in chunks from S3."""
+        client = await self._get_client()
+        full_key = self._full_key(key)
+
+        try:
+            response = await client.get_object(Bucket=self._bucket, Key=full_key)
+        except client.exceptions.NoSuchKey as e:
+            raise ObjectNotFoundError(key) from e
+        except client.exceptions.ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "")
+            if error_code == "NoSuchKey":
+                raise ObjectNotFoundError(key) from e
+            if error_code in ("AccessDenied", "403"):
+                raise ObjectStorePermissionError(str(e)) from e
+            raise ObjectStoreError(str(e)) from e
+
+        body = response["Body"]
+        while True:
+            chunk = await body.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
 
     async def delete(self, key: str) -> None:
         client = await self._get_client()

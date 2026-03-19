@@ -94,3 +94,12 @@ class TestProtocolCompliance:
         with tempfile.TemporaryDirectory() as tmpdir:
             store = FilesystemStore(root_dir=tmpdir)
             assert isinstance(store, ObjectStore)
+
+    def test_protocol_has_streaming_methods(self) -> None:
+        """ObjectStore protocol should define put_stream and get_stream."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = FilesystemStore(root_dir=tmpdir)
+            assert hasattr(store, "put_stream")
+            assert hasattr(store, "get_stream")

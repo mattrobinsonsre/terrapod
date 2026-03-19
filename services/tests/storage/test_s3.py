@@ -45,6 +45,41 @@ class TestS3StoreUnit:
             S3Store(bucket="test", presigned_url_expiry_seconds=7200)
             mock_logger.warning.assert_called_once()
 
+    async def test_put_stream_multipart(self, store: S3Store) -> None:
+        """put_stream should use S3 multipart upload."""
+        from unittest.mock import AsyncMock
+
+        mock_client = AsyncMock()
+        mock_client.create_multipart_upload.return_value = {"UploadId": "test-upload-id"}
+        mock_client.upload_part.return_value = {"ETag": '"part-etag"'}
+        mock_client.complete_multipart_upload.return_value = {"ETag": '"final-etag"'}
+        store._client = mock_client
+
+        async def _chunks():
+            yield b"chunk1"
+            yield b"chunk2"
+
+        meta = await store.put_stream("test/stream.bin", _chunks(), content_type="application/zip")
+        assert meta.key == "test/stream.bin"
+        assert meta.size_bytes == 12
+        mock_client.create_multipart_upload.assert_called_once()
+        mock_client.complete_multipart_upload.assert_called_once()
+
+    async def test_get_stream(self, store: S3Store) -> None:
+        """get_stream should read chunks from S3 body."""
+        from unittest.mock import AsyncMock
+
+        mock_body = AsyncMock()
+        mock_body.read.side_effect = [b"chunk1", b"chunk2", b""]
+        mock_client = AsyncMock()
+        mock_client.get_object.return_value = {"Body": mock_body}
+        store._client = mock_client
+
+        result = b""
+        async for chunk in store.get_stream("test/stream.bin"):
+            result += chunk
+        assert result == b"chunk1chunk2"
+
 
 class TestS3StoreIntegration:
     """Integration tests using LocalStack. Skipped unless LOCALSTACK_ENDPOINT is set."""

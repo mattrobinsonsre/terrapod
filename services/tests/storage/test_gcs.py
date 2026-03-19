@@ -121,6 +121,44 @@ class TestGCSStoreUnit:
             assert results[0].key == "logs/a.txt"
             assert results[1].key == "logs/b.txt"
 
+    async def test_put_stream_uses_sync_client(self, store: GCSStore) -> None:
+        mock_blob = MagicMock()
+        mock_blob.upload_from_file = MagicMock()
+        mock_bucket = MagicMock()
+        mock_bucket.blob.return_value = mock_blob
+        mock_client = MagicMock()
+        mock_client.bucket.return_value = mock_bucket
+
+        with patch.object(store, "_get_sync_client", return_value=mock_client):
+
+            async def _chunks():
+                yield b"hello"
+                yield b"world"
+
+            meta = await store.put_stream(
+                "test/stream.bin", _chunks(), content_type="application/zip"
+            )
+            assert meta.key == "test/stream.bin"
+            assert meta.size_bytes == 10
+            mock_blob.upload_from_file.assert_called_once()
+
+    async def test_get_stream(self, store: GCSStore) -> None:
+        import io
+
+        mock_blob = MagicMock()
+        mock_blob.exists.return_value = True
+        mock_blob.open.return_value = io.BytesIO(b"hello world")
+        mock_bucket = MagicMock()
+        mock_bucket.blob.return_value = mock_blob
+        mock_client = MagicMock()
+        mock_client.bucket.return_value = mock_bucket
+
+        with patch.object(store, "_get_sync_client", return_value=mock_client):
+            result = b""
+            async for chunk in store.get_stream("test/stream.bin", chunk_size=5):
+                result += chunk
+            assert result == b"hello world"
+
     async def test_presigned_put_url_has_content_type_header(self, store: GCSStore) -> None:
         mock_blob = MagicMock()
         mock_blob.generate_signed_url.return_value = "https://storage.googleapis.com/signed"
