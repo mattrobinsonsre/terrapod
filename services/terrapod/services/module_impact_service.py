@@ -29,6 +29,7 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import github_service, gitlab_service, run_service
+from terrapod.services.archive_utils import strip_archive_top_level_dir
 from terrapod.services.vcs_provider import PullRequest
 from terrapod.storage import get_storage
 from terrapod.storage.keys import module_override_key
@@ -235,6 +236,9 @@ async def _create_module_test_runs(
             exc_info=True,
         )
         return
+
+    # Strip top-level directory wrapper from VCS archive before storing
+    archive_bytes = strip_archive_top_level_dir(archive_bytes)
 
     # Upload override tarball (keyed by commit SHA for reuse across workspaces/retries)
     override_key = module_override_key(pr.head_sha, module.namespace, module.name, module.provider)
