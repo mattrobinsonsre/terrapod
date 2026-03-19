@@ -53,6 +53,7 @@ def _mock_workspace(
     ws.labels = labels or {}
     ws.owner_email = owner_email
     ws.vcs_connection_id = None
+    ws.vcs_connection = None
     ws.vcs_repo_url = ""
     ws.vcs_branch = ""
     ws.vcs_working_directory = ""

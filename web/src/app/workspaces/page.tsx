@@ -54,11 +54,18 @@ export default function WorkspacesPage() {
   const [newVersion, setNewVersion] = useState('1.9')
   const [newCpu, setNewCpu] = useState('1')
   const [newMemory, setNewMemory] = useState('2Gi')
+  const [newVcsConnectionId, setNewVcsConnectionId] = useState('')
+  const [newVcsRepoUrl, setNewVcsRepoUrl] = useState('')
+  const [newVcsBranch, setNewVcsBranch] = useState('')
   const [creating, setCreating] = useState(false)
 
   // Version suggestions
   const [versionSuggestions, setVersionSuggestions] = useState<string[]>([])
   const [versionsBackend, setVersionsBackend] = useState('')
+
+  // VCS connections
+  const [vcsConnections, setVcsConnections] = useState<{ id: string; attributes: { name: string; provider: string } }[]>([])
+  const [vcsConnectionsLoaded, setVcsConnectionsLoaded] = useState(false)
 
   type WsSortKey = 'name' | 'mode' | 'resources' | 'status' | 'created'
 
@@ -118,6 +125,15 @@ export default function WorkspacesPage() {
     loadWorkspaces()
   }, []))
 
+  // Load VCS connections when form opens
+  useEffect(() => {
+    if (!showCreate || vcsConnectionsLoaded) return
+    apiFetch('/api/v2/organizations/default/vcs-connections')
+      .then(res => res.ok ? res.json() : { data: [] })
+      .then(data => { setVcsConnections(data.data || []); setVcsConnectionsLoaded(true) })
+      .catch(() => {})
+  }, [showCreate, vcsConnectionsLoaded])
+
   // Fetch version suggestions when backend changes and form is open
   useEffect(() => {
     if (!showCreate || newBackend === versionsBackend) return
@@ -163,7 +179,16 @@ export default function WorkspacesPage() {
               'auto-apply': newAutoApply,
               'resource-cpu': newCpu,
               'resource-memory': newMemory,
+              'vcs-repo-url': newVcsRepoUrl,
+              'vcs-branch': newVcsBranch,
             },
+            ...(newVcsConnectionId ? {
+              relationships: {
+                'vcs-connection': {
+                  data: { id: newVcsConnectionId, type: 'vcs-connections' },
+                },
+              },
+            } : {}),
           },
         }),
       })
@@ -178,6 +203,9 @@ export default function WorkspacesPage() {
       setNewAutoApply(false)
       setNewCpu('1')
       setNewMemory('2Gi')
+      setNewVcsConnectionId('')
+      setNewVcsRepoUrl('')
+      setNewVcsBranch('')
       setShowCreate(false)
       await loadWorkspaces()
     } catch (err) {
@@ -294,6 +322,44 @@ export default function WorkspacesPage() {
                   />
                   <span className="text-sm text-slate-300">Auto Apply</span>
                 </label>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div>
+                <label htmlFor="ws-vcs-conn" className="block text-sm font-medium text-slate-300 mb-1">VCS Connection</label>
+                <select
+                  id="ws-vcs-conn"
+                  value={newVcsConnectionId}
+                  onChange={(e) => setNewVcsConnectionId(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                >
+                  <option value="">None</option>
+                  {vcsConnections.map((c) => (
+                    <option key={c.id} value={c.id}>{c.attributes.name} ({c.attributes.provider})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="ws-vcs-repo" className="block text-sm font-medium text-slate-300 mb-1">VCS Repository URL</label>
+                <input
+                  id="ws-vcs-repo"
+                  type="text"
+                  value={newVcsRepoUrl}
+                  onChange={(e) => setNewVcsRepoUrl(e.target.value)}
+                  placeholder="https://github.com/org/repo"
+                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label htmlFor="ws-vcs-branch" className="block text-sm font-medium text-slate-300 mb-1">VCS Branch</label>
+                <input
+                  id="ws-vcs-branch"
+                  type="text"
+                  value={newVcsBranch}
+                  onChange={(e) => setNewVcsBranch(e.target.value)}
+                  placeholder="main (default)"
+                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                />
               </div>
             </div>
             <button

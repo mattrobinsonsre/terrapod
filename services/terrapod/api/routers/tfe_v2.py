@@ -312,6 +312,9 @@ def _workspace_json(
                 "vcs-repo-url": ws.vcs_repo_url,
                 "vcs-branch": ws.vcs_branch,
                 "vcs-working-directory": ws.vcs_working_directory,
+                "vcs-connection-id": f"vcs-{ws.vcs_connection_id}"
+                if ws.vcs_connection_id
+                else None,
                 "var-files": ws.var_files or [],
                 "drift-detection-enabled": ws.drift_detection_enabled,
                 "drift-detection-interval-seconds": ws.drift_detection_interval_seconds,
@@ -321,6 +324,7 @@ def _workspace_json(
                 "latest-run": latest_run_attr,
                 "agent-pool-id": f"apool-{ws.agent_pool_id}" if ws.agent_pool_id else None,
                 "agent-pool-name": ws.agent_pool.name if ws.agent_pool else None,
+                "vcs-connection-name": ws.vcs_connection.name if ws.vcs_connection else None,
                 "labels": ws.labels or {},
                 "owner-email": ws.owner_email,
                 "created-at": _rfc3339(ws.created_at),
