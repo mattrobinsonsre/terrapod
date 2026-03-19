@@ -342,11 +342,12 @@ if [ "$TP_PHASE" = "plan" ]; then
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/plan-result" || true
     fi
 
-    # Upload plan log (best-effort)
+    # Upload plan log (best-effort) — prepend init output so the full log is visible
     if [ -n "$TP_API_URL" ] && [ -f /tmp/plan.log ]; then
+        cat /tmp/init.log /tmp/plan.log > /tmp/plan-full.log 2>/dev/null
         curl -sSf --max-time 10 -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
-            --data-binary @/tmp/plan.log \
+            --data-binary @/tmp/plan-full.log \
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-log" || true
     fi
 
@@ -379,11 +380,12 @@ elif [ "$TP_PHASE" = "apply" ]; then
     # Show apply output in pod logs
     cat /tmp/apply.log 2>/dev/null || true
 
-    # Upload apply log (best-effort, bounded by --max-time)
+    # Upload apply log (best-effort, bounded by --max-time) — prepend init output
     if [ -n "$TP_API_URL" ] && [ -f /tmp/apply.log ]; then
+        cat /tmp/init.log /tmp/apply.log > /tmp/apply-full.log 2>/dev/null
         curl -sSf --max-time 10 -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
-            --data-binary @/tmp/apply.log \
+            --data-binary @/tmp/apply-full.log \
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/apply-log" || \
             echo "[entrypoint] WARNING: apply log upload failed"
     fi
