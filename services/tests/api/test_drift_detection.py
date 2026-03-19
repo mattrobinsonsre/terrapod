@@ -40,6 +40,7 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.vcs_branch = ""
     ws.vcs_working_directory = ""
     ws.vcs_connection_id = None
+    ws.vcs_connection = None
     ws.labels = {}
     ws.owner_email = "test@example.com"
     ws.drift_detection_enabled = overrides.get("drift_detection_enabled", False)

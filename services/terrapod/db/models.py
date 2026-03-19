@@ -274,6 +274,9 @@ class Workspace(Base):
         ForeignKey("vcs_connections.id", ondelete="SET NULL"),
         nullable=True,
     )
+    vcs_connection: Mapped["VCSConnection | None"] = relationship(
+        "VCSConnection", foreign_keys=[vcs_connection_id], lazy="joined"
+    )
     vcs_repo_url: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     vcs_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     vcs_working_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")

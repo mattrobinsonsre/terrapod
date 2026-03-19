@@ -45,6 +45,8 @@ interface WorkspaceAttrs {
   'var-files': string[]
   'vcs-repo-url': string
   'vcs-branch': string
+  'vcs-connection-id': string | null
+  'vcs-connection-name': string | null
   'drift-detection-enabled': boolean
   'drift-detection-interval-seconds': number
   'drift-last-checked-at': string
@@ -190,11 +192,18 @@ function WorkspaceDetailContent() {
   const [editOwner, setEditOwner] = useState('')
   const [editVarFiles, setEditVarFiles] = useState<string[]>([])
   const [newVarFile, setNewVarFile] = useState('')
+  const [editVcsConnectionId, setEditVcsConnectionId] = useState<string | null>(null)
+  const [editVcsRepoUrl, setEditVcsRepoUrl] = useState('')
+  const [editVcsBranch, setEditVcsBranch] = useState('')
   const [saving, setSaving] = useState(false)
 
   // Agent pools
   const [agentPools, setAgentPools] = useState<AgentPool[]>([])
   const [poolsLoaded, setPoolsLoaded] = useState(false)
+
+  // VCS connections
+  const [vcsConnections, setVcsConnections] = useState<{ id: string; attributes: { name: string; provider: string } }[]>([])
+  const [vcsConnectionsLoaded, setVcsConnectionsLoaded] = useState(false)
 
   // Version suggestions
   const [versionSuggestions, setVersionSuggestions] = useState<string[]>([])
@@ -537,11 +546,20 @@ function WorkspaceDetailContent() {
     setEditOwner(workspace.attributes['owner-email'] || '')
     setEditVarFiles(workspace.attributes['var-files'] || [])
     setNewVarFile('')
+    setEditVcsConnectionId(workspace.attributes['vcs-connection-id'] || null)
+    setEditVcsRepoUrl(workspace.attributes['vcs-repo-url'] || '')
+    setEditVcsBranch(workspace.attributes['vcs-branch'] || '')
     setEditing(true)
     if (!poolsLoaded) {
       apiFetch('/api/v2/organizations/default/agent-pools').then(res => res.ok ? res.json() : { data: [] }).then(data => {
         setAgentPools(data.data || [])
         setPoolsLoaded(true)
+      }).catch(() => {})
+    }
+    if (!vcsConnectionsLoaded) {
+      apiFetch('/api/v2/organizations/default/vcs-connections').then(res => res.ok ? res.json() : { data: [] }).then(data => {
+        setVcsConnections(data.data || [])
+        setVcsConnectionsLoaded(true)
       }).catch(() => {})
     }
     const backend = workspace.attributes['execution-backend'] || 'tofu'
@@ -576,9 +594,16 @@ function WorkspaceDetailContent() {
               'terraform-version': editVersion,
               'agent-pool-id': editPoolId,
               'var-files': editVarFiles,
+              'vcs-repo-url': editVcsRepoUrl,
+              'vcs-branch': editVcsBranch,
               labels: editLabels,
               ...(isAdmin() ? { 'owner-email': editOwner } : {}),
               ...(force ? { force: true } : {}),
+            },
+            relationships: {
+              'vcs-connection': {
+                data: editVcsConnectionId ? { id: editVcsConnectionId, type: 'vcs-connections' } : null,
+              },
             },
           },
         }),
@@ -1191,6 +1216,43 @@ function WorkspaceDetailContent() {
                     <input type="email" value={editOwner} onChange={(e) => setEditOwner(e.target.value)} placeholder="user@example.com" className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{attrs['owner-email'] || 'None'}</dd>
+                  )}
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">VCS Connection</dt>
+                  {editing ? (
+                    <select
+                      value={editVcsConnectionId || ''}
+                      onChange={(e) => setEditVcsConnectionId(e.target.value || null)}
+                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    >
+                      <option value="">None</option>
+                      {vcsConnections.map((c) => (
+                        <option key={c.id} value={c.id}>{c.attributes.name} ({c.attributes.provider})</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['vcs-connection-name'] || 'None'}</dd>
+                  )}
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">VCS Repository</dt>
+                  {editing ? (
+                    <input type="text" value={editVcsRepoUrl} onChange={(e) => setEditVcsRepoUrl(e.target.value)} placeholder="https://github.com/org/repo" className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">
+                      {attrs['vcs-repo-url'] ? (
+                        <a href={attrs['vcs-repo-url']} target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:text-brand-300">{attrs['vcs-repo-url']}</a>
+                      ) : 'None'}
+                    </dd>
+                  )}
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">VCS Branch</dt>
+                  {editing ? (
+                    <input type="text" value={editVcsBranch} onChange={(e) => setEditVcsBranch(e.target.value)} placeholder="main (default)" className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['vcs-branch'] || 'Default'}</dd>
                   )}
                 </div>
                 <div className="sm:col-span-2">
