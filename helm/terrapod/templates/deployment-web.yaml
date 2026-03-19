@@ -60,13 +60,13 @@ spec:
           envFrom:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.web.startupProbe }}
           startupProbe:
             httpGet:
               path: /
               port: http
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+            failureThreshold: {{ hasKey .Values.web.startupProbe "failureThreshold" | ternary .Values.web.startupProbe.failureThreshold 30 }}
+            periodSeconds: {{ hasKey .Values.web.startupProbe "periodSeconds" | ternary .Values.web.startupProbe.periodSeconds 2 }}
+            timeoutSeconds: {{ hasKey .Values.web.startupProbe "timeoutSeconds" | ternary .Values.web.startupProbe.timeoutSeconds 1 }}
           livenessProbe:
             httpGet:
               path: /
