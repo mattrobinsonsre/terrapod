@@ -377,7 +377,7 @@ class RunnerListener:
             {"key": v["key"], "value": v["value"]} for v in attrs.get("terraform-vars", [])
         ]
 
-        run_short = run_id[:8]
+        run_short = run_id[:16]
         auth_secret_name = f"tprun-{run_short}-auth"
 
         spec = build_job_spec(
@@ -539,7 +539,7 @@ class RunnerListener:
         from terrapod.runner.job_manager import _get_core_api
 
         namespace = os.environ.get("TERRAPOD_RUNNER_NAMESPACE", "terrapod-runners")
-        run_short = run_id[:8]
+        run_short = run_id[:16]
         secret_name = f"tprun-{run_short}-auth"
 
         secret = k8s_client.V1Secret(

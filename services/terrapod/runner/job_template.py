@@ -77,7 +77,7 @@ def build_job_spec(
     if not namespace:
         namespace = os.environ.get("TERRAPOD_RUNNER_NAMESPACE", "terrapod-runners")
 
-    run_short = run_id[:8]
+    run_short = run_id[:16]
     job_name = f"tprun-{run_short}-{phase}"
 
     # Resolve the default runner definition for setup_script
