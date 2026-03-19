@@ -1087,11 +1087,8 @@ async def _serve_log(
     try:
         data = await storage.get(log_key)
     except ObjectNotFoundError:
-        if phase_done:
-            # Phase finished but no log — return empty complete stream
-            return Response(content=_STX + _ETX, media_type="text/plain")
-
-        # Try live-streamed data from Redis
+        # Try live-streamed data from Redis (available for both in-progress
+        # and recently-completed runs where the Job didn't upload final logs)
         try:
             from terrapod.redis.client import LOG_STREAM_PREFIX, get_redis_client
 
@@ -1102,10 +1099,15 @@ async def _serve_log(
                 if isinstance(live_data, str):
                     live_data = live_data.encode()
                 data = live_data
+            elif phase_done:
+                # Phase finished, no log in storage or Redis — empty stream
+                return Response(content=_STX + _ETX, media_type="text/plain")
             else:
                 # Still running, no log yet — return empty (client retries)
                 return Response(content=b"", media_type="text/plain")
         except Exception:
+            if phase_done:
+                return Response(content=_STX + _ETX, media_type="text/plain")
             return Response(content=b"", media_type="text/plain")
 
     if strip_ansi:
