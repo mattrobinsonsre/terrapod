@@ -506,12 +506,17 @@ The provider cache implements the Terraform network mirror protocol. Runner Jobs
      }
    }
    ```
-2. Terraform requests provider binaries from the mirror URL (authenticated via credentials block)
-3. Terrapod checks the cache (`cached_provider_packages` table)
-4. Cache hit: redirect to presigned URL in object storage
-5. Cache miss: fetch from upstream (`registry.terraform.io` or `registry.opentofu.org`), store, serve
+2. Terraform requests `{version}.json` from the mirror URL (authenticated via credentials block)
+3. Terrapod uses a **three-tier cache lookup**:
+   - **Tier 1 — Postgres**: check for cached binaries in object storage. Cached platforms get presigned download URLs
+   - **Tier 2 — Redis**: check for upstream metadata (24h TTL). Uncached platforms get proxy download URLs
+   - **Tier 3 — Upstream**: fetch metadata from upstream registry, cache in Redis, return proxy URLs
+4. The `{version}.json` response returns **instantly** — no binary downloads during this step
+5. When terraform picks its platform and follows the download URL:
+   - **Cached**: 302 redirect to presigned URL in object storage
+   - **Uncached**: the download proxy fetches the single binary from upstream, stores it in object storage, creates a DB record, then 302 redirects — **only the requested os/arch is cached**
 
-**Note:** Provider mirror endpoints require authentication. Runner Jobs authenticate via the `credentials` block in the CLI config, which sends the runner token as a Bearer token to the Terrapod host.
+**Note:** Provider mirror endpoints require authentication. Runner Jobs authenticate via the `credentials` block in the CLI config, which sends the runner token as a Bearer token to the Terrapod host. The runner entrypoint sets `TF_REGISTRY_CLIENT_TIMEOUT=30` and `TF_PROVIDER_DOWNLOAD_RETRY=3` for timeout/retry resilience.
 
 ### Configuration
 
@@ -539,7 +544,13 @@ Returns a version list for the provider.
 GET /v1/providers/{hostname}/{namespace}/{type}/{version}.json
 ```
 
-Returns platform-specific download URLs with `zh:` (zip hash) checksums.
+Returns platform-specific download info with `zh:` (zip hash) checksums. Cached platforms get presigned storage URLs; uncached platforms get proxy download URLs.
+
+```
+GET /v1/providers/{hostname}/{namespace}/{type}/{version}/download/{os}/{arch}
+```
+
+Download proxy — on cache hit, 302 redirects to presigned URL. On cache miss, fetches the single binary from upstream, caches it in object storage, then 302 redirects.
 
 ### Runner Integration
 
@@ -622,11 +633,23 @@ curl -X DELETE https://terrapod.example.com/api/v2/admin/binary-cache/terraform/
 cache/binaries/{tool}/{version}/{os}_{arch}
 ```
 
+### Provider Cache Admin Endpoints
+
+**List cached provider binaries (admin):**
+```zsh
+curl https://terrapod.example.com/api/v2/admin/provider-cache \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN"
+```
+
+**Purge cached provider version (admin):**
+```zsh
+curl -X DELETE https://terrapod.example.com/api/v2/admin/provider-cache/registry.terraform.io/hashicorp/aws/6.37.0 \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN"
+```
+
 ### Admin UI
 
-The web UI includes a binary cache admin page at `/admin/binary-cache` (admin-only) for viewing, warming, and purging cached binaries.
-
-![Binary Cache Admin](images/admin-binary-cache.png)
+The web UI includes a cache admin page at `/admin/binary-cache` (admin-only) for viewing and purging cached CLI binaries and provider binaries.
 
 ---
 
@@ -650,7 +673,7 @@ This enables `terraform init` to discover private module and provider sources wh
 For fully air-gapped environments where runner Jobs have no internet access:
 
 1. **Pre-warm the binary cache** with the required terraform/tofu versions
-2. **Pre-warm the provider cache** by running `terraform init` once from a machine with internet access (the first request populates the cache)
+2. **Pre-populate the provider cache** by running `terraform init` once from a staging environment with internet access — the on-demand cache will fetch and store only the platforms actually requested
 3. **Upload private modules** to the module registry
 
 ```yaml
