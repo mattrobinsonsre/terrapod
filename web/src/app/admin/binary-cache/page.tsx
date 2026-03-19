@@ -26,9 +26,24 @@ interface CachedBinary {
   }
 }
 
-export default function BinaryCachePage() {
+interface CachedProvider {
+  id: string
+  attributes: {
+    hostname: string
+    namespace: string
+    'provider-type': string
+    version: string
+    os: string
+    arch: string
+    shasum: string
+    'cached-at': string | null
+  }
+}
+
+export default function CachePage() {
   const router = useRouter()
   const [entries, setEntries] = useState<CachedBinary[]>([])
+  const [providerEntries, setProviderEntries] = useState<CachedProvider[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -47,59 +62,48 @@ export default function BinaryCachePage() {
     entries, 'cached-at', 'desc', binaryAccessor,
   )
 
-  // Warm form
-  const [showWarm, setShowWarm] = useState(false)
-  const [warmTool, setWarmTool] = useState('terraform')
-  const [warmVersion, setWarmVersion] = useState('')
-  const [warmOs, setWarmOs] = useState('linux')
-  const [warmArch, setWarmArch] = useState('amd64')
-  const [warming, setWarming] = useState(false)
+  type ProviderSortKey = 'provider' | 'version' | 'hostname' | 'os' | 'arch' | 'cached-at'
+  const providerAccessor = useCallback((item: CachedProvider, key: ProviderSortKey) => {
+    switch (key) {
+      case 'provider': return `${item.attributes.namespace}/${item.attributes['provider-type']}`
+      case 'version': return item.attributes.version
+      case 'hostname': return item.attributes.hostname
+      case 'os': return item.attributes.os
+      case 'arch': return item.attributes.arch
+      case 'cached-at': return item.attributes['cached-at']
+    }
+  }, [])
+  const { sortedItems: sortedProviders, sortState: providerSortState, toggleSort: toggleProviderSort } = useSortable<CachedProvider, ProviderSortKey>(
+    providerEntries, 'cached-at', 'desc', providerAccessor,
+  )
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
     if (!isAdmin()) { router.push('/'); return }
-    loadEntries()
+    loadAll()
   }, [router])
 
-  usePollingInterval(!loading, 60_000, loadEntries)
+  usePollingInterval(!loading, 60_000, loadAll)
 
-  async function loadEntries() {
+  async function loadAll() {
     setLoading(true)
     try {
-      const res = await apiFetch('/api/v2/admin/binary-cache')
-      if (!res.ok) throw new Error('Failed to load binary cache')
-      const data = await res.json()
-      setEntries(data.data || [])
+      const [binaryRes, providerRes] = await Promise.all([
+        apiFetch('/api/v2/admin/binary-cache'),
+        apiFetch('/api/v2/admin/provider-cache'),
+      ])
+      if (!binaryRes.ok) throw new Error('Failed to load binary cache')
+      const binaryData = await binaryRes.json()
+      setEntries(binaryData.data || [])
+
+      if (providerRes.ok) {
+        const providerData = await providerRes.json()
+        setProviderEntries(providerData.data || [])
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load binary cache')
+      setError(err instanceof Error ? err.message : 'Failed to load cache')
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function handleWarm(e: React.FormEvent) {
-    e.preventDefault()
-    setWarming(true)
-    setError('')
-    setSuccess('')
-    try {
-      const res = await apiFetch('/api/v2/admin/binary-cache/warm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tool: warmTool, version: warmVersion, os: warmOs, arch: warmArch }),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Warm failed (${res.status})`)
-      }
-      setSuccess(`Cached ${warmTool} ${warmVersion} (${warmOs}/${warmArch})`)
-      setWarmVersion('')
-      setShowWarm(false)
-      await loadEntries()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to warm binary')
-    } finally {
-      setWarming(false)
     }
   }
 
@@ -113,9 +117,25 @@ export default function BinaryCachePage() {
       if (!res.ok) throw new Error(`Purge failed (${res.status})`)
       const data = await res.json()
       setSuccess(`Purged ${data.count || 0} entries for ${tool} ${version}`)
-      await loadEntries()
+      await loadAll()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to purge')
+    }
+  }
+
+  async function handleProviderPurge(hostname: string, namespace: string, type: string, version: string) {
+    setError('')
+    setSuccess('')
+    try {
+      const res = await apiFetch(`/api/v2/admin/provider-cache/${hostname}/${namespace}/${type}/${version}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) throw new Error(`Purge failed (${res.status})`)
+      const data = await res.json()
+      setSuccess(`Purged ${data.count || 0} entries for ${namespace}/${type} ${version}`)
+      await loadAll()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to purge provider')
     }
   }
 
@@ -132,16 +152,8 @@ export default function BinaryCachePage() {
       <NavBar />
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <PageHeader
-          title="Binary Cache"
-          description="Terraform and tofu CLI binary cache management"
-          actions={
-            <button
-              onClick={() => setShowWarm(!showWarm)}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
-            >
-              {showWarm ? 'Cancel' : 'Warm Cache'}
-            </button>
-          }
+          title="Cache"
+          description="CLI binary and provider cache management"
         />
 
         {error && <ErrorBanner message={error} />}
@@ -151,78 +163,99 @@ export default function BinaryCachePage() {
           </div>
         )}
 
-        {showWarm && (
-          <form onSubmit={handleWarm} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div>
-                <label htmlFor="w-tool" className="block text-sm font-medium text-slate-300 mb-1">Tool</label>
-                <select id="w-tool" value={warmTool} onChange={(e) => setWarmTool(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-                  <option value="terraform">terraform</option>
-                  <option value="tofu">tofu</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="w-ver" className="block text-sm font-medium text-slate-300 mb-1">Version</label>
-                <input id="w-ver" type="text" value={warmVersion} onChange={(e) => setWarmVersion(e.target.value)} required placeholder="1.9.0"
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
-              </div>
-              <div>
-                <label htmlFor="w-os" className="block text-sm font-medium text-slate-300 mb-1">OS</label>
-                <input id="w-os" type="text" value={warmOs} onChange={(e) => setWarmOs(e.target.value)} required
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
-              </div>
-              <div>
-                <label htmlFor="w-arch" className="block text-sm font-medium text-slate-300 mb-1">Arch</label>
-                <input id="w-arch" type="text" value={warmArch} onChange={(e) => setWarmArch(e.target.value)} required
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
-              </div>
-            </div>
-            <button type="submit" disabled={warming}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
-              {warming ? 'Warming...' : 'Warm'}
-            </button>
-          </form>
-        )}
-
         {loading ? (
           <LoadingSpinner />
-        ) : entries.length === 0 ? (
-          <EmptyState message="No cached binaries yet." />
         ) : (
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-700/50">
-                  <SortableHeader label="Tool" sortKey="tool" sortState={binarySortState} onSort={toggleBinarySort} />
-                  <SortableHeader label="Version" sortKey="version" sortState={binarySortState} onSort={toggleBinarySort} />
-                  <SortableHeader label="OS" sortKey="os" sortState={binarySortState} onSort={toggleBinarySort} />
-                  <SortableHeader label="Arch" sortKey="arch" sortState={binarySortState} onSort={toggleBinarySort} />
-                  <SortableHeader label="Cached At" sortKey="cached-at" sortState={binarySortState} onSort={toggleBinarySort} />
-                  <th className="text-right px-4 py-3 text-slate-400 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedEntries.map((entry) => (
-                  <tr key={entry.id} className="border-b border-slate-700/30 last:border-0">
-                    <td className="px-4 py-3 text-slate-200 font-mono">{entry.attributes.tool}</td>
-                    <td className="px-4 py-3 text-slate-200 font-mono">{entry.attributes.version}</td>
-                    <td className="px-4 py-3 text-slate-400">{entry.attributes.os}</td>
-                    <td className="px-4 py-3 text-slate-400">{entry.attributes.arch}</td>
-                    <td className="px-4 py-3 text-slate-400 text-xs">{formatDate(entry.attributes['cached-at'])}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => handlePurge(entry.attributes.tool, entry.attributes.version)}
-                        className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                      >
-                        Purge
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Binary Cache Section */}
+            <h2 className="text-lg font-semibold text-slate-200 mb-3">CLI Binaries</h2>
+            {entries.length === 0 ? (
+              <EmptyState message="No cached CLI binaries yet." />
+            ) : (
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden mb-8">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-700/50">
+                      <SortableHeader label="Tool" sortKey="tool" sortState={binarySortState} onSort={toggleBinarySort} />
+                      <SortableHeader label="Version" sortKey="version" sortState={binarySortState} onSort={toggleBinarySort} />
+                      <SortableHeader label="OS" sortKey="os" sortState={binarySortState} onSort={toggleBinarySort} />
+                      <SortableHeader label="Arch" sortKey="arch" sortState={binarySortState} onSort={toggleBinarySort} />
+                      <SortableHeader label="Cached At" sortKey="cached-at" sortState={binarySortState} onSort={toggleBinarySort} />
+                      <th className="text-right px-4 py-3 text-slate-400 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedEntries.map((entry) => (
+                      <tr key={entry.id} className="border-b border-slate-700/30 last:border-0">
+                        <td className="px-4 py-3 text-slate-200 font-mono">{entry.attributes.tool}</td>
+                        <td className="px-4 py-3 text-slate-200 font-mono">{entry.attributes.version}</td>
+                        <td className="px-4 py-3 text-slate-400">{entry.attributes.os}</td>
+                        <td className="px-4 py-3 text-slate-400">{entry.attributes.arch}</td>
+                        <td className="px-4 py-3 text-slate-400 text-xs">{formatDate(entry.attributes['cached-at'])}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => handlePurge(entry.attributes.tool, entry.attributes.version)}
+                            className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                          >
+                            Purge
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Provider Cache Section */}
+            <h2 className="text-lg font-semibold text-slate-200 mb-3">Provider Binaries</h2>
+            {providerEntries.length === 0 ? (
+              <EmptyState message="No cached provider binaries yet." />
+            ) : (
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-700/50">
+                      <SortableHeader label="Provider" sortKey="provider" sortState={providerSortState} onSort={toggleProviderSort} />
+                      <SortableHeader label="Version" sortKey="version" sortState={providerSortState} onSort={toggleProviderSort} />
+                      <SortableHeader label="Hostname" sortKey="hostname" sortState={providerSortState} onSort={toggleProviderSort} />
+                      <SortableHeader label="OS" sortKey="os" sortState={providerSortState} onSort={toggleProviderSort} />
+                      <SortableHeader label="Arch" sortKey="arch" sortState={providerSortState} onSort={toggleProviderSort} />
+                      <SortableHeader label="Cached At" sortKey="cached-at" sortState={providerSortState} onSort={toggleProviderSort} />
+                      <th className="text-right px-4 py-3 text-slate-400 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedProviders.map((entry) => (
+                      <tr key={entry.id} className="border-b border-slate-700/30 last:border-0">
+                        <td className="px-4 py-3 text-slate-200 font-mono">
+                          {entry.attributes.namespace}/{entry.attributes['provider-type']}
+                        </td>
+                        <td className="px-4 py-3 text-slate-200 font-mono">{entry.attributes.version}</td>
+                        <td className="px-4 py-3 text-slate-400 text-xs">{entry.attributes.hostname}</td>
+                        <td className="px-4 py-3 text-slate-400">{entry.attributes.os}</td>
+                        <td className="px-4 py-3 text-slate-400">{entry.attributes.arch}</td>
+                        <td className="px-4 py-3 text-slate-400 text-xs">{formatDate(entry.attributes['cached-at'])}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => handleProviderPurge(
+                              entry.attributes.hostname,
+                              entry.attributes.namespace,
+                              entry.attributes['provider-type'],
+                              entry.attributes.version,
+                            )}
+                            className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                          >
+                            Purge
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </main>
     </>

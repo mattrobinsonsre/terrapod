@@ -1,19 +1,23 @@
-"""Terraform/tofu CLI binary cache endpoints.
+"""Terraform/tofu CLI binary cache + provider cache admin endpoints.
 
 Provides pull-through caching for terraform and tofu CLI binaries.
 Runner Jobs fetch their binary from here at startup instead of using
 images with a baked-in binary version.
 
+Also provides admin endpoints for the provider binary cache (network mirror).
+
 UX CONTRACT: Admin cache endpoints are consumed by the web frontend:
-  - web/src/app/admin/binary-cache/page.tsx (list, warm, purge)
+  - web/src/app/admin/binary-cache/page.tsx (list, warm, purge for both caches)
   Changes to response shapes, attribute names, or status codes here MUST be
   matched by corresponding updates to that frontend page.
 
 Endpoints:
-    GET    /api/v2/binary-cache/{tool}/{version}/{os}/{arch}    — download (redirect)
-    GET    /api/v2/admin/binary-cache                           — list cached
-    POST   /api/v2/admin/binary-cache/warm                      — pre-warm
-    DELETE /api/v2/admin/binary-cache/{tool}/{version}           — purge
+    GET    /api/v2/binary-cache/{tool}/{version}/{os}/{arch}                        — download (redirect)
+    GET    /api/v2/admin/binary-cache                                                — list cached binaries
+    POST   /api/v2/admin/binary-cache/warm                                           — pre-warm binary
+    DELETE /api/v2/admin/binary-cache/{tool}/{version}                               — purge binary
+    GET    /api/v2/admin/provider-cache                                              — list cached providers
+    DELETE /api/v2/admin/provider-cache/{hostname}/{namespace}/{type}/{version}      — purge provider
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -32,6 +36,10 @@ from terrapod.services.binary_cache_service import (
     purge_binary,
     resolve_version,
     warm_binary,
+)
+from terrapod.services.provider_cache_service import (
+    list_cached_providers,
+    purge_cached_provider,
 )
 from terrapod.storage import get_storage
 from terrapod.storage.protocol import ObjectStore
@@ -196,6 +204,58 @@ async def purge_binary_endpoint(
 ) -> JSONResponse:
     """Purge all cached binaries for a tool+version."""
     count = await purge_binary(db, storage, tool, version)
+    await db.commit()
+    return JSONResponse(
+        content={"status": "purged", "count": count},
+    )
+
+
+# --- Provider cache admin endpoints ---
+
+
+@router.get("/api/v2/admin/provider-cache")
+async def list_cached_providers_endpoint(
+    hostname: str | None = None,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """List all cached provider binaries."""
+    entries = await list_cached_providers(db, hostname=hostname)
+    return JSONResponse(
+        content={
+            "data": [
+                {
+                    "id": str(e.id),
+                    "type": "cached-providers",
+                    "attributes": {
+                        "hostname": e.hostname,
+                        "namespace": e.namespace,
+                        "provider-type": e.type,
+                        "version": e.version,
+                        "os": e.os,
+                        "arch": e.arch,
+                        "shasum": e.shasum,
+                        "cached-at": e.cached_at.isoformat() if e.cached_at else None,
+                    },
+                }
+                for e in entries
+            ]
+        }
+    )
+
+
+@router.delete("/api/v2/admin/provider-cache/{hostname}/{namespace}/{type}/{version}")
+async def purge_provider_endpoint(
+    hostname: str,
+    namespace: str,
+    type: str,
+    version: str,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Purge all cached platforms for a provider version."""
+    count = await purge_cached_provider(db, storage, hostname, namespace, type, version)
     await db.commit()
     return JSONResponse(
         content={"status": "purged", "count": count},

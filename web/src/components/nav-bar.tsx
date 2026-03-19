@@ -72,7 +72,7 @@ export default function NavBar() {
         <>
           <NavLink href="/admin/binary-cache" onClick={closeMenu}>
             <HardDrive size={16} />
-            Binary Cache
+            Cache
           </NavLink>
           <NavLink href="/admin/vcs-connections" onClick={closeMenu}>
             <GitBranch size={16} />
