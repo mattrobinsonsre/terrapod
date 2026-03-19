@@ -280,7 +280,13 @@ async def download_provider_cli(
     provider = await get_provider(db, namespace, name)
     if provider is not None:
         perm = await resolve_registry_permission(
-            db, user.email, user.roles, provider.name, provider.labels or {}, provider.owner_email
+            db,
+            user.email,
+            user.roles,
+            provider.name,
+            provider.labels or {},
+            provider.owner_email,
+            auth_method=user.auth_method,
         )
         if not has_registry_permission(perm, "read"):
             raise HTTPException(status_code=404, detail="Provider platform not found")
@@ -329,7 +335,13 @@ async def list_providers_endpoint(
     visible = []
     for p in providers:
         perm = await resolve_registry_permission(
-            db, user.email, user.roles, p.name, p.labels or {}, p.owner_email
+            db,
+            user.email,
+            user.roles,
+            p.name,
+            p.labels or {},
+            p.owner_email,
+            auth_method=user.auth_method,
         )
         if perm is not None:
             visible.append(_provider_to_jsonapi(p, perm))

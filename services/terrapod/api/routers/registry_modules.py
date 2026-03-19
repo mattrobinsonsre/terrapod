@@ -206,7 +206,13 @@ async def download_module_cli(
     module = await get_module(db, namespace, name, provider)
     if module is not None:
         perm = await resolve_registry_permission(
-            db, user.email, user.roles, module.name, module.labels or {}, module.owner_email
+            db,
+            user.email,
+            user.roles,
+            module.name,
+            module.labels or {},
+            module.owner_email,
+            auth_method=user.auth_method,
         )
         if not has_registry_permission(perm, "read"):
             raise HTTPException(status_code=404, detail="Module version not found")
@@ -296,7 +302,13 @@ async def list_modules_endpoint(
     visible = []
     for m in modules:
         perm = await resolve_registry_permission(
-            db, user.email, user.roles, m.name, m.labels or {}, m.owner_email
+            db,
+            user.email,
+            user.roles,
+            m.name,
+            m.labels or {},
+            m.owner_email,
+            auth_method=user.auth_method,
         )
         if perm is not None:
             visible.append(_module_to_jsonapi(m, perm))
@@ -555,7 +567,13 @@ async def delete_module_version_endpoint(
     module = await get_module(db, "default", name, provider)
     if module is not None:
         perm = await resolve_registry_permission(
-            db, user.email, user.roles, module.name, module.labels or {}, module.owner_email
+            db,
+            user.email,
+            user.roles,
+            module.name,
+            module.labels or {},
+            module.owner_email,
+            auth_method=user.auth_method,
         )
         if not has_registry_permission(perm, "admin"):
             raise HTTPException(
