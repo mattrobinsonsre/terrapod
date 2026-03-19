@@ -1060,6 +1060,7 @@ async def apply_log(
         offset=offset,
         limit=limit,
         strip_ansi=format == "plain",
+        phase="apply",
     )
 
 
@@ -1073,6 +1074,7 @@ async def _serve_log(
     offset: int,
     limit: int,
     strip_ansi: bool = False,
+    phase: str = "plan",
 ) -> Response:
     """Shared log serving logic with STX/ETX framing.
 
@@ -1093,7 +1095,6 @@ async def _serve_log(
             from terrapod.redis.client import LOG_STREAM_PREFIX, get_redis_client
 
             redis = get_redis_client()
-            phase = "plan" if run.status in ("planning", "queued") else "apply"
             live_data = await redis.get(f"{LOG_STREAM_PREFIX}{run.id}:{phase}")
             if live_data is not None:
                 if isinstance(live_data, str):

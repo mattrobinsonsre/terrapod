@@ -240,6 +240,13 @@ TFEOF
     esac
 fi
 
+# --- Provider download timeouts ---
+# Increase registry client timeout (default 10s) and enable retries for
+# provider binary downloads. Covers first-request latency when the provider
+# mirror is caching a binary on-demand from upstream.
+export TF_REGISTRY_CLIENT_TIMEOUT=30
+export TF_PROVIDER_DOWNLOAD_RETRY=3
+
 # --- Initialize ---
 echo "[entrypoint] Running $TP_BACKEND init..."
 INIT_EXIT=0
