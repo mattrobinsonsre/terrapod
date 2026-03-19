@@ -46,16 +46,18 @@ async def resolve_registry_permission(
     resource_name: str,
     resource_labels: dict,
     owner_email: str,
+    auth_method: str = "",
 ) -> str | None:
     """Returns highest permission level (read/write/admin), or None.
 
     Resolution order (highest wins):
     1. Platform admin → admin
     2. Platform audit → read
-    3. Resource owner → admin
-    4. Label-based RBAC (custom roles) → mapped workspace_permission
-    5. 'everyone' role with access: everyone label → read
-    6. Default → None (no access)
+    3. Runner token → read (runners must download modules/providers to execute)
+    4. Resource owner → admin
+    5. Label-based RBAC (custom roles) → mapped workspace_permission
+    6. 'everyone' role with access: everyone label → read
+    7. Default → None (no access)
     """
     role_set = set(user_roles)
 
@@ -69,11 +71,16 @@ async def resolve_registry_permission(
     if "audit" in role_set:
         best = "read"
 
-    # 3. Owner → admin
+    # 3. Runner tokens → read (runners must download modules/providers to execute)
+    if auth_method == "runner_token":
+        if best is None:
+            best = "read"
+
+    # 4. Owner → admin
     if owner_email and owner_email == user_email:
         return "admin"
 
-    # 4. Label-based RBAC from custom roles
+    # 5. Label-based RBAC from custom roles
     custom_role_names = role_set - BUILTIN_ROLE_NAMES
     if custom_role_names:
         result = await db.execute(select(Role).where(Role.name.in_(custom_role_names)))
@@ -108,7 +115,7 @@ async def resolve_registry_permission(
                 ) > REGISTRY_PERMISSION_HIERARCHY.get(best, -1):
                     best = registry_perm
 
-    # 5. 'everyone' role: if resource has label access=everyone, grant read
+    # 6. 'everyone' role: if resource has label access=everyone, grant read
     if resource_labels.get("access") == "everyone":
         if best is None:
             best = "read"

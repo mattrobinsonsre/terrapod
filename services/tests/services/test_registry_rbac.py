@@ -200,6 +200,34 @@ class TestResolveRegistryPermission:
         )
         assert result is None
 
+    async def test_runner_token_gets_read(self):
+        """Runner tokens get implicit read access to download modules."""
+        db = _mock_db_with_roles()
+        result = await resolve_registry_permission(
+            db,
+            "runner@internal",
+            ["everyone"],
+            "private-module",
+            {},
+            "",
+            auth_method="runner_token",
+        )
+        assert result == "read"
+
+    async def test_runner_token_does_not_escalate_above_read(self):
+        """Runner tokens get read but don't override higher permissions."""
+        db = _mock_db_with_roles()
+        result = await resolve_registry_permission(
+            db,
+            "owner@test.com",
+            ["everyone"],
+            "my-module",
+            {},
+            "owner@test.com",
+            auth_method="runner_token",
+        )
+        assert result == "admin"
+
     async def test_only_builtin_roles_skip_db_query(self):
         db = _mock_db_with_roles()
         await resolve_registry_permission(db, "user@test.com", ["everyone"], "mod", {}, "")

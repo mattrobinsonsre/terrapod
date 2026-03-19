@@ -131,6 +131,7 @@ Modules follow the same owner + label RBAC model as workspaces:
 - Creator becomes owner (admin permission)
 - Label-based roles grant read/write/admin
 - The `workspace_permission` on a role maps to registry permissions: `plan` maps to `read`
+- Runner tokens receive implicit `read` access (required for `terraform init` to download modules)
 
 Module API responses include a `permissions` block (`can-update`, `can-destroy`, `can-create-version`) reflecting the caller's effective access. The web UI uses these to gate editing, deletion, and version upload controls.
 
