@@ -17,9 +17,6 @@ runs each poll cycle per interval. Webhook-triggered immediate polls use
 the scheduler's trigger queue with deduplication.
 """
 
-import io
-import tarfile
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +24,7 @@ from terrapod.db.models import Run, VCSConnection, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import github_service, gitlab_service, run_service
+from terrapod.services.archive_utils import strip_archive_top_level_dir
 from terrapod.services.vcs_provider import PullRequest
 from terrapod.storage import get_storage
 from terrapod.storage.keys import config_version_key
@@ -147,34 +145,7 @@ async def _resolve_branch(conn: VCSConnection, ws: Workspace, owner: str, repo: 
     return None
 
 
-def _strip_top_level_dir(archive: bytes) -> bytes:
-    """Repack a tarball, stripping the single top-level directory.
-
-    GitHub/GitLab tarballs wrap content in a directory like
-    ``owner-repo-sha/``.  The runner entrypoint extracts to /workspace
-    and expects .tf files at the root, so we strip the wrapper.
-    """
-    in_buf = io.BytesIO(archive)
-    out_buf = io.BytesIO()
-
-    with (
-        tarfile.open(fileobj=in_buf, mode="r:gz") as src,
-        tarfile.open(fileobj=out_buf, mode="w:gz") as dst,
-    ):
-        for member in src.getmembers():
-            # Strip first path component: "owner-repo-sha/file" → "file"
-            parts = member.name.split("/", 1)
-            if len(parts) < 2 or not parts[1]:
-                continue  # skip the top-level directory entry itself
-            member.name = parts[1]
-            if member.isfile():
-                f = src.extractfile(member)
-                if f:
-                    dst.addfile(member, f)
-            else:
-                dst.addfile(member)
-
-    return out_buf.getvalue()
+_strip_top_level_dir = strip_archive_top_level_dir  # alias for internal use
 
 
 async def _create_vcs_run(
