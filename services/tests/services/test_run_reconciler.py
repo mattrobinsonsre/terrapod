@@ -124,10 +124,16 @@ class TestReconcileOne:
 # ── _handle_succeeded ─────────────────────────────────────────────────
 
 
+_PERSIST_PATCH = "terrapod.services.run_reconciler._persist_live_log_if_missing"
+
+
 class TestHandleSucceeded:
+    @patch(_PERSIST_PATCH, new_callable=AsyncMock)
     @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
     @patch("terrapod.services.run_service.transition_run", new_callable=AsyncMock)
-    async def test_plan_succeeded_transitions_to_planned(self, mock_transition, mock_stage):
+    async def test_plan_succeeded_transitions_to_planned(
+        self, mock_transition, mock_stage, mock_persist
+    ):
         db = AsyncMock()
         run = _mock_run(status="planning")
         mock_stage.return_value = None
@@ -136,10 +142,14 @@ class TestHandleSucceeded:
         await _handle_succeeded(db, run)
 
         mock_transition.assert_called_once_with(db, run, "planned")
+        mock_persist.assert_called_once_with(run, "plan")
 
+    @patch(_PERSIST_PATCH, new_callable=AsyncMock)
     @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
     @patch("terrapod.services.run_service.transition_run", new_callable=AsyncMock)
-    async def test_plan_with_auto_apply_transitions_to_confirmed(self, mock_transition, mock_stage):
+    async def test_plan_with_auto_apply_transitions_to_confirmed(
+        self, mock_transition, mock_stage, mock_persist
+    ):
         db = AsyncMock()
         run = _mock_run(status="planning", auto_apply=True)
         mock_stage.return_value = None
@@ -154,9 +164,10 @@ class TestHandleSucceeded:
         assert mock_transition.call_args_list[0].args[2] == "planned"
         assert mock_transition.call_args_list[1].args[2] == "confirmed"
 
+    @patch(_PERSIST_PATCH, new_callable=AsyncMock)
     @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
     @patch("terrapod.services.run_service.transition_run", new_callable=AsyncMock)
-    async def test_plan_only_unlocks_workspace(self, mock_transition, mock_stage):
+    async def test_plan_only_unlocks_workspace(self, mock_transition, mock_stage, mock_persist):
         db = AsyncMock()
         run = _mock_run(status="planning", plan_only=True)
         mock_stage.return_value = None
@@ -172,8 +183,9 @@ class TestHandleSucceeded:
         assert ws.locked is False
         assert ws.lock_id is None
 
+    @patch(_PERSIST_PATCH, new_callable=AsyncMock)
     @patch("terrapod.services.run_service.transition_run", new_callable=AsyncMock)
-    async def test_apply_succeeded_transitions_to_applied(self, mock_transition):
+    async def test_apply_succeeded_transitions_to_applied(self, mock_transition, mock_persist):
         db = AsyncMock()
         run = _mock_run(status="applying")
         mock_transition.return_value = run
@@ -185,12 +197,14 @@ class TestHandleSucceeded:
 
         mock_transition.assert_called_once_with(db, run, "applied")
         assert ws.locked is False
+        mock_persist.assert_called_once_with(run, "apply")
 
+    @patch(_PERSIST_PATCH, new_callable=AsyncMock)
     @patch("terrapod.services.run_task_service.resolve_stage", new_callable=AsyncMock)
     @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
     @patch("terrapod.services.run_service.transition_run", new_callable=AsyncMock)
     async def test_post_plan_task_stage_failed_errors_run(
-        self, mock_transition, mock_create_stage, mock_resolve
+        self, mock_transition, mock_create_stage, mock_resolve, mock_persist
     ):
         db = AsyncMock()
         run = _mock_run(status="planning")
@@ -211,8 +225,9 @@ class TestHandleSucceeded:
 
 
 class TestHandleFailed:
+    @patch(_PERSIST_PATCH, new_callable=AsyncMock)
     @patch("terrapod.services.run_service.transition_run", new_callable=AsyncMock)
-    async def test_transitions_to_errored(self, mock_transition):
+    async def test_transitions_to_errored(self, mock_transition, mock_persist):
         db = AsyncMock()
         run = _mock_run(status="planning")
         mock_transition.return_value = run
@@ -224,6 +239,7 @@ class TestHandleFailed:
 
         mock_transition.assert_called_once_with(db, run, "errored", error_message="Job failed")
         assert ws.locked is False
+        mock_persist.assert_called_once_with(run, "plan")
 
 
 # ── _check_stale ──────────────────────────────────────────────────────

@@ -27,6 +27,45 @@ logger = get_logger(__name__)
 STALE_TIMEOUT = timedelta(hours=1)
 
 
+async def _persist_live_log_if_missing(run: Run, phase: str) -> None:
+    """Promote live-streamed log from Redis to object storage if the runner
+    didn't upload its own final log.  This prevents log loss when a Job fails
+    before the entrypoint's log upload step (or when the upload itself fails).
+    """
+    from terrapod.redis.client import LOG_STREAM_PREFIX, get_redis_client
+    from terrapod.storage import get_storage
+    from terrapod.storage.keys import apply_log_key, plan_log_key
+    from terrapod.storage.protocol import ObjectNotFoundError
+
+    storage = get_storage()
+    ws_id = str(run.workspace_id)
+    run_id = str(run.id)
+    log_key = plan_log_key(ws_id, run_id) if phase == "plan" else apply_log_key(ws_id, run_id)
+
+    # Check if runner already uploaded the final log
+    try:
+        await storage.get(log_key)
+        return  # Already in storage — nothing to do
+    except ObjectNotFoundError:
+        pass
+
+    # Promote Redis live log to storage
+    try:
+        redis = get_redis_client()
+        live_data = await redis.get(f"{LOG_STREAM_PREFIX}{run.id}:{phase}")
+        if live_data:
+            if isinstance(live_data, str):
+                live_data = live_data.encode()
+            await storage.put(log_key, live_data)
+            logger.info(
+                "Persisted live log from Redis to storage",
+                run_id=run_id,
+                phase=phase,
+            )
+    except Exception as e:
+        logger.warning("Failed to persist live log", run_id=run_id, error=str(e))
+
+
 async def reconcile_runs() -> None:
     """Drive run state transitions based on Job outcomes.
 
@@ -112,6 +151,9 @@ async def _handle_succeeded(db: AsyncSession, run: Run) -> None:
     """Handle a succeeded Job."""
     from terrapod.services import run_service, run_task_service
 
+    phase = "plan" if run.status == "planning" else "apply"
+    await _persist_live_log_if_missing(run, phase)
+
     if run.status == "planning":
         # Check post_plan task stage
         ts = await run_task_service.create_task_stage(db, run.id, run.workspace_id, "post_plan")
@@ -156,6 +198,9 @@ async def _handle_succeeded(db: AsyncSession, run: Run) -> None:
 async def _handle_failed(db: AsyncSession, run: Run, error_message: str) -> None:
     """Handle a failed or deleted Job."""
     from terrapod.services import run_service
+
+    phase = "plan" if run.status == "planning" else "apply"
+    await _persist_live_log_if_missing(run, phase)
 
     run = await run_service.transition_run(db, run, "errored", error_message=error_message)
 
