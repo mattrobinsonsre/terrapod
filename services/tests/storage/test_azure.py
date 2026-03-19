@@ -124,6 +124,43 @@ class TestAzureStoreUnit:
         assert meta.content_type == "text/plain"
         assert meta.metadata["key"] == "value"
 
+    async def test_put_stream_staged_blocks(self, store: AzureStore) -> None:
+        mock_container = _make_mock_container()
+        mock_blob_client = mock_container.get_blob_client.return_value
+        mock_blob_client.stage_block = AsyncMock()
+        mock_blob_client.commit_block_list = AsyncMock()
+
+        store._container_client = mock_container
+
+        async def _chunks():
+            yield b"chunk1"
+            yield b"chunk2"
+
+        meta = await store.put_stream("test/stream.bin", _chunks(), content_type="application/zip")
+        assert meta.key == "test/stream.bin"
+        assert meta.size_bytes == 12
+        # One stage_block for the combined buffer (< 8MB)
+        mock_blob_client.stage_block.assert_called_once()
+        mock_blob_client.commit_block_list.assert_called_once()
+
+    async def test_get_stream(self, store: AzureStore) -> None:
+        mock_container = _make_mock_container()
+        mock_blob_client = mock_container.get_blob_client.return_value
+
+        async def _mock_chunks():
+            yield b"chunk1"
+            yield b"chunk2"
+
+        mock_stream = MagicMock()
+        mock_stream.chunks.return_value = _mock_chunks()
+        mock_blob_client.download_blob = AsyncMock(return_value=mock_stream)
+
+        store._container_client = mock_container
+        result = b""
+        async for chunk in store.get_stream("test/stream.bin"):
+            result += chunk
+        assert result == b"chunk1chunk2"
+
     async def test_presigned_put_url_includes_blob_type_header(self, store: AzureStore) -> None:
         mock_delegation_key = MagicMock()
         store._delegation_key = mock_delegation_key

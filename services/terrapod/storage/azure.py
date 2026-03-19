@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -151,6 +153,62 @@ class AzureStore:
             metadata=metadata or {},
         )
 
+    async def put_stream(
+        self,
+        key: str,
+        chunks: AsyncIterator[bytes],
+        content_type: str = "application/octet-stream",
+        metadata: dict[str, str] | None = None,
+    ) -> ObjectMeta:
+        """Store an object via Azure staged block upload, streaming chunks."""
+        container = await self._get_container_client()
+        blob_name = self._full_key(key)
+        blob_client = container.get_blob_client(blob_name)
+        block_size = 8 * 1024 * 1024  # 8MB blocks
+
+        block_ids: list[str] = []
+        total_size = 0
+        buffer = bytearray()
+        md5_hasher = hashlib.md5()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+
+        try:
+            async for chunk in chunks:
+                buffer.extend(chunk)
+                total_size += len(chunk)
+                md5_hasher.update(chunk)
+                while len(buffer) >= block_size:
+                    block_data = bytes(buffer[:block_size])
+                    del buffer[:block_size]
+                    block_id = uuid.uuid4().hex
+                    await blob_client.stage_block(block_id, block_data)
+                    block_ids.append(block_id)
+
+            # Upload remaining buffer
+            if buffer or not block_ids:
+                block_id = uuid.uuid4().hex
+                await blob_client.stage_block(block_id, bytes(buffer))
+                block_ids.append(block_id)
+
+            await blob_client.commit_block_list(
+                block_ids,
+                content_settings=_content_settings(content_type),
+                metadata=metadata,
+            )
+        except Exception as e:
+            if _is_permission_error(e):
+                raise ObjectStorePermissionError(str(e)) from e
+            raise ObjectStoreError(str(e)) from e
+
+        etag = md5_hasher.hexdigest()
+        return ObjectMeta(
+            key=key,
+            size_bytes=total_size,
+            content_type=content_type,
+            etag=etag,
+            last_modified=datetime.now(UTC),
+            metadata=metadata or {},
+        )
+
     async def get(self, key: str) -> bytes:
         container = await self._get_container_client()
         blob_name = self._full_key(key)
@@ -159,6 +217,27 @@ class AzureStore:
         try:
             stream = await blob_client.download_blob()
             return await stream.readall()
+        except Exception as e:
+            if _is_not_found(e):
+                raise ObjectNotFoundError(key) from e
+            if _is_permission_error(e):
+                raise ObjectStorePermissionError(str(e)) from e
+            raise ObjectStoreError(str(e)) from e
+
+    async def get_stream(
+        self,
+        key: str,
+        chunk_size: int = 256 * 1024,
+    ) -> AsyncIterator[bytes]:
+        """Stream an object's content in chunks from Azure Blob."""
+        container = await self._get_container_client()
+        blob_name = self._full_key(key)
+        blob_client = container.get_blob_client(blob_name)
+
+        try:
+            stream = await blob_client.download_blob()
+            async for chunk in stream.chunks():
+                yield chunk
         except Exception as e:
             if _is_not_found(e):
                 raise ObjectNotFoundError(key) from e

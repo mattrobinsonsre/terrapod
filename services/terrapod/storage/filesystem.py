@@ -14,6 +14,7 @@ import os
 import secrets
 import time
 import urllib.parse
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -100,6 +101,45 @@ class FilesystemStore:
             metadata=metadata or {},
         )
 
+    async def put_stream(
+        self,
+        key: str,
+        chunks: AsyncIterator[bytes],
+        content_type: str = "application/octet-stream",
+        metadata: dict[str, str] | None = None,
+    ) -> ObjectMeta:
+        """Store an object by streaming chunks directly to file."""
+        path = self._full_path(key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        md5_hasher = hashlib.md5()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+        total_size = 0
+
+        async with aiofiles.open(path, "wb") as f:
+            async for chunk in chunks:
+                await f.write(chunk)
+                md5_hasher.update(chunk)
+                total_size += len(chunk)
+
+        # Store content type in sidecar file
+        meta_path = Path(str(path) + ".meta")
+        meta_content = content_type
+        if metadata:
+            meta_content += "\n" + "\n".join(f"{k}={v}" for k, v in metadata.items())
+        async with aiofiles.open(meta_path, "w") as f:
+            await f.write(meta_content)
+
+        stat = await aiofiles.os.stat(path)
+        etag = md5_hasher.hexdigest()
+
+        return ObjectMeta(
+            key=key,
+            size_bytes=total_size,
+            content_type=content_type,
+            etag=etag,
+            last_modified=datetime.fromtimestamp(stat.st_mtime, tz=UTC),
+            metadata=metadata or {},
+        )
+
     async def get(self, key: str) -> bytes:
         path = self._full_path(key)
         if not path.exists():
@@ -107,6 +147,23 @@ class FilesystemStore:
 
         async with aiofiles.open(path, "rb") as f:
             return await f.read()
+
+    async def get_stream(
+        self,
+        key: str,
+        chunk_size: int = 256 * 1024,
+    ) -> AsyncIterator[bytes]:
+        """Stream an object's content in chunks from the filesystem."""
+        path = self._full_path(key)
+        if not path.exists():
+            raise ObjectNotFoundError(key)
+
+        async with aiofiles.open(path, "rb") as f:
+            while True:
+                chunk = await f.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
 
     async def delete(self, key: str) -> None:
         path = self._full_path(key)

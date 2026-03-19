@@ -5,6 +5,7 @@ Defines the ObjectStore Protocol that all storage backends must satisfy,
 along with shared data types and exceptions.
 """
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol, runtime_checkable
@@ -87,6 +88,28 @@ class ObjectStore(Protocol):
         """
         ...
 
+    async def put_stream(
+        self,
+        key: str,
+        chunks: AsyncIterator[bytes],
+        content_type: str = "application/octet-stream",
+        metadata: dict[str, str] | None = None,
+    ) -> ObjectMeta:
+        """Store an object by streaming chunks directly to the backend.
+
+        Avoids loading the full payload into memory.
+
+        Args:
+            key: Object key (path).
+            chunks: Async iterator of byte chunks.
+            content_type: MIME type.
+            metadata: Optional user-defined metadata.
+
+        Returns:
+            Metadata of the stored object.
+        """
+        ...
+
     async def get(self, key: str) -> bytes:
         """Retrieve an object's content.
 
@@ -100,6 +123,30 @@ class ObjectStore(Protocol):
             ObjectNotFoundError: If the object does not exist.
         """
         ...
+
+    async def get_stream(
+        self,
+        key: str,
+        chunk_size: int = 256 * 1024,
+    ) -> AsyncIterator[bytes]:
+        """Stream an object's content in chunks.
+
+        Avoids loading the full object into memory.
+
+        Args:
+            key: Object key.
+            chunk_size: Size of each chunk in bytes.
+
+        Returns:
+            Async iterator of byte chunks.
+
+        Raises:
+            ObjectNotFoundError: If the object does not exist.
+        """
+        ...
+        # This yield is needed to make the type checker recognize this as an
+        # async generator in the Protocol definition.
+        yield b""  # pragma: no cover
 
     async def delete(self, key: str) -> None:
         """Delete an object.

@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
+from starlette.responses import StreamingResponse
 
 from terrapod.logging_config import get_logger
 
@@ -55,9 +56,8 @@ async def storage_put(key: str, request: Request) -> Response:
             detail="Invalid or expired signature",
         )
 
-    body = await request.body()
-    await store.put(key, body, content_type=content_type)
-    logger.info("Object stored via presigned URL", key=key, size=len(body))
+    await store.put_stream(key, request.stream(), content_type=content_type)
+    logger.info("Object stored via presigned URL", key=key)
 
     return Response(status_code=status.HTTP_201_CREATED)
 
@@ -79,18 +79,15 @@ async def storage_get(key: str, request: Request) -> Response:
     from terrapod.storage.protocol import ObjectNotFoundError
 
     try:
-        data = await store.get(key)
+        meta = await store.head(key)
     except ObjectNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Object not found: {key}",
         ) from e
 
-    # Read content type from metadata
-    meta = await store.head(key)
-
-    return Response(
-        content=data,
+    return StreamingResponse(
+        store.get_stream(key),
         media_type=meta.content_type,
         headers={"ETag": meta.etag},
     )

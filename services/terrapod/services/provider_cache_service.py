@@ -5,8 +5,6 @@ fetches version/platform metadata and binary from the upstream registry,
 caches in object storage, and serves from cache on subsequent requests.
 """
 
-import hashlib
-
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.config import settings
 from terrapod.db.models import CachedProviderPackage
 from terrapod.logging_config import get_logger
+from terrapod.services.hashing_stream import HashingStream
 from terrapod.storage.keys import provider_cache_key
 from terrapod.storage.protocol import ObjectStore
 
@@ -205,17 +204,18 @@ async def _fetch_and_cache_platforms(
                 if download_info is None:
                     continue
 
-                # Download the binary
-                binary_resp = await client.get(download_info["download_url"], timeout=120.0)
-                binary_resp.raise_for_status()
-                binary_data = binary_resp.content
-
                 filename = download_info["filename"]
-                shasum = hashlib.sha256(binary_data).hexdigest()
-
-                # Store in object storage
                 key = provider_cache_key(hostname, namespace, type_, version, filename)
-                await storage.put(key, binary_data, content_type="application/zip")
+
+                # Stream binary directly to object storage
+                async with client.stream(
+                    "GET", download_info["download_url"], timeout=300.0
+                ) as resp:
+                    resp.raise_for_status()
+                    stream = HashingStream(resp)
+                    await storage.put_stream(key, stream, content_type="application/zip")
+                    shasum = stream.sha256_hex
+                    size_bytes = stream.size
 
                 # Record in database
                 entry = CachedProviderPackage(
@@ -244,7 +244,7 @@ async def _fetch_and_cache_platforms(
                     provider=f"{namespace}/{type_}",
                     version=version,
                     platform=platform_key,
-                    size_bytes=len(binary_data),
+                    size_bytes=size_bytes,
                 )
             except Exception:
                 logger.exception(

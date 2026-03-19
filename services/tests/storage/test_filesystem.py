@@ -83,6 +83,31 @@ class TestFilesystemStore:
         assert meta.metadata["workspace"] == "ws-123"
         assert meta.metadata["run"] == "run-456"
 
+    async def test_put_stream_and_get(self, fs_store: FilesystemStore) -> None:
+        async def _chunks():
+            yield b"hello "
+            yield b"world"
+
+        meta = await fs_store.put_stream("test/streamed.txt", _chunks(), content_type="text/plain")
+        assert meta.key == "test/streamed.txt"
+        assert meta.size_bytes == 11
+        assert meta.content_type == "text/plain"
+
+        result = await fs_store.get("test/streamed.txt")
+        assert result == b"hello world"
+
+    async def test_get_stream(self, fs_store: FilesystemStore) -> None:
+        await fs_store.put("test/stream-read.txt", b"abcdefghij", content_type="text/plain")
+        result = b""
+        async for chunk in fs_store.get_stream("test/stream-read.txt", chunk_size=4):
+            result += chunk
+        assert result == b"abcdefghij"
+
+    async def test_get_stream_nonexistent_raises(self, fs_store: FilesystemStore) -> None:
+        with pytest.raises(ObjectNotFoundError):
+            async for _ in fs_store.get_stream("nonexistent/key"):
+                pass  # pragma: no cover
+
     async def test_path_traversal_rejected(self, fs_store: FilesystemStore) -> None:
         with pytest.raises(ObjectStoreError):
             await fs_store.put("../escape.txt", b"nope")

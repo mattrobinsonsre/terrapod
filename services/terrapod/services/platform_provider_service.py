@@ -19,7 +19,6 @@ API ↔ Provider Contract:
         cache/provider/terrapod/{version}/terraform-provider-terrapod_{version}_SHA256SUMS.sig
 """
 
-import hashlib
 from functools import lru_cache
 from pathlib import Path
 
@@ -27,6 +26,7 @@ import httpx
 
 from terrapod.config import settings
 from terrapod.logging_config import get_logger
+from terrapod.services.hashing_stream import HashingStream
 from terrapod.storage.keys import (
     platform_provider_binary_key,
     platform_provider_shasums_key,
@@ -187,23 +187,21 @@ async def _fetch_and_cache_binary(
     filename: str,
     key: str,
 ) -> None:
-    """Fetch a provider binary from GitHub and cache it."""
+    """Fetch a provider binary from GitHub and cache it (streaming)."""
     url = _release_url(version, filename)
-    async with httpx.AsyncClient(follow_redirects=True, timeout=120.0) as http:
-        resp = await http.get(url)
-        if resp.status_code != 200:
-            raise RuntimeError(f"Failed to fetch {url}: HTTP {resp.status_code}")
-        data = resp.content
-
-    sha256 = hashlib.sha256(data).hexdigest()
-    await storage.put(key, data, content_type="application/zip")
-    logger.info(
-        "Cached platform provider binary",
-        version=version,
-        filename=filename,
-        size=len(data),
-        sha256=sha256,
-    )
+    async with httpx.AsyncClient(follow_redirects=True, timeout=300.0) as http:
+        async with http.stream("GET", url) as resp:
+            if resp.status_code != 200:
+                raise RuntimeError(f"Failed to fetch {url}: HTTP {resp.status_code}")
+            stream = HashingStream(resp)
+            await storage.put_stream(key, stream, content_type="application/zip")
+            logger.info(
+                "Cached platform provider binary",
+                version=version,
+                filename=filename,
+                size=stream.size,
+                sha256=stream.sha256_hex,
+            )
 
 
 async def _fetch_and_cache_shasums(
