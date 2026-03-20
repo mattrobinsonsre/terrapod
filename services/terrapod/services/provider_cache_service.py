@@ -16,7 +16,6 @@ Cache layers:
 import json
 
 import httpx
-from fastapi import Request
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -94,7 +93,6 @@ async def get_or_fetch_platforms(
     namespace: str,
     type_: str,
     version: str,
-    request: Request | None = None,
 ) -> dict:
     """Get cached platform info or fetch metadata from upstream.
 
@@ -173,30 +171,47 @@ async def get_or_fetch_platforms(
     if meta is None:
         return {"archives": archives} if archives else {"archives": {}}
 
-    # Add proxy URLs for platforms not yet cached in storage.
-    # Use the caller's own hostname so download URLs match however the runner
-    # reached us (external via BFF or internal direct). X-Forwarded-Host is set
-    # by the ingress/BFF proxy chain; fall back to the request's Host header
-    # for direct (non-proxied) requests.
-    base = ""
-    if request is not None:
-        fwd_host = request.headers.get("x-forwarded-host")
-        if fwd_host:
-            proto = request.headers.get("x-forwarded-proto", "https")
-            base = f"{proto}://{fwd_host}"
-        else:
-            base = str(request.base_url).rstrip("/")
+    # For uncached platforms: eagerly cache platforms matching the configured
+    # filter (returning presigned storage URLs), and return upstream direct
+    # download URLs for all others (no auth needed — public registries).
+    configured_platforms = {
+        f"{p['os']}_{p['arch']}" for p in settings.registry.provider_cache.platforms
+    }
+
     for platform_key, platform_meta in meta.items():
         if platform_key in cached_platforms:
             continue  # Already have presigned URL from tier 1
-        os_, arch = platform_key.split("_", 1)
-        proxy_url = (
-            f"{base}/v1/providers/{hostname}/{namespace}/{type_}/{version}/download/{os_}/{arch}"
-        )
-        archives[platform_key] = {
-            "url": proxy_url,
-            "hashes": [f"zh:{platform_meta['shasum']}"],
-        }
+
+        if platform_key in configured_platforms:
+            # Eagerly cache and return presigned URL
+            os_, arch = platform_key.split("_", 1)
+            try:
+                url = await fetch_and_cache_single_platform(
+                    db, storage, hostname, namespace, type_, version, os_, arch
+                )
+                archives[platform_key] = {
+                    "url": url,
+                    "hashes": [f"zh:{platform_meta['shasum']}"],
+                }
+            except Exception:
+                logger.warning(
+                    "Failed to eagerly cache platform, falling back to upstream URL",
+                    hostname=hostname,
+                    provider=f"{namespace}/{type_}",
+                    version=version,
+                    platform=platform_key,
+                    exc_info=True,
+                )
+                archives[platform_key] = {
+                    "url": platform_meta["download_url"],
+                    "hashes": [f"zh:{platform_meta['shasum']}"],
+                }
+        else:
+            # Not in filter — upstream direct URL (public, no auth needed)
+            archives[platform_key] = {
+                "url": platform_meta["download_url"],
+                "hashes": [f"zh:{platform_meta['shasum']}"],
+            }
 
     return {"archives": archives}
 

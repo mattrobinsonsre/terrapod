@@ -170,6 +170,11 @@ api:
           - registry.terraform.io
           - registry.opentofu.org
         warm_on_first_request: true
+        platforms:
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
       binary_cache:
         enabled: true
         terraform_mirror_url: "https://releases.hashicorp.com/terraform"

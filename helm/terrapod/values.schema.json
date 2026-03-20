@@ -506,7 +506,17 @@
                   "type": "array",
                   "items": { "type": "string" }
                 },
-                "warm_on_first_request": { "type": "boolean" }
+                "warm_on_first_request": { "type": "boolean" },
+                "platforms": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "os": { "type": "string" },
+                      "arch": { "type": "string" }
+                    }
+                  }
+                }
               }
             },
             "binary_cache": {

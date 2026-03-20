@@ -353,6 +353,9 @@ class ProviderCacheConfig(BaseModel):
         default=["registry.terraform.io", "registry.opentofu.org"]
     )
     warm_on_first_request: bool = Field(default=True)
+    platforms: list[dict[str, str]] = Field(
+        default=[{"os": "linux", "arch": "amd64"}, {"os": "linux", "arch": "arm64"}],
+    )
 
 
 class BinaryCacheConfig(BaseModel):
