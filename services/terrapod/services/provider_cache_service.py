@@ -64,9 +64,9 @@ async def get_or_fetch_versions(
         return {"versions": {}}
 
     # Check Redis cache first
-    from terrapod.redis.client import get_redis
+    from terrapod.redis.client import get_redis_client
 
-    redis = get_redis()
+    redis = get_redis_client()
     cache_key = _index_redis_key(hostname, namespace, type_)
     cached = await redis.get(cache_key)
     if cached:
