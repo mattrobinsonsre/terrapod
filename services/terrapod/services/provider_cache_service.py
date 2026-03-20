@@ -173,24 +173,26 @@ async def get_or_fetch_platforms(
     if meta is None:
         return {"archives": archives} if archives else {"archives": {}}
 
-    # Add proxy URLs for platforms not yet cached in storage
+    # Add proxy URLs for platforms not yet cached in storage.
+    # Use the caller's own hostname so download URLs match however the runner
+    # reached us (external via BFF or internal direct). X-Forwarded-Host is set
+    # by the ingress/BFF proxy chain; fall back to the request's Host header
+    # for direct (non-proxied) requests.
+    base = ""
+    if request is not None:
+        fwd_host = request.headers.get("x-forwarded-host")
+        if fwd_host:
+            proto = request.headers.get("x-forwarded-proto", "https")
+            base = f"{proto}://{fwd_host}"
+        else:
+            base = str(request.base_url).rstrip("/")
     for platform_key, platform_meta in meta.items():
         if platform_key in cached_platforms:
             continue  # Already have presigned URL from tier 1
         os_, arch = platform_key.split("_", 1)
-        proxy_url = f"/v1/providers/{hostname}/{namespace}/{type_}/{version}/download/{os_}/{arch}"
-        if request is not None:
-            proxy_url = str(
-                request.url_for(
-                    "provider_download_proxy",
-                    hostname=hostname,
-                    namespace=namespace,
-                    type=type_,
-                    version=version,
-                    os=os_,
-                    arch=arch,
-                )
-            )
+        proxy_url = (
+            f"{base}/v1/providers/{hostname}/{namespace}/{type_}/{version}/download/{os_}/{arch}"
+        )
         archives[platform_key] = {
             "url": proxy_url,
             "hashes": [f"zh:{platform_meta['shasum']}"],
