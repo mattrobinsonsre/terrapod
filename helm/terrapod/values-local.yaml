@@ -41,6 +41,11 @@ api:
         base_url: "https://terrapod.local"
     audit:
       retention_days: 90
+    registry:
+      provider_cache:
+        platforms:
+          - os: darwin
+            arch: arm64
     auth:
       local_enabled: true
       callback_base_url: "https://terrapod.local"
