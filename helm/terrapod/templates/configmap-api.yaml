@@ -138,6 +138,13 @@ data:
           {{- end }}
         {{- end }}
         warm_on_first_request: {{ .Values.api.config.registry.provider_cache.warm_on_first_request }}
+        {{- if .Values.api.config.registry.provider_cache.platforms }}
+        platforms:
+          {{- range .Values.api.config.registry.provider_cache.platforms }}
+          - os: {{ .os | quote }}
+            arch: {{ .arch | quote }}
+          {{- end }}
+        {{- end }}
       {{- end }}
       {{- if .Values.api.config.registry.binary_cache }}
       binary_cache:
