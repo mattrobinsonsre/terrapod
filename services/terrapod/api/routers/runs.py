@@ -468,7 +468,10 @@ async def retry_run(
     run = await _get_run(run_id, db)
     await _require_run_ws_permission(run, "plan", user, db)
 
-    if run.status not in run_service.TERMINAL_STATES:
+    is_terminal = run.status in run_service.TERMINAL_STATES or (
+        run.plan_only and run.status == "planned"
+    )
+    if not is_terminal:
         raise HTTPException(
             status_code=409,
             detail=f"Cannot retry run in non-terminal state '{run.status}'",
