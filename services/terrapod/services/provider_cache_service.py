@@ -38,45 +38,53 @@ def _meta_redis_key(hostname: str, namespace: str, type_: str, version: str) -> 
     return f"{_META_KEY_PREFIX}:{hostname}:{namespace}:{type_}:{version}"
 
 
+# Redis key for cached upstream version index (24h TTL)
+_INDEX_KEY_PREFIX = "tp:provider_index"
+
+
+def _index_redis_key(hostname: str, namespace: str, type_: str) -> str:
+    return f"{_INDEX_KEY_PREFIX}:{hostname}:{namespace}:{type_}"
+
+
 async def get_or_fetch_versions(
     db: AsyncSession,
     hostname: str,
     namespace: str,
     type_: str,
 ) -> dict:
-    """Get cached version list or fetch from upstream.
+    """Get version list from upstream (Redis-cached, 24h TTL).
 
     Returns the index.json-shaped dict for the network mirror protocol.
+    The version index must reflect ALL upstream versions — not just the subset
+    we've cached binaries for — so that terraform/tofu version constraint
+    resolution works correctly.
     """
-    # Check if we have any cached entries for this provider
-    result = await db.execute(
-        select(CachedProviderPackage.version)
-        .where(
-            CachedProviderPackage.hostname == hostname,
-            CachedProviderPackage.namespace == namespace,
-            CachedProviderPackage.type == type_,
-        )
-        .distinct()
-    )
-    cached_versions = [row[0] for row in result.all()]
-
-    if cached_versions:
-        return {
-            "versions": {v: {} for v in sorted(cached_versions)},
-        }
-
-    # Fetch from upstream if warm_on_first_request
     cfg = settings.registry.provider_cache
-    if not cfg.warm_on_first_request:
-        return {"versions": {}}
-
     if hostname not in cfg.upstream_registries:
         return {"versions": {}}
 
+    # Check Redis cache first
+    from terrapod.redis.client import get_redis_client
+
+    redis = get_redis_client()
+    cache_key = _index_redis_key(hostname, namespace, type_)
+    cached = await redis.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    # Fetch from upstream
     upstream_versions = await _fetch_upstream_versions(hostname, namespace, type_)
-    return {
+    if not upstream_versions:
+        return {"versions": {}}
+
+    result = {
         "versions": {v: {} for v in upstream_versions},
     }
+
+    # Cache in Redis (24h TTL)
+    await redis.set(cache_key, json.dumps(result), ex=_META_TTL)
+
+    return result
 
 
 async def get_or_fetch_platforms(
