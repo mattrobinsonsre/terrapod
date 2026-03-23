@@ -187,7 +187,7 @@ function LogPanel({
           </button>
         </div>
         <div className="flex items-center gap-2">
-          {onRefresh && !isStreaming && (
+          {onRefresh && (
             <button
               onClick={onRefresh}
               className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
