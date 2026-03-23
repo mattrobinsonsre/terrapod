@@ -11,7 +11,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
-import { ChevronsDown, ChevronsUp, ArrowDownToLine } from 'lucide-react'
+import { ChevronsDown, ChevronsUp, ArrowDownToLine, RefreshCw } from 'lucide-react'
 
 interface RunActions {
   'is-confirmable': boolean
@@ -92,6 +92,7 @@ function LogPanel({
   phase,
   runId,
   isStreaming,
+  onRefresh,
 }: {
   log: string | null
   loading: boolean
@@ -99,6 +100,7 @@ function LogPanel({
   phase: 'plan' | 'apply'
   runId: string
   isStreaming: boolean
+  onRefresh?: () => void
 }) {
   const [colorMode, setColorMode] = useState(true)
   const [following, setFollowing] = useState(true)
@@ -185,6 +187,16 @@ function LogPanel({
           </button>
         </div>
         <div className="flex items-center gap-2">
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
+              title="Refresh log"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Refresh
+            </button>
+          )}
           {isStreaming && (
             <button
               onClick={() => {
@@ -657,6 +669,7 @@ export default function RunDetailPage() {
             phase="plan"
             runId={runId}
             isStreaming={attrs.status === 'planning'}
+            onRefresh={loadPlanLog}
           />
         )}
 
@@ -669,6 +682,7 @@ export default function RunDetailPage() {
             phase="apply"
             runId={runId}
             isStreaming={attrs.status === 'applying'}
+            onRefresh={loadApplyLog}
           />
         )}
       </main>
