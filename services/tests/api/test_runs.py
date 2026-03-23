@@ -408,3 +408,189 @@ class TestRunJsonSerialization:
             resp = await c.get(f"/api/v2/runs/run-{run.id}", headers=_AUTH)
 
         assert resp.json()["data"]["attributes"]["actions"]["is-confirmable"] is False
+
+
+# ── CLI Apply Guard (VCS vs non-VCS remote workspaces) ────────────────
+
+
+class TestCLIApplyGuard:
+    """Test that CLI apply is blocked on VCS-connected remote workspaces
+    but allowed on non-VCS remote workspaces (#58)."""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    async def test_create_apply_blocked_on_vcs_remote_workspace(self, mock_resolve, *mocks):
+        """Remote + VCS + plan_only=false → 422."""
+        mock_resolve.return_value = "write"
+        ws = _mock_workspace()
+        ws.execution_mode = "remote"
+        ws.vcs_connection_id = uuid.uuid4()  # VCS-connected
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        cv_id = uuid.uuid4()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"plan-only": False},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}"}},
+                            "configuration-version": {"data": {"id": f"cv-{cv_id}"}},
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+        assert "VCS-connected" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    async def test_create_apply_allowed_on_non_vcs_remote_workspace(
+        self, mock_resolve, mock_create_run, mock_queue, *mocks
+    ):
+        """Remote + no VCS + plan_only=false → 201 (CLI-driven workflow)."""
+        mock_resolve.return_value = "write"
+        ws = _mock_workspace()
+        ws.execution_mode = "remote"
+        ws.vcs_connection_id = None  # No VCS
+
+        run = _mock_run(ws_id=ws.id, status="queued")
+        mock_create_run.return_value = run
+        mock_queue.return_value = run
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+        mock_db.get.return_value = MagicMock(status="uploaded")
+
+        cv_id = uuid.uuid4()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"plan-only": False},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}"}},
+                            "configuration-version": {"data": {"id": f"cv-{cv_id}"}},
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    async def test_create_plan_forced_on_vcs_remote_workspace(
+        self, mock_resolve, mock_create_run, mock_queue, *mocks
+    ):
+        """Remote + VCS + plan_only=true → 201 (plan is always allowed)."""
+        mock_resolve.return_value = "plan"
+        ws = _mock_workspace()
+        ws.execution_mode = "remote"
+        ws.vcs_connection_id = uuid.uuid4()
+
+        run = _mock_run(ws_id=ws.id, plan_only=True, status="queued")
+        mock_create_run.return_value = run
+        mock_queue.return_value = run
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+        mock_db.get.return_value = MagicMock(status="uploaded")
+
+        cv_id = uuid.uuid4()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"plan-only": True},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}"}},
+                            "configuration-version": {"data": {"id": f"cv-{cv_id}"}},
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_confirm_blocked_on_vcs_remote_workspace(
+        self, mock_get_run, mock_resolve, *mocks
+    ):
+        """Confirm CLI run on VCS-connected remote workspace → 422."""
+        mock_resolve.return_value = "write"
+        run = _mock_run(status="planned")
+        mock_get_run.return_value = run
+
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        ws.execution_mode = "remote"
+        ws.vcs_connection_id = uuid.uuid4()
+
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/v2/runs/run-{run.id}/actions/confirm",
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+        assert "VCS-connected" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.confirm_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_confirm_allowed_on_non_vcs_remote_workspace(
+        self, mock_get_run, mock_resolve, mock_confirm, *mocks
+    ):
+        """Confirm CLI run on non-VCS remote workspace → 200."""
+        mock_resolve.return_value = "write"
+        run = _mock_run(status="planned")
+        mock_get_run.return_value = run
+        confirmed = _mock_run(status="confirmed")
+        mock_confirm.return_value = confirmed
+
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        ws.execution_mode = "remote"
+        ws.vcs_connection_id = None  # No VCS
+
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/v2/runs/run-{run.id}/actions/confirm",
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200
