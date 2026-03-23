@@ -80,12 +80,6 @@ def build_job_spec(
     run_short = run_id[:16]
     job_name = f"tprun-{run_short}-{phase}"
 
-    # Resolve the default runner definition for setup_script
-    default_def = next(
-        (d for d in runner_config.definitions if d.name == runner_config.default),
-        runner_config.definitions[0] if runner_config.definitions else None,
-    )
-
     # Build container env vars
     container_env = [
         {"name": "TP_RUN_ID", "value": run_id},
@@ -104,11 +98,6 @@ def build_job_spec(
             },
         },
     ]
-
-    # Setup script (runs before terraform init)
-    setup_script = default_def.setup_script if default_def else ""
-    if setup_script:
-        container_env.append({"name": "TP_SETUP_SCRIPT", "value": setup_script})
 
     # Terraform version + backend
     version = terraform_version or runner_config.default_terraform_version

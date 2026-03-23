@@ -229,7 +229,7 @@ class TestConfirmRun:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/runs/run-{run.id}/actions/confirm",
+                f"/api/v2/runs/run-{run.id}/actions/apply",
                 headers=_AUTH,
             )
         assert resp.status_code == 200
@@ -254,7 +254,7 @@ class TestConfirmRun:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/runs/run-{run.id}/actions/confirm",
+                f"/api/v2/runs/run-{run.id}/actions/apply",
                 headers=_AUTH,
             )
         assert resp.status_code == 409
@@ -559,7 +559,7 @@ class TestCLIApplyGuard:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/runs/run-{run.id}/actions/confirm",
+                f"/api/v2/runs/run-{run.id}/actions/apply",
                 headers=_AUTH,
             )
         assert resp.status_code == 422
@@ -590,7 +590,7 @@ class TestCLIApplyGuard:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/runs/run-{run.id}/actions/confirm",
+                f"/api/v2/runs/run-{run.id}/actions/apply",
                 headers=_AUTH,
             )
         assert resp.status_code == 200

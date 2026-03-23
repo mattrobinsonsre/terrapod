@@ -8,7 +8,6 @@ metadata:
     app.kubernetes.io/component: runner
 data:
   runners.yaml: |
-    default: {{ .Values.runners.default | quote }}
     image:
       repository: {{ .Values.runners.image.repository | quote }}
       tag: {{ .Values.runners.image.tag | default .Chart.AppVersion | quote }}
@@ -20,20 +19,6 @@ data:
     termination_grace_period_seconds: {{ .Values.runners.terminationGracePeriodSeconds }}
     token_ttl_seconds: {{ .Values.runners.tokenTTLSeconds }}
     max_token_ttl_seconds: {{ .Values.runners.maxTokenTTLSeconds }}
-    definitions:
-      {{- range .Values.runners.definitions }}
-      - name: {{ .name | quote }}
-        description: {{ .description | default "" | quote }}
-        timeout_minutes: {{ .timeout_minutes | default 60 }}
-        setup_script: {{ .setup_script | default "" | quote }}
-        resources:
-          requests:
-            cpu: {{ .resources.requests.cpu | quote }}
-            memory: {{ .resources.requests.memory | quote }}
-          limits:
-            cpu: {{ .resources.limits.cpu | quote }}
-            memory: {{ .resources.limits.memory | quote }}
-      {{- end }}
     {{- with .Values.runners.nodeSelector }}
     node_selector:
       {{- toYaml . | nindent 6 }}

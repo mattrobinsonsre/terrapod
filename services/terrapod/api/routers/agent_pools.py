@@ -89,25 +89,14 @@ def _token_json(token, raw_token: str | None = None) -> dict:
 def _listener_json(listener: dict) -> dict:
     """Format a Redis-backed listener dict as JSON:API.
 
-    Accepts a dict with keys: id, name, pool_id, runner_definitions (JSON string),
+    Accepts a dict with keys: id, name, pool_id,
     certificate_fingerprint, certificate_expires_at, created_at, last_heartbeat, etc.
     """
-    # runner_definitions is stored as JSON string in Redis
-    runner_defs = listener.get("runner_definitions", "[]")
-    if isinstance(runner_defs, str):
-        import json as _json
-
-        try:
-            runner_defs = _json.loads(runner_defs)
-        except (ValueError, TypeError):
-            runner_defs = []
-
     return {
         "id": f"listener-{listener['id']}",
         "type": "runner-listeners",
         "attributes": {
             "name": listener.get("name", ""),
-            "runner-definitions": runner_defs,
             "certificate-fingerprint": listener.get("certificate_fingerprint", ""),
             "certificate-expires-at": listener.get("certificate_expires_at", ""),
             "created-at": listener.get("created_at", ""),
@@ -303,7 +292,6 @@ async def join_listener(
 
     join_token = body.get("join_token", "")
     name = body.get("name", "")
-    runner_definitions = body.get("runner_definitions", ["standard"])
 
     if not join_token:
         raise HTTPException(status_code=422, detail="join_token is required")
@@ -317,7 +305,7 @@ async def join_listener(
     if token.pool_id != pool.id:
         raise HTTPException(status_code=403, detail="Token does not belong to this pool")
 
-    result = await agent_pool_service.join_listener(pool, token, name, runner_definitions, db)
+    result = await agent_pool_service.join_listener(pool, token, name, db)
     await db.commit()
 
     from terrapod.redis.client import POOL_EVENTS_PREFIX, publish_event
@@ -342,7 +330,6 @@ async def join_listener_by_token(
     """
     join_token = body.get("join_token", "")
     name = body.get("name", "")
-    runner_definitions = body.get("runner_definitions", ["standard"])
 
     if not join_token:
         raise HTTPException(status_code=422, detail="join_token is required")
@@ -357,7 +344,7 @@ async def join_listener_by_token(
     if pool is None:
         raise HTTPException(status_code=404, detail="Pool not found")
 
-    result = await agent_pool_service.join_listener(pool, token, name, runner_definitions, db)
+    result = await agent_pool_service.join_listener(pool, token, name, db)
     result["pool_id"] = str(pool.id)
     await db.commit()
 
@@ -515,14 +502,12 @@ async def listener_heartbeat(
 
     capacity = body.get("capacity", 1)
     active_runs = body.get("active_runs", 0)
-    runner_defs = body.get("runner_definitions", [])
 
     await agent_pool_service.heartbeat_listener(
         listener_id=str(l_uuid),
         name=listener["name"],
         capacity=str(capacity),
         active_runs=str(active_runs),
-        runner_definitions=json.dumps(runner_defs),
     )
 
     # Publish heartbeat event to admin dashboard + pool SSE channels

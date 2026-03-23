@@ -45,7 +45,6 @@ interface Listener {
   attributes: {
     name: string
     status: string
-    'runner-definitions': string[]
     'certificate-expires-at': string | null
     'created-at': string
   }
@@ -506,7 +505,6 @@ export default function AgentPoolDetailPage() {
                     <tr className="border-b border-slate-700/50">
                       <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Name</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Runner Defs</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Cert Expires</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
                     </tr>
@@ -520,9 +518,6 @@ export default function AgentPoolDetailPage() {
                             <span className={`w-2 h-2 rounded-full ${l.attributes.status === 'online' ? 'bg-green-400' : 'bg-slate-500'}`} />
                             <span className="text-xs text-slate-400">{l.attributes.status}</span>
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
-                          {(l.attributes['runner-definitions'] || []).join(', ') || '-'}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">
                           {formatDate(l.attributes['certificate-expires-at'])}

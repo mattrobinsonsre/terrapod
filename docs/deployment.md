@@ -388,10 +388,8 @@ listener:
 
 | Value | Default | Description |
 |---|---|---|
-| `runners.default` | `standard` | Default runner definition name |
 | `runners.image.repository` | `ghcr.io/mattrobinsonsre/terrapod-runner` | Runner Job image |
 | `runners.ttlSecondsAfterFinished` | `600` | Job cleanup TTL |
-| `runners.definitions` | See values.yaml | Named runner definitions |
 | `runners.serviceAccount.create` | `true` | Create ServiceAccount for runner Jobs |
 | `runners.serviceAccount.name` | `""` | SA name (cloud identity) |
 | `runners.serviceAccount.annotations` | `{}` | SA annotations (for IRSA, GCP WIF, Azure WI) |
@@ -862,7 +860,7 @@ The chart includes these templates in `helm/terrapod/templates/`:
 | Template | Resource |
 |---|---|
 | `configmap-api.yaml` | API config.yaml ConfigMap |
-| `configmap-runner.yaml` | Runner definitions ConfigMap |
+| `configmap-runner.yaml` | Runner configuration ConfigMap |
 | `deployment-api.yaml` | API Deployment |
 | `deployment-listener.yaml` | Runner listener Deployment |
 | `deployment-web.yaml` | Web UI Deployment |

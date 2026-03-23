@@ -232,7 +232,6 @@ class RunnerListener:
                 json={
                     "capacity": self._max_concurrent,
                     "active_runs": self._active_launches,
-                    "runner_definitions": [d.name for d in self.runner_config.definitions],
                 },
                 headers=self._auth_headers(),
             )

@@ -28,35 +28,6 @@ def yaml_config_settings_source() -> dict[str, Any]:
 # --- Runner Configuration Models ---
 
 
-class RunnerResourceSpec(BaseModel):
-    """CPU and memory specification for a runner Job."""
-
-    cpu: str = Field(default="500m")
-    memory: str = Field(default="1Gi")
-
-
-class RunnerResources(BaseModel):
-    """Resource requests and limits for a runner Job."""
-
-    requests: RunnerResourceSpec = Field(default_factory=RunnerResourceSpec)
-    limits: RunnerResourceSpec = Field(
-        default_factory=lambda: RunnerResourceSpec(cpu="1", memory="2Gi")
-    )
-
-
-class RunnerDefinition(BaseModel):
-    """Named runner definition — defines a K8s Job resource envelope."""
-
-    name: str = Field(description="Runner definition name")
-    description: str = Field(default="")
-    resources: RunnerResources = Field(default_factory=RunnerResources)
-    timeout_minutes: int = Field(default=60)
-    setup_script: str = Field(
-        default="",
-        description="Shell script to run before tofu/terraform init (e.g. install providers, configure backends)",
-    )
-
-
 class RunnerImageConfig(BaseModel):
     """Container image used for runner Jobs."""
 
@@ -69,10 +40,9 @@ class RunnerConfig(BaseModel):
     """Runner configuration, loaded from /etc/terrapod/runners.yaml.
 
     Separate from main Settings because listeners need their own
-    runner definitions independent of the API server's config.
+    config independent of the API server's config.
     """
 
-    default: str = Field(default="standard", description="Default runner definition name")
     image: RunnerImageConfig = Field(default_factory=RunnerImageConfig)
     server_url: str = Field(
         default="",
@@ -84,9 +54,6 @@ class RunnerConfig(BaseModel):
     service_account_name: str = Field(default="")
     azure_workload_identity: bool = Field(default=False)
     ttl_seconds_after_finished: int = Field(default=600)
-    definitions: list[RunnerDefinition] = Field(
-        default_factory=lambda: [RunnerDefinition(name="standard", description="Standard runner")]
-    )
     termination_grace_period_seconds: int = Field(
         default=120,
         description="Time budget for graceful shutdown + artifact uploads (pod terminationGracePeriodSeconds)",

@@ -39,7 +39,7 @@ class TestListenerHeartbeat:
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
                 f"/api/v2/listeners/{lid}/heartbeat",
-                json={"capacity": 5, "active_runs": 2, "runner_definitions": ["default"]},
+                json={"capacity": 5, "active_runs": 2},
             )
 
         assert res.status_code == 200

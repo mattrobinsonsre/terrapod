@@ -403,11 +403,8 @@ web:
     name: ""
     annotations: {}
 
-# ── Runner Definitions ──────────────────────────────────────────────────────── ────────────────────────────────────────────────────────
+# ── Runner Configuration ─────────────────────────────────────────────────────
 runners:
-  # Default runner definition name (must match a name below)
-  default: standard
-
   # Runner job container image (generic runner — binary fetched at runtime)
   image:
     repository: ghcr.io/mattrobinsonsre/terrapod-runner
@@ -418,42 +415,7 @@ runners:
   # for presigned storage URLs. Defaults to http://<release>-api:8000.
   serverUrl: ""
 
-  # Named runner definitions — each defines a K8s Job resource envelope
-  definitions:
-    - name: standard
-      description: "Standard runner for most workspaces"
-      resources:
-        requests:
-          cpu: "500m"
-          memory: "1Gi"
-        limits:
-          cpu: "1"
-          memory: "2Gi"
-      timeout_minutes: 60
-
-    - name: large
-      description: "Large runner for workspaces with many resources"
-      resources:
-        requests:
-          cpu: "1"
-          memory: "4Gi"
-        limits:
-          cpu: "2"
-          memory: "8Gi"
-      timeout_minutes: 120
-
-    - name: xlarge
-      description: "Extra large runner for very large state files"
-      resources:
-        requests:
-          cpu: "2"
-          memory: "8Gi"
-        limits:
-          cpu: "4"
-          memory: "16Gi"
-      timeout_minutes: 180
-
-  # Shared Job settings (applied to all runner definitions)
+  # Shared Job settings
   nodeSelector: {}
   tolerations: []
   affinity: {}

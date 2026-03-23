@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  allowedDevOrigins: ['terrapod.local'],
   // Prevent gzip buffering on SSE endpoints. Next.js compression buffers
   // small messages (keepalives, events) indefinitely, breaking real-time
   // streaming. Setting Content-Encoding: none tells the compression

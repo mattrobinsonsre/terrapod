@@ -95,24 +95,8 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "default": { "type": "string" },
         "image": { "$ref": "#/$defs/imageSpec" },
         "serverUrl": { "type": "string" },
-        "definitions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "name": { "type": "string" },
-              "description": { "type": "string" },
-              "resources": { "$ref": "#/$defs/resourceSpec" },
-              "timeout_minutes": { "type": "integer", "minimum": 1 },
-              "setup_script": { "type": "string" }
-            },
-            "required": ["name", "resources"]
-          }
-        },
         "nodeSelector": { "type": "object" },
         "tolerations": { "type": "array", "items": { "type": "object" } },
         "affinity": { "type": "object" },

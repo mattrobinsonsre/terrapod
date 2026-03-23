@@ -10,7 +10,7 @@ Endpoints:
     POST   /api/v2/runs                              (create run)
     GET    /api/v2/runs/{run_id}                      (show run)
     GET    /api/v2/workspaces/{id}/runs               (list runs)
-    POST   /api/v2/runs/{run_id}/actions/confirm      (confirm plan)
+    POST   /api/v2/runs/{run_id}/actions/apply        (confirm plan for apply)
     POST   /api/v2/runs/{run_id}/actions/discard      (discard plan)
     POST   /api/v2/runs/{run_id}/actions/cancel       (cancel run)
     POST   /api/v2/runs/{run_id}/actions/retry        (retry run — create new run from terminal run)
@@ -407,7 +407,7 @@ async def list_workspace_runs(
     )
 
 
-@router.post("/runs/{run_id}/actions/confirm")
+@router.post("/runs/{run_id}/actions/apply")
 async def confirm_run(
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
