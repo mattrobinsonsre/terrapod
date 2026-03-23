@@ -32,7 +32,7 @@ from terrapod.services import github_service, gitlab_service, run_service
 from terrapod.services.archive_utils import strip_archive_top_level_dir
 from terrapod.services.vcs_provider import PullRequest
 from terrapod.storage import get_storage
-from terrapod.storage.keys import module_override_key
+from terrapod.storage.keys import config_version_key, module_override_key
 
 logger = get_logger(__name__)
 
@@ -215,6 +215,64 @@ async def _cancel_stale_module_runs(
                 )
 
 
+async def _fetch_workspace_config(
+    db: AsyncSession,
+    ws: Workspace,
+    storage,  # type: ignore[no-untyped-def]
+    *,
+    speculative: bool = False,
+) -> uuid.UUID | None:
+    """Fetch a workspace's VCS code and create a ConfigurationVersion.
+
+    Returns the config version ID, or None if the workspace has no VCS
+    connection or the download fails.
+    """
+    if not ws.vcs_connection_id or not ws.vcs_repo_url:
+        return None
+
+    ws_conn = await db.get(VCSConnection, ws.vcs_connection_id)
+    if ws_conn is None or ws_conn.status != "active":
+        return None
+
+    parse_fn = _dispatch_parse_repo_url(ws_conn.provider)
+    parsed = parse_fn(ws.vcs_repo_url)
+    if parsed is None:
+        return None
+
+    ws_owner, ws_repo = parsed
+    branch = ws.vcs_branch
+    if not branch:
+        branch = await _get_default_branch(ws_conn, ws_owner, ws_repo) or "main"
+
+    try:
+        archive = await _download_archive(ws_conn, ws_owner, ws_repo, branch)
+    except Exception:
+        logger.warning(
+            "Failed to download workspace archive for module-test",
+            workspace=ws.name,
+            branch=branch,
+            exc_info=True,
+        )
+        return None
+
+    archive = strip_archive_top_level_dir(archive)
+
+    cv = await run_service.create_configuration_version(
+        db,
+        workspace_id=ws.id,
+        source="module-test",
+        auto_queue_runs=False,
+        speculative=speculative,
+    )
+    await db.flush()
+
+    key = config_version_key(str(ws.id), str(cv.id))
+    await storage.put(key, archive, content_type="application/x-tar")
+
+    cv = await run_service.mark_configuration_uploaded(db, cv)
+    return cv.id
+
+
 async def _create_module_test_runs(
     db: AsyncSession,
     storage,  # type: ignore[no-untyped-def]
@@ -270,12 +328,23 @@ async def _create_module_test_runs(
         if ws is None:
             continue
 
+        # Fetch the workspace's own VCS code so the runner has configuration
+        cv_id = await _fetch_workspace_config(db, ws, storage, speculative=True)
+        if cv_id is None:
+            logger.warning(
+                "Skipping module-test run — could not fetch workspace config",
+                workspace=ws.name,
+                module=module.name,
+            )
+            continue
+
         run = await run_service.create_run(
             db,
             workspace=ws,
             message=f"Module impact: PR #{pr.number} on {module.name}/{module.provider} — {pr.title}",
             source="module-test",
             plan_only=True,
+            configuration_version_id=cv_id,
             created_by="module-impact-analysis",
         )
         run.module_overrides = overrides
@@ -325,10 +394,21 @@ async def trigger_linked_workspace_runs(
     if not links:
         return []
 
+    storage = get_storage()
     runs: list[Run] = []
     for link in links:
         ws = link.workspace
         if ws is None:
+            continue
+
+        # Fetch workspace VCS code so the runner has configuration
+        cv_id = await _fetch_workspace_config(db, ws, storage)
+        if cv_id is None:
+            logger.warning(
+                "Skipping module-publish run — could not fetch workspace config",
+                workspace=ws.name,
+                module=f"{module.name}/{module.provider}",
+            )
             continue
 
         run = await run_service.create_run(
@@ -337,6 +417,7 @@ async def trigger_linked_workspace_runs(
             message=f"Module {module.name}/{module.provider} v{version} published",
             source="module-publish",
             plan_only=False,
+            configuration_version_id=cv_id,
             created_by="module-impact-analysis",
         )
         if commit_sha:
