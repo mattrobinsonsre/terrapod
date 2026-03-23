@@ -171,6 +171,11 @@ async def _poll_module_prs(
         try:
             await _create_module_test_runs(db, storage, module, conn, owner, repo, pr)
             pr_shas[pr_num_str] = pr.head_sha
+            # Commit after each PR so runs + module_overrides are visible to
+            # listeners immediately when the SSE event fires (flush alone keeps
+            # data in the uncommitted transaction, invisible to other sessions).
+            module.vcs_last_pr_shas = pr_shas
+            await db.commit()
         except Exception:
             logger.warning(
                 "Failed to create module test runs",

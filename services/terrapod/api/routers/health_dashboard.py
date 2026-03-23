@@ -12,7 +12,7 @@ from datetime import UTC, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from sqlalchemy import case, func, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
@@ -23,6 +23,14 @@ from terrapod.logging_config import get_logger
 
 router = APIRouter(prefix="/api/v2", tags=["health-dashboard"])
 logger = get_logger(__name__)
+
+
+def _primary_run_filter():
+    """Exclude auxiliary runs (module-test, speculative PR) from health metrics."""
+    return ~or_(
+        Run.source == "module-test",
+        and_(Run.plan_only.is_(True), Run.vcs_pull_request_number.isnot(None)),
+    )
 
 
 def _rfc3339(dt) -> str:
@@ -173,15 +181,17 @@ async def _get_run_health(db: AsyncSession) -> dict:
     now_utc = func.now()
     cutoff = now_utc - timedelta(hours=24)
 
+    prf = _primary_run_filter()
+
     # Current queue depth
     queued_result = await db.execute(
-        select(func.count()).select_from(Run).where(Run.status == "queued")
+        select(func.count()).select_from(Run).where(Run.status == "queued", prf)
     )
     queued = queued_result.scalar_one()
 
     # In-progress count
     in_progress_result = await db.execute(
-        select(func.count()).select_from(Run).where(Run.status.in_(["planning", "applying"]))
+        select(func.count()).select_from(Run).where(Run.status.in_(["planning", "applying"]), prf)
     )
     in_progress = in_progress_result.scalar_one()
 
@@ -191,7 +201,7 @@ async def _get_run_health(db: AsyncSession) -> dict:
             Run.status,
             func.count(),
         )
-        .where(Run.created_at >= cutoff)
+        .where(Run.created_at >= cutoff, prf)
         .group_by(Run.status)
     )
     recent_24h = {"total": 0, "applied": 0, "errored": 0, "canceled": 0}
@@ -215,6 +225,7 @@ async def _get_run_health(db: AsyncSession) -> dict:
             Run.plan_started_at.isnot(None),
             Run.plan_finished_at.isnot(None),
             Run.created_at >= cutoff,
+            prf,
         )
     )
     avg_plan_secs = plan_avg_result.scalar_one()
@@ -230,6 +241,7 @@ async def _get_run_health(db: AsyncSession) -> dict:
             Run.apply_started_at.isnot(None),
             Run.apply_finished_at.isnot(None),
             Run.created_at >= cutoff,
+            prf,
         )
     )
     avg_apply_secs = apply_avg_result.scalar_one()
