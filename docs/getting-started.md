@@ -201,19 +201,18 @@ State is uploaded to Terrapod after a successful apply. You can view state versi
 
 For remote execution, the runner listener creates a K8s Job that runs tofu (or terraform) on the server.
 
-**Important:** In remote mode, CLI-initiated runs are always **plan-only**. This is a deliberate security policy — CLI-uploaded code hasn't been through VCS review. To apply changes in remote mode, use one of:
+Remote workspaces support two workflows depending on whether VCS is connected:
 
-- **VCS-triggered runs** — push to the tracked branch to trigger a full plan+apply cycle
-- **UI confirmation** — confirm a VCS-triggered planned run in the web UI
+**VCS-connected workspaces** — VCS is the source of truth. CLI can only plan; applies must come through VCS.
 
-| Source | Plan | Apply |
+**Non-VCS workspaces (CLI-driven)** — the CLI is the source of truth. `tofu plan` and `tofu apply` both work, with the apply phase running on the server after plan confirmation.
+
+| Source | VCS-Connected | Non-VCS (CLI-driven) |
 |---|---|---|
-| `tofu plan` (CLI) | Plan-only on server | N/A |
-| `tofu apply` (CLI) | Plan-only on server | Not permitted |
-| VCS push to tracked branch | Full plan on server | Apply (auto or manual confirm) |
+| `tofu plan` (CLI) | Plan-only on server | Plan-only on server |
+| `tofu apply` (CLI) | Blocked (use VCS) | Plan + confirm + apply on server |
+| VCS push to tracked branch | Full plan + apply | N/A |
 | VCS pull request / merge request | Speculative plan-only | N/A |
-
-If you need `tofu apply` from the CLI, use **local execution mode** instead.
 
 1. Set the workspace execution mode to `remote`:
 

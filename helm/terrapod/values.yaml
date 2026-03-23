@@ -70,6 +70,17 @@ api:
     # outbound references back to the UI. Example: https://terrapod.example.com
     external_url: ""
 
+    # SQLAlchemy connection pool settings for RDS Proxy / pgBouncer compatibility.
+    # Tune these if using a connection pooler or high-availability PostgreSQL.
+    database:
+      pool_size: 10            # Persistent connections in pool
+      max_overflow: 20         # Extra connections beyond pool_size
+      pool_pre_ping: true      # SELECT 1 before checkout (handles stale connections)
+      pool_recycle: 1800       # Recycle connections after N seconds (below proxy max lifetime)
+      pool_timeout: 30         # Seconds to wait for a pool connection
+      connect_timeout: 10      # TCP connect timeout in seconds
+      command_timeout: 30      # Query timeout in seconds
+
     # Default execution backend and version for new workspaces
     default_execution_backend: tofu  # tofu | terraform
     default_terraform_version: "1.9"
@@ -403,11 +414,8 @@ web:
     name: ""
     annotations: {}
 
-# ── Runner Definitions ──────────────────────────────────────────────────────── ────────────────────────────────────────────────────────
+# ── Runner Configuration ─────────────────────────────────────────────────────
 runners:
-  # Default runner definition name (must match a name below)
-  default: standard
-
   # Runner job container image (generic runner — binary fetched at runtime)
   image:
     repository: ghcr.io/mattrobinsonsre/terrapod-runner
@@ -418,42 +426,7 @@ runners:
   # for presigned storage URLs. Defaults to http://<release>-api:8000.
   serverUrl: ""
 
-  # Named runner definitions — each defines a K8s Job resource envelope
-  definitions:
-    - name: standard
-      description: "Standard runner for most workspaces"
-      resources:
-        requests:
-          cpu: "500m"
-          memory: "1Gi"
-        limits:
-          cpu: "1"
-          memory: "2Gi"
-      timeout_minutes: 60
-
-    - name: large
-      description: "Large runner for workspaces with many resources"
-      resources:
-        requests:
-          cpu: "1"
-          memory: "4Gi"
-        limits:
-          cpu: "2"
-          memory: "8Gi"
-      timeout_minutes: 120
-
-    - name: xlarge
-      description: "Extra large runner for very large state files"
-      resources:
-        requests:
-          cpu: "2"
-          memory: "8Gi"
-        limits:
-          cpu: "4"
-          memory: "16Gi"
-      timeout_minutes: 180
-
-  # Shared Job settings (applied to all runner definitions)
+  # Shared Job settings
   nodeSelector: {}
   tolerations: []
   affinity: {}

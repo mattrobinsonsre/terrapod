@@ -484,7 +484,7 @@ GET /api/v2/workspaces/{id}/runs
 ### Confirm Run (Approve Apply)
 
 ```
-POST /api/v2/runs/{run_id}/actions/confirm
+POST /api/v2/runs/{run_id}/actions/apply
 ```
 
 **Required permission:** `write` on the workspace.
@@ -951,8 +951,7 @@ Registers a listener using a join token. The token identifies the pool — no po
 ```json
 {
   "join_token": "<raw-token>",
-  "name": "my-listener",
-  "runner_definitions": ["standard"]
+  "name": "my-listener"
 }
 ```
 

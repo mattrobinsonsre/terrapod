@@ -114,9 +114,9 @@ ingress:
 tls:
   existingSecret: terrapod-tls-local
 
-# Listener join token for local dev (must match pool token created by setup-dev-pool)
+# Listener config for local dev
 listener:
-  replicas: 2
+  replicas: 1
   name: "dev-listener"
   podAntiAffinity:
     enabled: false
@@ -129,10 +129,12 @@ listener:
   pdb:
     enabled: false
 
-# Bootstrap admin user for local dev
+# Bootstrap admin user + agent pool for local dev
 bootstrap:
   adminEmail: admin
   adminPassword: admin
+  poolName: dev-pool
+  poolToken: "dev-join-token-do-not-use-in-prod"
 
 # Local PostgreSQL (bundled via Tiltfile)
 postgresql:

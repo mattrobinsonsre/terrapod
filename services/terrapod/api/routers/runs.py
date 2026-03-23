@@ -10,12 +10,14 @@ Endpoints:
     POST   /api/v2/runs                              (create run)
     GET    /api/v2/runs/{run_id}                      (show run)
     GET    /api/v2/workspaces/{id}/runs               (list runs)
-    POST   /api/v2/runs/{run_id}/actions/confirm      (confirm plan)
+    POST   /api/v2/runs/{run_id}/actions/apply        (confirm plan for apply)
     POST   /api/v2/runs/{run_id}/actions/discard      (discard plan)
     POST   /api/v2/runs/{run_id}/actions/cancel       (cancel run)
     POST   /api/v2/runs/{run_id}/actions/retry        (retry run — create new run from terminal run)
     GET    /api/v2/runs/{run_id}/plan                 (plan details)
+    GET    /api/v2/plans/{plan_id}                    (plan details by ID)
     GET    /api/v2/runs/{run_id}/apply                (apply details)
+    GET    /api/v2/applies/{apply_id}                 (apply details by ID)
     PATCH  /api/v2/listeners/{id}/runs/{run_id}       (listener status update)
     GET    /api/v2/listeners/{id}/runs/next            (poll for next run)
 """
@@ -53,7 +55,7 @@ def _rfc3339(dt) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _run_json(run: Run) -> dict:
+def _run_json(run: Run, *, workspace_has_vcs: bool = False) -> dict:
     """Serialize a Run to TFE V2 JSON:API format."""
     run_id = f"run-{run.id}"
 
@@ -80,6 +82,7 @@ def _run_json(run: Run) -> dict:
                 "allow-empty-apply": run.allow_empty_apply,
                 "is-drift-detection": run.is_drift_detection,
                 "has-changes": run.has_changes,
+                "workspace-has-vcs": workspace_has_vcs,
                 "module-overrides": run.module_overrides,
                 "vcs-commit-sha": run.vcs_commit_sha,
                 "vcs-branch": run.vcs_branch,
@@ -270,20 +273,26 @@ async def create_run(
 
     ws = await _get_workspace(ws_id, db)
 
-    # CLI-initiated runs in remote mode with uploaded config: plan is allowed,
-    # apply is not. The guard only applies when a configuration version is being
-    # uploaded (CLI workflow). Runs without a config version (UI-queued, VCS, drift)
-    # get their code from VCS, so apply is safe.
+    # CLI-initiated runs on VCS-connected remote workspaces: plan is allowed,
+    # apply is not — VCS is the source of truth. Non-VCS ("CLI-driven") remote
+    # workspaces allow both plan and apply from the CLI.
+    # The guard only applies when a configuration version is being uploaded
+    # (CLI workflow). Runs without a CV (UI-queued, VCS, drift) get code from VCS.
     plan_only = attrs.get("plan-only", False)
     source = attrs.get("source", "tfe-api")
     cv_data = relationships.get("configuration-version", {}).get("data", {})
     has_cv = bool(cv_data.get("id", "") if cv_data else "")
-    if ws.execution_mode == "remote" and source not in ("vcs", "drift-detection") and has_cv:
+    if (
+        ws.execution_mode == "remote"
+        and ws.vcs_connection_id is not None
+        and source not in ("vcs", "drift-detection")
+        and has_cv
+    ):
         if not plan_only:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Apply is not allowed from the CLI on remote execution workspaces. "
-                "Use 'terraform plan' for speculative plans, or trigger applies using VCS integration and/or the UX.",
+                detail="Apply is not allowed from the CLI on VCS-connected remote workspaces. "
+                "Use 'tofu plan' for speculative plans, or trigger applies via VCS integration and/or the UI.",
             )
         plan_only = True
 
@@ -356,7 +365,10 @@ async def create_run(
     await db.commit()
     await db.refresh(run)
 
-    return JSONResponse(content=_run_json(run), status_code=201)
+    return JSONResponse(
+        content=_run_json(run, workspace_has_vcs=ws.vcs_connection_id is not None),
+        status_code=201,
+    )
 
 
 @router.get("/runs/{run_id}")
@@ -368,7 +380,10 @@ async def show_run(
     """Show a run. Requires read on workspace."""
     run = await _get_run(run_id, db)
     await _require_run_ws_permission(run, "read", user, db)
-    return JSONResponse(content=_run_json(run))
+    ws = await db.get(Workspace, run.workspace_id)
+    return JSONResponse(
+        content=_run_json(run, workspace_has_vcs=bool(ws and ws.vcs_connection_id)),
+    )
 
 
 @router.get("/workspaces/{workspace_id}/runs")
@@ -388,10 +403,13 @@ async def list_workspace_runs(
             detail="Requires read permission on workspace",
         )
     runs = await run_service.list_workspace_runs(db, ws.id, page_number, page_size)
-    return JSONResponse(content={"data": [_run_json(r)["data"] for r in runs]})
+    has_vcs = ws.vcs_connection_id is not None
+    return JSONResponse(
+        content={"data": [_run_json(r, workspace_has_vcs=has_vcs)["data"] for r in runs]}
+    )
 
 
-@router.post("/runs/{run_id}/actions/confirm")
+@router.post("/runs/{run_id}/actions/apply")
 async def confirm_run(
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -401,13 +419,14 @@ async def confirm_run(
     run = await _get_run(run_id, db)
     await _require_run_ws_permission(run, "write", user, db)
 
-    # Block apply for CLI-uploaded code in remote execution mode
+    # Block apply for CLI-uploaded code on VCS-connected remote workspaces
     if run.source not in ("vcs", "drift-detection"):
         ws = await db.get(Workspace, run.workspace_id)
-        if ws and ws.execution_mode == "remote":
+        if ws and ws.execution_mode == "remote" and ws.vcs_connection_id is not None:
             raise HTTPException(
                 status_code=422,
-                detail="Apply is not supported for CLI-uploaded code in remote execution mode. Only VCS-managed code can be applied.",
+                detail="Apply is not supported for CLI-uploaded code on VCS-connected remote workspaces. "
+                "Only VCS-managed code can be applied on VCS-connected workspaces.",
             )
 
     try:
@@ -649,6 +668,42 @@ async def show_plan(
     return JSONResponse(content=_plan_json(run))
 
 
+def _apply_json(run: Run) -> dict:
+    """Build apply JSON:API response for a run."""
+    from terrapod.config import settings
+
+    base = settings.auth.callback_base_url.rstrip("/")
+    return {
+        "data": {
+            "id": f"apply-{run.id}",
+            "type": "applies",
+            "attributes": {
+                "status": _apply_status(run),
+                "log-read-url": f"{base}/api/v2/applies/{run.id}/log",
+            },
+            "links": {
+                "self": f"/api/v2/applies/apply-{run.id}",
+            },
+        }
+    }
+
+
+@router.get("/applies/{apply_id}")
+async def show_apply_by_id(
+    apply_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Show apply details by apply ID (go-tfe compatibility).
+
+    go-tfe fetches applies via GET /api/v2/applies/{apply_id} during cloud runs.
+    Apply IDs use the same UUID as the run with an 'apply-' prefix.
+    """
+    run = await _get_run(apply_id.replace("apply-", "run-"), db)
+    await _require_run_ws_permission(run, "read", user, db)
+    return JSONResponse(content=_apply_json(run))
+
+
 @router.get("/runs/{run_id}/apply")
 async def show_apply(
     run_id: str = Path(...),
@@ -658,25 +713,7 @@ async def show_apply(
     """Show apply details including log URL."""
     run = await _get_run(run_id, db)
     await _require_run_ws_permission(run, "read", user, db)
-    from terrapod.config import settings
-
-    base = settings.auth.callback_base_url.rstrip("/")
-
-    return JSONResponse(
-        content={
-            "data": {
-                "id": f"apply-{run.id}",
-                "type": "applies",
-                "attributes": {
-                    "status": _apply_status(run),
-                    "log-read-url": f"{base}/api/v2/applies/{run.id}/log",
-                },
-                "links": {
-                    "self": f"/api/v2/runs/{run_id}/apply",
-                },
-            }
-        }
-    )
+    return JSONResponse(content=_apply_json(run))
 
 
 # ── SSE (Server-Sent Events) ─────────────────────────────────────────────

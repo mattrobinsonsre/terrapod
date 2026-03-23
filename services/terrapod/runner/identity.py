@@ -3,7 +3,6 @@
 import os
 import uuid
 
-from terrapod.config import load_runner_config
 from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -117,9 +116,6 @@ async def _join_via_token(name: str, api_url: str) -> ListenerIdentity:
             "then set the token as TERRAPOD_JOIN_TOKEN."
         )
 
-    runner_config = load_runner_config()
-    runner_defs = [d.name for d in runner_config.definitions]
-
     max_retries = 30
     backoff = 2
 
@@ -131,7 +127,6 @@ async def _join_via_token(name: str, api_url: str) -> ListenerIdentity:
                     json={
                         "join_token": join_token,
                         "name": name,
-                        "runner_definitions": runner_defs,
                     },
                 )
                 response.raise_for_status()

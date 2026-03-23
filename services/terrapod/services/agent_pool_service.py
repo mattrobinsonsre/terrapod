@@ -1,7 +1,6 @@
 """Agent pool, join token, and listener management service."""
 
 import hashlib
-import json
 import secrets
 import uuid
 from datetime import UTC, datetime
@@ -173,7 +172,6 @@ async def join_listener(
     pool: AgentPool,
     token: AgentPoolToken,
     name: str,
-    runner_definitions: list[str],
     db: AsyncSession,
 ) -> dict:
     """Register or re-register a listener via join token exchange.
@@ -202,7 +200,6 @@ async def join_listener(
                 "pool_id": str(pool.id),
                 "certificate_fingerprint": fingerprint,
                 "certificate_expires_at": cert.not_valid_after_utc.isoformat(),
-                "runner_definitions": json.dumps(runner_definitions),
                 "status": "online",
                 "last_heartbeat": now,
             },
@@ -226,7 +223,6 @@ async def join_listener(
                 "pool_id": str(pool.id),
                 "certificate_fingerprint": fingerprint,
                 "certificate_expires_at": cert.not_valid_after_utc.isoformat(),
-                "runner_definitions": json.dumps(runner_definitions),
                 "status": "online",
                 "capacity": "10",
                 "active_runs": "0",
@@ -385,7 +381,7 @@ async def heartbeat_listener(listener_id: str, name: str, **fields: str) -> None
 
     Called by the heartbeat endpoint. Refreshes TTL on both the hash and
     name lookup keys, and merges any updated runtime fields (status, capacity,
-    active_runs, runner_definitions).
+    active_runs).
     """
     redis = get_redis_client()
     now = datetime.now(UTC).isoformat()

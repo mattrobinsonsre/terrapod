@@ -28,35 +28,6 @@ def yaml_config_settings_source() -> dict[str, Any]:
 # --- Runner Configuration Models ---
 
 
-class RunnerResourceSpec(BaseModel):
-    """CPU and memory specification for a runner Job."""
-
-    cpu: str = Field(default="500m")
-    memory: str = Field(default="1Gi")
-
-
-class RunnerResources(BaseModel):
-    """Resource requests and limits for a runner Job."""
-
-    requests: RunnerResourceSpec = Field(default_factory=RunnerResourceSpec)
-    limits: RunnerResourceSpec = Field(
-        default_factory=lambda: RunnerResourceSpec(cpu="1", memory="2Gi")
-    )
-
-
-class RunnerDefinition(BaseModel):
-    """Named runner definition — defines a K8s Job resource envelope."""
-
-    name: str = Field(description="Runner definition name")
-    description: str = Field(default="")
-    resources: RunnerResources = Field(default_factory=RunnerResources)
-    timeout_minutes: int = Field(default=60)
-    setup_script: str = Field(
-        default="",
-        description="Shell script to run before terraform init (e.g. install providers, configure backends)",
-    )
-
-
 class RunnerImageConfig(BaseModel):
     """Container image used for runner Jobs."""
 
@@ -69,10 +40,9 @@ class RunnerConfig(BaseModel):
     """Runner configuration, loaded from /etc/terrapod/runners.yaml.
 
     Separate from main Settings because listeners need their own
-    runner definitions independent of the API server's config.
+    config independent of the API server's config.
     """
 
-    default: str = Field(default="standard", description="Default runner definition name")
     image: RunnerImageConfig = Field(default_factory=RunnerImageConfig)
     server_url: str = Field(
         default="",
@@ -84,9 +54,6 @@ class RunnerConfig(BaseModel):
     service_account_name: str = Field(default="")
     azure_workload_identity: bool = Field(default=False)
     ttl_seconds_after_finished: int = Field(default=600)
-    definitions: list[RunnerDefinition] = Field(
-        default_factory=lambda: [RunnerDefinition(name="standard", description="Standard runner")]
-    )
     termination_grace_period_seconds: int = Field(
         default=120,
         description="Time budget for graceful shutdown + artifact uploads (pod terminationGracePeriodSeconds)",
@@ -473,6 +440,43 @@ class MetricsConfig(BaseModel):
     )
 
 
+class DatabaseConfig(BaseModel):
+    """SQLAlchemy connection pool settings.
+
+    Tunable for RDS Proxy, pgBouncer, and high-availability PostgreSQL
+    deployments where connection lifetime and idle management matter.
+    """
+
+    pool_size: int = Field(
+        default=10,
+        description="Number of persistent connections in the pool",
+    )
+    max_overflow: int = Field(
+        default=20,
+        description="Max additional connections beyond pool_size",
+    )
+    pool_pre_ping: bool = Field(
+        default=True,
+        description="Test connections with SELECT 1 before checkout (handles stale connections)",
+    )
+    pool_recycle: int = Field(
+        default=1800,
+        description="Recycle connections after N seconds (set below proxy max_connection_lifetime)",
+    )
+    pool_timeout: int = Field(
+        default=30,
+        description="Seconds to wait for a connection from the pool before raising an error",
+    )
+    connect_timeout: int = Field(
+        default=10,
+        description="Seconds to wait for initial TCP connection to the database",
+    )
+    command_timeout: int = Field(
+        default=30,
+        description="Seconds to wait for a query to complete",
+    )
+
+
 # --- Main Settings ---
 
 
@@ -505,6 +509,7 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://terrapod:terrapod@localhost:5432/terrapod",
         description="PostgreSQL connection URL",
     )
+    database: "DatabaseConfig" = Field(default_factory=lambda: DatabaseConfig())
 
     # Redis
     redis_url: RedisDsn = Field(

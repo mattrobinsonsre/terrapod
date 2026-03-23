@@ -13,6 +13,16 @@ data:
     {{- if .Values.api.config.external_url }}
     external_url: {{ .Values.api.config.external_url | quote }}
     {{- end }}
+    {{- if .Values.api.config.database }}
+    database:
+      pool_size: {{ .Values.api.config.database.pool_size | default 10 }}
+      max_overflow: {{ .Values.api.config.database.max_overflow | default 20 }}
+      pool_pre_ping: {{ .Values.api.config.database.pool_pre_ping | default true }}
+      pool_recycle: {{ .Values.api.config.database.pool_recycle | default 1800 }}
+      pool_timeout: {{ .Values.api.config.database.pool_timeout | default 30 }}
+      connect_timeout: {{ .Values.api.config.database.connect_timeout | default 10 }}
+      command_timeout: {{ .Values.api.config.database.command_timeout | default 30 }}
+    {{- end }}
     storage:
       backend: {{ .Values.api.config.storage.backend | quote }}
       {{- if eq .Values.api.config.storage.backend "s3" }}
