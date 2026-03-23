@@ -270,28 +270,8 @@ async def get_module_download_url(
             coord = f"{namespace}/{name}/{provider}"
             override_path = run.module_overrides.get(coord)
             if override_path:
-                logger.info(
-                    "Serving module override",
-                    run_id=run_id,
-                    coord=coord,
-                    override_path=override_path,
-                )
                 presigned = await storage.presigned_get_url(override_path)
                 return presigned.url
-            else:
-                logger.info(
-                    "Module override not matched",
-                    run_id=run_id,
-                    coord=coord,
-                    overrides=run.module_overrides,
-                )
-        elif run_id:
-            logger.info(
-                "Module override lookup miss",
-                run_id=run_id,
-                run_found=run is not None,
-                has_overrides=bool(run.module_overrides) if run else False,
-            )
 
     # Normal path: look up published version
     module = await get_module(db, namespace, name, provider)

@@ -77,5 +77,11 @@ async def github_webhook(request: Request) -> Response:
             {"repo": full_name},
             dedup_key=f"vcs_poll:{full_name}",
         )
+        # Also trigger module impact analysis for VCS-connected modules
+        await enqueue_trigger(
+            "module_impact_immediate_poll",
+            {"repo": full_name},
+            dedup_key=f"module_impact_poll:{full_name}",
+        )
 
     return JSONResponse(content={"message": "accepted"})

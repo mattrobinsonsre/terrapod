@@ -99,6 +99,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
         # Module impact analysis: speculative plans for module PRs
         from terrapod.services.module_impact_service import (
+            handle_module_impact_immediate_poll,
             handle_module_test_completed,
             module_impact_poll_cycle,
         )
@@ -108,6 +109,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             interval_seconds=settings.vcs.poll_interval_seconds,
             handler=module_impact_poll_cycle,
             description="Poll VCS-connected modules for open PRs and create speculative runs",
+        )
+
+        register_trigger_handler(
+            "module_impact_immediate_poll",
+            handler=handle_module_impact_immediate_poll,
+            description="Webhook-triggered immediate module impact poll",
         )
 
         register_trigger_handler(

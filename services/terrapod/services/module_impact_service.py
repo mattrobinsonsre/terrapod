@@ -84,6 +84,13 @@ async def _get_default_branch(conn: VCSConnection, owner: str, repo: str) -> str
 # ---------------------------------------------------------------------------
 
 
+async def handle_module_impact_immediate_poll(payload: dict) -> None:
+    """Webhook-triggered immediate module impact poll for a specific repo."""
+    repo = payload.get("repo", "unknown")
+    logger.info("Immediate module impact poll triggered by webhook", repo=repo)
+    await module_impact_poll_cycle()
+
+
 async def module_impact_poll_cycle() -> None:
     """Poll VCS-connected modules (with workspace links) for open PRs."""
     async with get_db_session() as db:
