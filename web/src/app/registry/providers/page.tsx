@@ -111,6 +111,8 @@ export default function ProvidersPage() {
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 required
+                pattern="[a-z][a-z0-9-]*"
+                title="Lowercase letters, numbers, and hyphens only. Must start with a lowercase letter."
                 placeholder="aws"
                 className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
               />

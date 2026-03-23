@@ -125,6 +125,8 @@ export default function AgentPoolsPage() {
               <div>
                 <label htmlFor="pool-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
                 <input id="pool-name" type="text" value={name} onChange={(e) => setName(e.target.value)} required
+                  pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*"
+                  title="Letters, numbers, hyphens, and underscores only. Must start with a letter or number."
                   placeholder="aws-prod"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
               </div>

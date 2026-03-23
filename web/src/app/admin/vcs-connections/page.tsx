@@ -185,6 +185,8 @@ export default function VCSConnectionsPage() {
               <div>
                 <label htmlFor="vcs-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
                 <input id="vcs-name" type="text" value={name} onChange={(e) => setName(e.target.value)} required
+                  pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*"
+                  title="Letters, numbers, hyphens, and underscores only. Must start with a letter or number."
                   placeholder="my-github-app"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
               </div>
@@ -199,6 +201,8 @@ export default function VCSConnectionsPage() {
               <div>
                 <label htmlFor="vcs-url" className="block text-sm font-medium text-slate-300 mb-1">Server URL (optional)</label>
                 <input id="vcs-url" type="text" value={serverUrl} onChange={(e) => setServerUrl(e.target.value)}
+                  pattern="https?://.+"
+                  title="Must be an HTTP or HTTPS URL (e.g. https://github.mycompany.com)"
                   placeholder={provider === 'github' ? 'https://api.github.com' : 'https://gitlab.com'}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
               </div>
@@ -210,12 +214,16 @@ export default function VCSConnectionsPage() {
                   <div>
                     <label htmlFor="gh-app-id" className="block text-sm font-medium text-slate-300 mb-1">App ID</label>
                     <input id="gh-app-id" type="text" value={appId} onChange={(e) => setAppId(e.target.value)} required
+                      pattern="[0-9]+"
+                      title="GitHub App ID — numeric digits only"
                       placeholder="123456"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
                     <label htmlFor="gh-install-id" className="block text-sm font-medium text-slate-300 mb-1">Installation ID</label>
                     <input id="gh-install-id" type="text" value={installationId} onChange={(e) => setInstallationId(e.target.value)} required
+                      pattern="[0-9]+"
+                      title="GitHub App Installation ID — numeric digits only"
                       placeholder="789012"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
