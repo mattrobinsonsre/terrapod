@@ -1027,7 +1027,10 @@ async def plan_log(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Stream plan log content (go-tfe LogReader compatible)."""
-    run_uuid = uuid.UUID(plan_id.removeprefix("plan-"))
+    try:
+        run_uuid = uuid.UUID(plan_id.removeprefix("plan-").removeprefix("run-"))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Plan not found") from None
     run = await run_service.get_run(db, run_uuid)
     if run is None:
         raise HTTPException(status_code=404, detail="Plan not found")
@@ -1051,7 +1054,10 @@ async def apply_log(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Stream apply log content (go-tfe LogReader compatible)."""
-    run_uuid = uuid.UUID(apply_id.removeprefix("apply-"))
+    try:
+        run_uuid = uuid.UUID(apply_id.removeprefix("apply-").removeprefix("run-"))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Apply not found") from None
     run = await run_service.get_run(db, run_uuid)
     if run is None:
         raise HTTPException(status_code=404, detail="Apply not found")
