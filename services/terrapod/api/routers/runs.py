@@ -967,10 +967,29 @@ async def upload_log_stream(
         phase = "plan" if run.status == "planning" else "apply"
     body_bytes = await request.body()
 
-    from terrapod.redis.client import LOG_STREAM_PREFIX, get_redis_client
+    from terrapod.redis.client import (
+        LOG_STREAM_PREFIX,
+        RUN_EVENTS_PREFIX,
+        get_redis_client,
+        publish_event,
+    )
 
     redis = get_redis_client()
     await redis.setex(f"{LOG_STREAM_PREFIX}{run.id}:{phase}", 300, body_bytes)
+
+    # Notify frontend that fresh log data is available
+    try:
+        payload = json.dumps(
+            {
+                "event": "log_updated",
+                "run_id": str(run.id),
+                "workspace_id": str(run.workspace_id),
+                "phase": phase,
+            }
+        )
+        await publish_event(f"{RUN_EVENTS_PREFIX}{run.workspace_id}", payload)
+    except Exception:
+        pass  # Never let SSE publishing break the log upload
 
     return Response(status_code=204)
 

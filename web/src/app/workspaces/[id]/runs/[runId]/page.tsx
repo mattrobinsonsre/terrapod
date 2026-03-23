@@ -316,12 +316,15 @@ export default function RunDetailPage() {
     loadRun()
   }, [router, loadRun])
 
-  // Real-time updates via SSE — reload on any workspace event for this run
+  // Real-time updates via SSE — reload run on status change, refresh logs on log_updated
   useRunEvents(workspaceId, useCallback((event) => {
-    // Reload on run_status_change for this run, or on reconnect (catch-up)
     const bareId = runId.replace(/^run-/, '')
-    if (event.event === 'reconnect' || event.run_id === bareId) {
+    if (event.event === 'reconnect' || (event.event === 'run_status_change' && event.run_id === bareId)) {
       loadRun()
+    }
+    if (event.event === 'log_updated' && event.run_id === bareId) {
+      if (event.phase === 'plan') loadPlanLog()
+      else if (event.phase === 'apply') loadApplyLog()
     }
   }, [runId, loadRun]))
 
