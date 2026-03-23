@@ -40,7 +40,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response, status
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
@@ -67,6 +67,19 @@ logger = get_logger(__name__)
 TFP_API_VERSION = "2.6"
 TFP_APP_NAME = "Terrapod"
 X_TFE_VERSION = "v0.1.0"
+
+
+def _primary_run_filter():
+    """Filter out auxiliary runs that should not affect workspace health.
+
+    Excludes module-test runs (module impact analysis) and speculative
+    VCS PR/MR runs — these are informational and should not influence
+    the workspace's displayed status.
+    """
+    return ~or_(
+        Run.source == "module-test",
+        and_(Run.plan_only.is_(True), Run.vcs_pull_request_number.isnot(None)),
+    )
 
 
 def _rfc3339(dt: datetime | None) -> str:
@@ -391,7 +404,7 @@ async def list_workspaces(
     if ws_ids:
         latest_run_q = (
             select(Run)
-            .where(Run.workspace_id.in_(ws_ids))
+            .where(Run.workspace_id.in_(ws_ids), _primary_run_filter())
             .order_by(Run.workspace_id, Run.created_at.desc())
             .distinct(Run.workspace_id)
         )
@@ -429,9 +442,12 @@ async def show_workspace(
     if perm is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    # Load latest run for this workspace
+    # Load latest primary run for this workspace (excludes module-test / speculative PR runs)
     run_result = await db.execute(
-        select(Run).where(Run.workspace_id == ws.id).order_by(Run.created_at.desc()).limit(1)
+        select(Run)
+        .where(Run.workspace_id == ws.id, _primary_run_filter())
+        .order_by(Run.created_at.desc())
+        .limit(1)
     )
     latest_run = run_result.scalar_one_or_none()
 
@@ -596,9 +612,12 @@ async def show_workspace_by_id(
     """Show a workspace by its ID."""
     ws, perm = await _require_ws_permission(workspace_id, "read", user, db)
 
-    # Load latest run for this workspace
+    # Load latest primary run for this workspace (excludes module-test / speculative PR runs)
     run_result = await db.execute(
-        select(Run).where(Run.workspace_id == ws.id).order_by(Run.created_at.desc()).limit(1)
+        select(Run)
+        .where(Run.workspace_id == ws.id, _primary_run_filter())
+        .order_by(Run.created_at.desc())
+        .limit(1)
     )
     latest_run = run_result.scalar_one_or_none()
 
