@@ -388,6 +388,8 @@ export default function RolesPage() {
                   <div>
                     <label htmlFor="r-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
                     <input id="r-name" type="text" value={roleName} onChange={(e) => setRoleName(e.target.value)} required placeholder="developer"
+                      pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*"
+                      title="Letters, numbers, hyphens, and underscores only. Must start with a letter or number."
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
@@ -574,7 +576,7 @@ export default function RolesPage() {
                   </div>
                   <div>
                     <label htmlFor="a-email" className="block text-sm font-medium text-slate-300 mb-1">Email</label>
-                    <input id="a-email" type="text" list="email-suggestions" value={assignEmail} onChange={(e) => setAssignEmail(e.target.value)} required
+                    <input id="a-email" type="email" list="email-suggestions" value={assignEmail} onChange={(e) => setAssignEmail(e.target.value)} required
                       placeholder="user@example.com"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                     <datalist id="email-suggestions">

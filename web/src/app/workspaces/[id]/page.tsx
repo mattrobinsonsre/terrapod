@@ -1148,7 +1148,10 @@ function WorkspaceDetailContent() {
                 <div>
                   <dt className="text-xs text-slate-500">CPU Request</dt>
                   {editing ? (
-                    <input type="text" value={editCpu} onChange={(e) => setEditCpu(e.target.value)} className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                    <input type="text" value={editCpu} onChange={(e) => setEditCpu(e.target.value)}
+                      pattern="[0-9]+m|[0-9]+(\.[0-9]+)?"
+                      title="Kubernetes CPU quantity: whole cores (1, 2) or millicores (500m, 100m)"
+                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{attrs['resource-cpu']}</dd>
                   )}
@@ -1156,7 +1159,10 @@ function WorkspaceDetailContent() {
                 <div>
                   <dt className="text-xs text-slate-500">Memory Request</dt>
                   {editing ? (
-                    <input type="text" value={editMemory} onChange={(e) => setEditMemory(e.target.value)} className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                    <input type="text" value={editMemory} onChange={(e) => setEditMemory(e.target.value)}
+                      pattern="[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E|m)?"
+                      title="Kubernetes memory quantity: bytes (1000) or with suffix (512Mi, 2Gi, 1Ti)"
+                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{attrs['resource-memory']}</dd>
                   )}
@@ -1176,7 +1182,10 @@ function WorkspaceDetailContent() {
                   <dt className="text-xs text-slate-500">Version</dt>
                   {editing ? (
                     <>
-                      <input type="text" list="edit-version-suggestions" value={editVersion} onChange={(e) => setEditVersion(e.target.value)} placeholder="e.g. 1.9 or 1.9.8" className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                      <input type="text" list="edit-version-suggestions" value={editVersion} onChange={(e) => setEditVersion(e.target.value)} placeholder="e.g. 1.9 or 1.9.8"
+                        pattern="[0-9]+\.[0-9]+(\.[0-9]+)?"
+                        title="Version in X.Y or X.Y.Z format (e.g. 1.9 or 1.9.8)"
+                        className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                       <datalist id="edit-version-suggestions">
                         {versionSuggestions.map(v => (
                           <option key={v} value={v} />
@@ -1238,7 +1247,10 @@ function WorkspaceDetailContent() {
                 <div>
                   <dt className="text-xs text-slate-500">VCS Repository</dt>
                   {editing ? (
-                    <input type="text" value={editVcsRepoUrl} onChange={(e) => setEditVcsRepoUrl(e.target.value)} placeholder="https://github.com/org/repo" className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                    <input type="text" value={editVcsRepoUrl} onChange={(e) => setEditVcsRepoUrl(e.target.value)} placeholder="https://github.com/org/repo"
+                      pattern="https?://.+"
+                      title="Must be an HTTP or HTTPS URL"
+                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">
                       {attrs['vcs-repo-url'] ? (

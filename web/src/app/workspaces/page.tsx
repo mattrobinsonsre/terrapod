@@ -245,6 +245,8 @@ export default function WorkspacesPage() {
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   required
+                  pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*"
+                  title="Letters, numbers, hyphens, and underscores only. Must start with a letter or number."
                   placeholder="my-workspace"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
@@ -281,6 +283,8 @@ export default function WorkspacesPage() {
                   list="version-suggestions"
                   value={newVersion}
                   onChange={(e) => setNewVersion(e.target.value)}
+                  pattern="[0-9]+\.[0-9]+(\.[0-9]+)?"
+                  title="Version in X.Y or X.Y.Z format (e.g. 1.9 or 1.9.8)"
                   placeholder="e.g. 1.9 or 1.9.8"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
@@ -297,9 +301,12 @@ export default function WorkspacesPage() {
                   type="text"
                   value={newCpu}
                   onChange={(e) => setNewCpu(e.target.value)}
+                  pattern="[0-9]+m|[0-9]+(\.[0-9]+)?"
+                  title="Kubernetes CPU quantity: whole cores (1, 2) or millicores (500m, 100m)"
                   placeholder="1"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
+                <p className="mt-1 text-xs text-slate-500">e.g. 1, 0.5, 500m</p>
               </div>
               <div>
                 <label htmlFor="ws-mem" className="block text-sm font-medium text-slate-300 mb-1">Memory Request</label>
@@ -308,9 +315,12 @@ export default function WorkspacesPage() {
                   type="text"
                   value={newMemory}
                   onChange={(e) => setNewMemory(e.target.value)}
+                  pattern="[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E|m)?"
+                  title="Kubernetes memory quantity: bytes (1000) or with suffix (512Mi, 2Gi, 1Ti)"
                   placeholder="2Gi"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
+                <p className="mt-1 text-xs text-slate-500">e.g. 2Gi, 512Mi, 1Ti</p>
               </div>
               <div className="flex items-end">
                 <label className="flex items-center gap-2 px-3 py-2 cursor-pointer">
@@ -346,6 +356,8 @@ export default function WorkspacesPage() {
                   type="text"
                   value={newVcsRepoUrl}
                   onChange={(e) => setNewVcsRepoUrl(e.target.value)}
+                  pattern="https?://.+"
+                  title="Must be an HTTP or HTTPS URL"
                   placeholder="https://github.com/org/repo"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />

@@ -354,6 +354,8 @@ export default function AgentPoolDetailPage() {
                   <dt className="text-xs text-slate-500">Name</dt>
                   {editing ? (
                     <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
+                      pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*"
+                      title="Letters, numbers, hyphens, and underscores only. Must start with a letter or number."
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{pool.attributes.name}</dd>
@@ -426,6 +428,8 @@ export default function AgentPoolDetailPage() {
                   <div>
                     <label htmlFor="tok-max" className="block text-sm font-medium text-slate-300 mb-1">Max Uses (optional)</label>
                     <input id="tok-max" type="number" value={tokenMaxUses} onChange={(e) => setTokenMaxUses(e.target.value)}
+                      min="1"
+                      step="1"
                       placeholder="Unlimited"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
