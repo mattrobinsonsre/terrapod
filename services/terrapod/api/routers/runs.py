@@ -15,7 +15,9 @@ Endpoints:
     POST   /api/v2/runs/{run_id}/actions/cancel       (cancel run)
     POST   /api/v2/runs/{run_id}/actions/retry        (retry run — create new run from terminal run)
     GET    /api/v2/runs/{run_id}/plan                 (plan details)
+    GET    /api/v2/plans/{plan_id}                    (plan details by ID)
     GET    /api/v2/runs/{run_id}/apply                (apply details)
+    GET    /api/v2/applies/{apply_id}                 (apply details by ID)
     PATCH  /api/v2/listeners/{id}/runs/{run_id}       (listener status update)
     GET    /api/v2/listeners/{id}/runs/next            (poll for next run)
 """
@@ -666,6 +668,42 @@ async def show_plan(
     return JSONResponse(content=_plan_json(run))
 
 
+def _apply_json(run: Run) -> dict:
+    """Build apply JSON:API response for a run."""
+    from terrapod.config import settings
+
+    base = settings.auth.callback_base_url.rstrip("/")
+    return {
+        "data": {
+            "id": f"apply-{run.id}",
+            "type": "applies",
+            "attributes": {
+                "status": _apply_status(run),
+                "log-read-url": f"{base}/api/v2/applies/{run.id}/log",
+            },
+            "links": {
+                "self": f"/api/v2/applies/apply-{run.id}",
+            },
+        }
+    }
+
+
+@router.get("/applies/{apply_id}")
+async def show_apply_by_id(
+    apply_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Show apply details by apply ID (go-tfe compatibility).
+
+    go-tfe fetches applies via GET /api/v2/applies/{apply_id} during cloud runs.
+    Apply IDs use the same UUID as the run with an 'apply-' prefix.
+    """
+    run = await _get_run(apply_id.replace("apply-", "run-"), db)
+    await _require_run_ws_permission(run, "read", user, db)
+    return JSONResponse(content=_apply_json(run))
+
+
 @router.get("/runs/{run_id}/apply")
 async def show_apply(
     run_id: str = Path(...),
@@ -675,25 +713,7 @@ async def show_apply(
     """Show apply details including log URL."""
     run = await _get_run(run_id, db)
     await _require_run_ws_permission(run, "read", user, db)
-    from terrapod.config import settings
-
-    base = settings.auth.callback_base_url.rstrip("/")
-
-    return JSONResponse(
-        content={
-            "data": {
-                "id": f"apply-{run.id}",
-                "type": "applies",
-                "attributes": {
-                    "status": _apply_status(run),
-                    "log-read-url": f"{base}/api/v2/applies/{run.id}/log",
-                },
-                "links": {
-                    "self": f"/api/v2/runs/{run_id}/apply",
-                },
-            }
-        }
-    )
+    return JSONResponse(content=_apply_json(run))
 
 
 # ── SSE (Server-Sent Events) ─────────────────────────────────────────────
