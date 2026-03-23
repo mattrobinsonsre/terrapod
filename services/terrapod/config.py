@@ -53,7 +53,7 @@ class RunnerDefinition(BaseModel):
     timeout_minutes: int = Field(default=60)
     setup_script: str = Field(
         default="",
-        description="Shell script to run before terraform init (e.g. install providers, configure backends)",
+        description="Shell script to run before tofu/terraform init (e.g. install providers, configure backends)",
     )
 
 

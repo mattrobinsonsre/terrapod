@@ -33,6 +33,6 @@ Next steps:
   1. Log in and create your first workspace
   2. Configure VCS connections (Admin > VCS Connections)
   3. Set up runner pools (Admin > Agent Pools)
-  4. Connect your CLI: terraform login {{ .Values.ingress.hostname | default "terrapod.example.com" }}
+  4. Connect your CLI: tofu login {{ .Values.ingress.hostname | default "terrapod.example.com" }}
 
 Documentation: https://github.com/mattrobinsonsre/terrapod

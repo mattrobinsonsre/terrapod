@@ -4,9 +4,9 @@ set -e
 # Signal-forwarding entrypoint for Terrapod runner Jobs.
 #
 # Time-budgeted graceful shutdown for spot instance preemption:
-#   T=0:       K8s sends SIGTERM → entrypoint forwards SIGINT to terraform
-#   T=0→CHILD_GRACE: Terraform graceful shutdown (writes state, releases lock)
-#   T=CHILD_GRACE: Watchdog sends SIGKILL if terraform is still running
+#   T=0:       K8s sends SIGTERM → entrypoint forwards SIGINT to tofu/terraform
+#   T=0→CHILD_GRACE: Graceful shutdown (writes state, releases lock)
+#   T=CHILD_GRACE: Watchdog sends SIGKILL if tofu/terraform is still running
 #   T=CHILD_GRACE→(GRACE-5): Artifact uploads (logs, state) with --max-time
 #   T=GRACE:   K8s SIGKILL deadline
 #
