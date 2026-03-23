@@ -361,6 +361,19 @@
           "enum": ["debug", "info", "warning", "error", "critical"]
         },
         "external_url": { "type": "string" },
+        "database": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pool_size": { "type": "integer", "minimum": 1 },
+            "max_overflow": { "type": "integer", "minimum": 0 },
+            "pool_pre_ping": { "type": "boolean" },
+            "pool_recycle": { "type": "integer", "minimum": -1 },
+            "pool_timeout": { "type": "integer", "minimum": 0 },
+            "connect_timeout": { "type": "integer", "minimum": 1 },
+            "command_timeout": { "type": "integer", "minimum": 1 }
+          }
+        },
         "default_execution_backend": {
           "type": "string",
           "enum": ["tofu", "terraform"]

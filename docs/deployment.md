@@ -407,11 +407,23 @@ listener:
 | `ingress.extraPaths` | `[]` | Extra paths prepended before the default catch-all |
 | `tls.existingSecret` | `""` | Existing TLS secret name |
 
-### Database & Redis
+### Database
 
 | Value | Default | Description |
 |---|---|---|
 | `postgresql.url` | `""` | PostgreSQL connection URL |
+| `api.config.database.pool_size` | `10` | Persistent connections in pool |
+| `api.config.database.max_overflow` | `20` | Extra connections beyond pool_size |
+| `api.config.database.pool_pre_ping` | `true` | SELECT 1 before checkout (handles stale connections) |
+| `api.config.database.pool_recycle` | `1800` | Recycle connections after N seconds |
+| `api.config.database.pool_timeout` | `30` | Seconds to wait for a pool connection |
+| `api.config.database.connect_timeout` | `10` | TCP connect timeout in seconds |
+| `api.config.database.command_timeout` | `30` | Query timeout in seconds |
+
+### Redis
+
+| Value | Default | Description |
+|---|---|---|
 | `redis.url` | `""` | Redis connection URL |
 
 ### Bootstrap
@@ -592,6 +604,79 @@ Database migrations run automatically as a Helm pre-install/pre-upgrade hook via
 migrations:
   enabled: false
 ```
+
+### Connection Pool Tuning
+
+Terrapod uses SQLAlchemy's async connection pool to manage PostgreSQL connections. The defaults work well for direct connections to a managed database, but you may need to tune them when using a connection pooler (RDS Proxy, pgBouncer) or for high-availability deployments.
+
+| Setting | Default | Description |
+|---|---|---|
+| `pool_size` | `10` | Number of persistent connections maintained in the pool. Each API replica maintains its own pool, so total connections = `pool_size x replicas` |
+| `max_overflow` | `20` | Additional connections allowed beyond `pool_size` under load. These are created on demand and closed when returned to the pool. Maximum connections per replica = `pool_size + max_overflow` |
+| `pool_pre_ping` | `true` | Issues a `SELECT 1` before handing out a connection. Detects and discards stale connections (e.g. after a proxy restart or failover). Small latency cost per checkout but prevents connection errors |
+| `pool_recycle` | `1800` | Connections older than this (in seconds) are recycled. Set this below your proxy's `max_connection_lifetime` to avoid the proxy forcibly closing connections mid-query |
+| `pool_timeout` | `30` | Seconds to wait for a connection from the pool before raising a timeout error. Increase if you see pool exhaustion errors under bursty load |
+| `connect_timeout` | `10` | TCP connect timeout in seconds. How long to wait when establishing a new connection to the database |
+| `command_timeout` | `30` | Query timeout in seconds. Queries exceeding this are cancelled by asyncpg |
+
+**When to tune these settings:**
+
+- **RDS Proxy / pgBouncer**: Set `pool_recycle` below the proxy's connection lifetime. RDS Proxy defaults to 1800s, so use `1700` to recycle before the proxy does. Keep `pool_pre_ping: true` to handle proxy-side disconnects
+- **Multiple API replicas**: Total connections = `(pool_size + max_overflow) x replicas`. With 3 replicas and defaults (10 + 20), that is 90 max connections. Ensure your database's `max_connections` accommodates this plus connections from migrations, monitoring, and other clients
+- **High-concurrency workloads**: Increase `pool_size` if you consistently see pool exhaustion. Increase `max_overflow` for bursty traffic patterns
+- **Cross-region or high-latency databases**: Increase `connect_timeout` beyond 10s. Consider increasing `command_timeout` for complex queries
+- **Failover / HA**: Keep `pool_pre_ping: true` (the default). After a database failover, stale connections to the old primary are detected and discarded on next checkout
+
+**Example: RDS Proxy**
+
+```yaml
+api:
+  config:
+    database:
+      pool_size: 5
+      max_overflow: 10
+      pool_pre_ping: true
+      pool_recycle: 1700     # Below RDS Proxy's default 1800s max_connection_lifetime
+      pool_timeout: 30
+      connect_timeout: 10
+      command_timeout: 30
+```
+
+With RDS Proxy, you can use a smaller `pool_size` because the proxy maintains its own connection pool to the database. The proxy handles connection multiplexing, so fewer persistent connections per replica are needed.
+
+**Example: pgBouncer (transaction mode)**
+
+```yaml
+api:
+  config:
+    database:
+      pool_size: 5
+      max_overflow: 10
+      pool_pre_ping: true
+      pool_recycle: 600      # pgBouncer default server_lifetime is 3600s; recycle well below
+      pool_timeout: 30
+      connect_timeout: 10
+      command_timeout: 30
+```
+
+When using pgBouncer in transaction mode, each query gets its own server connection for the duration of the transaction. Use a smaller `pool_size` since pgBouncer multiplexes connections. Set `pool_recycle` well below pgBouncer's `server_lifetime` setting.
+
+**Example: Direct connection (high concurrency)**
+
+```yaml
+api:
+  config:
+    database:
+      pool_size: 20
+      max_overflow: 30
+      pool_pre_ping: true
+      pool_recycle: 1800
+      pool_timeout: 60
+      connect_timeout: 10
+      command_timeout: 60
+```
+
+For direct database connections under high load, increase `pool_size` and `max_overflow`. With 3 replicas this allows up to 150 simultaneous connections -- ensure your database's `max_connections` is set accordingly (typically 200+ with headroom for admin connections).
 
 ---
 
@@ -787,9 +872,10 @@ Runner Jobs are ephemeral and scale naturally. Configure workspace-level resourc
 ### Database
 
 PostgreSQL is the bottleneck for high-concurrency scenarios. Use:
-- Connection pooling (PgBouncer) for large deployments
+- Connection pooling (PgBouncer or RDS Proxy) for large deployments -- see [Connection Pool Tuning](#connection-pool-tuning) for recommended settings
 - Read replicas for read-heavy workloads
 - Appropriately sized instance for your run volume
+- Total max connections = `(pool_size + max_overflow) x replicas` -- ensure your database's `max_connections` accommodates this
 
 ### Redis
 

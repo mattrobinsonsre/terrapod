@@ -70,6 +70,17 @@ api:
     # outbound references back to the UI. Example: https://terrapod.example.com
     external_url: ""
 
+    # SQLAlchemy connection pool settings for RDS Proxy / pgBouncer compatibility.
+    # Tune these if using a connection pooler or high-availability PostgreSQL.
+    database:
+      pool_size: 10            # Persistent connections in pool
+      max_overflow: 20         # Extra connections beyond pool_size
+      pool_pre_ping: true      # SELECT 1 before checkout (handles stale connections)
+      pool_recycle: 1800       # Recycle connections after N seconds (below proxy max lifetime)
+      pool_timeout: 30         # Seconds to wait for a pool connection
+      connect_timeout: 10      # TCP connect timeout in seconds
+      command_timeout: 30      # Query timeout in seconds
+
     # Default execution backend and version for new workspaces
     default_execution_backend: tofu  # tofu | terraform
     default_terraform_version: "1.9"

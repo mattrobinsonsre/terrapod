@@ -440,6 +440,43 @@ class MetricsConfig(BaseModel):
     )
 
 
+class DatabaseConfig(BaseModel):
+    """SQLAlchemy connection pool settings.
+
+    Tunable for RDS Proxy, pgBouncer, and high-availability PostgreSQL
+    deployments where connection lifetime and idle management matter.
+    """
+
+    pool_size: int = Field(
+        default=10,
+        description="Number of persistent connections in the pool",
+    )
+    max_overflow: int = Field(
+        default=20,
+        description="Max additional connections beyond pool_size",
+    )
+    pool_pre_ping: bool = Field(
+        default=True,
+        description="Test connections with SELECT 1 before checkout (handles stale connections)",
+    )
+    pool_recycle: int = Field(
+        default=1800,
+        description="Recycle connections after N seconds (set below proxy max_connection_lifetime)",
+    )
+    pool_timeout: int = Field(
+        default=30,
+        description="Seconds to wait for a connection from the pool before raising an error",
+    )
+    connect_timeout: int = Field(
+        default=10,
+        description="Seconds to wait for initial TCP connection to the database",
+    )
+    command_timeout: int = Field(
+        default=30,
+        description="Seconds to wait for a query to complete",
+    )
+
+
 # --- Main Settings ---
 
 
@@ -472,6 +509,7 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://terrapod:terrapod@localhost:5432/terrapod",
         description="PostgreSQL connection URL",
     )
+    database: "DatabaseConfig" = Field(default_factory=lambda: DatabaseConfig())
 
     # Redis
     redis_url: RedisDsn = Field(

@@ -26,12 +26,19 @@ async def init_db() -> None:
     global _engine, _async_session_factory  # noqa: PLW0603
     logger.info("Initializing database connection")
 
+    db_cfg = settings.database
     _engine = create_async_engine(
         str(settings.database_url),
         echo=settings.debug,
-        pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=20,
+        pool_pre_ping=db_cfg.pool_pre_ping,
+        pool_size=db_cfg.pool_size,
+        max_overflow=db_cfg.max_overflow,
+        pool_recycle=db_cfg.pool_recycle,
+        pool_timeout=db_cfg.pool_timeout,
+        connect_args={
+            "timeout": db_cfg.connect_timeout,
+            "command_timeout": db_cfg.command_timeout,
+        },
     )
 
     _async_session_factory = async_sessionmaker(
