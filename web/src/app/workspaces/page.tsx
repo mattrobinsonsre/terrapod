@@ -51,7 +51,7 @@ export default function WorkspacesPage() {
   const [newExecMode, setNewExecMode] = useState('local')
   const [newAutoApply, setNewAutoApply] = useState(false)
   const [newBackend, setNewBackend] = useState('tofu')
-  const [newVersion, setNewVersion] = useState('1.9')
+  const [newVersion, setNewVersion] = useState('1.11')
   const [newCpu, setNewCpu] = useState('1')
   const [newMemory, setNewMemory] = useState('2Gi')
   const [newVcsConnectionId, setNewVcsConnectionId] = useState('')
@@ -199,7 +199,7 @@ export default function WorkspacesPage() {
       setNewName('')
       setNewExecMode('local')
       setNewBackend('tofu')
-      setNewVersion('1.9')
+      setNewVersion('1.11')
       setNewAutoApply(false)
       setNewCpu('1')
       setNewMemory('2Gi')
@@ -284,8 +284,8 @@ export default function WorkspacesPage() {
                   value={newVersion}
                   onChange={(e) => setNewVersion(e.target.value)}
                   pattern="[0-9]+\.[0-9]+(\.[0-9]+)?"
-                  title="Version in X.Y or X.Y.Z format (e.g. 1.9 or 1.9.8)"
-                  placeholder="e.g. 1.9 or 1.9.8"
+                  title="Version in X.Y or X.Y.Z format (e.g. 1.11 or 1.11.5)"
+                  placeholder="e.g. 1.11 or 1.11.5"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
                 <datalist id="version-suggestions">

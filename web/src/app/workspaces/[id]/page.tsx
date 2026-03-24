@@ -1182,9 +1182,9 @@ function WorkspaceDetailContent() {
                   <dt className="text-xs text-slate-500">Version</dt>
                   {editing ? (
                     <>
-                      <input type="text" list="edit-version-suggestions" value={editVersion} onChange={(e) => setEditVersion(e.target.value)} placeholder="e.g. 1.9 or 1.9.8"
+                      <input type="text" list="edit-version-suggestions" value={editVersion} onChange={(e) => setEditVersion(e.target.value)} placeholder="e.g. 1.11 or 1.11.5"
                         pattern="[0-9]+\.[0-9]+(\.[0-9]+)?"
-                        title="Version in X.Y or X.Y.Z format (e.g. 1.9 or 1.9.8)"
+                        title="Version in X.Y or X.Y.Z format (e.g. 1.11 or 1.11.5)"
                         className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                       <datalist id="edit-version-suggestions">
                         {versionSuggestions.map(v => (

@@ -16,7 +16,7 @@ def _mock_workspace(**overrides):
     ws.locked = False
     ws.auto_apply = False
     ws.execution_mode = "remote"
-    ws.terraform_version = "1.9"
+    ws.terraform_version = "1.11"
     ws.resource_cpu = "1"
     ws.resource_memory = "2Gi"
     ws.agent_pool_id = None

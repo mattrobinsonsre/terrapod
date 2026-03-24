@@ -11,7 +11,7 @@ def _runner_config():
     cfg.image.tag = "latest"
     cfg.image.pull_policy = "IfNotPresent"
     cfg.default = "default"
-    cfg.default_terraform_version = "1.9.8"
+    cfg.default_terraform_version = "1.11"
     cfg.default_execution_backend = "tofu"
     cfg.ttl_seconds_after_finished = 300
     cfg.azure_workload_identity = False

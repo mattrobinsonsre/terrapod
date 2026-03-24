@@ -206,7 +206,7 @@ def _mock_workspace(**kwargs):
     ws.id = kwargs.get("id", uuid.uuid4())
     ws.name = kwargs.get("name", "test-ws")
     ws.auto_apply = kwargs.get("auto_apply", False)
-    ws.terraform_version = kwargs.get("terraform_version", "1.9.0")
+    ws.terraform_version = kwargs.get("terraform_version", "1.11")
     ws.resource_cpu = kwargs.get("resource_cpu", "1")
     ws.resource_memory = kwargs.get("resource_memory", "2Gi")
     ws.agent_pool_id = kwargs.get("agent_pool_id", None)

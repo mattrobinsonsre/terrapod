@@ -249,7 +249,7 @@ class Workspace(Base):
     execution_backend: Mapped[str] = mapped_column(
         String(20), nullable=False, default="tofu"
     )  # tofu, terraform
-    terraform_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.9")
+    terraform_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.11")
     working_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     lock_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
