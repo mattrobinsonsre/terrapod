@@ -29,8 +29,8 @@ spec:
         {{- toYaml .Values.api.podSecurityContext | nindent 8 }}
       containers:
         - name: migrations
-          image: {{ include "terrapod.api.image" . }}
-          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          image: {{ include "terrapod.migrations.image" . }}
+          imagePullPolicy: {{ .Values.migrations.image.pullPolicy }}
           command:
             - alembic
             - upgrade

@@ -103,11 +103,52 @@ Listener service account name.
 {{- end }}
 
 {{/*
-Get the image tag, defaulting to appVersion
+Get the API image reference, defaulting tag to appVersion
 */}}
 {{- define "terrapod.api.image" -}}
+{{- $repo := .Values.api.image.repository -}}
+{{- if .Values.global.imageRegistry -}}
+{{- $repo = printf "%s/%s" .Values.global.imageRegistry (trimPrefix "ghcr.io/" $repo) -}}
+{{- end -}}
 {{- $tag := default .Chart.AppVersion .Values.api.image.tag -}}
-{{- printf "%s:%s" .Values.api.image.repository $tag -}}
+{{- printf "%s:%s" $repo $tag -}}
+{{- end }}
+
+{{/*
+Get the listener image reference, defaulting tag to appVersion
+*/}}
+{{- define "terrapod.listener.image" -}}
+{{- $repo := .Values.listener.image.repository -}}
+{{- if .Values.global.imageRegistry -}}
+{{- $repo = printf "%s/%s" .Values.global.imageRegistry (trimPrefix "ghcr.io/" $repo) -}}
+{{- end -}}
+{{- $tag := default .Chart.AppVersion .Values.listener.image.tag -}}
+{{- printf "%s:%s" $repo $tag -}}
+{{- end }}
+
+{{/*
+Get the migrations image reference, defaulting tag to appVersion
+*/}}
+{{- define "terrapod.migrations.image" -}}
+{{- $repo := .Values.migrations.image.repository -}}
+{{- if .Values.global.imageRegistry -}}
+{{- $repo = printf "%s/%s" .Values.global.imageRegistry (trimPrefix "ghcr.io/" $repo) -}}
+{{- end -}}
+{{- $tag := default .Chart.AppVersion .Values.migrations.image.tag -}}
+{{- printf "%s:%s" $repo $tag -}}
+{{- end }}
+
+{{/*
+Get the runner image repository with registry override applied.
+Used in the runner ConfigMap (not a full image:tag ref since the ConfigMap
+has separate repository and tag fields).
+*/}}
+{{- define "terrapod.runner.imageRepo" -}}
+{{- $repo := .Values.runners.image.repository -}}
+{{- if .Values.global.imageRegistry -}}
+{{- $repo = printf "%s/%s" .Values.global.imageRegistry (trimPrefix "ghcr.io/" $repo) -}}
+{{- end -}}
+{{- $repo -}}
 {{- end }}
 
 {{/*
@@ -126,11 +167,15 @@ app.kubernetes.io/component: web
 {{- end }}
 
 {{/*
-Get the web image tag, defaulting to appVersion
+Get the web image reference, defaulting tag to appVersion
 */}}
 {{- define "terrapod.web.image" -}}
+{{- $repo := .Values.web.image.repository -}}
+{{- if .Values.global.imageRegistry -}}
+{{- $repo = printf "%s/%s" .Values.global.imageRegistry (trimPrefix "ghcr.io/" $repo) -}}
+{{- end -}}
 {{- $tag := default .Chart.AppVersion .Values.web.image.tag -}}
-{{- printf "%s:%s" .Values.web.image.repository $tag -}}
+{{- printf "%s:%s" $repo $tag -}}
 {{- end }}
 
 {{/*

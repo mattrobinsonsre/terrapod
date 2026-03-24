@@ -1,0 +1,42 @@
+# Terrapod Migrations Dockerfile
+# Minimal image for Alembic database migrations.
+# Only includes SQLAlchemy, asyncpg, and alembic.
+
+FROM python:3.14-slim AS builder
+
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+    pkg-config \
+    gcc \
+    libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY services/pyproject-migrations.toml pyproject.toml
+RUN pip install --no-cache-dir .
+
+# ── Runtime stage ─────────────────────────────────────────────────────────────
+FROM python:3.14-slim
+LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
+
+WORKDIR /app
+
+# Copy installed Python packages from builder
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Only the modules needed for migrations: db models + alembic config
+COPY services/terrapod/db/ ./terrapod/db/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./
+
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash terrapod \
+    && chown -R terrapod:terrapod /app
+
+USER terrapod
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app
+
+ENTRYPOINT ["alembic", "upgrade", "head"]

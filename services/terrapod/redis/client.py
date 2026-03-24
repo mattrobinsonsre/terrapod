@@ -8,7 +8,6 @@ Follows the same lifecycle pattern as db/session.py.
 from collections.abc import AsyncGenerator
 
 import redis.asyncio as aioredis
-
 from terrapod.config import settings
 from terrapod.logging_config import get_logger
 

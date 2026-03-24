@@ -1,0 +1,53 @@
+# Terrapod Listener Dockerfile
+# Minimal image for the runner listener — SSE event loop + K8s Job launcher.
+# Only includes httpx, kubernetes, prometheus-client, structlog, pydantic.
+# No cloud SDKs, no SQLAlchemy, no authlib, no SAML.
+
+FROM python:3.14-slim AS builder
+
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+    pkg-config \
+    gcc \
+    libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY services/pyproject-listener.toml pyproject.toml
+RUN pip install --no-cache-dir .
+
+# ── Runtime stage ─────────────────────────────────────────────────────────────
+FROM python:3.14-slim
+LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
+
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy installed Python packages from builder
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Only the modules the listener imports: config, logging_config, runner/
+COPY services/terrapod/config.py ./terrapod/config.py
+COPY services/terrapod/logging_config.py ./terrapod/logging_config.py
+COPY services/terrapod/runner/ ./terrapod/runner/
+
+# Create non-root user and data directories
+RUN useradd --create-home --shell /bin/bash terrapod \
+    && mkdir -p /var/lib/terrapod/certs \
+    && chown -R terrapod:terrapod /app /var/lib/terrapod
+
+USER terrapod
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8081/health || exit 1
+
+EXPOSE 8081
+
+ENTRYPOINT ["python", "-m", "terrapod.runner.listener"]

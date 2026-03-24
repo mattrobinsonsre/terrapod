@@ -1,0 +1,14 @@
+[project]
+name = "terrapod-listener"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28",
+    "kubernetes>=35.0",
+    "prometheus-client>=0.24",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "pyyaml>=6.0",
+    "structlog>=25.5",
+    "standard-imghdr>=3.13",
+]

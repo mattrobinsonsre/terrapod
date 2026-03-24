@@ -68,6 +68,8 @@ Terrapod is published to GitHub Container Registry (GHCR) as both Docker images 
 | Artifact | Registry |
 |---|---|
 | API image | `ghcr.io/mattrobinsonsre/terrapod-api` |
+| Listener image | `ghcr.io/mattrobinsonsre/terrapod-listener` |
+| Migrations image | `ghcr.io/mattrobinsonsre/terrapod-migrations` |
 | Web UI image | `ghcr.io/mattrobinsonsre/terrapod-web` |
 | Runner image | `ghcr.io/mattrobinsonsre/terrapod-runner` |
 | Helm chart | `oci://ghcr.io/mattrobinsonsre/terrapod` |
@@ -348,6 +350,8 @@ Enable encryption on your managed database and object storage services. For file
 | Value | Default | Description |
 |---|---|---|
 | `listener.enabled` | `true` | Enable runner listener |
+| `listener.image.repository` | `ghcr.io/mattrobinsonsre/terrapod-listener` | Listener Docker image |
+| `listener.image.tag` | `""` (appVersion) | Image tag |
 | `listener.replicas` | `1` | Number of listener replicas |
 | `listener.name` | `"listener"` | Listener name (registered in the pool) |
 | `listener.joinToken` | `""` | Raw join token (use `existingSecret` for production) |
@@ -441,6 +445,8 @@ listener:
 | Value | Default | Description |
 |---|---|---|
 | `migrations.enabled` | `true` | Run Alembic migrations on install/upgrade |
+| `migrations.image.repository` | `ghcr.io/mattrobinsonsre/terrapod-migrations` | Migrations Docker image |
+| `migrations.image.tag` | `""` (appVersion) | Image tag |
 
 ---
 

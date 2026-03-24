@@ -9,7 +9,7 @@ metadata:
 data:
   runners.yaml: |
     image:
-      repository: {{ .Values.runners.image.repository | quote }}
+      repository: {{ include "terrapod.runner.imageRepo" . | quote }}
       tag: {{ .Values.runners.image.tag | default .Chart.AppVersion | quote }}
       pull_policy: {{ .Values.runners.image.pullPolicy | quote }}
     server_url: {{ .Values.runners.serverUrl | default .Values.listener.apiUrl | default (printf "http://%s-api:8000" (include "terrapod.fullname" .)) | quote }}

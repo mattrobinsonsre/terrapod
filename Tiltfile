@@ -81,6 +81,25 @@ docker_build(
     ],
 )
 
+# Listener (separate image — minimal deps for SSE event loop + K8s Job launcher)
+docker_build(
+    'terrapod-listener',
+    context='.',
+    dockerfile='docker/Dockerfile.listener',
+    live_update=[
+        sync('./services/terrapod/config.py', '/app/terrapod/config.py'),
+        sync('./services/terrapod/logging_config.py', '/app/terrapod/logging_config.py'),
+        sync('./services/terrapod/runner', '/app/terrapod/runner'),
+    ],
+)
+
+# Migrations (separate image — just SQLAlchemy + asyncpg + alembic)
+docker_build(
+    'terrapod-migrations',
+    context='.',
+    dockerfile='docker/Dockerfile.migrations',
+)
+
 # Runner Job image (Alpine + curl/tar/jq, signal-forwarding entrypoint)
 # Built as a local_resource (not docker_build) because the runner image is
 # referenced in the runners.yaml ConfigMap, not in a pod spec — Tilt's image
@@ -214,6 +233,12 @@ k8s_yaml(helm(
         'api.image.repository=terrapod-api',
         'api.image.tag=latest',
         'api.image.pullPolicy=Never',
+        'listener.image.repository=terrapod-listener',
+        'listener.image.tag=latest',
+        'listener.image.pullPolicy=Never',
+        'migrations.image.repository=terrapod-migrations',
+        'migrations.image.tag=latest',
+        'migrations.image.pullPolicy=Never',
         'web.image.repository=terrapod-web',
         'web.image.tag=latest',
         'web.image.pullPolicy=Never',

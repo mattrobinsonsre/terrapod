@@ -129,19 +129,16 @@ async def _bootstrap_pool(session: AsyncSession, pool_name: str) -> None:
         await session.flush()
         logger.info("Created agent pool: %s (id: %s)", pool_name, pool.id)
 
-    # Check if a token already exists for this pool
+    # Check if a token with this hash already exists (unique constraint spans all pools)
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
     result = await session.execute(
-        select(AgentPoolToken).where(
-            AgentPoolToken.pool_id == pool.id,
-            AgentPoolToken.is_revoked.is_(False),
-        )
+        select(AgentPoolToken).where(AgentPoolToken.token_hash == token_hash)
     )
     existing_token = result.scalar_one_or_none()
 
     if existing_token:
         logger.info("Join token already exists for pool '%s', skipping", pool_name)
     else:
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
         token = AgentPoolToken(
             pool_id=pool.id,
             token_hash=token_hash,

@@ -55,6 +55,11 @@ class RunnerListener:
         self._last_heartbeat_at: float | None = None
         self._active_launches = 0  # count of concurrent launch operations
 
+        # Reusable HTTP clients — created once in start(), closed on shutdown.
+        # Eliminates memory fragmentation from repeated create/destroy cycles.
+        self._http_client: httpx.AsyncClient | None = None
+        self._sse_client: httpx.AsyncClient | None = None
+
         # Prometheus metrics — separate registry to avoid colliding with API metrics
         from prometheus_client import CollectorRegistry, Gauge
 
@@ -100,15 +105,27 @@ class RunnerListener:
             pod_name=os.environ.get("POD_NAME", ""),
         )
 
-        # Start concurrent loops — SSE for sub-second responsiveness,
-        # poll loop as reliability fallback (~30s worst-case latency)
-        await asyncio.gather(
-            self._health_server(),
-            self._heartbeat_loop(),
-            self._sse_loop(),
-            self._poll_loop(),
-            self._shutdown_waiter(),
+        # Create reusable HTTP clients — one for API calls, one for SSE (no timeout)
+        self._http_client = httpx.AsyncClient(
+            base_url=self.identity.api_url,
+            timeout=httpx.Timeout(30, connect=10),
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
         )
+        self._sse_client = httpx.AsyncClient(timeout=None)
+
+        try:
+            # Start concurrent loops — SSE for sub-second responsiveness,
+            # poll loop as reliability fallback (~30s worst-case latency)
+            await asyncio.gather(
+                self._health_server(),
+                self._heartbeat_loop(),
+                self._sse_loop(),
+                self._poll_loop(),
+                self._shutdown_waiter(),
+            )
+        finally:
+            await self._http_client.aclose()
+            await self._sse_client.aclose()
 
     # ── Health server ────────────────────────────────────────────────
 
@@ -226,15 +243,14 @@ class RunnerListener:
 
     async def _send_heartbeat(self) -> None:
         """Send heartbeat via API."""
-        async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=10) as client:
-            await client.post(
-                f"/api/v2/listeners/listener-{self.identity.listener_id}/heartbeat",
-                json={
-                    "capacity": self._max_concurrent,
-                    "active_runs": self._active_launches,
-                },
-                headers=self._auth_headers(),
-            )
+        await self._http_client.post(
+            f"/api/v2/listeners/listener-{self.identity.listener_id}/heartbeat",
+            json={
+                "capacity": self._max_concurrent,
+                "active_runs": self._active_launches,
+            },
+            headers=self._auth_headers(),
+        )
         self._last_heartbeat_at = time.monotonic()
 
     # ── SSE Event Loop ───────────────────────────────────────────────
@@ -267,29 +283,28 @@ class RunnerListener:
         )
         logger.info("SSE connecting", url=url)
 
-        async with httpx.AsyncClient(timeout=None) as client:
-            async with client.stream("GET", url, headers=self._auth_headers()) as response:
-                response.raise_for_status()
-                logger.info("SSE connected")
+        async with self._sse_client.stream("GET", url, headers=self._auth_headers()) as response:
+            response.raise_for_status()
+            logger.info("SSE connected")
 
-                event_type = ""
-                event_data = ""
+            event_type = ""
+            event_data = ""
 
-                async for line in response.aiter_lines():
-                    if _shutdown.is_set():
-                        return
+            async for line in response.aiter_lines():
+                if _shutdown.is_set():
+                    return
 
-                    if line.startswith("event:"):
-                        event_type = line[6:].strip()
-                    elif line.startswith("data:"):
-                        event_data = line[5:].strip()
-                    elif line == "":
-                        # Empty line = end of event
-                        if event_type and event_data:
-                            asyncio.create_task(self._dispatch_event(event_type, event_data))
-                        event_type = ""
-                        event_data = ""
-                    # Ignore comment lines (keepalives start with ":")
+                if line.startswith("event:"):
+                    event_type = line[6:].strip()
+                elif line.startswith("data:"):
+                    event_data = line[5:].strip()
+                elif line == "":
+                    # Empty line = end of event
+                    if event_type and event_data:
+                        asyncio.create_task(self._dispatch_event(event_type, event_data))
+                    event_type = ""
+                    event_data = ""
+                # Ignore comment lines (keepalives start with ":")
 
     # ── Poll Fallback Loop ─────────────────────────────────────────
 
@@ -342,19 +357,18 @@ class RunnerListener:
         if self._active_launches >= self._max_concurrent:
             return
 
-        async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
-            response = await client.get(
-                f"/api/v2/listeners/listener-{self.identity.listener_id}/runs/next",
-                headers=self._auth_headers(),
-            )
+        response = await self._http_client.get(
+            f"/api/v2/listeners/listener-{self.identity.listener_id}/runs/next",
+            headers=self._auth_headers(),
+        )
 
-            if response.status_code == 204:
-                return  # No runs available (another listener claimed it)
-            response.raise_for_status()
+        if response.status_code == 204:
+            return  # No runs available (another listener claimed it)
+        response.raise_for_status()
 
-            data = response.json()["data"]
-            run_id = data["id"].removeprefix("run-")
-            attrs = data.get("attributes", {})
+        data = response.json()["data"]
+        run_id = data["id"].removeprefix("run-")
+        attrs = data.get("attributes", {})
 
         # Launch the Job in the background (fire-and-forget)
         self._active_launches += 1
@@ -416,13 +430,12 @@ class RunnerListener:
 
         # Report Job launched to the API
         try:
-            async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
-                await client.post(
-                    f"/api/v2/listeners/listener-{self.identity.listener_id}"
-                    f"/runs/run-{run_id}/job-launched",
-                    json={"job_name": job_name, "job_namespace": namespace},
-                    headers=self._auth_headers(),
-                )
+            await self._http_client.post(
+                f"/api/v2/listeners/listener-{self.identity.listener_id}"
+                f"/runs/run-{run_id}/job-launched",
+                json={"job_name": job_name, "job_namespace": namespace},
+                headers=self._auth_headers(),
+            )
         except Exception as e:
             logger.error("Failed to report job-launched", run_id=run_id, error=str(e))
 
@@ -454,13 +467,12 @@ class RunnerListener:
             return
 
         try:
-            async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=10) as client:
-                await client.post(
-                    f"/api/v2/listeners/listener-{self.identity.listener_id}"
-                    f"/runs/run-{run_id}/job-status",
-                    json={"status": status, "phase": phase},
-                    headers=self._auth_headers(),
-                )
+            await self._http_client.post(
+                f"/api/v2/listeners/listener-{self.identity.listener_id}"
+                f"/runs/run-{run_id}/job-status",
+                json={"status": status, "phase": phase},
+                headers=self._auth_headers(),
+            )
         except Exception as e:
             logger.warning("Failed to report Job status", run_id=run_id, error=str(e))
 
@@ -485,17 +497,16 @@ class RunnerListener:
             return  # Pod may not have logs yet
 
         try:
-            async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=10) as client:
-                await client.put(
-                    f"/api/v2/listeners/listener-{self.identity.listener_id}"
-                    f"/runs/run-{run_id}/log-stream",
-                    params={"phase": phase},
-                    content=logs.encode() if isinstance(logs, str) else logs,
-                    headers={
-                        **self._auth_headers(),
-                        "Content-Type": "application/octet-stream",
-                    },
-                )
+            await self._http_client.put(
+                f"/api/v2/listeners/listener-{self.identity.listener_id}"
+                f"/runs/run-{run_id}/log-stream",
+                params={"phase": phase},
+                content=logs.encode() if isinstance(logs, str) else logs,
+                headers={
+                    **self._auth_headers(),
+                    "Content-Type": "application/octet-stream",
+                },
+            )
         except Exception:
             pass  # Best-effort log streaming
 
@@ -519,15 +530,14 @@ class RunnerListener:
 
     async def _get_runner_token(self, run_id: str) -> str:
         """Request a short-lived runner token from the API."""
-        async with httpx.AsyncClient(base_url=self.identity.api_url, timeout=30) as client:
-            response = await client.post(
-                f"/api/v2/listeners/listener-{self.identity.listener_id}"
-                f"/runs/run-{run_id}/runner-token",
-                json={},
-                headers=self._auth_headers(),
-            )
-            response.raise_for_status()
-            return response.json()["token"]
+        response = await self._http_client.post(
+            f"/api/v2/listeners/listener-{self.identity.listener_id}"
+            f"/runs/run-{run_id}/runner-token",
+            json={},
+            headers=self._auth_headers(),
+        )
+        response.raise_for_status()
+        return response.json()["token"]
 
     async def _create_auth_secret(
         self, run_id: str, token: str, job_name: str, job_uid: str

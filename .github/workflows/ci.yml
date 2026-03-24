@@ -67,7 +67,7 @@ jobs:
           sha_short="${GITHUB_SHA::7}"
           images_exist=true
 
-          for image in terrapod-api terrapod-web terrapod-runner; do
+          for image in terrapod-api terrapod-web terrapod-runner terrapod-listener terrapod-migrations; do
             if ! docker manifest inspect "$REGISTRY/$image:sha-$sha_short" > /dev/null 2>&1; then
               echo "$image:sha-$sha_short not found"
               images_exist=false
@@ -320,7 +320,7 @@ jobs:
       fail-fast: true
       matrix:
         arch: [amd64, arm64]
-        image: [terrapod-api, terrapod-web, terrapod-runner]
+        image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
         include:
           - image: terrapod-api
             dockerfile: docker/Dockerfile.api
@@ -328,6 +328,10 @@ jobs:
             dockerfile: docker/Dockerfile.web
           - image: terrapod-runner
             dockerfile: docker/Dockerfile.runner
+          - image: terrapod-listener
+            dockerfile: docker/Dockerfile.listener
+          - image: terrapod-migrations
+            dockerfile: docker/Dockerfile.migrations
     steps:
       - uses: actions/checkout@v6
 
@@ -368,7 +372,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [terrapod-api, terrapod-web, terrapod-runner]
+        image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
     steps:
       - uses: actions/checkout@v6
 
@@ -423,7 +427,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [terrapod-api, terrapod-web, terrapod-runner]
+        image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
     steps:
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -470,7 +474,7 @@ jobs:
           sha_short="${{ needs.prepare.outputs.sha_short }}"
           version="${{ needs.prepare.outputs.version }}"
 
-          for image in terrapod-api terrapod-web terrapod-runner; do
+          for image in terrapod-api terrapod-web terrapod-runner terrapod-listener terrapod-migrations; do
             echo "Retagging $image:sha-$sha_short -> $version + latest"
             docker buildx imagetools create \
               -t "$REGISTRY/$image:$version" \
@@ -568,7 +572,7 @@ jobs:
           # Install syft
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
 
-          for image in terrapod-api terrapod-web terrapod-runner; do
+          for image in terrapod-api terrapod-web terrapod-runner terrapod-listener terrapod-migrations; do
             echo "Generating SBOM for $image:$version"
             syft "$REGISTRY/$image:$version" -o spdx-json="dist/sbom-${image}.spdx.json"
           done
@@ -594,6 +598,8 @@ jobs:
             dist/sbom-terrapod-api.spdx.json \
             dist/sbom-terrapod-web.spdx.json \
             dist/sbom-terrapod-runner.spdx.json \
+            dist/sbom-terrapod-listener.spdx.json \
+            dist/sbom-terrapod-migrations.spdx.json \
             dist/checksums.txt \
             --clobber
 
