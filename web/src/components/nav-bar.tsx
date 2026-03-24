@@ -36,11 +36,9 @@ function NavLink({
 
 export default function NavBar() {
   const router = useRouter()
-  const roles = useSyncExternalStore(
-    () => () => {},  // no-op subscribe — localStorage doesn't change mid-session
-    () => ({ admin: isAdmin(), adminOrAudit: isAdminOrAudit() }),  // client
-    () => ({ admin: false, adminOrAudit: false }),  // server
-  )
+  const noopSubscribe = () => () => {}
+  const admin = useSyncExternalStore(noopSubscribe, isAdmin, () => false)
+  const adminOrAudit = useSyncExternalStore(noopSubscribe, isAdminOrAudit, () => false)
   const [menuOpen, setMenuOpen] = useState(false)
 
   const handleLogout = () => {
@@ -72,7 +70,7 @@ export default function NavBar() {
         <Activity size={16} />
         Sessions
       </NavLink>
-      {roles.admin && (
+      {admin && (
         <>
           <NavLink href="/admin/binary-cache" onClick={closeMenu}>
             <HardDrive size={16} />
@@ -104,7 +102,7 @@ export default function NavBar() {
           </NavLink>
         </>
       )}
-      {roles.adminOrAudit && (
+      {adminOrAudit && (
         <NavLink href="/admin/audit-log" onClick={closeMenu}>
           <FileText size={16} />
           Audit Log
