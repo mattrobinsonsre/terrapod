@@ -115,6 +115,8 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+            - name: ca-cache
+              mountPath: /var/lib/terrapod/ca
             {{- if eq .Values.api.config.storage.backend "filesystem" }}
             - name: storage
               mountPath: {{ .Values.api.config.storage.filesystem.root_dir }}
@@ -158,6 +160,8 @@ spec:
           configMap:
             name: {{ include "terrapod.fullname" . }}-api-config
         - name: tmp
+          emptyDir: {}
+        - name: ca-cache
           emptyDir: {}
         {{- if eq .Values.api.config.storage.backend "filesystem" }}
         - name: storage
