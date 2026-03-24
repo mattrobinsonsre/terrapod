@@ -6,6 +6,13 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api.metrics import (
+    RUN_APPLY_DURATION,
+    RUN_PLAN_DURATION,
+    RUNS_CREATED,
+    RUNS_TERMINAL,
+    RUNS_TRANSITIONED,
+)
 from terrapod.db.models import (
     ConfigurationVersion,
     Run,
@@ -237,6 +244,8 @@ async def create_run(
     db.add(run)
     await db.flush()
 
+    RUNS_CREATED.labels(source=source, plan_only=str(plan_only)).inc()
+
     logger.info(
         "Run created",
         run_id=str(run.id),
@@ -303,6 +312,16 @@ async def transition_run(
         run.apply_finished_at = now
 
     await db.flush()
+
+    RUNS_TRANSITIONED.labels(from_status=old_status, to_status=target_status).inc()
+    if target_status in TERMINAL_STATES:
+        RUNS_TERMINAL.labels(status=target_status).inc()
+    if run.plan_started_at and run.plan_finished_at and target_status in ("planned", "errored"):
+        duration = (run.plan_finished_at - run.plan_started_at).total_seconds()
+        RUN_PLAN_DURATION.labels(status=target_status).observe(duration)
+    if run.apply_started_at and run.apply_finished_at and target_status in ("applied", "errored"):
+        duration = (run.apply_finished_at - run.apply_started_at).total_seconds()
+        RUN_APPLY_DURATION.labels(status=target_status).observe(duration)
 
     logger.info(
         "Run transitioned",

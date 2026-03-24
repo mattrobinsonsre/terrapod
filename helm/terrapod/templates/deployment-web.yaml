@@ -21,9 +21,16 @@ spec:
       {{- include "terrapod.web.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.web.podAnnotations }}
+      {{- if or .Values.api.config.metrics.enabled .Values.web.podAnnotations }}
       annotations:
+        {{- if .Values.api.config.metrics.enabled }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        prometheus.io/path: "/metrics"
+        {{- end }}
+        {{- with .Values.web.podAnnotations }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
       labels:
         {{- include "terrapod.web.selectorLabels" . | nindent 8 }}
@@ -50,6 +57,11 @@ spec:
             - name: http
               containerPort: 3000
               protocol: TCP
+            {{- if .Values.api.config.metrics.enabled }}
+            - name: metrics
+              containerPort: 9091
+              protocol: TCP
+            {{- end }}
           env:
             - name: API_URL
               value: "http://{{ include "terrapod.fullname" . }}-api:8000"

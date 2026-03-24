@@ -16,5 +16,7 @@ home: https://github.com/mattrobinsonsre/terrapod
 sources:
   - https://github.com/mattrobinsonsre/terrapod
 
+icon: https://raw.githubusercontent.com/mattrobinsonsre/terrapod/main/web/public/logo.svg
+
 maintainers:
   - name: Matt Robinson

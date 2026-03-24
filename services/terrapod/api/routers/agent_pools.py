@@ -308,8 +308,10 @@ async def join_listener(
     result = await agent_pool_service.join_listener(pool, token, name, db)
     await db.commit()
 
+    from terrapod.api.metrics import LISTENER_JOINS
     from terrapod.redis.client import POOL_EVENTS_PREFIX, publish_event
 
+    LISTENER_JOINS.labels(pool_name=pool.name).inc()
     await publish_event(
         f"{POOL_EVENTS_PREFIX}{pool.id}",
         json.dumps({"event": "listener_joined", "listener_name": name}),
@@ -348,8 +350,10 @@ async def join_listener_by_token(
     result["pool_id"] = str(pool.id)
     await db.commit()
 
+    from terrapod.api.metrics import LISTENER_JOINS
     from terrapod.redis.client import POOL_EVENTS_PREFIX, publish_event
 
+    LISTENER_JOINS.labels(pool_name=pool.name).inc()
     await publish_event(
         f"{POOL_EVENTS_PREFIX}{pool.id}",
         json.dumps({"event": "listener_joined", "listener_name": name}),
@@ -509,6 +513,10 @@ async def listener_heartbeat(
         capacity=str(capacity),
         active_runs=str(active_runs),
     )
+
+    from terrapod.api.metrics import LISTENER_HEARTBEATS
+
+    LISTENER_HEARTBEATS.labels(pool_id=listener.get("pool_id", "unknown")).inc()
 
     # Publish heartbeat event to admin dashboard + pool SSE channels
     try:

@@ -23,6 +23,11 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap-api.yaml") . | sha256sum }}
+        {{- if .Values.api.config.metrics.enabled }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+        {{- end }}
         {{- with .Values.api.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

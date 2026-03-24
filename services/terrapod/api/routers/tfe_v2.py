@@ -945,6 +945,10 @@ async def create_state_version(
     await db.commit()
     await db.refresh(sv)
 
+    from terrapod.api.metrics import STATE_VERSIONS_CREATED
+
+    STATE_VERSIONS_CREATED.inc()
+
     logger.info("State version created", workspace=ws.name, serial=serial, sv_id=str(sv.id))
 
     from terrapod.redis.client import publish_workspace_event
@@ -1043,6 +1047,9 @@ async def lock_workspace(
     lock_id = lock_info.get("ID", f"lock-{user.email}")
 
     if ws.locked:
+        from terrapod.api.metrics import STATE_LOCK_CONFLICTS
+
+        STATE_LOCK_CONFLICTS.inc()
         raise HTTPException(
             status_code=409, detail=f'workspace already locked (lock ID: "{ws.lock_id}")'
         )

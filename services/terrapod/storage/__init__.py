@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from terrapod.config import StorageBackend, settings
 from terrapod.logging_config import get_logger
-from terrapod.storage.protocol import ObjectStore
+from terrapod.storage.protocol import InstrumentedStore, ObjectStore
 
 logger = get_logger(__name__)
 
@@ -76,6 +76,10 @@ async def init_storage() -> None:
                 presigned_url_expiry_seconds=cfg.gcs.presigned_url_expiry_seconds,
             )
             logger.info("Storage initialized", backend="gcs", bucket=cfg.gcs.bucket)
+
+    # Wrap with metrics instrumentation when enabled
+    if _store is not None and settings.metrics.enabled:
+        _store = InstrumentedStore(_store)  # type: ignore[assignment]
 
 
 async def close_storage() -> None:

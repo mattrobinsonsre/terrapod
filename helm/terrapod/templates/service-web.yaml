@@ -17,6 +17,12 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    {{- if .Values.api.config.metrics.enabled }}
+    - port: 9091
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+    {{- end }}
   selector:
     {{- include "terrapod.web.selectorLabels" . | nindent 4 }}
 {{- end }}

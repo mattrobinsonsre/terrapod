@@ -1,0 +1,22 @@
+{{- if .Values.web.enabled }}
+{{- if and .Values.api.config.metrics.enabled .Values.api.config.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "terrapod.fullname" . }}-web
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+    {{- with .Values.api.config.metrics.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "terrapod.web.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: {{ .Values.api.config.metrics.serviceMonitor.interval | default "30s" }}
+{{- end }}
+{{- end }}

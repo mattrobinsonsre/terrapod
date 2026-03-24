@@ -81,6 +81,9 @@ async def get_db() -> AsyncGenerator[AsyncSession]:
             yield session
             await session.commit()
         except Exception:
+            from terrapod.api.metrics import DB_ERRORS
+
+            DB_ERRORS.labels(operation="session").inc()
             await session.rollback()
             raise
 
@@ -100,6 +103,9 @@ async def get_db_session() -> AsyncGenerator[AsyncSession]:
             yield session
             await session.commit()
         except Exception:
+            from terrapod.api.metrics import DB_ERRORS
+
+            DB_ERRORS.labels(operation="session").inc()
             await session.rollback()
             raise
 

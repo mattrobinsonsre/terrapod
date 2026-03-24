@@ -65,6 +65,9 @@ async def github_webhook(request: Request) -> Response:
         return JSONResponse(content={"message": "ignored"})
 
     if event_type in ("push", "pull_request"):
+        from terrapod.api.metrics import VCS_WEBHOOK_RECEIVED
+
+        VCS_WEBHOOK_RECEIVED.labels(provider="github").inc()
         logger.info(
             "Webhook event received",
             event_type=event_type,
