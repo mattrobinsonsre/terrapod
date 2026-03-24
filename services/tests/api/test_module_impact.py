@@ -97,7 +97,7 @@ def _mock_run(
     run.auto_apply = False
     run.plan_only = False
     run.execution_backend = "tofu"
-    run.terraform_version = "1.9.0"
+    run.terraform_version = "1.11"
     run.error_message = ""
     run.is_drift_detection = False
     run.has_changes = None

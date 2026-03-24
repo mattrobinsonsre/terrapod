@@ -49,8 +49,8 @@ class RunnerConfig(BaseModel):
         description="Internal API URL for runner Jobs (e.g. http://terrapod-api:8000). "
         "Used as base URL for presigned storage URLs. Falls back to TERRAPOD_API_URL env var.",
     )
-    default_terraform_version: str = Field(default="1.9.8")
-    default_execution_backend: str = Field(default="terraform")
+    default_terraform_version: str = Field(default="1.11")
+    default_execution_backend: str = Field(default="tofu")
     service_account_name: str = Field(default="")
     azure_workload_identity: bool = Field(default=False)
     ttl_seconds_after_finished: int = Field(default=600)
@@ -553,7 +553,7 @@ class Settings(BaseSettings):
         description="Default execution backend for new workspaces (tofu or terraform)",
     )
     default_terraform_version: str = Field(
-        default="1.9",
+        default="1.11",
         description="Default terraform/tofu version for new workspaces",
     )
 

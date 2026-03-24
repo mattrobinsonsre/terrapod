@@ -83,7 +83,7 @@ api:
 
     # Default execution backend and version for new workspaces
     default_execution_backend: tofu  # tofu | terraform
-    default_terraform_version: "1.9"
+    default_terraform_version: "1.11"
 
     # Storage configuration — exactly one backend must be configured.
     # IMPORTANT: Filesystem storage is for dev/single-instance only.

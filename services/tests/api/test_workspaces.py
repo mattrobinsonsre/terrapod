@@ -33,7 +33,7 @@ def _mock_workspace(
     lock_id=None,
     auto_apply=False,
     execution_mode="local",
-    terraform_version="1.9.0",
+    terraform_version="1.11",
     resource_cpu="1",
     resource_memory="2Gi",
 ):

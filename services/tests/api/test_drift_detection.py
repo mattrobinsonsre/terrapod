@@ -30,7 +30,7 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.name = name
     ws.auto_apply = False
     ws.execution_mode = "remote"
-    ws.terraform_version = "1.9.8"
+    ws.terraform_version = "1.11"
     ws.working_directory = ""
     ws.locked = False
     ws.lock_id = None
@@ -270,7 +270,7 @@ class TestRunDriftAttributes:
         run.auto_apply = False
         run.plan_only = True
         run.source = "drift-detection"
-        run.terraform_version = "1.9.8"
+        run.terraform_version = "1.11"
         run.error_message = ""
         run.is_drift_detection = True
         run.has_changes = True

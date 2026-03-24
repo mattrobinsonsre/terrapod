@@ -205,7 +205,7 @@ data:
       enabled: {{ .Values.api.config.metrics.enabled }}
     {{- end }}
     default_execution_backend: {{ .Values.api.config.default_execution_backend | default "tofu" | quote }}
-    default_terraform_version: {{ .Values.api.config.default_terraform_version | default "1.9" | quote }}
+    default_terraform_version: {{ .Values.api.config.default_terraform_version | default "1.11" | quote }}
     {{- if .Values.api.config.cors.allow_origins }}
     cors:
       allow_origins:
