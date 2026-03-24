@@ -269,7 +269,7 @@ def upgrade() -> None:
         sa.Column("execution_mode", sa.String(20), nullable=False, server_default="local"),
         sa.Column("auto_apply", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("execution_backend", sa.String(20), nullable=False, server_default="tofu"),
-        sa.Column("terraform_version", sa.String(20), nullable=False, server_default="1.11"),
+        sa.Column("terraform_version", sa.String(20), nullable=False, server_default="1.9"),
         sa.Column("working_directory", sa.String(500), nullable=False, server_default=""),
         sa.Column("locked", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("lock_id", sa.String(255), nullable=True),
