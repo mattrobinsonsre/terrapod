@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Users, Shield, Server, Variable, HeartPulse, FileText, BookOpen, Code, LogOut, Menu, X } from 'lucide-react'
@@ -36,7 +36,11 @@ function NavLink({
 
 export default function NavBar() {
   const router = useRouter()
-  const [roles] = useState(() => ({ admin: isAdmin(), adminOrAudit: isAdminOrAudit() }))
+  const roles = useSyncExternalStore(
+    () => () => {},  // no-op subscribe — localStorage doesn't change mid-session
+    () => ({ admin: isAdmin(), adminOrAudit: isAdminOrAudit() }),  // client
+    () => ({ admin: false, adminOrAudit: false }),  // server
+  )
   const [menuOpen, setMenuOpen] = useState(false)
 
   const handleLogout = () => {
