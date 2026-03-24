@@ -127,7 +127,7 @@ export default function NavBar() {
                 API
               </NavLink>
               <a
-                href="https://github.com/mattrobinsonsre/terrapod/tree/main/docs"
+                href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/index.md"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors whitespace-nowrap"
@@ -153,7 +153,7 @@ export default function NavBar() {
             </Link>
             <div className="flex items-center gap-1">
               <a
-                href="https://github.com/mattrobinsonsre/terrapod/tree/main/docs"
+                href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/index.md"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"

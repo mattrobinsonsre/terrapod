@@ -48,6 +48,11 @@ export default function CachePage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  // Multi-select state
+  const [selectedBinaries, setSelectedBinaries] = useState<Set<string>>(new Set())
+  const [selectedProviders, setSelectedProviders] = useState<Set<string>>(new Set())
+  const [purging, setPurging] = useState(false)
+
   type BinarySortKey = 'tool' | 'version' | 'os' | 'arch' | 'cached-at'
   const binaryAccessor = useCallback((item: CachedBinary, key: BinarySortKey) => {
     switch (key) {
@@ -139,6 +144,103 @@ export default function CachePage() {
     }
   }
 
+  function toggleBinarySelection(id: string) {
+    setSelectedBinaries((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAllBinaries() {
+    if (selectedBinaries.size === entries.length) {
+      setSelectedBinaries(new Set())
+    } else {
+      setSelectedBinaries(new Set(entries.map((e) => e.id)))
+    }
+  }
+
+  function toggleProviderSelection(id: string) {
+    setSelectedProviders((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAllProviders() {
+    if (selectedProviders.size === providerEntries.length) {
+      setSelectedProviders(new Set())
+    } else {
+      setSelectedProviders(new Set(providerEntries.map((e) => e.id)))
+    }
+  }
+
+  async function handleBatchPurgeBinaries() {
+    setPurging(true)
+    setError('')
+    setSuccess('')
+    try {
+      // Deduplicate by tool+version (API purges all platforms for a tool+version)
+      const keys = new Map<string, { tool: string; version: string }>()
+      for (const entry of entries) {
+        if (selectedBinaries.has(entry.id)) {
+          const key = `${entry.attributes.tool}/${entry.attributes.version}`
+          if (!keys.has(key)) keys.set(key, { tool: entry.attributes.tool, version: entry.attributes.version })
+        }
+      }
+      let totalPurged = 0
+      for (const { tool, version } of keys.values()) {
+        const res = await apiFetch(`/api/v2/admin/binary-cache/${tool}/${version}`, { method: 'DELETE' })
+        if (!res.ok) throw new Error(`Purge failed for ${tool} ${version}`)
+        const data = await res.json()
+        totalPurged += data.count || 0
+      }
+      setSuccess(`Purged ${totalPurged} binary cache entries`)
+      setSelectedBinaries(new Set())
+      await loadAll()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to purge')
+    } finally {
+      setPurging(false)
+    }
+  }
+
+  async function handleBatchPurgeProviders() {
+    setPurging(true)
+    setError('')
+    setSuccess('')
+    try {
+      // Deduplicate by hostname+namespace+type+version
+      const keys = new Map<string, { hostname: string; namespace: string; type: string; version: string }>()
+      for (const entry of providerEntries) {
+        if (selectedProviders.has(entry.id)) {
+          const key = `${entry.attributes.hostname}/${entry.attributes.namespace}/${entry.attributes['provider-type']}/${entry.attributes.version}`
+          if (!keys.has(key)) keys.set(key, {
+            hostname: entry.attributes.hostname,
+            namespace: entry.attributes.namespace,
+            type: entry.attributes['provider-type'],
+            version: entry.attributes.version,
+          })
+        }
+      }
+      let totalPurged = 0
+      for (const { hostname, namespace, type, version } of keys.values()) {
+        const res = await apiFetch(`/api/v2/admin/provider-cache/${hostname}/${namespace}/${type}/${version}`, { method: 'DELETE' })
+        if (!res.ok) throw new Error(`Purge failed for ${namespace}/${type} ${version}`)
+        const data = await res.json()
+        totalPurged += data.count || 0
+      }
+      setSuccess(`Purged ${totalPurged} provider cache entries`)
+      setSelectedProviders(new Set())
+      await loadAll()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to purge providers')
+    } finally {
+      setPurging(false)
+    }
+  }
+
   function formatDate(iso: string | null): string {
     if (!iso) return '-'
     return new Date(iso).toLocaleDateString(undefined, {
@@ -168,7 +270,18 @@ export default function CachePage() {
         ) : (
           <>
             {/* Binary Cache Section */}
-            <h2 className="text-lg font-semibold text-slate-200 mb-3">CLI Binaries</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-slate-200">CLI Binaries</h2>
+              {selectedBinaries.size > 0 && (
+                <button
+                  onClick={handleBatchPurgeBinaries}
+                  disabled={purging}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 disabled:opacity-50 text-red-400 transition-colors"
+                >
+                  {purging ? 'Purging...' : `Purge Selected (${selectedBinaries.size})`}
+                </button>
+              )}
+            </div>
             {entries.length === 0 ? (
               <EmptyState message="No cached CLI binaries yet." />
             ) : (
@@ -176,6 +289,10 @@ export default function CachePage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-700/50">
+                      <th className="px-4 py-3 w-8">
+                        <input type="checkbox" checked={selectedBinaries.size === entries.length && entries.length > 0} onChange={toggleAllBinaries}
+                          className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+                      </th>
                       <SortableHeader label="Tool" sortKey="tool" sortState={binarySortState} onSort={toggleBinarySort} />
                       <SortableHeader label="Version" sortKey="version" sortState={binarySortState} onSort={toggleBinarySort} />
                       <SortableHeader label="OS" sortKey="os" sortState={binarySortState} onSort={toggleBinarySort} />
@@ -186,7 +303,11 @@ export default function CachePage() {
                   </thead>
                   <tbody>
                     {sortedEntries.map((entry) => (
-                      <tr key={entry.id} className="border-b border-slate-700/30 last:border-0">
+                      <tr key={entry.id} className={`border-b border-slate-700/30 last:border-0 ${selectedBinaries.has(entry.id) ? 'bg-brand-900/10' : ''}`}>
+                        <td className="px-4 py-3">
+                          <input type="checkbox" checked={selectedBinaries.has(entry.id)} onChange={() => toggleBinarySelection(entry.id)}
+                            className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+                        </td>
                         <td className="px-4 py-3 text-slate-200 font-mono">{entry.attributes.tool}</td>
                         <td className="px-4 py-3 text-slate-200 font-mono">{entry.attributes.version}</td>
                         <td className="px-4 py-3 text-slate-400">{entry.attributes.os}</td>
@@ -208,7 +329,18 @@ export default function CachePage() {
             )}
 
             {/* Provider Cache Section */}
-            <h2 className="text-lg font-semibold text-slate-200 mb-3">Provider Binaries</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-slate-200">Provider Binaries</h2>
+              {selectedProviders.size > 0 && (
+                <button
+                  onClick={handleBatchPurgeProviders}
+                  disabled={purging}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 disabled:opacity-50 text-red-400 transition-colors"
+                >
+                  {purging ? 'Purging...' : `Purge Selected (${selectedProviders.size})`}
+                </button>
+              )}
+            </div>
             {providerEntries.length === 0 ? (
               <EmptyState message="No cached provider binaries yet." />
             ) : (
@@ -216,6 +348,10 @@ export default function CachePage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-700/50">
+                      <th className="px-4 py-3 w-8">
+                        <input type="checkbox" checked={selectedProviders.size === providerEntries.length && providerEntries.length > 0} onChange={toggleAllProviders}
+                          className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+                      </th>
                       <SortableHeader label="Provider" sortKey="provider" sortState={providerSortState} onSort={toggleProviderSort} />
                       <SortableHeader label="Version" sortKey="version" sortState={providerSortState} onSort={toggleProviderSort} />
                       <SortableHeader label="Hostname" sortKey="hostname" sortState={providerSortState} onSort={toggleProviderSort} />
@@ -227,7 +363,11 @@ export default function CachePage() {
                   </thead>
                   <tbody>
                     {sortedProviders.map((entry) => (
-                      <tr key={entry.id} className="border-b border-slate-700/30 last:border-0">
+                      <tr key={entry.id} className={`border-b border-slate-700/30 last:border-0 ${selectedProviders.has(entry.id) ? 'bg-brand-900/10' : ''}`}>
+                        <td className="px-4 py-3">
+                          <input type="checkbox" checked={selectedProviders.has(entry.id)} onChange={() => toggleProviderSelection(entry.id)}
+                            className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
+                        </td>
                         <td className="px-4 py-3 text-slate-200 font-mono">
                           {entry.attributes.namespace}/{entry.attributes['provider-type']}
                         </td>
