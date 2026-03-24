@@ -10,6 +10,13 @@ fullnameOverride: ""
 
 # Global settings
 global:
+  # imageRegistry overrides the registry portion (ghcr.io) of all Terrapod image
+  # references. Useful for ECR pull-through cache or private mirrors.
+  # Example for ECR pull-through:
+  #   imageRegistry: "123456789012.dkr.ecr.eu-west-1.amazonaws.com/ghcr"
+  # This rewrites ghcr.io/mattrobinsonsre/terrapod-api to:
+  #   123456789012.dkr.ecr.eu-west-1.amazonaws.com/ghcr/mattrobinsonsre/terrapod-api
+  imageRegistry: ""
   # imagePullSecrets:
   #   - name: myregistrykey
   imagePullSecrets: []
@@ -470,6 +477,11 @@ runners:
 listener:
   enabled: true
   replicas: 1
+
+  image:
+    repository: ghcr.io/mattrobinsonsre/terrapod-listener
+    tag: ""  # Defaults to appVersion
+    pullPolicy: IfNotPresent
   # Base name for listener identity. Each pod appends its pod name,
   # so the registered name becomes "{name}-{pod-name}".
   name: "listener"
@@ -600,6 +612,11 @@ tls:
 # ── Migrations ────────────────────────────────────────────────────────────────
 migrations:
   enabled: true
+
+  image:
+    repository: ghcr.io/mattrobinsonsre/terrapod-migrations
+    tag: ""  # Defaults to appVersion
+    pullPolicy: IfNotPresent
 
 # ── Bootstrap (initial admin user + optional pool) ─────────────────────────
 # bootstrap:

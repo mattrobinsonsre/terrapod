@@ -44,8 +44,8 @@ spec:
       {{- end }}
       containers:
         - name: listener
-          image: {{ include "terrapod.api.image" . }}
-          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          image: {{ include "terrapod.listener.image" . }}
+          imagePullPolicy: {{ .Values.listener.image.pullPolicy }}
           command:
             - python
             - -m

@@ -12,6 +12,10 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
+        "imageRegistry": {
+          "type": "string",
+          "description": "Override ghcr.io in all Terrapod image references (e.g. ECR pull-through cache URI)"
+        },
         "imagePullSecrets": {
           "type": "array",
           "items": { "type": "object" }
@@ -119,6 +123,7 @@
       "properties": {
         "enabled": { "type": "boolean" },
         "replicas": { "type": "integer", "minimum": 1 },
+        "image": { "$ref": "#/$defs/imageSpec" },
         "name": { "type": "string" },
         "healthPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
         "apiUrl": { "type": "string" },
@@ -177,7 +182,8 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" }
+        "enabled": { "type": "boolean" },
+        "image": { "$ref": "#/$defs/imageSpec" }
       }
     },
 

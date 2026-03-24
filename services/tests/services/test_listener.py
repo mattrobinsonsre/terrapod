@@ -111,12 +111,9 @@ class TestHandleRunAvailable:
 
         mock_client = AsyncMock()
         mock_client.get.return_value = mock_response
+        listener._http_client = mock_client
 
-        with patch("httpx.AsyncClient") as mock_cls:
-            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
-
-            await listener._handle_run_available()
+        await listener._handle_run_available()
 
         mock_client.get.assert_called_once()
 
@@ -137,13 +134,10 @@ class TestHandleRunAvailable:
 
         mock_client = AsyncMock()
         mock_client.get.return_value = mock_response
+        listener._http_client = mock_client
 
-        with patch("httpx.AsyncClient") as mock_cls:
-            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_cls.return_value.__aexit__ = AsyncMock(return_value=False)
-
-            listener._launch_run = AsyncMock()
-            await listener._handle_run_available()
+        listener._launch_run = AsyncMock()
+        await listener._handle_run_available()
 
         listener._launch_run.assert_called_once()
         assert listener._active_launches == 0  # Decremented after launch
