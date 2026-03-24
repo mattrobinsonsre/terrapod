@@ -21,6 +21,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api.metrics import AUTH_FAILURES
 from terrapod.auth.api_tokens import validate_api_token
 from terrapod.auth.sessions import (
     Session,
@@ -161,6 +162,15 @@ async def get_current_user(
                 provider_name=session.provider_name,
                 auth_method="session",
             )
+
+    if credentials is not None:
+        _tok = credentials.credentials
+        if _tok.startswith("runtok:"):
+            AUTH_FAILURES.labels(method="runner_token", reason="invalid_or_expired").inc()
+        else:
+            AUTH_FAILURES.labels(method="bearer", reason="invalid_or_expired").inc()
+    else:
+        AUTH_FAILURES.labels(method="none", reason="missing").inc()
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

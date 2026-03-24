@@ -88,6 +88,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Health Dashboard](health-dashboard.md) | Workspace health, drift status, run metrics |
 | [Cloud Credentials](cloud-credentials.md) | AWS IRSA, GCP WIF, Azure WI setup |
 | [Registry](registry.md) | Private module/provider registry, caching layers |
+| [Monitoring](monitoring.md) | Prometheus metrics, scraping, recommended alerts |
 | [Deployment](deployment.md) | Production Helm deployment, storage backends, scaling |
 | [API Reference](api-reference.md) | All API endpoints with examples |
 

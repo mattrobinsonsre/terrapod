@@ -17,9 +17,17 @@ runs each poll cycle per interval. Webhook-triggered immediate polls use
 the scheduler's trigger queue with deduplication.
 """
 
+import time as time_mod
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api.metrics import (
+    VCS_COMMITS_DETECTED,
+    VCS_POLL_DURATION,
+    VCS_PRS_DETECTED,
+    VCS_RUNS_CREATED,
+)
 from terrapod.db.models import Run, VCSConnection, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
@@ -243,6 +251,8 @@ async def _poll_workspace_branch(
     if sha == ws.vcs_last_commit_sha:
         return
 
+    VCS_COMMITS_DETECTED.labels(provider=conn.provider).inc()
+
     logger.info(
         "New commit detected",
         workspace=ws.name,
@@ -288,6 +298,7 @@ async def _poll_workspace_branch(
     )
 
     if run:
+        VCS_RUNS_CREATED.labels(provider=conn.provider, type="push").inc()
         ws.vcs_last_commit_sha = sha
         await db.commit()
 
@@ -358,6 +369,8 @@ async def _poll_workspace_prs(
                     error=str(e),
                 )
 
+        VCS_PRS_DETECTED.labels(provider=conn.provider).inc()
+
         logger.info(
             "New PR commit detected",
             workspace=ws.name,
@@ -406,6 +419,7 @@ async def _poll_workspace_prs(
         )
 
         if run:
+            VCS_RUNS_CREATED.labels(provider=conn.provider, type="pr").inc()
             await db.commit()
             logger.info(
                 "Speculative run created for PR",
@@ -459,6 +473,7 @@ async def poll_cycle() -> None:
     Called by the distributed scheduler as a periodic task. Only one
     replica runs this per interval across the entire deployment.
     """
+    start = time_mod.monotonic()
     async with get_db_session() as db:
         result = await db.execute(
             select(Workspace).where(
@@ -469,6 +484,7 @@ async def poll_cycle() -> None:
         workspaces = result.scalars().all()
 
         if not workspaces:
+            VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
             return
 
         logger.debug("VCS poll cycle", workspace_count=len(workspaces))
@@ -483,6 +499,8 @@ async def poll_cycle() -> None:
                     error=str(e),
                     exc_info=e,
                 )
+
+    VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
 
 
 async def handle_immediate_poll(payload: dict) -> None:

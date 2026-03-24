@@ -67,6 +67,9 @@ async def get_redis_health() -> bool:
         await _redis.ping()
         return True
     except Exception as e:
+        from terrapod.api.metrics import REDIS_ERRORS
+
+        REDIS_ERRORS.labels(operation="health_check").inc()
         logger.error("Redis health check failed", error=str(e))
         return False
 

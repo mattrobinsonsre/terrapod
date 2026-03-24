@@ -31,6 +31,13 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+from terrapod.api.metrics import (
+    SCHEDULER_TASK_DURATION,
+    SCHEDULER_TASK_EXECUTIONS,
+    SCHEDULER_TRIGGER_DEDUPLICATED,
+    SCHEDULER_TRIGGER_ENQUEUED,
+    SCHEDULER_TRIGGER_PROCESSED,
+)
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
 
@@ -164,6 +171,7 @@ async def enqueue_trigger(
         dedup_redis_key = f"{PREFIX}:trigger:{dedup_key}"
         added = await redis.set(dedup_redis_key, "1", nx=True, ex=dedup_ttl)
         if not added:
+            SCHEDULER_TRIGGER_DEDUPLICATED.labels(type=trigger_type).inc()
             logger.debug("Trigger deduplicated", type=trigger_type, dedup_key=dedup_key)
             return False
 
@@ -176,6 +184,7 @@ async def enqueue_trigger(
         }
     )
     await redis.lpush(f"{PREFIX}:triggers", item)
+    SCHEDULER_TRIGGER_ENQUEUED.labels(type=trigger_type).inc()
     logger.info("Trigger enqueued", type=trigger_type, dedup_key=dedup_key)
     return True
 
@@ -206,9 +215,12 @@ async def _run_periodic_loop(
         try:
             if await try_claim_periodic(task.name, task.interval_seconds):
                 logger.debug("Claimed periodic task", task=task.name)
+                start = time.monotonic()
                 try:
                     await task.handler()
+                    SCHEDULER_TASK_EXECUTIONS.labels(task=task.name, status="success").inc()
                 except Exception as e:
+                    SCHEDULER_TASK_EXECUTIONS.labels(task=task.name, status="error").inc()
                     logger.error(
                         "Periodic task failed",
                         task=task.name,
@@ -216,6 +228,7 @@ async def _run_periodic_loop(
                         exc_info=e,
                     )
                 finally:
+                    SCHEDULER_TASK_DURATION.labels(task=task.name).observe(time.monotonic() - start)
                     await mark_completed(task.name)
         except Exception as e:
             logger.error("Scheduler claim error", task=task.name, error=str(e))
@@ -254,7 +267,9 @@ async def _run_trigger_consumer(shutdown: asyncio.Event) -> None:
                 logger.info("Executing trigger", type=trigger_type)
                 try:
                     await handler_def.handler(payload)
+                    SCHEDULER_TRIGGER_PROCESSED.labels(type=trigger_type, status="success").inc()
                 except Exception as e:
+                    SCHEDULER_TRIGGER_PROCESSED.labels(type=trigger_type, status="error").inc()
                     logger.error(
                         "Trigger handler failed",
                         type=trigger_type,

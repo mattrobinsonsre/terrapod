@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api.metrics import AUTH_LOGIN
 from terrapod.auth.claims_mapper import map_claims_to_roles
 from terrapod.auth.recent_users import record_recent_user
 from terrapod.auth.sso import AuthenticatedIdentity
@@ -65,8 +66,10 @@ async def process_login(
         result = await db.execute(select(User).where(User.email == identity.email))
         user = result.scalar_one_or_none()
         if not user:
+            AUTH_LOGIN.labels(provider=identity.provider_name, outcome="user_not_found").inc()
             raise ValueError("User not found")
         if not user.is_active:
+            AUTH_LOGIN.labels(provider=identity.provider_name, outcome="disabled").inc()
             raise ValueError("User account is disabled")
         # Update last_login_at
         from terrapod.db.models import utc_now
@@ -105,6 +108,8 @@ async def process_login(
         await record_recent_user(identity.provider_name, identity.email, identity.display_name)
     except Exception:
         logger.debug("Failed to record recent user", exc_info=True)
+
+    AUTH_LOGIN.labels(provider=identity.provider_name, outcome="success").inc()
 
     return LoginResult(
         email=identity.email,

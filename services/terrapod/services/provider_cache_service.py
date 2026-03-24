@@ -19,6 +19,7 @@ import httpx
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.api.metrics import PROVIDER_CACHE_REQUESTS
 from terrapod.config import settings
 from terrapod.db.models import CachedProviderPackage
 from terrapod.logging_config import get_logger
@@ -153,6 +154,11 @@ async def get_or_fetch_platforms(
                 delete(CachedProviderPackage).where(CachedProviderPackage.id.in_(stale_ids))
             )
             await db.flush()
+
+    if cached_platforms:
+        PROVIDER_CACHE_REQUESTS.labels(result="hit").inc()
+    else:
+        PROVIDER_CACHE_REQUESTS.labels(result="miss").inc()
 
     # --- Tier 2: check Redis for upstream metadata ---
     meta = await _get_cached_metadata(hostname, namespace, type_, version)
