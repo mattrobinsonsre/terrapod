@@ -380,7 +380,7 @@ class DriftDetectionConfig(BaseModel):
     and creates plan-only runs to detect infrastructure drift.
     """
 
-    enabled: bool = Field(default=False, description="Enable drift detection")
+    enabled: bool = Field(default=True, description="Enable drift detection")
     poll_interval_seconds: int = Field(
         default=300,
         description="How often the scheduler checks for workspaces due for drift detection",
@@ -420,7 +420,7 @@ class CORSConfig(BaseModel):
 class RateLimitConfig(BaseModel):
     """API rate limiting configuration."""
 
-    enabled: bool = Field(default=False, description="Enable rate limiting")
+    enabled: bool = Field(default=True, description="Enable rate limiting")
     requests_per_minute: int = Field(
         default=100, description="Max requests per minute for general API endpoints"
     )

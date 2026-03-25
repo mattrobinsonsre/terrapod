@@ -160,7 +160,7 @@ Terrapod's default pod and container security contexts are already compatible wi
 
 ## Rate Limiting
 
-Enable API rate limiting to protect against brute-force and denial-of-service attacks:
+API rate limiting is enabled by default to protect against brute-force and denial-of-service attacks. The default configuration:
 
 ```yaml
 api:

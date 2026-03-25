@@ -23,11 +23,11 @@ Drift runs are **plan-only** — they never apply changes. An admin must review 
 
 ### Platform-Level
 
-Drift detection must be enabled at the platform level before any per-workspace settings take effect.
+Drift detection is enabled by default at the platform level. Per-workspace settings control which workspaces are checked.
 
 | Setting | Default | Description |
 |---|---|---|
-| `drift_detection.enabled` | `false` | Enable the drift detection scheduler task |
+| `drift_detection.enabled` | `true` | Enable the drift detection scheduler task |
 | `drift_detection.poll_interval_seconds` | `300` | How often the scheduler scans for workspaces due for a check |
 | `drift_detection.min_workspace_interval_seconds` | `3600` | Floor for per-workspace check intervals (prevents excessive checking) |
 

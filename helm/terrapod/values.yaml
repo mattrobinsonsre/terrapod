@@ -224,7 +224,7 @@ api:
 
     # Drift Detection — scheduled plan-only runs to detect infrastructure drift
     drift_detection:
-      enabled: false
+      enabled: true
       poll_interval_seconds: 300
       min_workspace_interval_seconds: 3600
 
@@ -243,7 +243,7 @@ api:
 
     # Rate limiting
     rate_limit:
-      enabled: false
+      enabled: true
       requests_per_minute: 100
       auth_requests_per_minute: 10
 

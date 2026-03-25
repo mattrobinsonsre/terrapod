@@ -276,7 +276,7 @@ The chart ships with a `values.schema.json` that validates all values at `helm i
 
 | Value | Default | Description |
 |---|---|---|
-| `api.config.drift_detection.enabled` | `false` | Enable the drift detection scheduler |
+| `api.config.drift_detection.enabled` | `true` | Enable the drift detection scheduler |
 | `api.config.drift_detection.poll_interval_seconds` | `300` | How often the scheduler checks for workspaces due for a drift scan |
 | `api.config.drift_detection.min_workspace_interval_seconds` | `3600` | Minimum allowed per-workspace drift check interval (floor for `drift-detection-interval-seconds` on any workspace) |
 
