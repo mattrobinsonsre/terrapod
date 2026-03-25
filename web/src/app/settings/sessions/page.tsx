@@ -135,8 +135,8 @@ export default function SessionsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {userSessions.map((s, i) => (
-                        <tr key={i} className="border-b border-slate-700/30 last:border-0">
+                      {userSessions.map((s) => (
+                        <tr key={s.token_hint} className="border-b border-slate-700/30 last:border-0">
                           <td className="px-4 py-3 text-slate-200">
                             {s.provider_name}
                             {s.is_current && (
