@@ -56,8 +56,10 @@ Each workspace has independent drift detection settings:
 
 | Field | Default | Description |
 |---|---|---|
-| `drift_detection_enabled` | `false` | Enable drift detection for this workspace |
+| `drift_detection_enabled` | `true` (VCS-connected) / `false` (non-VCS) | Enable drift detection for this workspace |
 | `drift_detection_interval_seconds` | `86400` (24h) | How frequently to check (clamped to platform minimum) |
+
+Drift detection is **automatically enabled** when a workspace is created with a VCS connection, or when a VCS connection is added to an existing workspace. It can be explicitly overridden in either case.
 
 Enable via the API:
 

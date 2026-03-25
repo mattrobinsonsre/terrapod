@@ -513,7 +513,10 @@ async def create_workspace(
         vcs_branch=attrs.get("vcs-branch", ""),
         vcs_working_directory=attrs.get("vcs-working-directory", ""),
         var_files=_validate_var_files(attrs.get("var-files", [])),
-        drift_detection_enabled=attrs.get("drift-detection-enabled", False),
+        drift_detection_enabled=attrs.get(
+            "drift-detection-enabled",
+            True if vcs_connection_id else False,
+        ),
         drift_detection_interval_seconds=_clamp_drift_interval(
             attrs.get("drift-detection-interval-seconds", 86400)
         ),
@@ -738,6 +741,9 @@ async def update_workspace(
 
             vcs_id = vcs_conn_data.get("id", "")
             ws.vcs_connection_id = _uuid.UUID(vcs_id.removeprefix("vcs-")) if vcs_id else None
+            # Auto-enable drift detection when VCS is connected (unless explicitly set in this request)
+            if "drift-detection-enabled" not in attrs and ws.vcs_connection_id:
+                ws.drift_detection_enabled = True
 
     await db.commit()
     await db.refresh(ws)

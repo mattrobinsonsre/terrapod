@@ -121,10 +121,9 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				ElementType: types.StringType,
 			},
 			"drift_detection_enabled": schema.BoolAttribute{
-				Description: "Enable drift detection for this workspace.",
+				Description: "Enable drift detection for this workspace. Defaults to true for VCS-connected workspaces, false otherwise.",
 				Optional:    true,
 				Computed:    true,
-				Default:     booldefault.StaticBool(false),
 			},
 			"drift_detection_interval_seconds": schema.Int64Attribute{
 				Description: "Interval in seconds between drift detection checks.",
