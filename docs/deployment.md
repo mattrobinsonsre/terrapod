@@ -295,6 +295,37 @@ When enabled, the drift detection scheduler runs as a periodic task (via the dis
 
 **Note:** Drift detection is automatically enabled on workspaces that have a VCS connection. Non-VCS workspaces default to drift detection disabled. This can be overridden per-workspace via the API or Terraform provider.
 
+### Artifact Retention
+
+| Value | Default | Description |
+|---|---|---|
+| `api.config.artifact_retention.enabled` | `true` | Enable automatic artifact cleanup |
+| `api.config.artifact_retention.poll_interval_seconds` | `86400` | How often cleanup runs (default: daily) |
+| `api.config.artifact_retention.batch_size` | `100` | Max items processed per category per cycle |
+| `api.config.artifact_retention.state_versions_keep` | `20` | State versions to keep per workspace (0 = disabled) |
+| `api.config.artifact_retention.run_artifacts_retention_days` | `90` | Days before terminal run logs/plans are deleted (0 = disabled) |
+| `api.config.artifact_retention.config_versions_retention_days` | `90` | Days before config tarballs are deleted (0 = disabled) |
+| `api.config.artifact_retention.provider_cache_retention_days` | `30` | Days since last access before provider cache entries are deleted (0 = disabled) |
+| `api.config.artifact_retention.binary_cache_retention_days` | `30` | Days since last access before binary cache entries are deleted (0 = disabled) |
+| `api.config.artifact_retention.module_overrides_retention_days` | `14` | Days before module override tarballs are deleted (0 = disabled) |
+
+When enabled, the retention task runs as a periodic task via the distributed scheduler. It is multi-replica safe. Cache entries (provider and binary) use **access-based retention** -- entries are only deleted if they haven't been accessed within the retention window, so frequently-used cache entries are preserved regardless of age.
+
+See [Artifact Retention](artifact-retention.md) for full documentation including safety invariants and monitoring.
+
+Example:
+
+```yaml
+api:
+  config:
+    artifact_retention:
+      enabled: true
+      state_versions_keep: 20
+      run_artifacts_retention_days: 90
+      provider_cache_retention_days: 30
+      binary_cache_retention_days: 30
+```
+
 ### Metrics
 
 | Value | Default | Description |

@@ -6,6 +6,8 @@ stores it in object storage, and returns a presigned download URL.
 Subsequent requests serve from cache.
 """
 
+from datetime import UTC, datetime
+
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,6 +54,9 @@ async def get_or_cache_binary(
     cached = await _get_cached(db, tool, version, os_, arch)
     if cached is not None:
         BINARY_CACHE_REQUESTS.labels(tool=tool, result="hit").inc()
+        # Touch last_accessed_at for retention tracking
+        cached.last_accessed_at = datetime.now(UTC)
+        await db.flush()
         key = binary_cache_key(tool, version, os_, arch)
         presigned = await storage.presigned_get_url(key)
         return presigned.url

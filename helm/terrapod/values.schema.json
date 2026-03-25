@@ -626,6 +626,22 @@
           }
         },
 
+        "artifact_retention": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "poll_interval_seconds": { "type": "integer", "minimum": 60 },
+            "batch_size": { "type": "integer", "minimum": 1 },
+            "state_versions_keep": { "type": "integer", "minimum": 0 },
+            "run_artifacts_retention_days": { "type": "integer", "minimum": 0 },
+            "config_versions_retention_days": { "type": "integer", "minimum": 0 },
+            "provider_cache_retention_days": { "type": "integer", "minimum": 0 },
+            "binary_cache_retention_days": { "type": "integer", "minimum": 0 },
+            "module_overrides_retention_days": { "type": "integer", "minimum": 0 }
+          }
+        },
+
         "cors": {
           "type": "object",
           "additionalProperties": false,

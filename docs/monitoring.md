@@ -178,6 +178,16 @@ scrape_configs:
 | `terrapod_state_versions_created_total` | Counter | -- | State versions created |
 | `terrapod_state_lock_conflicts_total` | Counter | -- | Lock conflicts (409) |
 
+### Retention
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `terrapod_retention_deleted_total` | Counter | category | Artifacts deleted by retention cleanup |
+| `terrapod_retention_errors_total` | Counter | category | Errors during retention cleanup |
+| `terrapod_retention_duration_seconds` | Histogram | -- | Duration of retention cleanup cycle |
+
+Categories: `state_versions`, `run_artifacts`, `config_versions`, `provider_cache`, `binary_cache`, `module_overrides`.
+
 ### Listeners (API-side)
 
 These metrics are emitted by the **API server**, since it receives all heartbeats and join requests:
@@ -276,4 +286,15 @@ The listener process itself exposes metrics on its health port (`8081` at `GET /
   for: 1h
   annotations:
     summary: "Binary cache miss rate above 50% over the last hour"
+```
+
+### Retention Errors
+
+```yaml
+- alert: TerrapodRetentionErrors
+  expr: increase(terrapod_retention_errors_total[1d]) > 10
+  for: 1h
+  annotations:
+    summary: "Artifact retention encountering persistent errors"
+    description: "More than 10 retention deletion errors in the last day. Check storage backend health."
 ```

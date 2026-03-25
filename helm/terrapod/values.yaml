@@ -259,6 +259,21 @@ api:
         interval: 30s
         labels: {}
 
+    # Artifact Retention — periodic cleanup of old artifacts from object storage.
+    # When enabled, a background task runs at the configured interval and removes
+    # artifacts that exceed their retention thresholds.  Cache entries (provider
+    # and binary) are cleaned based on last-access time, not creation time.
+    artifact_retention:
+      enabled: true
+      poll_interval_seconds: 86400   # daily
+      batch_size: 100
+      state_versions_keep: 20       # per workspace; 0 = disabled
+      run_artifacts_retention_days: 90
+      config_versions_retention_days: 90
+      provider_cache_retention_days: 30   # days since last access
+      binary_cache_retention_days: 30     # days since last access
+      module_overrides_retention_days: 14
+
     # CORS
     cors:
       allow_origins: []

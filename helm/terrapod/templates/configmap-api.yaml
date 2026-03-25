@@ -204,6 +204,18 @@ data:
     metrics:
       enabled: {{ .Values.api.config.metrics.enabled }}
     {{- end }}
+    {{- if .Values.api.config.artifact_retention }}
+    artifact_retention:
+      enabled: {{ .Values.api.config.artifact_retention.enabled }}
+      poll_interval_seconds: {{ .Values.api.config.artifact_retention.poll_interval_seconds | default 86400 }}
+      batch_size: {{ .Values.api.config.artifact_retention.batch_size | default 100 }}
+      state_versions_keep: {{ .Values.api.config.artifact_retention.state_versions_keep | default 20 }}
+      run_artifacts_retention_days: {{ .Values.api.config.artifact_retention.run_artifacts_retention_days | default 90 }}
+      config_versions_retention_days: {{ .Values.api.config.artifact_retention.config_versions_retention_days | default 90 }}
+      provider_cache_retention_days: {{ .Values.api.config.artifact_retention.provider_cache_retention_days | default 30 }}
+      binary_cache_retention_days: {{ .Values.api.config.artifact_retention.binary_cache_retention_days | default 30 }}
+      module_overrides_retention_days: {{ .Values.api.config.artifact_retention.module_overrides_retention_days | default 14 }}
+    {{- end }}
     default_execution_backend: {{ .Values.api.config.default_execution_backend | default "tofu" | quote }}
     default_terraform_version: {{ .Values.api.config.default_terraform_version | default "1.11" | quote }}
     {{- if .Values.api.config.cors.allow_origins }}

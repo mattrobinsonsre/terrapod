@@ -626,6 +626,9 @@ class CachedProviderPackage(Base):
     cached_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
+    last_accessed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
 
     __table_args__ = (
         sa.UniqueConstraint(
@@ -656,6 +659,9 @@ class CachedBinary(Base):
     shasum: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     download_url: Mapped[str] = mapped_column(String(1000), nullable=False, default="")
     cached_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    last_accessed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
 

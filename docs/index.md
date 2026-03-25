@@ -85,6 +85,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Notifications](notifications.md) | Webhook, Slack, and email alerts on run events |
 | [Run Tasks](run-tasks.md) | Pre/post-plan webhook hooks for external validation |
 | [Audit Logging](audit-logging.md) | Immutable event log, query API, retention |
+| [Artifact Retention](artifact-retention.md) | Automated cleanup of old state versions, run logs, cache entries |
 | [Health Dashboard](health-dashboard.md) | Workspace health, drift status, run metrics |
 | [Cloud Credentials](cloud-credentials.md) | AWS IRSA, GCP WIF, Azure WI setup |
 | [Registry](registry.md) | Private module/provider registry, caching layers |

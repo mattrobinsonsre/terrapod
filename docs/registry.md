@@ -647,6 +647,19 @@ curl -X DELETE https://terrapod.example.com/api/v2/admin/provider-cache/registry
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
+### Automatic Cleanup
+
+Both caching layers support automatic retention cleanup via the [artifact retention](artifact-retention.md) system. When enabled, cache entries that haven't been **accessed** within the configured retention window are automatically deleted from both object storage and the database. Frequently-used entries are preserved regardless of age -- retention is based on last access time, not creation time.
+
+```yaml
+api:
+  config:
+    artifact_retention:
+      enabled: true
+      provider_cache_retention_days: 30  # delete provider cache entries not accessed in 30 days
+      binary_cache_retention_days: 30    # delete binary cache entries not accessed in 30 days
+```
+
 ### Admin UI
 
 The web UI includes a cache admin page at `/admin/binary-cache` (admin-only) for viewing and purging cached CLI binaries and provider binaries.

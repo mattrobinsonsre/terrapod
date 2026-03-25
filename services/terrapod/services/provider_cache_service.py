@@ -14,6 +14,7 @@ Cache layers:
 """
 
 import json
+from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy import delete, select
@@ -123,6 +124,7 @@ async def get_or_fetch_platforms(
 
     if cached:
         stale_ids = []
+        now = datetime.now(UTC)
         for entry in cached:
             key = provider_cache_key(hostname, namespace, type_, version, entry.filename)
             # Verify the object actually exists in storage
@@ -136,6 +138,9 @@ async def get_or_fetch_platforms(
                 )
                 stale_ids.append(entry.id)
                 continue
+
+            # Touch last_accessed_at for retention tracking
+            entry.last_accessed_at = now
 
             presigned = await storage.presigned_get_url(key)
             platform_key = f"{entry.os}_{entry.arch}"
@@ -339,6 +344,10 @@ async def get_cached_platform(
         await db.delete(cached)
         await db.flush()
         return None
+
+    # Touch last_accessed_at for retention tracking
+    cached.last_accessed_at = datetime.now(UTC)
+    await db.flush()
 
     presigned = await storage.presigned_get_url(key)
     return presigned.url
