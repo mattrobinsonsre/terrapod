@@ -356,6 +356,86 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
 
+  # ── E2E Tests (Playwright) ─────────────────────────────
+  e2e-test:
+    name: E2E Tests
+    needs: [prepare, build-images]
+    if: |
+      always()
+      && needs.build-images.result == 'success'
+      && needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull images
+        run: |
+          sha_short="${{ needs.prepare.outputs.sha_short }}"
+          for image in terrapod-api terrapod-web terrapod-migrations; do
+            docker pull "$REGISTRY/$image:sha-${sha_short}-amd64"
+            docker tag "$REGISTRY/$image:sha-${sha_short}-amd64" "$image:local"
+          done
+
+      - name: Start E2E stack
+        run: docker compose -f e2e/docker-compose.e2e.yml up -d
+
+      - name: Wait for stack health
+        run: |
+          timeout=120
+          elapsed=0
+          while ! curl -sf http://localhost:3000/ > /dev/null 2>&1; do
+            if (( elapsed >= timeout )); then
+              echo "Stack not healthy after ${timeout}s"
+              docker compose -f e2e/docker-compose.e2e.yml logs
+              exit 1
+            fi
+            sleep 2
+            elapsed=$((elapsed + 2))
+          done
+          echo "Stack healthy (${elapsed}s)"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+        working-directory: e2e
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+        working-directory: e2e
+
+      - name: Run Playwright tests
+        run: npx playwright test
+        working-directory: e2e
+        env:
+          CI: true
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 14
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f e2e/docker-compose.e2e.yml down -v
+
   # ── Scan Images (Trivy) ────────────────────────────────
   scan-images:
     name: Scan ${{ matrix.image }}

@@ -5,7 +5,7 @@
 # Releases are automated via GitHub Actions (push a semver tag).
 
 .PHONY: lint lint-python \
-	test test-python \
+	test test-python test-e2e test-e2e-down \
 	build images \
 	pentest pentest-sast pentest-images pentest-dast \
 	dev dev-down \
@@ -25,6 +25,12 @@ test:               ## Test all (Python) in Docker
 
 test-python:        ## Test Python only (Docker)
 	scripts/test.sh python
+
+test-e2e:           ## Run Playwright E2E tests (Docker Compose stack)
+	scripts/e2e.sh
+
+test-e2e-down:      ## Tear down E2E test containers
+	docker compose -f e2e/docker-compose.e2e.yml down -v
 
 # ── Build ─────────────────────────────────────────────────
 images:             ## Build Docker images (single-arch, local)
