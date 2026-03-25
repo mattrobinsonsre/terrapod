@@ -727,6 +727,7 @@ jobs:
       - sast
       - build-images
       - scan-images
+      - e2e-test
       - create-manifests
       - release
     runs-on: ubuntu-latest
@@ -749,6 +750,7 @@ jobs:
             "${{ needs.sast.result }}"
             "${{ needs.build-images.result }}"
             "${{ needs.scan-images.result }}"
+            "${{ needs.e2e-test.result }}"
             "${{ needs.create-manifests.result }}"
             "${{ needs.release.result }}"
           )
