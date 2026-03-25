@@ -6,14 +6,15 @@ Terrapod supports multiple authentication methods: local passwords, OIDC, SAML, 
 
 ## Overview
 
-Two authentication methods, evaluated in priority order:
+Three authentication methods, evaluated in priority order:
 
 | Type | Storage | Lifetime | Use Case |
 |---|---|---|---|
+| **Runner Tokens** | Stateless (HMAC-SHA256) | Short-lived (1h default, 2h max) | Runner Jobs (scoped to a single run) |
 | **API Tokens** | PostgreSQL (SHA-256 hashed) | Configurable max TTL | terraform CLI, automation |
 | **Sessions** | Redis | 12h sliding TTL | Web UI |
 
-The unified auth dependency tries API token first, then session. Both return the same `AuthenticatedUser` shape to downstream handlers.
+The unified auth dependency tries runner tokens first (fast HMAC verification, no I/O), then API tokens (DB lookup), then sessions (Redis lookup). All return the same `AuthenticatedUser` shape to downstream handlers.
 
 ---
 
@@ -382,7 +383,7 @@ curl -X DELETE https://terrapod.example.com/api/v2/authentication-tokens/{token-
 api:
   config:
     auth:
-      api_token_max_ttl_hours: 168  # 7 days (default). Set 0 for no limit
+      api_token_max_ttl_hours: 8760  # 1 year (default). Set 0 for no limit
 ```
 
 The TTL is computed at validation time as `created_at + max_ttl`. Tokens older than this are rejected.

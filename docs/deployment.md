@@ -250,7 +250,7 @@ The chart ships with a `values.schema.json` that validates all values at `helm i
 | `api.config.auth.local_enabled` | `true` | Enable local password auth |
 | `api.config.auth.callback_base_url` | `""` | Externally-reachable URL for callbacks |
 | `api.config.auth.session_ttl_hours` | `12` | Session lifetime |
-| `api.config.auth.api_token_max_ttl_hours` | `168` | Max API token lifetime in hours (168 = 7 days) |
+| `api.config.auth.api_token_max_ttl_hours` | `8760` | Max API token lifetime in hours (8760 = 1 year). Set 0 for no limit |
 | `api.config.auth.sso.default_provider` | `""` | Default SSO provider name |
 | `api.config.auth.sso.oidc` | `[]` | OIDC provider configurations |
 | `api.config.auth.sso.saml` | `[]` | SAML provider configurations |
@@ -441,6 +441,8 @@ listener:
 | `bootstrap.existingSecret` | | K8s secret with admin credentials |
 | `bootstrap.poolName` | `""` | Optional: create an agent pool with this name |
 | `bootstrap.poolToken` | `""` | Optional: raw join token for the pool (generated if omitted) |
+
+**Security note:** The bootstrap admin credentials are used only for initial setup. After deploying, either change the admin password immediately or configure SSO (OIDC/SAML) and disable local auth (`auth.local_enabled: false`). For production, always use `bootstrap.existingSecret` with a Kubernetes Secret rather than plain-text values in Helm.
 
 ### Migrations
 

@@ -164,15 +164,21 @@ ObjectStore Protocol
 All storage paths are constructed via `storage/keys.py`:
 
 ```
-state/{workspace_id}/{version_id}.tfstate             # State files (encrypted at rest by object store)
-config/{workspace_id}/{config_version_id}.tar.gz       # Configuration tarballs
-plans/{workspace_id}/{run_id}.tfplan                    # Plan output
-logs/{workspace_id}/plans/{run_id}.log                  # Plan logs
-logs/{workspace_id}/applies/{run_id}.log                # Apply logs
-registry/modules/{ns}/{name}/{prov}/{ver}.tar.gz        # Private modules
-registry/providers/{ns}/{name}/{ver}/...                 # Private providers
-cache/providers/{host}/{ns}/{type}/{ver}/{file}          # Cached providers
-cache/binaries/{tool}/{ver}/{os}_{arch}                  # Cached CLI binaries
+state/index.yaml                                        # State index (break-glass DR recovery)
+state/{workspace_id}/{version_id}.tfstate               # State files (encrypted at rest by object store)
+state/{workspace_id}/{version_id}.backup.tfstate         # State backups
+config/{workspace_id}/{config_version_id}.tar.gz         # Configuration tarballs
+plans/{workspace_id}/{run_id}.tfplan                     # Plan output
+logs/{workspace_id}/plans/{run_id}.log                   # Plan logs
+logs/{workspace_id}/applies/{run_id}.log                 # Apply logs
+runs/{workspace_id}/{run_id}.auto.tfvars                 # Generated .tfvars files
+registry/modules/{ns}/{name}/{prov}/{ver}.tar.gz         # Private modules
+registry/providers/{ns}/{name}/{ver}/...                  # Private providers
+cache/providers/{host}/{ns}/{type}/{ver}/{file}           # Cached providers
+cache/binaries/{tool}/{ver}/{os}_{arch}                   # Cached CLI binaries
+cache/provider/terrapod/{ver}/...                         # Platform provider cache
+module_overrides/{commit_sha}/{ns}/{name}/{prov}.tar.gz  # Module impact analysis overrides
+policies/{policy_set_id}/{version_id}.tar.gz              # Policy set bundles
 ```
 
 ### Presigned URLs
@@ -225,7 +231,7 @@ Terrapod's execution layer follows the Actions Runner Controller (ARC) pattern: 
    f. Uploads plan log + plan file via artifact endpoints (PUT)
    g. Reports has_changes to API (plan phase only)
         |
-9. Run reconciler (30s periodic task) drives state transitions:
+9. Run reconciler (10s periodic task) drives state transitions:
    a. Publishes "check_job_status" event via SSE → listener queries K8s
    b. Listener POSTs Job status to Redis
    c. Reconciler reads status from Redis → transitions run state
@@ -288,11 +294,11 @@ All listeners follow the same flow — there is no "local" vs "remote" distincti
 6. Certificates are saved to disk for restart persistence (avoiding unnecessary re-joins)
 7. The listener authenticates subsequent API calls via `X-Terrapod-Client-Cert` header (base64-encoded PEM)
 8. The listener connects to the SSE endpoint (`GET /api/v2/listeners/{id}/events`) — a persistent outbound HTTP stream for receiving events from the API
-9. Heartbeats every 60s (180s TTL in Redis), SSE event loop handles run claims, Job status queries, log streaming, and cancellation
+9. Heartbeats every 60s (300s TTL in Redis), SSE event loop handles run claims, Job status queries, log streaming, and cancellation
 
 A listener can be deployed in the same cluster as the API or in a completely separate cluster — the join flow is identical. The SSE connection is outbound from the listener to the API, which works through firewalls without requiring inbound access. The Helm chart deploys a listener as a Deployment using a dedicated lightweight Docker image (`terrapod-listener`, ~225MB) that includes only the listener's dependencies (httpx, kubernetes, pydantic, structlog). The entrypoint is `python -m terrapod.runner.listener`. The listener has RBAC to create/watch/delete Jobs and Pods in the runner namespace.
 
-**Multiple listener replicas** are supported for high availability. Set `listener.replicas > 1` — each pod derives a unique name by appending its Kubernetes pod name to the configured base name (`{base_name}-{pod_name}`). All replicas in a pool compete for queued runs via atomic Postgres locking (`SELECT ... FOR UPDATE SKIP LOCKED`). No leader election is required — Redis heartbeats track each listener independently, and stale records from terminated pods go offline after the 180s heartbeat TTL.
+**Multiple listener replicas** are supported for high availability. Set `listener.replicas > 1` — each pod derives a unique name by appending its Kubernetes pod name to the configured base name (`{base_name}-{pod_name}`). All replicas in a pool compete for queued runs via atomic Postgres locking (`SELECT ... FOR UPDATE SKIP LOCKED`). No leader election is required — Redis heartbeats track each listener independently, and stale records from terminated pods auto-expire after the 300s heartbeat TTL.
 
 ![Agent Pool Detail](images/admin-agent-pool-detail.png)
 
@@ -513,6 +519,7 @@ Currently registered periodic tasks:
 | `audit_retention` | 86400s (daily) | `audit_service.purge_old_entries` | Purge audit log entries older than retention period |
 | `drift_check` | 300s (configurable) | `drift_detection_service.drift_check_cycle` | Check workspaces for infrastructure drift |
 | `run_reconciler` | 10s | `run_reconciler.reconcile_runs` | Drive run state transitions based on Job outcomes |
+| `module_impact_poll` | 60s (configurable) | `module_impact_service.module_impact_poll_cycle` | Poll module PRs and create speculative runs on linked workspaces |
 
 ### Triggered Tasks
 
@@ -527,6 +534,8 @@ Currently registered trigger handlers:
 | `notification_deliver` | Deliver workspace notification on run state change | Per run+trigger (60s) |
 | `run_task_call` | Deliver run task webhook to external service | Per result (5 min) |
 | `drift_run_completed` | Update workspace drift status when drift run completes | Per run (5 min) |
+| `module_test_completed` | Post VCS commit status and PR comment for module-test runs | Per run (5 min) |
+| `module_impact_immediate_poll` | Webhook-triggered immediate module impact poll | Per repo (5 min) |
 
 ### Key Redis Patterns
 
@@ -600,7 +609,6 @@ The database schema is managed by Alembic migrations in `alembic/versions/`. Key
 | `Run` | Run lifecycle (status, timestamps, VCS metadata, resources) |
 | `AgentPool` | Named runner pool with service account |
 | `AgentPoolToken` | Join tokens for listener registration |
-| `RunnerListener` | Registered listener identity and certificate |
 | `CertificateAuthorityModel` | CA keypair for listener certificates |
 | `VCSConnection` | VCS provider auth config (GitHub App or GitLab token) |
 | `RegistryModule` / `RegistryModuleVersion` | Private module registry |
@@ -612,12 +620,15 @@ The database schema is managed by Alembic migrations in `alembic/versions/`. Key
 | `AuditLog` | Immutable API request log entries |
 | `NotificationConfiguration` | Workspace notification configs (webhook/Slack/email) |
 | `RunTask` / `TaskStage` / `TaskStageResult` | Run task webhooks and callback tracking |
+| `ModuleWorkspaceLink` | Module-to-workspace links for impact analysis |
+
+**Note:** Runner listeners are stored entirely in Redis (not PostgreSQL) with auto-expiring TTL (300s, refreshed by heartbeat). See [Agent Pools and Listeners](#agent-pools-and-listeners) for the Redis key layout.
 
 ---
 
 ## Observability
 
-Both the API server and runner listener expose Prometheus metrics on their existing HTTP ports (no separate metrics ports). Metrics are feature-gated via `settings.metrics.enabled` (default: `true`).
+The API server, runner listener, and web frontend all expose Prometheus metrics. Metrics are feature-gated via `settings.metrics.enabled` (default: `true`).
 
 ### API Server Metrics
 
@@ -642,6 +653,10 @@ Exposed at `GET /metrics` on port 8081 (same health HTTP server). Uses a separat
 | `terrapod_listener_identity_ready` | Gauge | 1 if identity established, 0 otherwise |
 | `terrapod_listener_heartbeat_age_seconds` | Gauge | Seconds since last successful heartbeat (-1 if never) |
 
+### Web Frontend Metrics
+
+When `metrics.enabled` is `true`, the Next.js frontend starts a separate metrics server on port 9091 via an `instrumentation.ts` hook. Metrics include page request counts and Node.js runtime metrics (GC, event loop, memory) via `prom-client`.
+
 ### Prometheus Operator Integration
 
 The Helm chart includes ServiceMonitor (API) and PodMonitor (listener) resources for Prometheus Operator. Both are disabled by default and independently gated:
@@ -654,8 +669,9 @@ See [Deployment -- Metrics](deployment.md#metrics) for Helm values.
 **Source files:**
 - `services/terrapod/api/metrics.py` -- API metrics middleware and endpoint
 - `services/terrapod/runner/listener.py` -- listener metrics (CollectorRegistry)
-- `helm/terrapod/templates/servicemonitor-api.yaml` -- ServiceMonitor
-- `helm/terrapod/templates/podmonitor-listener.yaml` -- PodMonitor
+- `helm/terrapod/templates/servicemonitor-api.yaml` -- API ServiceMonitor
+- `helm/terrapod/templates/servicemonitor-web.yaml` -- Web ServiceMonitor
+- `helm/terrapod/templates/podmonitor-listener.yaml` -- Listener PodMonitor
 
 ---
 

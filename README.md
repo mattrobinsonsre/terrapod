@@ -254,6 +254,8 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Audit Logging](docs/audit-logging.md) | Immutable event log, query API, retention |
 | [Health Dashboard](docs/health-dashboard.md) | Workspace health, drift status, run metrics |
 | [Cloud Credentials](docs/cloud-credentials.md) | AWS IRSA, GCP WIF, Azure WI setup |
+| [Monitoring](docs/monitoring.md) | Prometheus metrics, scraping, recommended alerts |
+| [Disaster Recovery](docs/disaster-recovery.md) | Break-glass state recovery from object storage |
 
 ---
 

@@ -178,14 +178,24 @@ scrape_configs:
 | `terrapod_state_versions_created_total` | Counter | -- | State versions created |
 | `terrapod_state_lock_conflicts_total` | Counter | -- | Lock conflicts (409) |
 
-### Listeners
+### Listeners (API-side)
 
-Listener metrics are emitted by the **API server** (not the listener itself), since the API receives all heartbeats and join requests. This avoids needing a separate scrape target on the listener.
+These metrics are emitted by the **API server**, since it receives all heartbeats and join requests:
 
 | Metric | Type | Labels | Description |
 |---|---|---|---|
 | `terrapod_listener_heartbeats_total` | Counter | pool_id | Heartbeats received from listeners |
 | `terrapod_listener_joins_total` | Counter | pool_name | Listener join events |
+
+### Listeners (Self-Reported)
+
+The listener process itself exposes metrics on its health port (`8081` at `GET /metrics`), scraped via the PodMonitor:
+
+| Metric | Type | Description |
+|---|---|---|
+| `terrapod_listener_active_runs` | Gauge | Number of currently active runner Jobs |
+| `terrapod_listener_identity_ready` | Gauge | 1 if identity established, 0 otherwise |
+| `terrapod_listener_heartbeat_age_seconds` | Gauge | Seconds since last successful heartbeat (-1 if never) |
 
 ### Web (Next.js)
 
