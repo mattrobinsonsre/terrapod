@@ -380,7 +380,7 @@ class DriftDetectionConfig(BaseModel):
     and creates plan-only runs to detect infrastructure drift.
     """
 
-    enabled: bool = Field(default=False, description="Enable drift detection")
+    enabled: bool = Field(default=True, description="Enable drift detection")
     poll_interval_seconds: int = Field(
         default=300,
         description="How often the scheduler checks for workspaces due for drift detection",
@@ -420,7 +420,7 @@ class CORSConfig(BaseModel):
 class RateLimitConfig(BaseModel):
     """API rate limiting configuration."""
 
-    enabled: bool = Field(default=False, description="Enable rate limiting")
+    enabled: bool = Field(default=True, description="Enable rate limiting")
     requests_per_minute: int = Field(
         default=100, description="Max requests per minute for general API endpoints"
     )
@@ -430,6 +430,47 @@ class RateLimitConfig(BaseModel):
 
 
 # --- Metrics Configuration ---
+
+
+class ArtifactRetentionConfig(BaseModel):
+    """Artifact retention and cleanup configuration.
+
+    When enabled, a periodic scheduler task cleans up old artifacts from
+    object storage and the database.  Zero on any per-category setting
+    disables that category's cleanup.
+    """
+
+    enabled: bool = Field(default=True, description="Enable artifact retention cleanup")
+    poll_interval_seconds: int = Field(
+        default=86400, description="How often the cleanup task runs (default: daily)"
+    )
+    batch_size: int = Field(
+        default=100, description="Max items to process per cleanup category per cycle"
+    )
+    state_versions_keep: int = Field(
+        default=20,
+        description="Number of state versions to keep per workspace (0 = disabled)",
+    )
+    run_artifacts_retention_days: int = Field(
+        default=90,
+        description="Days to keep run logs + plans for terminal runs (0 = disabled)",
+    )
+    config_versions_retention_days: int = Field(
+        default=90,
+        description="Days to keep config version tarballs (0 = disabled)",
+    )
+    provider_cache_retention_days: int = Field(
+        default=30,
+        description="Days since last access before cached provider binaries are eligible for cleanup (0 = disabled)",
+    )
+    binary_cache_retention_days: int = Field(
+        default=30,
+        description="Days since last access before cached CLI binaries are eligible for cleanup (0 = disabled)",
+    )
+    module_overrides_retention_days: int = Field(
+        default=14,
+        description="Days to keep module override tarballs for terminal runs (0 = disabled)",
+    )
 
 
 class MetricsConfig(BaseModel):
@@ -546,6 +587,9 @@ class Settings(BaseSettings):
 
     # Metrics
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
+
+    # Artifact Retention
+    artifact_retention: ArtifactRetentionConfig = Field(default_factory=ArtifactRetentionConfig)
 
     # Workspace defaults
     default_execution_backend: str = Field(

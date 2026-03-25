@@ -232,6 +232,28 @@ LISTENER_JOINS = Counter(
 )
 
 
+# ---------------------------------------------------------------------------
+# Retention metrics
+# ---------------------------------------------------------------------------
+
+RETENTION_DELETED = Counter(
+    "terrapod_retention_deleted_total",
+    "Artifacts deleted by retention cleanup",
+    ["category"],
+)
+
+RETENTION_ERRORS = Counter(
+    "terrapod_retention_errors_total",
+    "Errors during retention cleanup",
+    ["category"],
+)
+
+RETENTION_DURATION = Histogram(
+    "terrapod_retention_duration_seconds",
+    "Duration of retention cleanup cycle",
+)
+
+
 def _get_path_template(request: Request) -> str:
     """Extract the FastAPI route pattern to avoid high-cardinality raw paths."""
     route = request.scope.get("route")

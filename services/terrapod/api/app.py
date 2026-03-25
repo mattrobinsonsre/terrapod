@@ -190,6 +190,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         description="Purge audit log entries older than retention period",
     )
 
+    # Artifact retention cleanup (disabled by default)
+    if settings.artifact_retention.enabled:
+
+        async def _artifact_retention() -> None:
+            from terrapod.services.artifact_retention_service import artifact_retention_cycle
+
+            await artifact_retention_cycle()
+
+        register_periodic_task(
+            "artifact_retention",
+            interval_seconds=settings.artifact_retention.poll_interval_seconds,
+            handler=_artifact_retention,
+            description="Clean up old artifacts from object storage",
+        )
+
     await start_scheduler()
     logger.info("Distributed scheduler started")
 

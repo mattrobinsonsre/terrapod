@@ -276,7 +276,7 @@ The chart ships with a `values.schema.json` that validates all values at `helm i
 
 | Value | Default | Description |
 |---|---|---|
-| `api.config.drift_detection.enabled` | `false` | Enable the drift detection scheduler |
+| `api.config.drift_detection.enabled` | `true` | Enable the drift detection scheduler |
 | `api.config.drift_detection.poll_interval_seconds` | `300` | How often the scheduler checks for workspaces due for a drift scan |
 | `api.config.drift_detection.min_workspace_interval_seconds` | `3600` | Minimum allowed per-workspace drift check interval (floor for `drift-detection-interval-seconds` on any workspace) |
 
@@ -294,6 +294,37 @@ api:
 When enabled, the drift detection scheduler runs as a periodic task (via the distributed scheduler) and creates plan-only runs with `-detailed-exitcode` for workspaces that have drift detection enabled and are past their check interval. The scheduler respects the per-workspace `drift-detection-interval-seconds` attribute, subject to the `min_workspace_interval_seconds` floor.
 
 **Note:** Drift detection is automatically enabled on workspaces that have a VCS connection. Non-VCS workspaces default to drift detection disabled. This can be overridden per-workspace via the API or Terraform provider.
+
+### Artifact Retention
+
+| Value | Default | Description |
+|---|---|---|
+| `api.config.artifact_retention.enabled` | `true` | Enable automatic artifact cleanup |
+| `api.config.artifact_retention.poll_interval_seconds` | `86400` | How often cleanup runs (default: daily) |
+| `api.config.artifact_retention.batch_size` | `100` | Max items processed per category per cycle |
+| `api.config.artifact_retention.state_versions_keep` | `20` | State versions to keep per workspace (0 = disabled) |
+| `api.config.artifact_retention.run_artifacts_retention_days` | `90` | Days before terminal run logs/plans are deleted (0 = disabled) |
+| `api.config.artifact_retention.config_versions_retention_days` | `90` | Days before config tarballs are deleted (0 = disabled) |
+| `api.config.artifact_retention.provider_cache_retention_days` | `30` | Days since last access before provider cache entries are deleted (0 = disabled) |
+| `api.config.artifact_retention.binary_cache_retention_days` | `30` | Days since last access before binary cache entries are deleted (0 = disabled) |
+| `api.config.artifact_retention.module_overrides_retention_days` | `14` | Days before module override tarballs are deleted (0 = disabled) |
+
+When enabled, the retention task runs as a periodic task via the distributed scheduler. It is multi-replica safe. Cache entries (provider and binary) use **access-based retention** -- entries are only deleted if they haven't been accessed within the retention window, so frequently-used cache entries are preserved regardless of age.
+
+See [Artifact Retention](artifact-retention.md) for full documentation including safety invariants and monitoring.
+
+Example:
+
+```yaml
+api:
+  config:
+    artifact_retention:
+      enabled: true
+      state_versions_keep: 20
+      run_artifacts_retention_days: 90
+      provider_cache_retention_days: 30
+      binary_cache_retention_days: 30
+```
 
 ### Metrics
 
