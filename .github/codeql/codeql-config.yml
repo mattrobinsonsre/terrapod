@@ -15,6 +15,9 @@
 # py/multiple-definition               — intentional re-fetch after DB mutation
 # py/empty-except                      — intentional fail-open patterns (Redis, K8s, URL parsing)
 
+paths-ignore:
+  - e2e
+
 query-filters:
   - exclude:
       id: py/ineffectual-statement

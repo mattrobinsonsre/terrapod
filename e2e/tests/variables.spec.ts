@@ -1,8 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createWorkspace } from '../helpers/api.js';
 
-const API_URL = process.env.API_URL || 'http://localhost:8000';
-
 test.describe('Variables', () => {
   let workspaceId: string;
   const wsName = `e2e-vars-${Date.now()}`;
