@@ -88,6 +88,9 @@ known-first-party = ["terrapod"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-v --tb=short"
+markers = [
+    "integration: Integration tests using real Postgres, Redis, and filesystem storage",
+]
 
 [tool.mypy]
 python_version = "3.13"
