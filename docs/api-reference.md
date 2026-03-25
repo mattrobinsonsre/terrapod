@@ -297,7 +297,7 @@ Workspaces support the following drift detection attributes (settable on create 
 
 | Attribute | Type | Default | Description |
 |---|---|---|---|
-| `drift-detection-enabled` | boolean | `false` | Enable or disable automatic drift detection for this workspace |
+| `drift-detection-enabled` | boolean | `true` (VCS) / `false` (non-VCS) | Enable or disable automatic drift detection. Auto-enabled when a VCS connection is set |
 | `drift-detection-interval-seconds` | integer | `86400` | How often to run drift detection checks (minimum: 3600 seconds / 1 hour) |
 
 The following read-only attributes are included in workspace responses when drift detection is enabled:

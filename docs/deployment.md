@@ -293,6 +293,8 @@ api:
 
 When enabled, the drift detection scheduler runs as a periodic task (via the distributed scheduler) and creates plan-only runs with `-detailed-exitcode` for workspaces that have drift detection enabled and are past their check interval. The scheduler respects the per-workspace `drift-detection-interval-seconds` attribute, subject to the `min_workspace_interval_seconds` floor.
 
+**Note:** Drift detection is automatically enabled on workspaces that have a VCS connection. Non-VCS workspaces default to drift detection disabled. This can be overridden per-workspace via the API or Terraform provider.
+
 ### Metrics
 
 | Value | Default | Description |
