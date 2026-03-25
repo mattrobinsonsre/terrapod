@@ -59,7 +59,7 @@ from terrapod.services.workspace_rbac_service import (
     resolve_workspace_permission,
 )
 from terrapod.storage import get_storage
-from terrapod.storage.keys import state_key
+from terrapod.storage.keys import state_index_key, state_key
 
 router = APIRouter(prefix="/api/v2", tags=["tfe-v2"])
 logger = get_logger(__name__)
@@ -128,11 +128,106 @@ def _validate_var_files(raw: object) -> list[str]:
     return result
 
 
+_WORKSPACE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
+
+
+def _validate_workspace_name(name: str) -> str:
+    """Validate and sanitize a workspace name.
+
+    Rules:
+    - Must start with alphanumeric
+    - May contain alphanumeric, hyphens, underscores
+    - Max 90 characters (matches DB column String(90))
+    """
+    cleaned = name.strip()
+    if not cleaned:
+        raise HTTPException(status_code=422, detail="Workspace name is required")
+    if len(cleaned) > 90:
+        raise HTTPException(status_code=422, detail="Workspace name must be 90 characters or fewer")
+    if not _WORKSPACE_NAME_RE.match(cleaned):
+        raise HTTPException(
+            status_code=422,
+            detail="Workspace name must start with a letter or number and contain only letters, numbers, hyphens, and underscores",
+        )
+    return cleaned
+
+
 def _clamp_drift_interval(value: int) -> int:
     """Clamp drift detection interval to the configured minimum."""
     from terrapod.config import settings
 
     return max(int(value), settings.drift_detection.min_workspace_interval_seconds)
+
+
+async def _update_state_index(
+    workspace_name: str,
+    workspace_id: str,
+    sv_key: str,
+    serial: int,
+) -> None:
+    """Best-effort update of state/index.yaml with the latest state path.
+
+    This index enables break-glass DR recovery: operators can download
+    the index from object storage to find state files by workspace name
+    without needing PostgreSQL access.
+
+    Failures are logged and swallowed — index updates must never break
+    state uploads.
+    """
+    try:
+        import yaml
+
+        storage = get_storage()
+        idx_key = state_index_key()
+
+        # Read existing index (or start fresh)
+        try:
+            raw = await storage.get(idx_key)
+            index = yaml.safe_load(raw) or {}
+        except Exception:
+            index = {}
+
+        index[workspace_name] = {
+            "workspace_id": workspace_id,
+            "state_key": sv_key,
+            "serial": serial,
+            "updated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+
+        await storage.put(
+            idx_key,
+            yaml.dump(index, default_flow_style=False).encode(),
+            content_type="application/x-yaml",
+        )
+    except Exception:
+        logger.warning("Failed to update state index", workspace=workspace_name, exc_info=True)
+
+
+async def _remove_state_index_entry(workspace_name: str) -> None:
+    """Best-effort remove a workspace entry from state/index.yaml."""
+    try:
+        import yaml
+
+        storage = get_storage()
+        idx_key = state_index_key()
+
+        try:
+            raw = await storage.get(idx_key)
+            index = yaml.safe_load(raw) or {}
+        except Exception:
+            return  # No index to update
+
+        if workspace_name in index:
+            del index[workspace_name]
+            await storage.put(
+                idx_key,
+                yaml.dump(index, default_flow_style=False).encode(),
+                content_type="application/x-yaml",
+            )
+    except Exception:
+        logger.warning(
+            "Failed to remove state index entry", workspace=workspace_name, exc_info=True
+        )
 
 
 @router.get("/ping")
@@ -466,9 +561,7 @@ async def create_workspace(
     """Create a workspace. Any authenticated user can create."""
 
     attrs = body.get("data", {}).get("attributes", {})
-    name = attrs.get("name", "")
-    if not name:
-        raise HTTPException(status_code=422, detail="Workspace name is required")
+    name = _validate_workspace_name(attrs.get("name", ""))
 
     # Check for existing
     result = await db.execute(select(Workspace).where(Workspace.name == name))
@@ -642,6 +735,21 @@ async def update_workspace(
 
     attrs = body.get("data", {}).get("attributes", {})
 
+    # Handle workspace rename
+    old_name = None
+    if "name" in attrs:
+        new_name = _validate_workspace_name(attrs["name"])
+        if new_name != ws.name:
+            existing = await db.execute(
+                select(Workspace).where(Workspace.name == new_name, Workspace.id != ws.id)
+            )
+            if existing.scalar_one_or_none() is not None:
+                raise HTTPException(
+                    status_code=422, detail=f"Workspace '{new_name}' already exists"
+                )
+            old_name = ws.name
+            ws.name = new_name
+
     # owner-email can only be changed by platform admin
     if "owner-email" in attrs:
         if "admin" not in user.roles:
@@ -752,6 +860,22 @@ async def update_workspace(
 
     await publish_workspace_event(str(ws.id), "workspace_updated")
 
+    # Update state index on rename
+    if old_name is not None:
+        await _remove_state_index_entry(old_name)
+        latest_sv_result = await db.execute(
+            select(StateVersion)
+            .where(StateVersion.workspace_id == ws.id)
+            .order_by(StateVersion.serial.desc())
+            .limit(1)
+        )
+        sv = latest_sv_result.scalar_one_or_none()
+        if sv:
+            await _update_state_index(
+                ws.name, str(ws.id), state_key(str(ws.id), str(sv.id)), sv.serial
+            )
+        logger.info("Workspace renamed", old_name=old_name, new_name=ws.name)
+
     return JSONResponse(content=_workspace_json(ws, perm), headers=_tfe_headers())
 
 
@@ -763,9 +887,14 @@ async def delete_workspace(
 ) -> Response:
     """Delete a workspace and all associated resources. Requires admin."""
     ws, _ = await _require_ws_permission(workspace_id, "admin", user, db)
+    ws_name = ws.name
     await db.delete(ws)
     await db.commit()
-    logger.info("Workspace deleted", workspace=ws.name)
+    logger.info("Workspace deleted", workspace=ws_name)
+
+    # Best-effort remove from DR state index
+    await _remove_state_index_entry(ws_name)
+
     return Response(status_code=204)
 
 
@@ -1012,6 +1141,10 @@ async def upload_state_content(
     from terrapod.redis.client import publish_workspace_event
 
     await publish_workspace_event(str(sv.workspace_id), "state_version_created")
+
+    # Best-effort update the DR state index
+    if ws:
+        await _update_state_index(ws.name, str(ws.id), key, sv.serial)
 
     return Response(status_code=200)
 
