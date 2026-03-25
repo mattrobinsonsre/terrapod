@@ -15,7 +15,12 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.dependencies import (
+    AuthenticatedUser,
+    ListenerIdentity,
+    get_current_user,
+    get_listener_identity,
+)
 from terrapod.db.models import Base
 
 # ---------------------------------------------------------------------------
@@ -101,12 +106,55 @@ def user_with_roles(email: str, roles: list[str]) -> AuthenticatedUser:
 
 
 def set_auth(app: FastAPI, user: AuthenticatedUser) -> None:
-    """Override auth dependency to return *user* for all requests."""
+    """Override auth dependency to return *user* for all requests.
 
-    async def _override() -> AuthenticatedUser:
+    Runner tokens (``runtok:`` prefix) are validated normally so that
+    artifact-upload endpoints work with real scoped tokens.
+    """
+    from starlette.requests import Request
+
+    async def _override(request: Request) -> AuthenticatedUser:
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer runtok:"):
+            token = auth_header.removeprefix("Bearer ")
+            from terrapod.auth.runner_tokens import verify_runner_token
+
+            run_id = verify_runner_token(token)
+            if run_id is not None:
+                return AuthenticatedUser(
+                    email="runner",
+                    display_name="Runner Job",
+                    roles=["everyone"],
+                    provider_name="runner_token",
+                    auth_method="runner_token",
+                    run_id=run_id,
+                )
         return user
 
     app.dependency_overrides[get_current_user] = _override
+
+
+def set_listener_auth(
+    app: FastAPI,
+    listener_id: str,
+    pool_id: str,
+    name: str = "test-listener",
+) -> None:
+    """Override listener certificate auth dependency."""
+    import uuid as _uuid
+
+    identity = ListenerIdentity(
+        listener_id=_uuid.UUID(listener_id),
+        name=name,
+        pool_id=_uuid.UUID(pool_id),
+        certificate_fingerprint="fake-fingerprint",
+        certificate_expires_at=None,
+    )
+
+    async def _override() -> ListenerIdentity:
+        return identity
+
+    app.dependency_overrides[get_listener_identity] = _override
 
 
 AUTH = {"Authorization": "Bearer integration-test-token"}
@@ -160,6 +208,13 @@ async def _test_lifespan(app: FastAPI) -> AsyncGenerator[None]:
     await init_redis()
     init_connectors()
     await init_storage()
+
+    # Initialize Certificate Authority (required for agent pool join flow)
+    from terrapod.auth.ca import init_ca
+    from terrapod.db.session import get_db_session
+
+    async with get_db_session() as db:
+        await init_ca(db)
 
     yield
 
