@@ -53,5 +53,35 @@ export default defineConfig({
       testMatch: 'navigation.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
+    {
+      name: 'registry',
+      testMatch: 'registry.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
+      name: 'tokens',
+      testMatch: 'tokens.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
+      name: 'audit-log',
+      testMatch: 'audit-log.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
+      name: 'roles',
+      testMatch: 'roles.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
+      name: 'users',
+      testMatch: 'users.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
+      name: 'variable-sets',
+      testMatch: 'variable-sets.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
   ],
 });
