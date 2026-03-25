@@ -6,6 +6,11 @@ All keys are relative to the storage backend's configured prefix.
 """
 
 
+def state_index_key() -> str:
+    """Key for the human-readable state index (break-glass DR recovery)."""
+    return "state/index.yaml"
+
+
 def state_key(workspace_id: str, version_id: str) -> str:
     """Key for a workspace state version."""
     return f"state/{workspace_id}/{version_id}.tfstate"

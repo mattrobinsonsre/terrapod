@@ -181,6 +181,8 @@ function WorkspaceDetailContent() {
 
   // Overview editing
   const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [nameChanged, setNameChanged] = useState(false)
   const [editCpu, setEditCpu] = useState('')
   const [editMemory, setEditMemory] = useState('')
   const [editAutoApply, setEditAutoApply] = useState(false)
@@ -535,6 +537,8 @@ function WorkspaceDetailContent() {
 
   function startEditing() {
     if (!workspace) return
+    setEditName(workspace.attributes.name)
+    setNameChanged(false)
     setEditCpu(workspace.attributes['resource-cpu'])
     setEditMemory(workspace.attributes['resource-memory'])
     setEditAutoApply(workspace.attributes['auto-apply'])
@@ -586,6 +590,7 @@ function WorkspaceDetailContent() {
           data: {
             type: 'workspaces',
             attributes: {
+              name: editName,
               'resource-cpu': editCpu,
               'resource-memory': editMemory,
               'auto-apply': editAutoApply,
@@ -616,8 +621,10 @@ function WorkspaceDetailContent() {
       }
       if (!res.ok) throw new Error('Failed to update workspace')
       const data = await res.json()
+      const wasRenamed = workspace && data.data.attributes.name !== workspace.attributes.name
       setWorkspace(data.data)
       setEditing(false)
+      if (wasRenamed) setNameChanged(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update workspace')
     } finally {
@@ -1122,7 +1129,23 @@ function WorkspaceDetailContent() {
                   </div>
                 )}
               </div>
+              {nameChanged && (
+                <div className="mb-4 rounded-lg border border-blue-500/50 bg-blue-500/10 p-3 text-sm text-blue-300">
+                  Workspace renamed. Update the <code className="bg-slate-700 px-1 rounded">name</code> field in your <code className="bg-slate-700 px-1 rounded">cloud {'{'}{'}' }</code> block to match.
+                </div>
+              )}
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <dt className="text-xs text-slate-500">Name</dt>
+                  {editing ? (
+                    <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
+                      pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*" maxLength={90}
+                      title="Letters, numbers, hyphens, underscores. Must start with a letter or number."
+                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">{attrs.name}</dd>
+                  )}
+                </div>
                 <div>
                   <dt className="text-xs text-slate-500">Execution Mode</dt>
                   {editing ? (
