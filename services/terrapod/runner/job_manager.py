@@ -5,6 +5,7 @@ Uses the kubernetes Python client to interact with the K8s API.
 
 import asyncio
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
@@ -15,6 +16,12 @@ logger = get_logger(__name__)
 
 _batch_v1: client.BatchV1Api | None = None
 _core_v1: client.CoreV1Api | None = None
+
+# Bounded thread pool for K8s API calls — limits thread-local SSL state accumulation.
+# 4 threads is sufficient for the listener's workload (status checks + log reads +
+# occasional Job create/delete). The default executor grows to min(32, cpu+4) which
+# keeps thread-local SSL contexts alive in every thread that was ever used.
+_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="k8s")
 
 
 def init_k8s() -> None:
@@ -71,7 +78,7 @@ async def create_job(job_spec: dict, namespace: str = "") -> str:
     try:
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
-            None,
+            _executor,
             lambda: batch_api.create_namespaced_job(namespace=namespace, body=job_spec),
         )
         logger.info("Created K8s Job", job=job_name, namespace=namespace)
@@ -138,12 +145,13 @@ async def _check_pod_stuck(job_name: str, namespace: str) -> str | None:
     try:
         loop = asyncio.get_event_loop()
         pods = await loop.run_in_executor(
-            None,
+            _executor,
             lambda: core_api.list_namespaced_pod(
                 namespace=namespace,
                 label_selector=f"job-name={job_name}",
             ),
         )
+        core_api.api_client.last_response = None
 
         for pod in pods.items:
             if not pod.status or not pod.status.container_statuses:
@@ -176,7 +184,7 @@ async def delete_job(
     try:
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
-            None,
+            _executor,
             lambda: batch_api.delete_namespaced_job(
                 name=job_name,
                 namespace=namespace,
@@ -208,9 +216,11 @@ async def get_job_status(job_name: str, namespace: str = "") -> str | None:
     try:
         loop = asyncio.get_event_loop()
         job = await loop.run_in_executor(
-            None,
+            _executor,
             lambda: batch_api.read_namespaced_job(name=job_name, namespace=namespace),
         )
+        # Clear last_response to avoid retaining Job JSON in memory
+        batch_api.api_client.last_response = None
 
         if job.status.succeeded and job.status.succeeded > 0:
             return "succeeded"
@@ -243,6 +253,7 @@ async def get_pod_logs(
     job_name: str,
     namespace: str = "",
     tail_lines: int = 100,
+    limit_bytes: int | None = None,
 ) -> str:
     """Get logs from a Job's pod."""
     if not namespace:
@@ -253,25 +264,33 @@ async def get_pod_logs(
     try:
         loop = asyncio.get_event_loop()
         pods = await loop.run_in_executor(
-            None,
+            _executor,
             lambda: core_api.list_namespaced_pod(
                 namespace=namespace,
                 label_selector=f"job-name={job_name}",
             ),
         )
+        # Clear last_response to release the V1PodList JSON from memory
+        core_api.api_client.last_response = None
 
         if not pods.items:
             return ""
 
         pod_name = pods.items[0].metadata.name
+        log_kwargs: dict = {
+            "name": pod_name,
+            "namespace": namespace,
+            "tail_lines": tail_lines,
+        }
+        if limit_bytes is not None:
+            log_kwargs["limit_bytes"] = limit_bytes
+
         logs = await loop.run_in_executor(
-            None,
-            lambda: core_api.read_namespaced_pod_log(
-                name=pod_name,
-                namespace=namespace,
-                tail_lines=tail_lines,
-            ),
+            _executor,
+            lambda: core_api.read_namespaced_pod_log(**log_kwargs),
         )
+        # Clear last_response to release the raw log string from K8s client memory
+        core_api.api_client.last_response = None
         return logs
     except ApiException:
         return ""

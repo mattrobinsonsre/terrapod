@@ -55,6 +55,9 @@ class RunnerListener:
         self._last_heartbeat_at: float | None = None
         self._active_launches = 0  # count of concurrent launch operations
 
+        # Track background tasks to prevent GC accumulation (Finding 1: memory leak)
+        self._background_tasks: set[asyncio.Task] = set()
+
         # Reusable HTTP clients — created once in start(), closed on shutdown.
         # Eliminates memory fragmentation from repeated create/destroy cycles.
         self._http_client: httpx.AsyncClient | None = None
@@ -81,12 +84,18 @@ class RunnerListener:
         )
 
     def _auth_headers(self) -> dict[str, str]:
-        """Build authentication headers for API calls."""
-        headers = {}
-        if self.identity.certificate_pem:
-            cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
-            headers["X-Terrapod-Client-Cert"] = cert_b64
-        return headers
+        """Build authentication headers for API calls.
+
+        The cert header is computed once and cached — the PEM is immutable for the
+        listener's lifetime, so re-encoding it on every request just fragments the heap.
+        """
+        if not hasattr(self, "_cached_auth_headers"):
+            headers: dict[str, str] = {}
+            if self.identity and self.identity.certificate_pem:
+                cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
+                headers["X-Terrapod-Client-Cert"] = cert_b64
+            self._cached_auth_headers = headers
+        return self._cached_auth_headers
 
     async def start(self) -> None:
         """Main entry point — initialize and start loops."""
@@ -111,7 +120,10 @@ class RunnerListener:
             timeout=httpx.Timeout(30, connect=10),
             limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
         )
-        self._sse_client = httpx.AsyncClient(timeout=None)
+        self._sse_client = httpx.AsyncClient(
+            timeout=None,
+            limits=httpx.Limits(max_connections=5, max_keepalive_connections=2),
+        )
 
         try:
             # Start concurrent loops — SSE for sub-second responsiveness,
@@ -191,6 +203,10 @@ class RunnerListener:
             pass  # Don't crash on malformed probe requests
         finally:
             writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
 
     def _check_readiness(self) -> tuple[bool, str]:
         """Check if the listener is ready to accept work."""
@@ -301,7 +317,9 @@ class RunnerListener:
                 elif line == "":
                     # Empty line = end of event
                     if event_type and event_data:
-                        asyncio.create_task(self._dispatch_event(event_type, event_data))
+                        task = asyncio.create_task(self._dispatch_event(event_type, event_data))
+                        self._background_tasks.add(task)
+                        task.add_done_callback(self._background_tasks.discard)
                     event_type = ""
                     event_data = ""
                 # Ignore comment lines (keepalives start with ":")
@@ -490,18 +508,27 @@ class RunnerListener:
             return
 
         try:
-            logs = await get_pod_logs(job_name, namespace=job_namespace, tail_lines=tail_lines)
+            logs = await get_pod_logs(
+                job_name,
+                namespace=job_namespace,
+                tail_lines=tail_lines,
+                limit_bytes=256 * 1024,  # Cap at 256KB to bound memory per call
+            )
             if not logs:
                 return
         except Exception:
             return  # Pod may not have logs yet
+
+        # Encode once — avoid holding both str and bytes simultaneously
+        log_bytes = logs.encode() if isinstance(logs, str) else logs
+        del logs  # Release the string copy immediately
 
         try:
             await self._http_client.put(
                 f"/api/v2/listeners/listener-{self.identity.listener_id}"
                 f"/runs/run-{run_id}/log-stream",
                 params={"phase": phase},
-                content=logs.encode() if isinstance(logs, str) else logs,
+                content=log_bytes,
                 headers={
                     **self._auth_headers(),
                     "Content-Type": "application/octet-stream",
