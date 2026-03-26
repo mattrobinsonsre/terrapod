@@ -120,7 +120,8 @@ tp_curl_download() {
                     esac
                 fi
             fi
-            curl -sSf -o "$_out" "$_location"
+            # Follow any further redirects (e.g. S3 region/path-style redirects)
+            curl -sSfL -o "$_out" "$_location"
             ;;
         200)
             # No redirect — re-fetch with output (rare, but handle it)
@@ -145,14 +146,31 @@ esac
 if [ -n "$TP_API_URL" ] && [ -n "$TP_VERSION" ]; then
     BINARY_URL="${TP_API_URL}/api/v2/binary-cache/${TP_BACKEND}/${TP_VERSION}/${TP_OS}/${TP_ARCH}"
     echo "[entrypoint] Downloading $TP_BACKEND $TP_VERSION ($TP_OS/$TP_ARCH) from binary cache..."
-    tp_curl_download "/tmp/${TP_BACKEND}.zip" -H "$AUTH_HEADER" "$BINARY_URL"
+    if ! tp_curl_download "/tmp/${TP_BACKEND}.zip" -H "$AUTH_HEADER" "$BINARY_URL"; then
+        echo "[entrypoint] Binary cache unavailable, downloading from upstream..."
+        if [ "$TP_BACKEND" = "terraform" ]; then
+            _upstream="https://releases.hashicorp.com/terraform/${TP_VERSION}/terraform_${TP_VERSION}_${TP_OS}_${TP_ARCH}.zip"
+        else
+            _upstream="https://github.com/opentofu/opentofu/releases/download/v${TP_VERSION}/tofu_${TP_VERSION}_${TP_OS}_${TP_ARCH}.zip"
+        fi
+        curl -sSfL -o "/tmp/${TP_BACKEND}.zip" "$_upstream"
+    fi
 else
     echo "[entrypoint] No API URL, expecting $TP_BACKEND on PATH"
     TP_BIN="$TP_BACKEND"
 fi
 
 if [ -z "$TP_BIN" ]; then
-    unzip -o -q "/tmp/${TP_BACKEND}.zip" -d /tmp/bin
+    _zip="/tmp/${TP_BACKEND}.zip"
+    # Validate the download is a zip (PK\x03\x04 magic bytes)
+    if ! head -c 4 "$_zip" 2>/dev/null | od -A n -t x1 | grep -q '50 4b 03 04'; then
+        echo "[entrypoint] ERROR: Downloaded file is not a valid zip archive" >&2
+        echo "[entrypoint] First bytes: $(head -c 64 "$_zip" 2>/dev/null | od -A n -t x1 | head -1)" >&2
+        echo "[entrypoint] This usually means the presigned storage URL returned an error" >&2
+        echo "[entrypoint] Check that the API storage backend region/endpoint is correct" >&2
+        exit 1
+    fi
+    unzip -o -q "$_zip" -d /tmp/bin
     chmod +x "/tmp/bin/${TP_BACKEND}"
     TP_BIN="/tmp/bin/${TP_BACKEND}"
 fi
