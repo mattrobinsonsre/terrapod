@@ -49,7 +49,7 @@ class S3Store:
                 expiry_seconds=self._default_expiry,
             )
 
-        self._session = aioboto3.Session()
+        self._session = aioboto3.Session(region_name=region)
         self._client: Any = None
 
     def _full_key(self, key: str) -> str:

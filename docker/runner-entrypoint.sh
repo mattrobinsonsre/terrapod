@@ -74,6 +74,14 @@ wait_for_child() {
     CHILD_PID=""
 }
 
+# --- Setup log capture ---
+# All output before terraform/tofu execution is captured so it can be
+# included in the uploaded log artifact (visible in the UI after the
+# live pod log stream ends).
+SETUP_LOG="/tmp/setup.log"
+: > "$SETUP_LOG"
+log() { echo "$@" | tee -a "$SETUP_LOG"; }
+
 # --- Configuration ---
 TP_BACKEND="${TP_BACKEND:-terraform}"
 TP_VERSION="${TP_VERSION:-1.9.8}"
@@ -145,9 +153,9 @@ esac
 
 if [ -n "$TP_API_URL" ] && [ -n "$TP_VERSION" ]; then
     BINARY_URL="${TP_API_URL}/api/v2/binary-cache/${TP_BACKEND}/${TP_VERSION}/${TP_OS}/${TP_ARCH}"
-    echo "[entrypoint] Downloading $TP_BACKEND $TP_VERSION ($TP_OS/$TP_ARCH) from binary cache..."
+    log "[entrypoint] Downloading $TP_BACKEND $TP_VERSION ($TP_OS/$TP_ARCH) from binary cache..."
     if ! tp_curl_download "/tmp/${TP_BACKEND}.zip" -H "$AUTH_HEADER" "$BINARY_URL"; then
-        echo "[entrypoint] Binary cache unavailable, downloading from upstream..."
+        log "[entrypoint] Binary cache unavailable, downloading from upstream..."
         if [ "$TP_BACKEND" = "terraform" ]; then
             _upstream="https://releases.hashicorp.com/terraform/${TP_VERSION}/terraform_${TP_VERSION}_${TP_OS}_${TP_ARCH}.zip"
         else
@@ -156,7 +164,7 @@ if [ -n "$TP_API_URL" ] && [ -n "$TP_VERSION" ]; then
         curl -sSfL -o "/tmp/${TP_BACKEND}.zip" "$_upstream"
     fi
 else
-    echo "[entrypoint] No API URL, expecting $TP_BACKEND on PATH"
+    log "[entrypoint] No API URL, expecting $TP_BACKEND on PATH"
     TP_BIN="$TP_BACKEND"
 fi
 
@@ -164,10 +172,10 @@ if [ -z "$TP_BIN" ]; then
     _zip="/tmp/${TP_BACKEND}.zip"
     # Validate the download is a zip (PK\x03\x04 magic bytes)
     if ! head -c 4 "$_zip" 2>/dev/null | od -A n -t x1 | grep -q '50 4b 03 04'; then
-        echo "[entrypoint] ERROR: Downloaded file is not a valid zip archive" >&2
-        echo "[entrypoint] First bytes: $(head -c 64 "$_zip" 2>/dev/null | od -A n -t x1 | head -1)" >&2
-        echo "[entrypoint] This usually means the presigned storage URL returned an error" >&2
-        echo "[entrypoint] Check that the API storage backend region/endpoint is correct" >&2
+        log "[entrypoint] ERROR: Downloaded file is not a valid zip archive"
+        log "[entrypoint] First bytes: $(head -c 64 "$_zip" 2>/dev/null | od -A n -t x1 | head -1)"
+        log "[entrypoint] This usually means the presigned storage URL returned an error"
+        log "[entrypoint] Check that the API storage backend region/endpoint is correct"
         exit 1
     fi
     unzip -o -q "$_zip" -d /tmp/bin
@@ -177,7 +185,7 @@ fi
 
 # --- Download configuration archive ---
 if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
-    echo "[entrypoint] Downloading configuration..."
+    log "[entrypoint] Downloading configuration..."
     tp_curl_download /tmp/config.tar.gz -H "$AUTH_HEADER" \
         "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/config" 2>/dev/null || true
     if [ -f /tmp/config.tar.gz ] && [ -s /tmp/config.tar.gz ]; then
@@ -200,22 +208,22 @@ if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
         done
         # Remove lock file — the runner resolves providers independently
         rm -f "$WORK_DIR/.terraform.lock.hcl"
-        echo "[entrypoint] Stripped cloud/backend blocks from uploaded config"
+        log "[entrypoint] Stripped cloud/backend blocks from uploaded config"
     else
-        echo "[entrypoint] No configuration archive (HTTP $HTTP_CODE)"
+        log "[entrypoint] No configuration archive (HTTP $HTTP_CODE)"
     fi
 fi
 
 # --- Download current state ---
 if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
-    echo "[entrypoint] Downloading current state..."
+    log "[entrypoint] Downloading current state..."
     tp_curl_download "$WORK_DIR/terraform.tfstate" -H "$AUTH_HEADER" \
         "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/state" 2>/dev/null || true
 fi
 
 # --- Run setup script (if configured) ---
 if [ -n "$TP_SETUP_SCRIPT" ]; then
-    echo "[entrypoint] Running setup script..."
+    log "[entrypoint] Running setup script..."
     eval "$TP_SETUP_SCRIPT"
 fi
 
@@ -242,7 +250,7 @@ provider_installation {
 }
 TFEOF
             export TF_CLI_CONFIG_FILE="/tmp/terraform.rc"
-            echo "[entrypoint] Provider mirror + credentials configured: ${TP_API_URL}/v1/providers/"
+            log "[entrypoint] Provider mirror + credentials configured: ${TP_API_URL}/v1/providers/"
             ;;
         *)
             # HTTP — skip network mirror (terraform requires HTTPS) but still
@@ -253,7 +261,7 @@ credentials "$MIRROR_HOST" {
 }
 TFEOF
             export TF_CLI_CONFIG_FILE="/tmp/terraform.rc"
-            echo "[entrypoint] Skipping provider mirror (requires HTTPS), credentials configured for: $MIRROR_HOST"
+            log "[entrypoint] Skipping provider mirror (requires HTTPS), credentials configured for: $MIRROR_HOST"
             ;;
     esac
 fi
@@ -266,17 +274,18 @@ export TF_REGISTRY_CLIENT_TIMEOUT=30
 export TF_PROVIDER_DOWNLOAD_RETRY=3
 
 # --- Initialize ---
-echo "[entrypoint] Running $TP_BACKEND init..."
+log "[entrypoint] Running $TP_BACKEND init..."
 INIT_EXIT=0
 "$TP_BIN" init -input=false > /tmp/init.log 2>&1 || INIT_EXIT=$?
 cat /tmp/init.log
 if [ "$INIT_EXIT" != "0" ]; then
-    echo "[entrypoint] Init failed with exit code $INIT_EXIT"
-    # Upload init output as plan log so it's visible in the UI
+    log "[entrypoint] Init failed with exit code $INIT_EXIT"
+    # Upload setup + init output as plan log so it's visible in the UI
     if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
+        cat "$SETUP_LOG" /tmp/init.log > /tmp/plan-full.log 2>/dev/null
         curl -sSf --max-time 10 -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
-            --data-binary @/tmp/init.log \
+            --data-binary @/tmp/plan-full.log \
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-log" || true
     fi
     exit "$INIT_EXIT"
@@ -293,7 +302,7 @@ if [ -n "$TP_VAR_FILES" ] && [ "$TP_VAR_FILES" != "[]" ]; then
         set -- "$@" "-var-file=$vf"
     done < /tmp/var_files.txt
     rm -f /tmp/var_files.txt
-    echo "[entrypoint] Using var files: $TP_VAR_FILES"
+    log "[entrypoint] Using var files: $TP_VAR_FILES"
 fi
 
 # --- Build -target arguments from TP_TARGET_ADDRS JSON ---
@@ -303,7 +312,7 @@ if [ -n "$TP_TARGET_ADDRS" ] && [ "$TP_TARGET_ADDRS" != "[]" ]; then
         set -- "$@" "-target=$tgt"
     done < /tmp/targets.txt
     rm -f /tmp/targets.txt
-    echo "[entrypoint] Using targets: $TP_TARGET_ADDRS"
+    log "[entrypoint] Using targets: $TP_TARGET_ADDRS"
 fi
 
 # --- Build -replace arguments from TP_REPLACE_ADDRS JSON (plan phase only) ---
@@ -313,7 +322,7 @@ if [ "$TP_PHASE" = "plan" ] && [ -n "$TP_REPLACE_ADDRS" ] && [ "$TP_REPLACE_ADDR
         set -- "$@" "-replace=$rpl"
     done < /tmp/replaces.txt
     rm -f /tmp/replaces.txt
-    echo "[entrypoint] Using replace addrs: $TP_REPLACE_ADDRS"
+    log "[entrypoint] Using replace addrs: $TP_REPLACE_ADDRS"
 fi
 
 # --- Execute phase ---
@@ -360,9 +369,9 @@ if [ "$TP_PHASE" = "plan" ]; then
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/plan-result" || true
     fi
 
-    # Upload plan log (best-effort) — prepend init output so the full log is visible
+    # Upload plan log (best-effort) — prepend setup + init output so the full log is visible
     if [ -n "$TP_API_URL" ] && [ -f /tmp/plan.log ]; then
-        cat /tmp/init.log /tmp/plan.log > /tmp/plan-full.log 2>/dev/null
+        cat "$SETUP_LOG" /tmp/init.log /tmp/plan.log > /tmp/plan-full.log 2>/dev/null
         curl -sSf --max-time 10 -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @/tmp/plan-full.log \
@@ -380,7 +389,7 @@ if [ "$TP_PHASE" = "plan" ]; then
 elif [ "$TP_PHASE" = "apply" ]; then
     # Download plan file from plan phase
     if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
-        echo "[entrypoint] Downloading plan file from plan phase..."
+        log "[entrypoint] Downloading plan file from plan phase..."
         tp_curl_download tfplan -H "$AUTH_HEADER" \
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-file" 2>/dev/null || true
     fi
@@ -398,9 +407,9 @@ elif [ "$TP_PHASE" = "apply" ]; then
     # Show apply output in pod logs
     cat /tmp/apply.log 2>/dev/null || true
 
-    # Upload apply log (best-effort, bounded by --max-time) — prepend init output
+    # Upload apply log (best-effort, bounded by --max-time) — prepend setup + init output
     if [ -n "$TP_API_URL" ] && [ -f /tmp/apply.log ]; then
-        cat /tmp/init.log /tmp/apply.log > /tmp/apply-full.log 2>/dev/null
+        cat "$SETUP_LOG" /tmp/init.log /tmp/apply.log > /tmp/apply-full.log 2>/dev/null
         curl -sSf --max-time 10 -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @/tmp/apply-full.log \
