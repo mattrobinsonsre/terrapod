@@ -28,6 +28,10 @@ const nextConfig = {
         source: '/api/v2/agent-pools/:path*/events',
         headers: [{ key: 'Content-Encoding', value: 'none' }],
       },
+      {
+        source: '/api/v2/runs/:path*/run-events',
+        headers: [{ key: 'Content-Encoding', value: 'none' }],
+      },
     ]
   },
 }

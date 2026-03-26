@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { setAuth } from '@/lib/auth'
+import { STORAGE_AUTH_STATE, STORAGE_PKCE_VERIFIER, STORAGE_REDIRECT_AFTER_LOGIN } from '@/lib/constants'
 
 type CallbackParams =
   | { error: string; code?: undefined; verifier?: undefined }
@@ -22,8 +23,8 @@ function getCallbackParams(): CallbackParams | null {
     return { error: 'Missing authorization code or state' }
   }
 
-  const savedState = sessionStorage.getItem('terrapod_auth_state')
-  const verifier = sessionStorage.getItem('terrapod_pkce_verifier')
+  const savedState = sessionStorage.getItem(STORAGE_AUTH_STATE)
+  const verifier = sessionStorage.getItem(STORAGE_PKCE_VERIFIER)
 
   if (!savedState || returnedState !== savedState) {
     return { error: 'State mismatch — possible CSRF attack' }
@@ -64,10 +65,10 @@ export default function CallbackHandler() {
       })
       .then((data) => {
         setAuth(data.session_token, data.email, data.roles, data.expires_at)
-        sessionStorage.removeItem('terrapod_pkce_verifier')
-        sessionStorage.removeItem('terrapod_auth_state')
-        const redirect = sessionStorage.getItem('terrapod_redirect_after_login')
-        sessionStorage.removeItem('terrapod_redirect_after_login')
+        sessionStorage.removeItem(STORAGE_PKCE_VERIFIER)
+        sessionStorage.removeItem(STORAGE_AUTH_STATE)
+        const redirect = sessionStorage.getItem(STORAGE_REDIRECT_AFTER_LOGIN)
+        sessionStorage.removeItem(STORAGE_REDIRECT_AFTER_LOGIN)
         if (redirect) {
           window.location.href = redirect
         } else {

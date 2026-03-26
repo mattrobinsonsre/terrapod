@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { setAuth } from '@/lib/auth'
+import { STORAGE_AUTH_STATE, STORAGE_PKCE_VERIFIER, STORAGE_REDIRECT_AFTER_LOGIN } from '@/lib/constants'
 import { generatePKCE, generateState } from '@/lib/pkce'
 
 interface Provider {
@@ -139,10 +140,10 @@ function LoginContent() {
       const { verifier, challenge } = await generatePKCE()
       const state = generateState()
 
-      sessionStorage.setItem('terrapod_pkce_verifier', verifier)
-      sessionStorage.setItem('terrapod_auth_state', state)
+      sessionStorage.setItem(STORAGE_PKCE_VERIFIER, verifier)
+      sessionStorage.setItem(STORAGE_AUTH_STATE, state)
       if (redirectUrl) {
-        sessionStorage.setItem('terrapod_redirect_after_login', redirectUrl)
+        sessionStorage.setItem(STORAGE_REDIRECT_AFTER_LOGIN, redirectUrl)
       }
 
       const params = new URLSearchParams({

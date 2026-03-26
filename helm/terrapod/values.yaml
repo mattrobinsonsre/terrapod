@@ -460,6 +460,7 @@ runners:
   terminationGracePeriodSeconds: 120  # Time budget for graceful shutdown + artifact uploads
   tokenTTLSeconds: 3600         # Runner token TTL (default 1 hour)
   maxTokenTTLSeconds: 7200      # Runner token max TTL (default 2 hours)
+  staleTimeoutSeconds: 3600     # Seconds before a run with no Job status is marked errored
 
   # ServiceAccount for runner Jobs (cloud workload identity)
   serviceAccount:

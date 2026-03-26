@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from terrapod.services.run_reconciler import (
-    STALE_TIMEOUT,
+    DEFAULT_STALE_TIMEOUT_SECONDS,
     _check_stale,
     _handle_failed,
     _handle_succeeded,
@@ -246,12 +246,16 @@ class TestHandleFailed:
 
 
 class TestCheckStale:
+    @patch("terrapod.services.run_reconciler.load_runner_config")
     @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
-    async def test_stale_plan_gets_errored(self, mock_handle):
+    async def test_stale_plan_gets_errored(self, mock_handle, mock_config):
+        mock_config.return_value = MagicMock(stale_timeout_seconds=DEFAULT_STALE_TIMEOUT_SECONDS)
         db = AsyncMock()
         run = _mock_run(
             status="planning",
-            plan_started_at=datetime.now(UTC) - STALE_TIMEOUT - timedelta(minutes=5),
+            plan_started_at=datetime.now(UTC)
+            - timedelta(seconds=DEFAULT_STALE_TIMEOUT_SECONDS)
+            - timedelta(minutes=5),
         )
 
         await _check_stale(db, run)
@@ -259,20 +263,26 @@ class TestCheckStale:
         mock_handle.assert_called_once()
         assert "stale" in mock_handle.call_args.args[2].lower()
 
+    @patch("terrapod.services.run_reconciler.load_runner_config")
     @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
-    async def test_stale_apply_gets_errored(self, mock_handle):
+    async def test_stale_apply_gets_errored(self, mock_handle, mock_config):
+        mock_config.return_value = MagicMock(stale_timeout_seconds=DEFAULT_STALE_TIMEOUT_SECONDS)
         db = AsyncMock()
         run = _mock_run(
             status="applying",
-            apply_started_at=datetime.now(UTC) - STALE_TIMEOUT - timedelta(minutes=5),
+            apply_started_at=datetime.now(UTC)
+            - timedelta(seconds=DEFAULT_STALE_TIMEOUT_SECONDS)
+            - timedelta(minutes=5),
         )
 
         await _check_stale(db, run)
 
         mock_handle.assert_called_once()
 
+    @patch("terrapod.services.run_reconciler.load_runner_config")
     @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
-    async def test_not_stale_yet(self, mock_handle):
+    async def test_not_stale_yet(self, mock_handle, mock_config):
+        mock_config.return_value = MagicMock(stale_timeout_seconds=DEFAULT_STALE_TIMEOUT_SECONDS)
         db = AsyncMock()
         run = _mock_run(
             status="planning",
@@ -283,11 +293,31 @@ class TestCheckStale:
 
         mock_handle.assert_not_called()
 
+    @patch("terrapod.services.run_reconciler.load_runner_config")
     @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
-    async def test_no_phase_start_skips_check(self, mock_handle):
+    async def test_no_phase_start_skips_check(self, mock_handle, mock_config):
+        mock_config.return_value = MagicMock(stale_timeout_seconds=DEFAULT_STALE_TIMEOUT_SECONDS)
         db = AsyncMock()
         run = _mock_run(status="planning", plan_started_at=None)
 
         await _check_stale(db, run)
 
         mock_handle.assert_not_called()
+
+    @patch("terrapod.services.run_reconciler.load_runner_config")
+    @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
+    async def test_custom_timeout_from_config(self, mock_handle, mock_config):
+        """Stale timeout is read from RunnerConfig, not hardcoded."""
+        custom_timeout = 300  # 5 minutes
+        mock_config.return_value = MagicMock(stale_timeout_seconds=custom_timeout)
+        db = AsyncMock()
+        # 10 minutes ago — stale with 5m timeout, NOT stale with default 1h
+        run = _mock_run(
+            status="planning",
+            plan_started_at=datetime.now(UTC) - timedelta(minutes=10),
+        )
+
+        await _check_stale(db, run)
+
+        mock_handle.assert_called_once()
+        assert "stale" in mock_handle.call_args.args[2].lower()

@@ -17,14 +17,15 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from terrapod.config import load_runner_config
 from terrapod.db.models import Run, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# Runs stuck longer than this with no Job status are errored
-STALE_TIMEOUT = timedelta(hours=1)
+# Default stale timeout (1 hour) — overridden by RunnerConfig.stale_timeout_seconds
+DEFAULT_STALE_TIMEOUT_SECONDS = 3600
 
 
 async def _persist_live_log_if_missing(run: Run, phase: str) -> None:
@@ -219,7 +220,10 @@ async def _check_stale(db: AsyncSession, run: Run) -> None:
     if phase_start is None:
         return
 
+    cfg = load_runner_config()
+    stale_timeout = timedelta(seconds=cfg.stale_timeout_seconds)
+
     now = datetime.now(UTC)
-    if now - phase_start > STALE_TIMEOUT:
-        await _handle_failed(db, run, f"Run stale — no Job status for >{STALE_TIMEOUT}")
+    if now - phase_start > stale_timeout:
+        await _handle_failed(db, run, f"Run stale — no Job status for >{stale_timeout}")
         logger.warning("Stale run errored", run_id=str(run.id), status=run.status)

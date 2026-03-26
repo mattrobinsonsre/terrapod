@@ -91,6 +91,8 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Registry](registry.md) | Private module/provider registry, caching layers |
 | [Monitoring](monitoring.md) | Prometheus metrics, scraping, recommended alerts |
 | [Deployment](deployment.md) | Production Helm deployment, storage backends, scaling |
+| [Security Hardening](security-hardening.md) | TLS, secrets management, network policies, rate limiting |
+| [Production Checklist](production-checklist.md) | Step-by-step checklist for go-live readiness |
 | [Disaster Recovery](disaster-recovery.md) | Break-glass state recovery from object storage |
 | [API Reference](api-reference.md) | All API endpoints with examples |
 

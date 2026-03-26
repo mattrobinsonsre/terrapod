@@ -1,0 +1,83 @@
+# Terrapod E2E test stack
+# Usage: docker compose -f e2e/docker-compose.e2e.yml up -d
+#    or: make test-e2e
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: terrapod
+      POSTGRES_PASSWORD: terrapod
+      POSTGRES_DB: terrapod
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U terrapod"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  migrations:
+    image: ${MIGRATIONS_IMAGE:-terrapod-migrations:local}
+    environment:
+      DATABASE_URL: postgresql+asyncpg://terrapod:terrapod@postgres:5432/terrapod
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  bootstrap:
+    image: ${API_IMAGE:-terrapod-api:local}
+    command: ["python", "-m", "terrapod.cli.bootstrap"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://terrapod:terrapod@postgres:5432/terrapod
+      TERRAPOD_BOOTSTRAP_ADMIN_EMAIL: admin@terrapod.local
+      TERRAPOD_BOOTSTRAP_ADMIN_PASSWORD: TestPassword123!
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+
+  api:
+    image: ${API_IMAGE:-terrapod-api:local}
+    environment:
+      TERRAPOD_DATABASE_URL: postgresql+asyncpg://terrapod:terrapod@postgres:5432/terrapod
+      TERRAPOD_REDIS_URL: redis://redis:6379
+      TERRAPOD_STORAGE__BACKEND: filesystem
+      TERRAPOD_STORAGE__FILESYSTEM__ROOT_DIR: /var/lib/terrapod/storage
+      TERRAPOD_RATE_LIMIT__ENABLED: "false"
+      TERRAPOD_LOG_LEVEL: INFO
+      TERRAPOD_JSON_LOGS: "false"
+    ports:
+      - "8000:8000"
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  web:
+    image: ${WEB_IMAGE:-terrapod-web:local}
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
