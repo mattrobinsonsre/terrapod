@@ -19,6 +19,7 @@ data:
     termination_grace_period_seconds: {{ .Values.runners.terminationGracePeriodSeconds }}
     token_ttl_seconds: {{ .Values.runners.tokenTTLSeconds }}
     max_token_ttl_seconds: {{ .Values.runners.maxTokenTTLSeconds }}
+    stale_timeout_seconds: {{ .Values.runners.staleTimeoutSeconds }}
     {{- with .Values.runners.nodeSelector }}
     node_selector:
       {{- toYaml . | nindent 6 }}

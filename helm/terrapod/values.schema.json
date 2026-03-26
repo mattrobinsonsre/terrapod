@@ -112,6 +112,7 @@
         "terminationGracePeriodSeconds": { "type": "integer", "minimum": 30 },
         "tokenTTLSeconds": { "type": "integer", "minimum": 1 },
         "maxTokenTTLSeconds": { "type": "integer", "minimum": 1 },
+        "staleTimeoutSeconds": { "type": "integer", "minimum": 60 },
         "serviceAccount": { "$ref": "#/$defs/serviceAccountSpec" },
         "azureWorkloadIdentity": { "type": "boolean" }
       }
