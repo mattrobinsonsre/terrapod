@@ -11,7 +11,9 @@ RUN apk upgrade --no-cache \
     curl \
     tar \
     jq \
-    unzip
+    unzip \
+    git \
+    openssh-client
 
 COPY docker/runner-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

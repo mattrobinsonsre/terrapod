@@ -101,6 +101,7 @@
       "properties": {
         "image": { "$ref": "#/$defs/imageSpec" },
         "serverUrl": { "type": "string" },
+        "imagePullSecrets": { "type": "array", "items": { "type": "string" } },
         "nodeSelector": { "type": "object" },
         "tolerations": { "type": "array", "items": { "type": "object" } },
         "affinity": { "type": "object" },

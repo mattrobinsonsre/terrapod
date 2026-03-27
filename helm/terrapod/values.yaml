@@ -448,6 +448,15 @@ runners:
   # for presigned storage URLs. Defaults to http://<release>-api:8000.
   serverUrl: ""
 
+  # Image pull secrets for runner Jobs (private registries).
+  # These are separate from global.imagePullSecrets which only cover
+  # Helm-managed workloads. Runner Jobs are created dynamically by the
+  # listener and need their own pull secrets.
+  imagePullSecrets: []
+  # Example:
+  #   imagePullSecrets:
+  #     - my-registry-secret
+
   # Shared Job settings
   nodeSelector: {}
   tolerations: []

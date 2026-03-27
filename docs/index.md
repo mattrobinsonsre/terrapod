@@ -87,6 +87,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Audit Logging](audit-logging.md) | Immutable event log, query API, retention |
 | [Artifact Retention](artifact-retention.md) | Automated cleanup of old state versions, run logs, cache entries |
 | [Health Dashboard](health-dashboard.md) | Workspace health, drift status, run metrics |
+| [Runners](runners.md) | Custom runner images, private registries, Job configuration |
 | [Cloud Credentials](cloud-credentials.md) | AWS IRSA, GCP WIF, Azure WI setup |
 | [Registry](registry.md) | Private module/provider registry, caching layers |
 | [Monitoring](monitoring.md) | Prometheus metrics, scraping, recommended alerts |
