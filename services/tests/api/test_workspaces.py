@@ -57,6 +57,7 @@ def _mock_workspace(
     ws.vcs_repo_url = ""
     ws.vcs_branch = ""
     ws.var_files = []
+    ws.trigger_prefixes = []
     ws.drift_detection_enabled = False
     ws.drift_detection_interval_seconds = 86400
     ws.drift_last_checked_at = None

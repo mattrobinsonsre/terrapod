@@ -140,6 +140,29 @@ def _sanitize_working_directory(raw: str) -> str:
     return v
 
 
+def _validate_trigger_prefixes(raw: object) -> list[str]:
+    """Validate and sanitize trigger-prefixes input.
+
+    Each entry is normalized the same way as working-directory (strip slashes,
+    reject traversal).  Max 20 entries.
+    """
+    if not isinstance(raw, list):
+        raise HTTPException(status_code=422, detail="trigger-prefixes must be a list of strings")
+    if len(raw) > 20:
+        raise HTTPException(status_code=422, detail="trigger-prefixes: maximum 20 entries")
+    result: list[str] = []
+    for entry in raw:
+        if not isinstance(entry, str):
+            raise HTTPException(status_code=422, detail="trigger-prefixes entries must be strings")
+        v = _sanitize_working_directory(entry)
+        if not v:
+            raise HTTPException(
+                status_code=422, detail="trigger-prefixes entries must be non-empty"
+            )
+        result.append(v)
+    return result
+
+
 _WORKSPACE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
 
 
@@ -438,6 +461,7 @@ def _workspace_json(
                 if ws.vcs_connection_id
                 else None,
                 "var-files": ws.var_files or [],
+                "trigger-prefixes": ws.trigger_prefixes or [],
                 "drift-detection-enabled": ws.drift_detection_enabled,
                 "drift-detection-interval-seconds": ws.drift_detection_interval_seconds,
                 "drift-last-checked-at": _rfc3339(ws.drift_last_checked_at),
@@ -619,6 +643,7 @@ async def create_workspace(
         vcs_repo_url=attrs.get("vcs-repo-url", ""),
         vcs_branch=attrs.get("vcs-branch", ""),
         var_files=_validate_var_files(attrs.get("var-files", [])),
+        trigger_prefixes=_validate_trigger_prefixes(attrs.get("trigger-prefixes", [])),
         drift_detection_enabled=attrs.get(
             "drift-detection-enabled",
             True if vcs_connection_id else False,
@@ -839,6 +864,8 @@ async def update_workspace(
         ws.vcs_branch = attrs["vcs-branch"]
     if "var-files" in attrs:
         ws.var_files = _validate_var_files(attrs["var-files"])
+    if "trigger-prefixes" in attrs:
+        ws.trigger_prefixes = _validate_trigger_prefixes(attrs["trigger-prefixes"])
     if "agent-pool-id" in attrs:
         import uuid as _uuid
 

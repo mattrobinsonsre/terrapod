@@ -84,14 +84,16 @@ async def _get_changed_files(
     return await github_service.get_changed_files(conn, owner, repo, base_sha, head_sha)
 
 
-def _changes_affect_directory(changed_files: list[str], working_directory: str) -> bool:
-    """Check if any changed files fall within the workspace's working directory.
+def _changes_affect_prefixes(changed_files: list[str], prefixes: list[str]) -> bool:
+    """Check if any changed files fall within any of the given directory prefixes.
 
-    Uses strict prefix matching: only files starting with "{working_directory}/"
-    are considered relevant. Root-level files don't trigger subdirectory workspaces.
+    Uses strict prefix matching: only files starting with "{prefix}/" are
+    considered relevant. Root-level files don't trigger subdirectory workspaces.
     """
-    prefix = working_directory.rstrip("/") + "/"
-    return any(f.startswith(prefix) for f in changed_files)
+    if not prefixes:
+        return False
+    normalized = [p.rstrip("/") + "/" for p in prefixes]
+    return any(f.startswith(n) for f in changed_files for n in normalized)
 
 
 async def _list_branches(conn: VCSConnection, owner: str, repo: str) -> list[dict[str, str]]:
@@ -235,7 +237,7 @@ async def _poll_workspace_branch(
             workspace=ws.name,
             repo=f"{owner}/{repo}",
             branch=branch,
-            error=str(e),
+            error=repr(e),
         )
         return
 
@@ -263,15 +265,21 @@ async def _poll_workspace_branch(
     )
 
     # VCS subdirectory filtering: skip runs when changes don't affect the workspace
-    if ws.working_directory and ws.vcs_last_commit_sha:
+    effective_prefixes = (
+        ws.trigger_prefixes
+        if ws.trigger_prefixes
+        else ([ws.working_directory] if ws.working_directory else [])
+    )
+    if effective_prefixes and ws.vcs_last_commit_sha:
         try:
             changed = await _get_changed_files(conn, owner, repo, ws.vcs_last_commit_sha, sha)
             # None means truncated — create run unconditionally
-            if changed is not None and not _changes_affect_directory(changed, ws.working_directory):
+            if changed is not None and not _changes_affect_prefixes(changed, effective_prefixes):
                 logger.info(
-                    "Skipping run — no changes in working directory",
+                    "Skipping run — no changes match trigger prefixes",
                     workspace=ws.name,
-                    working_directory=ws.working_directory,
+                    trigger_prefixes=effective_prefixes,
+                    changed_files=changed[:20],
                     changed_files_count=len(changed),
                 )
                 ws.vcs_last_commit_sha = sha
@@ -281,7 +289,7 @@ async def _poll_workspace_branch(
             logger.warning(
                 "Failed to get changed files, creating run anyway",
                 workspace=ws.name,
-                error=str(e),
+                error=repr(e),
             )
 
     run = await _create_vcs_run(
@@ -379,20 +387,25 @@ async def _poll_workspace_prs(
         )
 
         # VCS subdirectory filtering for PRs: compare PR head against tracked branch
-        if ws.working_directory and ws.vcs_last_commit_sha:
+        pr_prefixes = (
+            ws.trigger_prefixes
+            if ws.trigger_prefixes
+            else ([ws.working_directory] if ws.working_directory else [])
+        )
+        if pr_prefixes and ws.vcs_last_commit_sha:
             try:
                 changed = await _get_changed_files(
                     conn, owner, repo, ws.vcs_last_commit_sha, pr.head_sha
                 )
                 # None means truncated — create run unconditionally
-                if changed is not None and not _changes_affect_directory(
-                    changed, ws.working_directory
-                ):
+                if changed is not None and not _changes_affect_prefixes(changed, pr_prefixes):
                     logger.info(
-                        "Skipping PR run — no changes in working directory",
+                        "Skipping PR run — no changes match trigger prefixes",
                         workspace=ws.name,
                         pr_number=pr.number,
-                        working_directory=ws.working_directory,
+                        trigger_prefixes=pr_prefixes,
+                        changed_files=changed[:20],
+                        changed_files_count=len(changed),
                     )
                     continue
             except Exception as e:
@@ -400,7 +413,7 @@ async def _poll_workspace_prs(
                     "Failed to get changed files for PR, creating run anyway",
                     workspace=ws.name,
                     pr_number=pr.number,
-                    error=str(e),
+                    error=repr(e),
                 )
 
         run = await _create_vcs_run(
