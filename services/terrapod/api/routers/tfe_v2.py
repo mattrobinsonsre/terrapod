@@ -35,6 +35,7 @@ Endpoints:
 import asyncio
 import hashlib
 import json
+import os
 import re
 from datetime import UTC, datetime
 
@@ -66,7 +67,10 @@ logger = get_logger(__name__)
 
 TFP_API_VERSION = "2.6"
 TFP_APP_NAME = "Terrapod"
-X_TFE_VERSION = "v0.1.0"
+X_TFE_VERSION = (
+    "v202301-1"  # TFE monthly format; pre-202302 disables structured run output (unsupported)
+)
+TERRAPOD_VERSION = os.environ.get("TERRAPOD_VERSION", "dev")
 
 
 def _primary_run_filter():
@@ -245,7 +249,10 @@ async def ping() -> JSONResponse:
     Returns 200 OK with TFE-compatible headers. No auth required.
     Used by go-tfe client for initialization and version detection.
     """
-    return JSONResponse(content={}, headers=_tfe_headers())
+    return JSONResponse(
+        content={"app_name": TFP_APP_NAME, "version": TERRAPOD_VERSION},
+        headers=_tfe_headers(),
+    )
 
 
 @router.get("/account/details")

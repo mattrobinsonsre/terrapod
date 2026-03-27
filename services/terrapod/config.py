@@ -67,6 +67,7 @@ class RunnerConfig(BaseModel):
     priority_class_name: str = Field(default="")
     topology_spread_constraints: list[dict] = Field(default_factory=list)
     pod_security_context: dict = Field(default_factory=dict)
+    image_pull_secrets: list[str] = Field(default_factory=list)
     stale_timeout_seconds: int = Field(
         default=3600,
         description="Seconds before a run with no Job status is marked errored",

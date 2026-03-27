@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Users, Shield, Server, Variable, HeartPulse, FileText, BookOpen, Code, LogOut, Menu, X } from 'lucide-react'
@@ -40,6 +40,11 @@ export default function NavBar() {
   const admin = useSyncExternalStore(noopSubscribe, isAdmin, () => false)
   const adminOrAudit = useSyncExternalStore(noopSubscribe, isAdminOrAudit, () => false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [version, setVersion] = useState('')
+
+  useEffect(() => {
+    fetch('/api/v2/ping').then((r) => r.json()).then((d) => setVersion(d.version || '')).catch(() => {})
+  }, [])
 
   const handleLogout = () => {
     clearAuth()
@@ -121,6 +126,7 @@ export default function NavBar() {
             <Link href="/" className="flex items-center gap-2 mr-3 flex-shrink-0">
               <img src="/logo.svg" alt="Terrapod" className="w-7 h-7" />
               <span className="font-bold text-lg text-slate-100">Terrapod</span>
+              {version && <span className="text-xs text-slate-500 font-normal">{version}</span>}
             </Link>
             <div className="flex items-center gap-1 flex-wrap flex-1">
               {navLinks}
@@ -152,6 +158,7 @@ export default function NavBar() {
             <Link href="/" className="flex items-center gap-2">
               <img src="/logo.svg" alt="Terrapod" className="w-7 h-7" />
               <span className="font-bold text-lg text-slate-100">Terrapod</span>
+              {version && <span className="text-xs text-slate-500 font-normal">{version}</span>}
             </Link>
             <div className="flex items-center gap-1">
               <a

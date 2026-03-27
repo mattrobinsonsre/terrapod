@@ -230,6 +230,10 @@ def build_job_spec(
 
     # Scheduling and placement from runner config
     pod_spec = job_spec["spec"]["template"]["spec"]
+
+    # Image pull secrets — for pulling custom runner images from private registries
+    if runner_config.image_pull_secrets:
+        pod_spec["imagePullSecrets"] = [{"name": s} for s in runner_config.image_pull_secrets]
     if runner_config.node_selector:
         pod_spec["nodeSelector"] = runner_config.node_selector
     if runner_config.tolerations:
