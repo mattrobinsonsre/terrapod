@@ -103,10 +103,6 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description: "Branch to track (empty = repo default).",
 				Optional:    true,
 			},
-			"vcs_working_directory": schema.StringAttribute{
-				Description: "Subdirectory within the repo.",
-				Optional:    true,
-			},
 			"vcs_connection_id": schema.StringAttribute{
 				Description: "VCS connection ID (e.g. vcs-abc123).",
 				Optional:    true,
@@ -340,9 +336,6 @@ func buildWorkspaceAttrs(m *workspaceModel) map[string]any {
 	if !m.VCSBranch.IsNull() {
 		attrs["vcs-branch"] = m.VCSBranch.ValueString()
 	}
-	if !m.VCSWorkingDirectory.IsNull() {
-		attrs["vcs-working-directory"] = m.VCSWorkingDirectory.ValueString()
-	}
 	if !m.AgentPoolID.IsNull() {
 		attrs["agent-pool-id"] = m.AgentPoolID.ValueString()
 	}
@@ -411,11 +404,6 @@ func readResourceIntoModel(ctx context.Context, res *client.Resource, m *workspa
 		m.VCSBranch = types.StringValue(v)
 	} else {
 		m.VCSBranch = types.StringNull()
-	}
-	if v := client.GetStringAttr(res, "vcs-working-directory"); v != "" {
-		m.VCSWorkingDirectory = types.StringValue(v)
-	} else {
-		m.VCSWorkingDirectory = types.StringNull()
 	}
 	if v := client.GetStringAttr(res, "agent-pool-id"); v != "" {
 		m.AgentPoolID = types.StringValue(v)

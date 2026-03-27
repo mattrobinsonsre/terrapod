@@ -36,7 +36,6 @@ type workspaceDataSourceModel struct {
 	Labels                        types.Map    `tfsdk:"labels"`
 	VCSRepoURL                    types.String `tfsdk:"vcs_repo_url"`
 	VCSBranch                     types.String `tfsdk:"vcs_branch"`
-	VCSWorkingDirectory           types.String `tfsdk:"vcs_working_directory"`
 	VCSConnectionID               types.String `tfsdk:"vcs_connection_id"`
 	AgentPoolID                   types.String `tfsdk:"agent_pool_id"`
 	VarFiles                      types.List   `tfsdk:"var_files"`
@@ -75,7 +74,6 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"labels":                            computedMap("Labels."),
 			"vcs_repo_url":                      computedString("VCS repo URL."),
 			"vcs_branch":                        computedString("VCS branch."),
-			"vcs_working_directory":             computedString("VCS working directory."),
 			"vcs_connection_id":                 computedString("VCS connection ID."),
 			"agent_pool_id":                     computedString("Agent pool ID."),
 			"var_files":                         computedList("Var files for -var-file arguments."),
@@ -146,7 +144,6 @@ func readDataSourceModel(ctx context.Context, res *client.Resource, m *workspace
 	setOptionalString(&m.TerraformVersion, client.GetStringAttr(res, "terraform-version"))
 	setOptionalString(&m.VCSRepoURL, client.GetStringAttr(res, "vcs-repo-url"))
 	setOptionalString(&m.VCSBranch, client.GetStringAttr(res, "vcs-branch"))
-	setOptionalString(&m.VCSWorkingDirectory, client.GetStringAttr(res, "vcs-working-directory"))
 	setOptionalString(&m.AgentPoolID, client.GetStringAttr(res, "agent-pool-id"))
 	setOptionalString(&m.DriftStatus, client.GetStringAttr(res, "drift-status"))
 	setOptionalString(&m.DriftLastCheckedAt, client.GetStringAttr(res, "drift-last-checked-at"))

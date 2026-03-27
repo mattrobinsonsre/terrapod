@@ -128,6 +128,14 @@ def _validate_var_files(raw: object) -> list[str]:
     return result
 
 
+def _sanitize_working_directory(raw: str) -> str:
+    """Sanitize working-directory: strip leading/trailing slashes, reject traversal."""
+    v = raw.strip().strip("/")
+    if ".." in v:
+        raise HTTPException(status_code=422, detail="working-directory: path traversal not allowed")
+    return v
+
+
 _WORKSPACE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
 
 
@@ -419,7 +427,6 @@ def _workspace_json(
                 "resource-memory": ws.resource_memory,
                 "vcs-repo-url": ws.vcs_repo_url,
                 "vcs-branch": ws.vcs_branch,
-                "vcs-working-directory": ws.vcs_working_directory,
                 "vcs-connection-id": f"vcs-{ws.vcs_connection_id}"
                 if ws.vcs_connection_id
                 else None,
@@ -595,7 +602,7 @@ async def create_workspace(
         auto_apply=attrs.get("auto-apply", False),
         execution_backend=attrs.get("execution-backend", settings.default_execution_backend),
         terraform_version=attrs.get("terraform-version", settings.default_terraform_version),
-        working_directory=attrs.get("working-directory", ""),
+        working_directory=_sanitize_working_directory(attrs.get("working-directory", "")),
         resource_cpu=attrs.get("resource-cpu", "1"),
         resource_memory=attrs.get("resource-memory", "2Gi"),
         labels=attrs.get("labels", {}),
@@ -604,7 +611,6 @@ async def create_workspace(
         vcs_connection_id=vcs_connection_id,
         vcs_repo_url=attrs.get("vcs-repo-url", ""),
         vcs_branch=attrs.get("vcs-branch", ""),
-        vcs_working_directory=attrs.get("vcs-working-directory", ""),
         var_files=_validate_var_files(attrs.get("var-files", [])),
         drift_detection_enabled=attrs.get(
             "drift-detection-enabled",
@@ -628,7 +634,13 @@ async def create_workspace(
 
 async def _get_workspace_by_id(workspace_id: str, db: AsyncSession) -> Workspace:
     """Look up a workspace by its ws-{uuid} ID."""
+    import uuid as _uuid
+
     ws_uuid = workspace_id.removeprefix("ws-")
+    try:
+        _uuid.UUID(ws_uuid)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Workspace not found") from None
     result = await db.execute(select(Workspace).where(Workspace.id == ws_uuid))
     ws = result.scalar_one_or_none()
     if ws is None:
@@ -774,7 +786,7 @@ async def update_workspace(
     if "terraform-version" in attrs:
         ws.terraform_version = attrs["terraform-version"]
     if "working-directory" in attrs:
-        ws.working_directory = attrs["working-directory"]
+        ws.working_directory = _sanitize_working_directory(attrs["working-directory"])
     if "resource-cpu" in attrs:
         ws.resource_cpu = attrs["resource-cpu"]
     if "resource-memory" in attrs:
@@ -818,8 +830,6 @@ async def update_workspace(
         ws.vcs_repo_url = attrs["vcs-repo-url"]
     if "vcs-branch" in attrs:
         ws.vcs_branch = attrs["vcs-branch"]
-    if "vcs-working-directory" in attrs:
-        ws.vcs_working_directory = attrs["vcs-working-directory"]
     if "var-files" in attrs:
         ws.var_files = _validate_var_files(attrs["var-files"])
     if "agent-pool-id" in attrs:

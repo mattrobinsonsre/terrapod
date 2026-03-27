@@ -195,10 +195,16 @@ if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
         # if extraction actually failed
         tar xzf /tmp/config.tar.gz --no-same-owner --no-same-permissions -C "$WORK_DIR" 2>/dev/null || true
 
+        # Determine the directory containing .tf files (working directory or repo root)
+        STRIP_DIR="$WORK_DIR"
+        if [ -n "${TP_WORKING_DIR:-}" ] && [ -d "$WORK_DIR/$TP_WORKING_DIR" ]; then
+            STRIP_DIR="$WORK_DIR/$TP_WORKING_DIR"
+        fi
+
         # Strip cloud {} and backend {} blocks from .tf files.
         # Uploaded configs have cloud/backend blocks that would cause recursive
         # backend use when running in remote execution mode.
-        for tf_file in "$WORK_DIR"/*.tf; do
+        for tf_file in "$STRIP_DIR"/*.tf; do
             [ -f "$tf_file" ] || continue
             awk '
             /^[[:space:]]*(cloud|backend)[[:space:]]*(\{|"[^"]*"[[:space:]]*\{)/ { depth=1; next }
@@ -207,7 +213,7 @@ if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
             ' "$tf_file" > "${tf_file}.tmp" && mv "${tf_file}.tmp" "$tf_file"
         done
         # Remove lock file — the runner resolves providers independently
-        rm -f "$WORK_DIR/.terraform.lock.hcl"
+        rm -f "$STRIP_DIR/.terraform.lock.hcl"
         log "[entrypoint] Stripped cloud/backend blocks from uploaded config"
     else
         log "[entrypoint] No configuration archive (HTTP $HTTP_CODE)"
@@ -272,6 +278,25 @@ fi
 # mirror is caching a binary on-demand from upstream.
 export TF_REGISTRY_CLIENT_TIMEOUT=30
 export TF_PROVIDER_DOWNLOAD_RETRY=3
+
+# --- Change to working directory (monorepo subdirectory support) ---
+if [ -n "${TP_WORKING_DIR:-}" ]; then
+    # Sanitize: strip leading/trailing slashes, reject path traversal
+    TP_WORKING_DIR=$(echo "$TP_WORKING_DIR" | sed 's|^/*||;s|/*$||')
+    case "$TP_WORKING_DIR" in
+        *..*)
+            log "[entrypoint] ERROR: working directory contains path traversal"
+            exit 1
+            ;;
+    esac
+    TARGET_DIR="$WORK_DIR/$TP_WORKING_DIR"
+    if [ ! -d "$TARGET_DIR" ]; then
+        log "[entrypoint] ERROR: working directory '$TP_WORKING_DIR' not found in config"
+        exit 1
+    fi
+    cd "$TARGET_DIR"
+    log "[entrypoint] Changed to working directory: $TP_WORKING_DIR"
+fi
 
 # --- Initialize ---
 log "[entrypoint] Running $TP_BACKEND init..."

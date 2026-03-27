@@ -263,17 +263,15 @@ async def _poll_workspace_branch(
     )
 
     # VCS subdirectory filtering: skip runs when changes don't affect the workspace
-    if ws.vcs_working_directory and ws.vcs_last_commit_sha:
+    if ws.working_directory and ws.vcs_last_commit_sha:
         try:
             changed = await _get_changed_files(conn, owner, repo, ws.vcs_last_commit_sha, sha)
             # None means truncated — create run unconditionally
-            if changed is not None and not _changes_affect_directory(
-                changed, ws.vcs_working_directory
-            ):
+            if changed is not None and not _changes_affect_directory(changed, ws.working_directory):
                 logger.info(
                     "Skipping run — no changes in working directory",
                     workspace=ws.name,
-                    working_directory=ws.vcs_working_directory,
+                    working_directory=ws.working_directory,
                     changed_files_count=len(changed),
                 )
                 ws.vcs_last_commit_sha = sha
@@ -381,20 +379,20 @@ async def _poll_workspace_prs(
         )
 
         # VCS subdirectory filtering for PRs: compare PR head against tracked branch
-        if ws.vcs_working_directory and ws.vcs_last_commit_sha:
+        if ws.working_directory and ws.vcs_last_commit_sha:
             try:
                 changed = await _get_changed_files(
                     conn, owner, repo, ws.vcs_last_commit_sha, pr.head_sha
                 )
                 # None means truncated — create run unconditionally
                 if changed is not None and not _changes_affect_directory(
-                    changed, ws.vcs_working_directory
+                    changed, ws.working_directory
                 ):
                     logger.info(
                         "Skipping PR run — no changes in working directory",
                         workspace=ws.name,
                         pr_number=pr.number,
-                        working_directory=ws.vcs_working_directory,
+                        working_directory=ws.working_directory,
                     )
                     continue
             except Exception as e:

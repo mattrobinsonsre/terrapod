@@ -194,6 +194,7 @@ function WorkspaceDetailContent() {
   const [editOwner, setEditOwner] = useState('')
   const [editVarFiles, setEditVarFiles] = useState<string[]>([])
   const [newVarFile, setNewVarFile] = useState('')
+  const [editWorkingDir, setEditWorkingDir] = useState('')
   const [editVcsConnectionId, setEditVcsConnectionId] = useState<string | null>(null)
   const [editVcsRepoUrl, setEditVcsRepoUrl] = useState('')
   const [editVcsBranch, setEditVcsBranch] = useState('')
@@ -550,6 +551,7 @@ function WorkspaceDetailContent() {
     setEditOwner(workspace.attributes['owner-email'] || '')
     setEditVarFiles(workspace.attributes['var-files'] || [])
     setNewVarFile('')
+    setEditWorkingDir(workspace.attributes['working-directory'] || '')
     setEditVcsConnectionId(workspace.attributes['vcs-connection-id'] || null)
     setEditVcsRepoUrl(workspace.attributes['vcs-repo-url'] || '')
     setEditVcsBranch(workspace.attributes['vcs-branch'] || '')
@@ -598,6 +600,7 @@ function WorkspaceDetailContent() {
               'execution-backend': editBackend,
               'terraform-version': editVersion,
               'agent-pool-id': editPoolId,
+              'working-directory': editWorkingDir,
               'var-files': editVarFiles,
               'vcs-repo-url': editVcsRepoUrl,
               'vcs-branch': editVcsBranch,
@@ -1221,7 +1224,12 @@ function WorkspaceDetailContent() {
                 </div>
                 <div>
                   <dt className="text-xs text-slate-500">Working Directory</dt>
-                  <dd className="mt-1 text-sm text-slate-200">{attrs['working-directory'] || '/'}</dd>
+                  {editing ? (
+                    <input type="text" value={editWorkingDir} onChange={(e) => setEditWorkingDir(e.target.value)} placeholder="e.g. environments/dev"
+                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['working-directory'] || '/'}</dd>
+                  )}
                 </div>
                 <div>
                   <dt className="text-xs text-slate-500">Agent Pool</dt>
