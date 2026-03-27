@@ -57,6 +57,7 @@ def build_job_spec(
     refresh_only: bool = False,
     refresh: bool = True,
     allow_empty_apply: bool = False,
+    working_directory: str = "",
 ) -> dict:
     """Build a K8s Job spec for a run phase.
 
@@ -118,6 +119,8 @@ def build_job_spec(
         container_env.append({"name": "TP_REFRESH", "value": "false"})
     if allow_empty_apply:
         container_env.append({"name": "TP_ALLOW_EMPTY_APPLY", "value": "true"})
+    if working_directory:
+        container_env.append({"name": "TP_WORKING_DIR", "value": working_directory})
 
     # Termination grace period — passed to entrypoint for time-budgeted shutdown
     container_env.append(

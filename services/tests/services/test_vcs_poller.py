@@ -11,7 +11,7 @@ def _mock_workspace(**overrides):
     ws.vcs_connection_id = overrides.get("vcs_connection_id", uuid.uuid4())
     ws.vcs_repo_url = overrides.get("vcs_repo_url", "https://github.com/org/repo")
     ws.vcs_branch = overrides.get("vcs_branch", "main")
-    ws.vcs_working_directory = overrides.get("vcs_working_directory", "")
+    ws.working_directory = overrides.get("working_directory", "")
     ws.vcs_last_commit_sha = overrides.get("vcs_last_commit_sha", "aaa111")
     ws.locked = False
     ws.auto_apply = False
@@ -88,7 +88,7 @@ class TestPollWorkspaceBranchFiltering:
         from terrapod.services.vcs_poller import _poll_workspace_branch
 
         ws = _mock_workspace(
-            vcs_working_directory="terraform/prod",
+            working_directory="terraform/prod",
             vcs_last_commit_sha="aaa111",
         )
         conn = _mock_connection()
@@ -110,7 +110,7 @@ class TestPollWorkspaceBranchFiltering:
         from terrapod.services.vcs_poller import _poll_workspace_branch
 
         ws = _mock_workspace(
-            vcs_working_directory="terraform/prod",
+            working_directory="terraform/prod",
             vcs_last_commit_sha="aaa111",
         )
         conn = _mock_connection()
@@ -134,7 +134,7 @@ class TestPollWorkspaceBranchFiltering:
         """When no working_directory set, always create run (no file check)."""
         from terrapod.services.vcs_poller import _poll_workspace_branch
 
-        ws = _mock_workspace(vcs_working_directory="", vcs_last_commit_sha="aaa111")
+        ws = _mock_workspace(working_directory="", vcs_last_commit_sha="aaa111")
         conn = _mock_connection()
         mock_sha.return_value = "bbb222"
         mock_run = MagicMock()
@@ -155,7 +155,7 @@ class TestPollWorkspaceBranchFiltering:
         from terrapod.services.vcs_poller import _poll_workspace_branch
 
         ws = _mock_workspace(
-            vcs_working_directory="infra",
+            working_directory="infra",
             vcs_last_commit_sha="",
         )
         conn = _mock_connection()
@@ -178,7 +178,7 @@ class TestPollWorkspaceBranchFiltering:
         from terrapod.services.vcs_poller import _poll_workspace_branch
 
         ws = _mock_workspace(
-            vcs_working_directory="infra",
+            working_directory="infra",
             vcs_last_commit_sha="aaa111",
         )
         conn = _mock_connection()
@@ -201,7 +201,7 @@ class TestPollWorkspaceBranchFiltering:
         from terrapod.services.vcs_poller import _poll_workspace_branch
 
         ws = _mock_workspace(
-            vcs_working_directory="infra",
+            working_directory="infra",
             vcs_last_commit_sha="aaa111",
         )
         conn = _mock_connection()

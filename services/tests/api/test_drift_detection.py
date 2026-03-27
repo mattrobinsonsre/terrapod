@@ -38,7 +38,6 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.resource_memory = "2Gi"
     ws.vcs_repo_url = ""
     ws.vcs_branch = ""
-    ws.vcs_working_directory = ""
     ws.vcs_connection_id = None
     ws.vcs_connection = None
     ws.labels = {}

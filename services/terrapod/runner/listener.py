@@ -429,6 +429,7 @@ class RunnerListener:
             refresh_only=attrs.get("refresh-only", False),
             refresh=attrs.get("refresh", True),
             allow_empty_apply=attrs.get("allow-empty-apply", False),
+            working_directory=attrs.get("working-directory", ""),
         )
 
         namespace = os.environ.get("TERRAPOD_RUNNER_NAMESPACE", "terrapod-runners")

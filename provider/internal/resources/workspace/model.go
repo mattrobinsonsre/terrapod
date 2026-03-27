@@ -24,7 +24,6 @@
 //	"labels"                            → labels              (map,    optional)
 //	"vcs-repo-url"                      → vcs_repo_url        (string, optional)
 //	"vcs-branch"                        → vcs_branch          (string, optional)
-//	"vcs-working-directory"             → vcs_working_directory (string, optional)
 //	"agent-pool-id"                     → agent_pool_id       (string, optional)
 //	"var-files"                         → var_files           (list,   optional)
 //	"drift-detection-enabled"           → drift_detection_enabled (bool, optional)
@@ -66,7 +65,6 @@ type workspaceModel struct {
 	Labels                        types.Map    `tfsdk:"labels"`
 	VCSRepoURL                    types.String `tfsdk:"vcs_repo_url"`
 	VCSBranch                     types.String `tfsdk:"vcs_branch"`
-	VCSWorkingDirectory           types.String `tfsdk:"vcs_working_directory"`
 	VCSConnectionID               types.String `tfsdk:"vcs_connection_id"`
 	AgentPoolID                   types.String `tfsdk:"agent_pool_id"`
 	VarFiles                      types.List   `tfsdk:"var_files"`

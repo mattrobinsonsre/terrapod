@@ -54,6 +54,7 @@ export default function WorkspacesPage() {
   const [newVersion, setNewVersion] = useState('1.11')
   const [newCpu, setNewCpu] = useState('1')
   const [newMemory, setNewMemory] = useState('2Gi')
+  const [newWorkingDir, setNewWorkingDir] = useState('')
   const [newVcsConnectionId, setNewVcsConnectionId] = useState('')
   const [newVcsRepoUrl, setNewVcsRepoUrl] = useState('')
   const [newVcsBranch, setNewVcsBranch] = useState('')
@@ -179,6 +180,7 @@ export default function WorkspacesPage() {
               'auto-apply': newAutoApply,
               'resource-cpu': newCpu,
               'resource-memory': newMemory,
+              'working-directory': newWorkingDir,
               'vcs-repo-url': newVcsRepoUrl,
               'vcs-branch': newVcsBranch,
             },
@@ -203,6 +205,7 @@ export default function WorkspacesPage() {
       setNewAutoApply(false)
       setNewCpu('1')
       setNewMemory('2Gi')
+      setNewWorkingDir('')
       setNewVcsConnectionId('')
       setNewVcsRepoUrl('')
       setNewVcsBranch('')
@@ -332,6 +335,18 @@ export default function WorkspacesPage() {
                   />
                   <span className="text-sm text-slate-300">Auto Apply</span>
                 </label>
+              </div>
+              <div>
+                <label htmlFor="ws-workdir" className="block text-sm font-medium text-slate-300 mb-1">Working Directory</label>
+                <input
+                  id="ws-workdir"
+                  type="text"
+                  value={newWorkingDir}
+                  onChange={(e) => setNewWorkingDir(e.target.value)}
+                  placeholder="e.g. environments/dev"
+                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                />
+                <p className="mt-1 text-xs text-slate-500">Subdirectory within repo containing .tf files</p>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

@@ -279,7 +279,6 @@ class Workspace(Base):
     )
     vcs_repo_url: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     vcs_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    vcs_working_directory: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     vcs_last_commit_sha: Mapped[str] = mapped_column(String(40), nullable=False, default="")
 
     # tfvars files — passed to runner as -var-file arguments
