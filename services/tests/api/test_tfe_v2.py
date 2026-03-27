@@ -157,6 +157,7 @@ class TestTokenCRUD:
         mock_token.id = "at-abc123"
         mock_token.description = "my token"
         mock_token.token_type = "user"
+        mock_token.user_email = "test@example.com"
         mock_token.created_at = datetime(2026, 1, 1, tzinfo=UTC)
         mock_token.last_used_at = None
         mock_token.lifespan_hours = None
@@ -207,6 +208,7 @@ class TestTokenCRUD:
         mock_token.id = "at-abc123"
         mock_token.description = "test"
         mock_token.token_type = "user"
+        mock_token.user_email = "test@example.com"
         mock_token.created_at = datetime(2026, 1, 1, tzinfo=UTC)
         mock_token.last_used_at = None
         mock_token.lifespan_hours = None

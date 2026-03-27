@@ -11,6 +11,7 @@ UX CONTRACT: Token endpoints are consumed by the web frontend:
 Endpoints:
     POST   /api/v2/users/:user_id/authentication-tokens — create user token
     GET    /api/v2/users/:user_id/authentication-tokens — list user tokens
+    GET    /api/v2/admin/authentication-tokens — list all tokens (admin only)
     GET    /api/v2/authentication-tokens/:id — show token (value is null)
     DELETE /api/v2/authentication-tokens/:id — revoke token
 """
@@ -26,6 +27,7 @@ from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.auth.api_tokens import (
     create_api_token,
     get_token_by_id,
+    list_all_tokens,
     list_user_tokens,
     revoke_token,
 )
@@ -63,6 +65,7 @@ def _token_to_jsonapi(token, raw_value: str | None = None) -> dict:  # type: ign
     attributes: dict = {
         "description": token.description,
         "token-type": token.token_type,
+        "created-by": token.user_email,
         "created-at": token.created_at.isoformat() if token.created_at else None,
         "last-used-at": token.last_used_at.isoformat() if token.last_used_at else None,
         "expires-at": expires_at,
@@ -125,6 +128,24 @@ async def list_user_tokens_endpoint(
         )
 
     tokens = await list_user_tokens(db, user.email)
+    return JSONResponse(
+        content={"data": [_token_to_jsonapi(t) for t in tokens]},
+    )
+
+
+@router.get("/admin/authentication-tokens")
+async def list_all_tokens_endpoint(
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """List all authentication tokens across all users (admin only)."""
+    if "admin" not in user.roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+
+    tokens = await list_all_tokens(db)
     return JSONResponse(
         content={"data": [_token_to_jsonapi(t) for t in tokens]},
     )

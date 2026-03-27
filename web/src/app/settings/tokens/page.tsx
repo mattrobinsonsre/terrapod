@@ -8,7 +8,7 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
-import { getAuthState, getUserId } from '@/lib/auth'
+import { getAuthState, getUserId, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 
@@ -17,6 +17,7 @@ interface Token {
   attributes: {
     description: string
     'token-type': string
+    'created-by': string
     'created-at': string | null
     'last-used-at': string | null
     'expires-at': string | null
@@ -43,15 +44,20 @@ export default function TokensPage() {
   const [lifespanHours, setLifespanHours] = useState<number>(8760)
   const [creating, setCreating] = useState(false)
   const [createdToken, setCreatedToken] = useState<string | null>(null)
+  const [showAll, setShowAll] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [revoking, setRevoking] = useState(false)
 
   const userId = getUserId()
+  const admin = isAdmin()
 
-  type TokenSortKey = 'description' | 'created-at' | 'last-used-at' | 'expires-at'
+  type TokenSortKey = 'description' | 'created-by' | 'created-at' | 'last-used-at' | 'expires-at'
   const { sortedItems: sortedTokens, sortState, toggleSort } = useSortable<Token, TokenSortKey>(
     tokens, 'created-at', 'desc',
     useCallback((item: Token, key: TokenSortKey) => {
       switch (key) {
         case 'description': return item.attributes.description
+        case 'created-by': return item.attributes['created-by']
         case 'created-at': return item.attributes['created-at']
         case 'last-used-at': return item.attributes['last-used-at']
         case 'expires-at': return item.attributes['expires-at']
@@ -62,12 +68,15 @@ export default function TokensPage() {
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
     loadTokens()
-  }, [router])
+  }, [router, showAll])
 
   async function loadTokens() {
     setLoading(true)
     try {
-      const res = await apiFetch(`/api/v2/users/${userId}/authentication-tokens`)
+      const url = showAll
+        ? '/api/v2/admin/authentication-tokens'
+        : `/api/v2/users/${userId}/authentication-tokens`
+      const res = await apiFetch(url)
       if (!res.ok) throw new Error('Failed to load tokens')
       const data = await res.json()
       setTokens(data.data || [])
@@ -121,9 +130,45 @@ export default function TokensPage() {
         method: 'DELETE',
       })
       if (!res.ok && res.status !== 204) throw new Error(`Failed to revoke token (${res.status})`)
+      setSelected((prev) => { const next = new Set(prev); next.delete(tokenId); return next })
       await loadTokens()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to revoke token')
+    }
+  }
+
+  async function handleBulkRevoke() {
+    if (selected.size === 0) return
+    if (!confirm(`Revoke ${selected.size} token${selected.size > 1 ? 's' : ''}?`)) return
+    setRevoking(true)
+    setError('')
+    try {
+      const ids = [...selected]
+      await Promise.all(ids.map((id) =>
+        apiFetch(`/api/v2/authentication-tokens/${id}`, { method: 'DELETE' })
+      ))
+      setSelected(new Set())
+      await loadTokens()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to revoke tokens')
+    } finally {
+      setRevoking(false)
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === sortedTokens.length) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(sortedTokens.map((t) => t.id)))
     }
   }
 
@@ -150,14 +195,28 @@ export default function TokensPage() {
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <PageHeader
           title="API Tokens"
-          description="Manage authentication tokens for CLI and automation"
+          description={showAll ? 'All tokens across all users' : 'Manage authentication tokens for CLI and automation'}
           actions={
-            <button
-              onClick={() => { setShowCreate(!showCreate); setCreatedToken(null) }}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
-            >
-              {showCreate ? 'Cancel' : 'Create Token'}
-            </button>
+            <div className="flex items-center gap-3">
+              {admin && (
+                <button
+                  onClick={() => setShowAll(!showAll)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    showAll
+                      ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                      : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                  }`}
+                >
+                  {showAll ? 'My Tokens' : 'All Tokens'}
+                </button>
+              )}
+              <button
+                onClick={() => { setShowCreate(!showCreate); setCreatedToken(null) }}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
+              >
+                {showCreate ? 'Cancel' : 'Create Token'}
+              </button>
+            </div>
           }
         />
 
@@ -217,6 +276,25 @@ export default function TokensPage() {
           </form>
         )}
 
+        {selected.size > 0 && (
+          <div className="mb-4 flex items-center gap-3 p-3 bg-red-900/20 rounded-lg border border-red-800/30">
+            <span className="text-sm text-slate-300">{selected.size} token{selected.size > 1 ? 's' : ''} selected</span>
+            <button
+              onClick={handleBulkRevoke}
+              disabled={revoking}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 disabled:bg-red-800 disabled:text-red-400 text-white transition-colors"
+            >
+              {revoking ? 'Revoking...' : `Revoke Selected`}
+            </button>
+            <button
+              onClick={() => setSelected(new Set())}
+              className="text-sm text-slate-400 hover:text-slate-300 transition-colors"
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <LoadingSpinner />
         ) : tokens.length === 0 ? (
@@ -226,7 +304,16 @@ export default function TokensPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-700/50">
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={sortedTokens.length > 0 && selected.size === sortedTokens.length}
+                      onChange={toggleSelectAll}
+                      className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
+                    />
+                  </th>
                   <SortableHeader label="Description" sortKey="description" sortState={sortState} onSort={toggleSort} />
+                  {showAll && <SortableHeader label="Created By" sortKey="created-by" sortState={sortState} onSort={toggleSort} />}
                   <SortableHeader label="Created" sortKey="created-at" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label="Last Used" sortKey="last-used-at" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label="Expires" sortKey="expires-at" sortState={sortState} onSort={toggleSort} />
@@ -235,10 +322,23 @@ export default function TokensPage() {
               </thead>
               <tbody>
                 {sortedTokens.map((tok) => (
-                  <tr key={tok.id} className="border-b border-slate-700/30 last:border-0">
+                  <tr key={tok.id} className={`border-b border-slate-700/30 last:border-0 ${selected.has(tok.id) ? 'bg-brand-900/10' : ''}`}>
+                    <td className="w-10 px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(tok.id)}
+                        onChange={() => toggleSelect(tok.id)}
+                        className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
+                      />
+                    </td>
                     <td className="px-4 py-3 text-slate-200">
                       {tok.attributes.description || <span className="text-slate-500 italic">No description</span>}
                     </td>
+                    {showAll && (
+                      <td className="px-4 py-3 text-slate-400 text-xs">
+                        {tok.attributes['created-by']}
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-slate-400 text-xs">
                       {formatDate(tok.attributes['created-at'])}
                     </td>
