@@ -286,6 +286,11 @@ class Workspace(Base):
         ARRAY(String(500)), nullable=False, server_default="{}"
     )
 
+    # VCS trigger prefixes — directories that trigger runs (overrides working_directory filtering)
+    trigger_prefixes: Mapped[list[str]] = mapped_column(
+        ARRAY(String(255)), nullable=False, server_default="{}"
+    )
+
     # Drift detection
     drift_detection_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     drift_detection_interval_seconds: Mapped[int] = mapped_column(

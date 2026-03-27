@@ -43,6 +43,7 @@ interface WorkspaceAttrs {
   labels: Record<string, string>
   'owner-email': string
   'var-files': string[]
+  'trigger-prefixes': string[]
   'vcs-repo-url': string
   'vcs-branch': string
   'vcs-connection-id': string | null
@@ -194,6 +195,8 @@ function WorkspaceDetailContent() {
   const [editOwner, setEditOwner] = useState('')
   const [editVarFiles, setEditVarFiles] = useState<string[]>([])
   const [newVarFile, setNewVarFile] = useState('')
+  const [editTriggerPrefixes, setEditTriggerPrefixes] = useState<string[]>([])
+  const [newTriggerPrefix, setNewTriggerPrefix] = useState('')
   const [editWorkingDir, setEditWorkingDir] = useState('')
   const [editVcsConnectionId, setEditVcsConnectionId] = useState<string | null>(null)
   const [editVcsRepoUrl, setEditVcsRepoUrl] = useState('')
@@ -551,6 +554,8 @@ function WorkspaceDetailContent() {
     setEditOwner(workspace.attributes['owner-email'] || '')
     setEditVarFiles(workspace.attributes['var-files'] || [])
     setNewVarFile('')
+    setEditTriggerPrefixes(workspace.attributes['trigger-prefixes'] || [])
+    setNewTriggerPrefix('')
     setEditWorkingDir(workspace.attributes['working-directory'] || '')
     setEditVcsConnectionId(workspace.attributes['vcs-connection-id'] || null)
     setEditVcsRepoUrl(workspace.attributes['vcs-repo-url'] || '')
@@ -602,6 +607,7 @@ function WorkspaceDetailContent() {
               'agent-pool-id': editPoolId,
               'working-directory': editWorkingDir,
               'var-files': editVarFiles,
+              'trigger-prefixes': editTriggerPrefixes,
               'vcs-repo-url': editVcsRepoUrl,
               'vcs-branch': editVcsBranch,
               labels: editLabels,
@@ -1363,6 +1369,66 @@ function WorkspaceDetailContent() {
                         </div>
                       ) : (
                         <span className="text-slate-500">None</span>
+                      )}
+                    </dd>
+                  )}
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-slate-500 mb-1">Trigger Prefixes</dt>
+                  {editing && perms['can-update'] ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-slate-400">Directories that trigger runs. Overrides working directory filtering when set.</p>
+                      {editTriggerPrefixes.map((f, i) => (
+                        <div key={f} className="flex items-center gap-2">
+                          <code className="text-sm text-slate-200 bg-slate-700 px-2 py-0.5 rounded flex-1 truncate">{f}</code>
+                          <button
+                            onClick={() => setEditTriggerPrefixes(editTriggerPrefixes.filter((_, j) => j !== i))}
+                            className="text-xs text-red-400 hover:text-red-300"
+                          >Remove</button>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={newTriggerPrefix}
+                          onChange={(e) => setNewTriggerPrefix(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newTriggerPrefix.trim()) {
+                              e.preventDefault()
+                              const v = newTriggerPrefix.trim().replace(/^\/|\/$/g, '')
+                              if (v && !editTriggerPrefixes.includes(v)) {
+                                setEditTriggerPrefixes([...editTriggerPrefixes, v])
+                              }
+                              setNewTriggerPrefix('')
+                            }
+                          }}
+                          placeholder="e.g. modules"
+                          className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
+                        <button
+                          onClick={() => {
+                            if (newTriggerPrefix.trim()) {
+                              const v = newTriggerPrefix.trim().replace(/^\/|\/$/g, '')
+                              if (v && !editTriggerPrefixes.includes(v)) {
+                                setEditTriggerPrefixes([...editTriggerPrefixes, v])
+                              }
+                              setNewTriggerPrefix('')
+                            }
+                          }}
+                          className="text-xs text-brand-400 hover:text-brand-300"
+                        >Add</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">
+                      {(attrs['trigger-prefixes'] || []).length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {attrs['trigger-prefixes'].map((f) => (
+                            <code key={f} className="bg-slate-700 px-2 py-0.5 rounded text-xs">{f}</code>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-500">None (uses working directory)</span>
                       )}
                     </dd>
                   )}

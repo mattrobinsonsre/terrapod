@@ -303,7 +303,55 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/workspace
 | `vcs-repo-url` | Repository URL (HTTPS or SSH format) | (required) |
 | `vcs-branch` | Branch to track | Repo's default branch |
 | `working-directory` | Subdirectory containing Terraform files | Repository root |
+| `trigger-prefixes` | Directories that trigger runs (overrides working directory filtering) | `[]` (uses working directory) |
 | `vcs-connection` (relationship) | VCS connection to use for authentication | (required) |
+
+### Trigger Prefixes
+
+By default, when a workspace has a `working-directory` set, only commits that change files within that directory trigger runs. This works well for simple layouts, but breaks down in monorepos where shared modules live outside the working directory.
+
+**`trigger-prefixes`** lets you specify exactly which directories should trigger runs. When set, it **replaces** (not appends to) the default working directory filtering.
+
+**Default behaviour (no trigger prefixes):**
+- `working-directory: "environments/dev"` → only changes in `environments/dev/` trigger runs
+
+**With trigger prefixes:**
+- `trigger-prefixes: ["environments/dev", "modules"]` → changes in `environments/dev/` OR `modules/` trigger runs
+
+**Example — monorepo with shared modules:**
+
+```
+repo/
+  environments/
+    dev/          ← workspace working directory
+      main.tf     ← references ../../modules/vpc
+    staging/
+  modules/
+    vpc/          ← shared module
+    rds/
+```
+
+```zsh
+curl -X PATCH https://terrapod.example.com/api/v2/workspaces/ws-XXXX \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{
+    "data": {
+      "type": "workspaces",
+      "attributes": {
+        "trigger-prefixes": ["environments/dev", "modules"]
+      }
+    }
+  }'
+```
+
+Now commits to `modules/vpc/main.tf` will trigger runs for this workspace.
+
+**Notes:**
+- Maximum 20 entries
+- Paths are normalized (leading/trailing slashes stripped)
+- When `trigger-prefixes` is set, the working directory is NOT automatically included — add it explicitly if needed
+- Set to `[]` (empty list) to revert to default working directory filtering
 
 ### Supported URL Formats
 

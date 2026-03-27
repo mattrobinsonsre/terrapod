@@ -12,6 +12,7 @@ def _mock_workspace(**overrides):
     ws.vcs_repo_url = overrides.get("vcs_repo_url", "https://github.com/org/repo")
     ws.vcs_branch = overrides.get("vcs_branch", "main")
     ws.working_directory = overrides.get("working_directory", "")
+    ws.trigger_prefixes = overrides.get("trigger_prefixes", [])
     ws.vcs_last_commit_sha = overrides.get("vcs_last_commit_sha", "aaa111")
     ws.locked = False
     ws.auto_apply = False
@@ -35,44 +36,54 @@ def _mock_connection(**overrides):
     return conn
 
 
-class TestChangesAffectDirectory:
-    """Unit tests for _changes_affect_directory helper."""
+class TestChangesAffectPrefixes:
+    """Unit tests for _changes_affect_prefixes helper."""
 
-    def test_file_in_subdirectory_matches(self):
-        from terrapod.services.vcs_poller import _changes_affect_directory
+    def test_single_prefix_matches(self):
+        from terrapod.services.vcs_poller import _changes_affect_prefixes
 
-        assert _changes_affect_directory(["infra/main.tf", "README.md"], "infra") is True
+        assert _changes_affect_prefixes(["infra/main.tf", "README.md"], ["infra"]) is True
 
-    def test_file_not_in_subdirectory(self):
-        from terrapod.services.vcs_poller import _changes_affect_directory
+    def test_multiple_prefixes_any_match(self):
+        from terrapod.services.vcs_poller import _changes_affect_prefixes
 
-        assert _changes_affect_directory(["app/main.py", "README.md"], "infra") is False
+        assert _changes_affect_prefixes(["modules/vpc/main.tf"], ["infra", "modules"]) is True
 
-    def test_root_file_does_not_match(self):
-        from terrapod.services.vcs_poller import _changes_affect_directory
+    def test_no_prefix_matches(self):
+        from terrapod.services.vcs_poller import _changes_affect_prefixes
 
-        assert _changes_affect_directory(["main.tf"], "infra") is False
+        assert _changes_affect_prefixes(["app/main.py", "README.md"], ["infra"]) is False
 
-    def test_nested_subdirectory_matches(self):
-        from terrapod.services.vcs_poller import _changes_affect_directory
+    def test_empty_prefix_list(self):
+        from terrapod.services.vcs_poller import _changes_affect_prefixes
 
-        assert _changes_affect_directory(["infra/prod/main.tf"], "infra") is True
+        assert _changes_affect_prefixes(["infra/main.tf"], []) is False
 
-    def test_prefix_collision_does_not_match(self):
-        """'infra-old/main.tf' should NOT match working_directory='infra'."""
-        from terrapod.services.vcs_poller import _changes_affect_directory
+    def test_prefix_collision(self):
+        """'infra-old/main.tf' should NOT match prefix 'infra'."""
+        from terrapod.services.vcs_poller import _changes_affect_prefixes
 
-        assert _changes_affect_directory(["infra-old/main.tf"], "infra") is False
+        assert _changes_affect_prefixes(["infra-old/main.tf"], ["infra"]) is False
 
     def test_trailing_slash_stripped(self):
-        from terrapod.services.vcs_poller import _changes_affect_directory
+        from terrapod.services.vcs_poller import _changes_affect_prefixes
 
-        assert _changes_affect_directory(["infra/main.tf"], "infra/") is True
+        assert _changes_affect_prefixes(["infra/main.tf"], ["infra/"]) is True
 
     def test_empty_changed_files(self):
-        from terrapod.services.vcs_poller import _changes_affect_directory
+        from terrapod.services.vcs_poller import _changes_affect_prefixes
 
-        assert _changes_affect_directory([], "infra") is False
+        assert _changes_affect_prefixes([], ["infra"]) is False
+
+    def test_nested_subdirectory_matches(self):
+        from terrapod.services.vcs_poller import _changes_affect_prefixes
+
+        assert _changes_affect_prefixes(["infra/prod/main.tf"], ["infra"]) is True
+
+    def test_root_file_does_not_match(self):
+        from terrapod.services.vcs_poller import _changes_affect_prefixes
+
+        assert _changes_affect_prefixes(["main.tf"], ["infra"]) is False
 
 
 class TestPollWorkspaceBranchFiltering:
@@ -215,3 +226,80 @@ class TestPollWorkspaceBranchFiltering:
         await _poll_workspace_branch(mock_db, ws, conn, "org", "repo", "main")
 
         mock_create.assert_called_once()
+
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    @patch("terrapod.services.vcs_poller._get_changed_files")
+    @patch("terrapod.services.vcs_poller._get_branch_sha")
+    async def test_uses_trigger_prefixes_over_working_dir(
+        self, mock_sha, mock_changed, mock_create
+    ):
+        """When trigger_prefixes is set, it overrides working_directory for filtering."""
+        from terrapod.services.vcs_poller import _poll_workspace_branch
+
+        ws = _mock_workspace(
+            working_directory="infra",
+            trigger_prefixes=["modules"],
+            vcs_last_commit_sha="aaa111",
+        )
+        conn = _mock_connection()
+        mock_sha.return_value = "bbb222"
+        mock_changed.return_value = ["modules/vpc/main.tf"]
+        mock_run = MagicMock()
+        mock_run.id = uuid.uuid4()
+        mock_create.return_value = mock_run
+
+        mock_db = AsyncMock()
+        await _poll_workspace_branch(mock_db, ws, conn, "org", "repo", "main")
+
+        # Change is in modules/ which matches trigger_prefixes, even though
+        # it's outside working_directory ("infra")
+        mock_create.assert_called_once()
+
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    @patch("terrapod.services.vcs_poller._get_changed_files")
+    @patch("terrapod.services.vcs_poller._get_branch_sha")
+    async def test_trigger_prefix_matches_outside_working_dir(
+        self, mock_sha, mock_changed, mock_create
+    ):
+        """Trigger prefixes can match directories outside the working directory."""
+        from terrapod.services.vcs_poller import _poll_workspace_branch
+
+        ws = _mock_workspace(
+            working_directory="environments/dev",
+            trigger_prefixes=["environments/dev", "modules"],
+            vcs_last_commit_sha="aaa111",
+        )
+        conn = _mock_connection()
+        mock_sha.return_value = "bbb222"
+        mock_changed.return_value = ["modules/vpc/main.tf"]
+        mock_run = MagicMock()
+        mock_run.id = uuid.uuid4()
+        mock_create.return_value = mock_run
+
+        mock_db = AsyncMock()
+        await _poll_workspace_branch(mock_db, ws, conn, "org", "repo", "main")
+
+        mock_create.assert_called_once()
+
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    @patch("terrapod.services.vcs_poller._get_changed_files")
+    @patch("terrapod.services.vcs_poller._get_branch_sha")
+    async def test_trigger_prefixes_skip_when_no_match(self, mock_sha, mock_changed, mock_create):
+        """When trigger_prefixes is set but no files match, skip the run."""
+        from terrapod.services.vcs_poller import _poll_workspace_branch
+
+        ws = _mock_workspace(
+            working_directory="environments/dev",
+            trigger_prefixes=["environments/dev", "modules"],
+            vcs_last_commit_sha="aaa111",
+        )
+        conn = _mock_connection()
+        mock_sha.return_value = "bbb222"
+        mock_changed.return_value = ["environments/staging/main.tf", "README.md"]
+
+        mock_db = AsyncMock()
+        await _poll_workspace_branch(mock_db, ws, conn, "org", "repo", "main")
+
+        mock_create.assert_not_called()
+        assert ws.vcs_last_commit_sha == "bbb222"
+        mock_db.commit.assert_called_once()
