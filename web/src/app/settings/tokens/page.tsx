@@ -47,9 +47,8 @@ export default function TokensPage() {
   const [showAll, setShowAll] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [revoking, setRevoking] = useState(false)
-
-  const userId = getUserId()
-  const admin = isAdmin()
+  const [admin, setAdmin] = useState(false)
+  const [userId, setUserId] = useState('')
 
   type TokenSortKey = 'description' | 'created-by' | 'created-at' | 'last-used-at' | 'expires-at'
   const { sortedItems: sortedTokens, sortState, toggleSort } = useSortable<Token, TokenSortKey>(
@@ -67,8 +66,14 @@ export default function TokensPage() {
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
+    setAdmin(isAdmin())
+    setUserId(getUserId())
+  }, [router])
+
+  useEffect(() => {
+    if (!userId) return
     loadTokens()
-  }, [router, showAll])
+  }, [userId, showAll])
 
   async function loadTokens() {
     setLoading(true)
