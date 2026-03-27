@@ -216,7 +216,7 @@ POST /api/v2/organizations/{org}/workspaces
       },
       "vcs-repo-url": "https://github.com/org/repo",
       "vcs-branch": "main",
-      "vcs-working-directory": "terraform/",
+      "working-directory": "terraform/",
       "drift-detection-enabled": false,
       "drift-detection-interval-seconds": 86400
     },

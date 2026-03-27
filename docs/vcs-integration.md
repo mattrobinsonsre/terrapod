@@ -282,7 +282,7 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/workspace
         "auto-apply": false,
         "vcs-repo-url": "https://github.com/my-org/my-infra-repo",
         "vcs-branch": "main",
-        "vcs-working-directory": "terraform/"
+        "working-directory": "terraform/"
       },
       "relationships": {
         "vcs-connection": {
@@ -302,7 +302,7 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/workspace
 |---|---|---|
 | `vcs-repo-url` | Repository URL (HTTPS or SSH format) | (required) |
 | `vcs-branch` | Branch to track | Repo's default branch |
-| `vcs-working-directory` | Subdirectory containing Terraform files | Repository root |
+| `working-directory` | Subdirectory containing Terraform files | Repository root |
 | `vcs-connection` (relationship) | VCS connection to use for authentication | (required) |
 
 ### Supported URL Formats
