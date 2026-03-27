@@ -51,4 +51,12 @@ data:
     pod_security_context:
       {{- toYaml . | nindent 6 }}
     {{- end }}
+    {{- with .Values.runners.extraEnv }}
+    extra_env:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.runners.extraEnvFrom }}
+    extra_env_from:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
 {{- end }}

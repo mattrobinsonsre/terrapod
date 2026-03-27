@@ -457,6 +457,28 @@ runners:
   #   imagePullSecrets:
   #     - my-registry-secret
 
+  # Extra environment variables injected into all runner Jobs.
+  # Supports literal values and valueFrom (secretKeyRef, configMapKeyRef).
+  extraEnv: []
+  # Example:
+  #   extraEnv:
+  #     - name: AWS_DEFAULT_REGION
+  #       value: eu-west-1
+  #     - name: AWS_ACCESS_KEY_ID
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: aws-credentials
+  #           key: access-key-id
+
+  # Inject all keys from Secrets or ConfigMaps as env vars on runner Jobs.
+  extraEnvFrom: []
+  # Example:
+  #   extraEnvFrom:
+  #     - secretRef:
+  #         name: aws-credentials
+  #     - configMapRef:
+  #         name: runner-config
+
   # Shared Job settings
   nodeSelector: {}
   tolerations: []
