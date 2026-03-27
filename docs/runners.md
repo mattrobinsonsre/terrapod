@@ -75,6 +75,55 @@ Note: `runners.imagePullSecrets` is separate from `global.imagePullSecrets`. The
 
 ---
 
+## Injecting Environment Variables
+
+There are two ways to get environment variables into runner Jobs:
+
+### Workspace Variables (per-workspace)
+
+Set variables on individual workspaces via the UI or API. Variables with `category=env` are injected as container environment variables. Sensitive variables are masked in API responses but the actual value is passed to the runner. Variable sets can share the same variables across multiple workspaces.
+
+### Helm Values (global, all runners)
+
+Use `runners.extraEnv` for individual env vars (literal values or from Secrets/ConfigMaps) and `runners.extraEnvFrom` to inject all keys from a Secret or ConfigMap:
+
+```yaml
+runners:
+  # Individual env vars
+  extraEnv:
+    - name: AWS_DEFAULT_REGION
+      value: eu-west-1
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: aws-credentials
+          key: access-key-id
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: aws-credentials
+          key: secret-access-key
+
+  # Bulk inject all keys from a Secret or ConfigMap
+  extraEnvFrom:
+    - secretRef:
+        name: aws-credentials
+    - configMapRef:
+        name: runner-config
+```
+
+Create the Secret in the runner namespace:
+
+```bash
+kubectl -n terrapod-runners create secret generic aws-credentials \
+  --from-literal=access-key-id=AKIA... \
+  --from-literal=secret-access-key=...
+```
+
+Helm-injected env vars apply to **all** runner Jobs globally. Use workspace variables when different workspaces need different credentials.
+
+---
+
 ## Job Configuration
 
 All runner Jobs inherit the following settings from `runners.*` in Helm values:
@@ -85,6 +134,8 @@ All runner Jobs inherit the following settings from `runners.*` in Helm values:
 | `runners.image.tag` | `""` (appVersion) | Image tag |
 | `runners.image.pullPolicy` | `IfNotPresent` | Image pull policy |
 | `runners.imagePullSecrets` | `[]` | Pull secrets for private registries |
+| `runners.extraEnv` | `[]` | Extra env vars for all runner Jobs |
+| `runners.extraEnvFrom` | `[]` | Inject env vars from Secrets/ConfigMaps |
 | `runners.nodeSelector` | `{}` | Node selector for Job pods |
 | `runners.tolerations` | `[]` | Tolerations for Job pods |
 | `runners.affinity` | `{}` | Affinity rules for Job pods |

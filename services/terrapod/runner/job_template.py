@@ -138,6 +138,10 @@ def build_job_spec(
     for var in terraform_vars:
         container_env.append({"name": f"TF_VAR_{var['key']}", "value": var["value"]})
 
+    # Extra env vars from runner config (Helm values → runners.extraEnv)
+    for extra in runner_config.extra_env:
+        container_env.append(extra)
+
     # Image config
     image = runner_config.image.repository
     if runner_config.image.tag:
@@ -221,6 +225,12 @@ def build_job_spec(
             },
         },
     }
+
+    # envFrom — inject all keys from Secrets/ConfigMaps as env vars
+    if runner_config.extra_env_from:
+        job_spec["spec"]["template"]["spec"]["containers"][0]["envFrom"] = (
+            runner_config.extra_env_from
+        )
 
     # Service account (CSP identity) — from global runner config (Helm values)
     if runner_config.service_account_name:
