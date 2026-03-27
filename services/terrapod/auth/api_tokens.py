@@ -137,6 +137,12 @@ async def list_user_tokens(db: AsyncSession, user_email: str) -> list[APIToken]:
     return list(result.scalars().all())
 
 
+async def list_all_tokens(db: AsyncSession) -> list[APIToken]:
+    """List all API tokens (admin use)."""
+    result = await db.execute(select(APIToken).order_by(APIToken.created_at.desc()))
+    return list(result.scalars().all())
+
+
 async def get_token_by_id(db: AsyncSession, token_id: str) -> APIToken | None:
     """Get a token by its public ID."""
     result = await db.execute(select(APIToken).where(APIToken.id == token_id))
