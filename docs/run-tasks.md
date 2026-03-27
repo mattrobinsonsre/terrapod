@@ -225,6 +225,134 @@ This sets the stage status to `overridden` and allows the run to proceed.
 
 ---
 
+## Example: OPA Policy Checks
+
+[Open Policy Agent](https://www.openpolicyagent.org/) can be used as a post-plan run task to enforce infrastructure policies written in Rego. This gives you Sentinel-like guardrails without any Terrapod-side changes.
+
+### Architecture
+
+```
+Run reaches "planned" stage
+  → Terrapod sends webhook to your OPA service
+  → OPA service fetches the plan JSON from Terrapod
+  → OPA evaluates Rego policies against the plan
+  → OPA posts pass/fail back via the callback URL
+  → Terrapod blocks or allows the run based on enforcement level
+```
+
+### Example OPA Service (Python/Flask)
+
+A minimal webhook receiver that evaluates Terraform plan JSON against OPA policies:
+
+```python
+"""Minimal OPA run task webhook receiver."""
+import hashlib
+import hmac
+import json
+
+import httpx
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+HMAC_KEY = "your-hmac-key"
+OPA_URL = "http://localhost:8181/v1/data/terraform/deny"
+TERRAPOD_TOKEN = "your-api-token"  # for fetching plan JSON
+
+
+def verify_signature(body: bytes, signature: str) -> bool:
+    expected = hmac.new(HMAC_KEY.encode(), body, hashlib.sha512).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
+@app.route("/webhook", methods=["POST"])
+def handle_task():
+    # 1. Verify HMAC signature
+    sig = request.headers.get("X-TFE-Task-Signature", "")
+    if not verify_signature(request.data, sig):
+        return jsonify({"error": "invalid signature"}), 401
+
+    payload = request.json
+    callback_url = payload["task_result_callback_url"]
+    access_token = payload["access_token"]
+    run_id = payload["run_id"]
+
+    # 2. Fetch plan JSON from Terrapod
+    plan_resp = httpx.get(
+        f"https://terrapod.local/api/v2/runs/{run_id}/plan/json-output",
+        headers={"Authorization": f"Bearer {TERRAPOD_TOKEN}"},
+    )
+    plan_json = plan_resp.json()
+
+    # 3. Evaluate against OPA
+    opa_resp = httpx.post(OPA_URL, json={"input": plan_json})
+    violations = opa_resp.json().get("result", [])
+
+    # 4. Report result via callback
+    if violations:
+        message = "Policy violations:\n" + "\n".join(f"- {v}" for v in violations)
+        status = "failed"
+    else:
+        message = "All policies passed"
+        status = "passed"
+
+    httpx.patch(callback_url, json={
+        "access_token": access_token,
+        "status": status,
+        "message": message,
+    })
+
+    return "", 200
+```
+
+### Example Rego Policy
+
+```rego
+# policy/terraform.rego — deny destructive changes to production databases
+package terraform
+
+deny[msg] {
+    rc := input.resource_changes[_]
+    rc.type == "aws_db_instance"
+    rc.change.actions[_] == "delete"
+    msg := sprintf("Deleting RDS instance %q is not allowed", [rc.address])
+}
+
+deny[msg] {
+    rc := input.resource_changes[_]
+    rc.type == "aws_s3_bucket"
+    rc.change.actions[_] == "delete"
+    msg := sprintf("Deleting S3 bucket %q is not allowed", [rc.address])
+}
+```
+
+### Setup
+
+1. Deploy your OPA service and load your Rego policies
+2. Create a run task on the workspace:
+
+```bash
+curl -X POST https://terrapod.local/api/v2/workspaces/ws-ID/run-tasks \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{
+    "data": {
+      "attributes": {
+        "name": "opa-policy-check",
+        "url": "https://your-opa-service.internal/webhook",
+        "hmac-key": "your-hmac-key",
+        "stage": "post_plan",
+        "enforcement-level": "mandatory",
+        "enabled": true
+      }
+    }
+  }'
+```
+
+3. All subsequent runs on this workspace will be evaluated against your OPA policies after the plan completes. Mandatory enforcement blocks the apply if any policies fail; an admin can override if needed.
+
+---
+
 ## See Also
 
 - [Notifications](notifications.md) — run lifecycle notifications
