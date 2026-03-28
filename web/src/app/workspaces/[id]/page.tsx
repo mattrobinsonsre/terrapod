@@ -87,6 +87,7 @@ interface RunItem {
     source: string
     message: string
     'plan-only': boolean
+    'is-destroy': boolean
     'created-at': string
     'plan-started-at': string | null
     'apply-finished-at': string | null
@@ -237,6 +238,8 @@ function WorkspaceDetailContent() {
   const [planRefresh, setPlanRefresh] = useState(true)
   const [planAllowEmpty, setPlanAllowEmpty] = useState(false)
   const [planOnly, setPlanOnly] = useState(true)
+  const [queueingDestroy, setQueueingDestroy] = useState(false)
+  const [showDestroyConfirm, setShowDestroyConfirm] = useState(false)
 
   // VCS ref picker
   const [vcsRef, setVcsRef] = useState('')
@@ -306,7 +309,7 @@ function WorkspaceDetailContent() {
       switch (key) {
         case 'id': return item.id
         case 'status': return item.attributes.status
-        case 'type': return item.attributes['plan-only'] ? 'plan only' : 'plan + apply'
+        case 'type': return item.attributes['is-destroy'] ? 'destroy' : item.attributes['plan-only'] ? 'plan only' : 'plan + apply'
         case 'source': return item.attributes.source
         case 'created-at': return item.attributes['created-at']
       }
@@ -849,6 +852,45 @@ function WorkspaceDetailContent() {
       setError(err instanceof Error ? err.message : 'Failed to queue plan')
     } finally {
       setQueueingPlan(false)
+    }
+  }
+
+  async function handleQueueDestroy() {
+    setQueueingDestroy(true)
+    setError('')
+    try {
+      const res = await apiFetch(`/api/v2/runs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: {
+            type: 'runs',
+            attributes: {
+              'is-destroy': true,
+              message: 'Destroy queued from UI',
+            },
+            relationships: {
+              workspace: { data: { type: 'workspaces', id: workspaceId } },
+            },
+          },
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `Failed to queue destroy (${res.status})`)
+      }
+      const runData = await res.json().catch(() => null)
+      const newRunId = runData?.data?.id as string | undefined
+      if (newRunId) {
+        setLastQueuedRunId(newRunId)
+        setTimeout(() => setLastQueuedRunId((prev) => prev === newRunId ? null : prev), 8000)
+      }
+      setShowDestroyConfirm(false)
+      await loadRuns()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to queue destroy')
+    } finally {
+      setQueueingDestroy(false)
     }
   }
 
@@ -1733,6 +1775,33 @@ function WorkspaceDetailContent() {
                   >
                     {showPlanOptions ? 'Hide Options' : 'Options'}
                   </button>
+                  {!showDestroyConfirm ? (
+                    <button
+                      onClick={() => setShowDestroyConfirm(true)}
+                      disabled={queueingDestroy || attrs.locked}
+                      className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 text-red-400 transition-colors"
+                      title={attrs.locked ? 'Workspace is locked' : 'Queue a destroy plan'}
+                    >
+                      Queue Destroy
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-red-400">Destroy all resources?</span>
+                      <button
+                        onClick={() => setShowDestroyConfirm(false)}
+                        className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleQueueDestroy}
+                        disabled={queueingDestroy}
+                        className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 disabled:bg-red-800 text-white transition-colors"
+                      >
+                        {queueingDestroy ? 'Queuing...' : 'Confirm Destroy'}
+                      </button>
+                    </div>
+                  )}
                   <button
                     onClick={handleQueuePlan}
                     disabled={queueingPlan || attrs.locked}
@@ -1888,7 +1957,11 @@ function WorkspaceDetailContent() {
                           </span>
                         </td>
                         <td className="px-4 py-3 hidden sm:table-cell">
-                          {run.attributes['plan-only'] ? (
+                          {run.attributes['is-destroy'] ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-300">
+                              destroy
+                            </span>
+                          ) : run.attributes['plan-only'] ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-900/50 text-cyan-300">
                               plan only
                             </span>
@@ -1946,12 +2019,25 @@ function WorkspaceDetailContent() {
                           {sv.attributes['created-at'] ? new Date(sv.attributes['created-at']).toLocaleString() : ''}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <a
-                            href={`/api/v2/state-versions/${sv.id}/download`}
+                          <button
+                            onClick={async () => {
+                              try {
+                                const resp = await apiFetch(`/api/v2/state-versions/${sv.id}/download`)
+                                const blob = await resp.blob()
+                                const url = URL.createObjectURL(blob)
+                                const a = document.createElement('a')
+                                a.href = url
+                                a.download = `state-${sv.attributes.serial}.json`
+                                a.click()
+                                URL.revokeObjectURL(url)
+                              } catch {
+                                alert('Failed to download state file')
+                              }
+                            }}
                             className="text-xs text-brand-400 hover:text-brand-300"
                           >
                             Download
-                          </a>
+                          </button>
                         </td>
                       </tr>
                     ))}

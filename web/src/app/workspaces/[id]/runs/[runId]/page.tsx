@@ -29,6 +29,7 @@ interface RunAttrs {
   'created-at': string
   'auto-apply': boolean
   'plan-only': boolean
+  'is-destroy': boolean
   'target-addrs': string[]
   'replace-addrs': string[]
   'refresh-only': boolean
@@ -446,7 +447,12 @@ export default function RunDetailPage() {
           description={attrs.message || `${attrs.source} run`}
           actions={
             <div className="flex items-center gap-2">
-              {attrs['plan-only'] && (
+              {attrs['is-destroy'] && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-900/50 text-red-300">
+                  destroy
+                </span>
+              )}
+              {attrs['plan-only'] && !attrs['is-destroy'] && (
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-cyan-900/50 text-cyan-300">
                   plan only
                 </span>
@@ -459,6 +465,15 @@ export default function RunDetailPage() {
         />
 
         {error && <ErrorBanner message={error} />}
+
+        {/* Destroy run warning */}
+        {attrs['is-destroy'] && (
+          <div className="mb-6 p-4 bg-red-900/20 rounded-lg border border-red-800/50">
+            <p className="text-sm text-red-300">
+              This is a <strong>destroy</strong> run &mdash; all managed resources will be destroyed when applied.
+            </p>
+          </div>
+        )}
 
         {/* Remote plan-only indicator for CLI-sourced runs on VCS-connected workspaces */}
         {attrs['plan-only'] && attrs.source === 'tfe-api' && attrs['workspace-has-vcs'] && run.relationships?.['configuration-version']?.data && (
