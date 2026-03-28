@@ -220,13 +220,6 @@ if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
     fi
 fi
 
-# --- Download current state ---
-if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
-    log "[entrypoint] Downloading current state..."
-    tp_curl_download "$WORK_DIR/terraform.tfstate" -H "$AUTH_HEADER" \
-        "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/state" 2>/dev/null || true
-fi
-
 # --- Run setup script (if configured) ---
 if [ -n "$TP_SETUP_SCRIPT" ]; then
     log "[entrypoint] Running setup script..."
@@ -296,6 +289,16 @@ if [ -n "${TP_WORKING_DIR:-}" ]; then
     fi
     cd "$TARGET_DIR"
     log "[entrypoint] Changed to working directory: $TP_WORKING_DIR"
+fi
+
+# --- Download current state ---
+# Must run AFTER working directory change so terraform.tfstate ends up in the
+# directory where tofu init/plan/apply will execute (the working directory for
+# monorepo subdirectory setups, or $WORK_DIR for root-level workspaces).
+if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
+    log "[entrypoint] Downloading current state..."
+    tp_curl_download terraform.tfstate -H "$AUTH_HEADER" \
+        "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/state" 2>/dev/null || true
 fi
 
 # --- Initialize ---

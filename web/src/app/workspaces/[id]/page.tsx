@@ -1946,12 +1946,25 @@ function WorkspaceDetailContent() {
                           {sv.attributes['created-at'] ? new Date(sv.attributes['created-at']).toLocaleString() : ''}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <a
-                            href={`/api/v2/state-versions/${sv.id}/download`}
+                          <button
+                            onClick={async () => {
+                              try {
+                                const resp = await apiFetch(`/api/v2/state-versions/${sv.id}/download`)
+                                const blob = await resp.blob()
+                                const url = URL.createObjectURL(blob)
+                                const a = document.createElement('a')
+                                a.href = url
+                                a.download = `state-${sv.attributes.serial}.json`
+                                a.click()
+                                URL.revokeObjectURL(url)
+                              } catch {
+                                alert('Failed to download state file')
+                              }
+                            }}
                             className="text-xs text-brand-400 hover:text-brand-300"
                           >
                             Download
-                          </a>
+                          </button>
                         </td>
                       </tr>
                     ))}
