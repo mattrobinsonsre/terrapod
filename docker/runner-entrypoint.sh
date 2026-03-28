@@ -358,8 +358,8 @@ EXIT_CODE=0
 
 if [ "$TP_PHASE" = "plan" ]; then
     echo "[entrypoint] Running $TP_BACKEND plan..."
-    # Redirect to file (not tee) so $! gives the plan PID for correct exit
-    # code capture and signal forwarding. Output shown via cat afterwards.
+    # Redirect to file so $! gives the plan PID for correct signal forwarding.
+    # A background tail -f streams output to pod logs in real-time.
     PLAN_ARGS="-input=false -detailed-exitcode"
     # Only save plan file if not plan-only (plan file is discarded for plan-only runs)
     if [ "${TP_PLAN_ONLY:-false}" != "true" ]; then
@@ -371,12 +371,16 @@ if [ "$TP_PHASE" = "plan" ]; then
     if [ "${TP_REFRESH:-true}" = "false" ]; then
         PLAN_ARGS="$PLAN_ARGS -refresh=false"
     fi
+    : > /tmp/plan.log
     "$TP_BIN" plan $PLAN_ARGS "$@" > /tmp/plan.log 2>&1 &
     CHILD_PID=$!
+    # Stream log to pod stdout in real-time so the listener can capture it
+    # for live log display in the UI. The file redirect preserves $! as
+    # the tofu PID for correct signal forwarding.
+    tail -f /tmp/plan.log &
+    TAIL_PID=$!
     wait_for_child
-
-    # Show plan output in pod logs
-    cat /tmp/plan.log 2>/dev/null || true
+    kill "$TAIL_PID" 2>/dev/null; wait "$TAIL_PID" 2>/dev/null || true
 
     # -detailed-exitcode: 0=no changes, 1=error, 2=changes present
     PLAN_HAS_CHANGES="false"
@@ -423,6 +427,7 @@ elif [ "$TP_PHASE" = "apply" ]; then
     fi
 
     echo "[entrypoint] Running $TP_BACKEND apply..."
+    : > /tmp/apply.log
     if [ -f tfplan ]; then
         # Plan file already includes var-file inputs — no need to re-specify
         "$TP_BIN" apply -input=false tfplan > /tmp/apply.log 2>&1 &
@@ -430,10 +435,11 @@ elif [ "$TP_PHASE" = "apply" ]; then
         "$TP_BIN" apply -input=false -auto-approve "$@" > /tmp/apply.log 2>&1 &
     fi
     CHILD_PID=$!
+    # Stream log to pod stdout in real-time for live log display in the UI
+    tail -f /tmp/apply.log &
+    TAIL_PID=$!
     wait_for_child
-
-    # Show apply output in pod logs
-    cat /tmp/apply.log 2>/dev/null || true
+    kill "$TAIL_PID" 2>/dev/null; wait "$TAIL_PID" 2>/dev/null || true
 
     # Upload apply log (best-effort, bounded by --max-time) — prepend setup + init output
     if [ -n "$TP_API_URL" ] && [ -f /tmp/apply.log ]; then
