@@ -96,6 +96,10 @@ interface RunItem {
     'created-at': string
     'plan-started-at': string | null
     'apply-finished-at': string | null
+    actions?: {
+      'is-confirmable': boolean
+      'is-discardable': boolean
+    }
   }
 }
 
@@ -1961,9 +1965,15 @@ function WorkspaceDetailContent() {
                       >
                         <td className="px-4 py-3 text-sm text-brand-400 font-mono">{run.id.replace(/^run-/, '').split('-').pop()}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(run.attributes.status)}`}>
-                            {run.attributes.status}
-                          </span>
+                          {run.attributes.actions?.['is-confirmable'] ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">
+                              needs confirm
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(run.attributes.status)}`}>
+                              {run.attributes.status}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 hidden sm:table-cell">
                           {run.attributes['is-destroy'] ? (
