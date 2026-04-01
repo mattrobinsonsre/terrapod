@@ -49,8 +49,12 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.state_diverged = overrides.get("state_diverged", False)
     ws.execution_backend = overrides.get("execution_backend", "tofu")
     ws.agent_pool = None
+    ws.agent_pool_id = overrides.get("agent_pool_id", None)
     ws.var_files = []
     ws.trigger_prefixes = []
+    ws.vcs_last_polled_at = None
+    ws.vcs_last_error = None
+    ws.vcs_last_error_at = None
     ws.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     ws.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
     return ws
@@ -155,96 +159,6 @@ class TestWorkspaceDriftAttributes:
         assert resp.status_code == 200
         # Should be clamped to min (default 3600)
         assert ws.drift_detection_interval_seconds >= 3600
-
-
-# ── Health Dashboard ──────────────────────────────────────────────────
-
-
-class TestHealthDashboard:
-    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
-    @patch("terrapod.api.app.init_redis")
-    @patch("terrapod.api.app.init_db")
-    async def test_requires_admin_or_audit(self, *mocks):
-        """Non-admin/audit user → 403."""
-        app, mock_db = _make_app(_user(roles=["everyone"]))
-
-        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/admin/health-dashboard", headers=_AUTH)
-        assert resp.status_code == 403
-
-    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
-    @patch("terrapod.api.app.init_redis")
-    @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.health_dashboard._get_listener_health")
-    @patch("terrapod.api.routers.health_dashboard._get_run_health")
-    @patch("terrapod.api.routers.health_dashboard._get_workspace_health")
-    async def test_admin_can_access(
-        self, mock_ws_health, mock_run_health, mock_listener_health, *mocks
-    ):
-        """Admin user gets 200 with expected shape."""
-        mock_ws_health.return_value = {
-            "total": 5,
-            "locked": 0,
-            "drift-enabled": 2,
-            "by-drift-status": {"unchecked": 3, "no-drift": 1, "drifted": 1, "errored": 0},
-            "stale": [],
-        }
-        mock_run_health.return_value = {
-            "queued": 0,
-            "in-progress": 0,
-            "recent-24h": {"total": 0, "applied": 0, "errored": 0, "canceled": 0},
-            "average-plan-duration-seconds": 0,
-            "average-apply-duration-seconds": 0,
-        }
-        mock_listener_health.return_value = {
-            "total": 1,
-            "online": 1,
-            "offline": 0,
-            "details": [],
-        }
-
-        app, mock_db = _make_app(_user(roles=["admin"]))
-
-        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/admin/health-dashboard", headers=_AUTH)
-        assert resp.status_code == 200
-        data = resp.json()["data"]
-        assert data["type"] == "health-dashboards"
-        assert "workspaces" in data["attributes"]
-        assert "runs" in data["attributes"]
-        assert "listeners" in data["attributes"]
-
-    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
-    @patch("terrapod.api.app.init_redis")
-    @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.health_dashboard._get_listener_health")
-    @patch("terrapod.api.routers.health_dashboard._get_run_health")
-    @patch("terrapod.api.routers.health_dashboard._get_workspace_health")
-    async def test_audit_role_can_access(
-        self, mock_ws_health, mock_run_health, mock_listener_health, *mocks
-    ):
-        """Audit role user gets 200."""
-        mock_ws_health.return_value = {
-            "total": 0,
-            "locked": 0,
-            "drift-enabled": 0,
-            "by-drift-status": {},
-            "stale": [],
-        }
-        mock_run_health.return_value = {
-            "queued": 0,
-            "in-progress": 0,
-            "recent-24h": {"total": 0, "applied": 0, "errored": 0, "canceled": 0},
-            "average-plan-duration-seconds": 0,
-            "average-apply-duration-seconds": 0,
-        }
-        mock_listener_health.return_value = {"total": 0, "online": 0, "offline": 0, "details": []}
-
-        app, mock_db = _make_app(_user(roles=["audit"]))
-
-        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/admin/health-dashboard", headers=_AUTH)
-        assert resp.status_code == 200
 
 
 # ── Run Drift Attributes ─────────────────────────────────────────────

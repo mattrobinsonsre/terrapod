@@ -49,16 +49,19 @@ def _rfc3339(dt) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _pool_json(pool) -> dict:
+def _pool_json(pool, listener_summary: dict | None = None) -> dict:
+    attrs: dict = {
+        "name": pool.name,
+        "description": pool.description or "",
+        "created-at": _rfc3339(pool.created_at),
+        "updated-at": _rfc3339(pool.updated_at),
+    }
+    if listener_summary is not None:
+        attrs["listener-summary"] = listener_summary
     return {
         "id": f"apool-{pool.id}",
         "type": "agent-pools",
-        "attributes": {
-            "name": pool.name,
-            "description": pool.description or "",
-            "created-at": _rfc3339(pool.created_at),
-            "updated-at": _rfc3339(pool.updated_at),
-        },
+        "attributes": attrs,
         "relationships": {
             "organization": {
                 "data": {"id": DEFAULT_ORG, "type": "organizations"},
@@ -128,7 +131,15 @@ async def list_pools(
 ) -> JSONResponse:
     """List all agent pools."""
     pools = await agent_pool_service.list_pools(db)
-    return JSONResponse(content={"data": [_pool_json(p) for p in pools]})
+    result = []
+    for p in pools:
+        listeners = await agent_pool_service.list_listeners(p.id)
+        summary = {
+            "total": len(listeners),
+            "online": sum(1 for lis in listeners if lis.get("status") == "online"),
+        }
+        result.append(_pool_json(p, listener_summary=summary))
+    return JSONResponse(content={"data": result})
 
 
 @router.post("/organizations/default/agent-pools", status_code=201)
@@ -163,7 +174,12 @@ async def show_pool(
 ) -> JSONResponse:
     """Show an agent pool."""
     pool = await _get_pool(pool_id, db)
-    return JSONResponse(content={"data": _pool_json(pool)})
+    listeners = await agent_pool_service.list_listeners(pool.id)
+    summary = {
+        "total": len(listeners),
+        "online": sum(1 for lis in listeners if lis.get("status") == "online"),
+    }
+    return JSONResponse(content={"data": _pool_json(pool, listener_summary=summary)})
 
 
 @router.patch("/agent-pools/{pool_id}")

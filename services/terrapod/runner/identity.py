@@ -99,6 +99,18 @@ def _try_resume(name: str, api_url: str) -> ListenerIdentity | None:
         return None
 
 
+def _clear_saved_certs() -> None:
+    """Remove saved certificates to force a fresh join on next establish_identity()."""
+    cert_dir = os.environ.get("TERRAPOD_CERT_DIR", "/var/lib/terrapod/certs")
+    for filename in ("listener.crt", "listener.key", "ca.crt", "identity.txt"):
+        path = os.path.join(cert_dir, filename)
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+    logger.info("Cleared saved certificates")
+
+
 async def _join_via_token(name: str, api_url: str) -> ListenerIdentity:
     """Join a pool via token exchange with the API server.
 

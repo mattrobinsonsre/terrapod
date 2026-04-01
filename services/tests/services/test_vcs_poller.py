@@ -1,6 +1,7 @@
-"""Tests for VCS poller — subdirectory filtering logic."""
+"""Tests for VCS poller — subdirectory filtering and VCS error tracking."""
 
 import uuid
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
@@ -14,6 +15,9 @@ def _mock_workspace(**overrides):
     ws.working_directory = overrides.get("working_directory", "")
     ws.trigger_prefixes = overrides.get("trigger_prefixes", [])
     ws.vcs_last_commit_sha = overrides.get("vcs_last_commit_sha", "aaa111")
+    ws.vcs_last_polled_at = overrides.get("vcs_last_polled_at", None)
+    ws.vcs_last_error = overrides.get("vcs_last_error", None)
+    ws.vcs_last_error_at = overrides.get("vcs_last_error_at", None)
     ws.locked = False
     ws.auto_apply = False
     ws.execution_mode = "remote"
@@ -303,3 +307,128 @@ class TestPollWorkspaceBranchFiltering:
         mock_create.assert_not_called()
         assert ws.vcs_last_commit_sha == "bbb222"
         mock_db.commit.assert_called_once()
+
+
+class TestPollWorkspaceVCSErrorTracking:
+    """Tests for VCS error state tracking in _poll_workspace."""
+
+    @patch("terrapod.services.vcs_poller._poll_workspace_prs")
+    @patch("terrapod.services.vcs_poller._poll_workspace_branch")
+    @patch("terrapod.services.vcs_poller._resolve_branch")
+    @patch("terrapod.services.vcs_poller._parse_repo_url")
+    async def test_sets_last_polled_on_success(
+        self, mock_parse, mock_resolve, mock_branch, mock_prs
+    ):
+        from terrapod.services.vcs_poller import _poll_workspace
+
+        ws = _mock_workspace()
+        conn = _mock_connection()
+        mock_parse.return_value = ("org", "repo")
+        mock_resolve.return_value = "main"
+        mock_branch.return_value = None
+        mock_prs.return_value = None
+
+        mock_db = AsyncMock()
+        mock_db.get.return_value = conn
+
+        await _poll_workspace(mock_db, ws)
+
+        assert ws.vcs_last_polled_at is not None
+        assert ws.vcs_last_error is None
+        assert ws.vcs_last_error_at is None
+
+    @patch("terrapod.services.vcs_poller._poll_workspace_prs")
+    @patch("terrapod.services.vcs_poller._poll_workspace_branch")
+    @patch("terrapod.services.vcs_poller._resolve_branch")
+    @patch("terrapod.services.vcs_poller._parse_repo_url")
+    async def test_sets_error_on_failure(self, mock_parse, mock_resolve, mock_branch, mock_prs):
+        from terrapod.services.vcs_poller import _poll_workspace
+
+        ws = _mock_workspace()
+        conn = _mock_connection()
+        mock_parse.return_value = ("org", "repo")
+        mock_resolve.return_value = "main"
+        mock_branch.side_effect = Exception("403 Forbidden")
+
+        mock_db = AsyncMock()
+        mock_db.get.return_value = conn
+
+        await _poll_workspace(mock_db, ws)
+
+        assert ws.vcs_last_error == "403 Forbidden"
+        assert ws.vcs_last_error_at is not None
+
+    @patch("terrapod.services.vcs_poller._poll_workspace_prs")
+    @patch("terrapod.services.vcs_poller._poll_workspace_branch")
+    @patch("terrapod.services.vcs_poller._resolve_branch")
+    @patch("terrapod.services.vcs_poller._parse_repo_url")
+    async def test_clears_error_on_recovery(self, mock_parse, mock_resolve, mock_branch, mock_prs):
+        from terrapod.services.vcs_poller import _poll_workspace
+
+        ws = _mock_workspace(
+            vcs_last_error="previous error",
+            vcs_last_error_at=datetime.now(UTC),
+        )
+        conn = _mock_connection()
+        mock_parse.return_value = ("org", "repo")
+        mock_resolve.return_value = "main"
+        mock_branch.return_value = None
+        mock_prs.return_value = None
+
+        mock_db = AsyncMock()
+        mock_db.get.return_value = conn
+
+        await _poll_workspace(mock_db, ws)
+
+        assert ws.vcs_last_polled_at is not None
+        assert ws.vcs_last_error is None
+        assert ws.vcs_last_error_at is None
+
+    async def test_inactive_connection_sets_error(self):
+        from terrapod.services.vcs_poller import _poll_workspace
+
+        ws = _mock_workspace()
+        conn = _mock_connection()
+        conn.status = "inactive"
+
+        mock_db = AsyncMock()
+        mock_db.get.return_value = conn
+
+        await _poll_workspace(mock_db, ws)
+
+        assert ws.vcs_last_error == "VCS connection is not active"
+        assert ws.vcs_last_error_at is not None
+
+    @patch("terrapod.services.vcs_poller._parse_repo_url")
+    async def test_unparseable_url_sets_error(self, mock_parse):
+        from terrapod.services.vcs_poller import _poll_workspace
+
+        ws = _mock_workspace(vcs_repo_url="not-a-valid-url")
+        conn = _mock_connection()
+        mock_parse.return_value = None
+
+        mock_db = AsyncMock()
+        mock_db.get.return_value = conn
+
+        await _poll_workspace(mock_db, ws)
+
+        assert "Cannot parse VCS repo URL" in ws.vcs_last_error
+        assert ws.vcs_last_error_at is not None
+
+    @patch("terrapod.services.vcs_poller._resolve_branch")
+    @patch("terrapod.services.vcs_poller._parse_repo_url")
+    async def test_unresolvable_branch_sets_error(self, mock_parse, mock_resolve):
+        from terrapod.services.vcs_poller import _poll_workspace
+
+        ws = _mock_workspace()
+        conn = _mock_connection()
+        mock_parse.return_value = ("org", "repo")
+        mock_resolve.return_value = None
+
+        mock_db = AsyncMock()
+        mock_db.get.return_value = conn
+
+        await _poll_workspace(mock_db, ws)
+
+        assert ws.vcs_last_error == "Cannot determine tracked branch"
+        assert ws.vcs_last_error_at is not None

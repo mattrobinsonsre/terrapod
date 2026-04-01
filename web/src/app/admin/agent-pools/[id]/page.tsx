@@ -19,6 +19,7 @@ interface PoolAttrs {
   description: string
   'is-default': boolean
   'created-at': string
+  'listener-summary'?: { total: number; online: number }
 }
 
 interface Pool {
@@ -498,6 +499,20 @@ export default function AgentPoolDetailPage() {
         {/* Listeners Tab */}
         {activeTab === 'listeners' && (
           <div>
+            {pool?.attributes['listener-summary'] && (
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
+                  <p className="text-xs text-slate-500 uppercase tracking-wider">Online</p>
+                  <p className={`text-2xl font-semibold mt-1 ${pool.attributes['listener-summary'].online > 0 ? 'text-green-400' : 'text-slate-500'}`}>
+                    {pool.attributes['listener-summary'].online}
+                  </p>
+                </div>
+                <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
+                  <p className="text-xs text-slate-500 uppercase tracking-wider">Total</p>
+                  <p className="text-2xl font-semibold text-slate-100 mt-1">{pool.attributes['listener-summary'].total}</p>
+                </div>
+              </div>
+            )}
             {listenersLoading ? (
               <LoadingSpinner />
             ) : listeners.length === 0 ? (

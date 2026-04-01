@@ -97,16 +97,24 @@ class RunnerListener:
             self._cached_auth_headers = headers
         return self._cached_auth_headers
 
+    async def _establish_identity(self) -> None:
+        """Establish or re-establish listener identity."""
+        from terrapod.runner.identity import establish_identity
+
+        self.identity = await establish_identity()
+        self._identity_ready = True
+        # Invalidate cached auth headers so the new cert is used
+        if hasattr(self, "_cached_auth_headers"):
+            del self._cached_auth_headers
+
     async def start(self) -> None:
         """Main entry point — initialize and start loops."""
-        from terrapod.runner.identity import establish_identity
         from terrapod.runner.job_manager import init_k8s
 
         init_k8s()
 
         # Establish identity via join token
-        self.identity = await establish_identity()
-        self._identity_ready = True
+        await self._establish_identity()
         logger.info(
             "Listener started",
             listener_id=str(self.identity.listener_id),
@@ -138,6 +146,34 @@ class RunnerListener:
         finally:
             await self._http_client.aclose()
             await self._sse_client.aclose()
+
+    async def _rejoin(self) -> None:
+        """Force a fresh join by clearing saved certs and re-establishing identity.
+
+        Called when the listener receives persistent 401s, indicating its
+        Redis registration has expired (300s TTL) while the saved certificate
+        is still on disk. Without this, the listener loops on 401 forever.
+        """
+        from terrapod.runner.identity import _clear_saved_certs
+
+        logger.warning("Forcing re-join due to persistent auth failures")
+        _clear_saved_certs()
+        await self._establish_identity()
+
+        # Recreate HTTP clients with the new identity base URL
+        if self._http_client:
+            await self._http_client.aclose()
+        self._http_client = httpx.AsyncClient(
+            base_url=self.identity.api_url,
+            timeout=httpx.Timeout(30, connect=10),
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+        )
+
+        logger.info(
+            "Re-joined successfully",
+            listener_id=str(self.identity.listener_id),
+            name=self.identity.name,
+        )
 
     # ── Health server ────────────────────────────────────────────────
 
@@ -275,11 +311,37 @@ class RunnerListener:
         """Connect to the API SSE endpoint and handle events.
 
         Reconnects automatically on disconnect with exponential backoff.
+        Detects persistent 401s (stale cert / expired Redis registration)
+        and triggers a re-join to recover without pod restart.
         """
+        consecutive_401s = 0
+        _REJOIN_THRESHOLD = 3  # re-join after 3 consecutive 401s
+
         while not _shutdown.is_set():
             try:
                 await self._sse_connect()
+                consecutive_401s = 0  # successful connection resets counter
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 401:
+                    consecutive_401s += 1
+                    if consecutive_401s >= _REJOIN_THRESHOLD:
+                        try:
+                            await self._rejoin()
+                            consecutive_401s = 0
+                            continue  # retry SSE immediately with new identity
+                        except Exception as rejoin_err:
+                            logger.error("Re-join failed", error=str(rejoin_err))
+                    else:
+                        logger.error(
+                            "SSE auth failed",
+                            error=str(e),
+                            consecutive_401s=consecutive_401s,
+                        )
+                else:
+                    consecutive_401s = 0
+                    logger.error("SSE connection failed", error=str(e))
             except Exception as e:
+                consecutive_401s = 0
                 logger.error("SSE connection failed", error=str(e))
 
             if _shutdown.is_set():

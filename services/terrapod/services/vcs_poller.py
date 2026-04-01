@@ -28,7 +28,7 @@ from terrapod.api.metrics import (
     VCS_PRS_DETECTED,
     VCS_RUNS_CREATED,
 )
-from terrapod.db.models import Run, VCSConnection, Workspace
+from terrapod.db.models import Run, VCSConnection, Workspace, utc_now
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import github_service, gitlab_service, run_service
@@ -229,17 +229,7 @@ async def _poll_workspace_branch(
     branch: str,
 ) -> None:
     """Check the tracked branch for new commits and create a run."""
-    try:
-        sha = await _get_branch_sha(conn, owner, repo, branch)
-    except Exception as e:
-        logger.error(
-            "Failed to get branch SHA",
-            workspace=ws.name,
-            repo=f"{owner}/{repo}",
-            branch=branch,
-            error=repr(e),
-        )
-        return
+    sha = await _get_branch_sha(conn, owner, repo, branch)
 
     if sha is None:
         logger.warning(
@@ -326,16 +316,7 @@ async def _poll_workspace_prs(
     branch: str,
 ) -> None:
     """Check open PRs/MRs targeting the tracked branch for speculative plans."""
-    try:
-        prs = await _list_open_prs(conn, owner, repo, branch)
-    except Exception as e:
-        logger.error(
-            "Failed to list PRs",
-            workspace=ws.name,
-            repo=f"{owner}/{repo}",
-            error=str(e),
-        )
-        return
+    prs = await _list_open_prs(conn, owner, repo, branch)
 
     for pr in prs:
         # Check if we already have any run for this PR + SHA (avoid duplicates)
@@ -448,6 +429,8 @@ async def _poll_workspace(db: AsyncSession, ws: Workspace) -> None:
 
     conn = await db.get(VCSConnection, ws.vcs_connection_id)
     if not conn or conn.status != "active":
+        ws.vcs_last_error = "VCS connection is not active"
+        ws.vcs_last_error_at = utc_now()
         logger.warning(
             "VCS connection not active",
             workspace=ws.name,
@@ -457,6 +440,8 @@ async def _poll_workspace(db: AsyncSession, ws: Workspace) -> None:
 
     parsed = _parse_repo_url(conn, ws.vcs_repo_url)
     if not parsed:
+        ws.vcs_last_error = f"Cannot parse VCS repo URL: {ws.vcs_repo_url}"
+        ws.vcs_last_error_at = utc_now()
         logger.warning(
             "Cannot parse VCS repo URL",
             workspace=ws.name,
@@ -469,13 +454,30 @@ async def _poll_workspace(db: AsyncSession, ws: Workspace) -> None:
 
     branch = await _resolve_branch(conn, ws, owner, repo)
     if not branch:
+        ws.vcs_last_error = "Cannot determine tracked branch"
+        ws.vcs_last_error_at = utc_now()
         return
 
-    # 1. Check tracked branch for new commits → real runs
-    await _poll_workspace_branch(db, ws, conn, owner, repo, branch)
+    try:
+        # 1. Check tracked branch for new commits → real runs
+        await _poll_workspace_branch(db, ws, conn, owner, repo, branch)
 
-    # 2. Check open PRs/MRs targeting the tracked branch → speculative plans
-    await _poll_workspace_prs(db, ws, conn, owner, repo, branch)
+        # 2. Check open PRs/MRs targeting the tracked branch → speculative plans
+        await _poll_workspace_prs(db, ws, conn, owner, repo, branch)
+
+        # Success: update last-polled timestamp and clear any previous error
+        ws.vcs_last_polled_at = utc_now()
+        ws.vcs_last_error = None
+        ws.vcs_last_error_at = None
+    except Exception as e:
+        logger.error(
+            "Error polling workspace VCS",
+            workspace=ws.name,
+            error=str(e),
+            exc_info=e,
+        )
+        ws.vcs_last_error = str(e)[:500]
+        ws.vcs_last_error_at = utc_now()
 
 
 async def poll_cycle() -> None:
@@ -510,6 +512,12 @@ async def poll_cycle() -> None:
                     error=str(e),
                     exc_info=e,
                 )
+            # Commit after each workspace so VCS error state is persisted
+            # independently, even if a later workspace fails
+            try:
+                await db.commit()
+            except Exception:
+                await db.rollback()
 
     VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
 
