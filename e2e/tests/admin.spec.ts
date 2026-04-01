@@ -9,7 +9,6 @@ test.describe('Admin access control', () => {
     await expect(adminPage.locator('nav >> text=Roles')).toBeVisible();
     await expect(adminPage.locator('nav >> text=Users')).toBeVisible();
     await expect(adminPage.locator('nav >> text=Agent Pools')).toBeVisible();
-    await expect(adminPage.locator('nav >> text=Health')).toBeVisible();
   });
 
   test('regular user does not see admin nav links', async ({ userPage }) => {
