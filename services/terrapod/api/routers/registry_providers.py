@@ -511,6 +511,7 @@ async def create_provider_version_endpoint(
         db, storage, provider.id, attrs.version, gpg_key_uuid, attrs.protocols
     )
     await db.commit()
+    await db.refresh(prov_version, attribute_names=["platforms"])
 
     logger.info(
         "Provider version created",
