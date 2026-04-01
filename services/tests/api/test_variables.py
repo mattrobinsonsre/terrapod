@@ -29,6 +29,10 @@ def _mock_workspace(ws_id=None):
     ws.id = ws_id or uuid.uuid4()
     ws.name = "test-ws"
     ws.execution_backend = "tofu"
+    ws.agent_pool_id = None
+    ws.vcs_last_polled_at = None
+    ws.vcs_last_error = None
+    ws.vcs_last_error_at = None
     return ws
 
 

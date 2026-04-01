@@ -414,6 +414,66 @@ async def organization_entitlements(
 # ── Workspaces ───────────────────────────────────────────────────────────────
 
 
+def _compute_health_conditions(ws: Workspace) -> list[dict]:
+    """Compute all active health conditions from workspace DB fields."""
+    conditions: list[dict] = []
+
+    if ws.state_diverged:
+        conditions.append(
+            {
+                "code": "state_diverged",
+                "severity": "error",
+                "title": "State may be diverged",
+                "detail": "The last apply completed but the state upload failed. "
+                "The actual infrastructure may not match the stored state.",
+            }
+        )
+
+    if ws.execution_mode == "remote" and not ws.agent_pool_id:
+        conditions.append(
+            {
+                "code": "no_agent_pool",
+                "severity": "warning",
+                "title": "No agent pool assigned",
+                "detail": "This workspace is in remote execution mode but has no agent pool. "
+                "Runs will be queued indefinitely because no runner can claim them.",
+            }
+        )
+
+    if ws.vcs_last_error:
+        conditions.append(
+            {
+                "code": "vcs_error",
+                "severity": "error",
+                "title": "VCS polling failed",
+                "detail": ws.vcs_last_error,
+            }
+        )
+
+    if ws.drift_status == "drifted":
+        conditions.append(
+            {
+                "code": "drifted",
+                "severity": "warning",
+                "title": "Infrastructure drift detected",
+                "detail": "A drift detection run found changes between the stored state "
+                "and the actual infrastructure.",
+            }
+        )
+
+    if ws.drift_status == "errored":
+        conditions.append(
+            {
+                "code": "drift_errored",
+                "severity": "warning",
+                "title": "Drift detection errored",
+                "detail": "The last drift detection run failed. Check the run output for details.",
+            }
+        )
+
+    return conditions
+
+
 def _workspace_json(
     ws: Workspace,
     effective_permission: str | None = None,
@@ -463,6 +523,10 @@ def _workspace_json(
                 "drift-last-checked-at": _rfc3339(ws.drift_last_checked_at),
                 "drift-status": ws.drift_status,
                 "state-diverged": ws.state_diverged,
+                "health-conditions": _compute_health_conditions(ws),
+                "vcs-last-polled-at": _rfc3339(ws.vcs_last_polled_at),
+                "vcs-last-error": ws.vcs_last_error,
+                "vcs-last-error-at": _rfc3339(ws.vcs_last_error_at),
                 "latest-run": latest_run_attr,
                 "agent-pool-id": f"apool-{ws.agent_pool_id}" if ws.agent_pool_id else None,
                 "agent-pool-name": ws.agent_pool.name if ws.agent_pool else None,

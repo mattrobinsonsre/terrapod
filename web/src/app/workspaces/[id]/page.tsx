@@ -9,6 +9,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { LabelsEditor } from '@/components/labels-editor'
+import { HealthConditions } from '@/components/health-conditions'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
@@ -53,6 +54,10 @@ interface WorkspaceAttrs {
   'drift-last-checked-at': string
   'drift-status': string
   'state-diverged': boolean
+  'health-conditions': { code: string; severity: 'error' | 'warning'; title: string; detail: string }[]
+  'vcs-last-polled-at': string | null
+  'vcs-last-error': string | null
+  'vcs-last-error-at': string | null
   'created-at': string
   'updated-at': string
   permissions: WorkspacePermissions
@@ -1153,24 +1158,7 @@ function WorkspaceDetailContent() {
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            {attrs['state-diverged'] && (
-              <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-4 flex items-start gap-3">
-                <svg className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
-                <div>
-                  <p className="text-sm font-medium text-red-300">State may be diverged</p>
-                  <p className="text-xs text-red-400/80 mt-1">The last apply completed but the state upload failed. The actual infrastructure may not match the stored state. Upload the correct state or run a new apply to resolve this.</p>
-                </div>
-              </div>
-            )}
-            {attrs['execution-mode'] === 'remote' && !attrs['agent-pool-id'] && (
-              <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 flex items-start gap-3">
-                <svg className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
-                <div>
-                  <p className="text-sm font-medium text-amber-300">No agent pool assigned</p>
-                  <p className="text-xs text-amber-400/80 mt-1">This workspace is in remote execution mode but has no agent pool. Runs will be queued indefinitely because no runner can claim them. Assign an agent pool in the settings below.</p>
-                </div>
-              </div>
-            )}
+            <HealthConditions conditions={attrs['health-conditions'] || []} />
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-slate-300">Settings</h3>
@@ -1353,6 +1341,20 @@ function WorkspaceDetailContent() {
                     <dd className="mt-1 text-sm text-slate-200">{attrs['vcs-branch'] || 'Default'}</dd>
                   )}
                 </div>
+                {attrs['vcs-connection-name'] && !editing && (
+                  <div>
+                    <dt className="text-xs text-slate-500">VCS Polling</dt>
+                    <dd className="mt-1 text-sm">
+                      {attrs['vcs-last-error'] ? (
+                        <span className="text-red-400" title={attrs['vcs-last-error']}>Error{attrs['vcs-last-error-at'] ? ` (${new Date(attrs['vcs-last-error-at']).toLocaleString()})` : ''}</span>
+                      ) : attrs['vcs-last-polled-at'] ? (
+                        <span className="text-green-400">OK ({new Date(attrs['vcs-last-polled-at']).toLocaleString()})</span>
+                      ) : (
+                        <span className="text-slate-400">Not polled yet</span>
+                      )}
+                    </dd>
+                  </div>
+                )}
                 <div className="sm:col-span-2">
                   <dt className="text-xs text-slate-500 mb-1">Labels</dt>
                   {editing && perms['can-update'] ? (

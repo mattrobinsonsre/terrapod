@@ -32,9 +32,13 @@ def _mock_workspace(ws_id=None, name="test-ws", owner_email=""):
     ws.name = name
     ws.owner_email = owner_email
     ws.labels = {}
+    ws.agent_pool_id = None
     ws.vcs_connection_id = None
     ws.vcs_connection = None
     ws.vcs_repo_url = ""
+    ws.vcs_last_polled_at = None
+    ws.vcs_last_error = None
+    ws.vcs_last_error_at = None
     return ws
 
 

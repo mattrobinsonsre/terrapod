@@ -281,6 +281,15 @@ class Workspace(Base):
     vcs_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     vcs_last_commit_sha: Mapped[str] = mapped_column(String(40), nullable=False, default="")
 
+    # VCS polling health
+    vcs_last_polled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    vcs_last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    vcs_last_error_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     # tfvars files — passed to runner as -var-file arguments
     var_files: Mapped[list[str]] = mapped_column(
         ARRAY(String(500)), nullable=False, server_default="{}"

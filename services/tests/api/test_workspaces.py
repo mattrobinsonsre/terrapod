@@ -49,6 +49,7 @@ def _mock_workspace(
     ws.resource_cpu = resource_cpu
     ws.execution_backend = "tofu"
     ws.resource_memory = resource_memory
+    ws.agent_pool_id = None
     ws.agent_pool = None
     ws.labels = labels or {}
     ws.owner_email = owner_email
@@ -56,6 +57,9 @@ def _mock_workspace(
     ws.vcs_connection = None
     ws.vcs_repo_url = ""
     ws.vcs_branch = ""
+    ws.vcs_last_polled_at = None
+    ws.vcs_last_error = None
+    ws.vcs_last_error_at = None
     ws.var_files = []
     ws.trigger_prefixes = []
     ws.drift_detection_enabled = False

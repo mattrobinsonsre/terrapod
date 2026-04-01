@@ -21,6 +21,13 @@ interface LatestRun {
   'created-at': string
 }
 
+interface HealthCondition {
+  code: string
+  severity: string
+  title: string
+  detail: string
+}
+
 interface Workspace {
   id: string
   attributes: {
@@ -34,6 +41,8 @@ interface Workspace {
     'drift-detection-enabled': boolean
     'drift-status': string
     'state-diverged': boolean
+    'vcs-last-error': string | null
+    'health-conditions': HealthCondition[]
     'latest-run': LatestRun | null
     'created-at': string
   }
@@ -75,6 +84,7 @@ export default function WorkspacesPage() {
     const run = ws.attributes['latest-run']
 
     if (ws.attributes['state-diverged']) return { label: 'State Diverged', color: 'red', priority: 0 }
+    if (ws.attributes['vcs-last-error']) return { label: 'VCS Error', color: 'red', priority: 0 }
     if (drift === 'drifted') return { label: 'Drifted', color: 'amber', priority: 1 }
     if (run) {
       const s = run.status
@@ -398,6 +408,28 @@ export default function WorkspacesPage() {
             </button>
           </form>
         )}
+
+        {!loading && workspaces.length > 0 && (() => {
+          const total = workspaces.length
+          const withConditions = workspaces.filter(ws => (ws.attributes['health-conditions'] || []).length > 0).length
+          const locked = workspaces.filter(ws => ws.attributes.locked).length
+          return (
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
+                <p className="text-xs text-slate-500 uppercase tracking-wider">Total</p>
+                <p className="text-2xl font-semibold text-slate-100 mt-1">{total}</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
+                <p className="text-xs text-slate-500 uppercase tracking-wider">Health Issues</p>
+                <p className={`text-2xl font-semibold mt-1 ${withConditions > 0 ? 'text-red-400' : 'text-slate-100'}`}>{withConditions}</p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
+                <p className="text-xs text-slate-500 uppercase tracking-wider">Locked</p>
+                <p className={`text-2xl font-semibold mt-1 ${locked > 0 ? 'text-amber-400' : 'text-slate-100'}`}>{locked}</p>
+              </div>
+            </div>
+          )
+        })()}
 
         {loading ? (
           <LoadingSpinner />

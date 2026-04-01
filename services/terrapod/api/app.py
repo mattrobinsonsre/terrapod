@@ -564,11 +564,6 @@ def create_application() -> FastAPI:
 
     app.include_router(run_tasks_router)
 
-    # Health dashboard endpoint
-    from terrapod.api.routers.health_dashboard import router as health_dashboard_router
-
-    app.include_router(health_dashboard_router)
-
     return app
 
 
