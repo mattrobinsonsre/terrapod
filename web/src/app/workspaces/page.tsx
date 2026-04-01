@@ -67,6 +67,7 @@ export default function WorkspacesPage() {
   const [newVcsConnectionId, setNewVcsConnectionId] = useState('')
   const [newVcsRepoUrl, setNewVcsRepoUrl] = useState('')
   const [newVcsBranch, setNewVcsBranch] = useState('')
+  const [newAgentPoolId, setNewAgentPoolId] = useState('')
   const [creating, setCreating] = useState(false)
 
   // Version suggestions
@@ -76,6 +77,10 @@ export default function WorkspacesPage() {
   // VCS connections
   const [vcsConnections, setVcsConnections] = useState<{ id: string; attributes: { name: string; provider: string } }[]>([])
   const [vcsConnectionsLoaded, setVcsConnectionsLoaded] = useState(false)
+
+  // Agent pools
+  const [agentPools, setAgentPools] = useState<{ id: string; attributes: { name: string } }[]>([])
+  const [agentPoolsLoaded, setAgentPoolsLoaded] = useState(false)
 
   type WsSortKey = 'name' | 'mode' | 'resources' | 'status' | 'created'
 
@@ -136,14 +141,22 @@ export default function WorkspacesPage() {
     loadWorkspaces()
   }, []))
 
-  // Load VCS connections when form opens
+  // Load VCS connections and agent pools when form opens
   useEffect(() => {
-    if (!showCreate || vcsConnectionsLoaded) return
-    apiFetch('/api/v2/organizations/default/vcs-connections')
-      .then(res => res.ok ? res.json() : { data: [] })
-      .then(data => { setVcsConnections(data.data || []); setVcsConnectionsLoaded(true) })
-      .catch(() => {})
-  }, [showCreate, vcsConnectionsLoaded])
+    if (!showCreate) return
+    if (!vcsConnectionsLoaded) {
+      apiFetch('/api/v2/organizations/default/vcs-connections')
+        .then(res => res.ok ? res.json() : { data: [] })
+        .then(data => { setVcsConnections(data.data || []); setVcsConnectionsLoaded(true) })
+        .catch(() => {})
+    }
+    if (!agentPoolsLoaded) {
+      apiFetch('/api/v2/organizations/default/agent-pools')
+        .then(res => res.ok ? res.json() : { data: [] })
+        .then(data => { setAgentPools(data.data || []); setAgentPoolsLoaded(true) })
+        .catch(() => {})
+    }
+  }, [showCreate, vcsConnectionsLoaded, agentPoolsLoaded])
 
   // Fetch version suggestions when backend changes and form is open
   useEffect(() => {
@@ -193,6 +206,7 @@ export default function WorkspacesPage() {
               'working-directory': newWorkingDir,
               'vcs-repo-url': newVcsRepoUrl,
               'vcs-branch': newVcsBranch,
+              ...(newAgentPoolId ? { 'agent-pool-id': newAgentPoolId } : {}),
             },
             ...(newVcsConnectionId ? {
               relationships: {
@@ -219,6 +233,7 @@ export default function WorkspacesPage() {
       setNewVcsConnectionId('')
       setNewVcsRepoUrl('')
       setNewVcsBranch('')
+      setNewAgentPoolId('')
       setShowCreate(false)
       await loadWorkspaces()
     } catch (err) {
@@ -335,15 +350,32 @@ export default function WorkspacesPage() {
                 />
                 <p className="mt-1 text-xs text-slate-500">e.g. 2Gi, 512Mi, 1Ti</p>
               </div>
-              <div className="flex items-end">
-                <label className="flex items-center gap-2 px-3 py-2 cursor-pointer">
+              {newExecMode === 'remote' && (
+              <div>
+                <label htmlFor="ws-pool" className="block text-sm font-medium text-slate-300 mb-1">Agent Pool</label>
+                <select
+                  id="ws-pool"
+                  value={newAgentPoolId}
+                  onChange={(e) => setNewAgentPoolId(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                >
+                  <option value="">None</option>
+                  {agentPools.map((p) => (
+                    <option key={p.id} value={p.id}>{p.attributes.name}</option>
+                  ))}
+                </select>
+              </div>
+              )}
+              <div>
+                <span className="block text-sm font-medium text-slate-300 mb-1">Auto Apply</span>
+                <label className="flex items-center gap-2 h-[42px] px-3 cursor-pointer border border-slate-600 rounded-lg bg-slate-700">
                   <input
                     type="checkbox"
                     checked={newAutoApply}
                     onChange={(e) => setNewAutoApply(e.target.checked)}
                     className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
                   />
-                  <span className="text-sm text-slate-300">Auto Apply</span>
+                  <span className="text-sm text-slate-300">Enabled</span>
                 </label>
               </div>
               <div>
