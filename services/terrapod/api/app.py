@@ -449,10 +449,21 @@ def create_application() -> FastAPI:
 
     app.include_router(oauth_router)
 
+    # Workspace extension routes (SSE, vcs-refs — must come before tfe_v2
+    # so /workspace-events is not matched as a workspace_id parameter)
+    from terrapod.api.routers.workspace_extensions import router as workspace_extensions_router
+
+    app.include_router(workspace_extensions_router)
+
     # TFE V2 compatibility routes
     from terrapod.api.routers.tfe_v2 import router as tfe_v2_router
 
     app.include_router(tfe_v2_router)
+
+    # State management routes (Terrapod-specific: delete, rollback, upload)
+    from terrapod.api.routers.state_management import router as state_management_router
+
+    app.include_router(state_management_router)
 
     # Token CRUD routes
     from terrapod.api.routers.tokens import router as tokens_router

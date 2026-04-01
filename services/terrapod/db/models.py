@@ -347,6 +347,12 @@ class StateVersion(Base):
     lineage: Mapped[str] = mapped_column(String(63), nullable=False, default="")
     md5: Mapped[str] = mapped_column(String(32), nullable=False, default="")
     state_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("runs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
@@ -357,6 +363,7 @@ class StateVersion(Base):
     __table_args__ = (
         sa.UniqueConstraint("workspace_id", "serial", name="uq_state_versions"),
         Index("ix_state_versions_workspace_id", "workspace_id"),
+        Index("ix_state_versions_run_id", "run_id"),
     )
 
 

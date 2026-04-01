@@ -36,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, get_listener_identity
-from terrapod.db.models import Run, VCSConnection, Workspace
+from terrapod.db.models import Run, StateVersion, VCSConnection, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service, run_service
@@ -55,7 +55,12 @@ def _rfc3339(dt) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _run_json(run: Run, *, workspace_has_vcs: bool = False) -> dict:
+def _run_json(
+    run: Run,
+    *,
+    workspace_has_vcs: bool = False,
+    state_version_id: str | None = None,
+) -> dict:
     """Serialize a Run to TFE V2 JSON:API format."""
     run_id = f"run-{run.id}"
 
@@ -143,6 +148,13 @@ def _run_json(run: Run, *, workspace_has_vcs: bool = False) -> dict:
                 },
                 "task-stages": {
                     "links": {"related": f"/api/v2/runs/{run_id}/task-stages"},
+                },
+                "created-state-version": {
+                    "data": (
+                        {"id": state_version_id, "type": "state-versions"}
+                        if state_version_id
+                        else None
+                    ),
                 },
             },
             "links": {
@@ -381,8 +393,20 @@ async def show_run(
     run = await _get_run(run_id, db)
     await _require_run_ws_permission(run, "read", user, db)
     ws = await db.get(Workspace, run.workspace_id)
+
+    # Look up state version created by this run (detail endpoint only)
+    sv_result = await db.execute(
+        select(StateVersion.id).where(StateVersion.run_id == run.id).limit(1)
+    )
+    sv_uuid = sv_result.scalar_one_or_none()
+    sv_id = f"sv-{sv_uuid}" if sv_uuid else None
+
     return JSONResponse(
-        content=_run_json(run, workspace_has_vcs=bool(ws and ws.vcs_connection_id)),
+        content=_run_json(
+            run,
+            workspace_has_vcs=bool(ws and ws.vcs_connection_id),
+            state_version_id=sv_id,
+        ),
     )
 
 
