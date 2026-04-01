@@ -29,12 +29,9 @@ Endpoints:
     GET  /api/v2/state-versions/{id}/download — download raw state
     PUT  /api/v2/state-versions/{id}/content — upload raw state
     PUT  /api/v2/state-versions/{id}/json-content — upload JSON state
-    GET  /api/v2/workspaces/{id}/vcs-refs — list VCS branches/tags for workspace
 """
 
-import asyncio
 import hashlib
-import json
 import os
 import re
 from datetime import UTC, datetime
@@ -43,7 +40,6 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Resp
 from fastapi.responses import JSONResponse
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sse_starlette.sse import EventSourceResponse
 
 from terrapod.api.dependencies import (
     DEFAULT_ORG,
@@ -697,52 +693,6 @@ async def _require_ws_permission(
     return ws, perm
 
 
-# ── SSE (Server-Sent Events) ─────────────────────────────────────────────
-# This MUST come before parameterized /workspaces/{workspace_id} routes
-# so FastAPI doesn't match "workspace-events" as a workspace_id parameter.
-
-
-@router.get("/workspace-events")
-async def workspace_list_events(
-    request: Request,
-) -> EventSourceResponse:
-    """Stream workspace list events via SSE for real-time updates.
-
-    Any authenticated user can subscribe. Uses short-lived DB session
-    for auth, then releases before SSE streaming.
-    """
-    from terrapod.api.dependencies import authenticate_request
-    from terrapod.redis.client import WORKSPACE_LIST_EVENTS_CHANNEL, subscribe_channel
-
-    await authenticate_request(request)
-
-    pubsub = await subscribe_channel(WORKSPACE_LIST_EVENTS_CHANNEL)
-
-    async def event_generator():
-        try:
-            while True:
-                if await request.is_disconnected():
-                    break
-                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
-                if message and message["type"] == "message":
-                    data = message["data"]
-                    if isinstance(data, bytes):
-                        data = data.decode()
-                    payload = json.loads(data)
-                    yield {
-                        "event": payload.get("event", "update"),
-                        "data": json.dumps(payload),
-                    }
-                else:
-                    yield {"comment": "keepalive"}
-                    await asyncio.sleep(1)
-        finally:
-            await pubsub.unsubscribe(WORKSPACE_LIST_EVENTS_CHANNEL)
-            await pubsub.aclose()
-
-    return EventSourceResponse(event_generator())
-
-
 @router.get("/workspaces/{workspace_id}")
 async def show_workspace_by_id(
     workspace_id: str = Path(...),
@@ -1046,9 +996,15 @@ def _state_version_json(sv: StateVersion) -> dict:
                 "md5": sv.md5,
                 "size": sv.state_size,
                 "created-at": _rfc3339(sv.created_at),
+                "created-by": sv.created_by,
                 "hosted-state-download-url": f"{base}/api/v2/state-versions/{sv_id}/download",
                 "hosted-state-upload-url": f"{base}/api/v2/state-versions/{sv_id}/content",
                 "hosted-json-state-upload-url": f"{base}/api/v2/state-versions/{sv_id}/json-content",
+            },
+            "relationships": {
+                "run": {
+                    "data": ({"id": f"run-{sv.run_id}", "type": "runs"} if sv.run_id else None),
+                },
             },
             "links": {
                 "self": f"/api/v2/state-versions/{sv_id}",
@@ -1102,6 +1058,20 @@ async def create_state_version(
     md5_from_client = attrs.get("md5", "")
     force = attrs.get("force", False)
 
+    # Extract run relationship if provided (go-tfe sends this when state
+    # is created as part of a run)
+    run_id_raw = (
+        body.get("data", {}).get("relationships", {}).get("run", {}).get("data", {}).get("id", "")
+    )
+    run_uuid = None
+    if run_id_raw:
+        import uuid as _uuid
+
+        try:
+            run_uuid = _uuid.UUID(run_id_raw.removeprefix("run-"))
+        except ValueError:
+            pass  # ignore malformed run IDs
+
     # Check for serial conflict (unless force is set)
     if not force:
         existing = await db.execute(
@@ -1119,6 +1089,8 @@ async def create_state_version(
         lineage=lineage,
         md5=md5_from_client,
         state_size=0,
+        created_by=user.email,
+        run_id=run_uuid,
     )
     db.add(sv)
     await db.commit()
@@ -1284,54 +1256,3 @@ async def unlock_workspace(
     await publish_workspace_event(str(ws.id), "workspace_lock_change", {"locked": False})
 
     return JSONResponse(content=_workspace_json(ws, perm), headers=_tfe_headers())
-
-
-@router.get("/workspaces/{workspace_id}/vcs-refs")
-async def list_vcs_refs(
-    workspace_id: str = Path(...),
-    user: AuthenticatedUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> JSONResponse:
-    """List branches, tags, and default branch for a VCS-connected workspace.
-
-    Requires read permission on the workspace.
-    """
-    from terrapod.db.models import VCSConnection
-    from terrapod.services.vcs_poller import (
-        _list_branches,
-        _list_tags,
-        _parse_repo_url,
-        _resolve_branch,
-    )
-
-    ws = await _get_workspace_by_id(workspace_id, db)
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
-    if not has_permission(perm, "read"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Requires read permission on workspace",
-        )
-
-    if not ws.vcs_connection_id or not ws.vcs_repo_url:
-        raise HTTPException(status_code=422, detail="Workspace is not VCS-connected")
-
-    conn = await db.get(VCSConnection, ws.vcs_connection_id)
-    if not conn or conn.status != "active":
-        raise HTTPException(status_code=422, detail="VCS connection is not active")
-
-    parsed = _parse_repo_url(conn, ws.vcs_repo_url)
-    if not parsed:
-        raise HTTPException(status_code=422, detail="Cannot parse VCS repo URL")
-    owner, repo = parsed
-
-    branches = await _list_branches(conn, owner, repo)
-    tags = await _list_tags(conn, owner, repo)
-    default_branch = await _resolve_branch(conn, ws, owner, repo) or ""
-
-    return JSONResponse(
-        content={
-            "branches": branches,
-            "tags": tags,
-            "default-branch": default_branch,
-        }
-    )

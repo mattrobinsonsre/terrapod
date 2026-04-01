@@ -590,6 +590,16 @@ export default function RunDetailPage() {
                 <dd className="mt-1 text-sm text-slate-200">#{attrs['vcs-pull-request-number']}</dd>
               </div>
             )}
+            {(run.relationships?.['created-state-version'] as { data: { id: string } | null } | undefined)?.data && (
+              <div>
+                <dt className="text-xs text-slate-500">State Version</dt>
+                <dd className="mt-1 text-sm">
+                  <Link href={`/workspaces/${workspaceId}?tab=state`} className="text-brand-400 hover:text-brand-300">
+                    View State
+                  </Link>
+                </dd>
+              </div>
+            )}
           </dl>
 
           {/* Run options (only show when non-default) */}

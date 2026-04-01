@@ -220,6 +220,8 @@ async def upload_state(
         lineage=lineage,
         md5=md5,
         state_size=len(body),
+        run_id=run.id,
+        created_by=run.created_by or None,
     )
     db.add(sv)
     await db.flush()

@@ -102,6 +102,10 @@ interface StateVersionItem {
     md5: string
     size: number
     'created-at': string
+    'created-by': string | null
+  }
+  relationships?: {
+    run?: { data: { id: string; type: string } | null }
   }
 }
 
@@ -253,6 +257,8 @@ function WorkspaceDetailContent() {
   // State versions
   const [stateVersions, setStateVersions] = useState<StateVersionItem[]>([])
   const [stateLoading, setStateLoading] = useState(false)
+  const [stateActionLoading, setStateActionLoading] = useState<string | null>(null)
+  const [confirmStateAction, setConfirmStateAction] = useState<{ action: 'delete' | 'rollback'; sv: StateVersionItem } | null>(null)
 
   // Variable editing
   const [editingVarId, setEditingVarId] = useState<string | null>(null)
@@ -317,7 +323,7 @@ function WorkspaceDetailContent() {
   )
 
   // Sorting for state tab
-  type StateSortKey = 'serial' | 'lineage' | 'size' | 'created-at'
+  type StateSortKey = 'serial' | 'lineage' | 'size' | 'created-at' | 'created-by'
   const { sortedItems: sortedState, sortState: stateSortState, toggleSort: toggleStateSort } = useSortable<StateVersionItem, StateSortKey>(
     stateVersions, 'serial', 'desc',
     useCallback((item: StateVersionItem, key: StateSortKey) => {
@@ -326,6 +332,7 @@ function WorkspaceDetailContent() {
         case 'lineage': return item.attributes.lineage
         case 'size': return item.attributes.size
         case 'created-at': return item.attributes['created-at']
+        case 'created-by': return item.attributes['created-by'] || ''
       }
     }, []),
   )
@@ -1991,6 +1998,98 @@ function WorkspaceDetailContent() {
         {/* State Tab */}
         {activeTab === 'state' && (
           <div>
+            {/* Confirmation dialog */}
+            {confirmStateAction && (
+              <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-4 mb-4">
+                <p className="text-sm text-red-200 mb-3">
+                  {confirmStateAction.action === 'delete'
+                    ? `Delete state version #${confirmStateAction.sv.attributes.serial}? This cannot be undone.`
+                    : `Rollback to state version #${confirmStateAction.sv.attributes.serial}? A new version will be created with the same content.`}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    disabled={!!stateActionLoading}
+                    onClick={async () => {
+                      const { action, sv } = confirmStateAction
+                      setStateActionLoading(sv.id)
+                      try {
+                        if (action === 'delete') {
+                          const resp = await apiFetch(`/api/v2/state-versions/${sv.id}/manage`, { method: 'DELETE' })
+                          if (!resp.ok) {
+                            const err = await resp.json().catch(() => ({ detail: 'Failed' }))
+                            throw new Error(err.detail || 'Failed to delete state version')
+                          }
+                        } else {
+                          const resp = await apiFetch(`/api/v2/state-versions/${sv.id}/actions/rollback`, { method: 'POST' })
+                          if (!resp.ok) {
+                            const err = await resp.json().catch(() => ({ detail: 'Failed' }))
+                            throw new Error(err.detail || 'Failed to rollback state version')
+                          }
+                        }
+                        setConfirmStateAction(null)
+                        loadStateVersions()
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : 'State action failed')
+                      } finally {
+                        setStateActionLoading(null)
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded text-xs font-medium text-white transition-colors ${
+                      confirmStateAction.action === 'delete'
+                        ? 'bg-red-600 hover:bg-red-500'
+                        : 'bg-amber-600 hover:bg-amber-500'
+                    }`}
+                  >
+                    {stateActionLoading ? 'Processing...' : confirmStateAction.action === 'delete' ? 'Confirm Delete' : 'Confirm Rollback'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmStateAction(null)}
+                    className="px-3 py-1.5 rounded text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Upload state button */}
+            {perms['can-create-state-versions'] && (
+              <div className="flex justify-end mb-4">
+                <label className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors cursor-pointer">
+                  Upload State
+                  <input
+                    type="file"
+                    accept=".json,.tfstate"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      setStateActionLoading('upload')
+                      try {
+                        const body = await file.text()
+                        JSON.parse(body) // validate JSON
+                        const resp = await apiFetch(`/api/v2/workspaces/${workspaceId}/state-versions/actions/upload`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body,
+                        })
+                        if (!resp.ok) {
+                          const err = await resp.json().catch(() => ({ detail: 'Failed' }))
+                          throw new Error(err.detail || 'Failed to upload state')
+                        }
+                        loadStateVersions()
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : 'Failed to upload state file')
+                      } finally {
+                        setStateActionLoading(null)
+                        e.target.value = ''
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+            )}
+
             {stateLoading ? (
               <LoadingSpinner />
             ) : stateVersions.length === 0 ? (
@@ -2001,46 +2100,79 @@ function WorkspaceDetailContent() {
                   <thead>
                     <tr className="border-b border-slate-700/50">
                       <SortableHeader label="Serial" sortKey="serial" sortState={stateSortState} onSort={toggleStateSort} />
-                      <SortableHeader label="Lineage" sortKey="lineage" sortState={stateSortState} onSort={toggleStateSort} className="hidden sm:table-cell" />
+                      <SortableHeader label="Created By" sortKey="created-by" sortState={stateSortState} onSort={toggleStateSort} className="hidden sm:table-cell" />
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Run</th>
                       <SortableHeader label="Size" sortKey="size" sortState={stateSortState} onSort={toggleStateSort} className="hidden md:table-cell" />
                       <SortableHeader label="Created" sortKey="created-at" sortState={stateSortState} onSort={toggleStateSort} className="hidden lg:table-cell" />
                       <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
-                    {sortedState.map((sv) => (
-                      <tr key={sv.id} className="hover:bg-slate-700/20 transition-colors">
-                        <td className="px-4 py-3 text-sm text-slate-200 font-mono">#{sv.attributes.serial}</td>
-                        <td className="px-4 py-3 text-xs text-slate-400 font-mono hidden sm:table-cell">{sv.attributes.lineage || '-'}</td>
-                        <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">
-                          {sv.attributes.size > 0 ? `${(sv.attributes.size / 1024).toFixed(1)} KB` : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-500 hidden lg:table-cell">
-                          {sv.attributes['created-at'] ? new Date(sv.attributes['created-at']).toLocaleString() : ''}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={async () => {
-                              try {
-                                const resp = await apiFetch(`/api/v2/state-versions/${sv.id}/download`)
-                                const blob = await resp.blob()
-                                const url = URL.createObjectURL(blob)
-                                const a = document.createElement('a')
-                                a.href = url
-                                a.download = `state-${sv.attributes.serial}.json`
-                                a.click()
-                                URL.revokeObjectURL(url)
-                              } catch {
-                                alert('Failed to download state file')
-                              }
-                            }}
-                            className="text-xs text-brand-400 hover:text-brand-300"
-                          >
-                            Download
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {sortedState.map((sv) => {
+                      const maxSerial = Math.max(...stateVersions.map(s => s.attributes.serial))
+                      const isLatest = sv.attributes.serial === maxSerial
+                      const runData = sv.relationships?.run?.data
+                      return (
+                        <tr key={sv.id} className="hover:bg-slate-700/20 transition-colors">
+                          <td className="px-4 py-3 text-sm text-slate-200 font-mono">#{sv.attributes.serial}</td>
+                          <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
+                            {sv.attributes['created-by'] || <span className="text-slate-500">runner</span>}
+                          </td>
+                          <td className="px-4 py-3 text-xs hidden sm:table-cell">
+                            {runData ? (
+                              <a href={`/workspaces/${workspaceId}/runs/${runData.id}`} className="text-brand-400 hover:text-brand-300">
+                                {runData.id.replace('run-', '').slice(0, 8)}
+                              </a>
+                            ) : (
+                              <span className="text-slate-500">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">
+                            {sv.attributes.size > 0 ? `${(sv.attributes.size / 1024).toFixed(1)} KB` : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-500 hidden lg:table-cell">
+                            {sv.attributes['created-at'] ? new Date(sv.attributes['created-at']).toLocaleString() : ''}
+                          </td>
+                          <td className="px-4 py-3 text-right space-x-2">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const resp = await apiFetch(`/api/v2/state-versions/${sv.id}/download`)
+                                  const blob = await resp.blob()
+                                  const url = URL.createObjectURL(blob)
+                                  const a = document.createElement('a')
+                                  a.href = url
+                                  a.download = `state-${sv.attributes.serial}.json`
+                                  a.click()
+                                  URL.revokeObjectURL(url)
+                                } catch {
+                                  alert('Failed to download state file')
+                                }
+                              }}
+                              className="text-xs text-brand-400 hover:text-brand-300"
+                            >
+                              Download
+                            </button>
+                            {!isLatest && perms['can-create-state-versions'] && (
+                              <button
+                                onClick={() => setConfirmStateAction({ action: 'rollback', sv })}
+                                className="text-xs text-amber-400 hover:text-amber-300"
+                              >
+                                Rollback
+                              </button>
+                            )}
+                            {!isLatest && perms['can-update'] && (
+                              <button
+                                onClick={() => setConfirmStateAction({ action: 'delete', sv })}
+                                className="text-xs text-red-400 hover:text-red-300"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

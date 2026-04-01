@@ -307,7 +307,7 @@ The following read-only attributes are included in workspace responses when drif
 | `drift-last-checked-at` | string (RFC3339) or null | Timestamp of the last completed drift detection check |
 | `drift-status` | string | Current drift status: `""` (never checked), `"no_drift"`, `"drifted"`, or `"errored"` |
 
-### List VCS Refs
+### List VCS Refs (Terrapod Extension)
 
 ```
 GET /api/v2/workspaces/{id}/vcs-refs
@@ -406,6 +406,70 @@ PUT /api/v2/state-versions/{id}/json-content
 ```
 
 Accepted and discarded (placeholder for future use).
+
+### State Version Response Format
+
+State version responses include a `created-by` attribute (email of the user who created it, or null for runner-created states) and a `run` relationship linking to the run that produced the state:
+
+```json
+{
+  "data": {
+    "id": "sv-...",
+    "type": "state-versions",
+    "attributes": {
+      "serial": 1,
+      "lineage": "...",
+      "md5": "...",
+      "size": 1234,
+      "created-at": "2026-01-01T00:00:00Z",
+      "created-by": "user@example.com"
+    },
+    "relationships": {
+      "run": {
+        "data": { "id": "run-...", "type": "runs" }
+      }
+    }
+  }
+}
+```
+
+### Delete State Version (Terrapod Extension)
+
+```
+DELETE /api/v2/state-versions/{id}/manage
+```
+
+Deletes a non-current state version. The current (highest serial) version cannot be deleted.
+
+**Required permission:** `admin` on the workspace.
+
+Returns 204 on success, 409 if attempting to delete the current version.
+
+### Rollback State Version (Terrapod Extension)
+
+```
+POST /api/v2/state-versions/{id}/actions/rollback
+```
+
+Creates a new state version with the content of the specified older version. The new version gets serial = max existing + 1. This is a "copy forward" rollback — no versions are deleted, history is preserved.
+
+**Required permission:** `write` on the workspace.
+
+Returns 201 with the new state version.
+
+### Upload State Manually (Terrapod Extension)
+
+```
+POST /api/v2/workspaces/{id}/state-versions/actions/upload
+```
+
+Upload a raw state JSON file. Serial is auto-assigned (max existing + 1). Useful for state surgery workflows.
+
+**Required permission:** `write` on the workspace.
+
+**Request body:** Raw state JSON (Content-Type: application/json).
+
+Returns 201 with the new state version.
 
 ---
 
@@ -536,7 +600,7 @@ The stream sends `: keepalive` comments every ~1 second. Events are JSON-encoded
 
 **Required permission:** `read` on the workspace.
 
-### Workspace List Events (SSE)
+### Workspace List Events (SSE) (Terrapod Extension)
 
 ```
 GET /api/v2/workspace-events

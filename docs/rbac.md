@@ -14,8 +14,8 @@ Workspace permissions are strictly hierarchical -- each level includes all permi
 |---|---|
 | **read** | View workspace, view runs and plan output, view state metadata, view non-sensitive variables |
 | **plan** | read + queue plan-only runs, lock/unlock (own locks), download raw state |
-| **write** | plan + confirm/discard applies, create apply runs, CRUD variables, upload state/config |
-| **admin** | write + update/delete workspace, change VCS/execution settings, change labels. Cannot change owner (platform admin only) |
+| **write** | plan + confirm/discard applies, create apply runs, CRUD variables, upload state/config, rollback state versions |
+| **admin** | write + update/delete workspace, change VCS/execution settings, change labels, delete state versions. Cannot change owner (platform admin only) |
 
 ### Registry Permission Levels
 
