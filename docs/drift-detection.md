@@ -131,13 +131,9 @@ When `drift_status` changes to `drifted`, a `run:drift_detected` notification tr
 
 ---
 
-## Health Dashboard
+## Workspace Health Conditions
 
-The [health dashboard](health-dashboard.md) aggregates drift status across all workspaces, showing:
-
-- Total workspaces with drift detection enabled
-- Breakdown by drift status (unchecked, no drift, drifted, errored)
-- Stale workspaces sorted by days since last apply
+Drift status is visible on the workspace overview tab as a health condition banner. The workspace list page aggregates health issues (including drift) into summary cards, showing at a glance how many workspaces have detected drift or other health concerns.
 
 ---
 
@@ -150,6 +146,5 @@ Drift detection uses the [distributed scheduler](architecture.md) — only one A
 ## See Also
 
 - [Notifications](notifications.md) — configure alerts for drift detection events
-- [Health Dashboard](health-dashboard.md) — view drift status across all workspaces
 - [Architecture](architecture.md) — scheduler and background task system
 - [API Reference](api-reference.md) — workspace API with drift detection fields

@@ -28,7 +28,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | **Notifications** | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
 | **Run Tasks** | Pre/post-plan webhook hooks for external validation |
 | **Drift Detection** | Scheduled plan-only runs to detect out-of-band infrastructure changes |
-| **Health Dashboard** | Workspace health scores, drift status, run metrics, listener availability |
+| **Workspace Health** | Per-workspace health conditions with status indicators on workspace list |
 | **Cloud Credentials** | Dynamic provider credentials via Kubernetes workload identity (AWS IRSA, GCP WIF, Azure WI) |
 | **Binary Caching** | Pull-through cache for terraform/tofu CLI binaries |
 
@@ -86,7 +86,6 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Run Tasks](run-tasks.md) | Pre/post-plan webhook hooks for external validation |
 | [Audit Logging](audit-logging.md) | Immutable event log, query API, retention |
 | [Artifact Retention](artifact-retention.md) | Automated cleanup of old state versions, run logs, cache entries |
-| [Health Dashboard](health-dashboard.md) | Workspace health, drift status, run metrics |
 | [Runners](runners.md) | Custom runner images, private registries, Job configuration |
 | [Cloud Credentials](cloud-credentials.md) | AWS IRSA, GCP WIF, Azure WI setup |
 | [Registry](registry.md) | Private module/provider registry, caching layers |
