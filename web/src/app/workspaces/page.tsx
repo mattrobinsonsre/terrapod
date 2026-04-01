@@ -366,15 +366,16 @@ export default function WorkspacesPage() {
                 </select>
               </div>
               )}
-              <div className="flex items-end">
-                <label className="flex items-center gap-2 px-3 py-2 cursor-pointer">
+              <div>
+                <span className="block text-sm font-medium text-slate-300 mb-1">Auto Apply</span>
+                <label className="flex items-center gap-2 h-[42px] px-3 cursor-pointer border border-slate-600 rounded-lg bg-slate-700">
                   <input
                     type="checkbox"
                     checked={newAutoApply}
                     onChange={(e) => setNewAutoApply(e.target.checked)}
                     className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
                   />
-                  <span className="text-sm text-slate-300">Auto Apply</span>
+                  <span className="text-sm text-slate-300">Enabled</span>
                 </label>
               </div>
               <div>
