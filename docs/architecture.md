@@ -100,7 +100,6 @@ High-priority pages that users watch actively use SSE for instant updates. The A
 | `tp:run_events:{ws_id}` | `GET /api/v2/workspaces/{id}/runs/events` | `useRunEvents` | Workspace detail page |
 | `tp:workspace_list_events` | `GET /api/v2/workspace-events` | `useWorkspaceListEvents` | Workspace list page |
 | `tp:pool_events:{pool_id}` | `GET /api/v2/agent-pools/{id}/events` | `usePoolEvents` | Agent pool detail page |
-| `tp:admin_events` | `GET /api/v2/admin/health-dashboard/events` | `useAdminEvents` | Health dashboard |
 | `tp:listener_events:{pool_id}` | `GET /api/v2/listeners/{id}/events` | (listener code) | Runner listeners |
 
 **Shared SSE engine (`use-sse.ts`):**

@@ -11,6 +11,8 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
 ![Workspaces](docs/images/workspaces.png)
 
+> **Drop-in replacement for HCP Terraform.** Point your existing `cloud` blocks, `go-tfe` clients, and CI/CD pipelines at Terrapod — zero code changes required.
+
 ---
 
 ## Key Features
@@ -35,7 +37,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | Run Triggers | Implemented | Cross-workspace dependency chains — source apply triggers downstream runs |
 | Notifications | Implemented | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
 | Run Tasks | Implemented | Pre/post-plan webhook hooks for external validation |
-| Health Dashboard | Implemented | Workspace health scores, drift status, staleness metrics |
+| Workspace Health | Implemented | Per-workspace health conditions, VCS polling status, drift detection indicators |
 | Cloud Credentials | Implemented | Dynamic provider credentials via K8s workload identity (AWS IRSA, GCP WIF, Azure WI) |
 
 ### Screenshots
@@ -53,15 +55,15 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 </details>
 
 <details>
-<summary>Health dashboard with drift status and workspace staleness</summary>
+<summary>Variables with sensitive masking and HCL support</summary>
 
-![Health Dashboard](docs/images/admin-health.png)
+![Variables](docs/images/workspace-variables.png)
 </details>
 
 <details>
-<summary>Audit log with filtering and pagination</summary>
+<summary>Agent pools with listener health monitoring</summary>
 
-![Audit Log](docs/images/admin-audit-log.png)
+![Agent Pools](docs/images/admin-agent-pools.png)
 </details>
 
 ---
@@ -252,7 +254,6 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Notifications](docs/notifications.md) | Webhook, Slack, and email alerts on run events |
 | [Run Tasks](docs/run-tasks.md) | Pre/post-plan webhook hooks for external validation |
 | [Audit Logging](docs/audit-logging.md) | Immutable event log, query API, retention |
-| [Health Dashboard](docs/health-dashboard.md) | Workspace health, drift status, run metrics |
 | [Cloud Credentials](docs/cloud-credentials.md) | AWS IRSA, GCP WIF, Azure WI setup |
 | [Monitoring](docs/monitoring.md) | Prometheus metrics, scraping, recommended alerts |
 | [Disaster Recovery](docs/disaster-recovery.md) | Break-glass state recovery from object storage |
@@ -327,6 +328,8 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 | [Digger](https://digger.dev/) | CI-native Terraform orchestration | Runs inside CI; no standalone platform |
 | [Terrateam](https://terrateam.io/) | GitHub-integrated TF automation | GitHub-coupled; limited community edition |
 | [Spacelift](https://spacelift.io/) | Commercial TF management platform | Not open source |
+
+Terrapod is the only open-source project that covers the full TFE surface: state management, remote execution, private registry, RBAC, VCS integration, drift detection, and a production-grade UI -- all in a single self-hosted Kubernetes deployment.
 
 Terrapod is a single, self-hosted platform covering the full TFE surface (state + runs + registry + governance + UI + API) under a copyleft (GPLv3) license.
 

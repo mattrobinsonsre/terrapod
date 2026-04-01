@@ -954,12 +954,6 @@ api:
 
 Logs are written to stdout in JSON format, suitable for log aggregation (Fluentd, Loki, CloudWatch, etc.).
 
-### Health Dashboard
-
-The admin health dashboard endpoint (`GET /api/v2/admin/health-dashboard`) provides a single-request overview of platform health, including workspace drift status, recent run statistics, and listener availability. This is useful for integration with external monitoring dashboards (Grafana, Datadog, etc.) or custom alerting.
-
-Requires `admin` or `audit` role. See the [API Reference](api-reference.md#health-dashboard) for the full response schema.
-
 ### Prometheus Metrics
 
 When `api.config.metrics.enabled` is true (default), the API server exposes a `/metrics` endpoint in Prometheus exposition format. The listener also serves `/metrics` on its health port. See the [Metrics](#metrics) configuration reference for available metrics and ServiceMonitor/PodMonitor setup.
@@ -972,8 +966,8 @@ When `api.config.metrics.enabled` is true (default), the API server exposes a `/
 | API request rate | `terrapod_http_requests_total` (Prometheus) |
 | Listener active runs | `terrapod_listener_active_runs` (Prometheus) |
 | Listener heartbeat age | `terrapod_listener_heartbeat_age_seconds` (Prometheus) |
-| Run queue depth | Count runs in `queued` state via API or health dashboard |
-| Drift status | Health dashboard `workspaces.by-drift-status` |
+| Run queue depth | Count runs in `queued` state via API |
+| Drift status | Workspace list health summary cards |
 | Database connections | PostgreSQL `pg_stat_activity` |
 | Storage operations | Cloud provider metrics (S3/Blob/GCS) |
 | Job success/failure | Kubernetes Job status in runner namespace |

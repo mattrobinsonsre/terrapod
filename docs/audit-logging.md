@@ -131,5 +131,4 @@ The retention task uses the distributed scheduler — it runs exactly once per d
 ## See Also
 
 - [RBAC](rbac.md) — `admin` and `audit` roles
-- [Health Dashboard](health-dashboard.md) — operational overview
 - [API Reference](api-reference.md) — full endpoint documentation
