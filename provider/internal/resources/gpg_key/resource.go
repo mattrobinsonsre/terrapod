@@ -97,9 +97,17 @@ func (r *gpgKeyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Optional: true, Description: "Source URL.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"key_id":     schema.StringAttribute{Computed: true, Description: "PGP key ID (extracted from armor)."},
-			"created_at": schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
-			"updated_at": schema.StringAttribute{Computed: true, Description: "Update timestamp."},
+			"key_id": schema.StringAttribute{
+				Computed: true, Description: "PGP key ID (extracted from armor).",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"created_at": schema.StringAttribute{
+				Computed: true, Description: "Creation timestamp.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"updated_at": schema.StringAttribute{
+				Computed: true, Description: "Update timestamp.",
+			},
 		},
 	}
 }

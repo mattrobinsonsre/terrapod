@@ -105,12 +105,28 @@ func (r *registryModuleResource) Schema(_ context.Context, _ resource.SchemaRequ
 			"vcs_repo_url":      schema.StringAttribute{Optional: true, Description: "VCS repo URL."},
 			"vcs_branch":        schema.StringAttribute{Optional: true, Description: "VCS branch."},
 			"vcs_tag_pattern":   schema.StringAttribute{Optional: true, Description: "VCS tag pattern (e.g. v*)."},
-			"namespace":         schema.StringAttribute{Computed: true, Description: "Namespace (always default)."},
-			"status":            schema.StringAttribute{Computed: true, Description: "Module status."},
-			"owner_email":       schema.StringAttribute{Computed: true, Description: "Owner email."},
-			"source":            schema.StringAttribute{Computed: true, Description: "Source (upload or vcs)."},
-			"created_at":        schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
-			"updated_at":        schema.StringAttribute{Computed: true, Description: "Update timestamp."},
+			"namespace": schema.StringAttribute{
+				Computed: true, Description: "Namespace (always default).",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"status": schema.StringAttribute{
+				Computed: true, Description: "Module status.",
+			},
+			"owner_email": schema.StringAttribute{
+				Computed: true, Description: "Owner email.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"source": schema.StringAttribute{
+				Computed: true, Description: "Source (upload or vcs).",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"created_at": schema.StringAttribute{
+				Computed: true, Description: "Creation timestamp.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"updated_at": schema.StringAttribute{
+				Computed: true, Description: "Update timestamp.",
+			},
 		},
 	}
 }

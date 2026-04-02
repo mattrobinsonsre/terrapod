@@ -119,8 +119,13 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 			"version_id": schema.StringAttribute{
 				Computed: true, Description: "Version identifier.",
 			},
-			"created_at": schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
-			"updated_at": schema.StringAttribute{Computed: true, Description: "Update timestamp."},
+			"created_at": schema.StringAttribute{
+				Computed: true, Description: "Creation timestamp.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"updated_at": schema.StringAttribute{
+				Computed: true, Description: "Update timestamp.",
+			},
 		},
 	}
 }

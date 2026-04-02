@@ -114,6 +114,9 @@ func (r *roleAssignmentResource) Schema(_ context.Context, _ resource.SchemaRequ
 			"created_at": schema.StringAttribute{
 				Description: "Creation timestamp.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}

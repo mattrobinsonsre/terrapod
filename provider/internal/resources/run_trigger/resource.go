@@ -45,11 +45,16 @@ func (r *runTriggerResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			},
 			"workspace_name": schema.StringAttribute{
 				Computed: true, Description: "Destination workspace name.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"sourceable_name": schema.StringAttribute{
 				Computed: true, Description: "Source workspace name.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"created_at": schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
+			"created_at": schema.StringAttribute{
+				Computed: true, Description: "Creation timestamp.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
