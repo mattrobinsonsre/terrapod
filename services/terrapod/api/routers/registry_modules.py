@@ -764,7 +764,7 @@ def _link_to_jsonapi(link: ModuleWorkspaceLink) -> dict:
         "id": str(link.id),
         "type": "workspace-links",
         "attributes": {
-            "workspace-id": str(link.workspace_id),
+            "workspace-id": f"ws-{link.workspace_id}",
             "workspace-name": ws.name if ws else "",
             "created-at": link.created_at.isoformat() if link.created_at else None,
             "created-by": link.created_by,
