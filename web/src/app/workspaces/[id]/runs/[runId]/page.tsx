@@ -89,6 +89,7 @@ function downloadFile(content: string, filename: string) {
 
 function LogPanel({
   log,
+  precomputedHtml,
   loading,
   emptyMessage,
   phase,
@@ -97,6 +98,7 @@ function LogPanel({
   onRefresh,
 }: {
   log: string | null
+  precomputedHtml?: string
   loading: boolean
   emptyMessage: string
   phase: 'plan' | 'apply'
@@ -111,10 +113,11 @@ function LogPanel({
   const cleanLog = useMemo(() => (log ? stripStxEtx(log) : null), [log])
 
   const htmlContent = useMemo(() => {
+    if (precomputedHtml !== undefined) return precomputedHtml
     if (!cleanLog) return ''
     if (!colorMode) return ''
     return ansiConverter.toHtml(cleanLog)
-  }, [cleanLog, colorMode])
+  }, [cleanLog, colorMode, precomputedHtml])
 
   const plainContent = useMemo(() => {
     if (!cleanLog) return ''
@@ -284,8 +287,20 @@ export default function RunDetailPage() {
 
   const [planLog, setPlanLog] = useState<string | null>(null)
   const [applyLog, setApplyLog] = useState<string | null>(null)
+  const [planHtml, setPlanHtml] = useState('')
+  const [applyHtml, setApplyHtml] = useState('')
   const [planLogLoading, setPlanLogLoading] = useState(false)
   const [applyLogLoading, setApplyLogLoading] = useState(false)
+
+  // Offset tracking for incremental log fetching (byte position in raw log data)
+  const planLogOffset = useRef(0)
+  const applyLogOffset = useRef(0)
+  // Cached log-read-url to avoid re-fetching plan/apply object each cycle
+  const planLogUrl = useRef<string | null>(null)
+  const applyLogUrl = useRef<string | null>(null)
+  // Lock to prevent concurrent fetches from racing on offsets
+  const planFetchLock = useRef(false)
+  const applyFetchLock = useRef(false)
 
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
@@ -334,50 +349,103 @@ export default function RunDetailPage() {
     if (!run) return
     const status = run.attributes.status
     if (['planning', 'planned', 'confirmed', 'applying', 'applied', 'errored', 'canceled', 'discarded'].includes(status)) {
-      loadPlanLog()
+      setPlanLogLoading(prev => planLog === null ? true : prev)
+      loadPlanLog(true).finally(() => setPlanLogLoading(false))
     }
     if (['applying', 'applied', 'errored'].includes(status) && !run.attributes['plan-only']) {
-      loadApplyLog()
+      setApplyLogLoading(prev => applyLog === null ? true : prev)
+      loadApplyLog(true).finally(() => setApplyLogLoading(false))
     }
   }, [run?.id, run?.attributes.status])
 
-  async function loadPlanLog() {
-    setPlanLogLoading(true)
+  async function fetchLogUrl(phase: 'plan' | 'apply'): Promise<string | null> {
+    const urlRef = phase === 'plan' ? planLogUrl : applyLogUrl
+    if (urlRef.current) return urlRef.current
+    const endpoint = phase === 'plan' ? 'plan' : 'apply'
+    const res = await apiFetch(`/api/v2/runs/${runId}/${endpoint}`)
+    if (!res.ok) return null
+    const data = await res.json()
+    const obj = data.data as PlanApply
+    const url = obj.attributes['log-read-url']
+    if (url) urlRef.current = url
+    return url
+  }
+
+  async function loadPlanLog(reset = false) {
+    if (planFetchLock.current) return
+    planFetchLock.current = true
     try {
-      const res = await apiFetch(`/api/v2/runs/${runId}/plan`)
-      if (!res.ok) { setPlanLogLoading(false); return }
-      const data = await res.json()
-      const plan = data.data as PlanApply
-      if (plan.attributes['log-read-url']) {
-        const logRes = await fetch(plan.attributes['log-read-url'])
-        if (logRes.ok) {
-          setPlanLog(await logRes.text())
-        }
+      if (reset) {
+        planLogOffset.current = 0
+        planLogUrl.current = null
+      }
+      const url = await fetchLogUrl('plan')
+      if (!url) return
+      const offset = planLogOffset.current
+      const logRes = await fetch(`${url}?offset=${offset}`)
+      if (!logRes.ok) return
+      const buffer = await logRes.arrayBuffer()
+      if (buffer.byteLength === 0) return
+      const bytes = new Uint8Array(buffer)
+      let dataStart = 0
+      let dataEnd = bytes.length
+      if (offset === 0 && bytes.length > 0 && bytes[0] === 0x02) dataStart = 1
+      if (bytes.length > 0 && bytes[bytes.length - 1] === 0x03) dataEnd -= 1
+      const rawDataBytes = dataEnd - dataStart
+      if (rawDataBytes <= 0) return
+      planLogOffset.current += rawDataBytes
+      const chunk = new TextDecoder().decode(bytes.slice(dataStart, dataEnd))
+      const html = ansiConverter.toHtml(chunk)
+      if (reset || offset === 0) {
+        setPlanLog(chunk || null)
+        setPlanHtml(html)
+      } else {
+        setPlanLog(prev => (prev ?? '') + chunk)
+        setPlanHtml(prev => prev + html)
       }
     } catch {
       // Plan log not available yet
     } finally {
-      setPlanLogLoading(false)
+      planFetchLock.current = false
     }
   }
 
-  async function loadApplyLog() {
-    setApplyLogLoading(true)
+  async function loadApplyLog(reset = false) {
+    if (applyFetchLock.current) return
+    applyFetchLock.current = true
     try {
-      const res = await apiFetch(`/api/v2/runs/${runId}/apply`)
-      if (!res.ok) { setApplyLogLoading(false); return }
-      const data = await res.json()
-      const apply = data.data as PlanApply
-      if (apply.attributes['log-read-url']) {
-        const logRes = await fetch(apply.attributes['log-read-url'])
-        if (logRes.ok) {
-          setApplyLog(await logRes.text())
-        }
+      if (reset) {
+        applyLogOffset.current = 0
+        applyLogUrl.current = null
+      }
+      const url = await fetchLogUrl('apply')
+      if (!url) return
+      const offset = applyLogOffset.current
+      const logRes = await fetch(`${url}?offset=${offset}`)
+      if (!logRes.ok) return
+      const buffer = await logRes.arrayBuffer()
+      if (buffer.byteLength === 0) return
+      const bytes = new Uint8Array(buffer)
+      let dataStart = 0
+      let dataEnd = bytes.length
+      if (offset === 0 && bytes.length > 0 && bytes[0] === 0x02) dataStart = 1
+      if (bytes.length > 0 && bytes[bytes.length - 1] === 0x03) dataEnd -= 1
+      const rawDataBytes = dataEnd - dataStart
+      if (rawDataBytes <= 0) return
+      applyLogOffset.current += rawDataBytes
+      const chunk = new TextDecoder().decode(bytes.slice(dataStart, dataEnd))
+      const html = ansiConverter.toHtml(chunk)
+      if (reset || offset === 0) {
+        setApplyLog(chunk || null)
+        setApplyHtml(html)
+      } else {
+        setApplyLog(prev => (prev ?? '') + chunk)
+        setApplyHtml(prev => prev + html)
       }
     } catch {
       // Apply log not available yet
     } finally {
-      setApplyLogLoading(false)
+      applyFetchLock.current = false
     }
   }
 
@@ -479,7 +547,7 @@ export default function RunDetailPage() {
         {attrs['plan-only'] && attrs.source === 'tfe-api' && attrs['workspace-has-vcs'] && run.relationships?.['configuration-version']?.data && (
           <div className="mb-6 p-4 bg-cyan-900/20 rounded-lg border border-cyan-800/50">
             <p className="text-sm text-cyan-300">
-              This is a <strong>plan-only</strong> run initiated from the CLI on a VCS-connected workspace. Apply is not available for CLI-uploaded code &mdash; only VCS-managed code can be applied.
+              This is a <strong>plan-only</strong>{' '}run initiated from the CLI on a VCS-connected workspace. Apply is not available for CLI-uploaded code &mdash; only VCS-managed code can be applied.
             </p>
           </div>
         )}
@@ -695,12 +763,13 @@ export default function RunDetailPage() {
         {activeSection === 'plan' && (
           <LogPanel
             log={planLog}
+            precomputedHtml={planHtml}
             loading={planLogLoading}
             emptyMessage="No plan output available yet."
             phase="plan"
             runId={runId}
             isStreaming={attrs.status === 'planning'}
-            onRefresh={loadPlanLog}
+            onRefresh={() => loadPlanLog(true)}
           />
         )}
 
@@ -708,12 +777,13 @@ export default function RunDetailPage() {
         {activeSection === 'apply' && (
           <LogPanel
             log={applyLog}
+            precomputedHtml={applyHtml}
             loading={applyLogLoading}
             emptyMessage="No apply output available yet."
             phase="apply"
             runId={runId}
             isStreaming={attrs.status === 'applying'}
-            onRefresh={loadApplyLog}
+            onRefresh={() => loadApplyLog(true)}
           />
         )}
       </main>
