@@ -57,10 +57,10 @@ class TestComputeHealthConditions:
         assert conditions[0]["code"] == "state_diverged"
         assert conditions[0]["severity"] == "error"
 
-    def test_no_agent_pool_remote(self):
+    def test_no_agent_pool_agent_mode(self):
         from terrapod.api.routers.tfe_v2 import _compute_health_conditions
 
-        ws = _mock_workspace(execution_mode="remote", agent_pool_id=None)
+        ws = _mock_workspace(execution_mode="agent", agent_pool_id=None)
         conditions = _compute_health_conditions(ws)
         assert len(conditions) == 1
         assert conditions[0]["code"] == "no_agent_pool"
@@ -108,7 +108,7 @@ class TestComputeHealthConditions:
             state_diverged=True,
             vcs_last_error="403 Forbidden",
             drift_status="drifted",
-            execution_mode="remote",
+            execution_mode="agent",
             agent_pool_id=None,
         )
         conditions = _compute_health_conditions(ws)

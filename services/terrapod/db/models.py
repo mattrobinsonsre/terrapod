@@ -244,7 +244,7 @@ class Workspace(Base):
     name: Mapped[str] = mapped_column(String(90), nullable=False)
     execution_mode: Mapped[str] = mapped_column(
         String(20), nullable=False, default="local"
-    )  # local, remote, agent
+    )  # local, agent
     auto_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     execution_backend: Mapped[str] = mapped_column(
         String(20), nullable=False, default="tofu"

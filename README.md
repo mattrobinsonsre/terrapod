@@ -21,7 +21,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 |---|---|---|
 | Workspaces | Implemented | Isolate state, variables, and runs per workspace |
 | Remote State Management | Implemented | Versioned state storage with locking, rollback, encryption at rest via CSP services |
-| Remote Execution | Implemented | Plan/apply runs on the server via K8s Job-based runner infrastructure |
+| Agent Execution | Implemented | Plan/apply runs on the server via K8s Job-based runner infrastructure |
 | VCS Integration | Implemented | GitHub (App) and GitLab (access token); polling-first with optional webhooks |
 | Variables & Secrets | Implemented | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets |
 | RBAC | Implemented | Label-based role system with hierarchical workspace permissions (read/plan/write/admin) |
@@ -329,7 +329,7 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 | [Terrateam](https://terrateam.io/) | GitHub-integrated TF automation | GitHub-coupled; limited community edition |
 | [Spacelift](https://spacelift.io/) | Commercial TF management platform | Not open source |
 
-Terrapod is the only open-source project that covers the full TFE surface: state management, remote execution, private registry, RBAC, VCS integration, drift detection, and a production-grade UI -- all in a single self-hosted Kubernetes deployment.
+Terrapod is the only open-source project that covers the full TFE surface: state management, agent execution, private registry, RBAC, VCS integration, drift detection, and a production-grade UI -- all in a single self-hosted Kubernetes deployment.
 
 Terrapod is a single, self-hosted platform covering the full TFE surface (state + runs + registry + governance + UI + API) under a copyleft (GPLv3) license.
 

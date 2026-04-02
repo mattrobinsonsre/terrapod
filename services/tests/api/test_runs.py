@@ -429,7 +429,7 @@ class TestCLIApplyGuard:
         """Remote + VCS + plan_only=false → 422."""
         mock_resolve.return_value = "write"
         ws = _mock_workspace()
-        ws.execution_mode = "remote"
+        ws.execution_mode = "agent"
         ws.vcs_connection_id = uuid.uuid4()  # VCS-connected
 
         app, mock_db = _make_app(_user())
@@ -467,7 +467,7 @@ class TestCLIApplyGuard:
         """Remote + no VCS + plan_only=false → 201 (CLI-driven workflow)."""
         mock_resolve.return_value = "write"
         ws = _mock_workspace()
-        ws.execution_mode = "remote"
+        ws.execution_mode = "agent"
         ws.vcs_connection_id = None  # No VCS
 
         run = _mock_run(ws_id=ws.id, status="queued")
@@ -510,7 +510,7 @@ class TestCLIApplyGuard:
         """Remote + VCS + plan_only=true → 201 (plan is always allowed)."""
         mock_resolve.return_value = "plan"
         ws = _mock_workspace()
-        ws.execution_mode = "remote"
+        ws.execution_mode = "agent"
         ws.vcs_connection_id = uuid.uuid4()
 
         run = _mock_run(ws_id=ws.id, plan_only=True, status="queued")
@@ -555,7 +555,7 @@ class TestCLIApplyGuard:
         mock_get_run.return_value = run
 
         ws = _mock_workspace(ws_id=run.workspace_id)
-        ws.execution_mode = "remote"
+        ws.execution_mode = "agent"
         ws.vcs_connection_id = uuid.uuid4()
 
         app, mock_db = _make_app(_user())
@@ -586,7 +586,7 @@ class TestCLIApplyGuard:
         mock_confirm.return_value = confirmed
 
         ws = _mock_workspace(ws_id=run.workspace_id)
-        ws.execution_mode = "remote"
+        ws.execution_mode = "agent"
         ws.vcs_connection_id = None  # No VCS
 
         app, mock_db = _make_app(_user())

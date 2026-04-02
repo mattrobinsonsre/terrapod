@@ -20,7 +20,7 @@ def _mock_workspace(**overrides):
     ws.vcs_last_error_at = overrides.get("vcs_last_error_at", None)
     ws.locked = False
     ws.auto_apply = False
-    ws.execution_mode = "remote"
+    ws.execution_mode = "agent"
     ws.terraform_version = "1.11"
     ws.resource_cpu = "1"
     ws.resource_memory = "2Gi"

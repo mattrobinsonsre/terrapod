@@ -80,7 +80,7 @@ async def _join_listener(client, pool_id: str, join_token: str, name="test-liste
 async def _create_remote_workspace(
     client, pool_id: str, name: str, auto_apply: bool = False
 ) -> str:
-    """Create a remote-execution workspace tied to a pool, return ws_id."""
+    """Create an agent-execution workspace tied to a pool, return ws_id."""
     resp = await client.post(
         WS_ENDPOINT,
         json={
@@ -88,7 +88,7 @@ async def _create_remote_workspace(
                 "type": "workspaces",
                 "attributes": {
                     "name": name,
-                    "execution-mode": "remote",
+                    "execution-mode": "agent",
                     "agent-pool-id": pool_id,
                     "auto-apply": auto_apply,
                 },

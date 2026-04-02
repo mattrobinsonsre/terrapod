@@ -38,7 +38,7 @@ provider "terrapod" {
 ```hcl
 resource "terrapod_workspace" "example" {
   name              = "my-first-workspace"
-  execution_mode    = "remote"
+  execution_mode    = "agent"
   execution_backend = "tofu"
   auto_apply        = false
 

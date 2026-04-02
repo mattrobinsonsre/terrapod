@@ -283,7 +283,7 @@ The entrypoint script is at `docker/runner-entrypoint.sh`.
 
 ![Agent Pools](images/admin-agent-pools.png)
 
-All listeners follow the same flow — there is no "local" vs "remote" distinction:
+All listeners follow the same flow — there is no distinction between pool types:
 
 1. An admin creates an **agent pool** via the API (e.g. "production", "dev")
 2. An admin generates a **join token** for the pool
