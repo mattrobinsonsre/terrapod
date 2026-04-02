@@ -255,7 +255,7 @@ async def _fetch_vcs_config(
     archive = _strip_top_level_dir(archive)
 
     cv = await run_service.create_configuration_version(
-        db, workspace_id=ws.id, source="tfe-api", auto_queue_runs=False
+        db, workspace_id=ws.id, source="vcs", auto_queue_runs=False
     )
     await db.flush()
 
@@ -285,21 +285,15 @@ async def create_run(
 
     ws = await _get_workspace(ws_id, db)
 
-    # CLI-initiated runs on VCS-connected remote workspaces: plan is allowed,
-    # apply is not — VCS is the source of truth. Non-VCS ("CLI-driven") remote
+    # CLI-initiated runs on VCS-connected agent workspaces: plan is allowed,
+    # apply is not — VCS is the source of truth. Non-VCS ("CLI-driven") agent
     # workspaces allow both plan and apply from the CLI.
-    # The guard only applies when a configuration version is being uploaded
-    # (CLI workflow). Runs without a CV (UI-queued, VCS, drift) get code from VCS.
+    # The guard fires when a configuration version is provided (CLI upload).
+    # Runs without a CV (UI-queued) will fetch code from VCS downstream.
     plan_only = attrs.get("plan-only", False)
-    source = attrs.get("source", "tfe-api")
     cv_data = relationships.get("configuration-version", {}).get("data", {})
     has_cv = bool(cv_data.get("id", "") if cv_data else "")
-    if (
-        ws.execution_mode == "agent"
-        and ws.vcs_connection_id is not None
-        and source not in ("vcs", "drift-detection")
-        and has_cv
-    ):
+    if ws.execution_mode == "agent" and ws.vcs_connection_id is not None and has_cv:
         if not plan_only:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -347,7 +341,7 @@ async def create_run(
         is_destroy=attrs.get("is-destroy", False),
         auto_apply=attrs.get("auto-apply"),
         plan_only=plan_only,
-        source=attrs.get("source", "tfe-api"),
+        source="tfe-api",
         terraform_version=attrs.get("terraform-version", ""),
         configuration_version_id=cv_uuid,
         created_by=user.email,
@@ -445,7 +439,13 @@ async def confirm_run(
 
     # Block apply for CLI-uploaded code on VCS-connected agent workspaces.
     # Destroy runs are exempt — they don't depend on uploaded code.
-    if run.source not in ("vcs", "drift-detection") and not run.is_destroy:
+    # Runs with vcs_commit_sha were fetched from VCS (UI-queued or poller)
+    # and are safe to apply even if source is "tfe-api".
+    if (
+        run.source not in ("vcs", "drift-detection")
+        and not run.is_destroy
+        and not run.vcs_commit_sha
+    ):
         ws = await db.get(Workspace, run.workspace_id)
         if ws and ws.execution_mode == "agent" and ws.vcs_connection_id is not None:
             raise HTTPException(
