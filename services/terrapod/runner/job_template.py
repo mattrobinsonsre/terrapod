@@ -175,7 +175,23 @@ def build_job_spec(
             },
         },
         "spec": {
-            "backoffLimit": 0,
+            "backoffLimit": 3,
+            "podFailurePolicy": {
+                "rules": [
+                    {
+                        "action": "FailJob",
+                        "onExitCodes": {
+                            "containerName": "runner",
+                            "operator": "NotIn",
+                            "values": [0],
+                        },
+                    },
+                    {
+                        "action": "Count",
+                        "onPodConditions": [{"type": "DisruptionTarget", "status": "True"}],
+                    },
+                ],
+            },
             "activeDeadlineSeconds": timeout_minutes * 60,
             "ttlSecondsAfterFinished": runner_config.ttl_seconds_after_finished,
             "template": {
