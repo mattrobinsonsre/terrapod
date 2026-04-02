@@ -25,9 +25,11 @@ WORKDIR /app
 # Copy dependency files
 COPY services/pyproject.toml services/poetry.lock* ./
 
-# Install dependencies into system Python (no virtualenv)
+# Install dependencies into system Python (no virtualenv), then remove Poetry
+# from site-packages so it doesn't end up in the runtime image (CVE-2026-34591).
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi --only main --no-root
+    && poetry install --no-interaction --no-ansi --only main --no-root \
+    && pip uninstall -y poetry
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM python:3.14-slim
