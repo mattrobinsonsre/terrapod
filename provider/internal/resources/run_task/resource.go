@@ -64,9 +64,16 @@ func (r *runTaskResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				Optional: true, Sensitive: true,
 				Description: "HMAC signing key (write-only).",
 			},
-			"has_hmac_key": schema.BoolAttribute{Computed: true, Description: "Whether an HMAC key is configured."},
-			"created_at":   schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
-			"updated_at":   schema.StringAttribute{Computed: true, Description: "Update timestamp."},
+			"has_hmac_key": schema.BoolAttribute{
+				Computed: true, Description: "Whether an HMAC key is configured.",
+			},
+			"created_at": schema.StringAttribute{
+				Computed: true, Description: "Creation timestamp.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"updated_at": schema.StringAttribute{
+				Computed: true, Description: "Update timestamp.",
+			},
 		},
 	}
 }

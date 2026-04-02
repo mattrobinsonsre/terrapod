@@ -71,9 +71,16 @@ func (r *notificationConfigResource) Schema(_ context.Context, _ resource.Schema
 				Optional: true, ElementType: types.StringType,
 				Description: "Email addresses (for email destination type).",
 			},
-			"has_token": schema.BoolAttribute{Computed: true, Description: "Whether a token is configured."},
-			"created_at": schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
-			"updated_at": schema.StringAttribute{Computed: true, Description: "Update timestamp."},
+			"has_token": schema.BoolAttribute{
+				Computed: true, Description: "Whether a token is configured.",
+			},
+			"created_at": schema.StringAttribute{
+				Computed: true, Description: "Creation timestamp.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"updated_at": schema.StringAttribute{
+				Computed: true, Description: "Update timestamp.",
+			},
 		},
 	}
 }

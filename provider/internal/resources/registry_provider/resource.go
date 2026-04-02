@@ -82,10 +82,21 @@ func (r *registryProviderResource) Schema(_ context.Context, _ resource.SchemaRe
 				Optional: true, ElementType: types.StringType,
 				Description: "Labels for RBAC evaluation.",
 			},
-			"namespace":   schema.StringAttribute{Computed: true, Description: "Namespace (always default)."},
-			"owner_email": schema.StringAttribute{Computed: true, Description: "Owner email."},
-			"created_at":  schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
-			"updated_at":  schema.StringAttribute{Computed: true, Description: "Update timestamp."},
+			"namespace": schema.StringAttribute{
+				Computed: true, Description: "Namespace (always default).",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"owner_email": schema.StringAttribute{
+				Computed: true, Description: "Owner email.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"created_at": schema.StringAttribute{
+				Computed: true, Description: "Creation timestamp.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"updated_at": schema.StringAttribute{
+				Computed: true, Description: "Update timestamp.",
+			},
 		},
 	}
 }

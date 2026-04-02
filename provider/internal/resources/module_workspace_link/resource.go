@@ -54,9 +54,16 @@ func (r *moduleWorkspaceLinkResource) Schema(_ context.Context, _ resource.Schem
 			},
 			"workspace_name": schema.StringAttribute{
 				Computed: true, Description: "Workspace name.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"created_at": schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
-			"created_by": schema.StringAttribute{Computed: true, Description: "Creator email."},
+			"created_at": schema.StringAttribute{
+				Computed: true, Description: "Creation timestamp.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"created_by": schema.StringAttribute{
+				Computed: true, Description: "Creator email.",
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 	}
 }
