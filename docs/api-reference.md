@@ -896,6 +896,18 @@ All module responses (show and list) include a `permissions` object:
 
 Create a version, then upload the tarball to the presigned URL returned in the response.
 
+### Workspace Links (Module Impact Analysis)
+
+```
+GET    /api/v2/organizations/{org}/registry-modules/private/default/{name}/{provider}/workspace-links
+POST   /api/v2/organizations/{org}/registry-modules/private/default/{name}/{provider}/workspace-links
+DELETE /api/v2/organizations/{org}/registry-modules/private/default/{name}/{provider}/workspace-links/{link_id}
+```
+
+**Required permission:** `admin` on the module (create/delete), `read` on the module (list).
+
+**Terraform provider resource:** `terrapod_module_workspace_link`
+
 ---
 
 ## Registry -- Providers

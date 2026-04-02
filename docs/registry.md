@@ -293,7 +293,25 @@ The key insight: the module download endpoint is intercepted at the registry lev
 
 ### Linking Workspaces
 
-Link workspaces to a module via the API or the web UI (on the module detail page):
+Link workspaces to a module via the Terraform provider, the API, or the web UI (on the module detail page).
+
+#### Terraform Provider
+
+```hcl
+resource "terrapod_module_workspace_link" "vpc_prod" {
+  module_name     = "vpc"
+  module_provider = "aws"
+  workspace_id    = terrapod_workspace.prod_infra.id
+}
+```
+
+Import existing links with composite ID `module_name/provider_name/link_uuid`:
+
+```zsh
+terraform import terrapod_module_workspace_link.vpc_prod vpc/aws/<link-uuid>
+```
+
+#### API
 
 ```zsh
 # Link a workspace

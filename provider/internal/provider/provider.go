@@ -20,6 +20,7 @@ import (
 	agentPoolRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/agent_pool"
 	agentPoolTokenRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/agent_pool_token"
 	gpgKeyRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/gpg_key"
+	moduleWorkspaceLinkRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_workspace_link"
 	notificationConfigRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/notification_configuration"
 	registryModuleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/registry_module"
 	registryProviderRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/registry_provider"
@@ -135,6 +136,7 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 		agentPoolTokenRes.NewResource,
 		registryModuleRes.NewResource,
 		registryProviderRes.NewResource,
+		moduleWorkspaceLinkRes.NewResource,
 		gpgKeyRes.NewResource,
 	}
 }
