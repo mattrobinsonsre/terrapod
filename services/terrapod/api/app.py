@@ -171,7 +171,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     register_periodic_task(
         "run_reconciler",
-        interval_seconds=10,
+        interval_seconds=2,
         handler=reconcile_runs,
         description="Drive run state transitions based on Job outcomes",
     )

@@ -8,7 +8,7 @@ The API owns all run lifecycle state. The reconciler:
 5. Publishes stream_logs events for live log streaming
 6. Detects stale runs (>1h with no Job status) and errors them
 
-Registered as a periodic task (10s interval) in app.py.
+Registered as a periodic task (2s interval) in app.py.
 """
 
 import uuid
@@ -70,7 +70,7 @@ async def _persist_live_log_if_missing(run: Run, phase: str) -> None:
 async def reconcile_runs() -> None:
     """Drive run state transitions based on Job outcomes.
 
-    This is the main entry point, called every 30s by the scheduler.
+    This is the main entry point, called every 2s by the scheduler.
     """
     async with get_db_session() as db:
         # Find runs in planning/applying with job_name set
