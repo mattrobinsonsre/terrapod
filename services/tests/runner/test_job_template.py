@@ -105,6 +105,55 @@ class TestVarFilesInjection:
         env_names = {e["name"] for e in container["env"]}
         assert "TP_VAR_FILES" not in env_names
 
+
+class TestPodFailurePolicy:
+    """Verify pod failure policy prevents retries after container execution."""
+
+    def _build_default_spec(self):
+        from terrapod.runner.job_template import build_job_spec
+
+        return build_job_spec(
+            run_id="abc123",
+            phase="plan",
+            runner_config=_runner_config(),
+            auth_secret_name="tprun-abc12345-auth",
+            env_vars=[],
+            terraform_vars=[],
+        )
+
+    def test_backoff_limit(self):
+        """backoffLimit should be 3 to allow retries for pod disruptions."""
+        spec = self._build_default_spec()
+        assert spec["spec"]["backoffLimit"] == 3
+
+    def test_container_exit_fails_job(self):
+        """First rule: any non-zero container exit → FailJob (no retry)."""
+        spec = self._build_default_spec()
+        rules = spec["spec"]["podFailurePolicy"]["rules"]
+        rule = rules[0]
+        assert rule["action"] == "FailJob"
+        assert rule["onExitCodes"]["containerName"] == "runner"
+        assert rule["onExitCodes"]["operator"] == "NotIn"
+        assert rule["onExitCodes"]["values"] == [0]
+
+    def test_disruption_counted(self):
+        """Second rule: DisruptionTarget → Count toward backoffLimit."""
+        spec = self._build_default_spec()
+        rules = spec["spec"]["podFailurePolicy"]["rules"]
+        rule = rules[1]
+        assert rule["action"] == "Count"
+        assert rule["onPodConditions"] == [{"type": "DisruptionTarget", "status": "True"}]
+
+    def test_exit_rule_before_disruption_rule(self):
+        """Exit rule must be evaluated before disruption rule."""
+        spec = self._build_default_spec()
+        rules = spec["spec"]["podFailurePolicy"]["rules"]
+        assert len(rules) == 2
+        assert "onExitCodes" in rules[0]
+        assert "onPodConditions" in rules[1]
+
+
+class TestAuthTokenInjection:
     def test_auth_token_from_secret_ref(self):
         """TP_AUTH_TOKEN should use secretKeyRef, not a plain value."""
         from terrapod.runner.job_template import build_job_spec
