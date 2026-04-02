@@ -197,11 +197,11 @@ tofu apply
 
 State is uploaded to Terrapod after a successful apply. You can view state versions in the web UI under the workspace's **State** tab.
 
-### Remote Execution Mode
+### Agent Execution Mode
 
-For remote execution, the runner listener creates a K8s Job that runs tofu (or terraform) on the server.
+For agent execution, the runner listener creates a K8s Job that runs tofu (or terraform) on the server via an agent pool.
 
-Remote workspaces support two workflows depending on whether VCS is connected:
+Agent workspaces support two workflows depending on whether VCS is connected:
 
 **VCS-connected workspaces** — VCS is the source of truth. CLI can only plan; applies must come through VCS.
 
@@ -214,7 +214,7 @@ Remote workspaces support two workflows depending on whether VCS is connected:
 | VCS push to tracked branch | Full plan + apply | N/A |
 | VCS pull request / merge request | Speculative plan-only | N/A |
 
-1. Set the workspace execution mode to `remote`:
+1. Set the workspace execution mode to `agent`:
 
 ```zsh
 curl -X PATCH https://terrapod.local/api/v2/workspaces/ws-{id} \
@@ -224,7 +224,7 @@ curl -X PATCH https://terrapod.local/api/v2/workspaces/ws-{id} \
     "data": {
       "type": "workspaces",
       "attributes": {
-        "execution-mode": "remote"
+        "execution-mode": "agent"
       }
     }
   }'

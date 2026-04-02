@@ -288,7 +288,7 @@ export default function WorkspacesPage() {
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 >
                   <option value="local">Local</option>
-                  <option value="remote">Remote</option>
+                  <option value="agent">Agent</option>
                 </select>
               </div>
               <div>
@@ -350,7 +350,7 @@ export default function WorkspacesPage() {
                 />
                 <p className="mt-1 text-xs text-slate-500">e.g. 2Gi, 512Mi, 1Ti</p>
               </div>
-              {newExecMode === 'remote' && (
+              {newExecMode === 'agent' && (
               <div>
                 <label htmlFor="ws-pool" className="block text-sm font-medium text-slate-300 mb-1">Agent Pool</label>
                 <select

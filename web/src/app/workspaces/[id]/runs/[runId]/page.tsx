@@ -475,11 +475,11 @@ export default function RunDetailPage() {
           </div>
         )}
 
-        {/* Remote plan-only indicator for CLI-sourced runs on VCS-connected workspaces */}
+        {/* Agent plan-only indicator for CLI-sourced runs on VCS-connected workspaces */}
         {attrs['plan-only'] && attrs.source === 'tfe-api' && attrs['workspace-has-vcs'] && run.relationships?.['configuration-version']?.data && (
           <div className="mb-6 p-4 bg-cyan-900/20 rounded-lg border border-cyan-800/50">
             <p className="text-sm text-cyan-300">
-              This is a <strong>plan-only</strong> remote run initiated from the CLI on a VCS-connected workspace. Apply is not available for CLI-uploaded code &mdash; only VCS-managed code can be applied.
+              This is a <strong>plan-only</strong> run initiated from the CLI on a VCS-connected workspace. Apply is not available for CLI-uploaded code &mdash; only VCS-managed code can be applied.
             </p>
           </div>
         )}

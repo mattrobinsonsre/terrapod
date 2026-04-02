@@ -206,7 +206,7 @@ POST /api/v2/organizations/{org}/workspaces
     "attributes": {
       "name": "my-workspace",
       "auto-apply": false,
-      "execution-mode": "remote",
+      "execution-mode": "agent",
       "terraform-version": "1.9.8",
       "resource-cpu": "1",
       "resource-memory": "2Gi",

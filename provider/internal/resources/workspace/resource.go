@@ -51,7 +51,7 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Required:    true,
 			},
 			"execution_mode": schema.StringAttribute{
-				Description: "Execution mode: local, remote, or agent.",
+				Description: "Execution mode: local or agent.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString("local"),

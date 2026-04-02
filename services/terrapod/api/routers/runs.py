@@ -295,7 +295,7 @@ async def create_run(
     cv_data = relationships.get("configuration-version", {}).get("data", {})
     has_cv = bool(cv_data.get("id", "") if cv_data else "")
     if (
-        ws.execution_mode == "remote"
+        ws.execution_mode == "agent"
         and ws.vcs_connection_id is not None
         and source not in ("vcs", "drift-detection")
         and has_cv
@@ -303,7 +303,7 @@ async def create_run(
         if not plan_only:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Apply is not allowed from the CLI on VCS-connected remote workspaces. "
+                detail="Apply is not allowed from the CLI on VCS-connected agent workspaces. "
                 "Use 'tofu plan' for speculative plans, or trigger applies via VCS integration and/or the UI.",
             )
         plan_only = True
@@ -443,14 +443,14 @@ async def confirm_run(
     run = await _get_run(run_id, db)
     await _require_run_ws_permission(run, "write", user, db)
 
-    # Block apply for CLI-uploaded code on VCS-connected remote workspaces.
+    # Block apply for CLI-uploaded code on VCS-connected agent workspaces.
     # Destroy runs are exempt — they don't depend on uploaded code.
     if run.source not in ("vcs", "drift-detection") and not run.is_destroy:
         ws = await db.get(Workspace, run.workspace_id)
-        if ws and ws.execution_mode == "remote" and ws.vcs_connection_id is not None:
+        if ws and ws.execution_mode == "agent" and ws.vcs_connection_id is not None:
             raise HTTPException(
                 status_code=422,
-                detail="Apply is not supported for CLI-uploaded code on VCS-connected remote workspaces. "
+                detail="Apply is not supported for CLI-uploaded code on VCS-connected agent workspaces. "
                 "Only VCS-managed code can be applied on VCS-connected workspaces.",
             )
 

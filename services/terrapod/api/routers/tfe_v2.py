@@ -429,13 +429,13 @@ def _compute_health_conditions(ws: Workspace) -> list[dict]:
             }
         )
 
-    if ws.execution_mode == "remote" and not ws.agent_pool_id:
+    if ws.execution_mode == "agent" and not ws.agent_pool_id:
         conditions.append(
             {
                 "code": "no_agent_pool",
                 "severity": "warning",
                 "title": "No agent pool assigned",
-                "detail": "This workspace is in remote execution mode but has no agent pool. "
+                "detail": "This workspace is in agent execution mode but has no agent pool. "
                 "Runs will be queued indefinitely because no runner can claim them.",
             }
         )
@@ -504,7 +504,7 @@ def _workspace_json(
                 "name": ws.name,
                 "auto-apply": ws.auto_apply,
                 "execution-mode": ws.execution_mode,
-                "operations": ws.execution_mode == "remote",
+                "operations": ws.execution_mode == "agent",
                 "execution-backend": ws.execution_backend,
                 "terraform-version": ws.terraform_version or "",
                 "working-directory": ws.working_directory,
@@ -687,9 +687,16 @@ async def create_workspace(
 
         agent_pool_id = _uuid.UUID(str(pool_val).removeprefix("apool-"))
 
+    execution_mode = attrs.get("execution-mode", "local")
+    if execution_mode not in ("local", "agent"):
+        raise HTTPException(
+            status_code=422,
+            detail="execution-mode must be 'local' or 'agent'",
+        )
+
     ws = Workspace(
         name=name,
-        execution_mode=attrs.get("execution-mode", "local"),
+        execution_mode=execution_mode,
         auto_apply=attrs.get("auto-apply", False),
         execution_backend=attrs.get("execution-backend", settings.default_execution_backend),
         terraform_version=attrs.get("terraform-version", settings.default_terraform_version),
@@ -818,6 +825,11 @@ async def update_workspace(
         ws.owner_email = attrs["owner-email"]
 
     if "execution-mode" in attrs:
+        if attrs["execution-mode"] not in ("local", "agent"):
+            raise HTTPException(
+                status_code=422,
+                detail="execution-mode must be 'local' or 'agent'",
+            )
         ws.execution_mode = attrs["execution-mode"]
     if "auto-apply" in attrs:
         ws.auto_apply = attrs["auto-apply"]

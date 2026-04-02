@@ -278,7 +278,7 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/workspace
       "type": "workspaces",
       "attributes": {
         "name": "my-infra",
-        "execution-mode": "remote",
+        "execution-mode": "agent",
         "auto-apply": false,
         "vcs-repo-url": "https://github.com/my-org/my-infra-repo",
         "vcs-branch": "main",

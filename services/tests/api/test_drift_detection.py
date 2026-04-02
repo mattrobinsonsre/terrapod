@@ -29,7 +29,7 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.id = ws_id or uuid.uuid4()
     ws.name = name
     ws.auto_apply = False
-    ws.execution_mode = "remote"
+    ws.execution_mode = "agent"
     ws.terraform_version = "1.11"
     ws.working_directory = ""
     ws.locked = False
