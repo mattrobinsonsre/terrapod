@@ -371,6 +371,9 @@ if [ "$TP_PHASE" = "plan" ]; then
     if [ "${TP_REFRESH:-true}" = "false" ]; then
         PLAN_ARGS="$PLAN_ARGS -refresh=false"
     fi
+    if [ "${TP_DESTROY:-false}" = "true" ]; then
+        PLAN_ARGS="$PLAN_ARGS -destroy"
+    fi
     : > /tmp/plan.log
     "$TP_BIN" plan $PLAN_ARGS "$@" > /tmp/plan.log 2>&1 &
     CHILD_PID=$!

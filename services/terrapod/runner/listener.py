@@ -491,6 +491,7 @@ class RunnerListener:
             refresh_only=attrs.get("refresh-only", False),
             refresh=attrs.get("refresh", True),
             allow_empty_apply=attrs.get("allow-empty-apply", False),
+            is_destroy=attrs.get("is-destroy", False),
             working_directory=attrs.get("working-directory", ""),
         )
 

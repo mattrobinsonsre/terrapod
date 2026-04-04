@@ -538,7 +538,7 @@ export default function RunDetailPage() {
         {attrs['is-destroy'] && (
           <div className="mb-6 p-4 bg-red-900/20 rounded-lg border border-red-800/50">
             <p className="text-sm text-red-300">
-              This is a <strong>destroy</strong> run &mdash; all managed resources will be destroyed when applied.
+              This is a <strong>destroy</strong>{' '}run &mdash; all managed resources will be destroyed when applied.
             </p>
           </div>
         )}
