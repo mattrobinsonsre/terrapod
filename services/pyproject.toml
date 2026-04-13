@@ -29,7 +29,7 @@ sqlalchemy = {extras = ["asyncio"], version = "^2.0"}
 asyncpg = "^0.31.0"
 alembic = "^1.14.0"
 # Redis
-redis = "^7.2.1"
+redis = "^7.4.0"
 # Auth
 authlib = "^1.4.0"
 python3-saml = "^1.16.0"
