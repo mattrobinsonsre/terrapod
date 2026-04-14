@@ -123,6 +123,7 @@ def _mock_run(
     run.resource_cpu = "1"
     run.resource_memory = "2Gi"
     run.configuration_version_id = None
+    run.created_by = "test@example.com"
     return run
 
 

@@ -94,6 +94,7 @@ interface RunItem {
     'plan-only': boolean
     'is-destroy': boolean
     'created-at': string
+    'created-by': string
     'plan-started-at': string | null
     'apply-finished-at': string | null
     actions?: {
@@ -1953,6 +1954,7 @@ function WorkspaceDetailContent() {
                       <SortableHeader label="Status" sortKey="status" sortState={runSortState} onSort={toggleRunSort} />
                       <SortableHeader label="Type" sortKey="type" sortState={runSortState} onSort={toggleRunSort} className="hidden sm:table-cell" />
                       <SortableHeader label="Source" sortKey="source" sortState={runSortState} onSort={toggleRunSort} className="hidden sm:table-cell" />
+                      <SortableHeader label="Triggered By" sortKey="created-by" sortState={runSortState} onSort={toggleRunSort} className="hidden lg:table-cell" />
                       <SortableHeader label="Created" sortKey="created-at" sortState={runSortState} onSort={toggleRunSort} className="hidden md:table-cell" />
                     </tr>
                   </thead>
@@ -1994,6 +1996,9 @@ function WorkspaceDetailContent() {
                           ) : run.attributes.source === 'module-publish' ? (
                             <span className="text-purple-400">module publish</span>
                           ) : run.attributes.source}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-400 hidden lg:table-cell">
+                          {run.attributes['created-by'] || <span className="text-slate-600">&mdash;</span>}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">
                           {run.attributes['created-at'] ? new Date(run.attributes['created-at']).toLocaleString() : ''}

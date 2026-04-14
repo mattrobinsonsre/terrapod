@@ -65,6 +65,7 @@ def _mock_run(
     run.resource_memory = "2Gi"
     run.configuration_version_id = None
     run.module_overrides = None
+    run.created_by = "test@example.com"
     return run
 
 

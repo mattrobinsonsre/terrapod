@@ -41,6 +41,7 @@ interface RunAttrs {
   'workspace-has-vcs': boolean
   'module-overrides': Record<string, string> | null
   'status-timestamps': Record<string, string>
+  'created-by': string
   actions: RunActions
   permissions: Record<string, boolean>
 }
@@ -636,6 +637,12 @@ export default function RunDetailPage() {
               <dt className="text-xs text-slate-500">Plan Only</dt>
               <dd className="mt-1 text-sm text-slate-200">{attrs['plan-only'] ? 'Yes' : 'No'}</dd>
             </div>
+            {attrs['created-by'] && (
+              <div>
+                <dt className="text-xs text-slate-500">Triggered By</dt>
+                <dd className="mt-1 text-sm text-slate-200">{attrs['created-by']}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-xs text-slate-500">Created</dt>
               <dd className="mt-1 text-sm text-slate-200">{formatTimestamp(attrs['created-at'])}</dd>
