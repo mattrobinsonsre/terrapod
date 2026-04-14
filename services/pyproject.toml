@@ -9,9 +9,9 @@ packages = [{include = "terrapod"}]
 [tool.poetry.dependencies]
 python = "^3.13"
 fastapi = "^0.135.2"
-uvicorn = {extras = ["standard"], version = "^0.42.0"}
+uvicorn = {extras = ["standard"], version = ">=0.42,<0.45"}
 pydantic = "^2.10.0"
-pydantic-settings = "^2.7.0"
+pydantic-settings = "^2.13.1"
 structlog = "^25.5.0"
 httpx = "^0.28.0"
 pyyaml = "^6.0.0"
@@ -23,13 +23,13 @@ azure-storage-blob = "^12.25.0"
 azure-identity = "^1.21.0"
 # GCP Cloud Storage
 google-cloud-storage = "^3.9.0"
-gcloud-aio-storage = "^9.3.0"
+gcloud-aio-storage = "^9.6.4"
 # Database
 sqlalchemy = {extras = ["asyncio"], version = "^2.0"}
 asyncpg = "^0.31.0"
 alembic = "^1.14.0"
 # Redis
-redis = "^7.2.1"
+redis = "^7.4.0"
 # Auth
 authlib = "^1.4.0"
 python3-saml = "^1.16.0"
