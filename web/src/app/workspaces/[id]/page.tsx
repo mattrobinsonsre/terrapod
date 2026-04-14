@@ -318,7 +318,7 @@ function WorkspaceDetailContent() {
   const [deleteRtId, setDeleteRtId] = useState<string | null>(null)
 
   // Sorting for runs tab
-  type RunSortKey = 'id' | 'status' | 'type' | 'source' | 'created-at'
+  type RunSortKey = 'id' | 'status' | 'type' | 'source' | 'created-by' | 'created-at'
   const { sortedItems: sortedRuns, sortState: runSortState, toggleSort: toggleRunSort } = useSortable<RunItem, RunSortKey>(
     runs, 'created-at', 'desc',
     useCallback((item: RunItem, key: RunSortKey) => {
@@ -327,6 +327,7 @@ function WorkspaceDetailContent() {
         case 'status': return item.attributes.status
         case 'type': return item.attributes['is-destroy'] ? 'destroy' : item.attributes['plan-only'] ? 'plan only' : 'plan + apply'
         case 'source': return item.attributes.source
+        case 'created-by': return item.attributes['created-by'] || ''
         case 'created-at': return item.attributes['created-at']
       }
     }, []),
