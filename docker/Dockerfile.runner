@@ -3,7 +3,7 @@
 # No terraform/tofu binary baked in — downloaded at runtime from binary cache.
 # Includes signal-forwarding entrypoint for graceful spot instance termination.
 
-FROM alpine:3.23
+FROM alpine:3.23.3
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
 RUN apk upgrade --no-cache \
@@ -13,7 +13,8 @@ RUN apk upgrade --no-cache \
     jq \
     unzip \
     git \
-    openssh-client
+    openssh-client \
+    openssl
 
 COPY docker/runner-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
