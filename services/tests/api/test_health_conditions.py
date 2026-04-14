@@ -87,19 +87,37 @@ class TestComputeHealthConditions:
         from terrapod.api.routers.tfe_v2 import _compute_health_conditions
 
         ws = _mock_workspace(drift_status="drifted")
+        ws.drift_detection_enabled = True
         conditions = _compute_health_conditions(ws)
         assert len(conditions) == 1
         assert conditions[0]["code"] == "drifted"
         assert conditions[0]["severity"] == "warning"
 
+    def test_drifted_hidden_when_detection_disabled(self):
+        from terrapod.api.routers.tfe_v2 import _compute_health_conditions
+
+        ws = _mock_workspace(drift_status="drifted")
+        ws.drift_detection_enabled = False
+        conditions = _compute_health_conditions(ws)
+        assert conditions == []
+
     def test_drift_errored(self):
         from terrapod.api.routers.tfe_v2 import _compute_health_conditions
 
         ws = _mock_workspace(drift_status="errored")
+        ws.drift_detection_enabled = True
         conditions = _compute_health_conditions(ws)
         assert len(conditions) == 1
         assert conditions[0]["code"] == "drift_errored"
         assert conditions[0]["severity"] == "warning"
+
+    def test_drift_errored_hidden_when_detection_disabled(self):
+        from terrapod.api.routers.tfe_v2 import _compute_health_conditions
+
+        ws = _mock_workspace(drift_status="errored")
+        ws.drift_detection_enabled = False
+        conditions = _compute_health_conditions(ws)
+        assert conditions == []
 
     def test_multiple_conditions_simultaneously(self):
         from terrapod.api.routers.tfe_v2 import _compute_health_conditions
@@ -111,6 +129,7 @@ class TestComputeHealthConditions:
             execution_mode="agent",
             agent_pool_id=None,
         )
+        ws.drift_detection_enabled = True
         conditions = _compute_health_conditions(ws)
         codes = {c["code"] for c in conditions}
         assert codes == {"state_diverged", "no_agent_pool", "vcs_error", "drifted"}

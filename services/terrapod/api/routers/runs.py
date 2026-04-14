@@ -105,6 +105,7 @@ def _run_json(
                 },
                 "created-at": _rfc3339(run.created_at),
                 "updated-at": _rfc3339(run.updated_at),
+                "created-by": run.created_by or "",
                 "actions": {
                     "is-confirmable": run.status == "planned"
                     and not run.auto_apply

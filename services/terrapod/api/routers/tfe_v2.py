@@ -450,7 +450,7 @@ def _compute_health_conditions(ws: Workspace) -> list[dict]:
             }
         )
 
-    if ws.drift_status == "drifted":
+    if ws.drift_detection_enabled and ws.drift_status == "drifted":
         conditions.append(
             {
                 "code": "drifted",
@@ -461,7 +461,7 @@ def _compute_health_conditions(ws: Workspace) -> list[dict]:
             }
         )
 
-    if ws.drift_status == "errored":
+    if ws.drift_detection_enabled and ws.drift_status == "errored":
         conditions.append(
             {
                 "code": "drift_errored",
@@ -902,6 +902,10 @@ async def update_workspace(
             ws.agent_pool_id = _uuid.UUID(str(pool_val).removeprefix("apool-"))
     if "drift-detection-enabled" in attrs:
         ws.drift_detection_enabled = attrs["drift-detection-enabled"]
+        # Reset drift status when disabling drift detection
+        if not ws.drift_detection_enabled:
+            ws.drift_status = ""
+            ws.drift_last_checked_at = None
     if "drift-detection-interval-seconds" in attrs:
         ws.drift_detection_interval_seconds = _clamp_drift_interval(
             attrs["drift-detection-interval-seconds"]
