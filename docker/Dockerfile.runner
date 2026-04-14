@@ -6,7 +6,6 @@
 FROM alpine:3.23.3
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
-# CVE-2026-28390: OpenSSL NULL pointer dereference — explicitly upgrade to 3.5.6+
 RUN apk upgrade --no-cache \
     && apk add --no-cache \
     curl \
@@ -14,7 +13,8 @@ RUN apk upgrade --no-cache \
     jq \
     unzip \
     git \
-    openssh-client
+    openssh-client \
+    openssl
 
 COPY docker/runner-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
