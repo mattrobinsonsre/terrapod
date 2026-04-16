@@ -37,6 +37,7 @@ def _mock_role(name="dev-team", ws_perm="read"):
     role.deny_labels = {}
     role.deny_names = []
     role.workspace_permission = ws_perm
+    role.pool_permission = "read"
     role.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     role.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
     return role
@@ -90,6 +91,28 @@ class TestListRoles:
         assert admin_entry["attributes"]["built-in"] is True
         custom_entry = next(r for r in data if r["name"] == "custom-role")
         assert custom_entry["attributes"]["built-in"] is False
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_list_includes_pool_permission(self, *mocks):
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        role = _mock_role("pool-role")
+        role.pool_permission = "write"
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [role]
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/v2/roles", headers=_AUTH)
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        custom_entry = next(r for r in data if r["name"] == "pool-role")
+        assert custom_entry["attributes"]["pool-permission"] == "write"
+        # Built-in admin should have pool-permission: admin
+        admin_entry = next(r for r in data if r["name"] == "admin")
+        assert admin_entry["attributes"]["pool-permission"] == "admin"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -221,6 +244,59 @@ class TestCreateRole:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
+    async def test_create_with_pool_permission(self, *mocks):
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/roles",
+                json={
+                    "data": {
+                        "name": "pool-admin-role",
+                        "attributes": {
+                            "workspace-permission": "read",
+                            "pool-permission": "admin",
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_invalid_pool_permission_rejected(self, *mocks):
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/roles",
+                json={
+                    "data": {
+                        "name": "bad-pool",
+                        "attributes": {
+                            "workspace-permission": "read",
+                            "pool-permission": "superadmin",
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
     async def test_create_requires_admin(self, *mocks):
         user = _user(roles=["audit"])
         app, _ = _make_app(user)
@@ -268,6 +344,44 @@ class TestShowRole:
             resp = await c.get("/api/v2/roles/my-role", headers=_AUTH)
         assert resp.status_code == 200
         assert resp.json()["data"]["attributes"]["workspace-permission"] == "write"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_show_role_includes_pool_permission(self, *mocks):
+        role = _mock_role("pool-role")
+        role.pool_permission = "write"
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = role
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/v2/roles/pool-role", headers=_AUTH)
+        assert resp.status_code == 200
+        assert resp.json()["data"]["attributes"]["pool-permission"] == "write"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_show_builtin_admin_has_pool_permission_admin(self, *mocks):
+        app, _ = _make_app(_user(roles=["admin"]))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/v2/roles/admin", headers=_AUTH)
+        assert resp.status_code == 200
+        assert resp.json()["data"]["attributes"]["pool-permission"] == "admin"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_show_builtin_everyone_has_pool_permission_read(self, *mocks):
+        app, _ = _make_app(_user(roles=["admin"]))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/v2/roles/everyone", headers=_AUTH)
+        assert resp.status_code == 200
+        assert resp.json()["data"]["attributes"]["pool-permission"] == "read"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

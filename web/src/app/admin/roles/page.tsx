@@ -20,6 +20,7 @@ interface Role {
     description: string
     'built-in': boolean
     'workspace-permission': string | null
+    'pool-permission': string | null
     'allow-labels': Record<string, string>
     'allow-names': string[]
     'deny-labels': Record<string, string>
@@ -64,6 +65,7 @@ export default function RolesPage() {
   const [roleAllowLabels, setRoleAllowLabels] = useState('')
   const [roleAllowNames, setRoleAllowNames] = useState('')
   const [roleDenyLabels, setRoleDenyLabels] = useState('')
+  const [rolePoolPermission, setRolePoolPermission] = useState('read')
   const [roleDenyNames, setRoleDenyNames] = useState('')
   const [creatingRole, setCreatingRole] = useState(false)
 
@@ -74,6 +76,7 @@ export default function RolesPage() {
   const [editRoleAllowLabels, setEditRoleAllowLabels] = useState('')
   const [editRoleAllowNames, setEditRoleAllowNames] = useState('')
   const [editRoleDenyLabels, setEditRoleDenyLabels] = useState('')
+  const [editRolePoolPermission, setEditRolePoolPermission] = useState('read')
   const [editRoleDenyNames, setEditRoleDenyNames] = useState('')
   const [savingRole, setSavingRole] = useState(false)
 
@@ -176,6 +179,7 @@ export default function RolesPage() {
         name: roleName,
         description: roleDesc,
         'workspace-permission': rolePermission,
+        'pool-permission': rolePoolPermission,
       }
       if (roleAllowLabels.trim()) attrs['allow-labels'] = parseLabels(roleAllowLabels)
       if (roleAllowNames.trim()) attrs['allow-names'] = roleAllowNames.split(',').map((s) => s.trim()).filter(Boolean)
@@ -195,6 +199,7 @@ export default function RolesPage() {
       setRoleName('')
       setRoleDesc('')
       setRolePermission('read')
+      setRolePoolPermission('read')
       setRoleAllowLabels('')
       setRoleAllowNames('')
       setRoleDenyLabels('')
@@ -212,6 +217,7 @@ export default function RolesPage() {
     setEditingRole(role.name)
     setEditRoleDesc(role.attributes.description || '')
     setEditRolePermission(role.attributes['workspace-permission'] || 'read')
+    setEditRolePoolPermission(role.attributes['pool-permission'] || 'read')
     setEditRoleAllowLabels(formatLabels(role.attributes['allow-labels'] || {}))
     setEditRoleAllowNames((role.attributes['allow-names'] || []).join(', '))
     setEditRoleDenyLabels(formatLabels(role.attributes['deny-labels'] || {}))
@@ -227,6 +233,7 @@ export default function RolesPage() {
       const attrs: Record<string, unknown> = {
         description: editRoleDesc,
         'workspace-permission': editRolePermission,
+        'pool-permission': editRolePoolPermission,
         'allow-labels': parseLabels(editRoleAllowLabels),
         'allow-names': editRoleAllowNames.split(',').map((s) => s.trim()).filter(Boolean),
         'deny-labels': parseLabels(editRoleDenyLabels),
@@ -384,7 +391,7 @@ export default function RolesPage() {
 
             {showCreateRole && (
               <form onSubmit={handleCreateRole} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <div>
                     <label htmlFor="r-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
                     <input id="r-name" type="text" value={roleName} onChange={(e) => setRoleName(e.target.value)} required placeholder="developer"
@@ -403,10 +410,19 @@ export default function RolesPage() {
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="r-desc" className="block text-sm font-medium text-slate-300 mb-1">Description</label>
-                    <input id="r-desc" type="text" value={roleDesc} onChange={(e) => setRoleDesc(e.target.value)} placeholder="Developer access"
-                      className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                    <label htmlFor="r-pool-perm" className="block text-sm font-medium text-slate-300 mb-1">Pool Permission</label>
+                    <select id="r-pool-perm" value={rolePoolPermission} onChange={(e) => setRolePoolPermission(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                      <option value="read">read</option>
+                      <option value="write">write</option>
+                      <option value="admin">admin</option>
+                    </select>
                   </div>
+                </div>
+                <div>
+                  <label htmlFor="r-desc" className="block text-sm font-medium text-slate-300 mb-1">Description</label>
+                  <input id="r-desc" type="text" value={roleDesc} onChange={(e) => setRoleDesc(e.target.value)} placeholder="Developer access"
+                    className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -466,11 +482,20 @@ export default function RolesPage() {
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                             </div>
                             <div>
-                              <label className="block text-xs text-slate-500 mb-1">Permission</label>
+                              <label className="block text-xs text-slate-500 mb-1">Workspace Permission</label>
                               <select value={editRolePermission} onChange={(e) => setEditRolePermission(e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
                                 <option value="read">read</option>
                                 <option value="plan">plan</option>
+                                <option value="write">write</option>
+                                <option value="admin">admin</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-500 mb-1">Pool Permission</label>
+                              <select value={editRolePoolPermission} onChange={(e) => setEditRolePoolPermission(e.target.value)}
+                                className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                                <option value="read">read</option>
                                 <option value="write">write</option>
                                 <option value="admin">admin</option>
                               </select>
@@ -507,7 +532,12 @@ export default function RolesPage() {
                               )}
                               {a['workspace-permission'] && (
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${permissionBadge(a['workspace-permission'])}`}>
-                                  {a['workspace-permission']}
+                                  ws: {a['workspace-permission']}
+                                </span>
+                              )}
+                              {a['pool-permission'] && a['pool-permission'] !== 'read' && (
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${permissionBadge(a['pool-permission'])}`}>
+                                  pool: {a['pool-permission']}
                                 </span>
                               )}
                             </div>

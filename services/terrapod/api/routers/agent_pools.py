@@ -21,6 +21,7 @@ Endpoints:
 
 import asyncio
 import json
+import re
 import uuid
 from datetime import UTC
 
@@ -38,6 +39,12 @@ from terrapod.api.dependencies import (
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service
+from terrapod.services.pool_rbac_service import (
+    POOL_PERMISSION_HIERARCHY,
+    fetch_custom_roles,
+    has_pool_permission,
+    resolve_pool_permission,
+)
 
 router = APIRouter(prefix="/api/v2", tags=["agent-pools"])
 logger = get_logger(__name__)
@@ -49,15 +56,60 @@ def _rfc3339(dt) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _pool_json(pool, listener_summary: dict | None = None) -> dict:
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _validate_owner_email(email: str | None) -> str | None:
+    """Validate owner_email looks like an email address. Returns the email or raises 422."""
+    if not email:
+        return None
+    if not _EMAIL_RE.match(email):
+        raise HTTPException(status_code=422, detail="owner-email must be a valid email address")
+    return email
+
+
+_MAX_LABELS = 50
+_MAX_LABEL_KEY_LEN = 63
+_MAX_LABEL_VALUE_LEN = 255
+
+
+def _validate_labels(labels: dict | None) -> dict:
+    """Validate labels are string key-value pairs within size limits."""
+    if not labels:
+        return {}
+    if not isinstance(labels, dict):
+        raise HTTPException(status_code=422, detail="labels must be an object")
+    if len(labels) > _MAX_LABELS:
+        raise HTTPException(status_code=422, detail=f"labels cannot exceed {_MAX_LABELS} entries")
+    clean: dict[str, str] = {}
+    for k, v in labels.items():
+        if not isinstance(k, str) or not isinstance(v, str):
+            raise HTTPException(status_code=422, detail="label keys and values must be strings")
+        if len(k) > _MAX_LABEL_KEY_LEN:
+            raise HTTPException(
+                status_code=422, detail=f"label key exceeds {_MAX_LABEL_KEY_LEN} characters"
+            )
+        if len(v) > _MAX_LABEL_VALUE_LEN:
+            raise HTTPException(
+                status_code=422, detail=f"label value exceeds {_MAX_LABEL_VALUE_LEN} characters"
+            )
+        clean[k] = v
+    return clean
+
+
+def _pool_json(pool, listener_summary: dict | None = None, permission: str | None = None) -> dict:
     attrs: dict = {
         "name": pool.name,
         "description": pool.description or "",
+        "labels": pool.labels or {},
+        "owner-email": pool.owner_email or None,
         "created-at": _rfc3339(pool.created_at),
         "updated-at": _rfc3339(pool.updated_at),
     }
     if listener_summary is not None:
         attrs["listener-summary"] = listener_summary
+    if permission is not None:
+        attrs["permission"] = permission
     return {
         "id": f"apool-{pool.id}",
         "type": "agent-pools",
@@ -121,6 +173,29 @@ async def _get_pool(pool_id: str, db: AsyncSession):
     return pool
 
 
+async def _require_pool_permission(
+    pool, user: AuthenticatedUser, db: AsyncSession, required: str
+) -> str:
+    """Resolve user's pool permission and require at least `required` level.
+
+    Returns the effective permission. Raises 404 if no access, 403 if
+    insufficient.
+    """
+    perm = await resolve_pool_permission(
+        db,
+        user_email=user.email,
+        user_roles=user.roles,
+        pool_name=pool.name,
+        pool_labels=pool.labels or {},
+        owner_email=pool.owner_email or "",
+    )
+    if perm is None:
+        raise HTTPException(status_code=404, detail="Agent pool not found")
+    if not has_pool_permission(perm, required):
+        raise HTTPException(status_code=403, detail=f"Requires {required} permission on pool")
+    return perm
+
+
 # ── Agent Pools ──────────────────────────────────────────────────────────
 
 
@@ -129,16 +204,29 @@ async def list_pools(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """List all agent pools."""
+    """List agent pools visible to the current user (RBAC-filtered)."""
     pools = await agent_pool_service.list_pools(db)
+    # Pre-fetch custom roles once to avoid N+1 queries
+    custom_roles = await fetch_custom_roles(db, user.roles)
     result = []
     for p in pools:
+        perm = await resolve_pool_permission(
+            db,
+            user_email=user.email,
+            user_roles=user.roles,
+            pool_name=p.name,
+            pool_labels=p.labels or {},
+            owner_email=p.owner_email or "",
+            preloaded_roles=custom_roles,
+        )
+        if perm is None:
+            continue
         listeners = await agent_pool_service.list_listeners(p.id)
         summary = {
             "total": len(listeners),
             "online": sum(1 for lis in listeners if lis.get("status") == "online"),
         }
-        result.append(_pool_json(p, listener_summary=summary))
+        result.append(_pool_json(p, listener_summary=summary, permission=perm))
     return JSONResponse(content={"data": result})
 
 
@@ -159,11 +247,13 @@ async def create_pool(
         db,
         name=name,
         description=attrs.get("description", ""),
+        labels=_validate_labels(attrs.get("labels")),
+        owner_email=_validate_owner_email(attrs.get("owner-email")) or user.email,
     )
     await db.commit()
     await db.refresh(pool)
 
-    return JSONResponse(content={"data": _pool_json(pool)}, status_code=201)
+    return JSONResponse(content={"data": _pool_json(pool, permission="admin")}, status_code=201)
 
 
 @router.get("/agent-pools/{pool_id}")
@@ -172,47 +262,103 @@ async def show_pool(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Show an agent pool."""
+    """Show an agent pool (requires read permission)."""
     pool = await _get_pool(pool_id, db)
+    perm = await _require_pool_permission(pool, user, db, "read")
     listeners = await agent_pool_service.list_listeners(pool.id)
     summary = {
         "total": len(listeners),
         "online": sum(1 for lis in listeners if lis.get("status") == "online"),
     }
-    return JSONResponse(content={"data": _pool_json(pool, listener_summary=summary)})
+    return JSONResponse(
+        content={"data": _pool_json(pool, listener_summary=summary, permission=perm)}
+    )
 
 
 @router.patch("/agent-pools/{pool_id}")
 async def update_pool(
     pool_id: str = Path(...),
     body: dict = Body(...),
-    user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Update an agent pool (admin only)."""
+    """Update an agent pool (requires admin permission on pool)."""
     pool = await _get_pool(pool_id, db)
+    perm = await _require_pool_permission(pool, user, db, "admin")
 
     attrs = body.get("data", {}).get("attributes", {})
+
+    # Distinguish "key absent" (don't change) from "key present with null/empty" (clear it).
+    # Use _UNSET sentinel so we can detect when a key was not provided at all.
+    _UNSET = object()
+
+    owner_arg = _UNSET
+    if "owner-email" in attrs:
+        raw_owner = attrs["owner-email"]
+        owner_arg = _validate_owner_email(raw_owner) if raw_owner else ""
+
+    labels_arg = _UNSET
+    if "labels" in attrs:
+        labels_arg = _validate_labels(attrs["labels"]) if attrs["labels"] else {}
+
+    # Self-lockout check: warn if label/owner change would reduce user's access.
+    # Platform admins are immune (their access doesn't depend on labels/owner).
+    if "admin" not in set(user.roles) and not attrs.get("force"):
+        new_labels = labels_arg if labels_arg is not _UNSET else (pool.labels or {})
+        new_owner = (owner_arg or None) if owner_arg is not _UNSET else pool.owner_email
+        if new_labels != (pool.labels or {}) or new_owner != pool.owner_email:
+            new_perm = await resolve_pool_permission(
+                db,
+                user_email=user.email,
+                user_roles=user.roles,
+                pool_name=attrs.get("name") or pool.name,
+                pool_labels=new_labels,
+                owner_email=new_owner or "",
+            )
+            if new_perm is None or POOL_PERMISSION_HIERARCHY.get(
+                new_perm, -1
+            ) < POOL_PERMISSION_HIERARCHY.get(perm, -1):
+                new_level = new_perm or "none"
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "errors": [
+                            {
+                                "status": "409",
+                                "title": "Label/owner change would reduce your access",
+                                "detail": (
+                                    f"This change would reduce your access from "
+                                    f"{perm} to {new_level} on this pool. "
+                                    f'Re-submit with "force": true to confirm.'
+                                ),
+                            }
+                        ]
+                    },
+                )
+
     pool = await agent_pool_service.update_pool(
         db,
         pool,
         name=attrs.get("name"),
         description=attrs.get("description"),
+        labels=labels_arg if labels_arg is not _UNSET else None,
+        owner_email=owner_arg if owner_arg is not _UNSET else None,
     )
     await db.commit()
     await db.refresh(pool)
 
-    return JSONResponse(content={"data": _pool_json(pool)})
+    return JSONResponse(content={"data": _pool_json(pool, permission="admin")})
 
 
 @router.delete("/agent-pools/{pool_id}", status_code=204)
 async def delete_pool(
     pool_id: str = Path(...),
-    user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    """Delete an agent pool (admin only)."""
+    """Delete an agent pool (requires admin permission on pool)."""
     pool = await _get_pool(pool_id, db)
+    await _require_pool_permission(pool, user, db, "admin")
     # Clean up all listener Redis keys for this pool before DB delete
     await agent_pool_service.delete_pool_listeners(pool.id)
     await agent_pool_service.delete_pool(db, pool)
@@ -225,11 +371,12 @@ async def delete_pool(
 @router.get("/agent-pools/{pool_id}/tokens")
 async def list_pool_tokens(
     pool_id: str = Path(...),
-    user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """List join tokens for an agent pool."""
+    """List join tokens for an agent pool (requires admin on pool)."""
     pool = await _get_pool(pool_id, db)
+    await _require_pool_permission(pool, user, db, "admin")
     tokens = await agent_pool_service.list_pool_tokens(db, pool.id)
     return JSONResponse(content={"data": [_token_json(t) for t in tokens]})
 
@@ -238,11 +385,12 @@ async def list_pool_tokens(
 async def create_pool_token(
     pool_id: str = Path(...),
     body: dict = Body(...),
-    user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Create a join token for an agent pool."""
+    """Create a join token for an agent pool (requires admin on pool)."""
     pool = await _get_pool(pool_id, db)
+    await _require_pool_permission(pool, user, db, "admin")
 
     attrs = body.get("data", {}).get("attributes", {})
 
@@ -266,11 +414,12 @@ async def create_pool_token(
 async def delete_pool_token(
     pool_id: str = Path(...),
     token_id: str = Path(...),
-    user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    """Delete/revoke a join token."""
+    """Delete/revoke a join token (requires admin on pool)."""
     pool = await _get_pool(pool_id, db)
+    await _require_pool_permission(pool, user, db, "admin")
     token_uuid = uuid.UUID(token_id.removeprefix("at-"))
 
     from sqlalchemy import select
@@ -387,8 +536,9 @@ async def list_pool_listeners(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """List listeners for an agent pool."""
+    """List listeners for an agent pool (requires read permission)."""
     pool = await _get_pool(pool_id, db)
+    await _require_pool_permission(pool, user, db, "read")
     listeners = await agent_pool_service.list_listeners(pool.id)
     return JSONResponse(content={"data": [_listener_json(lis) for lis in listeners]})
 
@@ -408,11 +558,10 @@ async def pool_events(
     from terrapod.redis.client import POOL_EVENTS_PREFIX, subscribe_channel
 
     user = await authenticate_request(request)
-    if "admin" not in user.roles:
-        raise HTTPException(status_code=403, detail="Admin access required")
 
     async with get_db_session() as db:
         pool = await _get_pool(pool_id, db)
+        await _require_pool_permission(pool, user, db, "read")
         pool_uuid = str(pool.id)
 
     channel = f"{POOL_EVENTS_PREFIX}{pool_uuid}"
@@ -446,16 +595,29 @@ async def pool_events(
 @router.delete("/listeners/{listener_id}", status_code=204)
 async def delete_listener(
     listener_id: str = Path(...),
-    user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> None:
-    """Delete a listener (admin only)."""
+    """Delete a listener (requires admin permission on pool)."""
     l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
     listener = await agent_pool_service.get_listener(l_uuid)
     if listener is None:
         raise HTTPException(status_code=404, detail="Listener not found")
-    await agent_pool_service.delete_listener(
-        listener["id"], listener["name"], listener.get("pool_id", "")
-    )
+    # Resolve pool to check admin permission
+    pool_id_str = listener.get("pool_id", "")
+    if not pool_id_str:
+        # Orphaned listener — require platform admin to clean up
+        if "admin" not in set(user.roles):
+            raise HTTPException(status_code=403, detail="Admin access required")
+    else:
+        pool = await agent_pool_service.get_pool(db, uuid.UUID(pool_id_str))
+        if pool is None:
+            # Pool deleted but listener Redis key persists — require platform admin
+            if "admin" not in set(user.roles):
+                raise HTTPException(status_code=403, detail="Admin access required")
+        else:
+            await _require_pool_permission(pool, user, db, "admin")
+    await agent_pool_service.delete_listener(listener["id"], listener["name"], pool_id_str)
 
 
 # ── SSE Event Channel ────────────────────────────────────────────────────

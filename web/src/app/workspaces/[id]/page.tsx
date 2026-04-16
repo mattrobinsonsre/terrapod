@@ -65,7 +65,7 @@ interface WorkspaceAttrs {
 
 interface AgentPool {
   id: string
-  attributes: { name: string }
+  attributes: { name: string; permission?: string }
 }
 
 interface Workspace {
@@ -584,7 +584,8 @@ function WorkspaceDetailContent() {
     setEditing(true)
     if (!poolsLoaded) {
       apiFetch('/api/v2/organizations/default/agent-pools').then(res => res.ok ? res.json() : { data: [] }).then(data => {
-        setAgentPools(data.data || [])
+        const allPools: AgentPool[] = data.data || []
+        setAgentPools(allPools.filter(p => p.attributes.permission === 'write' || p.attributes.permission === 'admin'))
         setPoolsLoaded(true)
       }).catch(() => {})
     }

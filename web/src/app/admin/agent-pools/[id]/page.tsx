@@ -9,6 +9,7 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { ConnectionStatus } from '@/components/connection-status'
+import { LabelsEditor } from '@/components/labels-editor'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { usePoolEvents } from '@/lib/use-pool-events'
@@ -18,6 +19,9 @@ interface PoolAttrs {
   name: string
   description: string
   'is-default': boolean
+  labels: Record<string, string>
+  'owner-email': string
+  permission?: string
   'created-at': string
   'listener-summary'?: { total: number; online: number }
 }
@@ -68,6 +72,8 @@ export default function AgentPoolDetailPage() {
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editDesc, setEditDesc] = useState('')
+  const [editLabels, setEditLabels] = useState<Record<string, string>>({})
+  const [editOwner, setEditOwner] = useState('')
   const [saving, setSaving] = useState(false)
 
   // Delete pool
@@ -103,7 +109,6 @@ export default function AgentPoolDetailPage() {
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
-    if (!isAdmin()) { router.push('/'); return }
     loadPool()
   }, [router, loadPool])
 
@@ -153,6 +158,8 @@ export default function AgentPoolDetailPage() {
     if (!pool) return
     setEditName(pool.attributes.name)
     setEditDesc(pool.attributes.description || '')
+    setEditLabels(pool.attributes.labels || {})
+    setEditOwner(pool.attributes['owner-email'] || '')
     setEditing(true)
   }
 
@@ -170,6 +177,8 @@ export default function AgentPoolDetailPage() {
             attributes: {
               name: editName,
               description: editDesc,
+              labels: editLabels,
+              'owner-email': editOwner || null,
             },
           },
         }),
@@ -266,9 +275,12 @@ export default function AgentPoolDetailPage() {
     })
   }
 
+  const poolPerm = pool?.attributes.permission || 'read'
+  const isPoolAdmin = poolPerm === 'admin'
+
   const tabs: { key: Tab; label: string }[] = [
     { key: 'settings', label: 'Settings' },
-    { key: 'tokens', label: 'Tokens' },
+    ...(isPoolAdmin ? [{ key: 'tokens' as Tab, label: 'Tokens' }] : []),
     { key: 'listeners', label: 'Listeners' },
   ]
 
@@ -339,7 +351,7 @@ export default function AgentPoolDetailPage() {
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-slate-300">Pool Settings</h3>
-                {!editing ? (
+                {isPoolAdmin && (!editing ? (
                   <button onClick={startEditing} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
                 ) : (
                   <div className="flex gap-2">
@@ -348,7 +360,7 @@ export default function AgentPoolDetailPage() {
                       {saving ? 'Saving...' : 'Save'}
                     </button>
                   </div>
-                )}
+                ))}
               </div>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -375,10 +387,40 @@ export default function AgentPoolDetailPage() {
                   <dt className="text-xs text-slate-500">Created</dt>
                   <dd className="mt-1 text-sm text-slate-200">{formatDate(pool.attributes['created-at'])}</dd>
                 </div>
+                <div>
+                  <dt className="text-xs text-slate-500">Owner</dt>
+                  {editing ? (
+                    <input type="email" value={editOwner} onChange={(e) => setEditOwner(e.target.value)}
+                      placeholder="user@example.com"
+                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">{pool.attributes['owner-email'] || '-'}</dd>
+                  )}
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">Your Permission</dt>
+                  <dd className="mt-1">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      poolPerm === 'admin' ? 'bg-purple-900/50 text-purple-300' :
+                      poolPerm === 'write' ? 'bg-blue-900/50 text-blue-300' :
+                      'bg-slate-700/50 text-slate-300'
+                    }`}>{poolPerm}</span>
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-slate-500 mb-1">Labels</dt>
+                  <dd>
+                    <LabelsEditor
+                      labels={editing ? editLabels : (pool.attributes.labels || {})}
+                      onChange={editing ? setEditLabels : undefined}
+                      readOnly={!editing}
+                    />
+                  </dd>
+                </div>
               </dl>
             </div>
 
-            {!pool.attributes['is-default'] && (
+            {isPoolAdmin && !pool.attributes['is-default'] && (
               <div className="bg-slate-800/50 rounded-lg border border-red-900/30 p-6">
                 <div className="flex items-center justify-between">
                   <div>

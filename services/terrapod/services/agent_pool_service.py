@@ -25,11 +25,15 @@ async def create_pool(
     db: AsyncSession,
     name: str,
     description: str = "",
+    labels: dict | None = None,
+    owner_email: str | None = None,
 ) -> AgentPool:
     """Create a new agent pool."""
     pool = AgentPool(
         name=name,
         description=description,
+        labels=labels or {},
+        owner_email=owner_email,
     )
     db.add(pool)
     await db.flush()
@@ -59,12 +63,18 @@ async def update_pool(
     pool: AgentPool,
     name: str | None = None,
     description: str | None = None,
+    labels: dict | None = None,
+    owner_email: str | None = None,
 ) -> AgentPool:
     """Update an agent pool."""
     if name is not None:
         pool.name = name
     if description is not None:
         pool.description = description
+    if labels is not None:
+        pool.labels = labels
+    if owner_email is not None:
+        pool.owner_email = owner_email or None  # empty string clears
     await db.flush()
     return pool
 

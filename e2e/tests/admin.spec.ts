@@ -18,7 +18,8 @@ test.describe('Admin access control', () => {
     // Admin-only links should not be visible
     await expect(userPage.locator('nav >> text=Roles')).not.toBeVisible();
     await expect(userPage.locator('nav >> text=Users')).not.toBeVisible();
-    await expect(userPage.locator('nav >> text=Agent Pools')).not.toBeVisible();
+    // Agent Pools is visible to all users (RBAC-filtered server-side)
+    await expect(userPage.locator('nav >> text=Agent Pools')).toBeVisible();
   });
 
   test('admin can access roles page', async ({ adminPage }) => {

@@ -9,6 +9,7 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
+import { LabelsEditor } from '@/components/labels-editor'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
@@ -20,6 +21,9 @@ interface AgentPool {
     name: string
     description: string
     'is-default': boolean
+    labels: Record<string, string>
+    'owner-email': string
+    permission?: string
     'created-at': string
     'listener-summary'?: { total: number; online: number }
   }
@@ -37,6 +41,7 @@ export default function AgentPoolsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [createLabels, setCreateLabels] = useState<Record<string, string>>({})
   const [creating, setCreating] = useState(false)
 
   const poolAccessor = useCallback((item: AgentPool, key: PoolSortKey) => {
@@ -53,7 +58,6 @@ export default function AgentPoolsPage() {
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
-    if (!isAdmin()) { router.push('/'); return }
     loadPools()
   }, [router])
 
@@ -80,6 +84,7 @@ export default function AgentPoolsPage() {
     try {
       const attrs: Record<string, unknown> = { name }
       if (description) attrs.description = description
+      if (Object.keys(createLabels).length > 0) attrs.labels = createLabels
 
       const res = await apiFetch('/api/v2/organizations/default/agent-pools', {
         method: 'POST',
@@ -92,6 +97,7 @@ export default function AgentPoolsPage() {
       }
       setName('')
       setDescription('')
+      setCreateLabels({})
       setShowCreate(false)
       await loadPools()
     } catch (err) {
@@ -108,14 +114,14 @@ export default function AgentPoolsPage() {
         <PageHeader
           title="Agent Pools"
           description="Manage runner agent pools and their listeners"
-          actions={
+          actions={isAdmin() ? (
             <button
               onClick={() => setShowCreate(!showCreate)}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
             >
               {showCreate ? 'Cancel' : 'New Pool'}
             </button>
-          }
+          ) : undefined}
         />
 
         {error && <ErrorBanner message={error} />}
@@ -137,6 +143,10 @@ export default function AgentPoolsPage() {
                   placeholder="Production AWS runners"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
               </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Labels</label>
+              <LabelsEditor labels={createLabels} onChange={setCreateLabels} />
             </div>
             <button type="submit" disabled={creating}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">

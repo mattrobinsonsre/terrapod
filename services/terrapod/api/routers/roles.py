@@ -30,6 +30,7 @@ router = APIRouter(prefix="/api/v2", tags=["roles"])
 logger = get_logger(__name__)
 
 VALID_PERMISSIONS = {"read", "plan", "write", "admin"}
+VALID_POOL_PERMISSIONS = {"read", "write", "admin"}
 
 
 def _rfc3339(dt) -> str:
@@ -49,6 +50,7 @@ def _role_json(role: Role) -> dict:
             "deny-labels": role.deny_labels,
             "deny-names": role.deny_names,
             "workspace-permission": role.workspace_permission,
+            "pool-permission": role.pool_permission,
             "built-in": False,
             "created-at": _rfc3339(role.created_at),
             "updated-at": _rfc3339(role.updated_at),
@@ -67,6 +69,7 @@ def _builtin_role_json(name: str, info: dict) -> dict:
             "deny-labels": {},
             "deny-names": [],
             "workspace-permission": "admin" if name == "admin" else "read",
+            "pool-permission": "admin" if name == "admin" else "read",
             "built-in": True,
             "created-at": "",
             "updated-at": "",
@@ -117,6 +120,10 @@ async def create_role(
     if ws_perm not in VALID_PERMISSIONS:
         raise HTTPException(status_code=422, detail=f"Invalid workspace-permission: {ws_perm}")
 
+    pool_perm = attrs.get("pool-permission", "read")
+    if pool_perm not in VALID_POOL_PERMISSIONS:
+        raise HTTPException(status_code=422, detail=f"Invalid pool-permission: {pool_perm}")
+
     role = Role(
         name=name,
         description=attrs.get("description", ""),
@@ -125,6 +132,7 @@ async def create_role(
         deny_labels=attrs.get("deny-labels", {}),
         deny_names=attrs.get("deny-names", []),
         workspace_permission=ws_perm,
+        pool_permission=pool_perm,
     )
     db.add(role)
     await db.commit()
@@ -186,6 +194,11 @@ async def update_role(
         if ws_perm not in VALID_PERMISSIONS:
             raise HTTPException(status_code=422, detail=f"Invalid workspace-permission: {ws_perm}")
         role.workspace_permission = ws_perm
+    if "pool-permission" in attrs:
+        pool_perm = attrs["pool-permission"]
+        if pool_perm not in VALID_POOL_PERMISSIONS:
+            raise HTTPException(status_code=422, detail=f"Invalid pool-permission: {pool_perm}")
+        role.pool_permission = pool_perm
 
     await db.commit()
     await db.refresh(role)

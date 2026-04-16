@@ -13,6 +13,8 @@
 //
 //	"name"                 -> name                 (string, required)
 //	"description"          -> description          (string, optional)
+//	"labels"               -> labels               (map[string]string, optional)
+//	"owner-email"          -> owner_email          (string, optional)
 //
 // Read-only attributes:
 //
@@ -24,11 +26,14 @@ package agent_pool
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -48,6 +53,8 @@ type agentPoolModel struct {
 	// Writable attributes
 	Name        types.String `tfsdk:"name"`
 	Description types.String `tfsdk:"description"`
+	Labels      types.Map    `tfsdk:"labels"`
+	OwnerEmail  types.String `tfsdk:"owner_email"`
 
 	// Read-only attributes
 	CreatedAt types.String `tfsdk:"created_at"`
@@ -84,6 +91,23 @@ func (r *agentPoolResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 			"description": schema.StringAttribute{
 				Description: "A description of the agent pool.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"labels": schema.MapAttribute{
+				Description: "Labels for RBAC-based access control.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"owner_email": schema.StringAttribute{
+				Description: "Email of the pool owner (granted admin permission).",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -146,7 +170,7 @@ func (r *agentPoolResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	readAgentPoolIntoModel(res, &plan)
+	resp.Diagnostics.Append(readAgentPoolIntoModel(ctx, res, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -173,7 +197,7 @@ func (r *agentPoolResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	readAgentPoolIntoModel(res, &state)
+	resp.Diagnostics.Append(readAgentPoolIntoModel(ctx, res, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -210,7 +234,7 @@ func (r *agentPoolResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	readAgentPoolIntoModel(res, &plan)
+	resp.Diagnostics.Append(readAgentPoolIntoModel(ctx, res, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -241,11 +265,25 @@ func buildAgentPoolAttrs(m *agentPoolModel) map[string]any {
 		attrs["description"] = m.Description.ValueString()
 	}
 
+	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
+		labels := map[string]string{}
+		for k, v := range m.Labels.Elements() {
+			labels[k] = v.(types.String).ValueString()
+		}
+		attrs["labels"] = labels
+	}
+
+	if !m.OwnerEmail.IsNull() && !m.OwnerEmail.IsUnknown() {
+		attrs["owner-email"] = m.OwnerEmail.ValueString()
+	}
+
 	return attrs
 }
 
 // readAgentPoolIntoModel populates the Terraform model from a JSON:API resource.
-func readAgentPoolIntoModel(res *client.Resource, m *agentPoolModel) {
+func readAgentPoolIntoModel(ctx context.Context, res *client.Resource, m *agentPoolModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+
 	m.ID = types.StringValue(res.ID)
 	m.Name = types.StringValue(client.GetStringAttr(res, "name"))
 
@@ -255,6 +293,30 @@ func readAgentPoolIntoModel(res *client.Resource, m *agentPoolModel) {
 		m.Description = types.StringNull()
 	}
 
+	// Labels — treat empty map {} as a valid value (not null) to avoid
+	// unnecessary Terraform diffs between config `labels = {}` and state `null`.
+	if raw, ok := res.Attributes["labels"]; ok && len(raw) > 0 {
+		var labels map[string]string
+		if err := json.Unmarshal(raw, &labels); err == nil {
+			val, d := types.MapValueFrom(ctx, types.StringType, labels)
+			diags.Append(d...)
+			m.Labels = val
+		} else {
+			m.Labels = types.MapNull(types.StringType)
+		}
+	} else {
+		m.Labels = types.MapNull(types.StringType)
+	}
+
+	// Owner email
+	if v := client.GetStringAttr(res, "owner-email"); v != "" {
+		m.OwnerEmail = types.StringValue(v)
+	} else {
+		m.OwnerEmail = types.StringNull()
+	}
+
 	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
 	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
+
+	return diags
 }
