@@ -84,10 +84,10 @@ class TestWorkspacePoolAssignment:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch(
-        "terrapod.services.pool_rbac_service.resolve_pool_permission",
+        "terrapod.api.routers.tfe_v2.resolve_pool_permission",
         new_callable=AsyncMock,
     )
-    @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.tfe_v2._agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
         "terrapod.services.workspace_rbac_service.resolve_workspace_permission",
         new_callable=AsyncMock,
@@ -132,10 +132,10 @@ class TestWorkspacePoolAssignment:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch(
-        "terrapod.services.pool_rbac_service.resolve_pool_permission",
+        "terrapod.api.routers.tfe_v2.resolve_pool_permission",
         new_callable=AsyncMock,
     )
-    @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.tfe_v2._agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
         "terrapod.services.workspace_rbac_service.resolve_workspace_permission",
         new_callable=AsyncMock,
@@ -215,10 +215,10 @@ class TestWorkspacePoolAssignment:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch(
-        "terrapod.services.pool_rbac_service.resolve_pool_permission",
+        "terrapod.api.routers.tfe_v2.resolve_pool_permission",
         new_callable=AsyncMock,
     )
-    @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.tfe_v2._agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
         "terrapod.services.workspace_rbac_service.resolve_workspace_permission",
         new_callable=AsyncMock,

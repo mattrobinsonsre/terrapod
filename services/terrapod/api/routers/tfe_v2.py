@@ -50,6 +50,8 @@ from terrapod.api.dependencies import (
 from terrapod.db.models import Run, StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services import agent_pool_service as _agent_pool_service
+from terrapod.services.pool_rbac_service import has_pool_permission, resolve_pool_permission
 from terrapod.services.workspace_rbac_service import (
     PERMISSION_HIERARCHY,
     has_permission,
@@ -686,13 +688,8 @@ async def create_workspace(
         import uuid as _uuid
 
         agent_pool_id = _uuid.UUID(str(pool_val).removeprefix("apool-"))
-        from terrapod.services import agent_pool_service
-        from terrapod.services.pool_rbac_service import (
-            has_pool_permission,
-            resolve_pool_permission,
-        )
 
-        target_pool = await agent_pool_service.get_pool(db, agent_pool_id)
+        target_pool = await _agent_pool_service.get_pool(db, agent_pool_id)
         if target_pool is None:
             raise HTTPException(status_code=404, detail="Agent pool not found")
         pool_perm = await resolve_pool_permission(
@@ -923,13 +920,7 @@ async def update_workspace(
         else:
             new_pool_id = _uuid.UUID(str(pool_val).removeprefix("apool-"))
             # Check write permission on target pool
-            from terrapod.services import agent_pool_service
-            from terrapod.services.pool_rbac_service import (
-                has_pool_permission,
-                resolve_pool_permission,
-            )
-
-            target_pool = await agent_pool_service.get_pool(db, new_pool_id)
+            target_pool = await _agent_pool_service.get_pool(db, new_pool_id)
             if target_pool is None:
                 raise HTTPException(status_code=404, detail="Agent pool not found")
             pool_perm = await resolve_pool_permission(

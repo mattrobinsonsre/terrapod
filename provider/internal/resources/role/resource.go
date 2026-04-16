@@ -139,6 +139,9 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Description: "Agent pool permission level: read, write, or admin. Defaults to read.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 
 			// Read-only

@@ -189,3 +189,50 @@ class TestResolvePoolPermission:
             db, "user@test.com", ["everyone"], "my-pool", {}, None
         )
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_audit_with_custom_role_elevation(self):
+        """Audit user with a custom role granting write gets write (not just read)."""
+        role = _make_role(pool_permission="write", allow_labels={"env": ["prod"]})
+        db = _mock_db_with_roles([role])
+        result = await resolve_pool_permission(
+            db,
+            "auditor@test.com",
+            ["audit", "custom-role"],
+            "prod-pool",
+            {"env": "prod"},
+            None,
+        )
+        assert result == "write"
+
+    @pytest.mark.asyncio
+    async def test_audit_without_matching_role_gets_read(self):
+        """Audit user with a custom role that doesn't match still gets read from audit."""
+        role = _make_role(pool_permission="write", allow_labels={"env": ["staging"]})
+        db = _mock_db_with_roles([role])
+        result = await resolve_pool_permission(
+            db,
+            "auditor@test.com",
+            ["audit", "custom-role"],
+            "prod-pool",
+            {"env": "prod"},
+            None,
+        )
+        assert result == "read"
+
+    @pytest.mark.asyncio
+    async def test_preloaded_roles_skips_db_query(self):
+        """When preloaded_roles is passed, no DB query should be made."""
+        role = _make_role(pool_permission="admin", allow_names=["my-pool"])
+        db = AsyncMock()
+        result = await resolve_pool_permission(
+            db,
+            "user@test.com",
+            ["custom-role"],
+            "my-pool",
+            {},
+            None,
+            preloaded_roles=[role],
+        )
+        assert result == "admin"
+        db.execute.assert_not_called()

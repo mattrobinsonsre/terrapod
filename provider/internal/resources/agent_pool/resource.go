@@ -29,9 +29,11 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -100,11 +102,17 @@ func (r *agentPoolResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"owner_email": schema.StringAttribute{
 				Description: "Email of the pool owner (granted admin permission).",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 
 			// Read-only
@@ -162,7 +170,7 @@ func (r *agentPoolResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	readAgentPoolIntoModel(ctx, res, &plan)
+	resp.Diagnostics.Append(readAgentPoolIntoModel(ctx, res, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -189,7 +197,7 @@ func (r *agentPoolResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	readAgentPoolIntoModel(ctx, res, &state)
+	resp.Diagnostics.Append(readAgentPoolIntoModel(ctx, res, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -226,7 +234,7 @@ func (r *agentPoolResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	readAgentPoolIntoModel(ctx, res, &plan)
+	resp.Diagnostics.Append(readAgentPoolIntoModel(ctx, res, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -273,7 +281,9 @@ func buildAgentPoolAttrs(m *agentPoolModel) map[string]any {
 }
 
 // readAgentPoolIntoModel populates the Terraform model from a JSON:API resource.
-func readAgentPoolIntoModel(ctx context.Context, res *client.Resource, m *agentPoolModel) {
+func readAgentPoolIntoModel(ctx context.Context, res *client.Resource, m *agentPoolModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+
 	m.ID = types.StringValue(res.ID)
 	m.Name = types.StringValue(client.GetStringAttr(res, "name"))
 
@@ -287,7 +297,8 @@ func readAgentPoolIntoModel(ctx context.Context, res *client.Resource, m *agentP
 	if raw, ok := res.Attributes["labels"]; ok && len(raw) > 0 {
 		var labels map[string]string
 		if err := json.Unmarshal(raw, &labels); err == nil && len(labels) > 0 {
-			val, _ := types.MapValueFrom(ctx, types.StringType, labels)
+			val, d := types.MapValueFrom(ctx, types.StringType, labels)
+			diags.Append(d...)
 			m.Labels = val
 		} else {
 			m.Labels = types.MapNull(types.StringType)
@@ -305,4 +316,6 @@ func readAgentPoolIntoModel(ctx context.Context, res *client.Resource, m *agentP
 
 	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
 	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
+
+	return diags
 }

@@ -21,6 +21,7 @@ Endpoints:
 
 import asyncio
 import json
+import re
 import uuid
 from datetime import UTC
 
@@ -38,7 +39,11 @@ from terrapod.api.dependencies import (
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service
-from terrapod.services.pool_rbac_service import has_pool_permission, resolve_pool_permission
+from terrapod.services.pool_rbac_service import (
+    fetch_custom_roles,
+    has_pool_permission,
+    resolve_pool_permission,
+)
 
 router = APIRouter(prefix="/api/v2", tags=["agent-pools"])
 logger = get_logger(__name__)
@@ -50,12 +55,24 @@ def _rfc3339(dt) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _validate_owner_email(email: str | None) -> str | None:
+    """Validate owner_email looks like an email address. Returns the email or raises 422."""
+    if not email:
+        return None
+    if not _EMAIL_RE.match(email):
+        raise HTTPException(status_code=422, detail="owner-email must be a valid email address")
+    return email
+
+
 def _pool_json(pool, listener_summary: dict | None = None, permission: str | None = None) -> dict:
     attrs: dict = {
         "name": pool.name,
         "description": pool.description or "",
         "labels": pool.labels or {},
-        "owner-email": pool.owner_email or "",
+        "owner-email": pool.owner_email or None,
         "created-at": _rfc3339(pool.created_at),
         "updated-at": _rfc3339(pool.updated_at),
     }
@@ -159,6 +176,8 @@ async def list_pools(
 ) -> JSONResponse:
     """List agent pools visible to the current user (RBAC-filtered)."""
     pools = await agent_pool_service.list_pools(db)
+    # Pre-fetch custom roles once to avoid N+1 queries
+    custom_roles = await fetch_custom_roles(db, user.roles)
     result = []
     for p in pools:
         perm = await resolve_pool_permission(
@@ -168,6 +187,7 @@ async def list_pools(
             pool_name=p.name,
             pool_labels=p.labels or {},
             owner_email=p.owner_email or "",
+            preloaded_roles=custom_roles,
         )
         if perm is None:
             continue
@@ -198,7 +218,7 @@ async def create_pool(
         name=name,
         description=attrs.get("description", ""),
         labels=attrs.get("labels", {}),
-        owner_email=attrs.get("owner-email") or user.email,
+        owner_email=_validate_owner_email(attrs.get("owner-email")) or user.email,
     )
     await db.commit()
     await db.refresh(pool)
@@ -243,7 +263,7 @@ async def update_pool(
         name=attrs.get("name"),
         description=attrs.get("description"),
         labels=attrs.get("labels"),
-        owner_email=attrs.get("owner-email"),
+        owner_email=_validate_owner_email(attrs.get("owner-email")),
     )
     await db.commit()
     await db.refresh(pool)
@@ -506,9 +526,17 @@ async def delete_listener(
         raise HTTPException(status_code=404, detail="Listener not found")
     # Resolve pool to check admin permission
     pool_id_str = listener.get("pool_id", "")
-    if pool_id_str:
+    if not pool_id_str:
+        # Orphaned listener — require platform admin to clean up
+        if "admin" not in set(user.roles):
+            raise HTTPException(status_code=403, detail="Admin access required")
+    else:
         pool = await agent_pool_service.get_pool(db, uuid.UUID(pool_id_str))
-        if pool:
+        if pool is None:
+            # Pool deleted but listener Redis key persists — require platform admin
+            if "admin" not in set(user.roles):
+                raise HTTPException(status_code=403, detail="Admin access required")
+        else:
             await _require_pool_permission(pool, user, db, "admin")
     await agent_pool_service.delete_listener(listener["id"], listener["name"], pool_id_str)
 

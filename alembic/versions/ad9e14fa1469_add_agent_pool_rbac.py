@@ -27,7 +27,9 @@ def upgrade() -> None:
         sa.Column("pool_permission", sa.String(20), nullable=False, server_default="read"),
     )
 
-    # Backward compat: existing pools get access=everyone
+    # Backward compat: existing pools get access=everyone so they remain
+    # visible to all users after upgrade. Newly created pools get {} (empty)
+    # by default — admins must set labels explicitly for RBAC visibility.
     op.execute('UPDATE agent_pools SET labels = \'{"access": "everyone"}\'')
 
 

@@ -8,6 +8,8 @@ Permission hierarchy: read < write < admin
 Resolution order: platform admin > audit > owner > label RBAC > everyone > none
 """
 
+from __future__ import annotations
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,15 +22,6 @@ logger = get_logger(__name__)
 
 POOL_PERMISSION_HIERARCHY = {"read": 0, "write": 1, "admin": 2}
 
-# Map workspace_permission values to pool permission levels.
-# "plan" has no meaning for pools → maps to "read".
-_WS_PERM_TO_POOL = {
-    "read": "read",
-    "plan": "read",
-    "write": "write",
-    "admin": "admin",
-}
-
 
 def has_pool_permission(effective: str | None, required: str) -> bool:
     """Check if effective permission meets the required level."""
@@ -39,6 +32,22 @@ def has_pool_permission(effective: str | None, required: str) -> bool:
     )
 
 
+async def fetch_custom_roles(
+    db: AsyncSession,
+    user_roles: list[str],
+) -> list[Role]:
+    """Fetch custom (non-builtin) Role objects for the given role names.
+
+    Use this to pre-load roles once before calling resolve_pool_permission
+    in a loop, passing the result as ``preloaded_roles`` to avoid N+1 queries.
+    """
+    custom_names = set(user_roles) - BUILTIN_ROLE_NAMES
+    if not custom_names:
+        return []
+    result = await db.execute(select(Role).where(Role.name.in_(custom_names)))
+    return list(result.scalars().all())
+
+
 async def resolve_pool_permission(
     db: AsyncSession,
     user_email: str,
@@ -46,6 +55,8 @@ async def resolve_pool_permission(
     pool_name: str,
     pool_labels: dict,
     owner_email: str | None,
+    *,
+    preloaded_roles: list[Role] | None = None,
 ) -> str | None:
     """Returns highest permission level (read/write/admin), or None.
 
@@ -56,6 +67,9 @@ async def resolve_pool_permission(
     4. Label-based RBAC (custom roles) → pool_permission field on role
     5. 'everyone' role with access: everyone label → read
     6. Default → None (no access)
+
+    Pass ``preloaded_roles`` (from :func:`fetch_custom_roles`) to skip the
+    per-call DB query — useful when resolving permissions for many pools.
     """
     role_set = set(user_roles)
 
@@ -76,8 +90,11 @@ async def resolve_pool_permission(
     # 4. Label-based RBAC from custom roles (uses pool_permission, not workspace_permission)
     custom_role_names = role_set - BUILTIN_ROLE_NAMES
     if custom_role_names:
-        result = await db.execute(select(Role).where(Role.name.in_(custom_role_names)))
-        roles = list(result.scalars().all())
+        if preloaded_roles is not None:
+            roles = preloaded_roles
+        else:
+            result = await db.execute(select(Role).where(Role.name.in_(custom_role_names)))
+            roles = list(result.scalars().all())
 
         for role in roles:
             # Check deny first
