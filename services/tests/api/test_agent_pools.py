@@ -448,6 +448,159 @@ class TestDeletePoolRBAC:
         assert res.status_code == 404
 
 
+class TestTokenEndpointRBAC:
+    """Token endpoints require admin permission — read-only gets 403."""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
+    @patch(
+        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        new_callable=AsyncMock,
+    )
+    async def test_list_tokens_read_only_returns_403(self, mock_resolve, mock_get_pool, *mocks):
+        """User with read permission cannot list pool tokens."""
+        pool = _mock_pool()
+        mock_get_pool.return_value = pool
+        mock_resolve.return_value = "read"
+
+        user = _user()
+        app, _ = _make_app(user)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.get(f"/api/v2/agent-pools/apool-{pool.id}/tokens", headers=_AUTH)
+
+        assert res.status_code == 403
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
+    @patch(
+        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        new_callable=AsyncMock,
+    )
+    async def test_create_token_read_only_returns_403(self, mock_resolve, mock_get_pool, *mocks):
+        """User with read permission cannot create pool tokens."""
+        pool = _mock_pool()
+        mock_get_pool.return_value = pool
+        mock_resolve.return_value = "read"
+
+        user = _user()
+        app, _ = _make_app(user)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.post(
+                f"/api/v2/agent-pools/apool-{pool.id}/tokens",
+                json={"data": {"attributes": {"description": "test"}}},
+                headers=_AUTH,
+            )
+
+        assert res.status_code == 403
+
+
+class TestUpdatePoolSelfLockout:
+    """Self-lockout protection prevents accidental access loss."""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
+    @patch(
+        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        new_callable=AsyncMock,
+    )
+    async def test_label_change_reducing_access_returns_409(
+        self, mock_resolve, mock_get_pool, *mocks
+    ):
+        """Changing labels that would reduce user's access returns 409."""
+        pool = _mock_pool(name="my-pool", labels={"team": "sre"})
+        mock_get_pool.return_value = pool
+        # First call: current permission check → admin
+        # Second call: simulated new permission → None (locked out)
+        mock_resolve.side_effect = ["admin", None]
+
+        user = _user(email="user@example.com", roles=["sre-role"])
+        app, _ = _make_app(user)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.patch(
+                f"/api/v2/agent-pools/apool-{pool.id}",
+                json={"data": {"attributes": {"labels": {"team": "other"}}}},
+                headers=_AUTH,
+            )
+
+        assert res.status_code == 409
+        assert "reduce your access" in res.json()["errors"][0]["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.update_pool", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
+    @patch(
+        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        new_callable=AsyncMock,
+    )
+    async def test_force_bypasses_lockout_check(
+        self, mock_resolve, mock_get_pool, mock_update, *mocks
+    ):
+        """Setting force: true bypasses the self-lockout check."""
+        pool = _mock_pool(name="my-pool", labels={"team": "sre"})
+        updated_pool = _mock_pool(name="my-pool", labels={"team": "other"})
+        mock_get_pool.return_value = pool
+        mock_resolve.return_value = "admin"
+        mock_update.return_value = updated_pool
+
+        user = _user(email="user@example.com", roles=["sre-role"])
+        app, mock_db = _make_app(user)
+        mock_db.commit = AsyncMock()
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.patch(
+                f"/api/v2/agent-pools/apool-{pool.id}",
+                json={"data": {"attributes": {"labels": {"team": "other"}, "force": True}}},
+                headers=_AUTH,
+            )
+
+        assert res.status_code == 200
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.update_pool", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
+    @patch(
+        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        new_callable=AsyncMock,
+    )
+    async def test_platform_admin_immune_to_lockout(
+        self, mock_resolve, mock_get_pool, mock_update, *mocks
+    ):
+        """Platform admins skip the self-lockout check entirely."""
+        pool = _mock_pool(name="my-pool", labels={"team": "sre"})
+        updated_pool = _mock_pool(name="my-pool", labels={})
+        mock_get_pool.return_value = pool
+        mock_resolve.return_value = "admin"
+        mock_update.return_value = updated_pool
+
+        user = _user(email="admin@example.com", roles=["admin"])
+        app, mock_db = _make_app(user)
+        mock_db.commit = AsyncMock()
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.patch(
+                f"/api/v2/agent-pools/apool-{pool.id}",
+                json={"data": {"attributes": {"labels": {}}}},
+                headers=_AUTH,
+            )
+
+        assert res.status_code == 200
+
+
 class TestDeleteListenerRBAC:
     """Listener delete requires admin on pool, or platform admin when pool can't be resolved."""
 
@@ -481,6 +634,34 @@ class TestDeleteListenerRBAC:
             res = await client.delete(f"/api/v2/listeners/{lid}", headers=_AUTH)
 
         assert res.status_code == 204
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.get_listener")
+    @patch(
+        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        new_callable=AsyncMock,
+    )
+    async def test_delete_listener_read_only_returns_403(
+        self, mock_resolve, mock_get_listener, mock_get_pool, *mocks
+    ):
+        """User with read permission cannot delete listeners."""
+        pool = _mock_pool()
+        lid = uuid.uuid4()
+        listener = _mock_listener_dict(listener_id=lid, pool_id=pool.id)
+        mock_get_listener.return_value = listener
+        mock_get_pool.return_value = pool
+        mock_resolve.return_value = "read"
+
+        user = _user()
+        app, _ = _make_app(user)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.delete(f"/api/v2/listeners/{lid}", headers=_AUTH)
+
+        assert res.status_code == 403
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

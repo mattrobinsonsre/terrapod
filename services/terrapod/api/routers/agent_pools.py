@@ -40,6 +40,7 @@ from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service
 from terrapod.services.pool_rbac_service import (
+    POOL_PERMISSION_HIERARCHY,
     fetch_custom_roles,
     has_pool_permission,
     resolve_pool_permission,
@@ -283,7 +284,7 @@ async def update_pool(
 ) -> JSONResponse:
     """Update an agent pool (requires admin permission on pool)."""
     pool = await _get_pool(pool_id, db)
-    await _require_pool_permission(pool, user, db, "admin")
+    perm = await _require_pool_permission(pool, user, db, "admin")
 
     attrs = body.get("data", {}).get("attributes", {})
 
@@ -299,6 +300,41 @@ async def update_pool(
     labels_arg = _UNSET
     if "labels" in attrs:
         labels_arg = _validate_labels(attrs["labels"]) if attrs["labels"] else {}
+
+    # Self-lockout check: warn if label/owner change would reduce user's access.
+    # Platform admins are immune (their access doesn't depend on labels/owner).
+    if "admin" not in set(user.roles) and not attrs.get("force"):
+        new_labels = labels_arg if labels_arg is not _UNSET else (pool.labels or {})
+        new_owner = (owner_arg or None) if owner_arg is not _UNSET else pool.owner_email
+        if new_labels != (pool.labels or {}) or new_owner != pool.owner_email:
+            new_perm = await resolve_pool_permission(
+                db,
+                user_email=user.email,
+                user_roles=user.roles,
+                pool_name=attrs.get("name") or pool.name,
+                pool_labels=new_labels,
+                owner_email=new_owner or "",
+            )
+            if new_perm is None or POOL_PERMISSION_HIERARCHY.get(
+                new_perm, -1
+            ) < POOL_PERMISSION_HIERARCHY.get(perm, -1):
+                new_level = new_perm or "none"
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "errors": [
+                            {
+                                "status": "409",
+                                "title": "Label/owner change would reduce your access",
+                                "detail": (
+                                    f"This change would reduce your access from "
+                                    f"{perm} to {new_level} on this pool. "
+                                    f'Re-submit with "force": true to confirm.'
+                                ),
+                            }
+                        ]
+                    },
+                )
 
     pool = await agent_pool_service.update_pool(
         db,
