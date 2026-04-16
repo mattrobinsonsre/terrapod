@@ -99,6 +99,9 @@ class Role(Base):
     workspace_permission: Mapped[str] = mapped_column(
         String(20), nullable=False, default="read"
     )  # read, plan, write, admin
+    pool_permission: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="read", server_default="read"
+    )  # read, write, admin
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
@@ -185,6 +188,10 @@ class AgentPool(Base):
     )
     name: Mapped[str] = mapped_column(String(63), unique=True, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # RBAC
+    labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    owner_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False

@@ -38,6 +38,7 @@ from terrapod.api.dependencies import (
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service
+from terrapod.services.pool_rbac_service import has_pool_permission, resolve_pool_permission
 
 router = APIRouter(prefix="/api/v2", tags=["agent-pools"])
 logger = get_logger(__name__)
@@ -49,15 +50,19 @@ def _rfc3339(dt) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _pool_json(pool, listener_summary: dict | None = None) -> dict:
+def _pool_json(pool, listener_summary: dict | None = None, permission: str | None = None) -> dict:
     attrs: dict = {
         "name": pool.name,
         "description": pool.description or "",
+        "labels": pool.labels or {},
+        "owner-email": pool.owner_email or "",
         "created-at": _rfc3339(pool.created_at),
         "updated-at": _rfc3339(pool.updated_at),
     }
     if listener_summary is not None:
         attrs["listener-summary"] = listener_summary
+    if permission is not None:
+        attrs["permission"] = permission
     return {
         "id": f"apool-{pool.id}",
         "type": "agent-pools",
@@ -121,6 +126,29 @@ async def _get_pool(pool_id: str, db: AsyncSession):
     return pool
 
 
+async def _require_pool_permission(
+    pool, user: AuthenticatedUser, db: AsyncSession, required: str
+) -> str:
+    """Resolve user's pool permission and require at least `required` level.
+
+    Returns the effective permission. Raises 404 if no access, 403 if
+    insufficient.
+    """
+    perm = await resolve_pool_permission(
+        db,
+        user_email=user.email,
+        user_roles=user.roles,
+        pool_name=pool.name,
+        pool_labels=pool.labels or {},
+        owner_email=pool.owner_email or "",
+    )
+    if perm is None:
+        raise HTTPException(status_code=404, detail="Agent pool not found")
+    if not has_pool_permission(perm, required):
+        raise HTTPException(status_code=403, detail=f"Requires {required} permission on pool")
+    return perm
+
+
 # ── Agent Pools ──────────────────────────────────────────────────────────
 
 
@@ -129,16 +157,26 @@ async def list_pools(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """List all agent pools."""
+    """List agent pools visible to the current user (RBAC-filtered)."""
     pools = await agent_pool_service.list_pools(db)
     result = []
     for p in pools:
+        perm = await resolve_pool_permission(
+            db,
+            user_email=user.email,
+            user_roles=user.roles,
+            pool_name=p.name,
+            pool_labels=p.labels or {},
+            owner_email=p.owner_email or "",
+        )
+        if perm is None:
+            continue
         listeners = await agent_pool_service.list_listeners(p.id)
         summary = {
             "total": len(listeners),
             "online": sum(1 for lis in listeners if lis.get("status") == "online"),
         }
-        result.append(_pool_json(p, listener_summary=summary))
+        result.append(_pool_json(p, listener_summary=summary, permission=perm))
     return JSONResponse(content={"data": result})
 
 
@@ -159,11 +197,13 @@ async def create_pool(
         db,
         name=name,
         description=attrs.get("description", ""),
+        labels=attrs.get("labels", {}),
+        owner_email=attrs.get("owner-email") or user.email,
     )
     await db.commit()
     await db.refresh(pool)
 
-    return JSONResponse(content={"data": _pool_json(pool)}, status_code=201)
+    return JSONResponse(content={"data": _pool_json(pool, permission="admin")}, status_code=201)
 
 
 @router.get("/agent-pools/{pool_id}")
@@ -172,25 +212,29 @@ async def show_pool(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Show an agent pool."""
+    """Show an agent pool (requires read permission)."""
     pool = await _get_pool(pool_id, db)
+    perm = await _require_pool_permission(pool, user, db, "read")
     listeners = await agent_pool_service.list_listeners(pool.id)
     summary = {
         "total": len(listeners),
         "online": sum(1 for lis in listeners if lis.get("status") == "online"),
     }
-    return JSONResponse(content={"data": _pool_json(pool, listener_summary=summary)})
+    return JSONResponse(
+        content={"data": _pool_json(pool, listener_summary=summary, permission=perm)}
+    )
 
 
 @router.patch("/agent-pools/{pool_id}")
 async def update_pool(
     pool_id: str = Path(...),
     body: dict = Body(...),
-    user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Update an agent pool (admin only)."""
+    """Update an agent pool (requires admin permission on pool)."""
     pool = await _get_pool(pool_id, db)
+    await _require_pool_permission(pool, user, db, "admin")
 
     attrs = body.get("data", {}).get("attributes", {})
     pool = await agent_pool_service.update_pool(
@@ -198,21 +242,24 @@ async def update_pool(
         pool,
         name=attrs.get("name"),
         description=attrs.get("description"),
+        labels=attrs.get("labels"),
+        owner_email=attrs.get("owner-email"),
     )
     await db.commit()
     await db.refresh(pool)
 
-    return JSONResponse(content={"data": _pool_json(pool)})
+    return JSONResponse(content={"data": _pool_json(pool, permission="admin")})
 
 
 @router.delete("/agent-pools/{pool_id}", status_code=204)
 async def delete_pool(
     pool_id: str = Path(...),
-    user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    """Delete an agent pool (admin only)."""
+    """Delete an agent pool (requires admin permission on pool)."""
     pool = await _get_pool(pool_id, db)
+    await _require_pool_permission(pool, user, db, "admin")
     # Clean up all listener Redis keys for this pool before DB delete
     await agent_pool_service.delete_pool_listeners(pool.id)
     await agent_pool_service.delete_pool(db, pool)
@@ -225,11 +272,12 @@ async def delete_pool(
 @router.get("/agent-pools/{pool_id}/tokens")
 async def list_pool_tokens(
     pool_id: str = Path(...),
-    user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """List join tokens for an agent pool."""
+    """List join tokens for an agent pool (requires admin on pool)."""
     pool = await _get_pool(pool_id, db)
+    await _require_pool_permission(pool, user, db, "admin")
     tokens = await agent_pool_service.list_pool_tokens(db, pool.id)
     return JSONResponse(content={"data": [_token_json(t) for t in tokens]})
 
@@ -238,11 +286,12 @@ async def list_pool_tokens(
 async def create_pool_token(
     pool_id: str = Path(...),
     body: dict = Body(...),
-    user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Create a join token for an agent pool."""
+    """Create a join token for an agent pool (requires admin on pool)."""
     pool = await _get_pool(pool_id, db)
+    await _require_pool_permission(pool, user, db, "admin")
 
     attrs = body.get("data", {}).get("attributes", {})
 
@@ -266,11 +315,12 @@ async def create_pool_token(
 async def delete_pool_token(
     pool_id: str = Path(...),
     token_id: str = Path(...),
-    user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    """Delete/revoke a join token."""
+    """Delete/revoke a join token (requires admin on pool)."""
     pool = await _get_pool(pool_id, db)
+    await _require_pool_permission(pool, user, db, "admin")
     token_uuid = uuid.UUID(token_id.removeprefix("at-"))
 
     from sqlalchemy import select
@@ -387,8 +437,9 @@ async def list_pool_listeners(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """List listeners for an agent pool."""
+    """List listeners for an agent pool (requires read permission)."""
     pool = await _get_pool(pool_id, db)
+    await _require_pool_permission(pool, user, db, "read")
     listeners = await agent_pool_service.list_listeners(pool.id)
     return JSONResponse(content={"data": [_listener_json(lis) for lis in listeners]})
 
@@ -408,11 +459,10 @@ async def pool_events(
     from terrapod.redis.client import POOL_EVENTS_PREFIX, subscribe_channel
 
     user = await authenticate_request(request)
-    if "admin" not in user.roles:
-        raise HTTPException(status_code=403, detail="Admin access required")
 
     async with get_db_session() as db:
         pool = await _get_pool(pool_id, db)
+        await _require_pool_permission(pool, user, db, "read")
         pool_uuid = str(pool.id)
 
     channel = f"{POOL_EVENTS_PREFIX}{pool_uuid}"
@@ -446,16 +496,21 @@ async def pool_events(
 @router.delete("/listeners/{listener_id}", status_code=204)
 async def delete_listener(
     listener_id: str = Path(...),
-    user: AuthenticatedUser = Depends(require_admin),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> None:
-    """Delete a listener (admin only)."""
+    """Delete a listener (requires admin permission on pool)."""
     l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
     listener = await agent_pool_service.get_listener(l_uuid)
     if listener is None:
         raise HTTPException(status_code=404, detail="Listener not found")
-    await agent_pool_service.delete_listener(
-        listener["id"], listener["name"], listener.get("pool_id", "")
-    )
+    # Resolve pool to check admin permission
+    pool_id_str = listener.get("pool_id", "")
+    if pool_id_str:
+        pool = await agent_pool_service.get_pool(db, uuid.UUID(pool_id_str))
+        if pool:
+            await _require_pool_permission(pool, user, db, "admin")
+    await agent_pool_service.delete_listener(listener["id"], listener["name"], pool_id_str)
 
 
 # ── SSE Event Channel ────────────────────────────────────────────────────

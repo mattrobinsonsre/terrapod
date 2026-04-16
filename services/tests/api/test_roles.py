@@ -37,6 +37,7 @@ def _mock_role(name="dev-team", ws_perm="read"):
     role.deny_labels = {}
     role.deny_names = []
     role.workspace_permission = ws_perm
+    role.pool_permission = "read"
     role.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     role.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
     return role

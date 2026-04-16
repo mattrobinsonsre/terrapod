@@ -75,6 +75,10 @@ export default function NavBar() {
         <Activity size={16} />
         Sessions
       </NavLink>
+      <NavLink href="/admin/agent-pools" onClick={closeMenu}>
+        <Server size={16} />
+        Agent Pools
+      </NavLink>
       {admin && (
         <>
           <NavLink href="/admin/binary-cache" onClick={closeMenu}>
@@ -92,10 +96,6 @@ export default function NavBar() {
           <NavLink href="/admin/roles" onClick={closeMenu}>
             <Shield size={16} />
             Roles
-          </NavLink>
-          <NavLink href="/admin/agent-pools" onClick={closeMenu}>
-            <Server size={16} />
-            Agent Pools
           </NavLink>
           <NavLink href="/admin/variable-sets" onClick={closeMenu}>
             <Variable size={16} />

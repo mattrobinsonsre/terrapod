@@ -6,6 +6,7 @@ package agent_pool
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -25,6 +26,8 @@ type agentPoolDataSourceModel struct {
 	ID          types.String `tfsdk:"id"`
 	Name        types.String `tfsdk:"name"`
 	Description types.String `tfsdk:"description"`
+	Labels      types.Map    `tfsdk:"labels"`
+	OwnerEmail  types.String `tfsdk:"owner_email"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
@@ -44,6 +47,8 @@ func (d *agentPoolDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"id":          schema.StringAttribute{Computed: true, Description: "Agent pool ID."},
 			"name":        schema.StringAttribute{Required: true, Description: "Agent pool name."},
 			"description": schema.StringAttribute{Computed: true, Description: "Description."},
+			"labels":      schema.MapAttribute{Computed: true, ElementType: types.StringType, Description: "Pool labels for RBAC."},
+			"owner_email": schema.StringAttribute{Computed: true, Description: "Pool owner email."},
 			"created_at":  schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
 			"updated_at":  schema.StringAttribute{Computed: true, Description: "Update timestamp."},
 		},
@@ -87,6 +92,27 @@ func (d *agentPoolDataSource) Read(ctx context.Context, req datasource.ReadReque
 			config.ID = types.StringValue(r.ID)
 			config.Name = types.StringValue(client.GetStringAttr(&r, "name"))
 			config.Description = types.StringValue(client.GetStringAttr(&r, "description"))
+
+			// Labels
+			if rawLabels, ok := r.Attributes["labels"]; ok && len(rawLabels) > 0 {
+				var labels map[string]string
+				if err := json.Unmarshal(rawLabels, &labels); err == nil && len(labels) > 0 {
+					val, d := types.MapValueFrom(ctx, types.StringType, labels)
+					resp.Diagnostics.Append(d...)
+					config.Labels = val
+				} else {
+					config.Labels = types.MapNull(types.StringType)
+				}
+			} else {
+				config.Labels = types.MapNull(types.StringType)
+			}
+
+			if v := client.GetStringAttr(&r, "owner-email"); v != "" {
+				config.OwnerEmail = types.StringValue(v)
+			} else {
+				config.OwnerEmail = types.StringNull()
+			}
+
 			config.CreatedAt = types.StringValue(client.GetStringAttr(&r, "created-at"))
 			config.UpdatedAt = types.StringValue(client.GetStringAttr(&r, "updated-at"))
 			resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)

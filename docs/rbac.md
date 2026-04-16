@@ -31,15 +31,38 @@ A role's `workspace_permission` maps to registry permissions: `plan` maps to `re
 
 **Runner tokens** receive implicit `read` access to all registry modules and providers. This allows runner Jobs to download modules and providers during `terraform init` without requiring explicit label-based permissions on each registry resource.
 
+### Pool Permission Levels
+
+Agent pools use a three-level hierarchy (separate from workspace permissions):
+
+| Level | Grants |
+|---|---|
+| **read** | View pool, list listeners |
+| **write** | read + assign pool to workspaces |
+| **admin** | write + manage tokens, update/delete pool |
+
+Each custom role has a `pool_permission` field (default: `read`) that is independent of `workspace_permission`. Assigning a pool to a workspace requires **both** `write` on the pool **and** `admin` on the workspace.
+
+Pool permission resolution follows the same order as workspace permissions:
+
+1. **Platform admin** → `admin` on all pools
+2. **Platform audit** → `read` on all pools
+3. **Pool owner** (`pool.owner_email == user.email`) → `admin`
+4. **Label-based RBAC** — custom roles matched against pool labels using `pool_permission`
+5. **`everyone` role** — pools with label `access: everyone` → `read`
+6. **Default** → no access (pool is invisible)
+
 ### Platform Permissions
 
 | Operation | Required Role |
 |---|---|
 | Manage roles and assignments | `admin` |
 | Manage VCS connections | `admin` |
-| Manage agent pools and tokens | `admin` |
+| Create agent pools | `admin` |
+| Manage agent pool tokens, update/delete pool | Pool `admin` (owner, platform admin, or role-based) |
 | Binary/module/provider cache admin | `admin` |
-| View roles, VCS connections, agent pools | `admin` or `audit` |
+| View roles, VCS connections | `admin` or `audit` |
+| View agent pools | Any authenticated user (filtered by pool RBAC) |
 | Create workspaces | Any authenticated user (creator becomes owner) |
 | Create registry modules/providers | Any authenticated user (creator becomes owner) |
 | Variable sets (create/update/delete) | `admin` |
@@ -130,6 +153,7 @@ curl -X POST https://terrapod.example.com/api/v2/roles \
 | `name` | string | Unique role name (lowercase, alphanumeric + hyphens) |
 | `description` | string | Human-readable description |
 | `workspace-permission` | string | One of: `read`, `plan`, `write`, `admin` |
+| `pool-permission` | string | One of: `read`, `write`, `admin` (default: `read`) |
 | `allow-labels` | object | Label key-value pairs that grant access |
 | `allow-names` | array | Explicit workspace names that grant access |
 | `deny-labels` | object | Label key-value pairs that deny access (overrides allow) |

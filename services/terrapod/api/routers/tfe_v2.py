@@ -679,13 +679,35 @@ async def create_workspace(
 
     from terrapod.config import settings
 
-    # Resolve agent pool ID from attributes
+    # Resolve agent pool ID from attributes (requires write permission on pool)
     agent_pool_id = None
     pool_val = attrs.get("agent-pool-id")
     if pool_val:
         import uuid as _uuid
 
         agent_pool_id = _uuid.UUID(str(pool_val).removeprefix("apool-"))
+        from terrapod.services import agent_pool_service
+        from terrapod.services.pool_rbac_service import (
+            has_pool_permission,
+            resolve_pool_permission,
+        )
+
+        target_pool = await agent_pool_service.get_pool(db, agent_pool_id)
+        if target_pool is None:
+            raise HTTPException(status_code=404, detail="Agent pool not found")
+        pool_perm = await resolve_pool_permission(
+            db,
+            user_email=user.email,
+            user_roles=user.roles,
+            pool_name=target_pool.name,
+            pool_labels=target_pool.labels or {},
+            owner_email=target_pool.owner_email or "",
+        )
+        if not has_pool_permission(pool_perm, "write"):
+            raise HTTPException(
+                status_code=403,
+                detail="Requires write permission on agent pool",
+            )
 
     execution_mode = attrs.get("execution-mode", "local")
     if execution_mode not in ("local", "agent"):
@@ -899,7 +921,31 @@ async def update_workspace(
         if pool_val is None:
             ws.agent_pool_id = None
         else:
-            ws.agent_pool_id = _uuid.UUID(str(pool_val).removeprefix("apool-"))
+            new_pool_id = _uuid.UUID(str(pool_val).removeprefix("apool-"))
+            # Check write permission on target pool
+            from terrapod.services import agent_pool_service
+            from terrapod.services.pool_rbac_service import (
+                has_pool_permission,
+                resolve_pool_permission,
+            )
+
+            target_pool = await agent_pool_service.get_pool(db, new_pool_id)
+            if target_pool is None:
+                raise HTTPException(status_code=404, detail="Agent pool not found")
+            pool_perm = await resolve_pool_permission(
+                db,
+                user_email=user.email,
+                user_roles=user.roles,
+                pool_name=target_pool.name,
+                pool_labels=target_pool.labels or {},
+                owner_email=target_pool.owner_email or "",
+            )
+            if not has_pool_permission(pool_perm, "write"):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Requires write permission on agent pool",
+                )
+            ws.agent_pool_id = new_pool_id
     if "drift-detection-enabled" in attrs:
         ws.drift_detection_enabled = attrs["drift-detection-enabled"]
         # Reset drift status when disabling drift detection

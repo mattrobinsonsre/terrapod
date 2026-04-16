@@ -23,6 +23,7 @@
 //	"deny-labels"                   → deny_labels          (map[string]string, optional)
 //	"deny-names"                    → deny_names           (list of strings, optional)
 //	"workspace-permission"          → workspace_permission (string, required: read/plan/write/admin)
+//	"pool-permission"               → pool_permission      (string, optional: read/write/admin, default "read")
 //
 // Read-only attributes:
 //
@@ -67,6 +68,7 @@ type roleModel struct {
 	DenyLabels          types.Map    `tfsdk:"deny_labels"`
 	DenyNames           types.List   `tfsdk:"deny_names"`
 	WorkspacePermission types.String `tfsdk:"workspace_permission"`
+	PoolPermission      types.String `tfsdk:"pool_permission"`
 
 	// Read-only attributes
 	BuiltIn   types.Bool   `tfsdk:"built_in"`
@@ -130,8 +132,13 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				ElementType: types.StringType,
 			},
 			"workspace_permission": schema.StringAttribute{
-				Description: "Permission level: read, plan, write, or admin.",
+				Description: "Workspace permission level: read, plan, write, or admin.",
 				Required:    true,
+			},
+			"pool_permission": schema.StringAttribute{
+				Description: "Agent pool permission level: read, write, or admin. Defaults to read.",
+				Optional:    true,
+				Computed:    true,
 			},
 
 			// Read-only
@@ -288,6 +295,10 @@ func buildRoleAttrs(m *roleModel) map[string]any {
 		"workspace-permission": m.WorkspacePermission.ValueString(),
 	}
 
+	if !m.PoolPermission.IsNull() && !m.PoolPermission.IsUnknown() {
+		attrs["pool-permission"] = m.PoolPermission.ValueString()
+	}
+
 	if !m.Description.IsNull() {
 		attrs["description"] = m.Description.ValueString()
 	}
@@ -382,6 +393,11 @@ func readRoleIntoModel(ctx context.Context, res *roleResponseData, m *roleModel)
 	m.Name = types.StringValue(res.Name)
 
 	m.WorkspacePermission = types.StringValue(getStringFromMap(res.Attributes, "workspace-permission"))
+	if v := getStringFromMap(res.Attributes, "pool-permission"); v != "" {
+		m.PoolPermission = types.StringValue(v)
+	} else {
+		m.PoolPermission = types.StringValue("read")
+	}
 	m.BuiltIn = types.BoolValue(getBoolFromMap(res.Attributes, "built-in"))
 	m.CreatedAt = types.StringValue(getStringFromMap(res.Attributes, "created-at"))
 	m.UpdatedAt = types.StringValue(getStringFromMap(res.Attributes, "updated-at"))
