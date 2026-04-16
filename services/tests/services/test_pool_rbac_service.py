@@ -236,3 +236,20 @@ class TestResolvePoolPermission:
         )
         assert result == "admin"
         db.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_preloaded_roles_filtered_by_user_roles(self):
+        """Preloaded roles not held by the user are ignored."""
+        role_held = _make_role(name="held-role", pool_permission="read", allow_names=["my-pool"])
+        role_other = _make_role(name="other-role", pool_permission="admin", allow_names=["my-pool"])
+        db = AsyncMock()
+        result = await resolve_pool_permission(
+            db,
+            "user@test.com",
+            ["held-role"],  # user only holds held-role, not other-role
+            "my-pool",
+            {},
+            None,
+            preloaded_roles=[role_held, role_other],
+        )
+        assert result == "read"  # only held-role's permission, not other-role's admin

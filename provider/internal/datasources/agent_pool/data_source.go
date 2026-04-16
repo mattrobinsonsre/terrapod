@@ -93,10 +93,10 @@ func (d *agentPoolDataSource) Read(ctx context.Context, req datasource.ReadReque
 			config.Name = types.StringValue(client.GetStringAttr(&r, "name"))
 			config.Description = types.StringValue(client.GetStringAttr(&r, "description"))
 
-			// Labels
+			// Labels — treat empty map {} as valid (not null)
 			if rawLabels, ok := r.Attributes["labels"]; ok && len(rawLabels) > 0 {
 				var labels map[string]string
-				if err := json.Unmarshal(rawLabels, &labels); err == nil && len(labels) > 0 {
+				if err := json.Unmarshal(rawLabels, &labels); err == nil {
 					val, d := types.MapValueFrom(ctx, types.StringType, labels)
 					resp.Diagnostics.Append(d...)
 					config.Labels = val

@@ -293,10 +293,11 @@ func readAgentPoolIntoModel(ctx context.Context, res *client.Resource, m *agentP
 		m.Description = types.StringNull()
 	}
 
-	// Labels
+	// Labels — treat empty map {} as a valid value (not null) to avoid
+	// unnecessary Terraform diffs between config `labels = {}` and state `null`.
 	if raw, ok := res.Attributes["labels"]; ok && len(raw) > 0 {
 		var labels map[string]string
-		if err := json.Unmarshal(raw, &labels); err == nil && len(labels) > 0 {
+		if err := json.Unmarshal(raw, &labels); err == nil {
 			val, d := types.MapValueFrom(ctx, types.StringType, labels)
 			diags.Append(d...)
 			m.Labels = val

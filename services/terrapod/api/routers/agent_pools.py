@@ -67,6 +67,35 @@ def _validate_owner_email(email: str | None) -> str | None:
     return email
 
 
+_MAX_LABELS = 50
+_MAX_LABEL_KEY_LEN = 63
+_MAX_LABEL_VALUE_LEN = 255
+
+
+def _validate_labels(labels: dict | None) -> dict:
+    """Validate labels are string key-value pairs within size limits."""
+    if not labels:
+        return {}
+    if not isinstance(labels, dict):
+        raise HTTPException(status_code=422, detail="labels must be an object")
+    if len(labels) > _MAX_LABELS:
+        raise HTTPException(status_code=422, detail=f"labels cannot exceed {_MAX_LABELS} entries")
+    clean: dict[str, str] = {}
+    for k, v in labels.items():
+        if not isinstance(k, str) or not isinstance(v, str):
+            raise HTTPException(status_code=422, detail="label keys and values must be strings")
+        if len(k) > _MAX_LABEL_KEY_LEN:
+            raise HTTPException(
+                status_code=422, detail=f"label key exceeds {_MAX_LABEL_KEY_LEN} characters"
+            )
+        if len(v) > _MAX_LABEL_VALUE_LEN:
+            raise HTTPException(
+                status_code=422, detail=f"label value exceeds {_MAX_LABEL_VALUE_LEN} characters"
+            )
+        clean[k] = v
+    return clean
+
+
 def _pool_json(pool, listener_summary: dict | None = None, permission: str | None = None) -> dict:
     attrs: dict = {
         "name": pool.name,
@@ -217,7 +246,7 @@ async def create_pool(
         db,
         name=name,
         description=attrs.get("description", ""),
-        labels=attrs.get("labels", {}),
+        labels=_validate_labels(attrs.get("labels")),
         owner_email=_validate_owner_email(attrs.get("owner-email")) or user.email,
     )
     await db.commit()
@@ -257,13 +286,27 @@ async def update_pool(
     await _require_pool_permission(pool, user, db, "admin")
 
     attrs = body.get("data", {}).get("attributes", {})
+
+    # Distinguish "key absent" (don't change) from "key present with null/empty" (clear it).
+    # Use _UNSET sentinel so we can detect when a key was not provided at all.
+    _UNSET = object()
+
+    owner_arg = _UNSET
+    if "owner-email" in attrs:
+        raw_owner = attrs["owner-email"]
+        owner_arg = _validate_owner_email(raw_owner) if raw_owner else ""
+
+    labels_arg = _UNSET
+    if "labels" in attrs:
+        labels_arg = _validate_labels(attrs["labels"]) if attrs["labels"] else {}
+
     pool = await agent_pool_service.update_pool(
         db,
         pool,
         name=attrs.get("name"),
         description=attrs.get("description"),
-        labels=attrs.get("labels"),
-        owner_email=_validate_owner_email(attrs.get("owner-email")),
+        labels=labels_arg if labels_arg is not _UNSET else None,
+        owner_email=owner_arg if owner_arg is not _UNSET else None,
     )
     await db.commit()
     await db.refresh(pool)

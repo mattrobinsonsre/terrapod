@@ -190,7 +190,9 @@ class AgentPool(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # RBAC
-    labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    labels: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict, server_default="{}", nullable=False
+    )
     owner_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(

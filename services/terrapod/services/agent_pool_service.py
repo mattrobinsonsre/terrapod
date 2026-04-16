@@ -74,7 +74,7 @@ async def update_pool(
     if labels is not None:
         pool.labels = labels
     if owner_email is not None:
-        pool.owner_email = owner_email
+        pool.owner_email = owner_email or None  # empty string clears
     await db.flush()
     return pool
 

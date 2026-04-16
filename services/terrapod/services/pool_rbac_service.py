@@ -91,7 +91,7 @@ async def resolve_pool_permission(
     custom_role_names = role_set - BUILTIN_ROLE_NAMES
     if custom_role_names:
         if preloaded_roles is not None:
-            roles = preloaded_roles
+            roles = [r for r in preloaded_roles if r.name in custom_role_names]
         else:
             result = await db.execute(select(Role).where(Role.name.in_(custom_role_names)))
             roles = list(result.scalars().all())

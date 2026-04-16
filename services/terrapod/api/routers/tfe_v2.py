@@ -700,6 +700,8 @@ async def create_workspace(
             pool_labels=target_pool.labels or {},
             owner_email=target_pool.owner_email or "",
         )
+        if pool_perm is None:
+            raise HTTPException(status_code=404, detail="Agent pool not found")
         if not has_pool_permission(pool_perm, "write"):
             raise HTTPException(
                 status_code=403,
@@ -931,6 +933,8 @@ async def update_workspace(
                 pool_labels=target_pool.labels or {},
                 owner_email=target_pool.owner_email or "",
             )
+            if pool_perm is None:
+                raise HTTPException(status_code=404, detail="Agent pool not found")
             if not has_pool_permission(pool_perm, "write"):
                 raise HTTPException(
                     status_code=403,
