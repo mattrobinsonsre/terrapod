@@ -54,8 +54,8 @@ api:
         default_provider: "auth0"
         oidc:
           - name: "auth0"
-            issuer_url: "https://dev-zqwrse0xlal03qiu.us.auth0.com/"
-            client_id: "AymR3SnEXQAdKE0t5NUPezczpcgpcXK5"
+            issuer_url: "https://dev-1234.us.auth0.com/"
+            client_id: "abc123"
             scopes:
               - openid
               - profile
@@ -97,17 +97,26 @@ web:
     periodSeconds: 10
     timeoutSeconds: 10
 
+  extraVolumeMounts:
+    - name: next-cache
+      mountPath: /app/.next
+
+  extraVolumes:
+    - name: next-cache
+      emptyDir: {}
+
   resources:
     requests:
       cpu: 200m
       memory: 512Mi
     limits:
       cpu: "1"
-      memory: 1Gi
+      memory: 2Gi
 
 # Ingress — BFF through web frontend, mkcert TLS
 ingress:
   enabled: true
+  className: nginx
   hostname: terrapod.local
   tls: true
 
