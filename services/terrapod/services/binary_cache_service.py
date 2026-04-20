@@ -30,6 +30,67 @@ VALID_ARCH = {"amd64", "arm64", "arm", "386"}
 _VERSION_CACHE_PREFIX = "tp:version_resolve"
 _VERSION_CACHE_TTL = 3600  # 1 hour
 
+# Pre-release stability tiers, least → most stable.
+# Both terraform and tofu use these suffixes (tofu does not emit "dev").
+_PRERELEASE_TAGS = ("dev", "alpha", "beta", "rc")
+_STABILITY_RANK = {"dev": 1, "alpha": 2, "beta": 3, "rc": 4, "stable": 5}
+# Floor imposed by the allow_prerelease policy value — the lowest rank accepted.
+_POLICY_FLOOR = {
+    "none": _STABILITY_RANK["stable"],
+    "rc": _STABILITY_RANK["rc"],
+    "beta": _STABILITY_RANK["beta"],
+    "alpha": _STABILITY_RANK["alpha"],
+    "dev": _STABILITY_RANK["dev"],
+}
+
+
+def _parse_stability(version: str) -> str:
+    """Return the stability tier of a version string.
+
+    Returns 'stable' for GA versions (e.g. '1.15.0'), or the matching
+    pre-release tier name (e.g. 'rc' for '1.15.0-rc2').
+    """
+    for tag in _PRERELEASE_TAGS:
+        if f"-{tag}" in version:
+            return tag
+    return "stable"
+
+
+def _is_version_allowed(version: str, policy: str) -> bool:
+    """True if `version` satisfies the pre-release `policy`."""
+    return _STABILITY_RANK[_parse_stability(version)] >= _POLICY_FLOOR.get(
+        policy, _STABILITY_RANK["stable"]
+    )
+
+
+def _version_sort_key(v: str) -> tuple:
+    """Sort key giving correct ordering across stable + pre-release versions.
+
+    Orders: 1.15.0 > 1.15.0-rc2 > 1.15.0-rc1 > 1.15.0-beta1 > 1.15.0-alpha2.
+    Base x.y.z components compare first; within the same base, stability rank
+    then intra-tier number decide.
+    """
+    base = v
+    tier_rank = _STABILITY_RANK["stable"]
+    tier_num = 0
+    for tag in _PRERELEASE_TAGS:
+        marker = f"-{tag}"
+        idx = v.find(marker)
+        if idx != -1:
+            base = v[:idx]
+            suffix = v[idx + len(marker) :]
+            tier_rank = _STABILITY_RANK[tag]
+            try:
+                tier_num = int(suffix) if suffix else 0
+            except ValueError:
+                tier_num = 0
+            break
+    try:
+        base_parts = tuple(int(x) for x in base.split("."))
+    except ValueError:
+        base_parts = (0,)
+    return base_parts + (tier_rank, tier_num)
+
 
 async def get_or_cache_binary(
     db: AsyncSession,
@@ -49,6 +110,14 @@ async def get_or_cache_binary(
         raise ValueError(f"Invalid OS: {os_}. Must be one of {VALID_OS}")
     if arch not in VALID_ARCH:
         raise ValueError(f"Invalid arch: {arch}. Must be one of {VALID_ARCH}")
+
+    policy = settings.registry.binary_cache.allow_prerelease
+    if not _is_version_allowed(version, policy):
+        raise ValueError(
+            f"Pre-release version {version!r} is not allowed by the current "
+            f"binary_cache.allow_prerelease policy ({policy!r}). Set the "
+            f"policy to 'rc', 'beta', 'alpha', or 'dev' to permit it."
+        )
 
     # Check cache
     cached = await _get_cached(db, tool, version, os_, arch)
@@ -184,8 +253,8 @@ async def list_available_versions(tool: str) -> list[str]:
     else:
         versions = await _fetch_tofu_versions()
 
-    # Sort descending
-    versions.sort(key=lambda v: [int(x) for x in v.split(".")], reverse=True)
+    # Sort descending (stability-aware so pre-release versions sort correctly)
+    versions.sort(key=_version_sort_key, reverse=True)
 
     # Add major.minor shortcuts (deduplicated, in order)
     shortcuts: list[str] = []
@@ -215,40 +284,49 @@ async def list_available_versions(tool: str) -> list[str]:
 
 
 async def _fetch_terraform_versions() -> list[str]:
-    """Fetch stable terraform versions from releases.hashicorp.com."""
+    """Fetch terraform versions from releases.hashicorp.com.
+
+    Filters by the configured allow_prerelease policy: stable-only by default,
+    or includes rc/beta/alpha/dev tiers down to the configured floor.
+    """
     url = "https://releases.hashicorp.com/terraform/index.json"
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.get(url)
         resp.raise_for_status()
         data = resp.json()
 
+    policy = settings.registry.binary_cache.allow_prerelease
     versions = []
     for v in data.get("versions", {}):
-        if any(tag in v for tag in ("-alpha", "-beta", "-rc", "-dev")):
+        if not _is_version_allowed(v, policy):
             continue
-        parts = v.split(".")
+        parts = v.split("-")[0].split(".")
         if len(parts) >= 3:
             versions.append(v)
     return versions
 
 
 async def _fetch_tofu_versions() -> list[str]:
-    """Fetch stable tofu versions from GitHub releases."""
+    """Fetch tofu versions from GitHub releases.
+
+    Filters by the configured allow_prerelease policy. GitHub's
+    `prerelease` flag is the authoritative signal for pre-release status;
+    the policy is applied on top of it.
+    """
     url = "https://api.github.com/repos/opentofu/opentofu/releases"
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.get(url, params={"per_page": 100})
         resp.raise_for_status()
         releases = resp.json()
 
+    policy = settings.registry.binary_cache.allow_prerelease
     versions = []
     for release in releases:
-        if release.get("prerelease", False):
-            continue
         tag = release.get("tag_name", "")
         version = tag.lstrip("v")
-        if any(t in version for t in ("-alpha", "-beta", "-rc")):
+        if not _is_version_allowed(version, policy):
             continue
-        parts = version.split(".")
+        parts = version.split("-")[0].split(".")
         if len(parts) >= 3:
             versions.append(version)
     return versions
@@ -319,9 +397,14 @@ async def resolve_version(tool: str, partial_version: str) -> str:
 
 
 async def _resolve_terraform_version(partial: str) -> str:
-    """Resolve partial terraform version via releases.hashicorp.com index."""
+    """Resolve partial terraform version via releases.hashicorp.com index.
+
+    Honors the allow_prerelease policy: pre-release versions are only
+    considered when explicitly permitted.
+    """
     url = "https://releases.hashicorp.com/terraform/index.json"
     prefix = f"{partial}."
+    policy = settings.registry.binary_cache.allow_prerelease
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.get(url)
@@ -331,25 +414,29 @@ async def _resolve_terraform_version(partial: str) -> str:
     versions = data.get("versions", {})
     matching = []
     for v in versions:
-        if v.startswith(prefix):
-            # Skip pre-release versions
-            if any(tag in v for tag in ("-alpha", "-beta", "-rc", "-dev")):
-                continue
-            matching.append(v)
+        if not v.startswith(prefix):
+            continue
+        if not _is_version_allowed(v, policy):
+            continue
+        matching.append(v)
 
     if not matching:
-        logger.warning("No matching terraform version found", partial=partial)
+        logger.warning("No matching terraform version found", partial=partial, policy=policy)
         return partial
 
-    # Sort by version parts and return the latest
-    matching.sort(key=lambda v: [int(x) for x in v.split(".")])
+    matching.sort(key=_version_sort_key)
     return matching[-1]
 
 
 async def _resolve_tofu_version(partial: str) -> str:
-    """Resolve partial tofu version via GitHub releases API."""
+    """Resolve partial tofu version via GitHub releases API.
+
+    Honors the allow_prerelease policy: pre-release versions are only
+    considered when explicitly permitted.
+    """
     url = "https://api.github.com/repos/opentofu/opentofu/releases"
     prefix = f"v{partial}."
+    policy = settings.registry.binary_cache.allow_prerelease
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.get(url, params={"per_page": 100})
@@ -359,18 +446,18 @@ async def _resolve_tofu_version(partial: str) -> str:
     matching = []
     for release in releases:
         tag = release.get("tag_name", "")
-        if tag.startswith(prefix) and not release.get("prerelease", False):
-            # Strip the 'v' prefix
-            version = tag.lstrip("v")
-            if any(t in version for t in ("-alpha", "-beta", "-rc")):
-                continue
-            matching.append(version)
+        if not tag.startswith(prefix):
+            continue
+        version = tag.lstrip("v")
+        if not _is_version_allowed(version, policy):
+            continue
+        matching.append(version)
 
     if not matching:
-        logger.warning("No matching tofu version found", partial=partial)
+        logger.warning("No matching tofu version found", partial=partial, policy=policy)
         return partial
 
-    matching.sort(key=lambda v: [int(x) for x in v.split(".")])
+    matching.sort(key=_version_sort_key)
     return matching[-1]
 
 

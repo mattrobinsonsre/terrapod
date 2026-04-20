@@ -46,6 +46,11 @@ api:
         platforms:
           - os: darwin
             arch: arm64
+      # Allow RC-tier pre-release terraform/tofu binaries in local dev so we
+      # can try upcoming releases (e.g. terraform 1.15-rc, tofu 1.12-beta)
+      # before they GA. Production defaults to "none" (GA only).
+      binary_cache:
+        allow_prerelease: rc
     auth:
       local_enabled: true
       callback_base_url: "https://terrapod.local"

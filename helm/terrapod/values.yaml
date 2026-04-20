@@ -197,6 +197,13 @@ api:
         enabled: true
         terraform_mirror_url: "https://releases.hashicorp.com/terraform"
         tofu_mirror_url: "https://github.com/opentofu/opentofu/releases/download"
+        # Lowest pre-release tier to accept for terraform/tofu CLI version
+        # resolution + caching. One of: none, rc, beta, alpha, dev.
+        # 'none' (default) permits only GA releases. 'rc' allows release
+        # candidates and GA. 'dev' allows everything. Set to 'rc' or 'beta'
+        # in dev/staging to try upcoming releases like terraform 1.15-rc or
+        # tofu 1.12-beta before they GA.
+        allow_prerelease: none
 
     # GPG signing key for provider registry
     # ASCII-armored GPG private key. If set, used to sign all provider SHA256SUMS.
