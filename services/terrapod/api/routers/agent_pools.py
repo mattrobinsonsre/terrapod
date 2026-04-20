@@ -56,13 +56,23 @@ def _rfc3339(dt) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# Sanity-check email shape. Each domain segment is bounded by literal dots
+# and cannot itself contain a dot, which eliminates the overlapping-quantifier
+# ambiguity that would otherwise let a malicious input induce polynomial
+# backtracking (CodeQL py/polynomial-redos).
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+$")
+_MAX_EMAIL_LEN = 254  # RFC 5321 §4.5.3.1.3
 
 
 def _validate_owner_email(email: str | None) -> str | None:
     """Validate owner_email looks like an email address. Returns the email or raises 422."""
     if not email:
         return None
+    if len(email) > _MAX_EMAIL_LEN:
+        raise HTTPException(
+            status_code=422,
+            detail=f"owner-email cannot exceed {_MAX_EMAIL_LEN} characters",
+        )
     if not _EMAIL_RE.match(email):
         raise HTTPException(status_code=422, detail="owner-email must be a valid email address")
     return email
