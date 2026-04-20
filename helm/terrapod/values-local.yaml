@@ -102,13 +102,25 @@ web:
     periodSeconds: 10
     timeoutSeconds: 10
 
+  # Dedicated emptyDir for Next.js build cache. Keeps hot-reload churn off
+  # the container overlay fs so dev rebuilds don't thrash the layer cache.
+  extraVolumeMounts:
+    - name: next-cache
+      mountPath: /app/.next
+
+  extraVolumes:
+    - name: next-cache
+      emptyDir: {}
+
   resources:
     requests:
       cpu: 200m
       memory: 512Mi
     limits:
       cpu: "1"
-      memory: 1Gi
+      # Next.js dev server routinely spikes over 1Gi on cold starts; bump
+      # to avoid OOMKills during the first few builds under Tilt.
+      memory: 2Gi
 
 # Ingress — BFF through web frontend, mkcert TLS
 ingress:

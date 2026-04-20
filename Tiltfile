@@ -74,6 +74,7 @@ docker_build(
     'terrapod-api',
     context='.',
     dockerfile='docker/Dockerfile.api',
+    cache_from=['terrapod-api:latest'],
     live_update=[
         sync('./services/terrapod', '/app/terrapod'),
         sync('./alembic', '/app/alembic'),
