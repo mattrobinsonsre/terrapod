@@ -3,7 +3,7 @@
 # No terraform/tofu binary baked in — downloaded at runtime from binary cache.
 # Includes signal-forwarding entrypoint for graceful spot instance termination.
 
-FROM alpine:3.23.3
+FROM alpine:3.23.4
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
 RUN apk upgrade --no-cache \
