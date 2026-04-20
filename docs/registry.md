@@ -608,7 +608,22 @@ api:
         enabled: true
         terraform_mirror_url: "https://releases.hashicorp.com/terraform"
         tofu_mirror_url: "https://github.com/opentofu/opentofu/releases/download"
+        allow_prerelease: none    # none | rc | beta | alpha | dev
 ```
+
+### Pre-release versions (`allow_prerelease`)
+
+Controls whether terraform / tofu **pre-release** builds (alpha, beta, rc, dev) can be cached, listed, and served. The value names the *lowest* tier accepted — everything more stable is also allowed:
+
+| Policy | Accepted tiers |
+|---|---|
+| `none` (default) | GA only |
+| `rc` | GA + rc |
+| `beta` | GA + rc + beta |
+| `alpha` | GA + rc + beta + alpha |
+| `dev` | everything |
+
+Requesting a version whose tier is not permitted returns HTTP 400 with a clear message. Production deployments should leave this at `none`. Dev / staging deployments can set `rc` (or `beta`) to try upcoming releases — e.g. Terraform 1.15 release candidates or OpenTofu 1.12 betas — before they GA.
 
 ### API Endpoints
 

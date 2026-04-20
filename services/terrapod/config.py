@@ -6,7 +6,7 @@ Non-secret configuration loaded from YAML file, secrets from environment variabl
 
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field, PostgresDsn, RedisDsn
@@ -338,6 +338,15 @@ class BinaryCacheConfig(BaseModel):
     enabled: bool = Field(default=True)
     terraform_mirror_url: str = Field(default="https://releases.hashicorp.com/terraform")
     tofu_mirror_url: str = Field(default="https://github.com/opentofu/opentofu/releases/download")
+    allow_prerelease: Literal["none", "rc", "beta", "alpha", "dev"] = Field(
+        default="none",
+        description="Lowest pre-release tier to accept for terraform/tofu CLI version "
+        "resolution and caching. The value names the LEAST stable tier allowed; every "
+        "more-stable tier is also allowed. 'none' (default) permits only GA releases. "
+        "'rc' allows release candidates and GA. 'dev' allows everything. "
+        "Intended for dev/staging deployments trying upcoming releases such as "
+        "terraform 1.15-rc or tofu 1.12-beta.",
+    )
 
 
 class RegistryConfig(BaseModel):

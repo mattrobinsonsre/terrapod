@@ -165,6 +165,9 @@ data:
         {{- if .Values.api.config.registry.binary_cache.tofu_mirror_url }}
         tofu_mirror_url: {{ .Values.api.config.registry.binary_cache.tofu_mirror_url | quote }}
         {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.allow_prerelease }}
+        allow_prerelease: {{ .Values.api.config.registry.binary_cache.allow_prerelease | quote }}
+        {{- end }}
       {{- end }}
     {{- end }}
     {{- if .Values.api.config.vcs }}
