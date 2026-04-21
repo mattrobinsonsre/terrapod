@@ -145,7 +145,7 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["sleep", "5"]
+                command: ["sleep", "{{ .Values.api.preStopSleepSeconds | default 30 }}"]
           resources:
             {{- toYaml .Values.api.resources | nindent 12 }}
           {{- with .Values.api.containerSecurityContext }}
