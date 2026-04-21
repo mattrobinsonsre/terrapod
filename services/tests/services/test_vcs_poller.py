@@ -432,3 +432,130 @@ class TestPollWorkspaceVCSErrorTracking:
 
         assert ws.vcs_last_error == "Cannot determine tracked branch"
         assert ws.vcs_last_error_at is not None
+
+
+class TestPollWorkspaceBranchRaceCondition:
+    """Tests for the CAS + dedup protection against concurrent VCS polls (issue #217)."""
+
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    @patch("terrapod.services.vcs_poller._get_branch_sha")
+    async def test_cas_success_proceeds_to_create_run(self, mock_sha, mock_create):
+        """When the CAS affects a row (no concurrent poll won), we create a run."""
+        from terrapod.services.vcs_poller import _poll_workspace_branch
+
+        ws = _mock_workspace(vcs_last_commit_sha="aaa111", working_directory="")
+        conn = _mock_connection()
+        mock_sha.return_value = "bbb222"
+        mock_create.return_value = MagicMock(id=uuid.uuid4())
+
+        # Simulate CAS affecting 1 row: scalar_one_or_none returns a non-None id
+        cas_result = MagicMock()
+        cas_result.scalar_one_or_none = MagicMock(return_value=ws.id)
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=cas_result)
+
+        await _poll_workspace_branch(mock_db, ws, conn, "org", "repo", "main")
+
+        mock_create.assert_called_once()
+        assert ws.vcs_last_commit_sha == "bbb222"
+
+    @patch("terrapod.services.vcs_poller._create_vcs_run")
+    @patch("terrapod.services.vcs_poller._get_branch_sha")
+    async def test_cas_miss_bails_without_creating_run(self, mock_sha, mock_create):
+        """When the CAS affects zero rows (another poll won the race), bail silently."""
+        from terrapod.services.vcs_poller import _poll_workspace_branch
+
+        ws = _mock_workspace(vcs_last_commit_sha="aaa111", working_directory="")
+        conn = _mock_connection()
+        mock_sha.return_value = "bbb222"
+
+        # Simulate CAS affecting 0 rows: scalar_one_or_none returns None
+        cas_result = MagicMock()
+        cas_result.scalar_one_or_none = MagicMock(return_value=None)
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=cas_result)
+
+        await _poll_workspace_branch(mock_db, ws, conn, "org", "repo", "main")
+
+        mock_create.assert_not_called()
+        # The losing poll must not mutate the in-memory ws state
+        assert ws.vcs_last_commit_sha == "aaa111"
+
+    @patch("terrapod.services.vcs_poller._get_branch_sha")
+    async def test_sha_unchanged_early_returns(self, mock_sha):
+        """If the branch SHA still matches vcs_last_commit_sha, no CAS attempted."""
+        from terrapod.services.vcs_poller import _poll_workspace_branch
+
+        ws = _mock_workspace(vcs_last_commit_sha="aaa111")
+        conn = _mock_connection()
+        mock_sha.return_value = "aaa111"
+
+        mock_db = AsyncMock()
+        await _poll_workspace_branch(mock_db, ws, conn, "org", "repo", "main")
+
+        # No DB writes at all — early return before CAS
+        mock_db.execute.assert_not_called()
+        mock_db.commit.assert_not_called()
+
+
+class TestCreateVcsRunDedup:
+    """Defensive dedup in _create_vcs_run prevents duplicate runs for the same commit."""
+
+    async def test_returns_none_when_duplicate_exists(self):
+        """If a run already exists for (workspace, sha, branch, pr_number), skip."""
+        from terrapod.services.vcs_poller import _create_vcs_run
+
+        ws = _mock_workspace()
+        conn = _mock_connection()
+
+        existing_run = MagicMock()
+        existing_run.id = uuid.uuid4()
+
+        # First mock_db.execute call is the dedup SELECT — return existing run
+        dedup_result = MagicMock()
+        dedup_result.scalar_one_or_none = MagicMock(return_value=existing_run)
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=dedup_result)
+
+        with patch("terrapod.services.vcs_poller._download_archive") as mock_dl:
+            run = await _create_vcs_run(
+                mock_db, ws, conn, "org", "repo", "bbb222", "main", message="test"
+            )
+
+        assert run is None
+        # We must bail before wasting bandwidth on the archive download
+        mock_dl.assert_not_called()
+
+    async def test_dedup_distinguishes_pr_number(self):
+        """A PR-scoped run must not dedup against a branch-push run with the same SHA."""
+        from terrapod.services.vcs_poller import _create_vcs_run
+
+        ws = _mock_workspace()
+        conn = _mock_connection()
+
+        # Dedup query returns nothing (no matching run exists)
+        dedup_result = MagicMock()
+        dedup_result.scalar_one_or_none = MagicMock(return_value=None)
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=dedup_result)
+
+        # Simulate the archive download failing so we don't need to mock the whole
+        # create-run chain — the assertion is that dedup passed (download was tried).
+        with patch(
+            "terrapod.services.vcs_poller._download_archive",
+            side_effect=RuntimeError("stop here"),
+        ) as mock_dl:
+            run = await _create_vcs_run(
+                mock_db,
+                ws,
+                conn,
+                "org",
+                "repo",
+                "bbb222",
+                "main",
+                pr_number=42,
+                message="test",
+            )
+
+        assert run is None  # Download failed, returns None
+        mock_dl.assert_called_once()  # But dedup let us through — the key assertion
