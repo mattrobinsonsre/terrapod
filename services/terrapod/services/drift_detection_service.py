@@ -294,10 +294,20 @@ async def handle_drift_run_completed(payload: dict) -> None:
             run_id=run_id,
         )
 
-        # Publish drift status change to SSE channels
+        # Publish drift status change to SSE channels.
+        #
+        # The workspace LIST page subscribes to WORKSPACE_LIST_EVENTS_CHANNEL,
+        # the admin dashboard to ADMIN_EVENTS_CHANNEL, and the workspace DETAIL
+        # page to tp:run_events:{workspace_id}. When a drift run completes we
+        # need to notify all three — without the per-workspace publish below,
+        # the detail page only sees the earlier run_status_change event (fired
+        # when the run transitioned to `planned`, before this handler ran) and
+        # so its loadWorkspace() call reads the stale drift_status. Publishing
+        # here too triggers a second refresh that picks up the updated status.
         try:
             from terrapod.redis.client import (
                 ADMIN_EVENTS_CHANNEL,
+                RUN_EVENTS_PREFIX,
                 WORKSPACE_LIST_EVENTS_CHANNEL,
                 publish_event,
             )
@@ -311,6 +321,7 @@ async def handle_drift_run_completed(payload: dict) -> None:
             )
             await publish_event(ADMIN_EVENTS_CHANNEL, drift_payload)
             await publish_event(WORKSPACE_LIST_EVENTS_CHANNEL, drift_payload)
+            await publish_event(f"{RUN_EVENTS_PREFIX}{ws.id}", drift_payload)
         except Exception as e:
             logger.debug("Failed to publish drift event", error=str(e))
 

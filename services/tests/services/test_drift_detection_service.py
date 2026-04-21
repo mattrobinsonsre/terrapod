@@ -249,7 +249,10 @@ class TestHandleDriftRunCompleted:
     async def test_publishes_drift_status_change_event(
         self, mock_run_svc, mock_session, mock_notif, mock_publish
     ):
-        """Drift status change publishes to admin and workspace list channels."""
+        """Drift status change publishes to admin, workspace-list, AND the
+        per-workspace run_events channel (the last is what the workspace
+        detail page listens to — without it the UI stays stale until a
+        manual reload)."""
         from terrapod.services.drift_detection_service import handle_drift_run_completed
 
         run = _mock_run(status="planned", has_changes=True)
@@ -268,8 +271,9 @@ class TestHandleDriftRunCompleted:
             }
         )
 
-        # Should publish to both admin and workspace list channels
-        assert mock_publish.call_count == 2
         channels = [call.args[0] for call in mock_publish.call_args_list]
         assert "tp:admin_events" in channels
         assert "tp:workspace_list_events" in channels
+        # The one that fixes the detail-page-stays-stale bug
+        assert f"tp:run_events:{ws.id}" in channels
+        assert mock_publish.call_count == 3
