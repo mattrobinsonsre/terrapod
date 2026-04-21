@@ -282,6 +282,7 @@ function WorkspaceDetailContent() {
   // Drift detection
   const [savingDrift, setSavingDrift] = useState(false)
   const [checkingDrift, setCheckingDrift] = useState(false)
+  const [dismissingDrift, setDismissingDrift] = useState(false)
 
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -754,6 +755,26 @@ function WorkspaceDetailContent() {
       setError(err instanceof Error ? err.message : 'Failed to queue drift check')
     } finally {
       setCheckingDrift(false)
+    }
+  }
+
+  async function handleDismissDrift() {
+    setDismissingDrift(true)
+    setError('')
+    try {
+      const res = await apiFetch(
+        `/api/v2/workspaces/${workspaceId}/actions/dismiss-drift`,
+        { method: 'POST' }
+      )
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `Failed to dismiss drift (${res.status})`)
+      }
+      await loadWorkspace()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to dismiss drift')
+    } finally {
+      setDismissingDrift(false)
     }
   }
 
@@ -1580,10 +1601,20 @@ function WorkspaceDetailContent() {
                 </div>
                 <div>
                   <dt className="text-xs text-slate-500">Status</dt>
-                  <dd className="mt-1">
+                  <dd className="mt-1 flex items-center gap-2">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${driftStatusBadge(attrs['drift-status']).cls}`}>
                       {driftStatusBadge(attrs['drift-status']).label}
                     </span>
+                    {perms['can-queue-run'] && (attrs['drift-status'] === 'drifted' || attrs['drift-status'] === 'errored') && (
+                      <button
+                        onClick={handleDismissDrift}
+                        disabled={dismissingDrift}
+                        title="Clear the reported drift state. The next scheduled check will repopulate it from reality."
+                        className="text-xs text-slate-400 hover:text-slate-200 disabled:text-slate-600 transition-colors"
+                      >
+                        {dismissingDrift ? 'Dismissing…' : 'Dismiss'}
+                      </button>
+                    )}
                   </dd>
                 </div>
                 <div>

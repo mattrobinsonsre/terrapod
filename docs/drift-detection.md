@@ -103,6 +103,30 @@ The status is updated after each drift run completes. The mapping from run outco
 | `errored` | — | `errored` |
 | `canceled` / `discarded` | — | No update |
 
+### Dismissing drift
+
+When a workspace shows `drifted` or `errored` status — for example after you've acknowledged the drift and plan to reconcile it through a real apply — you can clear the reported state without disabling scheduled drift detection.
+
+**UI**: click the "Dismiss" link next to the drift-status badge on the workspace overview.
+
+**API**:
+
+```http
+POST /api/v2/workspaces/{workspace_id}/actions/dismiss-drift
+```
+
+Effect:
+
+- `drift_status` → `""` (unchecked)
+- `drift_last_checked_at` → `null`
+- `drift_detection_enabled` — **unchanged** (scheduled checks continue)
+
+The next scheduled check repopulates the status from current infrastructure reality. If drift is still present, the status flips back to `drifted`.
+
+Idempotent: dismissing a workspace that isn't currently reporting drift is a no-op.
+
+Requires `plan` permission on the workspace.
+
 ---
 
 ## Skipping Logic
