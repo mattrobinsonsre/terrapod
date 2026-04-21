@@ -96,7 +96,7 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["sleep", "5"]
+                command: ["sleep", "{{ .Values.web.preStopSleepSeconds | default 30 }}"]
           {{- with .Values.web.extraVolumeMounts }}
           volumeMounts:
             {{- toYaml . | nindent 12 }}

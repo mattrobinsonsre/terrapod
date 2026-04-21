@@ -291,6 +291,13 @@ api:
     maxUnavailable: 0
 
   terminationGracePeriodSeconds: 120
+  # Seconds to sleep in preStop before SIGTERM reaches uvicorn. Gives the
+  # ingress controller + kube-proxy time to remove the pod from the Service
+  # endpoints so in-flight and newly-arriving requests drain to the surviving
+  # replica instead of hitting a pod that's about to shut down. 30s covers
+  # typical kube-proxy + Traefik propagation; bump higher if your ingress
+  # has slower endpoint convergence.
+  preStopSleepSeconds: 30
 
   # Pod anti-affinity spreads replicas across nodes (required) and AZs (preferred).
   # Disable on single-node clusters. Set 'affinity' to override with custom rules.
@@ -394,7 +401,14 @@ web:
     maxSurge: 1
     maxUnavailable: 0
 
-  terminationGracePeriodSeconds: 30
+  # Bumped from 30 to 60 so the preStop drain (default 30s) fits comfortably
+  # within the grace period with room for in-flight Next.js SSR requests.
+  terminationGracePeriodSeconds: 60
+  # See the matching comment on api.preStopSleepSeconds — same purpose: let the
+  # ingress / kube-proxy remove the pod from endpoints before Next.js begins
+  # its shutdown. Prevents the rollout from dropping BFF-proxied API calls +
+  # SSE connections held by users.
+  preStopSleepSeconds: 30
 
   # Pod anti-affinity spreads replicas across nodes (required) and AZs (preferred).
   # Disable on single-node clusters. Set 'affinity' to override with custom rules.
@@ -592,6 +606,10 @@ listener:
     maxUnavailable: 0
 
   terminationGracePeriodSeconds: 120
+  # Listeners are stateless event bridges to K8s; the API server can tolerate
+  # brief listener churn. 15s is enough for the SSE and heartbeat loops on
+  # other replicas to notice and rebalance before this one shuts down.
+  preStopSleepSeconds: 15
 
   # Pod anti-affinity spreads replicas across nodes (required) and AZs (preferred).
   # Disable on single-node clusters. Set 'affinity' to override with custom rules.

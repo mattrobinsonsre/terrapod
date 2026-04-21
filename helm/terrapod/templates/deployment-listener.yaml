@@ -116,7 +116,7 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["sleep", "5"]
+                command: ["sleep", "{{ .Values.listener.preStopSleepSeconds | default 15 }}"]
           resources:
             {{- toYaml .Values.listener.resources | nindent 12 }}
           {{- with .Values.listener.containerSecurityContext }}
