@@ -4,8 +4,9 @@ These endpoints are NOT part of the TFE V2 API specification. They provide
 Terrapod-specific functionality consumed by the web UI.
 
 Endpoints:
-    GET /api/v2/workspace-events — SSE stream for workspace list updates
-    GET /api/v2/workspaces/{workspace_id}/vcs-refs — list VCS branches/tags
+    GET  /api/v2/workspace-events — SSE stream for workspace list updates
+    GET  /api/v2/workspaces/{workspace_id}/vcs-refs — list VCS branches/tags
+    POST /api/v2/workspaces/{workspace_id}/actions/dismiss-drift — clear drift status
 """
 
 import asyncio
@@ -119,5 +120,58 @@ async def list_vcs_refs(
             "branches": branches,
             "tags": tags,
             "default-branch": default_branch,
+        }
+    )
+
+
+@router.post("/workspaces/{workspace_id}/actions/dismiss-drift")
+async def dismiss_drift(
+    workspace_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Clear the workspace's transient drift_status without disabling drift detection.
+
+    Sets `drift_status = ""` and `drift_last_checked_at = null`. Leaves
+    `drift_detection_enabled` unchanged — scheduled checks continue to run.
+    The next scheduled check will repopulate the state from the current
+    infrastructure reality.
+
+    Idempotent: dismissing when no drift is currently reported is a no-op.
+
+    Requires `plan` permission on the workspace (same level as lock/unlock —
+    a transient state reset, not a configuration mutation).
+    """
+    from terrapod.api.routers.tfe_v2 import _get_workspace_by_id
+
+    ws = await _get_workspace_by_id(workspace_id, db)
+    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    if not has_permission(perm, "plan"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires plan permission on workspace",
+        )
+
+    ws.drift_status = ""
+    ws.drift_last_checked_at = None
+    await db.commit()
+
+    logger.info(
+        "Drift status dismissed",
+        workspace=ws.name,
+        user=user.email,
+    )
+
+    return JSONResponse(
+        content={
+            "data": {
+                "id": f"ws-{ws.id}",
+                "type": "workspaces",
+                "attributes": {
+                    "drift-status": ws.drift_status,
+                    "drift-last-checked-at": None,
+                    "drift-detection-enabled": ws.drift_detection_enabled,
+                },
+            }
         }
     )

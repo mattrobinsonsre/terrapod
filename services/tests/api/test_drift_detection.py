@@ -223,3 +223,97 @@ class TestRunDriftAttributes:
         attrs = resp.json()["data"]["attributes"]
         assert attrs["is-drift-detection"] is True
         assert attrs["has-changes"] is True
+
+
+# ── Dismiss drift action ─────────────────────────────────────────────────
+
+
+class TestDismissDriftAction:
+    """POST /workspaces/{id}/actions/dismiss-drift clears transient drift state."""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.workspace_extensions.resolve_workspace_permission")
+    async def test_dismiss_drift_clears_state_and_keeps_detection_enabled(
+        self, mock_resolve, *mocks
+    ):
+        """drift_status and drift_last_checked_at reset; drift_detection_enabled unchanged."""
+        mock_resolve.return_value = "plan"
+        ws = _mock_workspace(
+            drift_detection_enabled=True,
+            drift_status="drifted",
+            drift_last_checked_at=datetime(2026, 4, 20, 12, 0, tzinfo=UTC),
+        )
+
+        app, mock_db = _make_app(_user())
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = ws_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/v2/workspaces/ws-{ws.id}/actions/dismiss-drift",
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200
+        assert ws.drift_status == ""
+        assert ws.drift_last_checked_at is None
+        # Detection itself must NOT be touched — scheduled checks continue
+        assert ws.drift_detection_enabled is True
+        body = resp.json()["data"]["attributes"]
+        assert body["drift-status"] == ""
+        assert body["drift-last-checked-at"] is None
+        assert body["drift-detection-enabled"] is True
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.workspace_extensions.resolve_workspace_permission")
+    async def test_dismiss_drift_requires_plan_permission(self, mock_resolve, *mocks):
+        """Read-only users cannot dismiss drift."""
+        mock_resolve.return_value = "read"
+        ws = _mock_workspace(drift_status="drifted")
+
+        app, mock_db = _make_app(_user())
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = ws_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/v2/workspaces/ws-{ws.id}/actions/dismiss-drift",
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 403
+        # State must not have changed
+        assert ws.drift_status == "drifted"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.workspace_extensions.resolve_workspace_permission")
+    async def test_dismiss_drift_is_idempotent(self, mock_resolve, *mocks):
+        """Dismissing a workspace with no drift reported is a no-op (still 200)."""
+        mock_resolve.return_value = "plan"
+        ws = _mock_workspace(
+            drift_detection_enabled=True,
+            drift_status="",
+            drift_last_checked_at=None,
+        )
+
+        app, mock_db = _make_app(_user())
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = ws_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/v2/workspaces/ws-{ws.id}/actions/dismiss-drift",
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 200
+        assert ws.drift_status == ""
