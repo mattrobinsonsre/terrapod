@@ -86,6 +86,10 @@ log() { echo "$@" | tee -a "$SETUP_LOG"; }
 TP_BACKEND="${TP_BACKEND:-terraform}"
 TP_VERSION="${TP_VERSION:-1.9.8}"
 TP_PHASE="${TP_PHASE:-plan}"
+# Timeout (seconds) for artifact uploads — logs, plan file, state. These can
+# be several MB and the old 10s cap routinely timed out under normal network
+# conditions. Small status POSTs keep their tighter local timeouts.
+TP_UPLOAD_TIMEOUT="${TP_UPLOAD_TIMEOUT:-60}"
 WORK_DIR="/workspace"
 
 mkdir -p "$WORK_DIR"
@@ -311,7 +315,7 @@ if [ "$INIT_EXIT" != "0" ]; then
     # Upload setup + init output as plan log so it's visible in the UI
     if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
         cat "$SETUP_LOG" /tmp/init.log > /tmp/plan-full.log 2>/dev/null
-        curl -sSf --max-time 10 -X PUT -H "$AUTH_HEADER" \
+        curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @/tmp/plan-full.log \
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-log" || true
@@ -407,7 +411,7 @@ if [ "$TP_PHASE" = "plan" ]; then
     # Upload plan log (best-effort) — prepend setup + init output so the full log is visible
     if [ -n "$TP_API_URL" ] && [ -f /tmp/plan.log ]; then
         cat "$SETUP_LOG" /tmp/init.log /tmp/plan.log > /tmp/plan-full.log 2>/dev/null
-        curl -sSf --max-time 10 -X PUT -H "$AUTH_HEADER" \
+        curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @/tmp/plan-full.log \
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-log" || true
@@ -415,7 +419,7 @@ if [ "$TP_PHASE" = "plan" ]; then
 
     # Upload plan file (best-effort)
     if [ -n "$TP_API_URL" ] && [ -f tfplan ]; then
-        curl -sSf --max-time 10 -X PUT -H "$AUTH_HEADER" \
+        curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @tfplan \
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-file" || true
@@ -447,7 +451,7 @@ elif [ "$TP_PHASE" = "apply" ]; then
     # Upload apply log (best-effort, bounded by --max-time) — prepend setup + init output
     if [ -n "$TP_API_URL" ] && [ -f /tmp/apply.log ]; then
         cat "$SETUP_LOG" /tmp/init.log /tmp/apply.log > /tmp/apply-full.log 2>/dev/null
-        curl -sSf --max-time 10 -X PUT -H "$AUTH_HEADER" \
+        curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @/tmp/apply-full.log \
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/apply-log" || \
@@ -456,7 +460,7 @@ elif [ "$TP_PHASE" = "apply" ]; then
 
     # Upload new state (FATAL — missing state = infrastructure/state divergence)
     if [ -n "$TP_API_URL" ] && [ -f terraform.tfstate ]; then
-        if ! curl -sSf --max-time 15 -X PUT -H "$AUTH_HEADER" \
+        if ! curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @terraform.tfstate \
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/state"; then
