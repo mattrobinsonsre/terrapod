@@ -19,7 +19,7 @@ the scheduler's trigger queue with deduplication.
 
 import time as time_mod
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.metrics import (
@@ -171,7 +171,35 @@ async def _create_vcs_run(
     pr_number: int | None = None,
     message: str = "",
 ) -> Run | None:
-    """Download archive, create ConfigurationVersion and Run."""
+    """Download archive, create ConfigurationVersion and Run.
+
+    Defensive dedup: if a run already exists for this (workspace, sha, branch,
+    pr_number), return None rather than creating a duplicate. This catches
+    races from any path that might create VCS-sourced runs — including the
+    vcs_poll ↔ vcs_immediate_poll race fixed by the CAS in _poll_workspace_branch.
+    """
+    # Belt-and-braces against any path creating a duplicate run for the same
+    # commit — the CAS in _poll_workspace_branch is the primary race closer.
+    dedup_q = select(Run).where(
+        Run.workspace_id == ws.id,
+        Run.vcs_commit_sha == sha,
+        Run.vcs_branch == branch,
+    )
+    if pr_number is None:
+        dedup_q = dedup_q.where(Run.vcs_pull_request_number.is_(None))
+    else:
+        dedup_q = dedup_q.where(Run.vcs_pull_request_number == pr_number)
+    existing = await db.execute(dedup_q.limit(1))
+    if existing.scalar_one_or_none() is not None:
+        logger.info(
+            "Skipping run creation — duplicate run already exists for this commit",
+            workspace=ws.name,
+            sha=sha[:8],
+            branch=branch,
+            pr_number=pr_number,
+        )
+        return None
+
     try:
         archive = await _download_archive(conn, owner, repo, sha)
     except Exception as e:
@@ -243,6 +271,31 @@ async def _poll_workspace_branch(
     if sha == ws.vcs_last_commit_sha:
         return
 
+    # Atomic compare-and-set: advance vcs_last_commit_sha to the new sha ONLY
+    # if no concurrent poll cycle has already done so. Closes the race between
+    # periodic vcs_poll and webhook-triggered vcs_immediate_poll (issue #217).
+    # If the CAS affects zero rows, another poll already handled this commit —
+    # we bail without creating a run.
+    old_sha = ws.vcs_last_commit_sha
+    cas = (
+        update(Workspace)
+        .where(Workspace.id == ws.id)
+        .where(Workspace.vcs_last_commit_sha.is_not_distinct_from(old_sha))
+        .values(vcs_last_commit_sha=sha)
+        .returning(Workspace.id)
+    )
+    cas_result = await db.execute(cas)
+    if cas_result.scalar_one_or_none() is None:
+        logger.debug(
+            "Concurrent VCS poll already advanced this workspace, bailing",
+            workspace=ws.name,
+            sha=sha[:8],
+        )
+        return
+    # Keep the in-memory ORM state consistent with the DB.
+    ws.vcs_last_commit_sha = sha
+    await db.commit()
+
     VCS_COMMITS_DETECTED.labels(provider=conn.provider).inc()
 
     logger.info(
@@ -250,7 +303,7 @@ async def _poll_workspace_branch(
         workspace=ws.name,
         repo=f"{owner}/{repo}",
         branch=branch,
-        old_sha=ws.vcs_last_commit_sha[:8] if ws.vcs_last_commit_sha else "(none)",
+        old_sha=old_sha[:8] if old_sha else "(none)",
         new_sha=sha[:8],
     )
 
@@ -260,9 +313,9 @@ async def _poll_workspace_branch(
         if ws.trigger_prefixes
         else ([ws.working_directory] if ws.working_directory else [])
     )
-    if effective_prefixes and ws.vcs_last_commit_sha:
+    if effective_prefixes and old_sha:
         try:
-            changed = await _get_changed_files(conn, owner, repo, ws.vcs_last_commit_sha, sha)
+            changed = await _get_changed_files(conn, owner, repo, old_sha, sha)
             # None means truncated — create run unconditionally
             if changed is not None and not _changes_affect_prefixes(changed, effective_prefixes):
                 logger.info(
@@ -272,8 +325,6 @@ async def _poll_workspace_branch(
                     changed_files=changed[:20],
                     changed_files_count=len(changed),
                 )
-                ws.vcs_last_commit_sha = sha
-                await db.commit()
                 return
         except Exception as e:
             logger.warning(
@@ -295,8 +346,6 @@ async def _poll_workspace_branch(
 
     if run:
         VCS_RUNS_CREATED.labels(provider=conn.provider, type="push").inc()
-        ws.vcs_last_commit_sha = sha
-        await db.commit()
 
         logger.info(
             "VCS run created",
