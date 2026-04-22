@@ -74,13 +74,16 @@ wait_for_child() {
     CHILD_PID=""
 }
 
-# --- Setup log capture ---
-# All output before terraform/tofu execution is captured so it can be
-# included in the uploaded log artifact (visible in the UI after the
-# live pod log stream ends).
-SETUP_LOG="/tmp/setup.log"
-: > "$SETUP_LOG"
-log() { echo "$@" | tee -a "$SETUP_LOG"; }
+# --- Combined log capture ---
+# All script output (setup + init + plan + apply) accumulates into a single
+# file that an EXIT trap uploads at the end, regardless of where the script
+# exits (early bin-download failure, init failure, plan failure, SIGTERM,
+# clean success). This replaces the previous pattern of per-checkpoint
+# `curl -sSf … || true` uploads that silently dropped logs whenever the
+# script exited before reaching a checkpoint.
+COMBINED_LOG="/tmp/combined.log"
+: > "$COMBINED_LOG"
+log() { echo "$@" | tee -a "$COMBINED_LOG"; }
 
 # --- Configuration ---
 TP_BACKEND="${TP_BACKEND:-terraform}"
@@ -90,6 +93,9 @@ TP_PHASE="${TP_PHASE:-plan}"
 # be several MB and the old 10s cap routinely timed out under normal network
 # conditions. Small status POSTs keep their tighter local timeouts.
 TP_UPLOAD_TIMEOUT="${TP_UPLOAD_TIMEOUT:-60}"
+# Artifact name used by upload_log() — set to "apply" when we enter the apply
+# phase so the trap writes to /artifacts/apply-log. Default is "plan".
+UPLOAD_PHASE="${TP_PHASE:-plan}"
 WORK_DIR="/workspace"
 
 mkdir -p "$WORK_DIR"
@@ -97,6 +103,42 @@ cd "$WORK_DIR"
 
 # Auth header for all API calls
 AUTH_HEADER="Authorization: Bearer $TP_AUTH_TOKEN"
+
+# --- Guaranteed log upload on exit ---
+# upload_log and an EXIT trap ensure the combined log is uploaded on every
+# exit path. Retries with linear backoff; on final failure, writes a FATAL
+# marker to the pod's own stdout/stderr so at minimum the pod log shows the
+# upload failed (visible via kubectl logs). Always returns 0 so the trap
+# never disturbs the script's real exit code.
+upload_log() {
+    _artifact="${UPLOAD_PHASE}-log"
+    if [ -z "$TP_API_URL" ] || [ -z "$TP_RUN_ID" ] || [ ! -s "$COMBINED_LOG" ]; then
+        return 0
+    fi
+    _i=1
+    while [ "$_i" -le 3 ]; do
+        if curl -sSf --max-time 30 -X PUT \
+             -H "$AUTH_HEADER" \
+             -H "Content-Type: application/octet-stream" \
+             --data-binary @"$COMBINED_LOG" \
+             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/${_artifact}" \
+             >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep "$((_i * 2))"
+        _i=$((_i + 1))
+    done
+    _size=$(wc -c < "$COMBINED_LOG" 2>/dev/null || echo 0)
+    echo "[entrypoint] FATAL: log upload failed after 3 attempts (artifact=${_artifact}, size=${_size}B, run=${TP_RUN_ID})" >&2
+    return 0
+}
+
+on_exit() {
+    _rc=$?
+    upload_log || true
+    exit "$_rc"
+}
+trap on_exit EXIT
 
 # --- Redirect-aware curl wrapper ---
 # API endpoints return 302 redirects to presigned URLs. For cloud storage
@@ -310,16 +352,10 @@ log "[entrypoint] Running $TP_BACKEND init..."
 INIT_EXIT=0
 "$TP_BIN" init -input=false > /tmp/init.log 2>&1 || INIT_EXIT=$?
 cat /tmp/init.log
+cat /tmp/init.log >> "$COMBINED_LOG"
 if [ "$INIT_EXIT" != "0" ]; then
     log "[entrypoint] Init failed with exit code $INIT_EXIT"
-    # Upload setup + init output as plan log so it's visible in the UI
-    if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
-        cat "$SETUP_LOG" /tmp/init.log > /tmp/plan-full.log 2>/dev/null
-        curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
-            -H "Content-Type: application/octet-stream" \
-            --data-binary @/tmp/plan-full.log \
-            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-log" || true
-    fi
+    # Log uploaded by on_exit trap — no explicit upload here.
     exit "$INIT_EXIT"
 fi
 
@@ -408,16 +444,10 @@ if [ "$TP_PHASE" = "plan" ]; then
             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/plan-result" || true
     fi
 
-    # Upload plan log (best-effort) — prepend setup + init output so the full log is visible
-    if [ -n "$TP_API_URL" ] && [ -f /tmp/plan.log ]; then
-        cat "$SETUP_LOG" /tmp/init.log /tmp/plan.log > /tmp/plan-full.log 2>/dev/null
-        curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
-            -H "Content-Type: application/octet-stream" \
-            --data-binary @/tmp/plan-full.log \
-            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-log" || true
-    fi
+    # Append plan.log to combined; on_exit trap uploads the combined log.
+    [ -f /tmp/plan.log ] && cat /tmp/plan.log >> "$COMBINED_LOG"
 
-    # Upload plan file (best-effort)
+    # Upload plan file (best-effort) — separate artifact, not a log.
     if [ -n "$TP_API_URL" ] && [ -f tfplan ]; then
         curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
@@ -426,6 +456,9 @@ if [ "$TP_PHASE" = "plan" ]; then
     fi
 
 elif [ "$TP_PHASE" = "apply" ]; then
+    # From here on, the trap uploads to /artifacts/apply-log rather than plan-log.
+    UPLOAD_PHASE="apply"
+
     # Download plan file from plan phase
     if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
         log "[entrypoint] Downloading plan file from plan phase..."
@@ -448,15 +481,8 @@ elif [ "$TP_PHASE" = "apply" ]; then
     wait_for_child
     kill "$TAIL_PID" 2>/dev/null; wait "$TAIL_PID" 2>/dev/null || true
 
-    # Upload apply log (best-effort, bounded by --max-time) — prepend setup + init output
-    if [ -n "$TP_API_URL" ] && [ -f /tmp/apply.log ]; then
-        cat "$SETUP_LOG" /tmp/init.log /tmp/apply.log > /tmp/apply-full.log 2>/dev/null
-        curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
-            -H "Content-Type: application/octet-stream" \
-            --data-binary @/tmp/apply-full.log \
-            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/apply-log" || \
-            echo "[entrypoint] WARNING: apply log upload failed"
-    fi
+    # Append apply.log to combined; on_exit trap uploads the combined log.
+    [ -f /tmp/apply.log ] && cat /tmp/apply.log >> "$COMBINED_LOG"
 
     # Upload new state (FATAL — missing state = infrastructure/state divergence)
     if [ -n "$TP_API_URL" ] && [ -f terraform.tfstate ]; then

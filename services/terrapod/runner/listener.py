@@ -580,8 +580,20 @@ class RunnerListener:
             )
             if not logs:
                 return
-        except Exception:
-            return  # Pod may not have logs yet
+        except Exception as e:
+            # Pod may not have logs yet (container still starting) — this is
+            # expected for the first few events after Job launch. But we MUST
+            # log so that repeated failures are diagnosable; previously this
+            # was a bare `except: return` which silenced permanent failures
+            # (auth, RBAC, wrong namespace, etc.) indistinguishably from the
+            # benign "logs not ready" case.
+            logger.debug(
+                "Failed to read pod logs (may be starting up)",
+                run_id=run_id,
+                job=job_name,
+                error=str(e),
+            )
+            return
 
         # Encode once — avoid holding both str and bytes simultaneously
         log_bytes = logs.encode() if isinstance(logs, str) else logs
@@ -598,8 +610,17 @@ class RunnerListener:
                     "Content-Type": "application/octet-stream",
                 },
             )
-        except Exception:
-            pass  # Best-effort log streaming
+        except Exception as e:
+            # Best-effort log streaming — runner-entrypoint uploads the full
+            # combined log via the on_exit trap, so live-stream failure isn't
+            # fatal. But log it at warning: if this happens every cycle we
+            # want it surfaced, not silently swallowed.
+            logger.warning(
+                "Failed to PUT log stream",
+                run_id=run_id,
+                job=job_name,
+                error=str(e),
+            )
 
     async def _handle_cancel_job(self, data: dict) -> None:
         """Delete a K8s Job for a canceled run."""
