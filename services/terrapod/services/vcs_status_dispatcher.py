@@ -233,6 +233,11 @@ async def handle_vcs_commit_status(payload: dict) -> None:
         if settings.external_url:
             target_url = f"{settings.external_url.rstrip('/')}/workspaces/{ws.id}/runs/{run.id}"
 
+        # Scope context to the workspace so multiple workspaces linked to the
+        # same PR (e.g. module-impact fan-out) each get a distinct check,
+        # rather than clobbering each other.
+        context = f"terrapod/{ws.name}"
+
         # Post commit status
         try:
             if conn.provider == "gitlab":
@@ -244,6 +249,7 @@ async def handle_vcs_commit_status(payload: dict) -> None:
                     state=gitlab_state,
                     description=description,
                     target_url=target_url,
+                    context=context,
                 )
             else:
                 await github_service.create_commit_status(
@@ -254,6 +260,7 @@ async def handle_vcs_commit_status(payload: dict) -> None:
                     state=github_state,
                     description=description,
                     target_url=target_url,
+                    context=context,
                 )
         except Exception as e:
             logger.warning(
