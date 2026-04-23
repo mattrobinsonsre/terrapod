@@ -46,14 +46,30 @@ _COMMENT_CACHE_PREFIX = "tp:vcs_comment:"
 _COMMENT_CACHE_TTL = 7 * 24 * 3600  # 7 days
 
 
-def _resolve_status(run_status: str, plan_only: bool) -> tuple[str, str, str]:
+def _resolve_status(
+    run_status: str, plan_only: bool, has_changes: bool | None = None
+) -> tuple[str, str, str]:
     """Map run status to (github_state, gitlab_state, description).
 
-    Special case: 'planned' status depends on whether the run is plan-only.
+    Plan-only 'planned' runs use the plan's has_changes flag to produce a
+    descriptive message ("Has changes" / "No changes") instead of the generic
+    "Plan finished". The check still reports success in both cases — only the
+    text differs. Non-plan-only 'planned' runs keep the awaiting-confirmation
+    pending state, annotated with has-changes when known. When has_changes
+    is None (older runs, pre-plan statuses) the description falls back to
+    the bare form.
     """
     if run_status == "planned":
+        # A no-op plan is effectively done — nothing to apply, nothing to
+        # confirm. Report success regardless of plan_only.
+        if has_changes is False:
+            return ("success", "success", "No changes")
         if plan_only:
+            if has_changes is True:
+                return ("success", "success", "Has changes")
             return ("success", "success", "Plan finished")
+        if has_changes is True:
+            return ("pending", "running", "Has changes, awaiting confirmation")
         return ("pending", "running", "Plan complete, awaiting confirmation")
     return _STATUS_MAP.get(run_status, ("pending", "pending", run_status))
 
@@ -68,7 +84,7 @@ def _build_comment_body(
     run_url: str,
 ) -> str:
     """Build the markdown body for a PR/MR comment."""
-    github_state, _, description = _resolve_status(run_status, plan_only)
+    github_state, _, description = _resolve_status(run_status, plan_only, has_changes)
     emoji = _STATUS_EMOJI.get(run_status, ":grey_question:")
 
     has_changes_line = ""
@@ -225,8 +241,12 @@ async def handle_vcs_commit_status(payload: dict) -> None:
 
         owner, repo = parsed
 
-        # Resolve status
-        github_state, gitlab_state, description = _resolve_status(target_status, run.plan_only)
+        # Resolve status. `has_changes` is set on the run by the runner
+        # when the plan finishes; None means unknown (pre-plan statuses,
+        # or older runs before the field existed).
+        github_state, gitlab_state, description = _resolve_status(
+            target_status, run.plan_only, run.has_changes
+        )
 
         # Build target URL
         target_url = ""
