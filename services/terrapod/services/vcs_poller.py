@@ -567,43 +567,63 @@ async def _poll_workspace_owned(ws_id: uuid.UUID, semaphore: asyncio.Semaphore) 
                 pass
 
 
-async def _select_workspace_ids(db: AsyncSession, repo: str | None = None) -> list[uuid.UUID]:
+async def _select_workspace_ids(
+    db: AsyncSession,
+    repo: str | None = None,
+    provider: str | None = None,
+) -> list[uuid.UUID]:
     """Fetch IDs of VCS-enabled workspaces, optionally filtered to one repo.
 
-    The ``repo`` filter is used by webhook-triggered immediate polls to
-    avoid re-polling every workspace when only one repo had a push. It
-    expects the ``owner/repo`` form emitted by the GitHub webhook's
-    ``repository.full_name``.
+    The ``repo`` + ``provider`` filter is used by webhook-triggered
+    immediate polls to avoid re-polling every workspace when only one
+    repo on one provider had a push. ``repo`` is the ``owner/repo``
+    form emitted by GitHub's ``repository.full_name`` (or GitLab's
+    ``project.path_with_namespace``). ``provider`` narrows to
+    ``"github"`` / ``"gitlab"`` — a GitHub webhook must not match a
+    GitLab workspace whose URL happens to contain the same owner/repo
+    slug (and vice-versa), because the two providers' parsers accept
+    each other's URL shapes.
 
-    We avoid fuzzy SQL matching on ``vcs_repo_url`` (which would require
-    LIKE with anchors + wildcard escaping and still risk false positives
-    across providers). Instead we load the VCS-enabled workspaces' URLs,
-    parse each to ``(owner, repo)`` using the same parser the poller
-    uses, and exact-match. Workspaces with VCS enabled typically number
-    in the dozens to low hundreds — Python-side filtering is negligible
-    and it's exact by construction.
+    We avoid fuzzy SQL matching on ``vcs_repo_url`` (which would risk
+    wildcard-escape hazards and cross-org suffix collisions). Instead
+    we load the VCS-enabled workspaces joined with their connection
+    provider, parse each URL with its OWN provider's parser, and exact-
+    match. Workspaces with VCS enabled typically number in the dozens
+    to low hundreds — Python-side filtering is negligible and exact
+    by construction.
     """
-    stmt = select(Workspace.id, Workspace.vcs_repo_url).where(
-        Workspace.vcs_repo_url != "",
-        Workspace.vcs_connection_id.isnot(None),
+    stmt = (
+        select(Workspace.id, Workspace.vcs_repo_url, VCSConnection.provider)
+        .join(VCSConnection, Workspace.vcs_connection_id == VCSConnection.id)
+        .where(
+            Workspace.vcs_repo_url != "",
+            Workspace.vcs_connection_id.isnot(None),
+        )
     )
+    if provider:
+        stmt = stmt.where(VCSConnection.provider == provider)
     result = await db.execute(stmt)
     rows = list(result.all())
     if not repo:
         return [row[0] for row in rows]
 
-    # Normalise the webhook input to (owner, repo). GitHub always gives us
-    # owner/repo in full_name. If parsing fails (malformed input), return
-    # no matches rather than silently polling everything.
-    parsed_target = github_service.parse_repo_url(f"https://github.com/{repo}")
-    if parsed_target is None:
-        return []
-    # Parse each workspace's URL and keep the exact matches. Either
-    # provider's parser works — they share the same owner/repo slug.
+    # Parse each workspace's URL with its OWN provider's parser. This is
+    # the correctness guard: github's parser will happily tokenise a
+    # gitlab.com URL as (owner, repo) — but we only want to consider
+    # workspaces whose connection provider matches the webhook source.
     matched: list[uuid.UUID] = []
-    for ws_id, url in rows:
-        parsed = github_service.parse_repo_url(url) or gitlab_service.parse_repo_url(url)
-        if parsed == parsed_target:
+    target = repo  # already in "owner/repo" form
+    for ws_id, url, ws_provider in rows:
+        parse = (
+            gitlab_service.parse_repo_url
+            if ws_provider == "gitlab"
+            else github_service.parse_repo_url
+        )
+        parsed = parse(url)
+        if parsed is None:
+            continue
+        owner, repo_name = parsed
+        if f"{owner}/{repo_name}" == target:
             matched.append(ws_id)
     return matched
 
@@ -637,16 +657,26 @@ async def handle_immediate_poll(payload: dict) -> None:
     """Handle a webhook-triggered immediate poll for a specific repo.
 
     Called by the distributed scheduler's trigger consumer. The payload
-    contains {"repo": "owner/repo"} from the webhook handler. We poll
-    only the workspaces that track this repo — no point re-checking every
-    other repo's workspaces just because one got a push.
+    contains ``{"repo": "owner/repo", "provider": "github"}`` from the
+    webhook handler (older payloads without ``provider`` are treated as
+    GitHub for back-compat, since that's the only webhook shipped before
+    this field was added). We poll only the workspaces whose connection
+    matches the webhook source.
     """
     start = time_mod.monotonic()
     repo = payload.get("repo", "")
-    logger.info("Immediate poll triggered by webhook", repo=repo)
+    # Back-compat: pre-PR enqueues didn't carry "provider". At the time,
+    # github was the only webhook receiver, so defaulting there matches
+    # historical behaviour for any in-flight triggers.
+    provider = payload.get("provider", "github")
+    logger.info("Immediate poll triggered by webhook", repo=repo, provider=provider)
 
     async with get_db_session() as db:
-        workspace_ids = await _select_workspace_ids(db, repo=repo or None)
+        workspace_ids = await _select_workspace_ids(
+            db,
+            repo=repo or None,
+            provider=provider,
+        )
 
     if not workspace_ids:
         logger.info("Immediate poll: no workspaces match repo", repo=repo)

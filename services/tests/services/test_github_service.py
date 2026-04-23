@@ -347,6 +347,25 @@ class TestGithubRequestRetry:
         assert m_cls.return_value.request.await_count == 1
 
     @pytest.mark.asyncio
+    async def test_5xx_retries_for_POST_when_retry_5xx_opt_in(self):
+        """Opt-in override: the installation-token endpoint (POST but safe
+        to replay) uses retry_5xx=True and must retry on a transient 5xx."""
+        from unittest.mock import AsyncMock
+
+        from terrapod.services.github_service import _github_request
+
+        first = _fake_resp(502)
+        second = _fake_resp(201)
+
+        with (
+            patch("terrapod.services.github_service.asyncio.sleep", new=AsyncMock()),
+            patch("httpx.AsyncClient", return_value=_patched_client([first, second])),
+        ):
+            resp = await _github_request("POST", "https://api.github.com/x", "tok", retry_5xx=True)
+
+        assert resp is second
+
+    @pytest.mark.asyncio
     async def test_429_still_retried_for_POST(self):
         """429 is a pre-execution rejection — no side effect, safe to
         retry regardless of method."""

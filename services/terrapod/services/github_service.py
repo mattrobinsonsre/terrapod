@@ -86,14 +86,19 @@ def _looks_like_secondary_rate_limit(resp: httpx.Response) -> bool:
     return "secondary rate limit" in sample
 
 
-def _should_retry(resp: httpx.Response, method: str) -> bool:
-    """Return True if the response status deserves a retry for this method.
+def _should_retry(resp: httpx.Response, method: str, retry_5xx: bool) -> bool:
+    """Return True if the response status deserves a retry.
 
-    - 429 and rate-limit 403: always retry (pre-execution rejection, no side
-      effect, so safe to replay on any method).
-    - 5xx: retry only on idempotent methods (GET/HEAD/OPTIONS). A POST that
-      returned 502 may have already been applied server-side; replaying it
-      could duplicate the operation (e.g. an extra PR comment).
+    - 429 and rate-limit 403: always retry (pre-execution rejection, no
+      side effect, so safe to replay on any method).
+    - 5xx: retry only when ``retry_5xx`` is True. By default this is the
+      "method is idempotent" check (GET/HEAD/OPTIONS) — a POST that
+      returned 502 may have already been applied server-side and
+      replaying it could duplicate the operation (e.g. an extra PR
+      comment). Callers with endpoints that ARE safe to replay
+      regardless of HTTP method (e.g. GitHub's installation-token
+      acquisition — the server-side effect is only "issue a new token",
+      which never conflicts) pass ``retry_5xx=True``.
     """
     if resp.status_code == 429:
         return True
@@ -102,7 +107,7 @@ def _should_retry(resp: httpx.Response, method: str) -> bool:
     ):
         return True
     if 500 <= resp.status_code < 600:
-        return method.upper() in _IDEMPOTENT_METHODS
+        return retry_5xx or method.upper() in _IDEMPOTENT_METHODS
     return False
 
 
@@ -112,6 +117,7 @@ async def _github_request(
     token: str,
     *,
     follow_redirects: bool = False,
+    retry_5xx: bool = False,
     **kwargs: object,
 ) -> httpx.Response:
     """Authenticated GitHub API request with retry on 429 / secondary-rate-limit / 5xx.
@@ -122,7 +128,9 @@ async def _github_request(
 
     Retry scope:
     - 429 and rate-limit 403: every method, every attempt.
-    - 5xx: only idempotent methods (GET/HEAD/OPTIONS).
+    - 5xx: only on idempotent methods (GET/HEAD/OPTIONS) by default.
+      Pass ``retry_5xx=True`` for endpoints that are safe to replay
+      regardless of method (e.g. token issuance).
     - Transport errors (connect / read / timeout): every method — they
       happen before the server has a chance to process the request, so
       replay is safe.
@@ -158,7 +166,7 @@ async def _github_request(
                 await asyncio.sleep(_DEFAULT_BACKOFF_SECONDS)
                 continue
 
-            if not _should_retry(resp, method):
+            if not _should_retry(resp, method, retry_5xx):
                 return resp
             if attempt >= _MAX_RETRIES:
                 logger.warning(
@@ -231,12 +239,16 @@ async def get_installation_token(conn: VCSConnection) -> str:
     api_url = _api_url(conn)
 
     # This call predates the caller having a token, so it uses the JWT
-    # directly rather than _github_request (which assumes an installation
-    # token). It still retries on rate-limit / 5xx via the same helper.
+    # directly as the bearer. The token endpoint is semantically idempotent
+    # (every call mints a fresh short-lived token; replaying after a 5xx
+    # is safe), so opt in to 5xx retries via retry_5xx=True — otherwise a
+    # single transient 5xx would propagate as an auth failure and stall
+    # every subsequent VCS operation on this connection.
     resp = await _github_request(
         "POST",
         f"{api_url}/app/installations/{installation_id}/access_tokens",
         app_jwt,
+        retry_5xx=True,
     )
     resp.raise_for_status()
     data = resp.json()
