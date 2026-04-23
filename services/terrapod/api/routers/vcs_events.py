@@ -83,11 +83,15 @@ async def github_webhook(request: Request) -> Response:
             {"repo": full_name, "provider": "github"},
             dedup_key=f"vcs_poll:github:{full_name}",
         )
-        # Also trigger module impact analysis for VCS-connected modules
+        # Also trigger module impact analysis for VCS-connected modules.
+        # The module-impact consumer runs a full cycle over all linked
+        # modules regardless of source, so leave the payload/dedup key
+        # unscoped — adding a `github:` prefix here would just churn
+        # Redis key space without any filtering benefit.
         await enqueue_trigger(
             "module_impact_immediate_poll",
-            {"repo": full_name, "provider": "github"},
-            dedup_key=f"module_impact_poll:github:{full_name}",
+            {"repo": full_name},
+            dedup_key=f"module_impact_poll:{full_name}",
         )
 
     return JSONResponse(content={"message": "accepted"})

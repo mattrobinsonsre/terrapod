@@ -41,6 +41,11 @@ from terrapod.storage.keys import config_version_key
 
 logger = get_logger(__name__)
 
+# Providers this module knows how to dispatch to. Keep in sync with
+# `_parse_repo_url` below and with `_select_workspace_ids`'s Python-side
+# filter — a new provider needs parser dispatch in both places.
+_KNOWN_VCS_PROVIDERS = frozenset({"github", "gitlab"})
+
 
 # --- Provider dispatch ---
 
@@ -614,6 +619,16 @@ async def _select_workspace_ids(
     matched: list[uuid.UUID] = []
     target = repo  # already in "owner/repo" form
     for ws_id, url, ws_provider in rows:
+        if ws_provider not in _KNOWN_VCS_PROVIDERS:
+            # A provider column we don't know how to parse. Skip rather
+            # than silently misparse with the github parser — whoever
+            # adds a new provider needs to extend this dispatch.
+            logger.warning(
+                "Unknown VCS provider on workspace, skipping immediate-poll filter",
+                workspace_id=str(ws_id),
+                provider=ws_provider,
+            )
+            continue
         parse = (
             gitlab_service.parse_repo_url
             if ws_provider == "gitlab"
