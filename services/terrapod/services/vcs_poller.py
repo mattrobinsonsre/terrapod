@@ -51,10 +51,23 @@ _KNOWN_VCS_PROVIDERS = frozenset({"github", "gitlab"})
 
 
 def _parse_repo_url(conn: VCSConnection, repo_url: str) -> tuple[str, str] | None:
-    """Parse a repo URL using the appropriate provider parser."""
+    """Parse a repo URL using the appropriate provider parser.
+
+    Unknown providers are logged and return None — the github parser is
+    permissive enough to tokenise a gitlab URL (and vice-versa), so an
+    unknown provider must not silently fall through. Whoever adds a new
+    provider needs to extend this dispatch (and ``_KNOWN_VCS_PROVIDERS``).
+    """
     if conn.provider == "gitlab":
         return gitlab_service.parse_repo_url(repo_url)
-    return github_service.parse_repo_url(repo_url)
+    if conn.provider == "github":
+        return github_service.parse_repo_url(repo_url)
+    logger.warning(
+        "Unknown VCS provider, cannot parse repo URL",
+        provider=conn.provider,
+        connection_id=str(conn.id),
+    )
+    return None
 
 
 async def _get_branch_sha(conn: VCSConnection, owner: str, repo: str, branch: str) -> str | None:

@@ -821,6 +821,35 @@ class TestPollCycleParallel:
         assert sorted(result) == sorted([github_ws, gitlab_ws])
 
     @pytest.mark.asyncio
+    async def test_unknown_provider_is_warned_and_skipped(self):
+        """An unknown provider row must NOT silently fall through to the
+        github parser. The defensive warn-and-skip is dead code today
+        (the DB only holds github/gitlab), but it's the tripwire that
+        catches a future provider addition without a dispatch update.
+        """
+        import uuid
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from terrapod.services.vcs_poller import _select_workspace_ids
+
+        bitbucket_ws = uuid.uuid4()
+        rows = [(bitbucket_ws, "https://bitbucket.org/ns/repo", "bitbucket")]
+
+        mock_db = AsyncMock()
+        select_result = MagicMock()
+        select_result.all = MagicMock(return_value=rows)
+        mock_db.execute = AsyncMock(return_value=select_result)
+
+        with patch("terrapod.services.vcs_poller.logger.warning") as mock_warn:
+            result = await _select_workspace_ids(mock_db, repo="ns/repo")
+
+        assert result == []
+        mock_warn.assert_called_once()
+        # The warning should identify the offending provider.
+        call_kwargs = mock_warn.call_args.kwargs
+        assert call_kwargs.get("provider") == "bitbucket"
+
+    @pytest.mark.asyncio
     async def test_immediate_poll_no_matches_returns_quickly(self):
         """When no workspaces match the repo, nothing is polled."""
         import uuid

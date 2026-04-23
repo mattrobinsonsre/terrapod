@@ -460,11 +460,16 @@ async def create_commit_status(
     if target_url:
         body["target_url"] = target_url
 
+    # Commit status is idempotent in practice — GitHub keeps only the
+    # latest status per (sha, context), so replaying the same body just
+    # re-asserts what we meant. Opt in to 5xx retry so a transient 502
+    # doesn't leave a PR check stuck on an older state.
     resp = await _github_request(
         "POST",
         f"{api_url}/repos/{owner}/{repo}/statuses/{sha}",
         token,
         json=body,
+        retry_5xx=True,
     )
     resp.raise_for_status()
 
