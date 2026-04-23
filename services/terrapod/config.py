@@ -456,6 +456,15 @@ class RateLimitConfig(BaseModel):
             "header or session cookie (non-runner). 0 = unlimited."
         ),
     )
+    runner_requests_per_minute: int = Field(
+        default=0,
+        description=(
+            "Max requests per minute for verified runner-token requests. "
+            "Defaults to 0 (unlimited) because runners routinely burst on "
+            "tofu init / apply artifact uploads and throttling them causes "
+            "plan failures. Raise if you need a hard cap."
+        ),
+    )
     auth_requests_per_minute: int = Field(
         default=10,
         description="Max requests per minute for auth endpoints (login). 0 = unlimited.",

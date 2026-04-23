@@ -60,12 +60,14 @@ class RateLimitMiddleware:
         app: ASGIApp,
         requests_per_minute: int = 100,
         authenticated_requests_per_minute: int = 1000,
+        runner_requests_per_minute: int = 0,
         auth_requests_per_minute: int = 10,
         get_redis: Callable | None = None,
     ) -> None:
         self.app = app
         self.requests_per_minute = requests_per_minute
         self.authenticated_requests_per_minute = authenticated_requests_per_minute
+        self.runner_requests_per_minute = runner_requests_per_minute
         self.auth_requests_per_minute = auth_requests_per_minute
         self._get_redis = get_redis
 
@@ -89,25 +91,16 @@ class RateLimitMiddleware:
 
         request = Request(scope)
 
-        # Verified runner tokens bypass the limiter entirely. HMAC verification
-        # is pure (no DB / Redis), cheap enough to run in middleware.
+        # Identify the request tier. HMAC verification of runner tokens is
+        # pure (no DB / Redis), cheap enough to run in middleware.
         auth_header = request.headers.get("authorization", "")
+        is_runner = False
         if auth_header.startswith("Bearer runtok:"):
             token = auth_header.removeprefix("Bearer ").strip()
-            if verify_runner_token(token) is not None:
-                await self.app(scope, receive, send)
-                return
+            is_runner = verify_runner_token(token) is not None
 
-        try:
-            redis = self._resolve_redis()
-        except RuntimeError:
-            # Redis not initialized — fail open
-            await self.app(scope, receive, send)
-            return
-
-        client_ip = _get_client_ip(request)
         is_auth_endpoint = _is_auth_path(path)
-        # Any other Authorization header or session cookie bumps the tier.
+        # Any Authorization header or session cookie bumps the tier.
         # We don't verify the credential here — the downstream auth
         # dependency will 401 bogus tokens — but presence is enough to
         # separate interactive / machine-integration traffic from
@@ -117,6 +110,9 @@ class RateLimitMiddleware:
         if is_auth_endpoint:
             limit = self.auth_requests_per_minute
             prefix = "auth"
+        elif is_runner:
+            limit = self.runner_requests_per_minute
+            prefix = "api_runner"
         elif is_authenticated:
             limit = self.authenticated_requests_per_minute
             prefix = "api_authn"
@@ -128,6 +124,15 @@ class RateLimitMiddleware:
         if limit <= 0:
             await self.app(scope, receive, send)
             return
+
+        try:
+            redis = self._resolve_redis()
+        except RuntimeError:
+            # Redis not initialized — fail open
+            await self.app(scope, receive, send)
+            return
+
+        client_ip = _get_client_ip(request)
 
         # Sliding window: 60-second buckets
         window_id = int(time.time()) // 60
