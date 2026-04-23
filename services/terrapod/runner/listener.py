@@ -322,7 +322,21 @@ class RunnerListener:
                 await self._sse_connect()
                 consecutive_401s = 0  # successful connection resets counter
             except httpx.HTTPStatusError as e:
-                if e.response.status_code == 401:
+                if e.response.status_code == 404:
+                    # API doesn't recognise our listener-id: Redis TTL expired
+                    # (e.g. during an API outage). Immediate re-join — 404 is
+                    # unambiguous, unlike a single 401 flap.
+                    logger.warning(
+                        "Listener ID unknown to API (stale registration) — re-joining",
+                        listener_id=str(self.identity.listener_id),
+                    )
+                    try:
+                        await self._rejoin()
+                        consecutive_401s = 0
+                        continue
+                    except Exception as rejoin_err:
+                        logger.error("Re-join failed", error=str(rejoin_err))
+                elif e.response.status_code == 401:
                     consecutive_401s += 1
                     if consecutive_401s >= _REJOIN_THRESHOLD:
                         try:
@@ -396,6 +410,10 @@ class RunnerListener:
         drop or buffer the connection. This loop ensures bounded worst-case
         latency (~30s) by periodically checking for available work regardless
         of SSE state.
+
+        A 404 from a listener-scoped endpoint means the API no longer has our
+        registration (Redis TTL expired during an outage) — triggers re-join
+        to recover a fresh identity without requiring a pod restart.
         """
         while not _shutdown.is_set():
             try:
@@ -406,6 +424,18 @@ class RunnerListener:
 
             try:
                 await self._handle_run_available()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 404:
+                    logger.warning(
+                        "Listener ID unknown to API (stale registration) — re-joining",
+                        listener_id=str(self.identity.listener_id),
+                    )
+                    try:
+                        await self._rejoin()
+                    except Exception as rejoin_err:
+                        logger.error("Re-join failed", error=str(rejoin_err))
+                else:
+                    logger.warning("Poll fallback failed", error=str(e))
             except Exception as e:
                 logger.warning("Poll fallback failed", error=str(e))
 
