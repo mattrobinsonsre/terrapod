@@ -17,7 +17,9 @@ runs each poll cycle per interval. Webhook-triggered immediate polls use
 the scheduler's trigger queue with deduplication.
 """
 
+import asyncio
 import time as time_mod
+import uuid
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,15 +41,33 @@ from terrapod.storage.keys import config_version_key
 
 logger = get_logger(__name__)
 
+# Providers this module knows how to dispatch to. Keep in sync with
+# `_parse_repo_url` below and with `_select_workspace_ids`'s Python-side
+# filter — a new provider needs parser dispatch in both places.
+_KNOWN_VCS_PROVIDERS = frozenset({"github", "gitlab"})
+
 
 # --- Provider dispatch ---
 
 
 def _parse_repo_url(conn: VCSConnection, repo_url: str) -> tuple[str, str] | None:
-    """Parse a repo URL using the appropriate provider parser."""
+    """Parse a repo URL using the appropriate provider parser.
+
+    Unknown providers are logged and return None — the github parser is
+    permissive enough to tokenise a gitlab URL (and vice-versa), so an
+    unknown provider must not silently fall through. Whoever adds a new
+    provider needs to extend this dispatch (and ``_KNOWN_VCS_PROVIDERS``).
+    """
     if conn.provider == "gitlab":
         return gitlab_service.parse_repo_url(repo_url)
-    return github_service.parse_repo_url(repo_url)
+    if conn.provider == "github":
+        return github_service.parse_repo_url(repo_url)
+    logger.warning(
+        "Unknown VCS provider, cannot parse repo URL",
+        provider=conn.provider,
+        connection_id=str(conn.id),
+    )
+    return None
 
 
 async def _get_branch_sha(conn: VCSConnection, owner: str, repo: str, branch: str) -> str | None:
@@ -529,44 +549,134 @@ async def _poll_workspace(db: AsyncSession, ws: Workspace) -> None:
         ws.vcs_last_error_at = utc_now()
 
 
+# Bound the number of workspaces polled in parallel per cycle. Each workspace
+# makes a handful of GitHub/GitLab API calls (branch SHA, list PRs, changed-files
+# per PR); we cap concurrency so one cycle can't exhaust the provider's API
+# rate limit or saturate the event loop with outstanding HTTP connections.
+# Most deployments have <10 VCS workspaces per repo, so 10 covers the common
+# case without bursting.
+_MAX_PARALLEL_WORKSPACE_POLLS = 10
+
+
+async def _poll_workspace_owned(ws_id: uuid.UUID, semaphore: asyncio.Semaphore) -> None:
+    """Poll a single workspace in its own DB session, bounded by a semaphore.
+
+    Each parallel poll needs its own session — AsyncSession is not safe to
+    share across concurrent coroutines. Errors are caught and logged here
+    so one workspace's failure doesn't sink the whole cycle.
+    """
+    async with semaphore, get_db_session() as db:
+        ws = await db.get(Workspace, ws_id)
+        if ws is None:
+            return
+        try:
+            await _poll_workspace(db, ws)
+            await db.commit()
+        except Exception as e:
+            logger.error(
+                "Error polling workspace",
+                workspace=ws.name,
+                error=str(e),
+                exc_info=e,
+            )
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+
+
+async def _select_workspace_ids(
+    db: AsyncSession,
+    repo: str | None = None,
+    provider: str | None = None,
+) -> list[uuid.UUID]:
+    """Fetch IDs of VCS-enabled workspaces, optionally filtered to one repo.
+
+    The ``repo`` + ``provider`` filter is used by webhook-triggered
+    immediate polls to avoid re-polling every workspace when only one
+    repo on one provider had a push. ``repo`` is the ``owner/repo``
+    form emitted by GitHub's ``repository.full_name`` (or GitLab's
+    ``project.path_with_namespace``). ``provider`` narrows to
+    ``"github"`` / ``"gitlab"`` — a GitHub webhook must not match a
+    GitLab workspace whose URL happens to contain the same owner/repo
+    slug (and vice-versa), because the two providers' parsers accept
+    each other's URL shapes.
+
+    We avoid fuzzy SQL matching on ``vcs_repo_url`` (which would risk
+    wildcard-escape hazards and cross-org suffix collisions). Instead
+    we load the VCS-enabled workspaces joined with their connection
+    provider, parse each URL with its OWN provider's parser, and exact-
+    match. Workspaces with VCS enabled typically number in the dozens
+    to low hundreds — Python-side filtering is negligible and exact
+    by construction.
+    """
+    stmt = (
+        select(Workspace.id, Workspace.vcs_repo_url, VCSConnection.provider)
+        .join(VCSConnection, Workspace.vcs_connection_id == VCSConnection.id)
+        .where(
+            Workspace.vcs_repo_url != "",
+            Workspace.vcs_connection_id.isnot(None),
+        )
+    )
+    if provider:
+        stmt = stmt.where(VCSConnection.provider == provider)
+    result = await db.execute(stmt)
+    rows = list(result.all())
+    if not repo:
+        return [row[0] for row in rows]
+
+    # Parse each workspace's URL with its OWN provider's parser. This is
+    # the correctness guard: github's parser will happily tokenise a
+    # gitlab.com URL as (owner, repo) — but we only want to consider
+    # workspaces whose connection provider matches the webhook source.
+    matched: list[uuid.UUID] = []
+    target = repo  # already in "owner/repo" form
+    for ws_id, url, ws_provider in rows:
+        if ws_provider not in _KNOWN_VCS_PROVIDERS:
+            # A provider column we don't know how to parse. Skip rather
+            # than silently misparse with the github parser — whoever
+            # adds a new provider needs to extend this dispatch.
+            logger.warning(
+                "Unknown VCS provider on workspace, skipping immediate-poll filter",
+                workspace_id=str(ws_id),
+                provider=ws_provider,
+            )
+            continue
+        parse = (
+            gitlab_service.parse_repo_url
+            if ws_provider == "gitlab"
+            else github_service.parse_repo_url
+        )
+        parsed = parse(url)
+        if parsed is None:
+            continue
+        owner, repo_name = parsed
+        if f"{owner}/{repo_name}" == target:
+            matched.append(ws_id)
+    return matched
+
+
 async def poll_cycle() -> None:
-    """Execute one poll cycle: check all VCS-enabled workspaces.
+    """Execute one poll cycle: check all VCS-enabled workspaces in parallel.
 
     Called by the distributed scheduler as a periodic task. Only one
     replica runs this per interval across the entire deployment.
     """
     start = time_mod.monotonic()
     async with get_db_session() as db:
-        result = await db.execute(
-            select(Workspace).where(
-                Workspace.vcs_repo_url != "",
-                Workspace.vcs_connection_id.isnot(None),
-            )
-        )
-        workspaces = result.scalars().all()
+        workspace_ids = await _select_workspace_ids(db)
 
-        if not workspaces:
-            VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
-            return
+    if not workspace_ids:
+        VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
+        return
 
-        logger.debug("VCS poll cycle", workspace_count=len(workspaces))
+    logger.debug("VCS poll cycle", workspace_count=len(workspace_ids))
 
-        for ws in workspaces:
-            try:
-                await _poll_workspace(db, ws)
-            except Exception as e:
-                logger.error(
-                    "Error polling workspace",
-                    workspace=ws.name,
-                    error=str(e),
-                    exc_info=e,
-                )
-            # Commit after each workspace so VCS error state is persisted
-            # independently, even if a later workspace fails
-            try:
-                await db.commit()
-            except Exception:
-                await db.rollback()
+    semaphore = asyncio.Semaphore(_MAX_PARALLEL_WORKSPACE_POLLS)
+    await asyncio.gather(
+        *[_poll_workspace_owned(wid, semaphore) for wid in workspace_ids],
+        return_exceptions=True,
+    )
 
     VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
 
@@ -575,10 +685,42 @@ async def handle_immediate_poll(payload: dict) -> None:
     """Handle a webhook-triggered immediate poll for a specific repo.
 
     Called by the distributed scheduler's trigger consumer. The payload
-    contains {"repo": "owner/repo"} from the webhook handler.
-    Runs a full poll cycle (the repo filter is informational — we poll
-    all workspaces since multiple workspaces may track the same repo).
+    contains ``{"repo": "owner/repo", "provider": "github"}`` from the
+    webhook handler (older payloads without ``provider`` are treated as
+    GitHub for back-compat, since that's the only webhook shipped before
+    this field was added). We poll only the workspaces whose connection
+    matches the webhook source.
     """
-    repo = payload.get("repo", "unknown")
-    logger.info("Immediate poll triggered by webhook", repo=repo)
-    await poll_cycle()
+    start = time_mod.monotonic()
+    repo = payload.get("repo", "")
+    # Back-compat: pre-PR enqueues didn't carry "provider". At the time,
+    # github was the only webhook receiver, so defaulting there matches
+    # historical behaviour for any in-flight triggers.
+    provider = payload.get("provider", "github")
+    logger.info("Immediate poll triggered by webhook", repo=repo, provider=provider)
+
+    async with get_db_session() as db:
+        workspace_ids = await _select_workspace_ids(
+            db,
+            repo=repo or None,
+            provider=provider,
+        )
+
+    if not workspace_ids:
+        logger.info("Immediate poll: no workspaces match repo", repo=repo)
+        VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
+        return
+
+    logger.info(
+        "Immediate poll: polling matching workspaces",
+        repo=repo,
+        workspace_count=len(workspace_ids),
+    )
+
+    semaphore = asyncio.Semaphore(_MAX_PARALLEL_WORKSPACE_POLLS)
+    await asyncio.gather(
+        *[_poll_workspace_owned(wid, semaphore) for wid in workspace_ids],
+        return_exceptions=True,
+    )
+
+    VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
