@@ -439,9 +439,10 @@ class RateLimitConfig(BaseModel):
     Each limit is per client IP per 60-second sliding window. Set a limit
     to 0 to disable that tier (unlimited).
 
-    Runner-token requests are ALWAYS exempt regardless of config — HMAC
-    verification is inline, and runners are trusted service-to-service
-    callers that routinely burst on tofu init / apply artifact uploads.
+    The runner tier is separate and defaults to unlimited — runners are
+    trusted service-to-service callers (HMAC-verified inline) that burst
+    on tofu init / apply artifact uploads. Raise `runner_requests_per_minute`
+    above 0 only if you need a hard cap.
     """
 
     enabled: bool = Field(default=True, description="Enable rate limiting")

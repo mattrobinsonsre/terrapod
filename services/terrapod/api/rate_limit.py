@@ -44,12 +44,13 @@ class RateLimitMiddleware:
     Pure ASGI middleware for correct async behavior.
 
     Tiers:
-    - Runner tokens (HMAC-verified inline): exempt entirely. Runners are
-      service-to-service callers and burst through the network-mirror and
-      artifact endpoints during `tofu init`/`apply`; 100/min starves them.
-    - Authenticated (API token / session / any `Authorization` header):
-      higher limit (`authenticated_requests_per_minute`). Interactive users
-      rarely approach this, but it stops one noisy client taking the pool.
+    - Runner tokens (HMAC-verified inline): `runner_requests_per_minute`
+      (default 0 = unlimited). Runners are service-to-service callers and
+      burst through the network-mirror and artifact endpoints during
+      `tofu init`/`apply`; a low limit starves them.
+    - Authenticated (any `Authorization` header): `authenticated_requests_per_minute`.
+      Interactive users and API-token automation rarely approach this, but
+      it stops one noisy client taking the pool.
     - Unauthenticated: base limit (`requests_per_minute`).
     - Auth endpoints (`/api/v2/auth/*`, `/oauth/*`): always `auth_requests_per_minute`
       regardless of who's calling — brute-force defence on login.
@@ -100,12 +101,13 @@ class RateLimitMiddleware:
             is_runner = verify_runner_token(token) is not None
 
         is_auth_endpoint = _is_auth_path(path)
-        # Any Authorization header or session cookie bumps the tier.
-        # We don't verify the credential here — the downstream auth
-        # dependency will 401 bogus tokens — but presence is enough to
-        # separate interactive / machine-integration traffic from
-        # unauthenticated traffic.
-        is_authenticated = bool(auth_header) or "terrapod_session" in request.cookies
+        # Any Authorization header bumps the tier. We don't verify the
+        # credential here — the downstream auth dependency will 401 bogus
+        # tokens — but presence is enough to separate interactive /
+        # machine-integration traffic from unauthenticated traffic.
+        # (The web UI also sends Bearer tokens from localStorage; there
+        # is no session cookie in Terrapod.)
+        is_authenticated = bool(auth_header)
 
         if is_auth_endpoint:
             limit = self.auth_requests_per_minute
