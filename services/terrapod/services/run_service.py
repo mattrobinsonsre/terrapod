@@ -82,8 +82,21 @@ async def _enqueue_vcs_status(run: Run, target_status: str) -> None:
 
     Only meaningful for VCS-sourced runs (those with a commit SHA).
     Posts commit status and optionally PR comments back to the provider.
+
+    Drift-detection runs are skipped — their commit SHAs are the current
+    default-branch HEAD (already merged), and posting "Has changes" /
+    "No changes" statuses there would be noise on commits that aren't
+    under review.
+
+    `has_changes` is snapshotted into the payload so the dispatcher is
+    independent of DB-commit timing (the trigger enqueue happens in the
+    same transaction as the status transition, but the dispatcher in
+    another replica may consume the trigger before the commit lands).
     """
     from terrapod.services.scheduler import enqueue_trigger
+
+    if run.is_drift_detection:
+        return
 
     try:
         await enqueue_trigger(
@@ -92,6 +105,7 @@ async def _enqueue_vcs_status(run: Run, target_status: str) -> None:
                 "run_id": str(run.id),
                 "workspace_id": str(run.workspace_id),
                 "target_status": target_status,
+                "has_changes": run.has_changes,
             },
             dedup_key=f"vcs_status:{run.id}:{target_status}",
             dedup_ttl=60,
