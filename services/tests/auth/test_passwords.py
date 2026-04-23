@@ -6,31 +6,31 @@ from terrapod.auth.passwords import hash_password, validate_password_strength, v
 
 
 class TestPasswordHashing:
-    def test_hash_and_verify_roundtrip(self):
+    async def test_hash_and_verify_roundtrip(self):
         password = "correct-horse-battery-staple-42!"
-        hashed = hash_password(password)
+        hashed = await hash_password(password)
 
         assert hashed != password
         assert hashed.startswith("pbkdf2:sha256:100000$")
-        assert verify_password(password, hashed)
+        assert await verify_password(password, hashed)
 
-    def test_wrong_password_fails(self):
-        hashed = hash_password("correct-password-here-99!")
-        assert not verify_password("wrong-password-here-99!", hashed)
+    async def test_wrong_password_fails(self):
+        hashed = await hash_password("correct-password-here-99!")
+        assert not await verify_password("wrong-password-here-99!", hashed)
 
-    def test_different_hashes_for_same_password(self):
+    async def test_different_hashes_for_same_password(self):
         """Each hash should use a different random salt."""
-        h1 = hash_password("same-password-twice-42!")
-        h2 = hash_password("same-password-twice-42!")
+        h1 = await hash_password("same-password-twice-42!")
+        h2 = await hash_password("same-password-twice-42!")
         assert h1 != h2
 
-    def test_verify_invalid_hash_format(self):
-        assert not verify_password("password", "not-a-valid-hash")
-        assert not verify_password("password", "a$b")
-        assert not verify_password("password", "wrong:method:0$salt$hash")
+    async def test_verify_invalid_hash_format(self):
+        assert not await verify_password("password", "not-a-valid-hash")
+        assert not await verify_password("password", "a$b")
+        assert not await verify_password("password", "wrong:method:0$salt$hash")
 
-    def test_verify_empty_hash(self):
-        assert not verify_password("password", "")
+    async def test_verify_empty_hash(self):
+        assert not await verify_password("password", "")
 
 
 class TestPasswordStrength:

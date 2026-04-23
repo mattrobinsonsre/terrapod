@@ -32,7 +32,7 @@ from terrapod.db.models import Run, VCSConnection, Workspace, utc_now
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import github_service, gitlab_service, run_service
-from terrapod.services.archive_utils import strip_archive_top_level_dir
+from terrapod.services.archive_utils import strip_archive_top_level_dir_async
 from terrapod.services.vcs_provider import PullRequest
 from terrapod.storage import get_storage
 from terrapod.storage.keys import config_version_key
@@ -155,7 +155,7 @@ async def _resolve_branch(conn: VCSConnection, ws: Workspace, owner: str, repo: 
     return None
 
 
-_strip_top_level_dir = strip_archive_top_level_dir  # alias for internal use
+_strip_top_level_dir = strip_archive_top_level_dir_async  # alias for internal use
 
 
 async def _create_vcs_run(
@@ -212,7 +212,7 @@ async def _create_vcs_run(
         return None
 
     # VCS tarballs have a top-level directory wrapper — strip it
-    archive = _strip_top_level_dir(archive)
+    archive = await _strip_top_level_dir(archive)
 
     cv = await run_service.create_configuration_version(
         db,

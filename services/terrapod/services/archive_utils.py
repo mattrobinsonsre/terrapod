@@ -6,8 +6,19 @@ workspace configs to have .tf files at the root.  The helper here strips
 that wrapper so downloaded archives are usable as-is.
 """
 
+import asyncio
 import io
 import tarfile
+
+
+async def strip_archive_top_level_dir_async(archive: bytes) -> bytes:
+    """Async wrapper that runs the sync repack in a thread.
+
+    Callers on an asyncio event loop (request handlers, scheduler tasks)
+    must use this form — the sync variant does CPU-heavy tarfile work and
+    will starve the loop on multi-MB archives.
+    """
+    return await asyncio.to_thread(strip_archive_top_level_dir, archive)
 
 
 def strip_archive_top_level_dir(archive: bytes) -> bytes:

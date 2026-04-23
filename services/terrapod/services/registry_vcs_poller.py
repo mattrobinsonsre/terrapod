@@ -17,7 +17,7 @@ from terrapod.db.models import RegistryModule, RegistryModuleVersion
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import github_service, gitlab_service
-from terrapod.services.archive_utils import strip_archive_top_level_dir
+from terrapod.services.archive_utils import strip_archive_top_level_dir_async
 from terrapod.storage import get_storage
 from terrapod.storage.keys import module_tarball_key
 
@@ -207,7 +207,7 @@ async def _poll_module(db: AsyncSession, storage, module: RegistryModule) -> Non
             continue
 
         # Strip top-level directory wrapper from VCS archive before storing
-        archive_bytes = strip_archive_top_level_dir(archive_bytes)
+        archive_bytes = await strip_archive_top_level_dir_async(archive_bytes)
 
         # Store tarball (overwrites existing if tag was moved)
         key = module_tarball_key(module.namespace, module.name, module.provider, version_str)

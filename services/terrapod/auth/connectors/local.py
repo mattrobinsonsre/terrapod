@@ -78,7 +78,7 @@ class LocalConnector(SSOConnector):
         if not user or not user.password_hash:
             raise ValueError("Invalid credentials")
 
-        if not verify_password(password, user.password_hash):
+        if not await verify_password(password, user.password_hash):
             raise ValueError("Invalid credentials")
 
         if not user.is_active:
