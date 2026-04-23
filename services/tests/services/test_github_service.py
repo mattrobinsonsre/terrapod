@@ -175,54 +175,198 @@ class TestPrivateKey:
 class TestGetChangedFiles:
     @pytest.mark.asyncio
     @patch("terrapod.services.github_service.get_installation_token")
-    async def test_returns_none_when_300_plus_files(self, mock_token):
+    @patch("terrapod.services.github_service._github_request")
+    async def test_returns_none_when_300_plus_files(self, mock_request, mock_token):
         """When GitHub returns 300+ files (truncated), returns None."""
-        from unittest.mock import AsyncMock
-
         mock_token.return_value = "fake-token"
         files = [{"filename": f"file{i}.tf"} for i in range(300)]
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"files": files}
         mock_response.raise_for_status = MagicMock()
+        mock_request.return_value = mock_response
 
-        conn = _mock_conn()
-        with patch("httpx.AsyncClient") as mock_client_cls:
-            mock_client = AsyncMock()
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.get = AsyncMock(return_value=mock_response)
-            mock_client_cls.return_value = mock_client
+        from terrapod.services.github_service import get_changed_files
 
-            from terrapod.services.github_service import get_changed_files
-
-            result = await get_changed_files(conn, "owner", "repo", "base", "head")
+        result = await get_changed_files(_mock_conn(), "owner", "repo", "base", "head")
 
         assert result is None
 
     @pytest.mark.asyncio
     @patch("terrapod.services.github_service.get_installation_token")
-    async def test_returns_filenames_under_300(self, mock_token):
+    @patch("terrapod.services.github_service._github_request")
+    async def test_returns_filenames_under_300(self, mock_request, mock_token):
         """When under 300 files, returns the filename list."""
-        from unittest.mock import AsyncMock
-
         mock_token.return_value = "fake-token"
         files = [{"filename": "main.tf"}, {"filename": "vars.tf"}]
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"files": files}
         mock_response.raise_for_status = MagicMock()
+        mock_request.return_value = mock_response
 
-        conn = _mock_conn()
-        with patch("httpx.AsyncClient") as mock_client_cls:
+        from terrapod.services.github_service import get_changed_files
+
+        result = await get_changed_files(_mock_conn(), "owner", "repo", "base", "head")
+
+        assert result == ["main.tf", "vars.tf"]
+
+
+# ── _github_request retry on 429 / 5xx / secondary-rate-limit 403 ────
+
+
+class TestGithubRequestRetry:
+    @pytest.mark.asyncio
+    async def test_429_triggers_retry_then_succeeds(self):
+        """A 429 response with Retry-After is retried after the indicated delay."""
+        from unittest.mock import AsyncMock
+
+        from terrapod.services.github_service import _github_request
+
+        first = MagicMock(status_code=429, headers={"Retry-After": "1"})
+        first.text = ""
+        second = MagicMock(status_code=200, headers={})
+        second.text = ""
+
+        with (
+            patch("terrapod.services.github_service.asyncio.sleep", new=AsyncMock()) as mock_sleep,
+            patch("httpx.AsyncClient") as mock_client_cls,
+        ):
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.request = AsyncMock(side_effect=[first, second])
             mock_client_cls.return_value = mock_client
 
-            from terrapod.services.github_service import get_changed_files
+            resp = await _github_request("GET", "https://api.github.com/x", "tok")
 
-            result = await get_changed_files(conn, "owner", "repo", "base", "head")
+        assert resp is second
+        assert mock_sleep.await_count == 1
+        assert mock_sleep.await_args[0][0] == 1.0  # Retry-After respected
 
-        assert result == ["main.tf", "vars.tf"]
+    @pytest.mark.asyncio
+    async def test_403_secondary_rate_limit_retries(self):
+        """A 403 containing 'secondary rate limit' is retried."""
+        from unittest.mock import AsyncMock
+
+        from terrapod.services.github_service import _github_request
+
+        first = MagicMock(status_code=403, headers={"Retry-After": "1"})
+        first.text = "You have exceeded a secondary rate limit"
+        second = MagicMock(status_code=200, headers={})
+
+        with (
+            patch("terrapod.services.github_service.asyncio.sleep", new=AsyncMock()),
+            patch("httpx.AsyncClient") as mock_client_cls,
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.request = AsyncMock(side_effect=[first, second])
+            mock_client_cls.return_value = mock_client
+
+            resp = await _github_request("GET", "https://api.github.com/x", "tok")
+
+        assert resp is second
+
+    @pytest.mark.asyncio
+    async def test_5xx_retries(self):
+        """Transient 5xx is retried."""
+        from unittest.mock import AsyncMock
+
+        from terrapod.services.github_service import _github_request
+
+        first = MagicMock(status_code=503, headers={})
+        first.text = ""
+        second = MagicMock(status_code=200, headers={})
+
+        with (
+            patch("terrapod.services.github_service.asyncio.sleep", new=AsyncMock()),
+            patch("httpx.AsyncClient") as mock_client_cls,
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.request = AsyncMock(side_effect=[first, second])
+            mock_client_cls.return_value = mock_client
+
+            resp = await _github_request("GET", "https://api.github.com/x", "tok")
+
+        assert resp is second
+
+    @pytest.mark.asyncio
+    async def test_retries_exhausted_returns_last_response(self):
+        """After 3 retries on persistent 429, the last response is returned unraised."""
+        from unittest.mock import AsyncMock
+
+        from terrapod.services.github_service import _github_request
+
+        stuck = MagicMock(status_code=429, headers={"Retry-After": "1"})
+        stuck.text = ""
+
+        with (
+            patch("terrapod.services.github_service.asyncio.sleep", new=AsyncMock()),
+            patch("httpx.AsyncClient") as mock_client_cls,
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.request = AsyncMock(return_value=stuck)
+            mock_client_cls.return_value = mock_client
+
+            resp = await _github_request("GET", "https://api.github.com/x", "tok")
+
+        assert resp is stuck
+        # Initial + 3 retries = 4 attempts total
+        assert mock_client.request.await_count == 4
+
+    @pytest.mark.asyncio
+    async def test_non_retryable_returns_immediately(self):
+        """A 404 (or other client error) is returned without retry."""
+        from unittest.mock import AsyncMock
+
+        from terrapod.services.github_service import _github_request
+
+        notfound = MagicMock(status_code=404, headers={})
+        notfound.text = ""
+
+        with (
+            patch("terrapod.services.github_service.asyncio.sleep", new=AsyncMock()),
+            patch("httpx.AsyncClient") as mock_client_cls,
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.request = AsyncMock(return_value=notfound)
+            mock_client_cls.return_value = mock_client
+
+            resp = await _github_request("GET", "https://api.github.com/x", "tok")
+
+        assert resp is notfound
+        assert mock_client.request.await_count == 1
+
+
+class TestParseRetryDelay:
+    def test_prefers_retry_after_seconds(self):
+        from terrapod.services.github_service import _parse_retry_delay
+
+        resp = MagicMock(headers={"Retry-After": "7", "X-RateLimit-Reset": "0"})
+        assert _parse_retry_delay(resp) == 7.0
+
+    def test_clamps_to_max(self):
+        from terrapod.services.github_service import (
+            _MAX_RETRY_WAIT_SECONDS,
+            _parse_retry_delay,
+        )
+
+        resp = MagicMock(headers={"Retry-After": "3600"})
+        assert _parse_retry_delay(resp) == _MAX_RETRY_WAIT_SECONDS
+
+    def test_falls_back_to_default(self):
+        from terrapod.services.github_service import (
+            _DEFAULT_BACKOFF_SECONDS,
+            _parse_retry_delay,
+        )
+
+        resp = MagicMock(headers={})
+        assert _parse_retry_delay(resp) == _DEFAULT_BACKOFF_SECONDS

@@ -5,6 +5,7 @@ operations via the GitHub REST API. All credentials (app_id, private key)
 are stored on the VCSConnection.
 """
 
+import asyncio
 import hashlib
 import hmac
 import time
@@ -19,6 +20,105 @@ from terrapod.logging_config import get_logger
 logger = get_logger(__name__)
 
 DEFAULT_GITHUB_API_URL = "https://api.github.com"
+
+# Hard cap on how long we'll wait between retries. GitHub's X-RateLimit-Reset
+# on the primary rate limit can be an hour out; we don't want to tie up a
+# poll-cycle coroutine that long — a short wait is enough to ride out a burst,
+# and another poll cycle will come along soon enough if we give up.
+_MAX_RETRY_WAIT_SECONDS = 60.0
+_DEFAULT_BACKOFF_SECONDS = 5.0
+_MAX_RETRIES = 3
+
+
+def _parse_retry_delay(resp: httpx.Response) -> float:
+    """Compute how long to wait before retrying a rate-limited GitHub response.
+
+    GitHub sets `Retry-After` on 429 responses and on some 403s (secondary
+    rate limit). Primary rate-limit 403s don't set Retry-After but do set
+    `X-RateLimit-Reset` (an epoch seconds value). We prefer Retry-After,
+    fall back to X-RateLimit-Reset, and finally to a fixed backoff. All
+    values are clamped to _MAX_RETRY_WAIT_SECONDS.
+    """
+    retry_after = resp.headers.get("Retry-After")
+    if retry_after:
+        try:
+            return max(1.0, min(float(retry_after), _MAX_RETRY_WAIT_SECONDS))
+        except ValueError:
+            pass  # HTTP-date form — rare; fall through to next strategy
+    reset = resp.headers.get("X-RateLimit-Reset")
+    if reset:
+        try:
+            wait = float(reset) - time.time()
+            return max(1.0, min(wait, _MAX_RETRY_WAIT_SECONDS))
+        except ValueError:
+            pass
+    return _DEFAULT_BACKOFF_SECONDS
+
+
+def _should_retry(resp: httpx.Response) -> bool:
+    """Return True if the response status deserves a retry.
+
+    - 429: primary rate limit
+    - 403 with remaining=0 or "secondary rate limit" body: also rate limit
+    - 5xx: transient server error
+    """
+    if resp.status_code == 429:
+        return True
+    if resp.status_code == 403 and (
+        resp.headers.get("X-RateLimit-Remaining") == "0"
+        or "secondary rate limit" in resp.text.lower()
+    ):
+        return True
+    return 500 <= resp.status_code < 600
+
+
+async def _github_request(
+    method: str,
+    url: str,
+    token: str,
+    *,
+    follow_redirects: bool = False,
+    **kwargs: object,
+) -> httpx.Response:
+    """Authenticated GitHub API request with retry on 429 / secondary-rate-limit / 5xx.
+
+    Standard headers (Authorization, Accept, API version) are added automatically.
+    The returned response is NOT raised-for-status — callers may still want to
+    inspect specific statuses (e.g. 404).
+    """
+    headers: dict[str, str] = dict(kwargs.pop("headers", {}) or {})  # type: ignore[arg-type]
+    headers.setdefault("Authorization", f"Bearer {token}")
+    headers.setdefault("Accept", "application/vnd.github+json")
+    headers.setdefault("X-GitHub-Api-Version", "2022-11-28")
+
+    async with httpx.AsyncClient(follow_redirects=follow_redirects) as client:
+        resp: httpx.Response | None = None
+        for attempt in range(_MAX_RETRIES + 1):
+            resp = await client.request(method, url, headers=headers, **kwargs)  # type: ignore[arg-type]
+            if not _should_retry(resp):
+                return resp
+            if attempt >= _MAX_RETRIES:
+                logger.warning(
+                    "GitHub retries exhausted, returning last response",
+                    method=method,
+                    url=url,
+                    status=resp.status_code,
+                )
+                return resp
+            delay = _parse_retry_delay(resp)
+            logger.warning(
+                "GitHub request rate-limited or failed, retrying",
+                method=method,
+                url=url,
+                status=resp.status_code,
+                delay_seconds=delay,
+                attempt=attempt + 1,
+            )
+            await asyncio.sleep(delay)
+        # Unreachable: loop either returns or exhausts and returns.
+        assert resp is not None
+        return resp
+
 
 # Installation token cache: {installation_id: (token, expires_at_epoch)}
 _token_cache: dict[int, tuple[str, float]] = {}
@@ -67,17 +167,16 @@ async def get_installation_token(conn: VCSConnection) -> str:
     app_jwt = _generate_app_jwt(conn.github_app_id, _private_key(conn))
     api_url = _api_url(conn)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{api_url}/app/installations/{installation_id}/access_tokens",
-            headers={
-                "Authorization": f"Bearer {app_jwt}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
+    # This call predates the caller having a token, so it uses the JWT
+    # directly rather than _github_request (which assumes an installation
+    # token). It still retries on rate-limit / 5xx via the same helper.
+    resp = await _github_request(
+        "POST",
+        f"{api_url}/app/installations/{installation_id}/access_tokens",
+        app_jwt,
+    )
+    resp.raise_for_status()
+    data = resp.json()
 
     token = data["token"]
     # Cache for 50 minutes (tokens last 60 min)
@@ -115,19 +214,11 @@ async def get_repo_branch_sha(
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api_url}/repos/{owner}/{repo}/branches/{branch}",
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
-        if resp.status_code == 404:
-            return None
-        resp.raise_for_status()
-        return resp.json()["commit"]["sha"]
+    resp = await _github_request("GET", f"{api_url}/repos/{owner}/{repo}/branches/{branch}", token)
+    if resp.status_code == 404:
+        return None
+    resp.raise_for_status()
+    return resp.json()["commit"]["sha"]
 
 
 async def get_repo_default_branch(conn: VCSConnection, owner: str, repo: str) -> str | None:
@@ -138,19 +229,11 @@ async def get_repo_default_branch(conn: VCSConnection, owner: str, repo: str) ->
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api_url}/repos/{owner}/{repo}",
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
-        if resp.status_code == 404:
-            return None
-        resp.raise_for_status()
-        return resp.json()["default_branch"]
+    resp = await _github_request("GET", f"{api_url}/repos/{owner}/{repo}", token)
+    if resp.status_code == 404:
+        return None
+    resp.raise_for_status()
+    return resp.json()["default_branch"]
 
 
 async def download_repo_archive(conn: VCSConnection, owner: str, repo: str, ref: str) -> bytes:
@@ -161,17 +244,14 @@ async def download_repo_archive(conn: VCSConnection, owner: str, repo: str, ref:
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
 
-    async with httpx.AsyncClient(follow_redirects=True) as client:
-        resp = await client.get(
-            f"{api_url}/repos/{owner}/{repo}/tarball/{ref}",
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
-        resp.raise_for_status()
-        return resp.content
+    resp = await _github_request(
+        "GET",
+        f"{api_url}/repos/{owner}/{repo}/tarball/{ref}",
+        token,
+        follow_redirects=True,
+    )
+    resp.raise_for_status()
+    return resp.content
 
 
 async def list_open_pull_requests(
@@ -184,23 +264,19 @@ async def list_open_pull_requests(
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api_url}/repos/{owner}/{repo}/pulls",
-            params={
-                "state": "open",
-                "base": base_branch,
-                "sort": "updated",
-                "direction": "desc",
-                "per_page": 100,
-            },
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
-        resp.raise_for_status()
+    resp = await _github_request(
+        "GET",
+        f"{api_url}/repos/{owner}/{repo}/pulls",
+        token,
+        params={
+            "state": "open",
+            "base": base_branch,
+            "sort": "updated",
+            "direction": "desc",
+            "per_page": 100,
+        },
+    )
+    resp.raise_for_status()
 
     return [
         {
@@ -221,17 +297,13 @@ async def list_repo_branches(conn: VCSConnection, owner: str, repo: str) -> list
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api_url}/repos/{owner}/{repo}/branches",
-            params={"per_page": 100},
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
-        resp.raise_for_status()
+    resp = await _github_request(
+        "GET",
+        f"{api_url}/repos/{owner}/{repo}/branches",
+        token,
+        params={"per_page": 100},
+    )
+    resp.raise_for_status()
 
     return [{"name": b["name"], "sha": b["commit"]["sha"]} for b in resp.json()]
 
@@ -244,17 +316,13 @@ async def list_repo_tags(conn: VCSConnection, owner: str, repo: str) -> list[dic
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api_url}/repos/{owner}/{repo}/tags",
-            params={"per_page": 100},
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
-        resp.raise_for_status()
+    resp = await _github_request(
+        "GET",
+        f"{api_url}/repos/{owner}/{repo}/tags",
+        token,
+        params={"per_page": 100},
+    )
+    resp.raise_for_status()
 
     return [{"name": tag["name"], "sha": tag["commit"]["sha"]} for tag in resp.json()]
 
@@ -271,16 +339,12 @@ async def get_changed_files(
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api_url}/repos/{owner}/{repo}/compare/{base_sha}...{head_sha}",
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
-        resp.raise_for_status()
+    resp = await _github_request(
+        "GET",
+        f"{api_url}/repos/{owner}/{repo}/compare/{base_sha}...{head_sha}",
+        token,
+    )
+    resp.raise_for_status()
 
     data = resp.json()
     files = data.get("files", [])
@@ -321,17 +385,13 @@ async def create_commit_status(
     if target_url:
         body["target_url"] = target_url
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{api_url}/repos/{owner}/{repo}/statuses/{sha}",
-            json=body,
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
-        resp.raise_for_status()
+    resp = await _github_request(
+        "POST",
+        f"{api_url}/repos/{owner}/{repo}/statuses/{sha}",
+        token,
+        json=body,
+    )
+    resp.raise_for_status()
 
     logger.debug(
         "GitHub commit status posted",
@@ -349,18 +409,14 @@ async def create_pr_comment(
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{api_url}/repos/{owner}/{repo}/issues/{pr_number}/comments",
-            json={"body": body},
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()["id"]
+    resp = await _github_request(
+        "POST",
+        f"{api_url}/repos/{owner}/{repo}/issues/{pr_number}/comments",
+        token,
+        json={"body": body},
+    )
+    resp.raise_for_status()
+    return resp.json()["id"]
 
 
 async def update_pr_comment(
@@ -370,17 +426,13 @@ async def update_pr_comment(
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.patch(
-            f"{api_url}/repos/{owner}/{repo}/issues/comments/{comment_id}",
-            json={"body": body},
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
-        resp.raise_for_status()
+    resp = await _github_request(
+        "PATCH",
+        f"{api_url}/repos/{owner}/{repo}/issues/comments/{comment_id}",
+        token,
+        json={"body": body},
+    )
+    resp.raise_for_status()
 
 
 async def list_pr_comments(
@@ -390,18 +442,14 @@ async def list_pr_comments(
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"{api_url}/repos/{owner}/{repo}/issues/{pr_number}/comments",
-            params={"per_page": 100},
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()
+    resp = await _github_request(
+        "GET",
+        f"{api_url}/repos/{owner}/{repo}/issues/{pr_number}/comments",
+        token,
+        params={"per_page": 100},
+    )
+    resp.raise_for_status()
+    return resp.json()
 
 
 def parse_repo_url(repo_url: str) -> tuple[str, str] | None:

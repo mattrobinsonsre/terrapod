@@ -17,9 +17,11 @@ runs each poll cycle per interval. Webhook-triggered immediate polls use
 the scheduler's trigger queue with deduplication.
 """
 
+import asyncio
 import time as time_mod
+import uuid
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.metrics import (
@@ -529,44 +531,89 @@ async def _poll_workspace(db: AsyncSession, ws: Workspace) -> None:
         ws.vcs_last_error_at = utc_now()
 
 
+# Bound the number of workspaces polled in parallel per cycle. Each workspace
+# makes a handful of GitHub/GitLab API calls (branch SHA, list PRs, changed-files
+# per PR); we cap concurrency so one cycle can't exhaust the provider's API
+# rate limit or saturate the event loop with outstanding HTTP connections.
+# Most deployments have <10 VCS workspaces per repo, so 10 covers the common
+# case without bursting.
+_MAX_PARALLEL_WORKSPACE_POLLS = 10
+
+
+async def _poll_workspace_owned(ws_id: uuid.UUID, semaphore: asyncio.Semaphore) -> None:
+    """Poll a single workspace in its own DB session, bounded by a semaphore.
+
+    Each parallel poll needs its own session — AsyncSession is not safe to
+    share across concurrent coroutines. Errors are caught and logged here
+    so one workspace's failure doesn't sink the whole cycle.
+    """
+    async with semaphore, get_db_session() as db:
+        ws = await db.get(Workspace, ws_id)
+        if ws is None:
+            return
+        try:
+            await _poll_workspace(db, ws)
+            await db.commit()
+        except Exception as e:
+            logger.error(
+                "Error polling workspace",
+                workspace=ws.name,
+                error=str(e),
+                exc_info=e,
+            )
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+
+
+async def _select_workspace_ids(db: AsyncSession, repo: str | None = None) -> list[uuid.UUID]:
+    """Fetch IDs of VCS-enabled workspaces, optionally filtered to one repo.
+
+    The repo filter is used by webhook-triggered immediate polls to avoid
+    re-polling every workspace when only one repo had a push. Matches URLs
+    like https://github.com/{owner}/{repo}, with or without trailing .git.
+    """
+    stmt = select(Workspace.id).where(
+        Workspace.vcs_repo_url != "",
+        Workspace.vcs_connection_id.isnot(None),
+    )
+    if repo:
+        # Match as a suffix rather than exact so http/https, trailing slash,
+        # and .git variants all hit.
+        like_core = f"%{repo}"
+        stmt = stmt.where(
+            or_(
+                Workspace.vcs_repo_url.like(like_core),
+                Workspace.vcs_repo_url.like(f"{like_core}/"),
+                Workspace.vcs_repo_url.like(f"{like_core}.git"),
+            )
+        )
+    result = await db.execute(stmt)
+    return [row[0] for row in result.all()]
+
+
 async def poll_cycle() -> None:
-    """Execute one poll cycle: check all VCS-enabled workspaces.
+    """Execute one poll cycle: check all VCS-enabled workspaces in parallel.
 
     Called by the distributed scheduler as a periodic task. Only one
     replica runs this per interval across the entire deployment.
     """
     start = time_mod.monotonic()
     async with get_db_session() as db:
-        result = await db.execute(
-            select(Workspace).where(
-                Workspace.vcs_repo_url != "",
-                Workspace.vcs_connection_id.isnot(None),
-            )
-        )
-        workspaces = result.scalars().all()
+        workspace_ids = await _select_workspace_ids(db)
 
-        if not workspaces:
-            VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
-            return
+    if not workspace_ids:
+        VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
+        return
 
-        logger.debug("VCS poll cycle", workspace_count=len(workspaces))
+    logger.debug("VCS poll cycle", workspace_count=len(workspace_ids))
 
-        for ws in workspaces:
-            try:
-                await _poll_workspace(db, ws)
-            except Exception as e:
-                logger.error(
-                    "Error polling workspace",
-                    workspace=ws.name,
-                    error=str(e),
-                    exc_info=e,
-                )
-            # Commit after each workspace so VCS error state is persisted
-            # independently, even if a later workspace fails
-            try:
-                await db.commit()
-            except Exception:
-                await db.rollback()
+    semaphore = asyncio.Semaphore(_MAX_PARALLEL_WORKSPACE_POLLS)
+    await asyncio.gather(
+        *[_poll_workspace_owned(wid, semaphore) for wid in workspace_ids],
+        return_exceptions=True,
+    )
 
     VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
 
@@ -575,10 +622,32 @@ async def handle_immediate_poll(payload: dict) -> None:
     """Handle a webhook-triggered immediate poll for a specific repo.
 
     Called by the distributed scheduler's trigger consumer. The payload
-    contains {"repo": "owner/repo"} from the webhook handler.
-    Runs a full poll cycle (the repo filter is informational — we poll
-    all workspaces since multiple workspaces may track the same repo).
+    contains {"repo": "owner/repo"} from the webhook handler. We poll
+    only the workspaces that track this repo — no point re-checking every
+    other repo's workspaces just because one got a push.
     """
-    repo = payload.get("repo", "unknown")
+    start = time_mod.monotonic()
+    repo = payload.get("repo", "")
     logger.info("Immediate poll triggered by webhook", repo=repo)
-    await poll_cycle()
+
+    async with get_db_session() as db:
+        workspace_ids = await _select_workspace_ids(db, repo=repo or None)
+
+    if not workspace_ids:
+        logger.info("Immediate poll: no workspaces match repo", repo=repo)
+        VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
+        return
+
+    logger.info(
+        "Immediate poll: polling matching workspaces",
+        repo=repo,
+        workspace_count=len(workspace_ids),
+    )
+
+    semaphore = asyncio.Semaphore(_MAX_PARALLEL_WORKSPACE_POLLS)
+    await asyncio.gather(
+        *[_poll_workspace_owned(wid, semaphore) for wid in workspace_ids],
+        return_exceptions=True,
+    )
+
+    VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
