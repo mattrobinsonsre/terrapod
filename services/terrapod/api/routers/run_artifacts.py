@@ -16,6 +16,7 @@ Endpoints:
     PUT  /api/v2/runs/{run_id}/artifacts/state        — upload new state
 """
 
+import asyncio
 import hashlib
 import json
 import uuid
@@ -211,7 +212,8 @@ async def upload_state(
 
     serial = state_data.get("serial", 0)
     lineage = state_data.get("lineage", "")
-    md5 = hashlib.md5(body).hexdigest()
+    # Hash off the event loop — runner state uploads can be multi-MB
+    md5 = await asyncio.to_thread(lambda: hashlib.md5(body).hexdigest())  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
 
     # Create StateVersion record
     sv = StateVersion(

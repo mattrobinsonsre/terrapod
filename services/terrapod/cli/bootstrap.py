@@ -70,7 +70,7 @@ async def bootstrap() -> None:
                 user = User(
                     email=admin_email,
                     display_name="Admin",
-                    password_hash=hash_password(admin_password),
+                    password_hash=await hash_password(admin_password),
                     is_active=True,
                 )
                 session.add(user)

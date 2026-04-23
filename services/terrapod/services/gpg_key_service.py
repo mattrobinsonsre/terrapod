@@ -5,6 +5,7 @@ Uses pgpy (pure Python) to parse key IDs from ASCII armor blocks.
 Includes auto-generation of signing keys and detached signature creation.
 """
 
+import asyncio
 import uuid
 
 import pgpy
@@ -24,20 +25,26 @@ from terrapod.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def extract_key_id(ascii_armor: str) -> str:
-    """Extract the GPG key ID from an ASCII-armored public key block.
+# pgpy is pure Python — every call below is CPU-heavy and would starve the
+# asyncio event loop if run directly. All public helpers are async and run
+# the work in a thread. RSA-2048 key generation takes 1-3 seconds; signing
+# and from_blob parses scale with blob size.
 
-    Returns the full 16-character key ID (last 16 hex digits of fingerprint).
-    """
+
+def _extract_key_id_sync(ascii_armor: str) -> str:
     key, _ = pgpy.PGPKey.from_blob(ascii_armor)
     return key.fingerprint.replace(" ", "")[-16:].upper()
 
 
-def generate_signing_keypair() -> tuple[str, str]:
-    """Generate a GPG keypair for provider signing.
+async def extract_key_id(ascii_armor: str) -> str:
+    """Extract the GPG key ID from an ASCII-armored public key block.
 
-    Returns (ascii_armor_public, ascii_armor_private).
+    Returns the full 16-character key ID (last 16 hex digits of fingerprint).
     """
+    return await asyncio.to_thread(_extract_key_id_sync, ascii_armor)
+
+
+def _generate_signing_keypair_sync() -> tuple[str, str]:
     key = pgpy.PGPKey.new(PubKeyAlgorithm.RSAEncryptOrSign, 2048)
     uid = pgpy.PGPUID.new("Terrapod Registry", email="registry@terrapod.local")
     key.add_uid(
@@ -50,24 +57,40 @@ def generate_signing_keypair() -> tuple[str, str]:
     return str(key.pubkey), str(key)
 
 
-def sign_data(private_key_armor: str, data: bytes) -> bytes:
-    """Create a detached binary GPG signature over data.
+async def generate_signing_keypair() -> tuple[str, str]:
+    """Generate a GPG keypair for provider signing.
 
-    Returns the raw binary signature bytes (OpenPGP packet format),
-    matching the format terraform/tofu expects for SHA256SUMS.sig.
+    Returns (ascii_armor_public, ascii_armor_private).
     """
+    return await asyncio.to_thread(_generate_signing_keypair_sync)
+
+
+def _sign_data_sync(private_key_armor: str, data: bytes) -> bytes:
     key, _ = pgpy.PGPKey.from_blob(private_key_armor)
     msg = pgpy.PGPMessage.new(data, compression=CompressionAlgorithm.Uncompressed)
     sig = key.sign(msg)
     return bytes(sig)
 
 
-def derive_public_key(private_key_armor: str) -> str:
-    """Derive the ASCII-armored public key from a private key."""
+async def sign_data(private_key_armor: str, data: bytes) -> bytes:
+    """Create a detached binary GPG signature over data.
+
+    Returns the raw binary signature bytes (OpenPGP packet format),
+    matching the format terraform/tofu expects for SHA256SUMS.sig.
+    """
+    return await asyncio.to_thread(_sign_data_sync, private_key_armor, data)
+
+
+def _derive_public_key_sync(private_key_armor: str) -> str:
     key, _ = pgpy.PGPKey.from_blob(private_key_armor)
     if not key.is_public:
         return str(key.pubkey)
     return str(key)
+
+
+async def derive_public_key(private_key_armor: str) -> str:
+    """Derive the ASCII-armored public key from a private key."""
+    return await asyncio.to_thread(_derive_public_key_sync, private_key_armor)
 
 
 async def create_gpg_key(
@@ -78,7 +101,7 @@ async def create_gpg_key(
     private_key_armor: str | None = None,
 ) -> GPGKey:
     """Create a new GPG key by parsing the key_id from the ASCII armor."""
-    key_id = extract_key_id(ascii_armor)
+    key_id = await extract_key_id(ascii_armor)
 
     gpg_key = GPGKey(
         key_id=key_id,
@@ -103,7 +126,7 @@ async def import_signing_key(
     Derives the public key from the private key and stores both.
     Replaces any existing signing key.
     """
-    public_armor = derive_public_key(private_key_armor)
+    public_armor = await derive_public_key(private_key_armor)
 
     # Delete any existing signing keys
     result = await db.execute(select(GPGKey).where(GPGKey.private_key.isnot(None)))
@@ -153,7 +176,7 @@ async def get_or_create_signing_key(db: AsyncSession) -> tuple[GPGKey, str]:
 
     # 3. Auto-generate
     logger.info("No signing key found, auto-generating GPG keypair")
-    public_armor, private_armor = generate_signing_keypair()
+    public_armor, private_armor = await generate_signing_keypair()
 
     gpg_key = await create_gpg_key(
         db,

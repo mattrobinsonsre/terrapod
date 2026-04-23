@@ -103,7 +103,7 @@ async def create_user(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=str(e),
             ) from None
-        pw_hash = hash_password(attrs.password)
+        pw_hash = await hash_password(attrs.password)
 
     new_user = User(
         email=email,
@@ -214,7 +214,7 @@ async def update_user(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=str(e),
             ) from None
-        target.password_hash = hash_password(attrs.password)
+        target.password_hash = await hash_password(attrs.password)
         logger.info("Reset password for user", target_email=email, by=user.email)
 
     if attrs.is_active is not None:

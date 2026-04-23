@@ -462,7 +462,7 @@ async def regenerate_shasums(
     if content_bytes:
         try:
             gpg_key, private_armor = await get_or_create_signing_key(db)
-            sig_bytes = sign_data(private_armor, content_bytes)
+            sig_bytes = await sign_data(private_armor, content_bytes)
             sig_k = provider_shasums_sig_key(namespace, name, version_str)
             await storage.put(sig_k, sig_bytes, "application/pgp-signature")
             prov_version.shasums_sig_uploaded = True

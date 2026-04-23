@@ -10,6 +10,7 @@ Endpoints:
     POST   /api/v2/workspaces/{id}/state-versions/actions/upload — manual state upload
 """
 
+import asyncio
 import hashlib
 import json
 
@@ -147,12 +148,15 @@ async def rollback_state_version(
     max_serial = max_serial_result.scalar_one() or 0
     new_serial = max_serial + 1
 
+    # Hash off the event loop — state files are multi-MB and hashlib blocks
+    md5_digest = await asyncio.to_thread(lambda: hashlib.md5(state_bytes).hexdigest())  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+
     # Create new state version record
     new_sv = StateVersion(
         workspace_id=sv.workspace_id,
         serial=new_serial,
         lineage=sv.lineage,
-        md5=hashlib.md5(state_bytes).hexdigest(),
+        md5=md5_digest,
         state_size=len(state_bytes),
         created_by=user.email,
     )
@@ -223,7 +227,8 @@ async def upload_state_manual(
         raise HTTPException(status_code=400, detail="Invalid state JSON") from exc
 
     lineage = state_data.get("lineage", "")
-    md5 = hashlib.md5(body).hexdigest()
+    # Hash off the event loop — state uploads can be multi-MB
+    md5 = await asyncio.to_thread(lambda: hashlib.md5(body).hexdigest())  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
 
     # Auto-assign serial
     max_serial_result = await db.execute(

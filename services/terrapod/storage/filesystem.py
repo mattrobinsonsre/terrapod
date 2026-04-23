@@ -8,6 +8,7 @@ This is the default backend — zero external dependencies for dev/CI.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import os
@@ -90,7 +91,7 @@ class FilesystemStore:
             await f.write(meta_content)
 
         stat = await aiofiles.os.stat(path)
-        etag = hashlib.md5(data).hexdigest()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+        etag = await asyncio.to_thread(lambda: hashlib.md5(data).hexdigest())  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
 
         return ObjectMeta(
             key=key,
@@ -201,7 +202,7 @@ class FilesystemStore:
         # Compute etag from file content
         async with aiofiles.open(path, "rb") as f:
             data = await f.read()
-        etag = hashlib.md5(data).hexdigest()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+        etag = await asyncio.to_thread(lambda: hashlib.md5(data).hexdigest())  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
 
         return ObjectMeta(
             key=key,

@@ -1,5 +1,6 @@
 """Password hashing and strength validation utilities."""
 
+import asyncio
 import hashlib
 import secrets
 
@@ -48,12 +49,12 @@ def validate_password_strength(password: str, user_inputs: list[str] | None = No
     return password
 
 
-def hash_password(password: str) -> str:
-    """
-    Hash a password using bcrypt-style salted hashing.
+# PBKDF2-SHA256 at 100k iterations is ~80-100ms of pure CPU on the asyncio
+# event loop. Always call the async variants from request handlers; the sync
+# helpers below are kept only for tests / non-async callers.
 
-    Uses PBKDF2-SHA256 with a random salt.
-    """
+
+def _hash_password_sync(password: str) -> str:
     salt = secrets.token_hex(16)
     hash_bytes = hashlib.pbkdf2_hmac(
         "sha256",
@@ -65,12 +66,12 @@ def hash_password(password: str) -> str:
     return f"pbkdf2:sha256:100000${salt}${hash_hex}"
 
 
-def verify_password(password: str, password_hash: str) -> bool:
-    """
-    Verify a password against its hash.
+async def hash_password(password: str) -> str:
+    """Hash a password using PBKDF2-SHA256 (100k iterations) in a thread."""
+    return await asyncio.to_thread(_hash_password_sync, password)
 
-    Returns True if the password matches, False otherwise.
-    """
+
+def _verify_password_sync(password: str, password_hash: str) -> bool:
     try:
         parts = password_hash.split("$")
         if len(parts) != 3:
@@ -96,3 +97,8 @@ def verify_password(password: str, password_hash: str) -> bool:
         return secrets.compare_digest(computed_hash, stored_hash)
     except (ValueError, IndexError):
         return False
+
+
+async def verify_password(password: str, password_hash: str) -> bool:
+    """Verify a password against its PBKDF2-SHA256 hash in a thread."""
+    return await asyncio.to_thread(_verify_password_sync, password, password_hash)
