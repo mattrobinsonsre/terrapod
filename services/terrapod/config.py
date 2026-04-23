@@ -434,14 +434,41 @@ class CORSConfig(BaseModel):
 
 
 class RateLimitConfig(BaseModel):
-    """API rate limiting configuration."""
+    """API rate limiting configuration.
+
+    Each limit is per client IP per 60-second sliding window. Set a limit
+    to 0 to disable that tier (unlimited).
+
+    The runner tier is separate and defaults to unlimited — runners are
+    trusted service-to-service callers (HMAC-verified inline) that burst
+    on tofu init / apply artifact uploads. Raise `runner_requests_per_minute`
+    above 0 only if you need a hard cap.
+    """
 
     enabled: bool = Field(default=True, description="Enable rate limiting")
     requests_per_minute: int = Field(
-        default=100, description="Max requests per minute for general API endpoints"
+        default=100,
+        description="Max requests per minute for unauthenticated API endpoints. 0 = unlimited.",
+    )
+    authenticated_requests_per_minute: int = Field(
+        default=1000,
+        description=(
+            "Max requests per minute for requests carrying an Authorization "
+            "header or session cookie (non-runner). 0 = unlimited."
+        ),
+    )
+    runner_requests_per_minute: int = Field(
+        default=0,
+        description=(
+            "Max requests per minute for verified runner-token requests. "
+            "Defaults to 0 (unlimited) because runners routinely burst on "
+            "tofu init / apply artifact uploads and throttling them causes "
+            "plan failures. Raise if you need a hard cap."
+        ),
     )
     auth_requests_per_minute: int = Field(
-        default=10, description="Max requests per minute for auth endpoints"
+        default=10,
+        description="Max requests per minute for auth endpoints (login). 0 = unlimited.",
     )
 
 

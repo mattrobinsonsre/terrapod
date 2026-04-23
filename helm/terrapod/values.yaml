@@ -248,10 +248,23 @@ api:
         from_address: "notifications@terrapod.local"
         use_tls: true
 
-    # Rate limiting
+    # Rate limiting. Per client IP per 60-second sliding window. Set any
+    # limit to 0 to disable that tier entirely (unlimited).
     rate_limit:
       enabled: true
+      # Unauthenticated requests.
       requests_per_minute: 100
+      # Requests carrying an Authorization header or session cookie (but
+      # not a runner token). Higher default so one noisy interactive
+      # client can't starve the rest of the pool.
+      authenticated_requests_per_minute: 1000
+      # Verified runner-token requests (HMAC-checked inline). Default is
+      # unlimited because runners routinely burst on tofu init / apply
+      # artifact uploads — throttling them causes plan failures. Raise if
+      # you need a hard cap on a specific cluster.
+      runner_requests_per_minute: 0
+      # Auth endpoints (/api/v2/auth/*, /oauth/*) — brute-force defence,
+      # applies to all callers regardless of credentials.
       auth_requests_per_minute: 10
 
     # Prometheus metrics

@@ -322,6 +322,8 @@ def create_application() -> FastAPI:
         app.add_middleware(
             RateLimitMiddleware,
             requests_per_minute=settings.rate_limit.requests_per_minute,
+            authenticated_requests_per_minute=settings.rate_limit.authenticated_requests_per_minute,
+            runner_requests_per_minute=settings.rate_limit.runner_requests_per_minute,
             auth_requests_per_minute=settings.rate_limit.auth_requests_per_minute,
         )
 

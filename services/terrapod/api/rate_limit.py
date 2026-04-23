@@ -11,6 +11,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from terrapod.auth.runner_tokens import verify_runner_token
 from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -41,17 +42,33 @@ class RateLimitMiddleware:
     """Sliding window rate limiter using Redis.
 
     Pure ASGI middleware for correct async behavior.
+
+    Tiers:
+    - Runner tokens (HMAC-verified inline): `runner_requests_per_minute`
+      (default 0 = unlimited). Runners are service-to-service callers and
+      burst through the network-mirror and artifact endpoints during
+      `tofu init`/`apply`; a low limit starves them.
+    - Authenticated (any `Authorization` header): `authenticated_requests_per_minute`.
+      Interactive users and API-token automation rarely approach this, but
+      it stops one noisy client taking the pool.
+    - Unauthenticated: base limit (`requests_per_minute`).
+    - Auth endpoints (`/api/v2/auth/*`, `/oauth/*`): always `auth_requests_per_minute`
+      regardless of who's calling — brute-force defence on login.
     """
 
     def __init__(
         self,
         app: ASGIApp,
         requests_per_minute: int = 100,
+        authenticated_requests_per_minute: int = 1000,
+        runner_requests_per_minute: int = 0,
         auth_requests_per_minute: int = 10,
         get_redis: Callable | None = None,
     ) -> None:
         self.app = app
         self.requests_per_minute = requests_per_minute
+        self.authenticated_requests_per_minute = authenticated_requests_per_minute
+        self.runner_requests_per_minute = runner_requests_per_minute
         self.auth_requests_per_minute = auth_requests_per_minute
         self._get_redis = get_redis
 
@@ -73,6 +90,43 @@ class RateLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
+        request = Request(scope)
+
+        # Identify the request tier. HMAC verification of runner tokens is
+        # pure (no DB / Redis), cheap enough to run in middleware.
+        auth_header = request.headers.get("authorization", "")
+        is_runner = False
+        if auth_header.startswith("Bearer runtok:"):
+            token = auth_header.removeprefix("Bearer ").strip()
+            is_runner = verify_runner_token(token) is not None
+
+        is_auth_endpoint = _is_auth_path(path)
+        # Any Authorization header bumps the tier. We don't verify the
+        # credential here — the downstream auth dependency will 401 bogus
+        # tokens — but presence is enough to separate interactive /
+        # machine-integration traffic from unauthenticated traffic.
+        # (The web UI also sends Bearer tokens from localStorage; there
+        # is no session cookie in Terrapod.)
+        is_authenticated = bool(auth_header)
+
+        if is_auth_endpoint:
+            limit = self.auth_requests_per_minute
+            prefix = "auth"
+        elif is_runner:
+            limit = self.runner_requests_per_minute
+            prefix = "api_runner"
+        elif is_authenticated:
+            limit = self.authenticated_requests_per_minute
+            prefix = "api_authn"
+        else:
+            limit = self.requests_per_minute
+            prefix = "api"
+
+        # 0 means unlimited for this tier — skip the bucket entirely.
+        if limit <= 0:
+            await self.app(scope, receive, send)
+            return
+
         try:
             redis = self._resolve_redis()
         except RuntimeError:
@@ -80,12 +134,7 @@ class RateLimitMiddleware:
             await self.app(scope, receive, send)
             return
 
-        request = Request(scope)
         client_ip = _get_client_ip(request)
-        is_auth = _is_auth_path(path)
-
-        limit = self.auth_requests_per_minute if is_auth else self.requests_per_minute
-        prefix = "auth" if is_auth else "api"
 
         # Sliding window: 60-second buckets
         window_id = int(time.time()) // 60
