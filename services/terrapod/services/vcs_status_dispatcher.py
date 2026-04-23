@@ -83,31 +83,28 @@ def _build_comment_body(
     has_changes: bool | None,
     run_url: str,
 ) -> str:
-    """Build the markdown body for a PR/MR comment."""
+    """Build the markdown body for a PR/MR comment.
+
+    `has_changes` is consumed by ``_resolve_status`` to form the status
+    description ("Has changes" / "No changes"); we don't append a second
+    has-changes line, which used to be redundant with the description.
+    """
     github_state, _, description = _resolve_status(run_status, plan_only, has_changes)
     emoji = _STATUS_EMOJI.get(run_status, ":grey_question:")
 
-    has_changes_line = ""
-    if run_status == "planned" and has_changes is not None:
-        if has_changes:
-            has_changes_line = "Plan has changes — review in Terrapod."
-        else:
-            has_changes_line = "No changes detected."
-
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    lines = [
-        f"<!-- terrapod:ws:{workspace_id} -->",
-        f"### Terrapod — {workspace_name}",
-        "",
-        f"**Status:** {emoji} {description}",
-        f"**Run:** [{run_id}]({run_url})",
-    ]
-    if has_changes_line:
-        lines.append(has_changes_line)
-    lines += ["", f"*Updated {now}*"]
-
-    return "\n".join(lines)
+    return "\n".join(
+        [
+            f"<!-- terrapod:ws:{workspace_id} -->",
+            f"### Terrapod — {workspace_name}",
+            "",
+            f"**Status:** {emoji} {description}",
+            f"**Run:** [{run_id}]({run_url})",
+            "",
+            f"*Updated {now}*",
+        ]
+    )
 
 
 def _comment_marker(workspace_id: str) -> str:
@@ -194,10 +191,21 @@ async def handle_vcs_commit_status(payload: dict) -> None:
     """Handle a VCS commit status trigger.
 
     Posts commit status and optionally a PR/MR comment.
+
+    ``has_changes`` is expected to be present in the payload — the enqueuer
+    snapshots it at the moment of status transition so we don't depend on
+    when the run row's ``has_changes`` column lands in the DB (a trigger
+    consumed by another replica can otherwise outrun the commit).
     """
     run_id_str = payload.get("run_id", "")
     workspace_id_str = payload.get("workspace_id", "")
     target_status = payload.get("target_status", "")
+    # has_changes is tri-state — True / False / None. The `in payload`
+    # check distinguishes "payload didn't carry it" (fall back to DB) from
+    # "payload carried None" (truly unknown).
+    payload_has_changes: bool | None = None
+    if "has_changes" in payload:
+        payload_has_changes = payload["has_changes"]
 
     if not run_id_str or not workspace_id_str or not target_status:
         logger.warning("Incomplete VCS status payload", payload=payload)
@@ -241,11 +249,14 @@ async def handle_vcs_commit_status(payload: dict) -> None:
 
         owner, repo = parsed
 
-        # Resolve status. `has_changes` is set on the run by the runner
-        # when the plan finishes; None means unknown (pre-plan statuses,
-        # or older runs before the field existed).
+        # Prefer the payload-carried has_changes — it was snapshotted at
+        # the moment of the status transition, before the trigger was
+        # enqueued, so it's never stale. Only fall back to the DB value
+        # when the payload omits the key (older enqueuers, or a replay
+        # from a queue entry written by pre-fix code).
+        has_changes = payload_has_changes if "has_changes" in payload else run.has_changes
         github_state, gitlab_state, description = _resolve_status(
-            target_status, run.plan_only, run.has_changes
+            target_status, run.plan_only, has_changes
         )
 
         # Build target URL
@@ -298,7 +309,7 @@ async def handle_vcs_commit_status(payload: dict) -> None:
                 run_id=f"run-{run.id}",
                 run_status=target_status,
                 plan_only=run.plan_only,
-                has_changes=run.has_changes,
+                has_changes=has_changes,
                 run_url=run_url,
             )
             await _find_or_create_comment(
