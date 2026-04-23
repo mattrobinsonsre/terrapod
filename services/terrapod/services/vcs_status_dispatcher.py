@@ -200,12 +200,12 @@ async def handle_vcs_commit_status(payload: dict) -> None:
     run_id_str = payload.get("run_id", "")
     workspace_id_str = payload.get("workspace_id", "")
     target_status = payload.get("target_status", "")
-    # has_changes is tri-state — True / False / None. The `in payload`
-    # check distinguishes "payload didn't carry it" (fall back to DB) from
-    # "payload carried None" (truly unknown).
-    payload_has_changes: bool | None = None
-    if "has_changes" in payload:
-        payload_has_changes = payload["has_changes"]
+    # has_changes is tri-state (True / False / None). We need to tell
+    # "payload didn't carry the key" (fall back to DB) apart from
+    # "payload carried None" (truly unknown — skip the fallback). A
+    # sentinel captures this without leaking `object` into the type.
+    _UNSET: object = object()
+    payload_has_changes: bool | None | object = payload.get("has_changes", _UNSET)
 
     if not run_id_str or not workspace_id_str or not target_status:
         logger.warning("Incomplete VCS status payload", payload=payload)
@@ -254,7 +254,11 @@ async def handle_vcs_commit_status(payload: dict) -> None:
         # enqueued, so it's never stale. Only fall back to the DB value
         # when the payload omits the key (older enqueuers, or a replay
         # from a queue entry written by pre-fix code).
-        has_changes = payload_has_changes if "has_changes" in payload else run.has_changes
+        has_changes: bool | None = (
+            payload_has_changes  # type: ignore[assignment]
+            if payload_has_changes is not _UNSET
+            else run.has_changes
+        )
         github_state, gitlab_state, description = _resolve_status(
             target_status, run.plan_only, has_changes
         )
