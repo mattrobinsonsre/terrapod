@@ -21,7 +21,7 @@ import asyncio
 import time as time_mod
 import uuid
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.metrics import (
@@ -570,27 +570,42 @@ async def _poll_workspace_owned(ws_id: uuid.UUID, semaphore: asyncio.Semaphore) 
 async def _select_workspace_ids(db: AsyncSession, repo: str | None = None) -> list[uuid.UUID]:
     """Fetch IDs of VCS-enabled workspaces, optionally filtered to one repo.
 
-    The repo filter is used by webhook-triggered immediate polls to avoid
-    re-polling every workspace when only one repo had a push. Matches URLs
-    like https://github.com/{owner}/{repo}, with or without trailing .git.
+    The ``repo`` filter is used by webhook-triggered immediate polls to
+    avoid re-polling every workspace when only one repo had a push. It
+    expects the ``owner/repo`` form emitted by the GitHub webhook's
+    ``repository.full_name``.
+
+    We avoid fuzzy SQL matching on ``vcs_repo_url`` (which would require
+    LIKE with anchors + wildcard escaping and still risk false positives
+    across providers). Instead we load the VCS-enabled workspaces' URLs,
+    parse each to ``(owner, repo)`` using the same parser the poller
+    uses, and exact-match. Workspaces with VCS enabled typically number
+    in the dozens to low hundreds — Python-side filtering is negligible
+    and it's exact by construction.
     """
-    stmt = select(Workspace.id).where(
+    stmt = select(Workspace.id, Workspace.vcs_repo_url).where(
         Workspace.vcs_repo_url != "",
         Workspace.vcs_connection_id.isnot(None),
     )
-    if repo:
-        # Match as a suffix rather than exact so http/https, trailing slash,
-        # and .git variants all hit.
-        like_core = f"%{repo}"
-        stmt = stmt.where(
-            or_(
-                Workspace.vcs_repo_url.like(like_core),
-                Workspace.vcs_repo_url.like(f"{like_core}/"),
-                Workspace.vcs_repo_url.like(f"{like_core}.git"),
-            )
-        )
     result = await db.execute(stmt)
-    return [row[0] for row in result.all()]
+    rows = list(result.all())
+    if not repo:
+        return [row[0] for row in rows]
+
+    # Normalise the webhook input to (owner, repo). GitHub always gives us
+    # owner/repo in full_name. If parsing fails (malformed input), return
+    # no matches rather than silently polling everything.
+    parsed_target = github_service.parse_repo_url(f"https://github.com/{repo}")
+    if parsed_target is None:
+        return []
+    # Parse each workspace's URL and keep the exact matches. Either
+    # provider's parser works — they share the same owner/repo slug.
+    matched: list[uuid.UUID] = []
+    for ws_id, url in rows:
+        parsed = github_service.parse_repo_url(url) or gitlab_service.parse_repo_url(url)
+        if parsed == parsed_target:
+            matched.append(ws_id)
+    return matched
 
 
 async def poll_cycle() -> None:

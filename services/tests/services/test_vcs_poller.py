@@ -588,15 +588,22 @@ class TestPollCycleParallel:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_db)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        call_times: list[float] = []
+        # Track concurrent entries rather than timing — robust on slow CI.
+        in_flight: list[int] = [0]
+        max_in_flight: list[int] = [0]
+        entered = 0
 
         async def fake_owned_poll(ws_id, semaphore):
             import asyncio as _a
-            import time as _t
 
+            nonlocal entered
             async with semaphore:
-                call_times.append(_t.monotonic())
-                await _a.sleep(0.05)  # simulate I/O
+                entered += 1
+                in_flight[0] += 1
+                max_in_flight[0] = max(max_in_flight[0], in_flight[0])
+                # Yield so other coroutines can enter before we release.
+                await _a.sleep(0.01)
+                in_flight[0] -= 1
 
         with (
             patch("terrapod.services.vcs_poller.get_db_session", return_value=mock_ctx),
@@ -607,27 +614,43 @@ class TestPollCycleParallel:
         ):
             await poll_cycle()
 
-        # All 5 workspaces should start within ~10ms of each other — proof
-        # they're running in parallel, not serially. If they were serial,
-        # each start would be 50ms apart.
-        assert len(call_times) == 5
-        span = max(call_times) - min(call_times)
-        assert span < 0.04, f"workspaces started {span * 1000:.0f}ms apart — not parallel"
+        # All 5 workspaces should execute, with at least 2 concurrently. If the
+        # poller were serial, max_in_flight would be 1.
+        assert entered == 5
+        assert max_in_flight[0] >= 2, (
+            f"workspaces never ran concurrently (max_in_flight={max_in_flight[0]}) — not parallel"
+        )
 
     @pytest.mark.asyncio
     async def test_immediate_poll_filters_to_matching_repo(self):
-        """handle_immediate_poll narrows the query to workspaces whose
-        vcs_repo_url matches the webhook's repo."""
+        """handle_immediate_poll narrows the set to workspaces whose
+        parsed (owner, repo) exactly matches the webhook's repo.
+
+        Workspaces for a different repo — even one whose URL is a suffix
+        of the target (wrapper/markupai/scalable-language-servers), or a
+        different host — must NOT be polled.
+        """
         import uuid
         from unittest.mock import AsyncMock, MagicMock, patch
 
         from terrapod.services.vcs_poller import handle_immediate_poll
 
-        matched_id = uuid.uuid4()
+        # 4 workspaces: 2 match, 2 do not.
+        matched_https = uuid.uuid4()
+        matched_ssh = uuid.uuid4()
+        other_repo = uuid.uuid4()
+        suffix_collision = uuid.uuid4()
+
+        rows = [
+            (matched_https, "https://github.com/markupai/scalable-language-servers"),
+            (matched_ssh, "git@github.com:markupai/scalable-language-servers.git"),
+            (other_repo, "https://github.com/markupai/other-repo"),
+            (suffix_collision, "https://github.com/wrapper/markupai/scalable-language-servers"),
+        ]
 
         mock_db = AsyncMock()
         select_result = MagicMock()
-        select_result.all = MagicMock(return_value=[(matched_id,)])
+        select_result.all = MagicMock(return_value=rows)
         mock_db.execute = AsyncMock(return_value=select_result)
 
         mock_ctx = AsyncMock()
@@ -648,25 +671,67 @@ class TestPollCycleParallel:
         ):
             await handle_immediate_poll({"repo": "markupai/scalable-language-servers"})
 
-        assert polled == [matched_id]
-        # The DB query must have been issued with the repo filter applied —
-        # a bare select(Workspace.id) without WHERE would be a regression.
-        # Look for the repo name in the compiled SQL params.
-        execute_call = mock_db.execute.await_args
-        stmt = execute_call[0][0]
-        compiled = str(stmt.compile(compile_kwargs={"literal_binds": True}))
-        assert "markupai/scalable-language-servers" in compiled
+        # Only the two exact-match workspaces were polled.
+        assert sorted(polled) == sorted([matched_https, matched_ssh])
+
+    @pytest.mark.asyncio
+    async def test_immediate_poll_underscore_repo_is_exact(self):
+        """A repo named `my_repo` must match only `my_repo`, not `myXrepo`.
+        Exact (owner, repo) comparison makes this trivial — this test
+        guards against regressing to a LIKE-based filter.
+        """
+        import uuid
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from terrapod.services.vcs_poller import handle_immediate_poll
+
+        matched = uuid.uuid4()
+        collision = uuid.uuid4()
+
+        rows = [
+            (matched, "https://github.com/ns/my_repo_v2"),
+            (collision, "https://github.com/ns/myXrepoXv2"),
+        ]
+
+        mock_db = AsyncMock()
+        select_result = MagicMock()
+        select_result.all = MagicMock(return_value=rows)
+        mock_db.execute = AsyncMock(return_value=select_result)
+
+        mock_ctx = AsyncMock()
+        mock_ctx.__aenter__ = AsyncMock(return_value=mock_db)
+        mock_ctx.__aexit__ = AsyncMock(return_value=False)
+
+        polled: list[uuid.UUID] = []
+
+        async def fake_owned_poll(ws_id, semaphore):
+            polled.append(ws_id)
+
+        with (
+            patch("terrapod.services.vcs_poller.get_db_session", return_value=mock_ctx),
+            patch(
+                "terrapod.services.vcs_poller._poll_workspace_owned",
+                side_effect=fake_owned_poll,
+            ),
+        ):
+            await handle_immediate_poll({"repo": "ns/my_repo_v2"})
+
+        assert polled == [matched]
 
     @pytest.mark.asyncio
     async def test_immediate_poll_no_matches_returns_quickly(self):
         """When no workspaces match the repo, nothing is polled."""
+        import uuid
         from unittest.mock import AsyncMock, MagicMock, patch
 
         from terrapod.services.vcs_poller import handle_immediate_poll
 
         mock_db = AsyncMock()
         select_result = MagicMock()
-        select_result.all = MagicMock(return_value=[])
+        # A workspace exists for a different repo; it must not be polled.
+        select_result.all = MagicMock(
+            return_value=[(uuid.uuid4(), "https://github.com/someone/else")]
+        )
         mock_db.execute = AsyncMock(return_value=select_result)
 
         mock_ctx = AsyncMock()

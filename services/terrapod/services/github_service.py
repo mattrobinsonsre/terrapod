@@ -28,6 +28,17 @@ DEFAULT_GITHUB_API_URL = "https://api.github.com"
 _MAX_RETRY_WAIT_SECONDS = 60.0
 _DEFAULT_BACKOFF_SECONDS = 5.0
 _MAX_RETRIES = 3
+# Only these methods get retried on 5xx. POST/PATCH/PUT/DELETE may have
+# already executed server-side when the 5xx was returned (e.g. the PR
+# comment was written but the response was lost), so retrying them risks
+# duplicate side effects. All methods still retry on 429 / rate-limit
+# 403 — those are pre-execution rejections with no side effect.
+_IDEMPOTENT_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+# Upper bound on how many bytes of a response body we'll decode to look
+# for GitHub's "secondary rate limit" marker. Large-body responses (like
+# archive downloads returning 403 because of lost access) should not be
+# fully decoded just to substring-search.
+_BODY_SCAN_LIMIT_BYTES = 4096
 
 
 def _parse_retry_delay(resp: httpx.Response) -> float:
@@ -55,21 +66,44 @@ def _parse_retry_delay(resp: httpx.Response) -> float:
     return _DEFAULT_BACKOFF_SECONDS
 
 
-def _should_retry(resp: httpx.Response) -> bool:
-    """Return True if the response status deserves a retry.
+def _looks_like_secondary_rate_limit(resp: httpx.Response) -> bool:
+    """Check a 403 body for the 'secondary rate limit' marker, safely.
 
-    - 429: primary rate limit
-    - 403 with remaining=0 or "secondary rate limit" body: also rate limit
-    - 5xx: transient server error
+    Only inspects the first few KiB and only when the content-type is
+    JSON/text — anything else (e.g. a tarball 403'd for lost access)
+    is returned as-is without decoding.
+    """
+    content_type = resp.headers.get("Content-Type", "").lower()
+    if not ("json" in content_type or content_type.startswith("text/")):
+        return False
+    # resp.content is the raw bytes buffer; slicing avoids decoding
+    # potentially huge bodies just to find an ASCII marker.
+    body = resp.content[:_BODY_SCAN_LIMIT_BYTES]
+    try:
+        sample = body.decode("utf-8", errors="replace").lower()
+    except Exception:
+        return False
+    return "secondary rate limit" in sample
+
+
+def _should_retry(resp: httpx.Response, method: str) -> bool:
+    """Return True if the response status deserves a retry for this method.
+
+    - 429 and rate-limit 403: always retry (pre-execution rejection, no side
+      effect, so safe to replay on any method).
+    - 5xx: retry only on idempotent methods (GET/HEAD/OPTIONS). A POST that
+      returned 502 may have already been applied server-side; replaying it
+      could duplicate the operation (e.g. an extra PR comment).
     """
     if resp.status_code == 429:
         return True
     if resp.status_code == 403 and (
-        resp.headers.get("X-RateLimit-Remaining") == "0"
-        or "secondary rate limit" in resp.text.lower()
+        resp.headers.get("X-RateLimit-Remaining") == "0" or _looks_like_secondary_rate_limit(resp)
     ):
         return True
-    return 500 <= resp.status_code < 600
+    if 500 <= resp.status_code < 600:
+        return method.upper() in _IDEMPOTENT_METHODS
+    return False
 
 
 async def _github_request(
@@ -85,6 +119,13 @@ async def _github_request(
     Standard headers (Authorization, Accept, API version) are added automatically.
     The returned response is NOT raised-for-status — callers may still want to
     inspect specific statuses (e.g. 404).
+
+    Retry scope:
+    - 429 and rate-limit 403: every method, every attempt.
+    - 5xx: only idempotent methods (GET/HEAD/OPTIONS).
+    - Transport errors (connect / read / timeout): every method — they
+      happen before the server has a chance to process the request, so
+      replay is safe.
     """
     headers: dict[str, str] = dict(kwargs.pop("headers", {}) or {})  # type: ignore[arg-type]
     headers.setdefault("Authorization", f"Bearer {token}")
@@ -94,8 +135,30 @@ async def _github_request(
     async with httpx.AsyncClient(follow_redirects=follow_redirects) as client:
         resp: httpx.Response | None = None
         for attempt in range(_MAX_RETRIES + 1):
-            resp = await client.request(method, url, headers=headers, **kwargs)  # type: ignore[arg-type]
-            if not _should_retry(resp):
+            try:
+                resp = await client.request(method, url, headers=headers, **kwargs)  # type: ignore[arg-type]
+            except httpx.TransportError as e:
+                # Connect errors / read timeouts / protocol errors — the
+                # request didn't land, so it's safe to retry any method.
+                if attempt >= _MAX_RETRIES:
+                    logger.warning(
+                        "GitHub transport error, retries exhausted",
+                        method=method,
+                        url=url,
+                        error=str(e),
+                    )
+                    raise
+                logger.warning(
+                    "GitHub transport error, retrying",
+                    method=method,
+                    url=url,
+                    error=str(e),
+                    attempt=attempt + 1,
+                )
+                await asyncio.sleep(_DEFAULT_BACKOFF_SECONDS)
+                continue
+
+            if not _should_retry(resp, method):
                 return resp
             if attempt >= _MAX_RETRIES:
                 logger.warning(
