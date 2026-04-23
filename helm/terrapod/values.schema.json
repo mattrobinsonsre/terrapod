@@ -606,8 +606,9 @@
           "additionalProperties": false,
           "properties": {
             "enabled": { "type": "boolean" },
-            "requests_per_minute": { "type": "integer", "minimum": 1 },
-            "auth_requests_per_minute": { "type": "integer", "minimum": 1 }
+            "requests_per_minute": { "type": "integer", "minimum": 0 },
+            "authenticated_requests_per_minute": { "type": "integer", "minimum": 0 },
+            "auth_requests_per_minute": { "type": "integer", "minimum": 0 }
           }
         },
 
