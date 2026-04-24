@@ -49,12 +49,21 @@ api:
     annotations: {}
 
   resources:
+    # Request/limit ratios deliberately tight: CPU ≤ 2× request,
+    # memory = request (Guaranteed QoS). Wide bands cause noisy-neighbour
+    # evictions on memory and unpredictable throttling on CPU.
+    #
+    # Memory raised from 1Gi after the parallel VCS poller (v0.17.2,
+    # PR #233) started holding up to 10 concurrent per-workspace archive
+    # buffers + AsyncSession + httpx clients per cycle. Steady-state RSS
+    # sits around 700-800Mi on moderate deployments and Python doesn't
+    # return heap to the OS, so 1Gi was prone to OOMKill under load.
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 500m
+      memory: 2Gi
     limits:
       cpu: "1"
-      memory: 1Gi
+      memory: 2Gi
 
   autoscaling:
     # Disabled by default — filesystem storage does not support multi-replica.
