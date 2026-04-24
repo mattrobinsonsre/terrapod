@@ -801,11 +801,6 @@ class TestPollCycleParallel:
         mock_ctx.__aenter__ = AsyncMock(return_value=mock_db)
         mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        polled: list[uuid.UUID] = []
-
-        async def fake_owned_poll(ws_id, semaphore):
-            polled.append(ws_id)
-
         # Call the inner helper directly (bypassing handle_immediate_poll's
         # SQL-side provider filter) so we can verify the Python-side
         # parser dispatch behaves correctly on a mixed row set.
