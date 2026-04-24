@@ -411,7 +411,7 @@ async def _poll_workspace_prs(
         )
         for stale_run in stale_result.scalars().all():
             try:
-                await run_service.cancel_run(db, stale_run)
+                await run_service.cancel_run(db, stale_run, force=True)
                 logger.info(
                     "Canceled stale PR run",
                     run_id=str(stale_run.id),

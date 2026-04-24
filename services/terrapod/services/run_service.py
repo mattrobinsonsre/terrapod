@@ -447,10 +447,30 @@ async def discard_run(db: AsyncSession, run: Run) -> Run:
     return await transition_run(db, run, "discarded")
 
 
-async def cancel_run(db: AsyncSession, run: Run) -> Run:
-    """Cancel a run."""
+# User-cancelable states: only in-progress. `planned` is awaiting user
+# confirm/discard and should be resolved that way — cancelling a
+# planned-awaiting-confirm run leaves the workspace in an ambiguous state
+# (plan exists, nothing applied, no record of user decision). Terminal
+# states have nothing left to cancel.
+#
+# Internal callers (vcs_poller, module_impact) legitimately cancel stale
+# `planned` speculative runs when a newer commit supersedes them; they
+# pass `force=True` below to bypass the user-action gate.
+CANCELABLE_STATES = frozenset({"pending", "queued", "planning", "confirmed", "applying"})
+
+
+async def cancel_run(db: AsyncSession, run: Run, *, force: bool = False) -> Run:
+    """Cancel a run.
+
+    By default only in-progress states (`CANCELABLE_STATES`) are cancelable.
+    Pass `force=True` to bypass that check — only for internal callers
+    that need to cancel superseded `planned` runs as part of cleanup.
+    Terminal states are always rejected.
+    """
     if run.status in TERMINAL_STATES:
         raise ValueError(f"Cannot cancel run in terminal state '{run.status}'")
+    if not force and run.status not in CANCELABLE_STATES:
+        raise ValueError(f"Cannot cancel run in state '{run.status}'")
     # Unlock workspace
     workspace = await db.get(Workspace, run.workspace_id)
     if workspace and workspace.locked:

@@ -38,6 +38,7 @@ interface Workspace {
     locked: boolean
     'resource-cpu': string
     'resource-memory': string
+    'agent-pool-name': string | null
     'drift-detection-enabled': boolean
     'drift-status': string
     'state-diverged': boolean
@@ -82,31 +83,45 @@ export default function WorkspacesPage() {
   const [agentPools, setAgentPools] = useState<{ id: string; attributes: { name: string } }[]>([])
   const [agentPoolsLoaded, setAgentPoolsLoaded] = useState(false)
 
-  type WsSortKey = 'name' | 'mode' | 'resources' | 'status' | 'created'
+  type WsSortKey = 'name' | 'mode' | 'pool' | 'resources' | 'status' | 'created'
 
-  function resolveStatus(ws: Workspace): { label: string; color: string; priority: number } {
+  // Resolved status. `runId` is the run that *defined* the status — set
+  // when the status comes from `latest-run`. For workspace-level
+  // conditions (state-diverged, vcs-error, drifted, no-runs) there's
+  // no single defining run so runId stays null and the pill doesn't
+  // link anywhere.
+  function resolveStatus(ws: Workspace): {
+    label: string
+    color: string
+    priority: number
+    runId: string | null
+  } {
     const drift = ws.attributes['drift-status']
     const run = ws.attributes['latest-run']
 
-    if (ws.attributes['state-diverged']) return { label: 'State Diverged', color: 'red', priority: 0 }
-    if (ws.attributes['vcs-last-error']) return { label: 'VCS Error', color: 'red', priority: 0 }
-    if (drift === 'drifted') return { label: 'Drifted', color: 'amber', priority: 1 }
+    if (ws.attributes['state-diverged'])
+      return { label: 'State Diverged', color: 'red', priority: 0, runId: null }
+    if (ws.attributes['vcs-last-error'])
+      return { label: 'VCS Error', color: 'red', priority: 0, runId: null }
+    if (drift === 'drifted')
+      return { label: 'Drifted', color: 'amber', priority: 1, runId: null }
     if (run) {
       const s = run.status
       const planOnly = run['plan-only']
-      if (s === 'errored') return { label: 'Errored', color: 'red', priority: 2 }
-      if (s === 'planned' && !planOnly) return { label: 'Needs Confirm', color: 'amber', priority: 3 }
-      if (s === 'planning') return { label: 'Planning', color: 'blue', priority: 4 }
-      if (s === 'applying') return { label: 'Applying', color: 'blue', priority: 4 }
-      if (s === 'confirmed') return { label: 'Confirmed', color: 'blue', priority: 4 }
-      if (s === 'queued') return { label: 'Queued', color: 'blue', priority: 4 }
-      if (s === 'pending') return { label: 'Pending', color: 'slate', priority: 5 }
-      if (s === 'applied') return { label: 'Applied', color: 'green', priority: 6 }
-      if (s === 'planned' && planOnly) return { label: 'Planned', color: 'green', priority: 7 }
-      if (s === 'canceled') return { label: 'Canceled', color: 'slate', priority: 8 }
-      if (s === 'discarded') return { label: 'Discarded', color: 'slate', priority: 8 }
+      const runId = run.id
+      if (s === 'errored') return { label: 'Errored', color: 'red', priority: 2, runId }
+      if (s === 'planned' && !planOnly) return { label: 'Needs Confirm', color: 'amber', priority: 3, runId }
+      if (s === 'planning') return { label: 'Planning', color: 'blue', priority: 4, runId }
+      if (s === 'applying') return { label: 'Applying', color: 'blue', priority: 4, runId }
+      if (s === 'confirmed') return { label: 'Confirmed', color: 'blue', priority: 4, runId }
+      if (s === 'queued') return { label: 'Queued', color: 'blue', priority: 4, runId }
+      if (s === 'pending') return { label: 'Pending', color: 'slate', priority: 5, runId }
+      if (s === 'applied') return { label: 'Applied', color: 'green', priority: 6, runId }
+      if (s === 'planned' && planOnly) return { label: 'Planned', color: 'green', priority: 7, runId }
+      if (s === 'canceled') return { label: 'Canceled', color: 'slate', priority: 8, runId }
+      if (s === 'discarded') return { label: 'Discarded', color: 'slate', priority: 8, runId }
     }
-    return { label: '\u2014', color: 'gray', priority: 9 }
+    return { label: '\u2014', color: 'gray', priority: 9, runId: null }
   }
 
   const badgeColors: Record<string, string> = {
@@ -124,6 +139,7 @@ export default function WorkspacesPage() {
       switch (key) {
         case 'name': return item.attributes.name
         case 'mode': return item.attributes['execution-mode']
+        case 'pool': return item.attributes['agent-pool-name'] || ''
         case 'resources': return item.attributes['resource-cpu']
         case 'status': return resolveStatus(item).label
         case 'created': return item.attributes['created-at']
@@ -474,9 +490,10 @@ export default function WorkspacesPage() {
                 <tr className="border-b border-slate-700/50">
                   <SortableHeader label="Name" sortKey="name" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label="Mode" sortKey="mode" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
-                  <SortableHeader label="Resources" sortKey="resources" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortableHeader label="Pool" sortKey="pool" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortableHeader label="Resources" sortKey="resources" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
                   <SortableHeader label="Status" sortKey="status" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
-                  <SortableHeader label="Created" sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
+                  <SortableHeader label="Created" sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden xl:table-cell" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/30">
@@ -497,19 +514,31 @@ export default function WorkspacesPage() {
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
                       <span className="text-xs text-slate-400">
+                        {ws.attributes['agent-pool-name'] || '\u2014'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 hidden lg:table-cell">
+                      <span className="text-xs text-slate-400">
                         {ws.attributes['resource-cpu']} CPU / {ws.attributes['resource-memory']}
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
                       {status.color === 'gray' ? (
                         <span className="text-xs text-slate-500">{status.label}</span>
+                      ) : status.runId ? (
+                        <Link
+                          href={`/workspaces/${ws.id}/runs/${status.runId}`}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium hover:opacity-80 transition-opacity ${badgeColors[status.color]}`}
+                        >
+                          {status.label}
+                        </Link>
                       ) : (
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColors[status.color]}`}>
                           {status.label}
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 hidden lg:table-cell">
+                    <td className="px-4 py-3 hidden xl:table-cell">
                       <span className="text-xs text-slate-500">
                         {ws.attributes['created-at'] ? new Date(ws.attributes['created-at']).toLocaleDateString() : ''}
                       </span>
