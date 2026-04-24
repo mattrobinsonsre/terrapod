@@ -38,6 +38,7 @@ interface RunAttrs {
   'vcs-commit-sha': string | null
   'vcs-branch': string | null
   'vcs-pull-request-number': number | null
+  'workspace-name': string
   'workspace-has-vcs': boolean
   'module-overrides': Record<string, string> | null
   'status-timestamps': Record<string, string>
@@ -507,12 +508,16 @@ export default function RunDetailPage() {
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <div className="mb-4">
           <Link href={`/workspaces/${workspaceId}?tab=runs`} className="text-sm text-slate-400 hover:text-slate-200">
-            &larr; Back to workspace
+            &larr; Back to {attrs['workspace-name'] || 'workspace'}
           </Link>
         </div>
 
         <PageHeader
-          title={`Run ${run.id.replace(/^run-/, '').split('-').pop()}`}
+          title={
+            attrs['workspace-name']
+              ? `${attrs['workspace-name']} — run ${run.id.replace(/^run-/, '').split('-').pop()}`
+              : `Run ${run.id.replace(/^run-/, '').split('-').pop()}`
+          }
           description={attrs.message || `${attrs.source} run`}
           actions={
             <div className="flex items-center gap-2">

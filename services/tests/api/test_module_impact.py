@@ -153,7 +153,9 @@ class TestRunJsonModuleOverrides:
         mock_get_run.return_value = run
         mock_resolve.return_value = "read"
 
-        app, _ = _make_app(_admin_user())
+        mock_db = AsyncMock()
+        mock_db.get.return_value = _mock_workspace(ws_id=run.workspace_id)
+        app, _ = _make_app(_admin_user(), mock_db=mock_db)
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             resp = await client.get(f"/api/v2/runs/run-{run.id}", headers=_AUTH)
 

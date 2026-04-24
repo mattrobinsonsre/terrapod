@@ -65,6 +65,7 @@ def _rfc3339(dt) -> str:
 def _run_json(
     run: Run,
     *,
+    workspace_name: str = "",
     workspace_has_vcs: bool = False,
     state_version_id: str | None = None,
 ) -> dict:
@@ -94,6 +95,7 @@ def _run_json(
                 "allow-empty-apply": run.allow_empty_apply,
                 "is-drift-detection": run.is_drift_detection,
                 "has-changes": run.has_changes,
+                "workspace-name": workspace_name,
                 "workspace-has-vcs": workspace_has_vcs,
                 "module-overrides": run.module_overrides,
                 "vcs-commit-sha": run.vcs_commit_sha,
@@ -382,7 +384,11 @@ async def create_run(
     await db.refresh(run)
 
     return JSONResponse(
-        content=_run_json(run, workspace_has_vcs=ws.vcs_connection_id is not None),
+        content=_run_json(
+            run,
+            workspace_name=ws.name,
+            workspace_has_vcs=ws.vcs_connection_id is not None,
+        ),
         status_code=201,
     )
 
@@ -408,6 +414,7 @@ async def show_run(
     return JSONResponse(
         content=_run_json(
             run,
+            workspace_name=ws.name if ws else "",
             workspace_has_vcs=bool(ws and ws.vcs_connection_id),
             state_version_id=sv_id,
         ),
@@ -433,7 +440,12 @@ async def list_workspace_runs(
     runs = await run_service.list_workspace_runs(db, ws.id, page_number, page_size)
     has_vcs = ws.vcs_connection_id is not None
     return JSONResponse(
-        content={"data": [_run_json(r, workspace_has_vcs=has_vcs)["data"] for r in runs]}
+        content={
+            "data": [
+                _run_json(r, workspace_name=ws.name, workspace_has_vcs=has_vcs)["data"]
+                for r in runs
+            ]
+        }
     )
 
 
