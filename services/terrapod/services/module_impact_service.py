@@ -212,7 +212,7 @@ async def _cancel_stale_module_runs(
         )
         for stale_run in result.scalars().all():
             try:
-                await run_service.cancel_run(db, stale_run)
+                await run_service.cancel_run(db, stale_run, force=True)
                 logger.info(
                     "Canceled stale module-test run",
                     run_id=str(stale_run.id),
@@ -330,7 +330,7 @@ async def _create_module_test_runs(
         )
         for stale_run in result.scalars().all():
             try:
-                await run_service.cancel_run(db, stale_run)
+                await run_service.cancel_run(db, stale_run, force=True)
             except Exception:
                 pass
 

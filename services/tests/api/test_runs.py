@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
@@ -371,7 +372,53 @@ class TestRunJsonSerialization:
         actions = resp.json()["data"]["attributes"]["actions"]
         assert actions["is-confirmable"] is True
         assert actions["is-discardable"] is True
-        assert actions["is-cancelable"] is True
+        # A `planned` run (awaiting confirm/discard) is intentionally NOT
+        # cancelable — the right actions are confirm or discard. Cancel
+        # only applies to in-progress states.
+        assert actions["is-cancelable"] is False
+
+    @pytest.mark.parametrize(
+        "status,expected",
+        [
+            ("pending", True),
+            ("queued", True),
+            ("planning", True),
+            ("confirmed", True),
+            ("applying", True),
+            ("planned", False),  # awaiting confirm/discard
+            ("applied", False),  # terminal
+            ("errored", False),  # terminal
+            ("canceled", False),  # terminal
+            ("discarded", False),  # terminal
+        ],
+    )
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_is_cancelable_by_status(
+        self,
+        mock_get_run,
+        mock_resolve,
+        mock_init_db,
+        mock_init_redis,
+        mock_init_storage,
+        status: str,
+        expected: bool,
+    ):
+        """Cancelable flips per run state — only in-progress states allow cancel."""
+        mock_resolve.return_value = "read"
+        run = _mock_run(status=status, auto_apply=False)
+        mock_get_run.return_value = run
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/runs/run-{run.id}", headers=_AUTH)
+
+        assert resp.json()["data"]["attributes"]["actions"]["is-cancelable"] is expected
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

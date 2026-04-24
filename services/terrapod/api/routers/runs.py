@@ -48,6 +48,13 @@ from terrapod.storage.protocol import ObjectNotFoundError
 router = APIRouter(prefix="/api/v2", tags=["runs"])
 logger = get_logger(__name__)
 
+# States where cancellation is a sensible action — the run is actively
+# moving through the pipeline. `planned` (awaiting user confirm/discard)
+# is deliberately excluded: the right actions there are confirm/discard,
+# not cancel. Terminal states (applied/errored/discarded/canceled) aren't
+# here because there's nothing left running.
+_CANCELABLE_STATES = frozenset({"pending", "queued", "planning", "confirmed", "applying"})
+
 
 def _rfc3339(dt) -> str:
     if dt is None:
@@ -111,15 +118,17 @@ def _run_json(
                     and not run.auto_apply
                     and not run.plan_only,
                     "is-discardable": run.status == "planned" and not run.plan_only,
-                    "is-cancelable": run.status not in run_service.TERMINAL_STATES
-                    and not (run.plan_only and run.status == "planned"),
+                    # Cancel only applies to in-progress states. In particular
+                    # `planned` (awaiting confirmation) is NOT cancelable —
+                    # the user should confirm or discard. Terminal states
+                    # aren't cancelable either (nothing running).
+                    "is-cancelable": run.status in _CANCELABLE_STATES,
                     "is-retryable": run.status in run_service.TERMINAL_STATES
                     or (run.plan_only and run.status == "planned"),
                 },
                 "permissions": {
                     "can-apply": run.status == "planned" and not run.plan_only,
-                    "can-cancel": run.status not in run_service.TERMINAL_STATES
-                    and not (run.plan_only and run.status == "planned"),
+                    "can-cancel": run.status in _CANCELABLE_STATES,
                     "can-discard": run.status == "planned" and not run.plan_only,
                     "can-retry": run.status in run_service.TERMINAL_STATES
                     or (run.plan_only and run.status == "planned"),
