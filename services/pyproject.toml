@@ -9,7 +9,7 @@ packages = [{include = "terrapod"}]
 [tool.poetry.dependencies]
 python = "^3.13"
 fastapi = ">=0.135.2,<0.137.0"
-uvicorn = {extras = ["standard"], version = ">=0.42,<0.45"}
+uvicorn = {extras = ["standard"], version = ">=0.42,<0.47"}
 pydantic = "^2.10.0"
 pydantic-settings = "^2.13.1"
 structlog = "^25.5.0"
