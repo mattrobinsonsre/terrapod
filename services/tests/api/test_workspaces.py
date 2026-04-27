@@ -528,3 +528,105 @@ class TestPermissionsBlock:
         assert perms["can-queue-run"] is True
         assert perms["can-lock"] is True
         assert perms["can-force-unlock"] is True
+
+
+# ── Cloud-block tag → label filtering ──────────────────────────────────
+
+
+class TestParseTagFilters:
+    """Unit tests for the cloud-block `tags` query parameter parser."""
+
+    def _req(self, query: str):
+        from urllib.parse import urlencode
+
+        from starlette.requests import Request
+
+        if isinstance(query, dict):
+            query = urlencode(query, doseq=True)
+        scope = {"type": "http", "query_string": query.encode("ascii"), "headers": []}
+        return Request(scope)
+
+    def test_no_tag_params_returns_empty(self):
+        from terrapod.api.routers.tfe_v2 import _parse_tag_filters
+
+        assert _parse_tag_filters(self._req("")) == []
+        assert _parse_tag_filters(self._req("search%5Bname%5D=foo")) == []
+
+    def test_list_form_bare_keys(self):
+        from terrapod.api.routers.tfe_v2 import _parse_tag_filters
+
+        # search[tags]=core,internal -> two key-only entries
+        out = _parse_tag_filters(self._req("search%5Btags%5D=core,internal"))
+        assert out == [("core", None), ("internal", None)]
+
+    def test_list_form_key_value(self):
+        from terrapod.api.routers.tfe_v2 import _parse_tag_filters
+
+        # search[tags]=env=prod,team=platform
+        out = _parse_tag_filters(self._req("search%5Btags%5D=env=prod,team=platform"))
+        assert out == [("env", "prod"), ("team", "platform")]
+
+    def test_list_form_mixed(self):
+        from terrapod.api.routers.tfe_v2 import _parse_tag_filters
+
+        out = _parse_tag_filters(self._req("search%5Btags%5D=core,env=prod"))
+        assert out == [("core", None), ("env", "prod")]
+
+    def test_list_form_strips_whitespace(self):
+        from terrapod.api.routers.tfe_v2 import _parse_tag_filters
+
+        out = _parse_tag_filters(self._req("search%5Btags%5D=%20core%20,%20env=prod%20"))
+        assert out == [("core", None), ("env", "prod")]
+
+    def test_list_form_skips_empty_tokens(self):
+        from terrapod.api.routers.tfe_v2 import _parse_tag_filters
+
+        out = _parse_tag_filters(self._req("search%5Btags%5D=,core,,internal,"))
+        assert out == [("core", None), ("internal", None)]
+
+    def test_map_form_single(self):
+        from terrapod.api.routers.tfe_v2 import _parse_tag_filters
+
+        # filter[tagged][0][key]=env&filter[tagged][0][value]=prod
+        q = "filter%5Btagged%5D%5B0%5D%5Bkey%5D=env&filter%5Btagged%5D%5B0%5D%5Bvalue%5D=prod"
+        out = _parse_tag_filters(self._req(q))
+        assert out == [("env", "prod")]
+
+    def test_map_form_multiple_indexed(self):
+        from terrapod.api.routers.tfe_v2 import _parse_tag_filters
+
+        # Two indexed entries; ensure they're returned in numeric (not insertion) order
+        q = (
+            "filter%5Btagged%5D%5B1%5D%5Bkey%5D=team"
+            "&filter%5Btagged%5D%5B1%5D%5Bvalue%5D=platform"
+            "&filter%5Btagged%5D%5B0%5D%5Bkey%5D=env"
+            "&filter%5Btagged%5D%5B0%5D%5Bvalue%5D=prod"
+        )
+        out = _parse_tag_filters(self._req(q))
+        assert out == [("env", "prod"), ("team", "platform")]
+
+    def test_map_form_missing_value_treated_as_key_only(self):
+        from terrapod.api.routers.tfe_v2 import _parse_tag_filters
+
+        # value omitted -> key-only filter (matches any value)
+        q = "filter%5Btagged%5D%5B0%5D%5Bkey%5D=core"
+        out = _parse_tag_filters(self._req(q))
+        assert out == [("core", None)]
+
+    def test_map_form_empty_key_skipped(self):
+        from terrapod.api.routers.tfe_v2 import _parse_tag_filters
+
+        q = "filter%5Btagged%5D%5B0%5D%5Bkey%5D=&filter%5Btagged%5D%5B0%5D%5Bvalue%5D=prod"
+        out = _parse_tag_filters(self._req(q))
+        assert out == []
+
+    def test_combined_list_and_map_forms(self):
+        from terrapod.api.routers.tfe_v2 import _parse_tag_filters
+
+        q = (
+            "search%5Btags%5D=core"
+            "&filter%5Btagged%5D%5B0%5D%5Bkey%5D=env"
+            "&filter%5Btagged%5D%5B0%5D%5Bvalue%5D=prod"
+        )
+        out = _parse_tag_filters(self._req(q))
+        assert out == [("core", None), ("env", "prod")]

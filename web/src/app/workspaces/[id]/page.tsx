@@ -1384,7 +1384,12 @@ function WorkspaceDetailContent() {
                   </div>
                 )}
                 <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-500 mb-1">Labels</dt>
+                  <dt
+                    className="text-xs text-slate-500 mb-1"
+                    title='Workspace labels do double duty: label-based RBAC matching, and as the "tags" matched by terraform/tofu cloud { workspaces { tags = ... } } blocks.'
+                  >
+                    Labels (tags)
+                  </dt>
                   {editing && perms['can-update'] ? (
                     <LabelsEditor labels={editLabels} onChange={setEditLabels} />
                   ) : (

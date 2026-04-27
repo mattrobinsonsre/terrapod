@@ -295,6 +295,37 @@ curl -X PATCH https://terrapod.example.com/api/v2/workspaces/ws-{id} \
 - Owners have `admin` permission on their workspace
 - Only a platform admin can change workspace ownership
 
+### Labels are also Tags
+
+Workspace labels do double duty: alongside their primary role in label-based RBAC, they also stand in for TFE's "workspace tags" concept on the CLI. The `cloud { workspaces { tags = ... } }` block in your `.tf` config is matched against the same `labels` map.
+
+```hcl
+terraform {
+  cloud {
+    hostname     = "terrapod.example.com"
+    organization = "default"
+
+    workspaces {
+      tags = ["core"]                    # all workspaces with label key "core"
+      # or
+      tags = { repo = "tf-aws-core" }    # all workspaces with label repo=tf-aws-core
+    }
+  }
+}
+```
+
+Both forms are accepted:
+
+| Form | Example | Matches |
+|---|---|---|
+| List, bare key | `tags = ["core"]` | workspaces with label key `core` (any value) |
+| List, key=value | `tags = ["env=prod"]` | workspaces with `env: prod` exactly |
+| Map | `tags = { env = "prod" }` | workspaces with `env: prod` exactly |
+
+Pick the workspace at run time with `terraform workspace select <name>` or the `TF_WORKSPACE` environment variable. This is how a single repo with multiple environments (e.g. `core-dev-eu1`, `core-stg-eu1`, `core-prod-eu1`) can use one `cloud {}` block and pick the env per CLI invocation.
+
+The web UI displays this field as **"Labels (tags)"** to make the dual purpose explicit.
+
 ---
 
 ## Self-Lockout Protection on Label Changes
