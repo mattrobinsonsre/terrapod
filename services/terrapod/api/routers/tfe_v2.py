@@ -873,6 +873,71 @@ async def show_workspace_by_id(
     )
 
 
+@router.get("/workspaces/{workspace_id}/tag-bindings")
+async def list_workspace_tag_bindings(
+    workspace_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """List a workspace's tag bindings.
+
+    Terraform's cloud backend probes this endpoint to decide whether the TFE
+    server supports key-value workspace tags. If it 404s, terraform falls back
+    to assuming only key-only tags are supported and refuses to use map-form
+    `tags = { key = "value" }` cloud blocks for state operations.
+
+    Terrapod doesn't have a separate `tag_bindings` concept — workspace labels
+    (also used for label-based RBAC) double as TFE tag bindings. Each label
+    key/value pair is returned as one tag-binding entry.
+    """
+    ws, _ = await _require_ws_permission(workspace_id, "read", user, db)
+
+    bindings = [
+        {
+            "type": "tag-bindings",
+            "attributes": {
+                "key": str(k),
+                "value": str(v) if v is not None else "",
+            },
+        }
+        for k, v in (ws.labels or {}).items()
+    ]
+    return JSONResponse(
+        content={"data": bindings},
+        headers=_tfe_headers(),
+    )
+
+
+@router.get("/workspaces/{workspace_id}/effective-tag-bindings")
+async def list_workspace_effective_tag_bindings(
+    workspace_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """List a workspace's effective tag bindings.
+
+    On HCP Terraform / TFE this includes tags inherited from a parent project.
+    Terrapod has no project hierarchy, so this is identical to the
+    workspace-level bindings.
+    """
+    ws, _ = await _require_ws_permission(workspace_id, "read", user, db)
+
+    bindings = [
+        {
+            "type": "effective-tag-bindings",
+            "attributes": {
+                "key": str(k),
+                "value": str(v) if v is not None else "",
+            },
+        }
+        for k, v in (ws.labels or {}).items()
+    ]
+    return JSONResponse(
+        content={"data": bindings},
+        headers=_tfe_headers(),
+    )
+
+
 @router.patch("/workspaces/{workspace_id}")
 async def update_workspace(
     workspace_id: str = Path(...),

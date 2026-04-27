@@ -530,6 +530,97 @@ class TestPermissionsBlock:
         assert perms["can-force-unlock"] is True
 
 
+# ── Tag bindings (terraform key-value tag support probe) ───────────────
+
+
+class TestWorkspaceTagBindings:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    async def test_returns_labels_as_bindings(self, mock_resolve, *mocks):
+        mock_resolve.return_value = "read"
+        ws = _mock_workspace(labels={"repo": "tf-aws-core", "env": "dev"})
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}/tag-bindings", headers=_AUTH)
+        assert resp.status_code == 200
+        items = resp.json()["data"]
+        # Same key/value pairs, regardless of ordering
+        assert {(i["attributes"]["key"], i["attributes"]["value"]) for i in items} == {
+            ("repo", "tf-aws-core"),
+            ("env", "dev"),
+        }
+        assert all(i["type"] == "tag-bindings" for i in items)
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    async def test_empty_labels_returns_empty_array(self, mock_resolve, *mocks):
+        mock_resolve.return_value = "read"
+        ws = _mock_workspace(labels={})
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}/tag-bindings", headers=_AUTH)
+        # Returning 200 with [] (rather than 404) is what tells terraform's
+        # cloud backend that this server supports key-value tags.
+        assert resp.status_code == 200
+        assert resp.json() == {"data": []}
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    async def test_no_permission_blocks_access(self, mock_resolve, *mocks):
+        mock_resolve.return_value = None
+        ws = _mock_workspace()
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}/tag-bindings", headers=_AUTH)
+        # 403 is fine for terraform's KV-tag-support probe — only a 404 would
+        # cause it to conclude the endpoint doesn't exist.
+        assert resp.status_code == 403
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    async def test_effective_tag_bindings_mirrors_workspace_bindings(self, mock_resolve, *mocks):
+        # Terrapod has no project hierarchy, so effective bindings == workspace bindings
+        mock_resolve.return_value = "read"
+        ws = _mock_workspace(labels={"repo": "tf-aws-core"})
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                f"/api/v2/workspaces/ws-{ws.id}/effective-tag-bindings", headers=_AUTH
+            )
+        assert resp.status_code == 200
+        items = resp.json()["data"]
+        assert items == [
+            {
+                "type": "effective-tag-bindings",
+                "attributes": {"key": "repo", "value": "tf-aws-core"},
+            }
+        ]
+
+
 # ── Cloud-block tag → label filtering ──────────────────────────────────
 
 
