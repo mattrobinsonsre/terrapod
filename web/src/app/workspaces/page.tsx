@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { Suspense, useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
@@ -51,7 +51,9 @@ interface Workspace {
   }
 }
 
-export default function WorkspacesPage() {
+// Wrapped in <Suspense> at the bottom — `useSearchParams()` triggers Next.js's
+// CSR bailout, and without a boundary the whole page fails to build statically.
+function WorkspacesPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
@@ -632,5 +634,13 @@ export default function WorkspacesPage() {
         )}
       </main>
     </>
+  )
+}
+
+export default function WorkspacesPage() {
+  return (
+    <Suspense fallback={<><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><LoadingSpinner /></main></>}>
+      <WorkspacesPageInner />
+    </Suspense>
   )
 }
