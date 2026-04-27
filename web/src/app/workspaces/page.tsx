@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
@@ -13,6 +13,7 @@ import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { useWorkspaceListEvents } from '@/lib/use-workspace-list-events'
+import { matchWorkspace, parseFilterQuery, removeTerm, serializeFilter } from '@/lib/workspace-filter'
 
 interface LatestRun {
   id: string
@@ -46,14 +47,40 @@ interface Workspace {
     'health-conditions': HealthCondition[]
     'latest-run': LatestRun | null
     'created-at': string
+    labels?: Record<string, string> | null
   }
 }
 
 export default function WorkspacesPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  // Filter input. Tokens are space-separated; bare words match the workspace
+  // name (case-insensitive substring), `key:value` / `key=value` match a
+  // label exactly, and `key:` / `key=` matches any workspace that has the
+  // label key set. Mirrored to the URL via ?q=… so refresh + share work.
+  const [filterInput, setFilterInput] = useState(searchParams.get('q') || '')
+  const parsedFilter = useMemo(() => parseFilterQuery(filterInput), [filterInput])
+
+  // Sync the input back to the URL whenever the parsed shape changes.
+  useEffect(() => {
+    const serialized = serializeFilter(parsedFilter)
+    const current = searchParams.get('q') || ''
+    if (serialized === current) return
+    const params = new URLSearchParams(Array.from(searchParams.entries()))
+    if (serialized) params.set('q', serialized)
+    else params.delete('q')
+    const qs = params.toString()
+    router.replace(qs ? `/workspaces?${qs}` : '/workspaces', { scroll: false })
+  }, [parsedFilter, router, searchParams])
+
+  const filteredWorkspaces = useMemo(
+    () => (parsedFilter.terms.length === 0 ? workspaces : workspaces.filter(ws => matchWorkspace(ws, parsedFilter))),
+    [workspaces, parsedFilter],
+  )
 
   // Create form
   const [showCreate, setShowCreate] = useState(false)
@@ -134,7 +161,7 @@ export default function WorkspacesPage() {
   }
 
   const { sortedItems: sortedWorkspaces, sortState, toggleSort } = useSortable<Workspace, WsSortKey>(
-    workspaces, 'name', 'asc',
+    filteredWorkspaces, 'name', 'asc',
     useCallback((item: Workspace, key: WsSortKey) => {
       switch (key) {
         case 'name': return item.attributes.name
@@ -479,10 +506,63 @@ export default function WorkspacesPage() {
           )
         })()}
 
+        {!loading && workspaces.length > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={filterInput}
+                onChange={e => setFilterInput(e.target.value)}
+                placeholder='Filter by name or label — e.g. "eu1" or "env:prod" or "repo:tf-aws-core eu1"'
+                aria-label="Filter workspaces"
+                className="flex-1 px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/50 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500"
+              />
+              {parsedFilter.terms.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFilterInput('')}
+                  className="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            {parsedFilter.terms.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {parsedFilter.terms.map((term, i) => {
+                  const label =
+                    term.kind === 'name'
+                      ? `name: ${term.value}`
+                      : term.value === null
+                        ? `${term.key}: (any)`
+                        : `${term.key}: ${term.value}`
+                  return (
+                    <button
+                      type="button"
+                      key={`${i}-${label}`}
+                      onClick={() => setFilterInput(serializeFilter(removeTerm(parsedFilter, i)))}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 transition-colors"
+                      title="Remove this term"
+                    >
+                      <span>{label}</span>
+                      <span aria-hidden className="text-slate-500">×</span>
+                    </button>
+                  )
+                })}
+                <span className="text-xs text-slate-500 self-center">
+                  Showing {filteredWorkspaces.length} of {workspaces.length}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <LoadingSpinner />
         ) : workspaces.length === 0 ? (
           <EmptyState message="No workspaces yet. Create one to get started." />
+        ) : filteredWorkspaces.length === 0 ? (
+          <EmptyState message="No workspaces match this filter." />
         ) : (
           <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
             <table className="w-full">
