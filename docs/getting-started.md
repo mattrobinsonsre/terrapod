@@ -157,6 +157,24 @@ resource "null_resource" "hello" {
 
 > Note: The `terraform {}` block syntax is used by both OpenTofu and Terraform. No changes are needed when switching between them.
 
+If you'd rather select a workspace at run time (typical when a single repo backs several environments) replace `name` with `tags`. Tags are matched against the workspace's labels — see the [RBAC docs](rbac.md#labels-are-also-tags) for details.
+
+```hcl
+workspaces {
+  tags = ["core"]                    # any workspace whose labels include "core"
+  # or, for an exact match:
+  tags = { repo = "tf-aws-core" }
+}
+```
+
+Then pick a specific workspace per invocation:
+
+```zsh
+TF_WORKSPACE=core-stg-eu1 tofu plan
+# or
+tofu workspace select core-stg-eu1
+```
+
 If you have not already run `tofu login`:
 
 ```zsh

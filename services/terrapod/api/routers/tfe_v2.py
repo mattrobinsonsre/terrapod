@@ -575,6 +575,61 @@ def _workspace_json(
     }
 
 
+def _parse_tag_filters(request: Request) -> list[tuple[str, str | None]]:
+    """Extract cloud-block tag filters from a workspace-list request.
+
+    The terraform/tofu CLI's `cloud { workspaces { tags = ... } }` block emits two
+    query-parameter shapes depending on whether `tags` is a list or a map:
+
+      - list form  `tags = ["core", "env=prod"]`
+            -> `?search[tags]=core,env=prod`
+            (each comma-separated token is either a bare key or `key=value`)
+
+      - map form   `tags = { env = "prod" }`
+            -> `?filter[tagged][0][key]=env&filter[tagged][0][value]=prod`
+
+    Terrapod doesn't have a separate "tags" concept on workspaces; instead each
+    tag is matched against `Workspace.labels` (which is also the source of
+    label-based RBAC). A bare key matches any workspace that has that label key
+    set; `key=value` matches an exact label entry.
+
+    Returns a list of `(key, value)` tuples where `value` is `None` for
+    key-only matches.
+    """
+    filters: list[tuple[str, str | None]] = []
+
+    # List form: search[tags]=a,b,c=d
+    raw_tags = request.query_params.get("search[tags]", "")
+    if raw_tags:
+        for token in raw_tags.split(","):
+            token = token.strip()
+            if not token:
+                continue
+            if "=" in token:
+                k, v = token.split("=", 1)
+                filters.append((k.strip(), v.strip()))
+            else:
+                filters.append((token, None))
+
+    # Map form: filter[tagged][N][key|value]=...
+    indexed: dict[int, dict[str, str]] = {}
+    for qk, qv in request.query_params.multi_items():
+        m = re.match(r"^filter\[tagged\]\[(\d+)\]\[(key|value)\]$", qk)
+        if not m:
+            continue
+        idx = int(m.group(1))
+        indexed.setdefault(idx, {})[m.group(2)] = qv
+    for idx in sorted(indexed):
+        entry = indexed[idx]
+        key = entry.get("key", "").strip()
+        if not key:
+            continue
+        value = entry.get("value")
+        filters.append((key, value.strip() if value is not None else None))
+
+    return filters
+
+
 @router.get("/organizations/default/workspaces")
 async def list_workspaces(
     user: AuthenticatedUser = Depends(get_current_user),
@@ -589,6 +644,15 @@ async def list_workspaces(
     search_name = request.query_params.get("search[name]", "") if request else ""
     if search_name:
         query = query.where(Workspace.name.ilike(f"%{search_name}%"))
+
+    # Cloud-block tag filtering. Tags are matched against Workspace.labels —
+    # see _parse_tag_filters for the dual-form parsing.
+    if request is not None:
+        for k, v in _parse_tag_filters(request):
+            if v is None:
+                query = query.where(Workspace.labels.has_key(k))  # noqa: W601
+            else:
+                query = query.where(Workspace.labels.contains({k: v}))
 
     result = await db.execute(query)
     workspaces = result.scalars().all()
