@@ -470,6 +470,11 @@ export default function RunDetailPage() {
           return
         }
       }
+      // Confirm = applies — jump straight to the apply tab so the user sees
+      // the apply log streaming instead of the plan log they were just on.
+      if (action === 'confirm') {
+        switchSection('apply')
+      }
       await loadRun()
     } catch (err) {
       setError(err instanceof Error ? err.message : `Failed to ${action} run`)
