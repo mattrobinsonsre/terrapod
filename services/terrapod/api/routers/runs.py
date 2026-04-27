@@ -264,7 +264,7 @@ async def _fetch_vcs_config(
             raise HTTPException(status_code=422, detail="Cannot get branch HEAD SHA")
 
     archive = await _download_archive(conn, owner, repo, sha)
-    archive = _strip_top_level_dir(archive)
+    archive = await _strip_top_level_dir(archive)
 
     cv = await run_service.create_configuration_version(
         db, workspace_id=ws.id, source="vcs", auto_queue_runs=False
