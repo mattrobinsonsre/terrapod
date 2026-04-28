@@ -16,6 +16,7 @@ spec:
     rollingUpdate:
       maxSurge: {{ .Values.listener.strategy.maxSurge }}
       maxUnavailable: {{ .Values.listener.strategy.maxUnavailable }}
+  minReadySeconds: {{ .Values.listener.minReadySeconds | default 30 }}
   selector:
     matchLabels:
       {{- include "terrapod.listener.selectorLabels" . | nindent 6 }}
@@ -59,6 +60,11 @@ spec:
               value: {{ include "terrapod.runnerNamespace" . | quote }}
             - name: TERRAPOD_LISTENER_NAME
               value: {{ .Values.listener.name | default "listener" | quote }}
+            # Credentials-Secret name is tied to the listener Deployment, not
+            # to listener.name, so renaming the listener (changing its
+            # API-registered identity) doesn't orphan the Secret.
+            - name: TERRAPOD_CREDENTIALS_SECRET_NAME
+              value: {{ include "terrapod.listenerCredentialsSecretName" . | quote }}
             - name: TERRAPOD_HEALTH_PORT
               value: {{ .Values.listener.healthPort | default 8081 | quote }}
             - name: POD_NAME
@@ -67,6 +73,12 @@ spec:
                   fieldPath: metadata.name
             - name: TERRAPOD_API_URL
               value: {{ .Values.listener.apiUrl | default (printf "http://%s-api:8000" (include "terrapod.fullname" .)) | quote }}
+            # Cert TTL drives the renewal threshold (renew at 50% + splay).
+            # Must match `api.config.agent_pools.listener_cert_ttl_seconds` so
+            # pods anticipate renewal correctly. Values-local.yaml lowers
+            # this for fast iteration.
+            - name: TERRAPOD_LISTENER_CERT_TTL_SECONDS
+              value: {{ .Values.api.config.agent_pools.listener_cert_ttl_seconds | default 3600 | quote }}
             {{- if .Values.listener.existingSecret }}
             - name: TERRAPOD_JOIN_TOKEN
               valueFrom:
@@ -88,8 +100,6 @@ spec:
             - name: runner-config
               mountPath: /etc/terrapod
               readOnly: true
-            - name: certs
-              mountPath: /var/lib/terrapod/certs
             - name: tmp
               mountPath: /tmp
             {{- with .Values.listener.extraVolumeMounts }}
@@ -130,8 +140,9 @@ spec:
         - name: runner-config
           configMap:
             name: {{ include "terrapod.fullname" . }}-runner-config
-        - name: certs
-          emptyDir: {}
+        # Cert material lives in the K8s Secret named after the Deployment
+        # (TERRAPOD_CREDENTIALS_SECRET_NAME above), accessed via the K8s API
+        # by the listener — not via a volume mount.
         - name: tmp
           emptyDir: {}
         {{- with .Values.listener.extraVolumes }}

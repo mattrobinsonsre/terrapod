@@ -51,4 +51,45 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "terrapod.listenerServiceAccountName" . }}
     namespace: {{ .Release.Namespace }}
+---
+# Credentials-Secret access in the listener's own namespace. The listener
+# stores its X.509 cert + key + CA + listener-id in this Secret and rotates
+# it via the API. Scoped to the single Secret name to limit blast radius.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "terrapod.fullname" . }}-listener-credentials
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: listener
+rules:
+  # `create` cannot be scoped to a resourceName (the resource doesn't exist
+  # yet at admission time); the rest are. The `delete` is for the rejoin
+  # path — wiping the Secret forces a fresh join-token bootstrap.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - {{ include "terrapod.listenerCredentialsSecretName" . | quote }}
+    verbs: ["get", "list", "watch", "patch", "update", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "terrapod.fullname" . }}-listener-credentials
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: listener
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "terrapod.fullname" . }}-listener-credentials
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "terrapod.listenerServiceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
 {{- end }}

@@ -33,7 +33,9 @@ from sse_starlette.sse import EventSourceResponse
 from terrapod.api.dependencies import (
     DEFAULT_ORG,
     AuthenticatedUser,
+    ListenerIdentity,
     get_current_user,
+    get_listener_identity,
     require_admin,
 )
 from terrapod.db.session import get_db
@@ -730,14 +732,25 @@ async def listener_heartbeat(
 @router.post("/listeners/{listener_id}/renew")
 async def renew_listener_cert(
     listener_id: str = Path(...),
+    identity: ListenerIdentity = Depends(get_listener_identity),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Renew a listener's certificate.
 
-    Auth: Certificate-based (X-Terrapod-Client-Cert). For now accepts
-    any request with a valid listener ID. Still needs DB for pool lookup.
+    Auth: must present a currently-valid client cert via
+    `X-Terrapod-Client-Cert` (verified by `get_listener_identity`: CA
+    signature, expiry, listener-name lookup, fingerprint match). The
+    cert's listener id must also match the path id — a listener can
+    only renew its own cert, not another listener's.
     """
     l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+
+    if identity.listener_id != l_uuid:
+        raise HTTPException(
+            status_code=403,
+            detail="Certificate does not match the listener id in the path",
+        )
+
     listener = await agent_pool_service.get_listener(l_uuid)
     if listener is None:
         raise HTTPException(status_code=404, detail="Listener not found")

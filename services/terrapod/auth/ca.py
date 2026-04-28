@@ -125,14 +125,17 @@ class CertificateAuthority:
         self,
         name: str,
         pool_name: str,
-        ttl_hours: int = 8760,
+        ttl_seconds: int = 3600,
     ) -> tuple[x509.Certificate, ed25519.Ed25519PrivateKey]:
         """Issue a certificate for a runner listener.
 
         Args:
             name: Listener name (used as CN).
             pool_name: Agent pool name (embedded in SAN URI).
-            ttl_hours: Certificate lifetime (default: 1 year).
+            ttl_seconds: Certificate lifetime in seconds (default: 1h).
+                Listeners renew at 50% of this lifetime plus a per-pod
+                splay; tighter values constrain how long a leaked cert
+                stays usable but increase API renewal traffic.
 
         Returns:
             Tuple of (certificate, private_key).
@@ -156,7 +159,7 @@ class CertificateAuthority:
             .public_key(public_key)
             .serial_number(x509.random_serial_number())
             .not_valid_before(now)
-            .not_valid_after(now + datetime.timedelta(hours=ttl_hours))
+            .not_valid_after(now + datetime.timedelta(seconds=ttl_seconds))
             .add_extension(
                 x509.BasicConstraints(ca=False, path_length=None),
                 critical=True,

@@ -86,16 +86,21 @@ class RunnerListener:
     def _auth_headers(self) -> dict[str, str]:
         """Build authentication headers for API calls.
 
-        The cert header is computed once and cached — the PEM is immutable for the
-        listener's lifetime, so re-encoding it on every request just fragments the heap.
+        The cert is renewed in the background by `renew_loop`, which mutates
+        `self.identity` in place. Cache by the cert PEM identity (id() is
+        stable while the same string object is held in memory) so we
+        re-encode only on rotation, not every request.
         """
-        if not hasattr(self, "_cached_auth_headers"):
-            headers: dict[str, str] = {}
-            if self.identity and self.identity.certificate_pem:
-                cert_b64 = base64.b64encode(self.identity.certificate_pem.encode()).decode()
-                headers["X-Terrapod-Client-Cert"] = cert_b64
-            self._cached_auth_headers = headers
-        return self._cached_auth_headers
+        cert_pem = self.identity.certificate_pem if self.identity else ""
+        cached = getattr(self, "_cached_auth_headers_for_cert", None)
+        if cached is not None and cached[0] is cert_pem:
+            return cached[1]
+        headers: dict[str, str] = {}
+        if cert_pem:
+            cert_b64 = base64.b64encode(cert_pem.encode()).decode()
+            headers["X-Terrapod-Client-Cert"] = cert_b64
+        self._cached_auth_headers_for_cert = (cert_pem, headers)
+        return headers
 
     async def _establish_identity(self) -> None:
         """Establish or re-establish listener identity."""
@@ -103,9 +108,8 @@ class RunnerListener:
 
         self.identity = await establish_identity()
         self._identity_ready = True
-        # Invalidate cached auth headers so the new cert is used
-        if hasattr(self, "_cached_auth_headers"):
-            del self._cached_auth_headers
+        # Drop any cached headers so the next call re-encodes against the new cert.
+        self._cached_auth_headers_for_cert = None
 
     async def start(self) -> None:
         """Main entry point — initialize and start loops."""
@@ -135,29 +139,61 @@ class RunnerListener:
 
         try:
             # Start concurrent loops — SSE for sub-second responsiveness,
-            # poll loop as reliability fallback (~30s worst-case latency)
+            # poll loop as reliability fallback (~30s worst-case latency),
+            # cert-renewal loop to refresh the X.509 cert before it expires.
             await asyncio.gather(
                 self._health_server(),
                 self._heartbeat_loop(),
                 self._sse_loop(),
                 self._poll_loop(),
+                self._cert_renewal_loop(),
                 self._shutdown_waiter(),
             )
         finally:
             await self._http_client.aclose()
             await self._sse_client.aclose()
 
+    async def _cert_renewal_loop(self) -> None:
+        """Keep the listener's X.509 cert fresh.
+
+        Coordinates with other pods of the same listener deployment via the
+        shared K8s Secret: read first, only call /renew if no other pod has
+        rotated yet, write with resourceVersion CAS to absorb genuine ties.
+        See `terrapod.runner.identity.renew_loop` for the full algorithm.
+        """
+        from terrapod.runner.identity import (
+            _credentials_secret_name,
+            _read_in_pod_namespace,
+            pod_splay_seconds,
+            renew_loop,
+        )
+
+        cert_validity_seconds = int(os.environ.get("TERRAPOD_LISTENER_CERT_TTL_SECONDS", "3600"))
+        secret_name = _credentials_secret_name(self.identity.name)
+        namespace = _read_in_pod_namespace()
+
+        await renew_loop(
+            self,
+            secret_name=secret_name,
+            namespace=namespace,
+            cert_validity_seconds=cert_validity_seconds,
+            splay_seconds=pod_splay_seconds(),
+        )
+
     async def _rejoin(self) -> None:
-        """Force a fresh join by clearing saved certs and re-establishing identity.
+        """Force a fresh join by clearing the credentials Secret and re-establishing.
 
         Called when the listener receives persistent 401s, indicating its
-        Redis registration has expired (300s TTL) while the saved certificate
-        is still on disk. Without this, the listener loops on 401 forever.
+        Redis registration has expired (300s TTL) and the API no longer
+        recognises the cert in our credentials Secret. We drop the Secret
+        so the next `establish_identity()` falls through to the join-token
+        path; other pods of the same deployment will pick up the change
+        on their next cert renewal cycle (Secret missing → bootstrap path).
         """
-        from terrapod.runner.identity import _clear_saved_certs
+        from terrapod.runner.identity import clear_credentials_secret
 
         logger.warning("Forcing re-join due to persistent auth failures")
-        _clear_saved_certs()
+        clear_credentials_secret()
         await self._establish_identity()
 
         # Recreate HTTP clients with the new identity base URL

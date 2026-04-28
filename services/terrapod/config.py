@@ -433,6 +433,45 @@ class CORSConfig(BaseModel):
 # --- Rate Limiting Configuration ---
 
 
+class AgentPoolsConfig(BaseModel):
+    """Agent pool join-token defaults and listener-certificate lifetime.
+
+    Tighter defaults reduce the blast radius of a leaked join token; looser
+    defaults reduce operational noise from re-issuance on routine pod
+    restarts that miss the renewal window. Listeners renew their cert at
+    50% of `listener_cert_ttl_seconds` (plus a small per-pod splay), so
+    that value also controls how often the API reissues a fresh cert.
+    """
+
+    listener_cert_ttl_seconds: int = Field(
+        default=3600,
+        description=(
+            "Listener X.509 certificate lifetime in seconds (default 1h). "
+            "Listeners renew at 50% of TTL plus a per-pod splay, so this "
+            "drives both how fast a compromised cert ages out and how often "
+            "the API issues fresh ones. For local Tilt, override to ~300s "
+            "in values-local.yaml so a renewal cycle finishes in minutes."
+        ),
+    )
+    default_join_token_max_uses: int | None = Field(
+        default=2,
+        description=(
+            "Default max_uses on newly-created join tokens. 2 tolerates a "
+            "single bootstrap-race retry across multi-replica listener "
+            "deployments without making the token reusable indefinitely. "
+            "Per-token override is still accepted via the API."
+        ),
+    )
+    default_join_token_ttl_seconds: int | None = Field(
+        default=3600,
+        description=(
+            "Default lifetime for newly-created join tokens, in seconds. "
+            "Applied as expires_at = now() + this. Default 1h. Set to null "
+            "to default to no expiry (per-token override still accepted)."
+        ),
+    )
+
+
 class RateLimitConfig(BaseModel):
     """API rate limiting configuration.
 
@@ -624,6 +663,9 @@ class Settings(BaseSettings):
 
     # CORS
     cors: CORSConfig = Field(default_factory=CORSConfig)
+
+    # Agent Pools
+    agent_pools: AgentPoolsConfig = Field(default_factory=AgentPoolsConfig)
 
     # Rate Limiting
     rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
