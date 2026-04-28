@@ -3,7 +3,7 @@
 import hashlib
 import secrets
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +14,7 @@ from terrapod.auth.ca import (
     serialize_certificate,
     serialize_private_key,
 )
+from terrapod.config import settings
 from terrapod.db.models import AgentPool, AgentPoolToken, utc_now
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
@@ -95,16 +96,32 @@ def generate_join_token() -> tuple[str, str]:
     return raw, token_hash
 
 
+_UNSET = object()
+
+
 async def create_pool_token(
     db: AsyncSession,
     pool_id: uuid.UUID,
     description: str,
     created_by: str,
-    expires_at=None,
-    max_uses: int | None = None,
+    expires_at=_UNSET,
+    max_uses: int | None | object = _UNSET,
 ) -> tuple[AgentPoolToken, str]:
-    """Create a join token for an agent pool. Returns (token_record, raw_token)."""
+    """Create a join token for an agent pool. Returns (token_record, raw_token).
+
+    `expires_at` and `max_uses` default to the values from
+    `settings.agent_pools.default_join_token_*` when the caller does not
+    pass them explicitly. Pass `None` to opt this token out of the limit
+    (unlimited uses or no expiry). The sentinel default lets us
+    distinguish "caller did not specify" from "caller wants unlimited".
+    """
     raw_token, token_hash = generate_join_token()
+
+    if expires_at is _UNSET:
+        ttl = settings.agent_pools.default_join_token_ttl_seconds
+        expires_at = (datetime.now(UTC) + timedelta(seconds=ttl)) if ttl else None
+    if max_uses is _UNSET:
+        max_uses = settings.agent_pools.default_join_token_max_uses
 
     token = AgentPoolToken(
         pool_id=pool_id,
@@ -195,7 +212,11 @@ async def join_listener(
     redis = get_redis_client()
 
     # Issue certificate
-    cert, private_key = ca.issue_listener_certificate(name, pool.name)
+    cert, private_key = ca.issue_listener_certificate(
+        name,
+        pool.name,
+        ttl_seconds=settings.agent_pools.listener_cert_ttl_seconds,
+    )
     fingerprint = get_certificate_fingerprint(cert)
     now = datetime.now(UTC).isoformat()
 
@@ -360,7 +381,11 @@ async def renew_listener_certificate(
     """Renew a listener's certificate. Updates fingerprint and expiry in Redis."""
     ca = get_ca()
     redis = get_redis_client()
-    cert, private_key = ca.issue_listener_certificate(listener_name, pool.name)
+    cert, private_key = ca.issue_listener_certificate(
+        listener_name,
+        pool.name,
+        ttl_seconds=settings.agent_pools.listener_cert_ttl_seconds,
+    )
     fingerprint = get_certificate_fingerprint(cert)
 
     key = f"{_LISTENER_PREFIX}{listener_id}"

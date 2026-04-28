@@ -7,7 +7,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_admin
+from terrapod.api.dependencies import (
+    AuthenticatedUser,
+    ListenerIdentity,
+    get_current_user,
+    get_listener_identity,
+    require_admin,
+)
 from terrapod.db.session import get_db
 
 _BASE = "http://test"
@@ -681,3 +687,100 @@ class TestDeleteListenerRBAC:
             res = await client.delete(f"/api/v2/listeners/{lid}", headers=_AUTH)
 
         assert res.status_code == 403
+
+
+# ── Renew listener cert (cert-authenticated) ────────────────────────
+
+
+def _mock_listener_identity(listener_id, name="listener-1", pool_id=None):
+    return ListenerIdentity(
+        listener_id=listener_id,
+        name=name,
+        pool_id=pool_id or uuid.uuid4(),
+        certificate_fingerprint="dead" * 16,
+        certificate_expires_at=None,
+    )
+
+
+class TestRenewListenerCert:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.renew_listener_certificate")
+    @patch("terrapod.services.agent_pool_service.get_pool")
+    @patch("terrapod.services.agent_pool_service.get_listener")
+    async def test_succeeds_when_cert_matches_path(
+        self,
+        mock_get_listener,
+        mock_get_pool,
+        mock_renew,
+        *mocks,
+    ):
+        """Cert listener_id matches the path → 200 + renewed cert returned."""
+        lid = uuid.uuid4()
+        pid = uuid.uuid4()
+        mock_get_listener.return_value = _mock_listener_dict(
+            listener_id=lid, name="listener-1", pool_id=pid
+        )
+        mock_get_pool.return_value = _mock_pool(pool_id=pid)
+        mock_renew.return_value = {
+            "certificate": "PEM",
+            "private_key": "PEM",
+            "ca_certificate": "PEM",
+            "certificate_fingerprint": "abcd",
+            "certificate_expires_at": "2026-01-01T01:00:00+00:00",
+        }
+
+        app = create_app()
+        app.dependency_overrides[get_listener_identity] = lambda: _mock_listener_identity(
+            lid, pool_id=pid
+        )
+        app.dependency_overrides[get_db] = lambda: AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.post(
+                f"/api/v2/listeners/{lid}/renew",
+                headers={"X-Terrapod-Client-Cert": "irrelevant-mocked"},
+            )
+
+        assert res.status_code == 200
+        assert res.json()["data"]["certificate"] == "PEM"
+        assert mock_renew.await_count == 1
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.renew_listener_certificate")
+    async def test_rejects_path_listener_id_mismatch(self, mock_renew, *mocks):
+        """Cert authenticates as listener-A; trying to renew listener-B → 403."""
+        cert_lid = uuid.uuid4()
+        path_lid = uuid.uuid4()  # different from cert_lid
+
+        app = create_app()
+        app.dependency_overrides[get_listener_identity] = lambda: _mock_listener_identity(cert_lid)
+        app.dependency_overrides[get_db] = lambda: AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.post(
+                f"/api/v2/listeners/{path_lid}/renew",
+                headers={"X-Terrapod-Client-Cert": "irrelevant-mocked"},
+            )
+
+        assert res.status_code == 403
+        assert "Certificate does not match" in res.json()["detail"]
+        # Renew was never called — auth check rejects before service layer
+        assert mock_renew.await_count == 0
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_rejects_request_without_cert_header(self, *mocks):
+        """No X-Terrapod-Client-Cert → 401 from the dep itself (no override)."""
+        app = create_app()
+        app.dependency_overrides[get_db] = lambda: AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.post(f"/api/v2/listeners/{uuid.uuid4()}/renew")
+
+        assert res.status_code == 401
+        assert "X-Terrapod-Client-Cert" in res.json()["detail"]

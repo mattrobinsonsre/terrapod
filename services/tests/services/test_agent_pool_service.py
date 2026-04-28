@@ -1,12 +1,17 @@
 """Tests for agent pool service — join token generation and validation."""
 
 import hashlib
+import uuid
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from terrapod.services.agent_pool_service import generate_join_token, validate_join_token
+from terrapod.services.agent_pool_service import (
+    create_pool_token,
+    generate_join_token,
+    validate_join_token,
+)
 
 # ── generate_join_token ──────────────────────────────────────────────
 
@@ -152,3 +157,102 @@ class TestValidateJoinToken:
 
         result = await validate_join_token(db, raw)
         assert result is mock_record
+
+
+# ── create_pool_token defaults ──────────────────────────────────────
+
+
+def _capture_pool_token_call() -> AsyncMock:
+    """Build an AsyncSession mock that records the AgentPoolToken passed to add()."""
+    db = AsyncMock()
+    captured = {}
+
+    def add(token):
+        captured["token"] = token
+
+    db.add = MagicMock(side_effect=add)
+    db.flush = AsyncMock()
+    db._captured = captured
+    return db
+
+
+class TestCreatePoolToken:
+    @pytest.mark.asyncio
+    async def test_defaults_max_uses_to_two(self):
+        """Default max_uses comes from settings.agent_pools (2 in the bundled config)."""
+        db = _capture_pool_token_call()
+
+        await create_pool_token(
+            db,
+            pool_id=uuid.uuid4(),
+            description="test",
+            created_by="alice@example.com",
+        )
+
+        assert db._captured["token"].max_uses == 2
+
+    @pytest.mark.asyncio
+    async def test_defaults_expiry_to_one_hour_from_now(self):
+        """Default expires_at is now + default_join_token_ttl_seconds (3600)."""
+        db = _capture_pool_token_call()
+
+        before = datetime.now(UTC)
+        await create_pool_token(
+            db,
+            pool_id=uuid.uuid4(),
+            description="test",
+            created_by="alice@example.com",
+        )
+        after = datetime.now(UTC)
+
+        expires_at = db._captured["token"].expires_at
+        # Should land within (now+1h - small skew, now+1h + small skew)
+        assert before + timedelta(seconds=3590) <= expires_at <= after + timedelta(seconds=3610)
+
+    @pytest.mark.asyncio
+    async def test_explicit_max_uses_none_means_unlimited(self):
+        """Caller passing max_uses=None (vs default sentinel) opts out of the cap."""
+        db = _capture_pool_token_call()
+
+        await create_pool_token(
+            db,
+            pool_id=uuid.uuid4(),
+            description="bootstrap",
+            created_by="op@example.com",
+            max_uses=None,
+        )
+
+        assert db._captured["token"].max_uses is None
+
+    @pytest.mark.asyncio
+    async def test_explicit_expires_at_none_means_no_expiry(self):
+        """Caller passing expires_at=None opts out of the default TTL."""
+        db = _capture_pool_token_call()
+
+        await create_pool_token(
+            db,
+            pool_id=uuid.uuid4(),
+            description="bootstrap",
+            created_by="op@example.com",
+            expires_at=None,
+        )
+
+        assert db._captured["token"].expires_at is None
+
+    @pytest.mark.asyncio
+    async def test_explicit_values_override_defaults(self):
+        """Caller-supplied max_uses + expires_at win over the config defaults."""
+        db = _capture_pool_token_call()
+        custom_expiry = datetime.now(UTC) + timedelta(days=7)
+
+        await create_pool_token(
+            db,
+            pool_id=uuid.uuid4(),
+            description="weekly-rotated",
+            created_by="op@example.com",
+            max_uses=10,
+            expires_at=custom_expiry,
+        )
+
+        assert db._captured["token"].max_uses == 10
+        assert db._captured["token"].expires_at == custom_expiry

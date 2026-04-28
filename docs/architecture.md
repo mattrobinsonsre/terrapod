@@ -286,18 +286,20 @@ The entrypoint script is at `docker/runner-entrypoint.sh`.
 All listeners follow the same flow — there is no distinction between pool types:
 
 1. An admin creates an **agent pool** via the API (e.g. "production", "dev")
-2. An admin generates a **join token** for the pool
-3. The listener is configured with `TERRAPOD_JOIN_TOKEN` and `TERRAPOD_API_URL`
-4. On startup, the listener calls `POST /api/v2/agent-pools/join` with the token
-5. The API validates the token, issues an X.509 certificate (Ed25519), and returns the listener ID, cert, and pool ID
-6. Certificates are saved to disk for restart persistence (avoiding unnecessary re-joins)
+2. An admin generates a **join token** for the pool (default: 2 uses, 1h expiry)
+3. The listener Deployment is configured with `TERRAPOD_JOIN_TOKEN` and `TERRAPOD_API_URL`
+4. On startup, each listener pod looks for a Kubernetes Secret named after the Deployment (`{release-fullname}-listener-credentials`, supplied via `TERRAPOD_CREDENTIALS_SECRET_NAME`) in its own namespace. If present and valid, it adopts the existing identity (cert, key, CA, listener-id) and skips the join entirely
+5. If no Secret exists, the pod calls `POST /api/v2/agent-pools/join` with the token. The API validates it (SHA-256 hash, expiry, `max_uses`), issues a short-lived X.509 certificate (Ed25519, 1h validity by default), and returns the listener ID, cert, and pool ID
+6. The pod writes the credentials to the Secret. If the create returns `409 AlreadyExists` (another pod won the race), the loser re-reads the Secret and adopts the winner's identity
 7. The listener authenticates subsequent API calls via `X-Terrapod-Client-Cert` header (base64-encoded PEM)
 8. The listener connects to the SSE endpoint (`GET /api/v2/listeners/{id}/events`) — a persistent outbound HTTP stream for receiving events from the API
 9. Heartbeats every 60s (300s TTL in Redis), SSE event loop handles run claims, Job status queries, log streaming, and cancellation
 
-A listener can be deployed in the same cluster as the API or in a completely separate cluster — the join flow is identical. The SSE connection is outbound from the listener to the API, which works through firewalls without requiring inbound access. The Helm chart deploys a listener as a Deployment using a dedicated lightweight Docker image (`terrapod-listener`, ~225MB) that includes only the listener's dependencies (httpx, kubernetes, pydantic, structlog). The entrypoint is `python -m terrapod.runner.listener`. The listener has RBAC to create/watch/delete Jobs and Pods in the runner namespace.
+The Secret-backed identity model means a listener Deployment has **one shared identity across all pods**, surviving pod replacement and rolling updates without re-joining. See [Runners → Listener identity](runners.md#listener-identity) for the full bootstrap, renewal, and rotation lifecycle.
 
-**Multiple listener replicas** are supported for high availability. Set `listener.replicas > 1` — each pod derives a unique name by appending its Kubernetes pod name to the configured base name (`{base_name}-{pod_name}`). All replicas in a pool compete for queued runs via atomic Postgres locking (`SELECT ... FOR UPDATE SKIP LOCKED`). No leader election is required — Redis heartbeats track each listener independently, and stale records from terminated pods auto-expire after the 300s heartbeat TTL.
+A listener can be deployed in the same cluster as the API or in a completely separate cluster — the join flow is identical. The SSE connection is outbound from the listener to the API, which works through firewalls without requiring inbound access. The Helm chart deploys a listener as a Deployment using a dedicated lightweight Docker image (`terrapod-listener`, ~225MB) that includes only the listener's dependencies (httpx, kubernetes, pydantic, structlog). The entrypoint is `python -m terrapod.runner.listener`. The listener has RBAC to create/watch/delete Jobs and Pods in the runner namespace, plus scoped `get/list/watch/patch/update/delete` on its own credentials Secret.
+
+**Multiple listener replicas** are supported for high availability. Set `listener.replicas > 1` — all pods share one identity (the credentials Secret) but each derives a unique heartbeat name by appending its Kubernetes pod name to the configured base name (`{base_name}-{pod_name}`). All replicas in a pool compete for queued runs via atomic Postgres locking (`SELECT ... FOR UPDATE SKIP LOCKED`). No leader election is required — Redis heartbeats track each pod independently, and stale records from terminated pods auto-expire after the 300s heartbeat TTL.
 
 ![Agent Pool Detail](images/admin-agent-pool-detail.png)
 
@@ -330,14 +332,17 @@ Store in certificate_authority DB table (single row)
     |
     v
 Listener Join Flow:
-    1. Admin creates agent pool + join token
-    2. Listener calls POST /api/v2/agent-pools/join with the token
-    3. API validates join token (SHA-256 hash, expiry, max_uses)
-    4. API issues X.509 certificate with SAN URIs:
+    1. Admin creates agent pool + join token (default: 2 uses, 1h expiry)
+    2. Listener pod reads K8s Secret {fullname}-listener-credentials
+       - If valid cert present: adopt and skip join
+       - Otherwise: continue to step 3
+    3. Listener calls POST /api/v2/agent-pools/join with the token
+    4. API validates join token (SHA-256 hash, expiry, max_uses)
+    5. API issues short-lived X.509 certificate (1h default) with SAN URIs:
        - terrapod://listener/{name}
        - terrapod://pool/{pool_name}
-    5. Returns: listener ID, pool ID, certificate, private key, CA cert
-    6. Listener saves certs to disk for restart persistence
+    6. Returns: listener ID, pool ID, certificate, private key, CA cert
+    7. Listener writes Secret. On 409 AlreadyExists: re-read and adopt winner's identity
     |
     v
 Ongoing Authentication:
@@ -345,9 +350,13 @@ Ongoing Authentication:
     - API verifies: CA signature, expiry, CN->DB lookup, fingerprint match
     |
     v
-Certificate Renewal:
-    - At 50% of validity: POST /api/v2/listeners/{id}/renew
-    - No re-registration needed on restart if stored cert is valid
+Certificate Renewal (multi-pod safe):
+    - Each pod sleeps until cert reaches its renewal threshold
+      (validity/2 + per-pod splay 0..30s, hash of POD_NAME)
+    - Re-read the Secret first: if another pod already renewed, adopt and skip /renew
+    - Otherwise: POST /api/v2/listeners/{id}/renew (3 attempts with backoff)
+    - Write Secret with resourceVersion CAS — on conflict, re-read and adopt
+    - On /renew 401/403: clear Secret, fall back to join-token bootstrap
 ```
 
 **Source files:**

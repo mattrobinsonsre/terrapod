@@ -179,6 +179,16 @@ data:
     audit:
       retention_days: {{ .Values.api.config.audit.retention_days | default 90 }}
     {{- end }}
+    {{- if .Values.api.config.agent_pools }}
+    agent_pools:
+      listener_cert_ttl_seconds: {{ .Values.api.config.agent_pools.listener_cert_ttl_seconds | default 3600 }}
+      {{- with .Values.api.config.agent_pools.default_join_token_max_uses }}
+      default_join_token_max_uses: {{ . }}
+      {{- end }}
+      {{- with .Values.api.config.agent_pools.default_join_token_ttl_seconds }}
+      default_join_token_ttl_seconds: {{ . }}
+      {{- end }}
+    {{- end }}
     {{- if .Values.api.config.drift_detection }}
     drift_detection:
       enabled: {{ .Values.api.config.drift_detection.enabled }}

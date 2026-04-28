@@ -142,6 +142,7 @@
         "autoscaling": { "$ref": "#/$defs/autoscalingSpec" },
         "pdb": { "$ref": "#/$defs/pdbSpec" },
         "strategy": { "$ref": "#/$defs/strategySpec" },
+        "minReadySeconds": { "type": "integer", "minimum": 0 },
         "terminationGracePeriodSeconds": { "type": "integer", "minimum": 0 },
         "preStopSleepSeconds": { "type": "integer", "minimum": 0 },
         "podAntiAffinity": { "$ref": "#/$defs/podAntiAffinitySpec" },
@@ -567,6 +568,20 @@
           "additionalProperties": false,
           "properties": {
             "retention_days": { "type": "integer", "minimum": 1 }
+          }
+        },
+
+        "agent_pools": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "listener_cert_ttl_seconds": { "type": "integer", "minimum": 60 },
+            "default_join_token_max_uses": {
+              "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }]
+            },
+            "default_join_token_ttl_seconds": {
+              "oneOf": [{ "type": "integer", "minimum": 60 }, { "type": "null" }]
+            }
           }
         },
 

@@ -136,13 +136,21 @@ class TestIssueListenerCertificate:
         eku = cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage)
         assert x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH in eku.value
 
-    def test_custom_ttl(self):
+    def test_default_ttl_is_one_hour(self):
         ca = CertificateAuthority.generate()
-        cert, _ = ca.issue_listener_certificate("listener-1", "pool-1", ttl_hours=24)
+        cert, _ = ca.issue_listener_certificate("listener-1", "pool-1")
         now = datetime.datetime.now(datetime.UTC)
-        # Should expire within ~25 hours
-        assert cert.not_valid_after_utc <= now + datetime.timedelta(hours=25)
-        assert cert.not_valid_after_utc >= now + datetime.timedelta(hours=23)
+        # Default 3600s (1h)
+        assert cert.not_valid_after_utc <= now + datetime.timedelta(seconds=3610)
+        assert cert.not_valid_after_utc >= now + datetime.timedelta(seconds=3590)
+
+    def test_custom_ttl_seconds(self):
+        ca = CertificateAuthority.generate()
+        cert, _ = ca.issue_listener_certificate("listener-1", "pool-1", ttl_seconds=300)
+        now = datetime.datetime.now(datetime.UTC)
+        # 300s (5min) — the value used in local Tilt for fast renewal cycles
+        assert cert.not_valid_after_utc <= now + datetime.timedelta(seconds=310)
+        assert cert.not_valid_after_utc >= now + datetime.timedelta(seconds=290)
 
     def test_unique_keys_per_listener(self):
         ca = CertificateAuthority.generate()

@@ -238,6 +238,21 @@ api:
     audit:
       retention_days: 90
 
+    # Agent pools — listener X.509 cert TTL + join-token defaults.
+    agent_pools:
+      # Listener cert lifetime in seconds. Listeners renew at 50% of this
+      # plus a per-pod splay (0..30s). 1h is a good production default;
+      # values-local.yaml overrides to 300s so renewal cycles are
+      # observable in a few minutes.
+      listener_cert_ttl_seconds: 3600
+      # New join tokens default to 2 uses + 1h expiry — tolerates a single
+      # bootstrap-race retry across multi-replica listener Deployments
+      # without leaving the token reusable. Set per-token via the API to
+      # override (max-uses=null means unlimited; expires-at=null means
+      # no expiry).
+      default_join_token_max_uses: 2
+      default_join_token_ttl_seconds: 3600
+
     # Drift Detection — scheduled plan-only runs to detect infrastructure drift
     drift_detection:
       enabled: true
@@ -572,8 +587,13 @@ listener:
     repository: ghcr.io/mattrobinsonsre/terrapod-listener
     tag: ""  # Defaults to appVersion
     pullPolicy: IfNotPresent
-  # Base name for listener identity. Each pod appends its pod name,
-  # so the registered name becomes "{name}-{pod-name}".
+  # Listener identity. ALL pods of this Deployment share this single name —
+  # they coordinate via a K8s Secret named "{name}-credentials" in the
+  # release namespace, store the X.509 cert there, and rotate it at 50%
+  # of `runners.listenerCertTtlSeconds` plus a per-pod splay. Multiple
+  # pods running concurrently is supported; coordination uses the
+  # existing pool-level pub/sub + the run-claim DB lock + the Secret CAS
+  # for cert renewal.
   name: "listener"
   # Port for /health and /ready HTTP probe endpoints
   healthPort: 8081
@@ -622,10 +642,15 @@ listener:
     enabled: true
     maxUnavailable: 1
 
-  # Rolling update strategy — surge before killing to avoid downtime at any replica count.
+  # Rolling update strategy. maxUnavailable=1 + maxSurge=0 + minReadySeconds=30
+  # roll one pod at a time, with a 30s settle window before the next pod is
+  # touched. Combined with the per-pod cert-renewal splay this keeps cert
+  # rotation cycles across the deployment unaligned, so at most one /renew
+  # call goes through the API per cycle in steady state.
   strategy:
-    maxSurge: 1
-    maxUnavailable: 0
+    maxSurge: 0
+    maxUnavailable: 1
+  minReadySeconds: 30
 
   terminationGracePeriodSeconds: 120
   # Listeners are stateless event bridges to K8s; the API server can tolerate

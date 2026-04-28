@@ -103,6 +103,15 @@ Listener service account name.
 {{- end }}
 
 {{/*
+Listener credentials Secret name. Tied to the listener Deployment name so the
+Secret follows the Deployment's lifecycle (rename/delete cleans up naturally)
+and is unique per Helm release even if multiple releases share `listener.name`.
+*/}}
+{{- define "terrapod.listenerCredentialsSecretName" -}}
+{{- printf "%s-listener-credentials" (include "terrapod.fullname" .) -}}
+{{- end -}}
+
+{{/*
 Get the API image reference, defaulting tag to appVersion
 */}}
 {{- define "terrapod.api.image" -}}

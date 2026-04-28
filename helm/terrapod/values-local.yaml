@@ -51,6 +51,11 @@ api:
       # before they GA. Production defaults to "none" (GA only).
       binary_cache:
         allow_prerelease: rc
+    # Fast cert renewal cycle for Tilt — listener cert valid for 5min so the
+    # full bootstrap → renew → rotate loop is observable in a few minutes
+    # instead of an hour. Production stays at the 1h default.
+    agent_pools:
+      listener_cert_ttl_seconds: 300
     auth:
       local_enabled: true
       callback_base_url: "https://terrapod.local"
