@@ -357,6 +357,13 @@ async def delete_listener(listener_id: str, name: str, pool_id: str) -> None:
     Includes lazy cleanup of any per-pod presence keys so admin-driven
     listener deletion doesn't leave stragglers that could otherwise survive
     until the 180s TTL on each pod key.
+
+    Race window: a pod can heartbeat between the SCAN+DELETE pass below and
+    the listener-hash deletion in the pipeline, leaving an orphan per-pod
+    key referencing a now-deleted listener. The orphan self-heals after at
+    most 180s (its own TTL) and isn't visible anywhere — count_listener_replicas
+    is only ever called for a listener that's still in the pool index, so the
+    leak is invisible to operators. Not worth a Lua script to close.
     """
     redis = get_redis_client()
     # Per-pod keys live under a different prefix → can't go in the same pipeline
@@ -450,10 +457,19 @@ async def heartbeat_listener(
     name lookup keys, merges any updated runtime fields (status, capacity,
     active_runs), and — if `pod_name` is provided — refreshes a per-pod
     presence key used to compute replica count.
+
+    `tracks_pods=1` is set on the listener hash whenever a heartbeat carries
+    pod_name. This flag lets the API distinguish "this listener is on a
+    post-0.19.0 image, replica-count is authoritative" from "this listener
+    is on an older image, replica-count would mislead". Once set it stays set
+    for the life of the hash — older clients downstream of an upgrade can't
+    sneak in and turn off tracking.
     """
     redis = get_redis_client()
     now = datetime.now(UTC).isoformat()
     updates: dict[str, str] = {"last_heartbeat": now, "status": "online", **fields}
+    if pod_name:
+        updates["tracks_pods"] = "1"
 
     # Pipeline writes that target tp:listener:* and tp:listener_name:*. These are
     # different prefixes (different cluster slots), so transaction must stay False.

@@ -569,8 +569,13 @@ export default function AgentPoolDetailPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-300">
-                          {typeof l.attributes['replica-count'] === 'number' && l.attributes['replica-count'] > 0
-                            ? l.attributes['replica-count']
+                          {/* `replica-count` is omitted entirely for listeners on
+                              pre-0.19.0 images (they don't write per-pod keys, so
+                              the count would always look like 0). When present,
+                              0 is meaningful: tracking is on, no pods are
+                              currently heartbeating. */}
+                          {typeof l.attributes['replica-count'] === 'number'
+                            ? <span className={l.attributes['replica-count'] === 0 ? 'text-amber-400' : ''}>{l.attributes['replica-count']}</span>
                             : <span className="text-slate-500">—</span>}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">

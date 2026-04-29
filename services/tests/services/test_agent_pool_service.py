@@ -295,6 +295,34 @@ class TestHeartbeatListenerPodTracking:
         assert kwargs.get("ex") == LISTENER_POD_TTL
         mock_pipe.execute.assert_awaited_once()
 
+        # tracks_pods="1" must be added to the listener hash so the API can
+        # tell this listener is on a post-0.19.0 image.
+        mock_pipe.hset.assert_called_once()
+        hset_kwargs = mock_pipe.hset.call_args.kwargs
+        mapping = hset_kwargs.get("mapping") or mock_pipe.hset.call_args.args[1]
+        assert mapping.get("tracks_pods") == "1"
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_without_pod_name_does_not_set_tracks_pods(self):
+        """Without pod_name we don't claim to be tracking pods — the API
+        relies on the absence of tracks_pods to omit replica-count."""
+        mock_redis = MagicMock()
+        mock_pipe = MagicMock()
+        mock_pipe.hset = MagicMock()
+        mock_pipe.expire = MagicMock()
+        mock_pipe.set = MagicMock()
+        mock_pipe.execute = AsyncMock()
+        mock_redis.pipeline.return_value = mock_pipe
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            await heartbeat_listener(listener_id="lid-1", name="lis", capacity="5")
+
+        mapping = mock_pipe.hset.call_args.kwargs.get("mapping") or mock_pipe.hset.call_args.args[1]
+        assert "tracks_pods" not in mapping
+
     @pytest.mark.asyncio
     async def test_heartbeat_without_pod_name_skips_pod_key(self):
         """Older clients (no pod_name) still heartbeat; no per-pod key is written."""

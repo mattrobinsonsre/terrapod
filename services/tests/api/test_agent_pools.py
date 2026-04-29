@@ -349,8 +349,8 @@ class TestListListenersReplicaCount:
         mock_resolve.return_value = "read"
         lid_a, lid_b = uuid.uuid4(), uuid.uuid4()
         mock_list_listeners.return_value = [
-            {"id": str(lid_a), "name": "lis-a", "status": "online"},
-            {"id": str(lid_b), "name": "lis-b", "status": "online"},
+            {"id": str(lid_a), "name": "lis-a", "status": "online", "tracks_pods": "1"},
+            {"id": str(lid_b), "name": "lis-b", "status": "online", "tracks_pods": "1"},
         ]
         # 3 pods for lis-a, 1 pod for lis-b
         mock_count.side_effect = [3, 1]
@@ -364,6 +364,81 @@ class TestListListenersReplicaCount:
         by_id = {item["id"]: item["attributes"] for item in data}
         assert by_id[f"listener-{lid_a}"]["replica-count"] == 3
         assert by_id[f"listener-{lid_b}"]["replica-count"] == 1
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.count_listener_replicas", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
+    @patch(
+        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        new_callable=AsyncMock,
+    )
+    async def test_replica_count_omitted_when_listener_does_not_track_pods(
+        self,
+        mock_resolve,
+        mock_get_pool,
+        mock_list_listeners,
+        mock_count,
+        *mocks,
+    ):
+        """Pre-0.19.0 listeners (no tracks_pods flag) → no replica-count attr,
+        and count_listener_replicas is never called."""
+        pool = _mock_pool()
+        mock_get_pool.return_value = pool
+        mock_resolve.return_value = "read"
+        lid = uuid.uuid4()
+        mock_list_listeners.return_value = [
+            {"id": str(lid), "name": "old-listener", "status": "online"},
+        ]
+
+        app, _ = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.get(f"/api/v2/agent-pools/apool-{pool.id}/listeners", headers=_AUTH)
+
+        assert res.status_code == 200
+        attrs = res.json()["data"][0]["attributes"]
+        assert "replica-count" not in attrs
+        mock_count.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.count_listener_replicas", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
+    @patch(
+        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        new_callable=AsyncMock,
+    )
+    async def test_replica_count_included_for_mixed_listeners(
+        self,
+        mock_resolve,
+        mock_get_pool,
+        mock_list_listeners,
+        mock_count,
+        *mocks,
+    ):
+        """Mixed list: tracking listener gets replica-count, old one doesn't."""
+        pool = _mock_pool()
+        mock_get_pool.return_value = pool
+        mock_resolve.return_value = "read"
+        lid_new, lid_old = uuid.uuid4(), uuid.uuid4()
+        mock_list_listeners.return_value = [
+            {"id": str(lid_new), "name": "new", "status": "online", "tracks_pods": "1"},
+            {"id": str(lid_old), "name": "old", "status": "online"},
+        ]
+        mock_count.side_effect = [2]  # only one count call expected
+
+        app, _ = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.get(f"/api/v2/agent-pools/apool-{pool.id}/listeners", headers=_AUTH)
+
+        data = {item["id"]: item["attributes"] for item in res.json()["data"]}
+        assert data[f"listener-{lid_new}"]["replica-count"] == 2
+        assert "replica-count" not in data[f"listener-{lid_old}"]
+        assert mock_count.call_count == 1
 
 
 class TestShowPoolRBAC:

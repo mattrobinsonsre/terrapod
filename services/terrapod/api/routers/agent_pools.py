@@ -166,8 +166,10 @@ def _listener_json(listener: dict, replica_count: int | None = None) -> dict:
     certificate_fingerprint, certificate_expires_at, created_at, last_heartbeat, etc.
 
     `replica_count` is the number of pods currently heartbeating for this
-    listener. Pre-0.19.0 listeners that don't send `pod_name` will report 0;
-    callers should treat 0 as "unknown" rather than "no replicas".
+    listener. Pass `None` (or omit) when the listener is on a pre-0.19.0
+    image (no `tracks_pods` flag); the attribute is then omitted from the
+    response and the UI shows "—" for unknown. Passing `0` is meaningful:
+    "this listener IS tracking, but no pods are currently heartbeating".
     """
     attrs: dict = {
         "name": listener.get("name", ""),
@@ -248,9 +250,9 @@ async def list_pools(
         if perm is None:
             continue
         listeners = await agent_pool_service.list_listeners(p.id)
-        # Any registered listener whose status field reports online → pool online.
-        # Stale listeners are auto-pruned from the pool set by list_listeners.
-        status = "online" if any(lis.get("status") == "online" for lis in listeners) else "offline"
+        # `list_listeners` lazily prunes any listener whose hash has expired,
+        # so anything still in the list is heartbeating ⇒ pool is online.
+        status = "online" if listeners else "offline"
         result.append(_pool_json(p, status=status, permission=perm))
     return JSONResponse(content={"data": result})
 
@@ -291,7 +293,8 @@ async def show_pool(
     pool = await _get_pool(pool_id, db)
     perm = await _require_pool_permission(pool, user, db, "read")
     listeners = await agent_pool_service.list_listeners(pool.id)
-    status = "online" if any(lis.get("status") == "online" for lis in listeners) else "offline"
+    # See list_pools for the rationale: any listener still in the list is online.
+    status = "online" if listeners else "offline"
     return JSONResponse(content={"data": _pool_json(pool, status=status, permission=perm)})
 
 
@@ -566,14 +569,27 @@ async def list_pool_listeners(
     pool = await _get_pool(pool_id, db)
     await _require_pool_permission(pool, user, db, "read")
     listeners = await agent_pool_service.list_listeners(pool.id)
+    # Only fetch replica counts for listeners that actually track pods. A
+    # listener on a pre-0.19.0 image doesn't write per-pod keys, so its SCAN
+    # would always come back zero — and the UI should distinguish "unknown"
+    # from "0 pods heartbeating but tracking is on".
+    tracking = [lis.get("tracks_pods") == "1" for lis in listeners]
     replica_counts = await asyncio.gather(
-        *[agent_pool_service.count_listener_replicas(lis["id"]) for lis in listeners]
+        *[
+            agent_pool_service.count_listener_replicas(lis["id"])
+            for lis, tracks in zip(listeners, tracking, strict=True)
+            if tracks
+        ]
     )
+    counts_iter = iter(replica_counts)
     return JSONResponse(
         content={
             "data": [
-                _listener_json(lis, replica_count=count)
-                for lis, count in zip(listeners, replica_counts, strict=True)
+                _listener_json(
+                    lis,
+                    replica_count=next(counts_iter) if tracks else None,
+                )
+                for lis, tracks in zip(listeners, tracking, strict=True)
             ]
         }
     )
