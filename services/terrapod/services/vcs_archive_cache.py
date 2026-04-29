@@ -380,7 +380,14 @@ async def materialize_archive(storage_key: str):
     f = await asyncio.to_thread(os.fdopen, fd, "wb")
     try:
         try:
-            async for chunk in await storage.get_stream(storage_key):
+            # `storage.get_stream` is an async generator (uses `yield` under
+            # the hood across S3/Azure/GCS/filesystem backends), so calling
+            # it returns the iterator directly — DO NOT `await` it. Awaiting
+            # an async-generator object raises `TypeError: 'async_generator'
+            # object can't be awaited`. AsyncMock-based unit tests don't
+            # surface this because the mock's `return_value` is itself
+            # awaitable; only the real backends bite.
+            async for chunk in storage.get_stream(storage_key):
                 if not chunk:
                     continue
                 await asyncio.to_thread(f.write, chunk)
