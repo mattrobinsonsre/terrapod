@@ -506,16 +506,25 @@ class TestVCSArchiveCachePartialUploadCleanup:
 class TestMaterializeArchive:
     @pytest.mark.asyncio
     async def test_streams_storage_key_to_local_temp_file(self, tmp_path):
-        """The yielded path contains exactly the bytes streamed from storage."""
+        """The yielded path contains exactly the bytes streamed from storage.
+
+        IMPORTANT: production storage backends implement `get_stream` as an
+        async generator (uses `yield` internally) — calling it returns the
+        iterator directly, no `await` needed. We mock that shape with a
+        plain attribute pointing at an async-gen function, NOT an
+        `AsyncMock(return_value=...)`. The latter is awaitable and would
+        hide the production bug where `await storage.get_stream(...)`
+        raises `TypeError: 'async_generator' object can't be awaited`.
+        """
         payload = _make_tarball({"a.tf": b"a", "b.tf": b"bb"})
 
-        async def chunks():
+        async def get_stream(_key):
             # Split into 2 chunks to exercise the loop
             yield payload[: len(payload) // 2]
             yield payload[len(payload) // 2 :]
 
         mock_storage = MagicMock()
-        mock_storage.get_stream = AsyncMock(return_value=chunks())
+        mock_storage.get_stream = get_stream
 
         observed: dict[str, bytes] = {}
 
@@ -553,11 +562,11 @@ class TestMaterializeArchive:
         sacrificing test clarity.
         """
 
-        async def chunks():
+        async def get_stream(_key):
             yield b"some bytes"
 
         mock_storage = MagicMock()
-        mock_storage.get_stream = AsyncMock(return_value=chunks())
+        mock_storage.get_stream = get_stream  # async generator, NOT AsyncMock
 
         observed_path: str | None = None
         observed_error: BaseException | None = None
@@ -604,12 +613,12 @@ class TestMaterializeArchive:
         large_chunk = b"X" * (4 * 1024 * 1024)
         payload = large_chunk + b"Y" * 1024
 
-        async def chunks():
+        async def get_stream(_key):
             yield large_chunk
             yield b"Y" * 1024
 
         mock_storage = MagicMock()
-        mock_storage.get_stream = AsyncMock(return_value=chunks())
+        mock_storage.get_stream = get_stream  # async generator, NOT AsyncMock
 
         with (
             patch(
