@@ -25,11 +25,17 @@ interface AgentPool {
     'owner-email': string
     permission?: string
     'created-at': string
-    status?: 'online' | 'offline'
+    status?: 'online' | 'offline' | 'degraded'
   }
 }
 
 type PoolSortKey = 'name' | 'description' | 'created'
+
+function statusDotClass(status: string | undefined): string {
+  if (status === 'online') return 'bg-green-400'
+  if (status === 'degraded') return 'bg-amber-400'
+  return 'bg-slate-500'
+}
 
 export default function AgentPoolsPage() {
   const router = useRouter()
@@ -190,8 +196,8 @@ export default function AgentPoolsPage() {
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
                       {pool.attributes.status ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${pool.attributes.status === 'online' ? 'bg-green-400' : 'bg-slate-500'}`} />
+                        <span className="inline-flex items-center gap-1.5" title={pool.attributes.status === 'degraded' ? 'Listeners are heartbeating but their certificates have expired — runs will fail to launch.' : undefined}>
+                          <span className={`w-2 h-2 rounded-full ${statusDotClass(pool.attributes.status)}`} />
                           <span className="text-xs text-slate-400 capitalize">{pool.attributes.status}</span>
                         </span>
                       ) : (

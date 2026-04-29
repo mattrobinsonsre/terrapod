@@ -231,6 +231,27 @@ LISTENER_JOINS = Counter(
     ["pool_name"],
 )
 
+LISTENER_LAUNCH_FAILURES = Counter(
+    "terrapod_listener_launch_failures_total",
+    (
+        "Pre-Job launch failures reported by listeners. Increments when a "
+        "listener PATCHes a run to `errored` from `planning`/`applying` while "
+        "the run still has no `job_name` — i.e. the listener claimed the run "
+        "but couldn't get as far as launching the K8s Job (auth failure on "
+        "/runner-token, create_job exception, auth Secret create failure)."
+    ),
+)
+
+LISTENER_PRELAUNCH_TIMEOUTS = Counter(
+    "terrapod_listener_prelaunch_timeouts_total",
+    (
+        "Reconciler timed out a run that was claimed but never had a Job "
+        "launched. Counterpart to launch_failures: the listener didn't even "
+        "manage to PATCH the failure (its cert was rejected, or it crashed). "
+        "Backstop signal for silent listener failures."
+    ),
+)
+
 
 # ---------------------------------------------------------------------------
 # Retention metrics

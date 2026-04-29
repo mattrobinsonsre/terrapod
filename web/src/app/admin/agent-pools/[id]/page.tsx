@@ -23,7 +23,30 @@ interface PoolAttrs {
   'owner-email': string
   permission?: string
   'created-at': string
-  status?: 'online' | 'offline'
+  status?: 'online' | 'offline' | 'degraded'
+}
+
+function statusDotClass(status: string | undefined): string {
+  if (status === 'online') return 'bg-green-400'
+  if (status === 'cert-expired') return 'bg-red-400'
+  if (status === 'degraded') return 'bg-amber-400'
+  return 'bg-slate-500'
+}
+
+function statusTitle(status: string | undefined): string | undefined {
+  if (status === 'cert-expired') return 'Listener is heartbeating but its certificate has expired — every cert-authenticated call (claim run, renew, runner-token) will fail. Most likely cause: the API never registered the latest cert, or the cert TTL elapsed before renewal.'
+  if (status === 'degraded') return 'Listeners are heartbeating but their certificates have expired — runs will fail to launch.'
+  return undefined
+}
+
+function defaultExpiryLocal(): string {
+  // Mirror the server's default_join_token_ttl_seconds (3600s = 1h) and format
+  // as a value the <input type="datetime-local"> accepts: "YYYY-MM-DDTHH:mm"
+  // in the browser's local TZ. The form submits this back as a local datetime
+  // and the API parses it as TZ-aware.
+  const d = new Date(Date.now() + 60 * 60 * 1000)
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 interface Pool {
@@ -86,8 +109,13 @@ export default function AgentPoolDetailPage() {
   const [tokensLoading, setTokensLoading] = useState(false)
   const [showCreateToken, setShowCreateToken] = useState(false)
   const [tokenDesc, setTokenDesc] = useState('')
-  const [tokenMaxUses, setTokenMaxUses] = useState('')
-  const [tokenExpiry, setTokenExpiry] = useState('')
+  // Prepopulate to mirror the server-side defaults
+  // (settings.agent_pools.default_join_token_max_uses=2, default_join_token_ttl_seconds=3600).
+  // An empty form submitted as-is would still get these defaults applied at the
+  // API, but blank inputs imply "no default" to the user — show what they'll
+  // actually get so the choice is informed.
+  const [tokenMaxUses, setTokenMaxUses] = useState('2')
+  const [tokenExpiry, setTokenExpiry] = useState(() => defaultExpiryLocal())
   const [creatingToken, setCreatingToken] = useState(false)
   const [createdToken, setCreatedToken] = useState<string | null>(null)
 
@@ -231,8 +259,8 @@ export default function AgentPoolDetailPage() {
       const data = await res.json()
       setCreatedToken(data.data?.attributes?.token || null)
       setTokenDesc('')
-      setTokenMaxUses('')
-      setTokenExpiry('')
+      setTokenMaxUses('2')
+      setTokenExpiry(defaultExpiryLocal())
       setShowCreateToken(false)
       await loadTokens()
     } catch (err) {
@@ -470,17 +498,18 @@ export default function AgentPoolDetailPage() {
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label htmlFor="tok-max" className="block text-sm font-medium text-slate-300 mb-1">Max Uses (optional)</label>
+                    <label htmlFor="tok-max" className="block text-sm font-medium text-slate-300 mb-1">Max Uses</label>
                     <input id="tok-max" type="number" value={tokenMaxUses} onChange={(e) => setTokenMaxUses(e.target.value)}
                       min="1"
                       step="1"
-                      placeholder="Unlimited"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                    <p className="mt-1 text-xs text-slate-500">Default 2 — tolerates one bootstrap-race retry across listener replicas.</p>
                   </div>
                   <div>
-                    <label htmlFor="tok-exp" className="block text-sm font-medium text-slate-300 mb-1">Expires At (optional)</label>
+                    <label htmlFor="tok-exp" className="block text-sm font-medium text-slate-300 mb-1">Expires At</label>
                     <input id="tok-exp" type="datetime-local" value={tokenExpiry} onChange={(e) => setTokenExpiry(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                    <p className="mt-1 text-xs text-slate-500">Default 1 hour from now.</p>
                   </div>
                 </div>
                 <button type="submit" disabled={creatingToken}
@@ -563,8 +592,8 @@ export default function AgentPoolDetailPage() {
                       <tr key={l.id} className="hover:bg-slate-700/20 transition-colors">
                         <td className="px-4 py-3 text-sm text-slate-200">{l.attributes.name}</td>
                         <td className="px-4 py-3">
-                          <span className="flex items-center gap-1.5">
-                            <span className={`w-2 h-2 rounded-full ${l.attributes.status === 'online' ? 'bg-green-400' : 'bg-slate-500'}`} />
+                          <span className="flex items-center gap-1.5" title={statusTitle(l.attributes.status)}>
+                            <span className={`w-2 h-2 rounded-full ${statusDotClass(l.attributes.status)}`} />
                             <span className="text-xs text-slate-400">{l.attributes.status}</span>
                           </span>
                         </td>

@@ -221,3 +221,61 @@ class TestConcurrentSafety:
         )
 
         assert len(claims) >= 5  # Both paths contributed
+
+
+# ── Launch failure reporting ─────────────────────────────────────────
+
+
+class TestLaunchFailureReporting:
+    """Pre-Job failures must be reported to the API so the run errors out fast.
+
+    Without this, /runner-token 401 / create_job exception / etc. would leave
+    the run in `planning` until the reconciler's launch_timeout (5 min). Active
+    reporting from the listener gives operators an immediate, accurate error
+    message at the API rather than a generic timeout 5 min later.
+    """
+
+    async def test_runner_token_failure_reports_errored(self, fresh_shutdown_event):
+        listener = _make_listener(fresh_shutdown_event)
+        listener._get_runner_token = AsyncMock(side_effect=RuntimeError("401 Unauthorized"))
+        listener._http_client = AsyncMock()
+
+        await listener._launch_run("abc-123", {"phase": "plan"})
+
+        listener._http_client.patch.assert_awaited_once()
+        kwargs = listener._http_client.patch.await_args.kwargs
+        body = kwargs["json"]
+        assert body["status"] == "errored"
+        assert "runner token" in body["error_message"].lower()
+        assert "401" in body["error_message"]
+
+    async def test_create_job_failure_reports_errored(self, fresh_shutdown_event):
+        listener = _make_listener(fresh_shutdown_event)
+        listener._get_runner_token = AsyncMock(return_value="runtok:xyz")
+        listener._http_client = AsyncMock()
+        listener.runner_config = MagicMock()
+
+        with (
+            patch("terrapod.runner.job_template.build_job_spec", return_value={"kind": "Job"}),
+            patch(
+                "terrapod.runner.job_manager.create_job",
+                AsyncMock(side_effect=RuntimeError("kubernetes API down")),
+            ),
+        ):
+            await listener._launch_run("abc-123", {"phase": "plan"})
+
+        listener._http_client.patch.assert_awaited_once()
+        body = listener._http_client.patch.await_args.kwargs["json"]
+        assert body["status"] == "errored"
+        assert (
+            "k8s job" in body["error_message"].lower() or "create" in body["error_message"].lower()
+        )
+
+    async def test_report_failure_swallows_patch_errors(self, fresh_shutdown_event):
+        """Best-effort: a failed PATCH must not crash the listener event loop."""
+        listener = _make_listener(fresh_shutdown_event)
+        listener._http_client = AsyncMock()
+        listener._http_client.patch = AsyncMock(side_effect=RuntimeError("network down"))
+
+        # Must not raise
+        await listener._report_launch_failed("abc-123", "boom")
