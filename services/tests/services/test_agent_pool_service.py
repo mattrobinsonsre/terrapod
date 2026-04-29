@@ -8,11 +8,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from terrapod.services.agent_pool_service import (
+    _LISTENER_FP_PREFIX,
     LISTENER_POD_TTL,
+    _fingerprint_ttl,
+    _register_fingerprint,
     count_listener_replicas,
     create_pool_token,
     generate_join_token,
     heartbeat_listener,
+    is_fingerprint_valid,
     validate_join_token,
 )
 
@@ -387,3 +391,123 @@ class TestCountListenerReplicas:
             return_value=mock_redis,
         ):
             assert await count_listener_replicas("lid-empty") == 0
+
+
+# ── Per-fingerprint registration (regression: cert renewal race) ──────
+
+
+class TestFingerprintRegistration:
+    """Each issued cert registers its fingerprint as its own TTL'd key.
+
+    The previous design tracked a single "current" fingerprint on the listener
+    hash. When N listener pods all called /renew within the same window, the
+    API issued N distinct certs but the K8s Secret CAS picked one — leaving
+    Redis pointing at a fingerprint that wasn't necessarily the cert all pods
+    actually used. Subsequent cert-auth calls 401'd with "fingerprint mismatch".
+
+    The fix: store each issued fingerprint under its own key. Auth does EXISTS
+    instead of equality. Concurrent renewals all stay valid until they expire.
+    """
+
+    @pytest.mark.asyncio
+    async def test_register_writes_setex_with_namespaced_key(self):
+        mock_redis = MagicMock()
+        mock_redis.setex = AsyncMock()
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            await _register_fingerprint("lid-x", "fp-abc", 600)
+
+        mock_redis.setex.assert_awaited_once_with(f"{_LISTENER_FP_PREFIX}lid-x:fp-abc", 600, "1")
+
+    @pytest.mark.asyncio
+    async def test_is_valid_true_when_key_exists(self):
+        mock_redis = MagicMock()
+        mock_redis.exists = AsyncMock(return_value=1)
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            assert await is_fingerprint_valid("lid-x", "fp-abc") is True
+
+        mock_redis.exists.assert_awaited_once_with(f"{_LISTENER_FP_PREFIX}lid-x:fp-abc")
+
+    @pytest.mark.asyncio
+    async def test_is_valid_false_when_key_absent(self):
+        mock_redis = MagicMock()
+        mock_redis.exists = AsyncMock(return_value=0)
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            assert await is_fingerprint_valid("lid-x", "fp-stale") is False
+
+    @pytest.mark.asyncio
+    async def test_concurrent_renewals_both_remain_valid(self):
+        """Two pods race on /renew → both fingerprints are independently registered.
+
+        Whichever cert wins the K8s Secret CAS becomes the active one in use,
+        but the loser's cert MUST also auth successfully — otherwise a pod
+        that adopted the winner's cert would 401 and the listener fleet would
+        lock itself out for the rest of the cert lifetime.
+        """
+        registered = set()
+
+        mock_redis = MagicMock()
+
+        async def fake_setex(key, ttl, value):
+            registered.add(key)
+
+        async def fake_exists(key):
+            return 1 if key in registered else 0
+
+        mock_redis.setex = fake_setex
+        mock_redis.exists = fake_exists
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            # Two concurrent renewals → two distinct fingerprints registered.
+            await _register_fingerprint("lid-x", "fp-pod-a", 600)
+            await _register_fingerprint("lid-x", "fp-pod-b", 600)
+
+            # Both must auth successfully regardless of which won the K8s
+            # Secret CAS on the listener side.
+            assert await is_fingerprint_valid("lid-x", "fp-pod-a") is True
+            assert await is_fingerprint_valid("lid-x", "fp-pod-b") is True
+
+        # And a rogue cert never registered must still be rejected.
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            assert await is_fingerprint_valid("lid-x", "fp-not-issued") is False
+
+    def test_ttl_buffer_against_clock_skew(self):
+        """The fingerprint key TTL is cert lifetime + 60s buffer.
+
+        The buffer prevents the rare case where Redis evicts the fingerprint
+        key a moment before the cert's not-after, causing a still-valid cert
+        to fail auth. 60s is enough for any realistic API↔Redis clock skew.
+        """
+        cert = MagicMock()
+        cert.not_valid_after_utc = datetime.now(UTC) + timedelta(seconds=600)
+        ttl = _fingerprint_ttl(cert)
+        # Should be ~660s (600 + 60 buffer); allow slack for test wall-clock drift.
+        assert 650 <= ttl <= 670
+
+    def test_ttl_floor_at_60_for_already_expired(self):
+        """An expired cert still gets a 60s floor so we don't pass 0/negative TTL.
+
+        Redis SETEX rejects a 0 or negative TTL with a runtime error. Better
+        to register the fingerprint briefly (it'll be rejected by the
+        not-after check in dependencies.py anyway) than crash the renewal.
+        """
+        cert = MagicMock()
+        cert.not_valid_after_utc = datetime.now(UTC) - timedelta(seconds=600)
+        assert _fingerprint_ttl(cert) >= 60
