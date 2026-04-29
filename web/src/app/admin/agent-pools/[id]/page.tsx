@@ -23,7 +23,7 @@ interface PoolAttrs {
   'owner-email': string
   permission?: string
   'created-at': string
-  'listener-summary'?: { total: number; online: number }
+  status?: 'online' | 'offline'
 }
 
 interface Pool {
@@ -50,6 +50,7 @@ interface Listener {
   attributes: {
     name: string
     status: string
+    'replica-count'?: number
     'certificate-expires-at': string | null
     'created-at': string
   }
@@ -541,20 +542,6 @@ export default function AgentPoolDetailPage() {
         {/* Listeners Tab */}
         {activeTab === 'listeners' && (
           <div>
-            {pool?.attributes['listener-summary'] && (
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
-                  <p className="text-xs text-slate-500 uppercase tracking-wider">Online</p>
-                  <p className={`text-2xl font-semibold mt-1 ${pool.attributes['listener-summary'].online > 0 ? 'text-green-400' : 'text-slate-500'}`}>
-                    {pool.attributes['listener-summary'].online}
-                  </p>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
-                  <p className="text-xs text-slate-500 uppercase tracking-wider">Total</p>
-                  <p className="text-2xl font-semibold text-slate-100 mt-1">{pool.attributes['listener-summary'].total}</p>
-                </div>
-              </div>
-            )}
             {listenersLoading ? (
               <LoadingSpinner />
             ) : listeners.length === 0 ? (
@@ -566,6 +553,7 @@ export default function AgentPoolDetailPage() {
                     <tr className="border-b border-slate-700/50">
                       <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Name</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Replicas</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Cert Expires</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
                     </tr>
@@ -579,6 +567,11 @@ export default function AgentPoolDetailPage() {
                             <span className={`w-2 h-2 rounded-full ${l.attributes.status === 'online' ? 'bg-green-400' : 'bg-slate-500'}`} />
                             <span className="text-xs text-slate-400">{l.attributes.status}</span>
                           </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-300">
+                          {typeof l.attributes['replica-count'] === 'number' && l.attributes['replica-count'] > 0
+                            ? l.attributes['replica-count']
+                            : <span className="text-slate-500">—</span>}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">
                           {formatDate(l.attributes['certificate-expires-at'])}

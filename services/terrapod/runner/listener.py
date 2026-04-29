@@ -330,12 +330,18 @@ class RunnerListener:
                 pass
 
     async def _send_heartbeat(self) -> None:
-        """Send heartbeat via API."""
+        """Send heartbeat via API.
+
+        Includes POD_NAME so the API can track replica count for this
+        listener identity (multiple pods of one Deployment share one
+        listener_id; per-pod presence keys give the API the fleet size).
+        """
         await self._http_client.post(
             f"/api/v2/listeners/listener-{self.identity.listener_id}/heartbeat",
             json={
                 "capacity": self._max_concurrent,
                 "active_runs": self._active_launches,
+                "pod_name": os.environ.get("POD_NAME") or os.environ.get("HOSTNAME") or "",
             },
             headers=self._auth_headers(),
         )
