@@ -109,7 +109,13 @@ def _validate_labels(labels: dict | None) -> dict:
     return clean
 
 
-def _pool_json(pool, listener_summary: dict | None = None, permission: str | None = None) -> dict:
+def _pool_json(pool, status: str | None = None, permission: str | None = None) -> dict:
+    """Format an AgentPool as JSON:API.
+
+    `status` is "online" if at least one live listener is registered for the pool,
+    "offline" otherwise. None means "don't include" (used by endpoints that
+    don't need to fetch listeners — e.g. create/update responses).
+    """
     attrs: dict = {
         "name": pool.name,
         "description": pool.description or "",
@@ -118,8 +124,8 @@ def _pool_json(pool, listener_summary: dict | None = None, permission: str | Non
         "created-at": _rfc3339(pool.created_at),
         "updated-at": _rfc3339(pool.updated_at),
     }
-    if listener_summary is not None:
-        attrs["listener-summary"] = listener_summary
+    if status is not None:
+        attrs["status"] = status
     if permission is not None:
         attrs["permission"] = permission
     return {
@@ -153,22 +159,32 @@ def _token_json(token, raw_token: str | None = None) -> dict:
     return result
 
 
-def _listener_json(listener: dict) -> dict:
+def _listener_json(listener: dict, replica_count: int | None = None) -> dict:
     """Format a Redis-backed listener dict as JSON:API.
 
     Accepts a dict with keys: id, name, pool_id,
     certificate_fingerprint, certificate_expires_at, created_at, last_heartbeat, etc.
+
+    `replica_count` is the number of pods currently heartbeating for this
+    listener. Pass `None` (or omit) when the listener is on a pre-0.19.0
+    image (no `tracks_pods` flag); the attribute is then omitted from the
+    response and the UI shows "—" for unknown. Passing `0` is meaningful:
+    "this listener IS tracking, but no pods are currently heartbeating".
     """
+    attrs: dict = {
+        "name": listener.get("name", ""),
+        "status": listener.get("status", "offline"),
+        "certificate-fingerprint": listener.get("certificate_fingerprint", ""),
+        "certificate-expires-at": listener.get("certificate_expires_at", ""),
+        "created-at": listener.get("created_at", ""),
+        "updated-at": listener.get("last_heartbeat", listener.get("created_at", "")),
+    }
+    if replica_count is not None:
+        attrs["replica-count"] = replica_count
     return {
         "id": f"listener-{listener['id']}",
         "type": "runner-listeners",
-        "attributes": {
-            "name": listener.get("name", ""),
-            "certificate-fingerprint": listener.get("certificate_fingerprint", ""),
-            "certificate-expires-at": listener.get("certificate_expires_at", ""),
-            "created-at": listener.get("created_at", ""),
-            "updated-at": listener.get("last_heartbeat", listener.get("created_at", "")),
-        },
+        "attributes": attrs,
         "relationships": {
             "agent-pool": {
                 "data": {"id": f"apool-{listener.get('pool_id', '')}", "type": "agent-pools"},
@@ -234,11 +250,10 @@ async def list_pools(
         if perm is None:
             continue
         listeners = await agent_pool_service.list_listeners(p.id)
-        summary = {
-            "total": len(listeners),
-            "online": sum(1 for lis in listeners if lis.get("status") == "online"),
-        }
-        result.append(_pool_json(p, listener_summary=summary, permission=perm))
+        # `list_listeners` lazily prunes any listener whose hash has expired,
+        # so anything still in the list is heartbeating ⇒ pool is online.
+        status = "online" if listeners else "offline"
+        result.append(_pool_json(p, status=status, permission=perm))
     return JSONResponse(content={"data": result})
 
 
@@ -278,13 +293,9 @@ async def show_pool(
     pool = await _get_pool(pool_id, db)
     perm = await _require_pool_permission(pool, user, db, "read")
     listeners = await agent_pool_service.list_listeners(pool.id)
-    summary = {
-        "total": len(listeners),
-        "online": sum(1 for lis in listeners if lis.get("status") == "online"),
-    }
-    return JSONResponse(
-        content={"data": _pool_json(pool, listener_summary=summary, permission=perm)}
-    )
+    # See list_pools for the rationale: any listener still in the list is online.
+    status = "online" if listeners else "offline"
+    return JSONResponse(content={"data": _pool_json(pool, status=status, permission=perm)})
 
 
 @router.patch("/agent-pools/{pool_id}")
@@ -548,11 +559,40 @@ async def list_pool_listeners(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """List listeners for an agent pool (requires read permission)."""
+    """List listeners for an agent pool (requires read permission).
+
+    Each listener carries a `replica-count` reflecting how many pods are
+    currently heartbeating for it. With v0.19.0's shared-identity model a
+    single listener record commonly maps to 2+ pods; this lets the UI show
+    the actual fleet size.
+    """
     pool = await _get_pool(pool_id, db)
     await _require_pool_permission(pool, user, db, "read")
     listeners = await agent_pool_service.list_listeners(pool.id)
-    return JSONResponse(content={"data": [_listener_json(lis) for lis in listeners]})
+    # Only fetch replica counts for listeners that actually track pods. A
+    # listener on a pre-0.19.0 image doesn't write per-pod keys, so its SCAN
+    # would always come back zero — and the UI should distinguish "unknown"
+    # from "0 pods heartbeating but tracking is on".
+    tracking = [lis.get("tracks_pods") == "1" for lis in listeners]
+    replica_counts = await asyncio.gather(
+        *[
+            agent_pool_service.count_listener_replicas(lis["id"])
+            for lis, tracks in zip(listeners, tracking, strict=True)
+            if tracks
+        ]
+    )
+    counts_iter = iter(replica_counts)
+    return JSONResponse(
+        content={
+            "data": [
+                _listener_json(
+                    lis,
+                    replica_count=next(counts_iter) if tracks else None,
+                )
+                for lis, tracks in zip(listeners, tracking, strict=True)
+            ]
+        }
+    )
 
 
 @router.get("/agent-pools/{pool_id}/events")
@@ -696,10 +736,15 @@ async def listener_heartbeat(
 
     capacity = body.get("capacity", 1)
     active_runs = body.get("active_runs", 0)
+    # pod_name lets us track replica count under the shared-identity model.
+    # Older clients that don't send it remain compatible — we just don't
+    # learn their replica count.
+    pod_name = body.get("pod_name") or None
 
     await agent_pool_service.heartbeat_listener(
         listener_id=str(l_uuid),
         name=listener["name"],
+        pod_name=pod_name,
         capacity=str(capacity),
         active_runs=str(active_runs),
     )

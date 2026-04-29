@@ -3,13 +3,16 @@
 import hashlib
 import uuid
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from terrapod.services.agent_pool_service import (
+    LISTENER_POD_TTL,
+    count_listener_replicas,
     create_pool_token,
     generate_join_token,
+    heartbeat_listener,
     validate_join_token,
 )
 
@@ -256,3 +259,131 @@ class TestCreatePoolToken:
 
         assert db._captured["token"].max_uses == 10
         assert db._captured["token"].expires_at == custom_expiry
+
+
+# ── heartbeat_listener — pod_name + replica tracking ──────────────────
+
+
+class TestHeartbeatListenerPodTracking:
+    @pytest.mark.asyncio
+    async def test_heartbeat_with_pod_name_writes_per_pod_key(self):
+        """When pod_name is supplied the heartbeat refreshes a tp:listener_pod:{lid}:{pod} TTL key."""
+        mock_redis = MagicMock()
+        # Pipeline mock: track .set() calls and provide an awaitable execute()
+        mock_pipe = MagicMock()
+        mock_pipe.hset = MagicMock()
+        mock_pipe.expire = MagicMock()
+        mock_pipe.set = MagicMock()
+        mock_pipe.execute = AsyncMock()
+        mock_redis.pipeline.return_value = mock_pipe
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            await heartbeat_listener(
+                listener_id="lid-1",
+                name="lis",
+                pod_name="lis-pod-abc",
+                capacity="5",
+            )
+
+        # The per-pod key write must use SET with TTL = LISTENER_POD_TTL
+        mock_pipe.set.assert_called_once()
+        args, kwargs = mock_pipe.set.call_args
+        assert args[0] == "tp:listener_pod:lid-1:lis-pod-abc"
+        assert kwargs.get("ex") == LISTENER_POD_TTL
+        mock_pipe.execute.assert_awaited_once()
+
+        # tracks_pods="1" must be added to the listener hash so the API can
+        # tell this listener is on a post-0.19.0 image.
+        mock_pipe.hset.assert_called_once()
+        hset_kwargs = mock_pipe.hset.call_args.kwargs
+        mapping = hset_kwargs.get("mapping") or mock_pipe.hset.call_args.args[1]
+        assert mapping.get("tracks_pods") == "1"
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_without_pod_name_does_not_set_tracks_pods(self):
+        """Without pod_name we don't claim to be tracking pods — the API
+        relies on the absence of tracks_pods to omit replica-count."""
+        mock_redis = MagicMock()
+        mock_pipe = MagicMock()
+        mock_pipe.hset = MagicMock()
+        mock_pipe.expire = MagicMock()
+        mock_pipe.set = MagicMock()
+        mock_pipe.execute = AsyncMock()
+        mock_redis.pipeline.return_value = mock_pipe
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            await heartbeat_listener(listener_id="lid-1", name="lis", capacity="5")
+
+        mapping = mock_pipe.hset.call_args.kwargs.get("mapping") or mock_pipe.hset.call_args.args[1]
+        assert "tracks_pods" not in mapping
+
+    @pytest.mark.asyncio
+    async def test_heartbeat_without_pod_name_skips_pod_key(self):
+        """Older clients (no pod_name) still heartbeat; no per-pod key is written."""
+        mock_redis = MagicMock()
+        mock_pipe = MagicMock()
+        mock_pipe.hset = MagicMock()
+        mock_pipe.expire = MagicMock()
+        mock_pipe.set = MagicMock()
+        mock_pipe.execute = AsyncMock()
+        mock_redis.pipeline.return_value = mock_pipe
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            await heartbeat_listener(listener_id="lid-1", name="lis", capacity="5")
+
+        mock_pipe.set.assert_not_called()
+
+
+# ── count_listener_replicas ───────────────────────────────────────────
+
+
+class TestCountListenerReplicas:
+    @pytest.mark.asyncio
+    async def test_counts_pod_keys_via_scan(self):
+        """Replica count is the number of tp:listener_pod:{lid}:* keys."""
+        mock_redis = MagicMock()
+
+        async def fake_scan_iter(match=None, count=None):
+            assert match == "tp:listener_pod:lid-x:*"
+            for k in (
+                "tp:listener_pod:lid-x:pod-a",
+                "tp:listener_pod:lid-x:pod-b",
+                "tp:listener_pod:lid-x:pod-c",
+            ):
+                yield k
+
+        mock_redis.scan_iter = fake_scan_iter
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            count = await count_listener_replicas("lid-x")
+
+        assert count == 3
+
+    @pytest.mark.asyncio
+    async def test_returns_zero_when_no_pod_keys(self):
+        """No per-pod keys (e.g. listener still on pre-0.19.0 image) → 0."""
+        mock_redis = MagicMock()
+
+        async def empty_scan_iter(match=None, count=None):
+            return
+            yield  # pragma: no cover (make this an async generator)
+
+        mock_redis.scan_iter = empty_scan_iter
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            assert await count_listener_replicas("lid-empty") == 0

@@ -81,7 +81,7 @@ class TestListenerHeartbeat:
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
                 f"/api/v2/listeners/{lid}/heartbeat",
-                json={"capacity": 5, "active_runs": 2},
+                json={"capacity": 5, "active_runs": 2, "pod_name": "listener-abc-123"},
             )
 
         assert res.status_code == 200
@@ -92,8 +92,31 @@ class TestListenerHeartbeat:
         call_kwargs = mock_heartbeat.call_args.kwargs
         assert call_kwargs["listener_id"] == str(lid)
         assert call_kwargs["name"] == "listener-1"
+        assert call_kwargs["pod_name"] == "listener-abc-123"
         assert call_kwargs["capacity"] == "5"
         assert call_kwargs["active_runs"] == "2"
+
+    @patch("terrapod.redis.client.publish_event", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.heartbeat_listener", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.get_listener")
+    async def test_heartbeat_without_pod_name_passes_none(
+        self, mock_get_listener, mock_heartbeat, mock_publish
+    ):
+        """Older clients that don't send pod_name still work; pod_name comes through as None."""
+        lid = uuid.uuid4()
+        mock_get_listener.return_value = _mock_listener_dict(listener_id=lid)
+
+        app = create_app()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.post(
+                f"/api/v2/listeners/{lid}/heartbeat",
+                json={"capacity": 5, "active_runs": 0},
+            )
+
+        assert res.status_code == 200
+        mock_heartbeat.assert_called_once()
+        assert mock_heartbeat.call_args.kwargs["pod_name"] is None
 
     @patch("terrapod.redis.client.publish_event", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.heartbeat_listener", new_callable=AsyncMock)
@@ -207,6 +230,215 @@ class TestListPoolsRBAC:
         assert res.status_code == 200
         data = res.json()["data"]
         assert data[0]["attributes"]["permission"] == "write"
+
+
+class TestPoolStatus:
+    """Pool list/detail surfaces a status string derived from registered listeners."""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.list_pools", new_callable=AsyncMock)
+    @patch(
+        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        new_callable=AsyncMock,
+    )
+    @patch(
+        "terrapod.api.routers.agent_pools.fetch_custom_roles",
+        new_callable=AsyncMock,
+    )
+    async def test_list_pools_status_online_when_listener_online(
+        self, mock_fetch_roles, mock_resolve, mock_list_pools, mock_list_listeners, *mocks
+    ):
+        pool = _mock_pool(name="busy-pool")
+        mock_list_pools.return_value = [pool]
+        mock_fetch_roles.return_value = []
+        mock_resolve.return_value = "read"
+        mock_list_listeners.return_value = [
+            {"id": str(uuid.uuid4()), "name": "lis-1", "status": "online"}
+        ]
+
+        app, _ = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.get("/api/v2/organizations/default/agent-pools", headers=_AUTH)
+
+        assert res.status_code == 200
+        attrs = res.json()["data"][0]["attributes"]
+        assert attrs["status"] == "online"
+        # listener-summary is gone — replaced by a single status pill
+        assert "listener-summary" not in attrs
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.list_pools", new_callable=AsyncMock)
+    @patch(
+        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        new_callable=AsyncMock,
+    )
+    @patch(
+        "terrapod.api.routers.agent_pools.fetch_custom_roles",
+        new_callable=AsyncMock,
+    )
+    async def test_list_pools_status_offline_when_no_listeners(
+        self, mock_fetch_roles, mock_resolve, mock_list_pools, mock_list_listeners, *mocks
+    ):
+        pool = _mock_pool(name="quiet-pool")
+        mock_list_pools.return_value = [pool]
+        mock_fetch_roles.return_value = []
+        mock_resolve.return_value = "read"
+        mock_list_listeners.return_value = []
+
+        app, _ = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.get("/api/v2/organizations/default/agent-pools", headers=_AUTH)
+
+        assert res.json()["data"][0]["attributes"]["status"] == "offline"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
+    @patch(
+        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        new_callable=AsyncMock,
+    )
+    async def test_show_pool_includes_status(
+        self, mock_resolve, mock_get_pool, mock_list_listeners, *mocks
+    ):
+        pool = _mock_pool(name="visible")
+        mock_get_pool.return_value = pool
+        mock_resolve.return_value = "read"
+        mock_list_listeners.return_value = [
+            {"id": str(uuid.uuid4()), "name": "lis", "status": "online"}
+        ]
+
+        app, _ = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.get(f"/api/v2/agent-pools/apool-{pool.id}", headers=_AUTH)
+
+        assert res.json()["data"]["attributes"]["status"] == "online"
+
+
+class TestListListenersReplicaCount:
+    """The /listeners endpoint enriches each listener with a replica count."""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.count_listener_replicas", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
+    @patch(
+        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        new_callable=AsyncMock,
+    )
+    async def test_listeners_carry_replica_count(
+        self,
+        mock_resolve,
+        mock_get_pool,
+        mock_list_listeners,
+        mock_count,
+        *mocks,
+    ):
+        pool = _mock_pool()
+        mock_get_pool.return_value = pool
+        mock_resolve.return_value = "read"
+        lid_a, lid_b = uuid.uuid4(), uuid.uuid4()
+        mock_list_listeners.return_value = [
+            {"id": str(lid_a), "name": "lis-a", "status": "online", "tracks_pods": "1"},
+            {"id": str(lid_b), "name": "lis-b", "status": "online", "tracks_pods": "1"},
+        ]
+        # 3 pods for lis-a, 1 pod for lis-b
+        mock_count.side_effect = [3, 1]
+
+        app, _ = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.get(f"/api/v2/agent-pools/apool-{pool.id}/listeners", headers=_AUTH)
+
+        assert res.status_code == 200
+        data = res.json()["data"]
+        by_id = {item["id"]: item["attributes"] for item in data}
+        assert by_id[f"listener-{lid_a}"]["replica-count"] == 3
+        assert by_id[f"listener-{lid_b}"]["replica-count"] == 1
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.count_listener_replicas", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
+    @patch(
+        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        new_callable=AsyncMock,
+    )
+    async def test_replica_count_omitted_when_listener_does_not_track_pods(
+        self,
+        mock_resolve,
+        mock_get_pool,
+        mock_list_listeners,
+        mock_count,
+        *mocks,
+    ):
+        """Pre-0.19.0 listeners (no tracks_pods flag) → no replica-count attr,
+        and count_listener_replicas is never called."""
+        pool = _mock_pool()
+        mock_get_pool.return_value = pool
+        mock_resolve.return_value = "read"
+        lid = uuid.uuid4()
+        mock_list_listeners.return_value = [
+            {"id": str(lid), "name": "old-listener", "status": "online"},
+        ]
+
+        app, _ = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.get(f"/api/v2/agent-pools/apool-{pool.id}/listeners", headers=_AUTH)
+
+        assert res.status_code == 200
+        attrs = res.json()["data"][0]["attributes"]
+        assert "replica-count" not in attrs
+        mock_count.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.count_listener_replicas", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
+    @patch(
+        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        new_callable=AsyncMock,
+    )
+    async def test_replica_count_included_for_mixed_listeners(
+        self,
+        mock_resolve,
+        mock_get_pool,
+        mock_list_listeners,
+        mock_count,
+        *mocks,
+    ):
+        """Mixed list: tracking listener gets replica-count, old one doesn't."""
+        pool = _mock_pool()
+        mock_get_pool.return_value = pool
+        mock_resolve.return_value = "read"
+        lid_new, lid_old = uuid.uuid4(), uuid.uuid4()
+        mock_list_listeners.return_value = [
+            {"id": str(lid_new), "name": "new", "status": "online", "tracks_pods": "1"},
+            {"id": str(lid_old), "name": "old", "status": "online"},
+        ]
+        mock_count.side_effect = [2]  # only one count call expected
+
+        app, _ = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.get(f"/api/v2/agent-pools/apool-{pool.id}/listeners", headers=_AUTH)
+
+        data = {item["id"]: item["attributes"] for item in res.json()["data"]}
+        assert data[f"listener-{lid_new}"]["replica-count"] == 2
+        assert "replica-count" not in data[f"listener-{lid_old}"]
+        assert mock_count.call_count == 1
 
 
 class TestShowPoolRBAC:

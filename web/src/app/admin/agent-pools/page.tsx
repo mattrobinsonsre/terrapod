@@ -25,7 +25,7 @@ interface AgentPool {
     'owner-email': string
     permission?: string
     'created-at': string
-    'listener-summary'?: { total: number; online: number }
+    status?: 'online' | 'offline'
   }
 }
 
@@ -166,7 +166,7 @@ export default function AgentPoolsPage() {
                 <tr className="border-b border-slate-700/50">
                   <SortableHeader label="Name" sortKey="name" sortState={sortState} onSort={toggleSort} />
                   <SortableHeader label="Description" sortKey="description" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Listeners</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Status</th>
                   <SortableHeader label="Created" sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
                 </tr>
               </thead>
@@ -189,16 +189,14 @@ export default function AgentPoolsPage() {
                       {pool.attributes.description || '-'}
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
-                      {pool.attributes['listener-summary'] ? (() => {
-                        const s = pool.attributes['listener-summary']
-                        return (
-                          <span className="text-xs">
-                            <span className={s.online > 0 ? 'text-green-400' : 'text-slate-500'}>{s.online}</span>
-                            <span className="text-slate-600"> / </span>
-                            <span className="text-slate-400">{s.total}</span>
-                          </span>
-                        )
-                      })() : <span className="text-xs text-slate-500">-</span>}
+                      {pool.attributes.status ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${pool.attributes.status === 'online' ? 'bg-green-400' : 'bg-slate-500'}`} />
+                          <span className="text-xs text-slate-400 capitalize">{pool.attributes.status}</span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-500">-</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500 hidden lg:table-cell">
                       {pool.attributes['created-at'] ? new Date(pool.attributes['created-at']).toLocaleDateString() : ''}
