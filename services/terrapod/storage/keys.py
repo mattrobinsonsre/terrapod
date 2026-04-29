@@ -121,3 +121,18 @@ def platform_provider_shasums_sig_key(version: str) -> str:
 def module_override_key(commit_sha: str, namespace: str, name: str, provider: str) -> str:
     """Key for a module override tarball (keyed by commit SHA for reuse across runs)."""
     return f"module_overrides/{commit_sha}/{namespace}/{name}/{provider}.tar.gz"
+
+
+# --- VCS Archive Cache ---
+
+
+def vcs_archive_key(connection_id: str, owner: str, repo: str, sha: str) -> str:
+    """Key for a cached, top-level-stripped VCS archive tarball.
+
+    Scoped by `connection_id` so two VCS connections that happen to point
+    at the same repo (e.g. one Terrapod app + one personal app for testing)
+    can't see each other's cache entries. Content is content-addressed by
+    commit SHA — same SHA = same tarball, safe to share across workspaces
+    using the same connection.
+    """
+    return f"vcs_archives/{connection_id}/{owner}/{repo}/{sha}.tar.gz"

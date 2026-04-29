@@ -15,6 +15,12 @@ api:
   podAntiAffinity:
     enabled: false
 
+  # Tilt + Rancher Desktop don't always have a CSI provisioner that satisfies
+  # generic ephemeral volumes; the system tempdir is fine for local dev where
+  # we don't poll giant monorepos.
+  ephemeralStorage:
+    enabled: false
+
   # Dev overrides — relax security for hot reload (writable filesystem for __pycache__, .pyc)
   # Dev images use string usernames (terrapod/nextjs) which k8s can't verify as non-root
   podSecurityContext:

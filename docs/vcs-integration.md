@@ -44,6 +44,14 @@ Terrapod's background poller checks your VCS providers every 60 seconds (configu
 - **No inbound connections required** -- Terrapod only makes outbound HTTPS calls to VCS provider APIs, so it works behind firewalls and NATs without any ingress configuration.
 - **Webhooks are optional** (GitHub only, currently) -- if you want faster feedback (sub-second instead of up to 60s), you can configure GitHub webhooks. The webhook tells the poller to check immediately rather than waiting for the next cycle.
 
+### Streaming + caching
+
+VCS tarball downloads stream from the provider through a local file pipeline (download → strip top-level dir → upload to object storage), never buffering the whole archive in process memory. Multi-hundred-MB monorepo tarballs stay under ~10 MB of process memory. The api pod requires per-pod ephemeral storage (`api.ephemeralStorage.enabled: true`, default 10 GiB) to back this pipeline — see [Deployment: VCS archive streaming and ephemeral storage](deployment.md#vcs-archive-streaming-and-ephemeral-storage-required-for-monorepo-workspaces).
+
+Stripped tarballs are cached in object storage at `vcs_archives/{conn_id}/{owner}/{repo}/{sha}.tar.gz`. Multiple workspaces tracking the same `(repo, sha)` only trigger one provider download per cycle (single-flight in-process + storage cache across cycles). The cache is content-addressed (commit SHA = key) and evicted by the artifact-retention sweeper after `vcs.archive_cache_retention_days` (default 7).
+
+If the api pod's ephemeral PVC nears capacity (e.g. previous-pod orphans, very large concurrent downloads), the cache automatically sweeps the oldest tarball temp files older than 5 minutes before reserving more disk. Tunable via `vcs.tmpdir_min_free_bytes` (default 2 GiB).
+
 ### Provider Dispatch
 
 The `VCSProvider` protocol defines the interface for VCS operations. The poller dispatches to the correct provider based on the VCS connection's `provider` field (`github` or `gitlab`). Each provider implements:

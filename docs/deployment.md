@@ -269,8 +269,44 @@ The chart ships with a `values.schema.json` that validates all values at `helm i
 |---|---|---|
 | `api.config.vcs.enabled` | `true` | Enable VCS integration |
 | `api.config.vcs.poll_interval_seconds` | `60` | Poll interval |
+| `api.config.vcs.tmpdir` | (matches `api.ephemeralStorage.mountPath`) | Directory for streaming download/strip/upload of VCS tarballs. Falls back to system tempdir if the path doesn't exist |
+| `api.config.vcs.archive_cache_retention_days` | `7` | TTL for cached stripped tarballs in object storage. Evicted by the artifact-retention sweeper |
 | `api.config.vcs.github.existingSecret` | `""` | K8s Secret containing the GitHub webhook HMAC secret |
 | `api.config.vcs.github.existingSecretKey` | `"webhook_secret"` | Key within the Secret |
+
+#### VCS archive streaming and ephemeral storage (REQUIRED for monorepo workspaces)
+
+The VCS poller streams every workspace's tarball from GitHub/GitLab through a local file pipeline (download → strip top-level dir → upload to object storage). Without per-pod ephemeral disk, multi-hundred-MB monorepo tarballs would land in process memory and OOM-kill the api pod under multi-workspace polling.
+
+The Helm chart provisions per-pod ephemeral storage by default:
+
+```yaml
+api:
+  ephemeralStorage:
+    enabled: true
+    size: 50Gi
+    storageClass: ""     # empty = cluster default
+    mountPath: /var/lib/terrapod/tmp
+```
+
+This uses a [generic ephemeral volume](https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/#generic-ephemeral-volumes) — each pod replica gets its own PVC, automatically deleted when the pod terminates. **Pick a `storageClass` whose reclaim policy is `Delete`**: with `Retain`, PersistentVolumes outlive their pods and accumulate as orphans on every restart. The cluster default is often `Retain`-flavoured (e.g. AWS EKS's `xfs-retain`, k3s's `local-path` default behaves correctly but check `kubectl get sc`).
+
+**AWS EKS example:** the EBS CSI driver ships with `gp3`/`xfs` (Delete) and `gp3-retain`/`xfs-retain` (Retain). Set `storageClass: xfs` (or `gp3`).
+
+**k3s example:** k3s ships with `local-path` as the default. It uses host-path provisioning and `Delete` reclaim — works out of the box for single-node clusters. For multi-node k3s, install a CSI driver (e.g. `longhorn`, `openebs-hostpath`) and set `storageClass` accordingly. If you can't run a CSI provisioner, set `enabled: false` and accept that you can't safely poll workspaces in repos larger than `~api.resources.limits.memory` / N replicas.
+
+**Local dev (Tilt, Rancher Desktop):** `values-local.yaml` already disables ephemeral storage. The local stack falls back to the system tempdir, which is fine for the small repos used in dev.
+
+**Cache layer:** stripped tarballs are persisted to object storage under `vcs_archives/{conn_id}/{owner}/{repo}/{sha}.tar.gz`. Multiple workspaces tracking the same `(repo, sha)` only trigger one GitHub download per cycle (single-flight in-process + storage cache across cycles + replicas). The cache is evicted by the artifact-retention sweeper after `vcs.archive_cache_retention_days` (default 7).
+
+**Sizing the ephemeral PVC:** the default 50 GiB covers fleets with monorepos up to ~500 MB and the default 10 parallel workspace polls (`_MAX_PARALLEL_WORKSPACE_POLLS = 10`). Each concurrent poll holds the raw + stripped tarball on disk (~2 × tarball size), so peak usage scales with `2 × tarball_size × parallel_polls`. Past releases used 10 GiB which was adequate for small repos but starved larger fleets — the new 50 GiB default solves that for most deployments. Sizing rule of thumb:
+
+```
+size = 4 × largest_tarball_size_MB × parallel_workspace_polls
+     + retention_days × distinct_SHAs_per_day × largest_tarball_size_MB
+```
+
+The first term covers in-flight downloads, the second covers cached stripped tarballs awaiting retention sweep. The `_ensure_tmpdir_space` sweeper kicks in below `vcs.tmpdir_min_free_bytes` (default 2 GiB) as a safety net for surprise fleet growth, but it shouldn't be the primary capacity mechanism — provision the PVC for steady state.
 
 ### Drift Detection
 

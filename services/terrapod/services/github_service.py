@@ -315,6 +315,11 @@ async def download_repo_archive(conn: VCSConnection, owner: str, repo: str, ref:
     """Download a repository tarball for a given ref (branch, tag, or SHA).
 
     Uses GitHub's tarball endpoint which returns a redirect to a CDN URL.
+
+    Loads the full tarball into process memory. Safe for small registry
+    archives but DANGEROUS for full monorepo poll-cycle archives — the api
+    pod will OOM under enough concurrent workspace polls. Use
+    `download_repo_archive_to_file` for the VCS-poll path.
     """
     token = await get_installation_token(conn)
     api_url = _api_url(conn)
@@ -327,6 +332,53 @@ async def download_repo_archive(conn: VCSConnection, owner: str, repo: str, ref:
     )
     resp.raise_for_status()
     return resp.content
+
+
+async def download_repo_archive_to_file(
+    conn: VCSConnection,
+    owner: str,
+    repo: str,
+    ref: str,
+    dest_path: str,
+    *,
+    chunk_size: int = 1 << 20,  # 1 MiB
+    timeout: float = 300.0,
+) -> int:
+    """Stream a repository tarball directly to a local file path.
+
+    Avoids buffering the full archive in process memory — chunks land on
+    disk as they arrive over the wire, so a 500 MB tarball uses ~chunk_size
+    of RAM regardless of repo size. Returns the total bytes written.
+
+    Retry policy: none. Transport errors propagate to the caller. The VCS
+    poller reruns every `vcs.poll_interval_seconds` (default 60s), so a
+    transient network hiccup is naturally retried by the next cycle. We
+    deliberately don't retry inline because mid-stream retries are unsafe
+    (no resumable offset against the GitHub tarball endpoint) and pre-byte
+    retries would just duplicate the cycle's own retry cadence.
+    """
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+    url = f"{api_url}/repos/{owner}/{repo}/tarball/{ref}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+    bytes_written = 0
+    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
+        async with client.stream("GET", url, headers=headers) as resp:
+            resp.raise_for_status()
+            with open(dest_path, "wb") as f:
+                async for chunk in resp.aiter_bytes(chunk_size=chunk_size):
+                    if not chunk:
+                        continue
+                    # Disk write is sync; offload to a thread so we don't
+                    # block the event loop on every chunk.
+                    await asyncio.to_thread(f.write, chunk)
+                    bytes_written += len(chunk)
+    return bytes_written
 
 
 async def list_open_pull_requests(

@@ -384,6 +384,38 @@ class VCSConfig(BaseModel):
         default=60, description="Polling interval in seconds for VCS changes"
     )
     github: GitHubWebhookConfig = Field(default_factory=GitHubWebhookConfig)
+    tmpdir: str = Field(
+        default="/var/lib/terrapod/tmp",
+        description=(
+            "Directory for temporary VCS archive files (raw + stripped tarballs). "
+            "Should point at an ephemeral PVC mount in production — multi-hundred-MB "
+            "monorepo tarballs land here during streaming download/strip/upload, "
+            "and a node tmpfs typically isn't large enough. The Helm chart provisions "
+            "this via `api.ephemeralStorage` and mounts it at this path. Falls back "
+            "to the system tempdir at runtime if the path doesn't exist (suitable for "
+            "tests and local dev)."
+        ),
+    )
+    archive_cache_retention_days: int = Field(
+        default=7,
+        description=(
+            "TTL for cached VCS archive tarballs in object storage. Stripped "
+            "tarballs are content-addressed by commit SHA so they're safe to "
+            "cache for the lifetime of any in-flight runs that reference them. "
+            "Evicted by the artifact-retention sweeper."
+        ),
+    )
+    tmpdir_min_free_bytes: int = Field(
+        default=2 * 1024**3,  # 2 GiB
+        description=(
+            "Minimum free space in `tmpdir` before each VCS download. If free "
+            "space drops below this, the cache evicts the oldest orphan temp "
+            "tarballs (anything older than 5 minutes that didn't get cleaned "
+            "up by its NamedTemporaryFile context — e.g. a previous pod crash) "
+            "until we hit the threshold or run out of candidates. Stops the "
+            "ephemeral PVC from filling up and breaking subsequent polls."
+        ),
+    )
 
 
 # --- Drift Detection Configuration ---
