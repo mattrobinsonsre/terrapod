@@ -237,15 +237,52 @@ async def _register_fingerprint(listener_id: str, fingerprint: str, ttl: int) ->
     await redis.setex(f"{_LISTENER_FP_PREFIX}{listener_id}:{fingerprint}", ttl, "1")
 
 
-async def is_fingerprint_valid(listener_id: str, fingerprint: str) -> bool:
+async def is_fingerprint_valid(
+    listener_id: str, fingerprint: str, listener: dict | None = None
+) -> bool:
     """Return True if `fingerprint` is registered for `listener_id`.
 
     Cert-auth's source of truth — replaces the previous single-value equality
     check on the listener hash field. Tolerates concurrent renewals issuing
     multiple valid certs at once.
+
+    Migration fallback: when this code first deploys, listeners that joined
+    under the old scheme have no `tp:listener_fp:*` key — only a fingerprint
+    on their listener hash. Without a fallback, every existing listener
+    would 401 on its next heartbeat / renew / runner-token call, triggering
+    a fleet-wide rejoin storm at deploy time. Pass the listener dict so we
+    can fall back to the legacy field, and self-heal by writing the new
+    key on first match. After the first request from each existing listener
+    the fallback path stops being exercised; new joins / renews never need
+    it because they call `_register_fingerprint` directly.
     """
     redis = get_redis_client()
-    return bool(await redis.exists(f"{_LISTENER_FP_PREFIX}{listener_id}:{fingerprint}"))
+    new_key = f"{_LISTENER_FP_PREFIX}{listener_id}:{fingerprint}"
+    if await redis.exists(new_key):
+        return True
+
+    if listener is not None and listener.get("certificate_fingerprint") == fingerprint:
+        # Self-heal: register in the new key family so subsequent requests
+        # take the fast path. TTL is derived from the legacy
+        # `certificate_expires_at` field; on missing / unparseable values
+        # fall back to a conservative 1-hour ceiling — the next renewal
+        # will refresh it.
+        ttl = 3600
+        expires_at = listener.get("certificate_expires_at", "")
+        if expires_at:
+            try:
+                expiry = datetime.fromisoformat(expires_at)
+                if expiry.tzinfo is None:
+                    expiry = expiry.replace(tzinfo=UTC)
+                remaining = int((expiry - datetime.now(UTC)).total_seconds())
+                if remaining > 60:
+                    ttl = remaining + 60
+            except ValueError:
+                pass
+        await redis.setex(new_key, ttl, "1")
+        return True
+
+    return False
 
 
 async def join_listener(

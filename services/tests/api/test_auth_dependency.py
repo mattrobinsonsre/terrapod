@@ -246,7 +246,7 @@ class TestGetListenerIdentity:
             "certificate_fingerprint": fp_b,  # whichever got hset last
         }
 
-        async def fake_is_valid(_lid, fp):
+        async def fake_is_valid(_lid, fp, listener=None):
             return fp in (fp_a, fp_b)
 
         with (
@@ -344,7 +344,7 @@ class TestAuthenticateListener:
             "certificate_fingerprint": fp_b,
         }
 
-        async def fake_is_valid(_lid, fp):
+        async def fake_is_valid(_lid, fp, listener=None):
             return fp in (fp_a, fp_b)
 
         request_a = MagicMock()
