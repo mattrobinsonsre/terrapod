@@ -64,6 +64,11 @@ async def artifact_retention_cycle() -> None:
             ("provider_cache", _cleanup_provider_cache, cfg.provider_cache_retention_days),
             ("binary_cache", _cleanup_binary_cache, cfg.binary_cache_retention_days),
             ("module_overrides", _cleanup_module_overrides, cfg.module_overrides_retention_days),
+            (
+                "vcs_archives",
+                _cleanup_vcs_archives,
+                settings.vcs.archive_cache_retention_days,
+            ),
         ]
 
         for category, handler, threshold in categories:
@@ -389,5 +394,71 @@ async def _cleanup_module_overrides(
     if deleted:
         await db.commit()
         RETENTION_DELETED.labels(category="module_overrides").inc(deleted)
+
+    return deleted
+
+
+async def _cleanup_vcs_archives(
+    db: AsyncSession,
+    storage: ObjectStore,
+    retention_days: int,
+    batch_size: int,
+) -> int:
+    """Delete cached VCS archive tarballs older than retention_days.
+
+    VCS archives are cached in object storage at
+    ``vcs_archives/{conn_id}/{owner}/{repo}/{sha}.tar.gz``. They have no DB
+    table — entries are content-addressed by commit SHA, so we list the prefix
+    and use each object's `last_modified` timestamp directly. No `db.commit()`
+    is needed because no relational state changes.
+
+    `db` is unused here but kept on the signature to match the other handlers.
+
+    Scaling: `list_prefix` returns ALL entries under the prefix in one call.
+    For typical fleets (≤100 monorepos × ≤10 unique SHAs per workspace per
+    week) this is well under 10k keys. If a deployment grows past that, the
+    handler logs a warning so operators can move to a DB-tracked index;
+    until then this single-call approach keeps the contract simple.
+    """
+    from terrapod.api.metrics import RETENTION_DELETED
+
+    cutoff = datetime.now(UTC) - timedelta(days=retention_days)
+    deleted = 0
+    _LIST_WARN_THRESHOLD = 10_000
+
+    try:
+        entries = await storage.list_prefix("vcs_archives/")
+    except Exception:
+        logger.warning("Failed to list vcs_archives prefix", exc_info=True)
+        return 0
+
+    if len(entries) >= _LIST_WARN_THRESHOLD:
+        logger.warning(
+            "vcs_archives prefix has many entries; consider DB-tracked index",
+            entry_count=len(entries),
+            threshold=_LIST_WARN_THRESHOLD,
+        )
+
+    # Oldest first so we evict the longest-stale entries first if we hit the batch cap.
+    entries.sort(key=lambda m: m.last_modified)
+    for meta in entries:
+        if meta.last_modified >= cutoff:
+            # Sorted oldest first; once we see anything still in retention,
+            # everything after is also in retention.
+            break
+        if deleted >= batch_size:
+            break
+        try:
+            await storage.delete(meta.key)
+            deleted += 1
+        except Exception:
+            logger.warning(
+                "Failed to delete VCS archive from storage",
+                key=meta.key,
+                exc_info=True,
+            )
+
+    if deleted:
+        RETENTION_DELETED.labels(category="vcs_archives").inc(deleted)
 
     return deleted

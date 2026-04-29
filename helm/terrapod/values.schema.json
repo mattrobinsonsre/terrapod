@@ -39,6 +39,7 @@
         "strategy": { "$ref": "#/$defs/strategySpec" },
         "terminationGracePeriodSeconds": { "type": "integer", "minimum": 0 },
         "preStopSleepSeconds": { "type": "integer", "minimum": 0 },
+        "ephemeralStorage": { "$ref": "#/$defs/ephemeralStorageSpec" },
         "podAntiAffinity": { "$ref": "#/$defs/podAntiAffinitySpec" },
         "nodeSelector": { "type": "object" },
         "tolerations": { "type": "array", "items": { "type": "object" } },
@@ -366,6 +367,17 @@
       }
     },
 
+    "ephemeralStorageSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "size": { "type": "string" },
+        "storageClass": { "type": "string" },
+        "mountPath": { "type": "string" }
+      }
+    },
+
     "apiConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -552,6 +564,8 @@
           "properties": {
             "enabled": { "type": "boolean" },
             "poll_interval_seconds": { "type": "integer", "minimum": 1 },
+            "tmpdir": { "type": "string" },
+            "archive_cache_retention_days": { "type": "integer", "minimum": 0 },
             "github": {
               "type": "object",
               "additionalProperties": false,

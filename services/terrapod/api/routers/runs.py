@@ -223,16 +223,14 @@ async def _fetch_vcs_config(
 
     Returns (cv_id, commit_sha, ref_name).
     """
+    from terrapod.services.vcs_archive_cache import VCSArchiveCache
     from terrapod.services.vcs_poller import (
-        _download_archive,
         _get_branch_sha,
         _list_tags,
         _parse_repo_url,
         _resolve_branch,
-        _strip_top_level_dir,
+        _stream_cv_upload_from_cache,
     )
-    from terrapod.storage import get_storage
-    from terrapod.storage.keys import config_version_key
 
     conn = await db.get(VCSConnection, ws.vcs_connection_id)
     if not conn or conn.status != "active":
@@ -253,7 +251,7 @@ async def _fetch_vcs_config(
             if tag_match:
                 sha = tag_match["sha"]
             else:
-                # Treat as raw SHA — download_archive accepts any git ref
+                # Treat as raw SHA — providers accept any git ref
                 sha = ref_override
     else:
         ref_name = await _resolve_branch(conn, ws, owner, repo) or ""
@@ -263,17 +261,20 @@ async def _fetch_vcs_config(
         if not sha:
             raise HTTPException(status_code=422, detail="Cannot get branch HEAD SHA")
 
-    archive = await _download_archive(conn, owner, repo, sha)
-    archive = await _strip_top_level_dir(archive)
+    # Streaming + storage cache: tarball never lands in process memory, and
+    # subsequent UI fetches at the same SHA hit the cache (storage `head()`)
+    # instead of re-downloading from GitHub. Single-shot cache instance is
+    # fine here — the in-process single-flight only matters when multiple
+    # workspaces poll the same SHA concurrently.
+    cache = VCSArchiveCache()
+    cache_storage_key = await cache.get_or_fetch(conn, owner, repo, sha)
 
     cv = await run_service.create_configuration_version(
         db, workspace_id=ws.id, source="vcs", auto_queue_runs=False
     )
     await db.flush()
 
-    storage = get_storage()
-    key = config_version_key(str(ws.id), str(cv.id))
-    await storage.put(key, archive, content_type="application/x-tar")
+    await _stream_cv_upload_from_cache(cache_storage_key, ws.id, cv.id)
 
     cv = await run_service.mark_configuration_uploaded(db, cv)
 

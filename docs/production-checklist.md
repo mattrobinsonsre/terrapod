@@ -11,6 +11,10 @@ A step-by-step checklist for preparing a Terrapod instance for production use. E
 - [ ] **PostgreSQL is externally managed** -- RDS, Cloud SQL, Azure Database, or equivalent with automated backups and point-in-time recovery (PITR). Do not run PostgreSQL inside the Kubernetes cluster for production workloads. See [Deployment: Database](deployment.md#database).
 - [ ] **Redis is externally managed** -- ElastiCache, MemoryDB, Azure Cache, or equivalent. Redis holds ephemeral data (sessions, scheduler state, listener heartbeats) so durability is not required, but availability is. See [Deployment: Redis](deployment.md#redis).
 - [ ] **Object storage is configured** -- S3, Azure Blob, or GCS with encryption at rest enabled. Filesystem storage (PVC) is acceptable for single-replica deployments but does not support multi-replica or cross-AZ redundancy. See [Deployment: Storage Backends](deployment.md#storage-backends).
+- [ ] **API pod ephemeral storage is provisioned** -- `api.ephemeralStorage.enabled: true` (default) gives each api pod replica its own PVC for streaming VCS tarballs. The configured `storageClass` MUST have `Delete` reclaim policy, otherwise PVs accumulate as orphans on every pod restart. See [Deployment: VCS archive streaming and ephemeral storage](deployment.md#vcs-archive-streaming-and-ephemeral-storage-required-for-monorepo-workspaces).
+  - **AWS EKS**: use `xfs` or `gp3` (NOT `xfs-retain` / `gp3-retain`).
+  - **k3s (single-node)**: built-in `local-path` works out of the box.
+  - **k3s (multi-node)**: install a CSI provisioner (`longhorn`, `openebs-hostpath`) and set the storage class explicitly.
 - [ ] **TLS is enforced end-to-end** -- Ingress terminates TLS with a valid certificate, database uses `sslmode=verify-full`, Redis uses `rediss://`. See [Security Hardening: TLS](security-hardening.md#tls-configuration).
 - [ ] **DNS record points to the ingress** -- The public hostname resolves to the ingress load balancer.
 

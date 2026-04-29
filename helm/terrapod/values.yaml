@@ -336,6 +336,33 @@ api:
   # has slower endpoint convergence.
   preStopSleepSeconds: 30
 
+  # Per-pod ephemeral storage for VCS archive streaming. Each api pod replica
+  # gets its own PVC (generic ephemeral volume → auto-deleted on pod removal).
+  # Required because the VCS poller streams multi-hundred-MB monorepo tarballs
+  # through this path during download → strip → upload; without it the api
+  # pod OOM-kills under multi-workspace polling of the same repo.
+  #
+  # Sizing: each concurrent workspace poll holds raw + stripped tarball on
+  # disk simultaneously (~2× tarball size). With the default 10 parallel
+  # workspace polls and a 500 MB monorepo, peak usage is ~10 GB just for
+  # in-flight downloads — plus the cached stripped tarballs from prior
+  # cycles waiting for the retention sweeper. 50 GiB is the safe default;
+  # bump it for fleets with bigger monorepos or more parallel workspaces.
+  #
+  # Disable only if you can guarantee no large monorepo workspaces (e.g. tests,
+  # local dev — values-local.yaml does this). The poller will fall back to the
+  # system tempdir, but tmpfs-backed /tmp on most images is too small.
+  ephemeralStorage:
+    enabled: true
+    size: 50Gi
+    # Empty string = cluster default StorageClass. Some default classes (e.g.
+    # k3s-rancher-default with `Retain` reclaim, or AWS EKS's `xfs-retain`)
+    # leave PVs hanging around after the pod dies, which defeats "ephemeral".
+    # Set this to a class with `Delete` reclaim policy. See docs/deployment.md
+    # for k3s + AWS guidance.
+    storageClass: ""
+    mountPath: /var/lib/terrapod/tmp
+
   # Pod anti-affinity spreads replicas across nodes (required) and AZs (preferred).
   # Disable on single-node clusters. Set 'affinity' to override with custom rules.
   podAntiAffinity:

@@ -519,14 +519,17 @@ class TestCreateVcsRunDedup:
         mock_db = AsyncMock()
         mock_db.execute = AsyncMock(return_value=dedup_result)
 
-        with patch("terrapod.services.vcs_poller._download_archive") as mock_dl:
+        with patch(
+            "terrapod.services.vcs_archive_cache.VCSArchiveCache.get_or_fetch",
+            new_callable=AsyncMock,
+        ) as mock_fetch:
             run = await _create_vcs_run(
                 mock_db, ws, conn, "org", "repo", "bbb222", "main", message="test"
             )
 
         assert run is None
         # We must bail before wasting bandwidth on the archive download
-        mock_dl.assert_not_called()
+        mock_fetch.assert_not_called()
 
     async def test_dedup_distinguishes_pr_number(self):
         """A PR-scoped run must not dedup against a branch-push run with the same SHA."""
@@ -541,12 +544,13 @@ class TestCreateVcsRunDedup:
         mock_db = AsyncMock()
         mock_db.execute = AsyncMock(return_value=dedup_result)
 
-        # Simulate the archive download failing so we don't need to mock the whole
-        # create-run chain — the assertion is that dedup passed (download was tried).
+        # Simulate the archive fetch failing so we don't need to mock the whole
+        # create-run chain — the assertion is that dedup passed (cache was tried).
         with patch(
-            "terrapod.services.vcs_poller._download_archive",
+            "terrapod.services.vcs_archive_cache.VCSArchiveCache.get_or_fetch",
+            new_callable=AsyncMock,
             side_effect=RuntimeError("stop here"),
-        ) as mock_dl:
+        ) as mock_fetch:
             run = await _create_vcs_run(
                 mock_db,
                 ws,
@@ -559,8 +563,8 @@ class TestCreateVcsRunDedup:
                 message="test",
             )
 
-        assert run is None  # Download failed, returns None
-        mock_dl.assert_called_once()  # But dedup let us through — the key assertion
+        assert run is None  # Fetch failed, returns None
+        mock_fetch.assert_called_once()  # But dedup let us through — the key assertion
 
 
 # ── poll_cycle parallelism + repo-scoped immediate polls ─────────────
@@ -593,7 +597,7 @@ class TestPollCycleParallel:
         max_in_flight: list[int] = [0]
         entered = 0
 
-        async def fake_owned_poll(ws_id, semaphore):
+        async def fake_owned_poll(ws_id, semaphore, cache=None):
             import asyncio as _a
 
             nonlocal entered
@@ -665,7 +669,7 @@ class TestPollCycleParallel:
 
         polled: list[uuid.UUID] = []
 
-        async def fake_owned_poll(ws_id, semaphore):
+        async def fake_owned_poll(ws_id, semaphore, cache=None):
             polled.append(ws_id)
 
         with (
@@ -710,7 +714,7 @@ class TestPollCycleParallel:
 
         polled: list[uuid.UUID] = []
 
-        async def fake_owned_poll(ws_id, semaphore):
+        async def fake_owned_poll(ws_id, semaphore, cache=None):
             polled.append(ws_id)
 
         with (
@@ -754,7 +758,7 @@ class TestPollCycleParallel:
 
         polled: list[uuid.UUID] = []
 
-        async def fake_owned_poll(ws_id, semaphore):
+        async def fake_owned_poll(ws_id, semaphore, cache=None):
             polled.append(ws_id)
 
         with (

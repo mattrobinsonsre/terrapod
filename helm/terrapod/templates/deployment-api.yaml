@@ -117,6 +117,14 @@ spec:
               mountPath: /tmp
             - name: ca-cache
               mountPath: /var/lib/terrapod/ca
+            {{- if .Values.api.ephemeralStorage.enabled }}
+            # VCS poller streams multi-hundred-MB monorepo tarballs through
+            # this path during download → strip → upload. Backed by a
+            # per-pod ephemeral PVC so we don't OOM the pod or rely on
+            # node tmpfs.
+            - name: vcs-tmpdir
+              mountPath: {{ .Values.api.ephemeralStorage.mountPath | default "/var/lib/terrapod/tmp" }}
+            {{- end }}
             {{- if eq .Values.api.config.storage.backend "filesystem" }}
             - name: storage
               mountPath: {{ .Values.api.config.storage.filesystem.root_dir }}
@@ -163,6 +171,27 @@ spec:
           emptyDir: {}
         - name: ca-cache
           emptyDir: {}
+        {{- if .Values.api.ephemeralStorage.enabled }}
+        # Generic ephemeral volume — each pod replica gets its own PVC,
+        # auto-deleted on pod removal. Used by the VCS poller to stream
+        # monorepo tarballs through (download → strip → upload) without
+        # ever materialising them in process memory.
+        - name: vcs-tmpdir
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                labels:
+                  {{- include "terrapod.labels" . | nindent 18 }}
+                  app.kubernetes.io/component: api
+              spec:
+                accessModes: ["ReadWriteOnce"]
+                {{- if .Values.api.ephemeralStorage.storageClass }}
+                storageClassName: {{ .Values.api.ephemeralStorage.storageClass | quote }}
+                {{- end }}
+                resources:
+                  requests:
+                    storage: {{ .Values.api.ephemeralStorage.size | default "10Gi" | quote }}
+        {{- end }}
         {{- if eq .Values.api.config.storage.backend "filesystem" }}
         - name: storage
           {{- if .Values.storage.filesystem.persistence.enabled }}

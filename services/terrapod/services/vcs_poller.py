@@ -35,6 +35,7 @@ from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import github_service, gitlab_service, run_service
 from terrapod.services.archive_utils import strip_archive_top_level_dir_async
+from terrapod.services.vcs_archive_cache import VCSArchiveCache, materialize_archive
 from terrapod.services.vcs_provider import PullRequest
 from terrapod.storage import get_storage
 from terrapod.storage.keys import config_version_key
@@ -178,6 +179,26 @@ async def _resolve_branch(conn: VCSConnection, ws: Workspace, owner: str, repo: 
 _strip_top_level_dir = strip_archive_top_level_dir_async  # alias for internal use
 
 
+async def _stream_cv_upload_from_cache(
+    cache_storage_key: str, workspace_id: uuid.UUID, cv_id: uuid.UUID
+) -> None:
+    """Materialise a cached VCS archive and stream-upload it to the workspace CV key.
+
+    Uses temp files end-to-end — never holds the tarball in process memory.
+    """
+    storage = get_storage()
+    cv_key = config_version_key(str(workspace_id), str(cv_id))
+
+    async with materialize_archive(cache_storage_key) as path:
+        from terrapod.services.vcs_archive_cache import _file_chunks
+
+        await storage.put_stream(
+            cv_key,
+            _file_chunks(path),
+            content_type="application/x-tar",
+        )
+
+
 async def _create_vcs_run(
     db: AsyncSession,
     ws: Workspace,
@@ -190,8 +211,14 @@ async def _create_vcs_run(
     speculative: bool = False,
     pr_number: int | None = None,
     message: str = "",
+    cache: VCSArchiveCache | None = None,
 ) -> Run | None:
-    """Download archive, create ConfigurationVersion and Run.
+    """Download archive (via cache + streaming), create ConfigurationVersion and Run.
+
+    The `cache` argument coalesces concurrent downloads of the same (conn, sha)
+    across workspace polls in the same cycle. Pass None when this path is
+    invoked one-shot (e.g. UI-queued runs); a fresh cache instance is built
+    internally so the streaming pipeline still applies.
 
     Defensive dedup: if a run already exists for this (workspace, sha, branch,
     pr_number), return None rather than creating a duplicate. This catches
@@ -220,19 +247,19 @@ async def _create_vcs_run(
         )
         return None
 
+    if cache is None:
+        cache = VCSArchiveCache()
+
     try:
-        archive = await _download_archive(conn, owner, repo, sha)
+        cache_storage_key = await cache.get_or_fetch(conn, owner, repo, sha)
     except Exception as e:
         logger.error(
-            "Failed to download repo archive",
+            "Failed to fetch repo archive into cache",
             workspace=ws.name,
             ref=sha[:8],
             error=str(e),
         )
         return None
-
-    # VCS tarballs have a top-level directory wrapper — strip it
-    archive = await _strip_top_level_dir(archive)
 
     cv = await run_service.create_configuration_version(
         db,
@@ -243,9 +270,17 @@ async def _create_vcs_run(
     )
     await db.flush()
 
-    storage = get_storage()
-    key = config_version_key(str(ws.id), str(cv.id))
-    await storage.put(key, archive, content_type="application/x-tar")
+    try:
+        await _stream_cv_upload_from_cache(cache_storage_key, ws.id, cv.id)
+    except Exception as e:
+        logger.error(
+            "Failed to materialise cached archive into config version",
+            workspace=ws.name,
+            ref=sha[:8],
+            cache_key=cache_storage_key,
+            error=str(e),
+        )
+        return None
 
     cv = await run_service.mark_configuration_uploaded(db, cv)
 
@@ -275,6 +310,7 @@ async def _poll_workspace_branch(
     owner: str,
     repo: str,
     branch: str,
+    cache: VCSArchiveCache | None = None,
 ) -> None:
     """Check the tracked branch for new commits and create a run."""
     sha = await _get_branch_sha(conn, owner, repo, branch)
@@ -362,6 +398,7 @@ async def _poll_workspace_branch(
         sha,
         branch,
         message=f"Triggered by commit {sha[:8]} on {branch}",
+        cache=cache,
     )
 
     if run:
@@ -383,6 +420,7 @@ async def _poll_workspace_prs(
     owner: str,
     repo: str,
     branch: str,
+    cache: VCSArchiveCache | None = None,
 ) -> None:
     """Check open PRs/MRs targeting the tracked branch for speculative plans."""
     prs = await _list_open_prs(conn, owner, repo, branch)
@@ -477,6 +515,7 @@ async def _poll_workspace_prs(
             speculative=True,
             pr_number=pr.number,
             message=f"Speculative plan for PR #{pr.number}: {pr.title}",
+            cache=cache,
         )
 
         if run:
@@ -491,8 +530,17 @@ async def _poll_workspace_prs(
             )
 
 
-async def _poll_workspace(db: AsyncSession, ws: Workspace) -> None:
-    """Poll a single workspace: check branch for pushes and PRs for speculative plans."""
+async def _poll_workspace(
+    db: AsyncSession,
+    ws: Workspace,
+    cache: VCSArchiveCache | None = None,
+) -> None:
+    """Poll a single workspace: check branch for pushes and PRs for speculative plans.
+
+    `cache` coalesces concurrent (conn, sha) downloads across workspaces in the
+    same poll cycle. Pass None for one-shot calls; a fresh cache is built inside
+    `_create_vcs_run` so streaming + per-call disk-temp behaviour still applies.
+    """
     if not ws.vcs_repo_url or not ws.vcs_connection_id:
         return
 
@@ -529,10 +577,10 @@ async def _poll_workspace(db: AsyncSession, ws: Workspace) -> None:
 
     try:
         # 1. Check tracked branch for new commits → real runs
-        await _poll_workspace_branch(db, ws, conn, owner, repo, branch)
+        await _poll_workspace_branch(db, ws, conn, owner, repo, branch, cache)
 
         # 2. Check open PRs/MRs targeting the tracked branch → speculative plans
-        await _poll_workspace_prs(db, ws, conn, owner, repo, branch)
+        await _poll_workspace_prs(db, ws, conn, owner, repo, branch, cache)
 
         # Success: update last-polled timestamp and clear any previous error
         ws.vcs_last_polled_at = utc_now()
@@ -558,19 +606,26 @@ async def _poll_workspace(db: AsyncSession, ws: Workspace) -> None:
 _MAX_PARALLEL_WORKSPACE_POLLS = 10
 
 
-async def _poll_workspace_owned(ws_id: uuid.UUID, semaphore: asyncio.Semaphore) -> None:
+async def _poll_workspace_owned(
+    ws_id: uuid.UUID,
+    semaphore: asyncio.Semaphore,
+    cache: VCSArchiveCache | None = None,
+) -> None:
     """Poll a single workspace in its own DB session, bounded by a semaphore.
 
     Each parallel poll needs its own session — AsyncSession is not safe to
     share across concurrent coroutines. Errors are caught and logged here
     so one workspace's failure doesn't sink the whole cycle.
+
+    `cache` is shared across all workspaces in this cycle so concurrent polls
+    of the same (conn, sha) coalesce on a single tarball download.
     """
     async with semaphore, get_db_session() as db:
         ws = await db.get(Workspace, ws_id)
         if ws is None:
             return
         try:
-            await _poll_workspace(db, ws)
+            await _poll_workspace(db, ws, cache)
             await db.commit()
         except Exception as e:
             logger.error(
@@ -672,9 +727,12 @@ async def poll_cycle() -> None:
 
     logger.debug("VCS poll cycle", workspace_count=len(workspace_ids))
 
+    # One cache instance per cycle — coalesces concurrent (conn, sha) tarball
+    # downloads across all workspace polls in this cycle.
+    cache = VCSArchiveCache()
     semaphore = asyncio.Semaphore(_MAX_PARALLEL_WORKSPACE_POLLS)
     await asyncio.gather(
-        *[_poll_workspace_owned(wid, semaphore) for wid in workspace_ids],
+        *[_poll_workspace_owned(wid, semaphore, cache) for wid in workspace_ids],
         return_exceptions=True,
     )
 
@@ -717,9 +775,12 @@ async def handle_immediate_poll(payload: dict) -> None:
         workspace_count=len(workspace_ids),
     )
 
+    # Webhook-triggered polls also share one cache instance — same coalescing
+    # benefit when multiple workspaces map to the same repo.
+    cache = VCSArchiveCache()
     semaphore = asyncio.Semaphore(_MAX_PARALLEL_WORKSPACE_POLLS)
     await asyncio.gather(
-        *[_poll_workspace_owned(wid, semaphore) for wid in workspace_ids],
+        *[_poll_workspace_owned(wid, semaphore, cache) for wid in workspace_ids],
         return_exceptions=True,
     )
 

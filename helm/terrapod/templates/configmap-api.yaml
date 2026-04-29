@@ -174,6 +174,13 @@ data:
     vcs:
       enabled: {{ .Values.api.config.vcs.enabled }}
       poll_interval_seconds: {{ .Values.api.config.vcs.poll_interval_seconds | default 60 }}
+      # tmpdir tracks the ephemeralStorage mountPath so the VCS poller writes
+      # streamed tarballs onto the PVC, not pod memory. Override
+      # api.config.vcs.tmpdir if you remount the PVC elsewhere.
+      tmpdir: {{ .Values.api.config.vcs.tmpdir | default .Values.api.ephemeralStorage.mountPath | default "/var/lib/terrapod/tmp" | quote }}
+      {{- with .Values.api.config.vcs.archive_cache_retention_days }}
+      archive_cache_retention_days: {{ . }}
+      {{- end }}
     {{- end }}
     {{- if .Values.api.config.audit }}
     audit:

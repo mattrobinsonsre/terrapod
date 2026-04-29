@@ -13,6 +13,7 @@ from terrapod.services.artifact_retention_service import (
     _cleanup_provider_cache,
     _cleanup_run_artifacts,
     _cleanup_state_versions,
+    _cleanup_vcs_archives,
     artifact_retention_cycle,
 )
 
@@ -459,3 +460,84 @@ class TestArtifactRetentionCycle:
             await artifact_retention_cycle()
             mock_sv.assert_not_called()
             mock_ra.assert_not_called()
+
+
+# ── _cleanup_vcs_archives ────────────────────────────────────────────
+
+
+def _make_object_meta(key: str, last_modified):
+    """Build an ObjectMeta-shaped MagicMock for storage.list_prefix() returns."""
+    meta = MagicMock()
+    meta.key = key
+    meta.last_modified = last_modified
+    return meta
+
+
+class TestCleanupVCSArchives:
+    @pytest.mark.asyncio
+    async def test_deletes_old_entries_only(self):
+        now = datetime.now(UTC)
+        old = _make_object_meta("vcs_archives/c1/owner/repo/old.tar.gz", now - timedelta(days=10))
+        recent = _make_object_meta(
+            "vcs_archives/c1/owner/repo/recent.tar.gz", now - timedelta(days=2)
+        )
+        storage = AsyncMock()
+        storage.list_prefix = AsyncMock(return_value=[old, recent])
+        storage.delete = AsyncMock()
+        db = AsyncMock()
+
+        deleted = await _cleanup_vcs_archives(db, storage, retention_days=7, batch_size=100)
+
+        assert deleted == 1
+        storage.delete.assert_awaited_once_with(old.key)
+
+    @pytest.mark.asyncio
+    async def test_evicts_oldest_first_when_capped_by_batch_size(self):
+        now = datetime.now(UTC)
+        ages = [now - timedelta(days=d) for d in (30, 20, 15, 10)]
+        # All four are past the 7-day cutoff; with batch_size=2 we expect the
+        # oldest two (days=30, days=20) deleted, the newer two left for next cycle.
+        entries = [
+            _make_object_meta(f"vcs_archives/c1/owner/repo/sha{i}.tar.gz", a)
+            for i, a in enumerate(ages)
+        ]
+        storage = AsyncMock()
+        storage.list_prefix = AsyncMock(return_value=entries)
+        storage.delete = AsyncMock()
+        db = AsyncMock()
+
+        deleted = await _cleanup_vcs_archives(db, storage, retention_days=7, batch_size=2)
+
+        assert deleted == 2
+        deleted_keys = [c.args[0] for c in storage.delete.await_args_list]
+        # Oldest first: sha0 (30 days), sha1 (20 days)
+        assert deleted_keys == [entries[0].key, entries[1].key]
+
+    @pytest.mark.asyncio
+    async def test_returns_zero_when_list_prefix_fails(self):
+        storage = AsyncMock()
+        storage.list_prefix = AsyncMock(side_effect=RuntimeError("storage backend down"))
+        storage.delete = AsyncMock()
+        db = AsyncMock()
+
+        deleted = await _cleanup_vcs_archives(db, storage, retention_days=7, batch_size=100)
+
+        assert deleted == 0
+        storage.delete.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_swallows_individual_delete_failure_and_continues(self):
+        now = datetime.now(UTC)
+        old1 = _make_object_meta("vcs_archives/c1/repo/a.tar.gz", now - timedelta(days=10))
+        old2 = _make_object_meta("vcs_archives/c1/repo/b.tar.gz", now - timedelta(days=9))
+        storage = AsyncMock()
+        storage.list_prefix = AsyncMock(return_value=[old1, old2])
+        # First delete fails, second succeeds — we should still count the
+        # successful one and proceed.
+        storage.delete = AsyncMock(side_effect=[RuntimeError("transient"), None])
+        db = AsyncMock()
+
+        deleted = await _cleanup_vcs_archives(db, storage, retention_days=7, batch_size=100)
+
+        assert deleted == 1
+        assert storage.delete.await_count == 2

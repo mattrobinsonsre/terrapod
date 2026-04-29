@@ -4,6 +4,7 @@ Authenticates via Project/Group Access Token (stored on the VCSConnection).
 Supports GitLab.com and self-hosted GitLab instances.
 """
 
+import asyncio
 from urllib.parse import quote as url_quote
 
 import httpx
@@ -72,7 +73,12 @@ async def get_default_branch(conn: VCSConnection, owner: str, repo: str) -> str 
 
 
 async def download_archive(conn: VCSConnection, owner: str, repo: str, ref: str) -> bytes:
-    """Download repository tarball at a given ref."""
+    """Download repository tarball at a given ref.
+
+    Buffers the full tarball into process memory. See the github_service
+    counterpart — use `download_archive_to_file` for the VCS-poll-cycle
+    path to avoid OOMing the api pod on large monorepos.
+    """
     api = _api_url(conn)
     project = _project_path(owner, repo)
 
@@ -84,6 +90,48 @@ async def download_archive(conn: VCSConnection, owner: str, repo: str, ref: str)
         )
         resp.raise_for_status()
         return resp.content
+
+
+async def download_archive_to_file(
+    conn: VCSConnection,
+    owner: str,
+    repo: str,
+    ref: str,
+    dest_path: str,
+    *,
+    chunk_size: int = 1 << 20,  # 1 MiB
+    timeout: float = 300.0,
+) -> int:
+    """Stream a project tarball directly to a local file path.
+
+    Avoids buffering the full archive in process memory — chunks land on
+    disk as they arrive. Returns total bytes written.
+
+    Retry policy: none. Same rationale as the github counterpart — the VCS
+    poller reruns every `vcs.poll_interval_seconds`, so transport errors
+    here are naturally retried by the next cycle. Mid-stream retries
+    against the GitLab archive endpoint aren't resumable.
+    """
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+    url = f"{api}/projects/{project}/repository/archive.tar.gz"
+
+    bytes_written = 0
+    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as client:
+        async with client.stream(
+            "GET",
+            url,
+            params={"sha": ref},
+            headers=_headers(conn),
+        ) as resp:
+            resp.raise_for_status()
+            with open(dest_path, "wb") as f:
+                async for chunk in resp.aiter_bytes(chunk_size=chunk_size):
+                    if not chunk:
+                        continue
+                    await asyncio.to_thread(f.write, chunk)
+                    bytes_written += len(chunk)
+    return bytes_written
 
 
 async def list_open_prs(
