@@ -319,11 +319,12 @@ async def authenticate_listener(request: Request) -> "ListenerIdentity":
         )
 
     fingerprint = get_certificate_fingerprint(cert)
-    stored_fp = listener.get("certificate_fingerprint", "")
-    if stored_fp and fingerprint != stored_fp:
+    if not await agent_pool_service.is_fingerprint_valid(
+        listener["id"], fingerprint, listener=listener
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Certificate fingerprint mismatch",
+            detail="Certificate fingerprint not registered",
         )
 
     return ListenerIdentity(
@@ -497,11 +498,12 @@ async def get_listener_identity(
 
     # Verify fingerprint match
     fingerprint = get_certificate_fingerprint(cert)
-    stored_fp = listener.get("certificate_fingerprint", "")
-    if stored_fp and fingerprint != stored_fp:
+    if not await agent_pool_service.is_fingerprint_valid(
+        listener["id"], fingerprint, listener=listener
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Certificate fingerprint mismatch",
+            detail="Certificate fingerprint not registered",
         )
 
     return ListenerIdentity(

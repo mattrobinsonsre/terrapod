@@ -71,15 +71,17 @@ async def reconcile_runs() -> None:
     """Drive run state transitions based on Job outcomes.
 
     This is the main entry point, called every 2s by the scheduler.
+
+    Picks up two cohorts:
+    1. planning/applying with job_name set — drive on Job status reports
+    2. planning/applying with NO job_name set — the listener claimed the run
+       but never reported job-launched (auth failure, K8s outage at create
+       time, listener died mid-launch). Without picking these up they sit
+       indefinitely. `_check_stale` applies a shorter `launch_timeout` to
+       this cohort so failures surface in minutes, not hours.
     """
     async with get_db_session() as db:
-        # Find runs in planning/applying with job_name set
-        result = await db.execute(
-            select(Run).where(
-                Run.status.in_(["planning", "applying"]),
-                Run.job_name.isnot(None),
-            )
-        )
+        result = await db.execute(select(Run).where(Run.status.in_(["planning", "applying"])))
         runs = list(result.scalars().all())
 
         if not runs:
@@ -103,6 +105,13 @@ async def _reconcile_one(db: AsyncSession, run: Run) -> None:
     from terrapod.redis.client import get_job_status_from_redis, publish_listener_event
 
     phase = "plan" if run.status == "planning" else "apply"
+
+    # If no Job has been launched yet (listener never POSTed job-launched),
+    # there's nothing for listeners to query — skip the SSE round-trip and
+    # rely on the launch_timeout in _check_stale.
+    if run.job_name is None:
+        await _check_stale(db, run)
+        return
 
     # Publish check_job_status event to the pool's listener channel
     if run.pool_id:
@@ -215,15 +224,39 @@ async def _handle_failed(db: AsyncSession, run: Run, error_message: str) -> None
 
 
 async def _check_stale(db: AsyncSession, run: Run) -> None:
-    """Check if a run is stale (stuck without Job status for too long)."""
+    """Check if a run is stale (stuck without Job status / Job launch for too long).
+
+    Two timeouts apply, depending on what stage the run is stuck at:
+    - **launch_timeout** (default 5 min) — run has no `job_name` yet. Listener
+      claimed it but never POSTed `job-launched`. Catches /runner-token auth
+      failures, K8s outages at create time, listener crashes mid-launch.
+    - **stale_timeout** (default 1 h) — Job exists but reports no status.
+      Catches dead listeners that stopped reporting, lost SSE channels,
+      pods that never produced output. Looser default because a long
+      `terraform plan` legitimately produces no extra status.
+    """
     phase_start = run.plan_started_at if run.status == "planning" else run.apply_started_at
     if phase_start is None:
         return
 
     cfg = load_runner_config()
-    stale_timeout = timedelta(seconds=cfg.stale_timeout_seconds)
+    if run.job_name is None:
+        timeout = timedelta(seconds=cfg.launch_timeout_seconds)
+        message_prefix = "Run stuck pre-launch"
+    else:
+        timeout = timedelta(seconds=cfg.stale_timeout_seconds)
+        message_prefix = "Run stale"
 
     now = datetime.now(UTC)
-    if now - phase_start > stale_timeout:
-        await _handle_failed(db, run, f"Run stale — no Job status for >{stale_timeout}")
-        logger.warning("Stale run errored", run_id=str(run.id), status=run.status)
+    if now - phase_start > timeout:
+        await _handle_failed(db, run, f"{message_prefix} — no progress for >{timeout}")
+        if run.job_name is None:
+            from terrapod.api.metrics import LISTENER_PRELAUNCH_TIMEOUTS
+
+            LISTENER_PRELAUNCH_TIMEOUTS.inc()
+        logger.warning(
+            "Stale run errored",
+            run_id=str(run.id),
+            status=run.status,
+            had_job=run.job_name is not None,
+        )

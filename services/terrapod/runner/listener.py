@@ -192,7 +192,18 @@ class RunnerListener:
         """
         from terrapod.runner.identity import clear_credentials_secret
 
-        logger.warning("Forcing re-join due to persistent auth failures")
+        # Error-level: this is an operator-actionable signal. Persistent auth
+        # failures usually mean the cert in our Secret no longer matches what
+        # the API has registered (Redis fingerprint key expired, listener
+        # registration aged out, or — pre-fix — a renewal race wrote the
+        # wrong fingerprint). The rejoin path consumes a join-token use, so
+        # repeated rejoins eventually exhaust max_uses and we'll start
+        # failing closed. Worth a SEV level in your log alerts.
+        logger.error(
+            "Forcing re-join due to persistent auth failures",
+            listener_id=str(self.identity.listener_id) if self.identity else "<unknown>",
+            name=self.identity.name if self.identity else "<unknown>",
+        )
         clear_credentials_secret()
         await self._establish_identity()
 
@@ -535,12 +546,26 @@ class RunnerListener:
             self._active_launches -= 1
 
     async def _launch_run(self, run_id: str, attrs: dict) -> None:
-        """Build and launch a K8s Job for a claimed run, then report back."""
+        """Build and launch a K8s Job for a claimed run, then report back.
+
+        Any pre-Job failure (token request, Job create, auth Secret create)
+        must transition the run to `errored` via the API — otherwise the run
+        sits forever in `planning`/`applying` because the reconciler skips
+        runs without a `job_name`. The reconciler's `launch_timeout` is the
+        backstop, but surfacing the actual error here gives operators an
+        immediate signal at the API instead of a generic timeout 5 min later.
+        """
         from terrapod.runner.job_manager import create_job, get_job_uid
         from terrapod.runner.job_template import build_job_spec
 
         phase = attrs.get("phase", "plan")
-        runner_token = await self._get_runner_token(run_id)
+
+        try:
+            runner_token = await self._get_runner_token(run_id)
+        except Exception as e:
+            logger.error("Failed to fetch runner token", run_id=run_id, error=str(e))
+            await self._report_launch_failed(run_id, f"Could not obtain runner token: {e}")
+            return
 
         env_vars = [{"key": v["key"], "value": v["value"]} for v in attrs.get("env-vars", [])]
         terraform_vars = [
@@ -578,6 +603,7 @@ class RunnerListener:
             job_name = await create_job(spec)
         except Exception as e:
             logger.error("Failed to create Job", run_id=run_id, error=str(e))
+            await self._report_launch_failed(run_id, f"Failed to create K8s Job: {e}")
             return
 
         # Create auth Secret with ownerReference to the Job
@@ -586,6 +612,8 @@ class RunnerListener:
             await self._create_auth_secret(run_id, runner_token, job_name, job_uid)
         except Exception as e:
             logger.error("Failed to create auth secret", run_id=run_id, error=str(e))
+            await self._report_launch_failed(run_id, f"Failed to create runner auth Secret: {e}")
+            return
 
         # Report Job launched to the API
         try:
@@ -597,6 +625,11 @@ class RunnerListener:
             )
         except Exception as e:
             logger.error("Failed to report job-launched", run_id=run_id, error=str(e))
+            # Don't error the run here — the Job is genuinely running. The
+            # reconciler will time it out via stale_timeout if status reports
+            # never arrive, but a transient HTTP blip here shouldn't kill an
+            # otherwise-healthy plan/apply.
+            return
 
         logger.info(
             "Job launched",
@@ -604,6 +637,33 @@ class RunnerListener:
             phase=phase,
             job=job_name,
         )
+
+    async def _report_launch_failed(self, run_id: str, error_message: str) -> None:
+        """Mark a run errored when the listener can't launch its Job.
+
+        Best-effort: if this PATCH itself fails (e.g. our cert is being
+        rejected — the very condition that caused the launch failure), the
+        reconciler's launch_timeout is the safety net. Don't let a failed
+        report-failure call cascade and break the listener's event loop.
+        """
+        try:
+            await self._http_client.patch(
+                f"/api/v2/listeners/listener-{self.identity.listener_id}/runs/run-{run_id}",
+                json={"status": "errored", "error_message": error_message},
+                headers=self._auth_headers(),
+            )
+            logger.info(
+                "Reported launch failure to API",
+                run_id=run_id,
+                error_message=error_message,
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to report launch failure (reconciler will time out)",
+                run_id=run_id,
+                error=str(e),
+                original_error=error_message,
+            )
 
     async def _handle_check_job_status(self, data: dict) -> None:
         """Query K8s for Job status and POST the result back to the API."""

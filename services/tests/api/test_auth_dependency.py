@@ -1,5 +1,7 @@
-"""Tests for the unified auth dependency (session + API token)."""
+"""Tests for the unified auth dependency (session + API token + listener cert)."""
 
+import base64
+import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -8,9 +10,16 @@ from fastapi.security import HTTPAuthorizationCredentials
 
 from terrapod.api.dependencies import (
     AuthenticatedUser,
+    authenticate_listener,
     get_current_user,
+    get_listener_identity,
     require_admin,
     require_admin_or_audit,
+)
+from terrapod.auth.ca import (
+    CertificateAuthority,
+    get_certificate_fingerprint,
+    serialize_certificate,
 )
 
 
@@ -189,3 +198,202 @@ class TestRequireAdminOrAudit:
             await require_admin_or_audit(user=user)
 
         assert exc_info.value.status_code == 403
+
+
+# ── Listener certificate auth ──────────────────────────────────────────
+
+
+@pytest.fixture(scope="module")
+def _test_ca() -> CertificateAuthority:
+    """Module-scoped CA so we don't pay 30 cert-generations per test."""
+    return CertificateAuthority.generate()
+
+
+def _cert_header(cert) -> str:
+    """Encode a cert as the X-Terrapod-Client-Cert header value."""
+    return base64.b64encode(serialize_certificate(cert)).decode()
+
+
+class TestGetListenerIdentity:
+    """Cert auth must accept any fingerprint registered in Redis, not just one.
+
+    Concurrent /renew calls register multiple valid fingerprints. Auth treats
+    each as independently valid until the per-fingerprint key TTLs out. This
+    is the regression test for the scenario where pod A and pod B both renew
+    in the same window and one of their certs ends up unused — but both must
+    still authenticate, otherwise the listener fleet 401-loops itself.
+    """
+
+    @pytest.mark.asyncio
+    async def test_concurrent_renewals_both_authenticate(self, _test_ca):
+        """Two certs issued seconds apart must both pass cert-auth."""
+        listener_name = "listener-1"
+        listener_id = str(uuid.uuid4())
+        pool_id = str(uuid.uuid4())
+
+        cert_a, _ = _test_ca.issue_listener_certificate(listener_name, "pool-1")
+        cert_b, _ = _test_ca.issue_listener_certificate(listener_name, "pool-1")
+        fp_a = get_certificate_fingerprint(cert_a)
+        fp_b = get_certificate_fingerprint(cert_b)
+        assert fp_a != fp_b  # different keys → different fingerprints
+
+        # Redis state: both fingerprints registered (the bug fix). The hash
+        # carries the latest fingerprint for UI display only — auth ignores it.
+        listener_dict = {
+            "id": listener_id,
+            "name": listener_name,
+            "pool_id": pool_id,
+            "certificate_fingerprint": fp_b,  # whichever got hset last
+        }
+
+        async def fake_is_valid(_lid, fp, listener=None):
+            return fp in (fp_a, fp_b)
+
+        with (
+            patch("terrapod.auth.ca.get_ca", return_value=_test_ca),
+            patch(
+                "terrapod.services.agent_pool_service.get_listener_by_name",
+                AsyncMock(return_value=listener_dict),
+            ),
+            patch(
+                "terrapod.services.agent_pool_service.is_fingerprint_valid",
+                side_effect=fake_is_valid,
+            ),
+        ):
+            id_a = await get_listener_identity(_cert_header(cert_a))
+            id_b = await get_listener_identity(_cert_header(cert_b))
+
+        assert str(id_a.listener_id) == listener_id
+        assert str(id_b.listener_id) == listener_id
+        assert id_a.certificate_fingerprint == fp_a
+        assert id_b.certificate_fingerprint == fp_b
+
+    @pytest.mark.asyncio
+    async def test_unregistered_fingerprint_rejected(self, _test_ca):
+        """A CA-signed cert whose fingerprint is not registered → 401.
+
+        Defends against a stale cert from a prior listener instance whose
+        Redis registration has aged out, or a forged cert (signed by another
+        instance of the same CA) that was never issued by this server.
+        """
+        listener_name = "listener-1"
+        cert, _ = _test_ca.issue_listener_certificate(listener_name, "pool-1")
+
+        with (
+            patch("terrapod.auth.ca.get_ca", return_value=_test_ca),
+            patch(
+                "terrapod.services.agent_pool_service.get_listener_by_name",
+                AsyncMock(
+                    return_value={
+                        "id": str(uuid.uuid4()),
+                        "name": listener_name,
+                        "pool_id": str(uuid.uuid4()),
+                    }
+                ),
+            ),
+            patch(
+                "terrapod.services.agent_pool_service.is_fingerprint_valid",
+                AsyncMock(return_value=False),
+            ),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                await get_listener_identity(_cert_header(cert))
+
+        assert exc_info.value.status_code == 401
+        assert "not registered" in exc_info.value.detail.lower()
+
+    @pytest.mark.asyncio
+    async def test_listener_not_in_redis_rejected(self, _test_ca):
+        """Cert authenticates against CA but listener has no Redis registration."""
+        cert, _ = _test_ca.issue_listener_certificate("ghost", "pool-1")
+
+        with (
+            patch("terrapod.auth.ca.get_ca", return_value=_test_ca),
+            patch(
+                "terrapod.services.agent_pool_service.get_listener_by_name",
+                AsyncMock(return_value=None),
+            ),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                await get_listener_identity(_cert_header(cert))
+
+        assert exc_info.value.status_code == 401
+
+
+class TestAuthenticateListener:
+    """Same coverage as get_listener_identity but for the SSE-path variant.
+
+    `authenticate_listener` is the Request-based form used by SSE handlers
+    (it must not hold a DB session for the streaming lifetime). Same cert
+    handling, same fingerprint check — keep them in lockstep.
+    """
+
+    @pytest.mark.asyncio
+    async def test_concurrent_renewals_both_authenticate(self, _test_ca):
+        listener_name = "listener-1"
+        listener_id = str(uuid.uuid4())
+        cert_a, _ = _test_ca.issue_listener_certificate(listener_name, "pool-1")
+        cert_b, _ = _test_ca.issue_listener_certificate(listener_name, "pool-1")
+        fp_a = get_certificate_fingerprint(cert_a)
+        fp_b = get_certificate_fingerprint(cert_b)
+
+        listener_dict = {
+            "id": listener_id,
+            "name": listener_name,
+            "pool_id": str(uuid.uuid4()),
+            "certificate_fingerprint": fp_b,
+        }
+
+        async def fake_is_valid(_lid, fp, listener=None):
+            return fp in (fp_a, fp_b)
+
+        request_a = MagicMock()
+        request_a.headers = {"x-terrapod-client-cert": _cert_header(cert_a)}
+        request_b = MagicMock()
+        request_b.headers = {"x-terrapod-client-cert": _cert_header(cert_b)}
+
+        with (
+            patch("terrapod.auth.ca.get_ca", return_value=_test_ca),
+            patch(
+                "terrapod.services.agent_pool_service.get_listener_by_name",
+                AsyncMock(return_value=listener_dict),
+            ),
+            patch(
+                "terrapod.services.agent_pool_service.is_fingerprint_valid",
+                side_effect=fake_is_valid,
+            ),
+        ):
+            id_a = await authenticate_listener(request_a)
+            id_b = await authenticate_listener(request_b)
+
+        assert id_a.certificate_fingerprint == fp_a
+        assert id_b.certificate_fingerprint == fp_b
+
+    @pytest.mark.asyncio
+    async def test_unregistered_fingerprint_rejected(self, _test_ca):
+        cert, _ = _test_ca.issue_listener_certificate("listener-1", "pool-1")
+        request = MagicMock()
+        request.headers = {"x-terrapod-client-cert": _cert_header(cert)}
+
+        with (
+            patch("terrapod.auth.ca.get_ca", return_value=_test_ca),
+            patch(
+                "terrapod.services.agent_pool_service.get_listener_by_name",
+                AsyncMock(
+                    return_value={
+                        "id": str(uuid.uuid4()),
+                        "name": "listener-1",
+                        "pool_id": str(uuid.uuid4()),
+                    }
+                ),
+            ),
+            patch(
+                "terrapod.services.agent_pool_service.is_fingerprint_valid",
+                AsyncMock(return_value=False),
+            ),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                await authenticate_listener(request)
+
+        assert exc_info.value.status_code == 401
+        assert "not registered" in exc_info.value.detail.lower()

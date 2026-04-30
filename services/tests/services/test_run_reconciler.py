@@ -249,7 +249,9 @@ class TestCheckStale:
     @patch("terrapod.services.run_reconciler.load_runner_config")
     @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
     async def test_stale_plan_gets_errored(self, mock_handle, mock_config):
-        mock_config.return_value = MagicMock(stale_timeout_seconds=DEFAULT_STALE_TIMEOUT_SECONDS)
+        mock_config.return_value = MagicMock(
+            stale_timeout_seconds=DEFAULT_STALE_TIMEOUT_SECONDS, launch_timeout_seconds=300
+        )
         db = AsyncMock()
         run = _mock_run(
             status="planning",
@@ -266,7 +268,9 @@ class TestCheckStale:
     @patch("terrapod.services.run_reconciler.load_runner_config")
     @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
     async def test_stale_apply_gets_errored(self, mock_handle, mock_config):
-        mock_config.return_value = MagicMock(stale_timeout_seconds=DEFAULT_STALE_TIMEOUT_SECONDS)
+        mock_config.return_value = MagicMock(
+            stale_timeout_seconds=DEFAULT_STALE_TIMEOUT_SECONDS, launch_timeout_seconds=300
+        )
         db = AsyncMock()
         run = _mock_run(
             status="applying",
@@ -282,7 +286,9 @@ class TestCheckStale:
     @patch("terrapod.services.run_reconciler.load_runner_config")
     @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
     async def test_not_stale_yet(self, mock_handle, mock_config):
-        mock_config.return_value = MagicMock(stale_timeout_seconds=DEFAULT_STALE_TIMEOUT_SECONDS)
+        mock_config.return_value = MagicMock(
+            stale_timeout_seconds=DEFAULT_STALE_TIMEOUT_SECONDS, launch_timeout_seconds=300
+        )
         db = AsyncMock()
         run = _mock_run(
             status="planning",
@@ -296,7 +302,9 @@ class TestCheckStale:
     @patch("terrapod.services.run_reconciler.load_runner_config")
     @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
     async def test_no_phase_start_skips_check(self, mock_handle, mock_config):
-        mock_config.return_value = MagicMock(stale_timeout_seconds=DEFAULT_STALE_TIMEOUT_SECONDS)
+        mock_config.return_value = MagicMock(
+            stale_timeout_seconds=DEFAULT_STALE_TIMEOUT_SECONDS, launch_timeout_seconds=300
+        )
         db = AsyncMock()
         run = _mock_run(status="planning", plan_started_at=None)
 
@@ -309,7 +317,9 @@ class TestCheckStale:
     async def test_custom_timeout_from_config(self, mock_handle, mock_config):
         """Stale timeout is read from RunnerConfig, not hardcoded."""
         custom_timeout = 300  # 5 minutes
-        mock_config.return_value = MagicMock(stale_timeout_seconds=custom_timeout)
+        mock_config.return_value = MagicMock(
+            stale_timeout_seconds=custom_timeout, launch_timeout_seconds=300
+        )
         db = AsyncMock()
         # 10 minutes ago — stale with 5m timeout, NOT stale with default 1h
         run = _mock_run(
@@ -321,3 +331,109 @@ class TestCheckStale:
 
         mock_handle.assert_called_once()
         assert "stale" in mock_handle.call_args.args[2].lower()
+
+
+# ── launch_timeout (no job_name) cohort ──────────────────────────────
+
+
+class TestCheckStaleLaunchTimeout:
+    """Runs that were claimed but never had a Job launched.
+
+    The listener can claim a run (transitioning it to planning/applying with
+    listener_id set) but then fail to actually create the K8s Job — auth
+    failure on /runner-token, K8s outage at create_job time, listener crash
+    mid-launch. Without picking these up they sit indefinitely. The shorter
+    launch_timeout (default 5 min) catches them quickly.
+    """
+
+    @patch("terrapod.services.run_reconciler.load_runner_config")
+    @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
+    async def test_pre_launch_run_errors_after_launch_timeout(self, mock_handle, mock_config):
+        mock_config.return_value = MagicMock(stale_timeout_seconds=3600, launch_timeout_seconds=300)
+        db = AsyncMock()
+        run = _mock_run(
+            status="planning",
+            job_name=None,  # never launched
+            plan_started_at=datetime.now(UTC) - timedelta(minutes=10),  # > 5 min
+        )
+
+        await _check_stale(db, run)
+
+        mock_handle.assert_called_once()
+        assert "pre-launch" in mock_handle.call_args.args[2].lower()
+
+    @patch("terrapod.services.run_reconciler.load_runner_config")
+    @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
+    async def test_pre_launch_timeout_increments_metric(self, mock_handle, mock_config):
+        """Backstop counter for silent listener failures must fire on pre-launch timeout."""
+        from terrapod.api.metrics import LISTENER_PRELAUNCH_TIMEOUTS
+
+        mock_config.return_value = MagicMock(stale_timeout_seconds=3600, launch_timeout_seconds=300)
+        db = AsyncMock()
+        run = _mock_run(
+            status="planning",
+            job_name=None,
+            plan_started_at=datetime.now(UTC) - timedelta(minutes=10),
+        )
+
+        before = LISTENER_PRELAUNCH_TIMEOUTS._value.get()
+        await _check_stale(db, run)
+        after = LISTENER_PRELAUNCH_TIMEOUTS._value.get()
+
+        assert after == before + 1
+
+    @patch("terrapod.services.run_reconciler.load_runner_config")
+    @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
+    async def test_pre_launch_run_within_window_not_errored(self, mock_handle, mock_config):
+        """Same condition as above but only 2 min in — under the 5m launch_timeout."""
+        mock_config.return_value = MagicMock(stale_timeout_seconds=3600, launch_timeout_seconds=300)
+        db = AsyncMock()
+        run = _mock_run(
+            status="planning",
+            job_name=None,
+            plan_started_at=datetime.now(UTC) - timedelta(minutes=2),
+        )
+
+        await _check_stale(db, run)
+
+        mock_handle.assert_not_called()
+
+    @patch("terrapod.services.run_reconciler.load_runner_config")
+    @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
+    async def test_running_job_uses_stale_timeout_not_launch_timeout(
+        self, mock_handle, mock_config
+    ):
+        """A run with job_name set must use stale_timeout (1h), not launch_timeout (5m).
+
+        Otherwise legitimate long plans would get killed at 5 min just because
+        the Job hasn't reported intermediate status.
+        """
+        mock_config.return_value = MagicMock(stale_timeout_seconds=3600, launch_timeout_seconds=300)
+        db = AsyncMock()
+        run = _mock_run(
+            status="planning",
+            job_name="tprun-abc123-plan",  # Job exists
+            plan_started_at=datetime.now(UTC) - timedelta(minutes=20),  # >5m, <1h
+        )
+
+        await _check_stale(db, run)
+
+        mock_handle.assert_not_called()
+
+
+class TestReconcileOneWithoutJobName:
+    """Pre-launch runs (no job_name) skip the SSE round-trip and go straight to stale check."""
+
+    @patch("terrapod.redis.client.get_job_status_from_redis", new_callable=AsyncMock)
+    @patch("terrapod.redis.client.publish_listener_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_reconciler._check_stale", new_callable=AsyncMock)
+    async def test_no_job_name_skips_publish(self, mock_check_stale, mock_publish, mock_status):
+        """No SSE check_job_status published — there's no Job for listeners to query."""
+        db = AsyncMock()
+        run = _mock_run(job_name=None)
+
+        await _reconcile_one(db, run)
+
+        mock_publish.assert_not_called()
+        mock_status.assert_not_called()
+        mock_check_stale.assert_called_once()

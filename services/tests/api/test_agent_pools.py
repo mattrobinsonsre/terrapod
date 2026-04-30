@@ -1,7 +1,7 @@
 """Tests for agent pool endpoints including RBAC gating."""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from httpx import ASGITransport, AsyncClient
@@ -68,6 +68,14 @@ def _mock_listener_dict(listener_id=None, name="listener-1", pool_id=None):
 
 
 class TestListenerHeartbeat:
+    """Heartbeat must be cert-authenticated.
+
+    Without auth, an attacker (or a misconfigured listener) could keep a
+    dead listener "online" by spamming heartbeats — masking a cert auth
+    failure that would otherwise mark the listener offline. The cert's
+    listener-id must also match the path id.
+    """
+
     @patch("terrapod.redis.client.publish_event", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.heartbeat_listener", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_listener")
@@ -77,11 +85,13 @@ class TestListenerHeartbeat:
         mock_get_listener.return_value = listener
 
         app = create_app()
+        app.dependency_overrides[get_listener_identity] = lambda: _mock_listener_identity(lid)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
                 f"/api/v2/listeners/{lid}/heartbeat",
                 json={"capacity": 5, "active_runs": 2, "pod_name": "listener-abc-123"},
+                headers={"X-Terrapod-Client-Cert": "irrelevant-mocked"},
             )
 
         assert res.status_code == 200
@@ -107,11 +117,13 @@ class TestListenerHeartbeat:
         mock_get_listener.return_value = _mock_listener_dict(listener_id=lid)
 
         app = create_app()
+        app.dependency_overrides[get_listener_identity] = lambda: _mock_listener_identity(lid)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
                 f"/api/v2/listeners/{lid}/heartbeat",
                 json={"capacity": 5, "active_runs": 0},
+                headers={"X-Terrapod-Client-Cert": "irrelevant-mocked"},
             )
 
         assert res.status_code == 200
@@ -129,11 +141,13 @@ class TestListenerHeartbeat:
         mock_get_listener.return_value = listener
 
         app = create_app()
+        app.dependency_overrides[get_listener_identity] = lambda: _mock_listener_identity(lid)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
                 f"/api/v2/listeners/{lid}/heartbeat",
                 json={"capacity": 3, "active_runs": 1},
+                headers={"X-Terrapod-Client-Cert": "irrelevant-mocked"},
             )
 
         assert res.status_code == 200
@@ -147,6 +161,21 @@ class TestListenerHeartbeat:
     async def test_heartbeat_not_found(self, mock_get_listener):
         mock_get_listener.return_value = None
 
+        lid = uuid.uuid4()
+        app = create_app()
+        app.dependency_overrides[get_listener_identity] = lambda: _mock_listener_identity(lid)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.post(
+                f"/api/v2/listeners/{lid}/heartbeat",
+                json={"capacity": 1},
+                headers={"X-Terrapod-Client-Cert": "irrelevant-mocked"},
+            )
+
+        assert res.status_code == 404
+
+    async def test_heartbeat_without_cert_returns_401(self):
+        """No client cert header → 401 from get_listener_identity."""
         app = create_app()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
@@ -155,7 +184,24 @@ class TestListenerHeartbeat:
                 json={"capacity": 1},
             )
 
-        assert res.status_code == 404
+        assert res.status_code == 401
+
+    async def test_heartbeat_cert_listener_id_mismatch_returns_403(self):
+        """Cert authenticates as listener A but URL targets listener B → 403."""
+        cert_lid = uuid.uuid4()
+        path_lid = uuid.uuid4()
+
+        app = create_app()
+        app.dependency_overrides[get_listener_identity] = lambda: _mock_listener_identity(cert_lid)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.post(
+                f"/api/v2/listeners/{path_lid}/heartbeat",
+                json={"capacity": 1},
+                headers={"X-Terrapod-Client-Cert": "irrelevant-mocked"},
+            )
+
+        assert res.status_code == 403
 
 
 class TestListPoolsRBAC:
@@ -321,6 +367,112 @@ class TestPoolStatus:
             res = await client.get(f"/api/v2/agent-pools/apool-{pool.id}", headers=_AUTH)
 
         assert res.json()["data"]["attributes"]["status"] == "online"
+
+
+# ── Truthful pool/listener status (cert-expiry cross-check) ──────────
+
+
+class TestDeriveListenerStatus:
+    """Cross-check heartbeat-reported status against cert expiry.
+
+    The heartbeat path blindly writes `status: "online"` regardless of cert
+    validity. A listener whose cert has expired keeps heartbeating but every
+    cert-authenticated call (claim run, renew, runner-token, etc.) 401s — it
+    isn't actually working. The derived status must reflect that.
+    """
+
+    def test_online_when_cert_valid(self):
+        from terrapod.api.routers.agent_pools import _derive_listener_status
+
+        future = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
+        listener = {"status": "online", "certificate_expires_at": future}
+        assert _derive_listener_status(listener) == "online"
+
+    def test_cert_expired_when_expiry_in_past(self):
+        from terrapod.api.routers.agent_pools import _derive_listener_status
+
+        past = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
+        listener = {"status": "online", "certificate_expires_at": past}
+        assert _derive_listener_status(listener) == "cert-expired"
+
+    def test_falls_back_to_raw_status_when_no_expiry_field(self):
+        """Older listeners may not populate the field — preserve the raw value."""
+        from terrapod.api.routers.agent_pools import _derive_listener_status
+
+        assert _derive_listener_status({"status": "offline"}) == "offline"
+        assert _derive_listener_status({"status": "online"}) == "online"
+
+    def test_falls_back_to_raw_status_on_unparseable_expiry(self):
+        from terrapod.api.routers.agent_pools import _derive_listener_status
+
+        listener = {"status": "online", "certificate_expires_at": "garbage"}
+        assert _derive_listener_status(listener) == "online"
+
+
+class TestDerivePoolStatus:
+    def test_offline_when_no_listeners(self):
+        from terrapod.api.routers.agent_pools import _derive_pool_status
+
+        assert _derive_pool_status([]) == "offline"
+
+    def test_online_when_any_listener_healthy(self):
+        from terrapod.api.routers.agent_pools import _derive_pool_status
+
+        future = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
+        past = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
+        listeners = [
+            {"status": "online", "certificate_expires_at": past},  # cert-expired
+            {"status": "online", "certificate_expires_at": future},  # online
+        ]
+        assert _derive_pool_status(listeners) == "online"
+
+    def test_degraded_when_all_certs_expired(self):
+        """All listeners heartbeating but every cert is past expiry → pool can't run anything."""
+        from terrapod.api.routers.agent_pools import _derive_pool_status
+
+        past = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
+        listeners = [
+            {"status": "online", "certificate_expires_at": past},
+            {"status": "online", "certificate_expires_at": past},
+        ]
+        assert _derive_pool_status(listeners) == "degraded"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
+    @patch("terrapod.services.agent_pool_service.list_pools", new_callable=AsyncMock)
+    @patch(
+        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        new_callable=AsyncMock,
+    )
+    @patch(
+        "terrapod.api.routers.agent_pools.fetch_custom_roles",
+        new_callable=AsyncMock,
+    )
+    async def test_list_pools_returns_degraded_when_all_certs_expired(
+        self, mock_fetch_roles, mock_resolve, mock_list_pools, mock_list_listeners, *mocks
+    ):
+        """End-to-end: heartbeating listener with expired cert surfaces as `degraded` at /agent-pools."""
+        pool = _mock_pool(name="dying-pool")
+        mock_list_pools.return_value = [pool]
+        mock_fetch_roles.return_value = []
+        mock_resolve.return_value = "read"
+        past = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
+        mock_list_listeners.return_value = [
+            {
+                "id": str(uuid.uuid4()),
+                "name": "lis",
+                "status": "online",
+                "certificate_expires_at": past,
+            }
+        ]
+
+        app, _ = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            res = await client.get("/api/v2/organizations/default/agent-pools", headers=_AUTH)
+
+        assert res.json()["data"][0]["attributes"]["status"] == "degraded"
 
 
 class TestListListenersReplicaCount:

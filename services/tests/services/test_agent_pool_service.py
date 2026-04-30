@@ -8,11 +8,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from terrapod.services.agent_pool_service import (
+    _LISTENER_FP_PREFIX,
     LISTENER_POD_TTL,
+    _fingerprint_ttl,
+    _register_fingerprint,
     count_listener_replicas,
     create_pool_token,
     generate_join_token,
     heartbeat_listener,
+    is_fingerprint_valid,
     validate_join_token,
 )
 
@@ -387,3 +391,247 @@ class TestCountListenerReplicas:
             return_value=mock_redis,
         ):
             assert await count_listener_replicas("lid-empty") == 0
+
+
+# ── Per-fingerprint registration (regression: cert renewal race) ──────
+
+
+class TestFingerprintRegistration:
+    """Each issued cert registers its fingerprint as its own TTL'd key.
+
+    The previous design tracked a single "current" fingerprint on the listener
+    hash. When N listener pods all called /renew within the same window, the
+    API issued N distinct certs but the K8s Secret CAS picked one — leaving
+    Redis pointing at a fingerprint that wasn't necessarily the cert all pods
+    actually used. Subsequent cert-auth calls 401'd with "fingerprint mismatch".
+
+    The fix: store each issued fingerprint under its own key. Auth does EXISTS
+    instead of equality. Concurrent renewals all stay valid until they expire.
+    """
+
+    @pytest.mark.asyncio
+    async def test_register_writes_setex_with_namespaced_key(self):
+        mock_redis = MagicMock()
+        mock_redis.setex = AsyncMock()
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            await _register_fingerprint("lid-x", "fp-abc", 600)
+
+        mock_redis.setex.assert_awaited_once_with(f"{_LISTENER_FP_PREFIX}lid-x:fp-abc", 600, "1")
+
+    @pytest.mark.asyncio
+    async def test_is_valid_true_when_key_exists(self):
+        mock_redis = MagicMock()
+        mock_redis.exists = AsyncMock(return_value=1)
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            assert await is_fingerprint_valid("lid-x", "fp-abc") is True
+
+        mock_redis.exists.assert_awaited_once_with(f"{_LISTENER_FP_PREFIX}lid-x:fp-abc")
+
+    @pytest.mark.asyncio
+    async def test_is_valid_false_when_key_absent(self):
+        mock_redis = MagicMock()
+        mock_redis.exists = AsyncMock(return_value=0)
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            assert await is_fingerprint_valid("lid-x", "fp-stale") is False
+
+    @pytest.mark.asyncio
+    async def test_two_distinct_fingerprints_can_coexist(self):
+        """Independent keys → two issued fingerprints both authenticate.
+
+        This is the structural property that makes concurrent /renew safe:
+        each registration writes its own key, so the K8s-Secret CAS can pick
+        either cert and the loser's fingerprint stays auth-valid until it
+        TTLs out — no fingerprint-mismatch 401s. Earlier name hinted at
+        a concurrency test but no actual race is exercised; the property
+        is "two registrations don't interfere".
+        """
+        registered = set()
+
+        mock_redis = MagicMock()
+
+        async def fake_setex(key, ttl, value):
+            registered.add(key)
+
+        async def fake_exists(key):
+            return 1 if key in registered else 0
+
+        mock_redis.setex = fake_setex
+        mock_redis.exists = fake_exists
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            # Two concurrent renewals → two distinct fingerprints registered.
+            await _register_fingerprint("lid-x", "fp-pod-a", 600)
+            await _register_fingerprint("lid-x", "fp-pod-b", 600)
+
+            # Both must auth successfully regardless of which won the K8s
+            # Secret CAS on the listener side.
+            assert await is_fingerprint_valid("lid-x", "fp-pod-a") is True
+            assert await is_fingerprint_valid("lid-x", "fp-pod-b") is True
+
+        # And a rogue cert never registered must still be rejected.
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            assert await is_fingerprint_valid("lid-x", "fp-not-issued") is False
+
+    def test_ttl_buffer_against_clock_skew(self):
+        """The fingerprint key TTL is cert lifetime + 60s buffer.
+
+        The buffer prevents the rare case where Redis evicts the fingerprint
+        key a moment before the cert's not-after, causing a still-valid cert
+        to fail auth. 60s is enough for any realistic API↔Redis clock skew.
+        """
+        cert = MagicMock()
+        cert.not_valid_after_utc = datetime.now(UTC) + timedelta(seconds=600)
+        ttl = _fingerprint_ttl(cert)
+        # Should be ~660s (600 + 60 buffer); allow slack for test wall-clock drift.
+        assert 650 <= ttl <= 670
+
+    def test_ttl_floor_at_60_for_already_expired(self):
+        """An expired cert still gets a 60s floor so we don't pass 0/negative TTL.
+
+        Redis SETEX rejects a 0 or negative TTL with a runtime error. Better
+        to register the fingerprint briefly (it'll be rejected by the
+        not-after check in dependencies.py anyway) than crash the renewal.
+        """
+        cert = MagicMock()
+        cert.not_valid_after_utc = datetime.now(UTC) - timedelta(seconds=600)
+        assert _fingerprint_ttl(cert) >= 60
+
+
+class TestFingerprintMigrationFallback:
+    """Auth must keep working for listeners that joined before this PR.
+
+    Pre-fix listeners only have their fingerprint on the legacy
+    `certificate_fingerprint` hash field — no `tp:listener_fp:*` key. Without
+    a fallback, the moment this code deploys every existing listener would
+    401 on its next call (heartbeat, renew, runner-token, runs/next), trigger
+    SSE 401s, force a rejoin, and consume join-token uses. A fleet-wide
+    rejoin storm is the exact failure mode this PR is meant to prevent.
+
+    The fallback accepts the legacy field on first request and self-heals
+    by writing the new key, so the slow path is exercised at most once per
+    listener per cert lifetime.
+    """
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_legacy_field_when_new_key_missing(self):
+        mock_redis = MagicMock()
+        # No tp:listener_fp:* key exists — this listener pre-dates the PR.
+        mock_redis.exists = AsyncMock(return_value=0)
+        mock_redis.setex = AsyncMock()
+
+        listener = {
+            "id": "lid-legacy",
+            "certificate_fingerprint": "fp-legacy",
+            "certificate_expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+        }
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            assert await is_fingerprint_valid("lid-legacy", "fp-legacy", listener=listener) is True
+
+    @pytest.mark.asyncio
+    async def test_fallback_self_heals_to_new_key_family(self):
+        """First fallback request must register the fingerprint going forward."""
+        mock_redis = MagicMock()
+        mock_redis.exists = AsyncMock(return_value=0)
+        mock_redis.setex = AsyncMock()
+
+        listener = {
+            "id": "lid-legacy",
+            "certificate_fingerprint": "fp-legacy",
+            "certificate_expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+        }
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            await is_fingerprint_valid("lid-legacy", "fp-legacy", listener=listener)
+
+        # New-style key was written so the next call hits the fast path.
+        mock_redis.setex.assert_awaited_once()
+        args = mock_redis.setex.await_args.args
+        assert args[0] == f"{_LISTENER_FP_PREFIX}lid-legacy:fp-legacy"
+        assert args[2] == "1"
+        # TTL ≈ remaining cert lifetime + 60s buffer (~3660s for 1h cert).
+        assert args[1] > 3000
+
+    @pytest.mark.asyncio
+    async def test_fallback_rejects_wrong_fingerprint(self):
+        """Legacy listener fingerprint of A — presenting cert B is still rejected.
+
+        Defends against an attacker who knows the listener-id but presents a
+        different (CA-signed) cert hoping the fallback will accept anything.
+        """
+        mock_redis = MagicMock()
+        mock_redis.exists = AsyncMock(return_value=0)
+        mock_redis.setex = AsyncMock()
+
+        listener = {
+            "id": "lid-legacy",
+            "certificate_fingerprint": "fp-legacy",
+            "certificate_expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+        }
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            assert (
+                await is_fingerprint_valid("lid-legacy", "fp-different", listener=listener) is False
+            )
+
+        mock_redis.setex.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_fallback_uses_safe_default_ttl_when_expiry_unparseable(self):
+        """Garbled/missing certificate_expires_at must not crash — use 1h default."""
+        mock_redis = MagicMock()
+        mock_redis.exists = AsyncMock(return_value=0)
+        mock_redis.setex = AsyncMock()
+
+        listener = {
+            "id": "lid-x",
+            "certificate_fingerprint": "fp",
+            "certificate_expires_at": "not-a-real-date",
+        }
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            assert await is_fingerprint_valid("lid-x", "fp", listener=listener) is True
+
+        assert mock_redis.setex.await_args.args[1] == 3600
+
+    @pytest.mark.asyncio
+    async def test_no_fallback_without_listener_dict(self):
+        """Old call shape (no listener arg) → no fallback → False as before."""
+        mock_redis = MagicMock()
+        mock_redis.exists = AsyncMock(return_value=0)
+
+        with patch(
+            "terrapod.services.agent_pool_service.get_redis_client",
+            return_value=mock_redis,
+        ):
+            assert await is_fingerprint_valid("lid-x", "fp") is False

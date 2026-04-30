@@ -23,7 +23,7 @@ import asyncio
 import json
 import re
 import uuid
-from datetime import UTC
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.responses import JSONResponse
@@ -159,6 +159,53 @@ def _token_json(token, raw_token: str | None = None) -> dict:
     return result
 
 
+def _derive_listener_status(listener: dict) -> str:
+    """Derive a truthful status from listener Redis state + cert expiry.
+
+    Heartbeats blindly write `status: "online"` regardless of cert validity.
+    A listener whose cert has expired keeps heartbeating but every cert-auth
+    call (renew, runner-token, runs/next, job-launched, etc.) returns 401 —
+    it's not actually working. Reflect that in the API/UI by downgrading the
+    status to "cert-expired" so operators can spot it instead of trusting a
+    misleading "online".
+
+    Returns one of: "online", "cert-expired", "offline".
+    """
+    raw_status = listener.get("status", "offline")
+    expires_at = listener.get("certificate_expires_at", "")
+    if not expires_at:
+        return raw_status
+    try:
+        # `fromisoformat` accepts both `+00:00` and `Z` suffix in 3.13+.
+        expiry = datetime.fromisoformat(expires_at)
+    except ValueError:
+        return raw_status
+    if expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=UTC)
+    if expiry < datetime.now(UTC):
+        return "cert-expired"
+    return raw_status
+
+
+def _derive_pool_status(listeners: list[dict]) -> str:
+    """Pool-level health derived from member listeners.
+
+    - `online`     — at least one listener has a non-expired cert
+    - `degraded`   — listeners exist but ALL have cert-expired (the listeners
+                     are heartbeating but can't authenticate any cert-protected
+                     call → no runs will execute)
+    - `offline`    — no listeners
+    """
+    if not listeners:
+        return "offline"
+    statuses = [_derive_listener_status(item) for item in listeners]
+    if any(s == "online" for s in statuses):
+        return "online"
+    if all(s == "cert-expired" for s in statuses):
+        return "degraded"
+    return "offline"
+
+
 def _listener_json(listener: dict, replica_count: int | None = None) -> dict:
     """Format a Redis-backed listener dict as JSON:API.
 
@@ -170,10 +217,14 @@ def _listener_json(listener: dict, replica_count: int | None = None) -> dict:
     image (no `tracks_pods` flag); the attribute is then omitted from the
     response and the UI shows "—" for unknown. Passing `0` is meaningful:
     "this listener IS tracking, but no pods are currently heartbeating".
+
+    `status` is computed from `_derive_listener_status` so a heartbeating
+    listener with an expired cert appears as `cert-expired` rather than the
+    misleading `online` written by the heartbeat path.
     """
     attrs: dict = {
         "name": listener.get("name", ""),
-        "status": listener.get("status", "offline"),
+        "status": _derive_listener_status(listener),
         "certificate-fingerprint": listener.get("certificate_fingerprint", ""),
         "certificate-expires-at": listener.get("certificate_expires_at", ""),
         "created-at": listener.get("created_at", ""),
@@ -250,9 +301,11 @@ async def list_pools(
         if perm is None:
             continue
         listeners = await agent_pool_service.list_listeners(p.id)
-        # `list_listeners` lazily prunes any listener whose hash has expired,
-        # so anything still in the list is heartbeating ⇒ pool is online.
-        status = "online" if listeners else "offline"
+        # `list_listeners` lazily prunes any listener whose hash has expired.
+        # Anything still in the list is heartbeating, but heartbeat alone is
+        # not enough — a listener with an expired cert keeps heartbeating but
+        # 401s every authenticated call, so we cross-check cert expiry too.
+        status = _derive_pool_status(listeners)
         result.append(_pool_json(p, status=status, permission=perm))
     return JSONResponse(content={"data": result})
 
@@ -293,8 +346,7 @@ async def show_pool(
     pool = await _get_pool(pool_id, db)
     perm = await _require_pool_permission(pool, user, db, "read")
     listeners = await agent_pool_service.list_listeners(pool.id)
-    # See list_pools for the rationale: any listener still in the list is online.
-    status = "online" if listeners else "offline"
+    status = _derive_pool_status(listeners)
     return JSONResponse(content={"data": _pool_json(pool, status=status, permission=perm)})
 
 
@@ -727,9 +779,21 @@ async def listener_events(
 async def listener_heartbeat(
     listener_id: str = Path(...),
     body: dict = Body(...),
+    identity: ListenerIdentity = Depends(get_listener_identity),
 ) -> JSONResponse:
-    """Listener heartbeat — refreshes TTL and updates runtime fields in Redis."""
+    """Listener heartbeat — refreshes TTL and updates runtime fields in Redis.
+
+    Auth: must present a valid client cert. Without this, anyone could keep
+    a dead listener "online" by spamming heartbeats — masking the very cert
+    failure that took it offline. The cert's listener-id must also match the
+    path id (a listener can only heartbeat itself).
+    """
     l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    if identity.listener_id != l_uuid:
+        raise HTTPException(
+            status_code=403,
+            detail="Certificate does not match the listener id in the path",
+        )
     listener = await agent_pool_service.get_listener(l_uuid)
     if listener is None:
         raise HTTPException(status_code=404, detail="Listener not found")

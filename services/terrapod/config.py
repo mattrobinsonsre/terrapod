@@ -74,6 +74,17 @@ class RunnerConfig(BaseModel):
         default=3600,
         description="Seconds before a run with no Job status is marked errored",
     )
+    launch_timeout_seconds: int = Field(
+        default=300,
+        description=(
+            "Seconds before a claimed run with NO job_name is marked errored. "
+            "Distinct from stale_timeout: this catches the 'listener claimed "
+            "the run but never launched a Job' failure mode (e.g. /runner-token "
+            "401, K8s API outage at create_job time). Shorter default than "
+            "stale_timeout because 'no Job launched after 5 min' is a clear "
+            "failure signal, whereas a long-running Job with no status is not."
+        ),
+    )
 
 
 def load_runner_config(path: str = "/etc/terrapod/runners.yaml") -> RunnerConfig:

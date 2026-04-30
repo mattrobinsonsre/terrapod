@@ -189,18 +189,100 @@ async def delete_pool_token(db: AsyncSession, token: AgentPoolToken) -> None:
 #   tp:pool_listeners:{pid}                SET    no TTL    — pool → listener index (lazily cleaned)
 #   tp:listener_name:{name}                STRING 300s TTL  — name → ID lookup
 #   tp:listener_pod:{id}:{pod_name}        STRING 180s TTL  — per-pod heartbeat presence (replica count)
+#   tp:listener_fp:{id}:{fingerprint}      STRING ~cert TTL — accepted cert fingerprints
 #
 # Why a separate per-pod key family: in v0.19.0 a listener Deployment shares one
 # identity (one tp:listener:{id} hash) across replicas, so the hash itself can't
 # tell us how many pods are running. Each pod's heartbeat refreshes its own
 # tp:listener_pod:{id}:{pod_name} key (TTL = 3x heartbeat interval); replica
 # count is the number of those keys still alive.
+#
+# Why a separate per-fingerprint key family: when N pods race on /renew at the
+# same moment, the API issues N distinct certs but the K8s Secret CAS only lets
+# one win — the others adopt the winner from the Secret. If auth tracked a
+# single "current" fingerprint, the cert that won the Secret might not be the
+# one whose fingerprint is in Redis (last-writer-wins on the hash field), and
+# every subsequent cert-auth call would 401 with "fingerprint mismatch". By
+# storing each issued fingerprint as its own TTL'd key and auth doing EXISTS,
+# all certs we issued remain valid until they actually expire — concurrent
+# renewals stop being a coordination problem.
 LISTENER_TTL = 300  # seconds (refreshed on every heartbeat)
 LISTENER_POD_TTL = 180  # seconds — 3x heartbeat interval, tolerates 2 missed beats
 _LISTENER_PREFIX = "tp:listener:"
 _POOL_LISTENERS_PREFIX = "tp:pool_listeners:"
 _LISTENER_NAME_PREFIX = "tp:listener_name:"
 _LISTENER_POD_PREFIX = "tp:listener_pod:"
+_LISTENER_FP_PREFIX = "tp:listener_fp:"
+
+
+def _fingerprint_ttl(cert) -> int:
+    """TTL to apply to a fingerprint registration key.
+
+    Cert validity plus 60s buffer. The 60s slack absorbs minor clock skew
+    between the API server and Redis so we never reject a still-valid cert
+    because its fingerprint key expired a moment too early.
+    """
+    remaining = (cert.not_valid_after_utc - datetime.now(UTC)).total_seconds()
+    return max(60, int(remaining) + 60)
+
+
+async def _register_fingerprint(listener_id: str, fingerprint: str, ttl: int) -> None:
+    """Register an accepted cert fingerprint for a listener.
+
+    Multiple fingerprints may be live concurrently (e.g. two pods both
+    successfully called /renew within the same window). Cert-auth treats
+    any registered fingerprint as valid until its key expires.
+    """
+    redis = get_redis_client()
+    await redis.setex(f"{_LISTENER_FP_PREFIX}{listener_id}:{fingerprint}", ttl, "1")
+
+
+async def is_fingerprint_valid(
+    listener_id: str, fingerprint: str, listener: dict | None = None
+) -> bool:
+    """Return True if `fingerprint` is registered for `listener_id`.
+
+    Cert-auth's source of truth — replaces the previous single-value equality
+    check on the listener hash field. Tolerates concurrent renewals issuing
+    multiple valid certs at once.
+
+    Migration fallback: when this code first deploys, listeners that joined
+    under the old scheme have no `tp:listener_fp:*` key — only a fingerprint
+    on their listener hash. Without a fallback, every existing listener
+    would 401 on its next heartbeat / renew / runner-token call, triggering
+    a fleet-wide rejoin storm at deploy time. Pass the listener dict so we
+    can fall back to the legacy field, and self-heal by writing the new
+    key on first match. After the first request from each existing listener
+    the fallback path stops being exercised; new joins / renews never need
+    it because they call `_register_fingerprint` directly.
+    """
+    redis = get_redis_client()
+    new_key = f"{_LISTENER_FP_PREFIX}{listener_id}:{fingerprint}"
+    if await redis.exists(new_key):
+        return True
+
+    if listener is not None and listener.get("certificate_fingerprint") == fingerprint:
+        # Self-heal: register in the new key family so subsequent requests
+        # take the fast path. TTL is derived from the legacy
+        # `certificate_expires_at` field; on missing / unparseable values
+        # fall back to a conservative 1-hour ceiling — the next renewal
+        # will refresh it.
+        ttl = 3600
+        expires_at = listener.get("certificate_expires_at", "")
+        if expires_at:
+            try:
+                expiry = datetime.fromisoformat(expires_at)
+                if expiry.tzinfo is None:
+                    expiry = expiry.replace(tzinfo=UTC)
+                remaining = int((expiry - datetime.now(UTC)).total_seconds())
+                if remaining > 60:
+                    ttl = remaining + 60
+            except ValueError:
+                pass
+        await redis.setex(new_key, ttl, "1")
+        return True
+
+    return False
 
 
 async def join_listener(
@@ -226,6 +308,7 @@ async def join_listener(
         ttl_seconds=settings.agent_pools.listener_cert_ttl_seconds,
     )
     fingerprint = get_certificate_fingerprint(cert)
+    fp_ttl = _fingerprint_ttl(cert)
     now = datetime.now(UTC).isoformat()
 
     # Check if listener already exists (re-join after restart)
@@ -247,6 +330,7 @@ async def join_listener(
         await redis.expire(f"{_LISTENER_NAME_PREFIX}{name}", LISTENER_TTL)
         # Ensure pool set membership (may have changed pools)
         await redis.sadd(f"{_POOL_LISTENERS_PREFIX}{pool.id}", listener_id)
+        await _register_fingerprint(listener_id, fingerprint, fp_ttl)
         logger.info(
             "Listener re-joined (updated existing)",
             listener=name,
@@ -274,6 +358,7 @@ async def join_listener(
         await redis.setex(f"{_LISTENER_NAME_PREFIX}{name}", LISTENER_TTL, listener_id)
         # Pool index
         await redis.sadd(f"{_POOL_LISTENERS_PREFIX}{pool.id}", listener_id)
+        await _register_fingerprint(listener_id, fingerprint, fp_ttl)
         logger.info(
             "Listener joined",
             listener=name,
@@ -366,11 +451,14 @@ async def delete_listener(listener_id: str, name: str, pool_id: str) -> None:
     leak is invisible to operators. Not worth a Lua script to close.
     """
     redis = get_redis_client()
-    # Per-pod keys live under a different prefix → can't go in the same pipeline
-    # under cluster mode. Drain them first.
+    # Per-pod and per-fingerprint keys live under different prefixes → can't go
+    # in the same pipeline under cluster mode. Drain them first.
     pod_pattern = f"{_LISTENER_POD_PREFIX}{listener_id}:*"
     async for pod_key in redis.scan_iter(match=pod_pattern, count=100):
         await redis.delete(pod_key)
+    fp_pattern = f"{_LISTENER_FP_PREFIX}{listener_id}:*"
+    async for fp_key in redis.scan_iter(match=fp_pattern, count=100):
+        await redis.delete(fp_key)
 
     pipe = redis.pipeline(transaction=False)
     pipe.delete(f"{_LISTENER_PREFIX}{listener_id}")
@@ -386,13 +474,16 @@ async def delete_pool_listeners(pool_id: uuid.UUID) -> None:
     member_ids = await redis.smembers(set_key)
 
     if member_ids:
-        # Per-pod keys must be drained outside the pipeline (different prefix
-        # → different cluster slot, can't share a pipeline with the listener
-        # hash deletes).
+        # Per-pod + per-fingerprint keys must be drained outside the pipeline
+        # (different prefix → different cluster slot, can't share a pipeline
+        # with the listener hash deletes).
         for lid in member_ids:
             pod_pattern = f"{_LISTENER_POD_PREFIX}{lid}:*"
             async for pod_key in redis.scan_iter(match=pod_pattern, count=100):
                 await redis.delete(pod_key)
+            fp_pattern = f"{_LISTENER_FP_PREFIX}{lid}:*"
+            async for fp_key in redis.scan_iter(match=fp_pattern, count=100):
+                await redis.delete(fp_key)
 
         pipe = redis.pipeline(transaction=False)
         for lid in member_ids:
@@ -412,7 +503,15 @@ async def renew_listener_certificate(
     listener_name: str,
     pool: AgentPool,
 ) -> dict:
-    """Renew a listener's certificate. Updates fingerprint and expiry in Redis."""
+    """Renew a listener's certificate. Registers the new fingerprint in Redis.
+
+    Concurrent /renew calls (one per listener pod racing within the same
+    window) all succeed — each registers its own fingerprint key, and all
+    are accepted by cert-auth until they expire. The K8s Secret CAS on
+    the listener side picks one cert to actually use; the others stay
+    valid-but-unused. The hash's `certificate_fingerprint` field is
+    updated for UI display only — not load-bearing for auth.
+    """
     ca = get_ca()
     redis = get_redis_client()
     cert, private_key = ca.issue_listener_certificate(
@@ -421,6 +520,8 @@ async def renew_listener_certificate(
         ttl_seconds=settings.agent_pools.listener_cert_ttl_seconds,
     )
     fingerprint = get_certificate_fingerprint(cert)
+
+    await _register_fingerprint(listener_id, fingerprint, _fingerprint_ttl(cert))
 
     key = f"{_LISTENER_PREFIX}{listener_id}"
     await redis.hset(

@@ -35,7 +35,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user, get_listener_identity
+from terrapod.api.dependencies import (
+    AuthenticatedUser,
+    ListenerIdentity,
+    get_current_user,
+    get_listener_identity,
+)
 from terrapod.db.models import Run, StateVersion, VCSConnection, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -829,13 +834,24 @@ async def run_events_stream(
 @router.get("/listeners/{listener_id}/runs/next")
 async def next_run(
     listener_id: str = Path(...),
+    identity: ListenerIdentity = Depends(get_listener_identity),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Poll for the next queued run assigned to this listener.
 
+    Auth: must present a valid client cert whose listener-id matches the
+    path. Without this, anyone with a listener-id could claim runs out from
+    under the real listener and gather their resolved variables (which
+    include sensitive workspace vars).
+
     Returns 204 No Content if no run is available.
     """
     l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    if identity.listener_id != l_uuid:
+        raise HTTPException(
+            status_code=403,
+            detail="Certificate does not match the listener id in the path",
+        )
     listener = await agent_pool_service.get_listener(l_uuid)
     if listener is None:
         raise HTTPException(status_code=404, detail="Listener not found")
@@ -880,13 +896,19 @@ async def update_run_status(
     listener_id: str = Path(...),
     run_id: str = Path(...),
     body: dict = Body(...),
+    identity: ListenerIdentity = Depends(get_listener_identity),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Listener reports run status update."""
     run = await _get_run(run_id, db)
 
-    # Verify this listener owns the run
+    # Verify this listener owns the run AND its cert matches the path
     l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    if identity.listener_id != l_uuid:
+        raise HTTPException(
+            status_code=403,
+            detail="Certificate does not match the listener id in the path",
+        )
     if run.listener_id != l_uuid:
         raise HTTPException(status_code=403, detail="Run not assigned to this listener")
 
@@ -896,6 +918,20 @@ async def update_run_status(
 
     if not target_status:
         raise HTTPException(status_code=422, detail="status is required")
+
+    # Listener is reporting a pre-launch failure if it's transitioning a run
+    # from planning/applying → errored while job_name is still NULL (no Job
+    # was ever created). Surface that in metrics so we can alert on bursts of
+    # listener failures (auth / K8s outage / secret-create) without grepping
+    # logs across replicas.
+    if (
+        target_status == "errored"
+        and run.job_name is None
+        and run.status in ("planning", "applying")
+    ):
+        from terrapod.api.metrics import LISTENER_LAUNCH_FAILURES
+
+        LISTENER_LAUNCH_FAILURES.inc()
 
     # Set has_changes before transition (so it's visible in drift handler)
     if has_changes is not None:
@@ -975,6 +1011,7 @@ async def report_job_launched(
     listener_id: str = Path(...),
     run_id: str = Path(...),
     body: dict = Body(...),
+    identity: ListenerIdentity = Depends(get_listener_identity),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Listener reports Job creation for a run.
@@ -986,6 +1023,11 @@ async def report_job_launched(
     run = await _get_run(run_id, db)
 
     l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    if identity.listener_id != l_uuid:
+        raise HTTPException(
+            status_code=403,
+            detail="Certificate does not match the listener id in the path",
+        )
     if run.listener_id != l_uuid:
         raise HTTPException(status_code=403, detail="Run not assigned to this listener")
 
@@ -1006,6 +1048,7 @@ async def report_job_status(
     listener_id: str = Path(...),
     run_id: str = Path(...),
     body: dict = Body(...),
+    identity: ListenerIdentity = Depends(get_listener_identity),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Listener reports Job status in response to a check_job_status event.
@@ -1014,6 +1057,12 @@ async def report_job_status(
     queries K8s for the Job status and POSTs the result here. The reconciler
     picks up the status from Redis on its next cycle.
     """
+    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    if identity.listener_id != l_uuid:
+        raise HTTPException(
+            status_code=403,
+            detail="Certificate does not match the listener id in the path",
+        )
     run = await _get_run(run_id, db)
 
     job_status = body.get("status", "")
@@ -1035,6 +1084,7 @@ async def upload_log_stream(
     run_id: str = Path(...),
     phase: str = Query("plan"),
     request: Request = ...,
+    identity: ListenerIdentity = Depends(get_listener_identity),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Listener uploads live pod log data for an in-progress run.
@@ -1048,6 +1098,12 @@ async def upload_log_stream(
     log data from being stored under the apply phase key when the run has
     already transitioned.
     """
+    l_uuid = uuid.UUID(listener_id.removeprefix("listener-"))
+    if identity.listener_id != l_uuid:
+        raise HTTPException(
+            status_code=403,
+            detail="Certificate does not match the listener id in the path",
+        )
     run = await _get_run(run_id, db)
     if phase not in ("plan", "apply"):
         phase = "plan" if run.status == "planning" else "apply"
