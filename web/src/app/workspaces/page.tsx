@@ -13,7 +13,16 @@ import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { useWorkspaceListEvents } from '@/lib/use-workspace-list-events'
-import { matchWorkspace, parseFilterQuery, removeTerm, serializeFilter } from '@/lib/workspace-filter'
+import {
+  STATUS_FILTER_ERRORED,
+  STATUS_FILTER_NEEDS_CONFIRM,
+  hasStatusTerm,
+  matchWorkspace,
+  parseFilterQuery,
+  removeTerm,
+  serializeFilter,
+  toggleStatusTerm,
+} from '@/lib/workspace-filter'
 
 interface LatestRun {
   id: string
@@ -79,10 +88,18 @@ function WorkspacesPageInner() {
     router.replace(qs ? `/workspaces?${qs}` : '/workspaces', { scroll: false })
   }, [parsedFilter, router, searchParams])
 
-  const filteredWorkspaces = useMemo(
-    () => (parsedFilter.terms.length === 0 ? workspaces : workspaces.filter(ws => matchWorkspace(ws, parsedFilter))),
-    [workspaces, parsedFilter],
-  )
+  const filteredWorkspaces = useMemo(() => {
+    if (parsedFilter.terms.length === 0) return workspaces
+    return workspaces.filter(ws => {
+      // Status terms need the resolved status; pass it conditionally so
+      // workspaces without a status (— display) don't accidentally match
+      // an empty `status:` predicate.
+      const resolved = resolveStatus(ws)
+      return matchWorkspace(ws, parsedFilter, resolved.filter ?? undefined)
+    })
+    // resolveStatus is a stateless closure over `ws` — safe to omit from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaces, parsedFilter])
 
   // Create form
   const [showCreate, setShowCreate] = useState(false)
@@ -118,39 +135,42 @@ function WorkspacesPageInner() {
   // when the status comes from `latest-run`. For workspace-level
   // conditions (state-diverged, vcs-error, drifted, no-runs) there's
   // no single defining run so runId stays null and the pill doesn't
-  // link anywhere.
+  // link anywhere. `filter` is the kebab-case lowercase token used by the
+  // `status:` filter predicate; kept alongside the display label so the
+  // two never drift out of sync.
   function resolveStatus(ws: Workspace): {
     label: string
     color: string
     priority: number
     runId: string | null
+    filter: string | null
   } {
     const drift = ws.attributes['drift-status']
     const run = ws.attributes['latest-run']
 
     if (ws.attributes['state-diverged'])
-      return { label: 'State Diverged', color: 'red', priority: 0, runId: null }
+      return { label: 'State Diverged', color: 'red', priority: 0, runId: null, filter: 'state-diverged' }
     if (ws.attributes['vcs-last-error'])
-      return { label: 'VCS Error', color: 'red', priority: 0, runId: null }
+      return { label: 'VCS Error', color: 'red', priority: 0, runId: null, filter: 'vcs-error' }
     if (drift === 'drifted')
-      return { label: 'Drifted', color: 'amber', priority: 1, runId: null }
+      return { label: 'Drifted', color: 'amber', priority: 1, runId: null, filter: 'drifted' }
     if (run) {
       const s = run.status
       const planOnly = run['plan-only']
       const runId = run.id
-      if (s === 'errored') return { label: 'Errored', color: 'red', priority: 2, runId }
-      if (s === 'planned' && !planOnly) return { label: 'Needs Confirm', color: 'amber', priority: 3, runId }
-      if (s === 'planning') return { label: 'Planning', color: 'blue', priority: 4, runId }
-      if (s === 'applying') return { label: 'Applying', color: 'blue', priority: 4, runId }
-      if (s === 'confirmed') return { label: 'Confirmed', color: 'blue', priority: 4, runId }
-      if (s === 'queued') return { label: 'Queued', color: 'blue', priority: 4, runId }
-      if (s === 'pending') return { label: 'Pending', color: 'slate', priority: 5, runId }
-      if (s === 'applied') return { label: 'Applied', color: 'green', priority: 6, runId }
-      if (s === 'planned' && planOnly) return { label: 'Planned', color: 'green', priority: 7, runId }
-      if (s === 'canceled') return { label: 'Canceled', color: 'slate', priority: 8, runId }
-      if (s === 'discarded') return { label: 'Discarded', color: 'slate', priority: 8, runId }
+      if (s === 'errored') return { label: 'Errored', color: 'red', priority: 2, runId, filter: 'errored' }
+      if (s === 'planned' && !planOnly) return { label: 'Needs Confirm', color: 'amber', priority: 3, runId, filter: 'needs-confirm' }
+      if (s === 'planning') return { label: 'Planning', color: 'blue', priority: 4, runId, filter: 'planning' }
+      if (s === 'applying') return { label: 'Applying', color: 'blue', priority: 4, runId, filter: 'applying' }
+      if (s === 'confirmed') return { label: 'Confirmed', color: 'blue', priority: 4, runId, filter: 'confirmed' }
+      if (s === 'queued') return { label: 'Queued', color: 'blue', priority: 4, runId, filter: 'queued' }
+      if (s === 'pending') return { label: 'Pending', color: 'slate', priority: 5, runId, filter: 'pending' }
+      if (s === 'applied') return { label: 'Applied', color: 'green', priority: 6, runId, filter: 'applied' }
+      if (s === 'planned' && planOnly) return { label: 'Planned', color: 'green', priority: 7, runId, filter: 'planned' }
+      if (s === 'canceled') return { label: 'Canceled', color: 'slate', priority: 8, runId, filter: 'canceled' }
+      if (s === 'discarded') return { label: 'Discarded', color: 'slate', priority: 8, runId, filter: 'discarded' }
     }
-    return { label: '\u2014', color: 'gray', priority: 9, runId: null }
+    return { label: '\u2014', color: 'gray', priority: 9, runId: null, filter: null }
   }
 
   const badgeColors: Record<string, string> = {
@@ -508,56 +528,101 @@ function WorkspacesPageInner() {
           )
         })()}
 
-        {!loading && workspaces.length > 0 && (
-          <div className="mb-4">
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={filterInput}
-                onChange={e => setFilterInput(e.target.value)}
-                placeholder='Filter by name or label — e.g. "eu1" or "env:prod" or "repo:tf-aws-core eu1"'
-                aria-label="Filter workspaces"
-                className="flex-1 px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/50 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500"
-              />
-              {parsedFilter.terms.length > 0 && (
+        {!loading && workspaces.length > 0 && (() => {
+          const erroredActive = hasStatusTerm(parsedFilter, STATUS_FILTER_ERRORED)
+          const needsConfirmActive = hasStatusTerm(parsedFilter, STATUS_FILTER_NEEDS_CONFIRM)
+          // Counts shown on the buttons answer "would clicking this find anything?".
+          // Cheap to compute on the unfiltered list — keeps the buttons honest if
+          // the filter input changes but these statuses are no longer present.
+          const erroredCount = workspaces.filter(w => resolveStatus(w).filter === STATUS_FILTER_ERRORED).length
+          const needsConfirmCount = workspaces.filter(w => resolveStatus(w).filter === STATUS_FILTER_NEEDS_CONFIRM).length
+          return (
+            <div className="mb-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={filterInput}
+                  onChange={e => setFilterInput(e.target.value)}
+                  placeholder='Filter by name, label, or status — e.g. "eu1", "env:prod", "status:errored"'
+                  aria-label="Filter workspaces"
+                  className="flex-1 px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/50 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500"
+                />
+                {parsedFilter.terms.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterInput('')}
+                    className="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2 mt-2">
                 <button
                   type="button"
-                  onClick={() => setFilterInput('')}
-                  className="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 transition-colors"
+                  onClick={() => setFilterInput(serializeFilter(toggleStatusTerm(parsedFilter, STATUS_FILTER_ERRORED)))}
+                  aria-pressed={erroredActive}
+                  className={
+                    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ' +
+                    (erroredActive
+                      ? 'bg-red-900/60 text-red-200 ring-1 ring-red-500/40'
+                      : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/60')
+                  }
+                  title={erroredActive ? 'Remove the errored filter' : 'Show only workspaces with a failed latest run'}
                 >
-                  Clear
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                  <span>Errored</span>
+                  <span className="text-[10px] text-slate-400">{erroredCount}</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterInput(serializeFilter(toggleStatusTerm(parsedFilter, STATUS_FILTER_NEEDS_CONFIRM)))}
+                  aria-pressed={needsConfirmActive}
+                  className={
+                    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ' +
+                    (needsConfirmActive
+                      ? 'bg-amber-900/60 text-amber-200 ring-1 ring-amber-500/40'
+                      : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/60')
+                  }
+                  title={needsConfirmActive ? 'Remove the needs-confirm filter' : 'Show only workspaces with an apply waiting for confirmation'}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  <span>Needs Confirm</span>
+                  <span className="text-[10px] text-slate-400">{needsConfirmCount}</span>
+                </button>
+              </div>
+              {parsedFilter.terms.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {parsedFilter.terms.map((term, i) => {
+                    const label =
+                      term.kind === 'name'
+                        ? `name: ${term.value}`
+                        : term.kind === 'status'
+                          ? `status: ${term.value}`
+                          : term.value === null
+                            ? `${term.key}: (any)`
+                            : `${term.key}: ${term.value}`
+                    return (
+                      <button
+                        type="button"
+                        key={`${i}-${label}`}
+                        onClick={() => setFilterInput(serializeFilter(removeTerm(parsedFilter, i)))}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 transition-colors"
+                        title="Remove this term"
+                      >
+                        <span>{label}</span>
+                        <span aria-hidden className="text-slate-500">×</span>
+                      </button>
+                    )
+                  })}
+                  <span className="text-xs text-slate-500 self-center">
+                    Showing {filteredWorkspaces.length} of {workspaces.length}
+                  </span>
+                </div>
               )}
             </div>
-            {parsedFilter.terms.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {parsedFilter.terms.map((term, i) => {
-                  const label =
-                    term.kind === 'name'
-                      ? `name: ${term.value}`
-                      : term.value === null
-                        ? `${term.key}: (any)`
-                        : `${term.key}: ${term.value}`
-                  return (
-                    <button
-                      type="button"
-                      key={`${i}-${label}`}
-                      onClick={() => setFilterInput(serializeFilter(removeTerm(parsedFilter, i)))}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 transition-colors"
-                      title="Remove this term"
-                    >
-                      <span>{label}</span>
-                      <span aria-hidden className="text-slate-500">×</span>
-                    </button>
-                  )
-                })}
-                <span className="text-xs text-slate-500 self-center">
-                  Showing {filteredWorkspaces.length} of {workspaces.length}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+          )
+        })()}
 
         {loading ? (
           <LoadingSpinner />
