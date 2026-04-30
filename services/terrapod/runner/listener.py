@@ -573,7 +573,13 @@ class RunnerListener:
         ]
 
         run_short = run_id[:16]
-        auth_secret_name = f"tprun-{run_short}-auth"
+        # Phase is part of the Secret name to avoid a 409 AlreadyExists when
+        # apply runs immediately after plan: the plan Job's auth Secret has
+        # an ownerReference back to the plan Job, but K8s GC doesn't always
+        # finalise the cascade before the apply phase tries to create its
+        # own. Per-phase names mean plan and apply have independent Secrets
+        # that GC at their own pace and never collide.
+        auth_secret_name = f"tprun-{run_short}-{phase}-auth"
 
         spec = build_job_spec(
             run_id=run_id,
@@ -609,7 +615,9 @@ class RunnerListener:
         # Create auth Secret with ownerReference to the Job
         try:
             job_uid = await get_job_uid(job_name)
-            await self._create_auth_secret(run_id, runner_token, job_name, job_uid)
+            await self._create_auth_secret(
+                auth_secret_name, run_id, runner_token, job_name, job_uid
+            )
         except Exception as e:
             logger.error("Failed to create auth secret", run_id=run_id, error=str(e))
             await self._report_launch_failed(run_id, f"Failed to create runner auth Secret: {e}")
@@ -789,16 +797,19 @@ class RunnerListener:
         return response.json()["token"]
 
     async def _create_auth_secret(
-        self, run_id: str, token: str, job_name: str, job_uid: str
+        self, secret_name: str, run_id: str, token: str, job_name: str, job_uid: str
     ) -> str:
-        """Create a K8s Secret containing the runner token with ownerReference."""
+        """Create a K8s Secret containing the runner token with ownerReference.
+
+        `secret_name` is computed by the caller (which knows the phase) so
+        plan and apply Secrets have distinct names and don't 409 each other
+        when both Jobs of the same run live briefly in the cluster.
+        """
         from kubernetes import client as k8s_client
 
         from terrapod.runner.job_manager import _get_core_api
 
         namespace = os.environ.get("TERRAPOD_RUNNER_NAMESPACE", "terrapod-runners")
-        run_short = run_id[:16]
-        secret_name = f"tprun-{run_short}-auth"
 
         secret = k8s_client.V1Secret(
             metadata=k8s_client.V1ObjectMeta(

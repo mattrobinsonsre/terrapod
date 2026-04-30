@@ -279,3 +279,53 @@ class TestLaunchFailureReporting:
 
         # Must not raise
         await listener._report_launch_failed("abc-123", "boom")
+
+
+# ── Auth Secret naming (phase collision regression) ───────────────────
+
+
+class TestAuthSecretNaming:
+    """Plan and apply phases of the same run must use distinct Secret names.
+
+    Confirm-and-Apply transitions a run from `planned` to `applying` within
+    seconds. The plan Job's auth Secret has an ownerReference back to the
+    plan Job, but K8s GC doesn't always finalise the cascade before the
+    apply phase tries to create its own Secret. Pre-fix, both phases used
+    `tprun-{run_short}-auth` → second create → 409 AlreadyExists → entire
+    apply Job fails to launch.
+
+    Per-phase names (`tprun-{run_short}-{phase}-auth`) eliminate the race
+    by giving each Job its own Secret keyed on the same phase suffix the
+    Job name already uses.
+    """
+
+    async def test_plan_and_apply_use_distinct_secret_names(self, fresh_shutdown_event):
+        """build_job_spec sees a phase-aware secret name; plan != apply."""
+        listener = _make_listener(fresh_shutdown_event)
+        listener._get_runner_token = AsyncMock(return_value="runtok:xyz")
+        listener._http_client = AsyncMock()
+        listener._create_auth_secret = AsyncMock(return_value="ok")
+        listener.runner_config = MagicMock()
+
+        captured = {}
+
+        def fake_build(**kwargs):
+            captured.setdefault("calls", []).append(kwargs)
+            return {"kind": "Job"}
+
+        with (
+            patch("terrapod.runner.job_template.build_job_spec", side_effect=fake_build),
+            patch("terrapod.runner.job_manager.create_job", AsyncMock(return_value="job-x")),
+            patch("terrapod.runner.job_manager.get_job_uid", AsyncMock(return_value="uid-x")),
+        ):
+            run_id = "0123456789abcdef-zzzz"
+            await listener._launch_run(run_id, {"phase": "plan"})
+            await listener._launch_run(run_id, {"phase": "apply"})
+
+        names = [c["auth_secret_name"] for c in captured["calls"]]
+        assert names[0] != names[1], f"plan/apply must differ, got {names}"
+        assert "plan" in names[0] and "apply" in names[1]
+        # Same run prefix on both — only the phase suffix differs.
+        prefix_plan = names[0].rsplit("-plan-", 1)[0]
+        prefix_apply = names[1].rsplit("-apply-", 1)[0]
+        assert prefix_plan == prefix_apply
