@@ -112,6 +112,19 @@ def configure_logging(json_logs: bool = True, log_level: str = "INFO") -> None:
     logging.getLogger("botocore").setLevel(logging.WARNING)
     logging.getLogger("aiobotocore").setLevel(logging.WARNING)
 
+    # Route uvicorn's loggers through our structlog ProcessorFormatter so
+    # access and error lines come out as JSON instead of uvicorn's default
+    # plaintext (`INFO:     10.x.y.z - "GET /path" 200 OK`). Uvicorn
+    # installs its own StreamHandler with a non-JSON formatter on these
+    # loggers at startup; we clear them and force propagation so records
+    # reach the root handler installed above. `foreign_pre_chain` on the
+    # ProcessorFormatter handles structlog enrichment for these stdlib
+    # log records (logger name, level, app context, timestamp).
+    for name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+        lg = logging.getLogger(name)
+        lg.handlers.clear()
+        lg.propagate = True
+
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
     """Get a structured logger instance."""
