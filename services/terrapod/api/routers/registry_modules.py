@@ -36,6 +36,7 @@ from terrapod.api.dependencies import AuthenticatedUser, get_current_user, requi
 from terrapod.db.models import ModuleWorkspaceLink, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services.label_validation import validate_labels
 from terrapod.services.registry_module_service import (
     create_module,
     create_module_version,
@@ -249,7 +250,7 @@ async def create_module_endpoint(
 
     module = await create_module(db, "default", attrs.name, attrs.provider)
     module.owner_email = user.email
-    module.labels = attrs.labels
+    module.labels = validate_labels(attrs.labels)
 
     # Apply VCS fields if provided
     if attrs.vcs_connection_id:
@@ -417,7 +418,9 @@ async def update_module_endpoint(
         module.owner_email = attrs["owner-email"]
 
     if "labels" in attrs:
-        new_labels = attrs["labels"]
+        # Validate up-front (size limits + reserved-key check). Raises 422
+        # before any self-lockout logic.
+        new_labels = validate_labels(attrs["labels"])
         # Self-lockout check: warn if label change would reduce user's access
         if (
             new_labels != (module.labels or {})

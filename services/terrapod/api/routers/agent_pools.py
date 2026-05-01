@@ -41,6 +41,7 @@ from terrapod.api.dependencies import (
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service
+from terrapod.services.label_validation import validate_labels as _validate_labels
 from terrapod.services.pool_rbac_service import (
     POOL_PERMISSION_HIERARCHY,
     fetch_custom_roles,
@@ -78,35 +79,6 @@ def _validate_owner_email(email: str | None) -> str | None:
     if not _EMAIL_RE.match(email):
         raise HTTPException(status_code=422, detail="owner-email must be a valid email address")
     return email
-
-
-_MAX_LABELS = 50
-_MAX_LABEL_KEY_LEN = 63
-_MAX_LABEL_VALUE_LEN = 255
-
-
-def _validate_labels(labels: dict | None) -> dict:
-    """Validate labels are string key-value pairs within size limits."""
-    if not labels:
-        return {}
-    if not isinstance(labels, dict):
-        raise HTTPException(status_code=422, detail="labels must be an object")
-    if len(labels) > _MAX_LABELS:
-        raise HTTPException(status_code=422, detail=f"labels cannot exceed {_MAX_LABELS} entries")
-    clean: dict[str, str] = {}
-    for k, v in labels.items():
-        if not isinstance(k, str) or not isinstance(v, str):
-            raise HTTPException(status_code=422, detail="label keys and values must be strings")
-        if len(k) > _MAX_LABEL_KEY_LEN:
-            raise HTTPException(
-                status_code=422, detail=f"label key exceeds {_MAX_LABEL_KEY_LEN} characters"
-            )
-        if len(v) > _MAX_LABEL_VALUE_LEN:
-            raise HTTPException(
-                status_code=422, detail=f"label value exceeds {_MAX_LABEL_VALUE_LEN} characters"
-            )
-        clean[k] = v
-    return clean
 
 
 def _pool_json(pool, status: str | None = None, permission: str | None = None) -> dict:

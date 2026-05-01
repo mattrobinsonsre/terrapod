@@ -295,6 +295,39 @@ curl -X PATCH https://terrapod.example.com/api/v2/workspaces/ws-{id} \
 - Owners have `admin` permission on their workspace
 - Only a platform admin can change workspace ownership
 
+### Label Limits
+
+Labels are validated at the API on workspace, agent pool, and registry module/provider create or update. The API returns **422 Unprocessable Entity** if any of the following limits are violated:
+
+| Limit | Value |
+|---|---|
+| Maximum labels per resource | 50 |
+| Maximum label key length | 63 characters |
+| Maximum label value length | 255 characters |
+
+Keys and values must be strings.
+
+### Reserved Label Keys
+
+A small set of label keys are reserved as **virtual filter fields** in the workspace-list filter UI. A filter term like `status:errored` resolves against a workspace's derived status, not against a literal label called `status`. To keep that filter language unambiguous, these keys cannot be used as literal labels — the API rejects them on create and update with 422.
+
+| Reserved key | Maps to | Filter status |
+|---|---|---|
+| `status` | derived run status (`errored`, `needs-confirm`, `drifted`, `applied`, …) | implemented |
+| `pool` | `agent_pool_name` | reserved (future virtual) |
+| `mode` | `execution_mode` (`local`/`agent`) | reserved (future virtual) |
+| `backend` | `execution_backend` (`tofu`/`terraform`) | reserved (future virtual) |
+| `owner` | `owner_email` | reserved (future virtual) |
+| `drift` | `drift_status` (`drifted`/`in_sync`/`never_checked`) | reserved (future virtual) |
+| `version` | `terraform_version` | reserved (future virtual) |
+| `vcs` | true if the workspace has a VCS connection | reserved (future virtual) |
+| `locked` | `locked` boolean | reserved (future virtual) |
+| `branch` | `vcs_branch` | reserved (future virtual) |
+
+If you have an existing label with one of these keys (from a deployment that pre-dates this restriction), reads and existing rows continue to work, but the next create or update of that resource that includes the reserved key in its `labels` field will be rejected. Migrate by renaming — for example, swap `pool: shared` for `team-pool: shared` (or simply drop it if the same data is already on `agent_pool_id`).
+
+The list lives in `terrapod.services.label_validation.RESERVED_LABEL_KEYS`. Adding to it is a behaviour change for any deployment with existing labels using the new key.
+
 ### Labels are also Tags
 
 Workspace labels do double duty: alongside their primary role in label-based RBAC, they also stand in for TFE's "workspace tags" concept on the CLI. The `cloud { workspaces { tags = ... } }` block in your `.tf` config is matched against the same `labels` map.

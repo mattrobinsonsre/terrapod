@@ -18,6 +18,12 @@
 // vcs-last-error. The accepted values are kebab-case lowercase versions of
 // the labels in `resolveStatus` on the workspaces page (see STATUS_FILTER
 // constants below).
+//
+// `status` (and the other reserved keys — see `RESERVED_LABEL_KEYS` in
+// `services/terrapod/services/label_validation.py`) cannot be used as
+// literal label keys: the API rejects them at create/update time so the
+// filter language stays unambiguous. The user-facing list lives in
+// `docs/rbac.md` § Reserved label keys.
 
 export interface NameTerm {
   kind: 'name'

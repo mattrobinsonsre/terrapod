@@ -51,6 +51,7 @@ from terrapod.db.models import Run, StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service as _agent_pool_service
+from terrapod.services.label_validation import validate_labels
 from terrapod.services.pool_rbac_service import has_pool_permission, resolve_pool_permission
 from terrapod.services.workspace_rbac_service import (
     PERMISSION_HIERARCHY,
@@ -788,7 +789,7 @@ async def create_workspace(
         working_directory=_sanitize_working_directory(attrs.get("working-directory", "")),
         resource_cpu=attrs.get("resource-cpu", "1"),
         resource_memory=attrs.get("resource-memory", "2Gi"),
-        labels=attrs.get("labels", {}),
+        labels=validate_labels(attrs.get("labels", {})),
         owner_email=user.email,
         agent_pool_id=agent_pool_id,
         vcs_connection_id=vcs_connection_id,
@@ -1000,7 +1001,10 @@ async def update_workspace(
     if "resource-memory" in attrs:
         ws.resource_memory = attrs["resource-memory"]
     if "labels" in attrs:
-        new_labels = attrs["labels"]
+        # Validate up-front (size limits + reserved-key check). Raises 422
+        # before any self-lockout logic so the error path stays simple and
+        # the user gets a clear message naming the offending key.
+        new_labels = validate_labels(attrs["labels"])
         # Self-lockout check: warn if label change would reduce user's access
         # Platform admins and owners are immune (their access doesn't depend on labels)
         if (
