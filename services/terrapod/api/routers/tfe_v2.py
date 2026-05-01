@@ -47,11 +47,11 @@ from terrapod.api.dependencies import (
     get_current_user,
     require_non_runner,
 )
+from terrapod.api.labels import validate_labels
 from terrapod.db.models import Run, StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service as _agent_pool_service
-from terrapod.services.label_validation import validate_labels
 from terrapod.services.pool_rbac_service import has_pool_permission, resolve_pool_permission
 from terrapod.services.workspace_rbac_service import (
     PERMISSION_HIERARCHY,

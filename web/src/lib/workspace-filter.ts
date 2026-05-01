@@ -22,8 +22,11 @@
 // `status` (and the other reserved keys — see `RESERVED_LABEL_KEYS` in
 // `services/terrapod/services/label_validation.py`) cannot be used as
 // literal label keys: the API rejects them at create/update time so the
-// filter language stays unambiguous. The user-facing list lives in
-// `docs/rbac.md` § Reserved label keys.
+// filter language stays unambiguous. Today only `status:` is implemented
+// as a virtual term; the other reserved keys parse here as label terms
+// (which always miss because no workspace can have those labels) and
+// will gain virtual-term implementations as they're built out. See
+// `docs/rbac.md` § Reserved label keys for the user-facing list.
 
 export interface NameTerm {
   kind: 'name'

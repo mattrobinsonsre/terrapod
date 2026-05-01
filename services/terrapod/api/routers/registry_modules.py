@@ -33,10 +33,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_non_runner
+from terrapod.api.labels import validate_labels
 from terrapod.db.models import ModuleWorkspaceLink, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services.label_validation import validate_labels
 from terrapod.services.registry_module_service import (
     create_module,
     create_module_version,

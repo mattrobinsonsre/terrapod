@@ -38,10 +38,10 @@ from terrapod.api.dependencies import (
     get_listener_identity,
     require_admin,
 )
+from terrapod.api.labels import validate_labels as _validate_labels
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service
-from terrapod.services.label_validation import validate_labels as _validate_labels
 from terrapod.services.pool_rbac_service import (
     POOL_PERMISSION_HIERARCHY,
     fetch_custom_roles,

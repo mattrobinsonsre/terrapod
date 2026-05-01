@@ -21,26 +21,7 @@ import {
   serializeFilter,
   toggleStatusTerm,
 } from '@/lib/workspace-filter'
-
-// Status options for the filter dropdown — kept in lockstep with `resolveStatus`
-// below so the kebab-case filter value matches what the server-side derived
-// status would be. Order: most operationally interesting first.
-const STATUS_FILTER_OPTIONS: Array<{ value: string; label: string; dot: string }> = [
-  { value: 'errored', label: 'Errored', dot: 'bg-red-400' },
-  { value: 'needs-confirm', label: 'Needs Confirm', dot: 'bg-amber-400' },
-  { value: 'state-diverged', label: 'State Diverged', dot: 'bg-red-400' },
-  { value: 'vcs-error', label: 'VCS Error', dot: 'bg-red-400' },
-  { value: 'drifted', label: 'Drifted', dot: 'bg-amber-400' },
-  { value: 'planning', label: 'Planning', dot: 'bg-blue-400' },
-  { value: 'applying', label: 'Applying', dot: 'bg-blue-400' },
-  { value: 'confirmed', label: 'Confirmed', dot: 'bg-blue-400' },
-  { value: 'queued', label: 'Queued', dot: 'bg-blue-400' },
-  { value: 'applied', label: 'Applied', dot: 'bg-green-400' },
-  { value: 'planned', label: 'Planned', dot: 'bg-green-400' },
-  { value: 'pending', label: 'Pending', dot: 'bg-slate-500' },
-  { value: 'canceled', label: 'Canceled', dot: 'bg-slate-500' },
-  { value: 'discarded', label: 'Discarded', dot: 'bg-slate-500' },
-]
+import { WORKSPACE_STATUSES, resolveStatus } from '@/lib/workspace-status'
 
 interface LatestRun {
   id: string
@@ -134,11 +115,8 @@ function WorkspacesPageInner() {
       // Status terms need the resolved status; pass it conditionally so
       // workspaces without a status (— display) don't accidentally match
       // an empty `status:` predicate.
-      const resolved = resolveStatus(ws)
-      return matchWorkspace(ws, parsedFilter, resolved.filter ?? undefined)
+      return matchWorkspace(ws, parsedFilter, resolveStatus(ws).def?.filter ?? undefined)
     })
-    // resolveStatus is a stateless closure over `ws` — safe to omit from deps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaces, parsedFilter])
 
   // Create form
@@ -171,47 +149,20 @@ function WorkspacesPageInner() {
 
   type WsSortKey = 'name' | 'mode' | 'pool' | 'resources' | 'status' | 'created'
 
-  // Resolved status. `runId` is the run that *defined* the status — set
-  // when the status comes from `latest-run`. For workspace-level
-  // conditions (state-diverged, vcs-error, drifted, no-runs) there's
-  // no single defining run so runId stays null and the pill doesn't
-  // link anywhere. `filter` is the kebab-case lowercase token used by the
-  // `status:` filter predicate; kept alongside the display label so the
-  // two never drift out of sync.
-  function resolveStatus(ws: Workspace): {
-    label: string
-    color: string
-    priority: number
-    runId: string | null
-    filter: string | null
-  } {
-    const drift = ws.attributes['drift-status']
-    const run = ws.attributes['latest-run']
+  // resolveStatus + WORKSPACE_STATUSES are imported from workspace-status.ts
+  // — single source of truth for both the row pill and the filter dropdown.
 
-    if (ws.attributes['state-diverged'])
-      return { label: 'State Diverged', color: 'red', priority: 0, runId: null, filter: 'state-diverged' }
-    if (ws.attributes['vcs-last-error'])
-      return { label: 'VCS Error', color: 'red', priority: 0, runId: null, filter: 'vcs-error' }
-    if (drift === 'drifted')
-      return { label: 'Drifted', color: 'amber', priority: 1, runId: null, filter: 'drifted' }
-    if (run) {
-      const s = run.status
-      const planOnly = run['plan-only']
-      const runId = run.id
-      if (s === 'errored') return { label: 'Errored', color: 'red', priority: 2, runId, filter: 'errored' }
-      if (s === 'planned' && !planOnly) return { label: 'Needs Confirm', color: 'amber', priority: 3, runId, filter: 'needs-confirm' }
-      if (s === 'planning') return { label: 'Planning', color: 'blue', priority: 4, runId, filter: 'planning' }
-      if (s === 'applying') return { label: 'Applying', color: 'blue', priority: 4, runId, filter: 'applying' }
-      if (s === 'confirmed') return { label: 'Confirmed', color: 'blue', priority: 4, runId, filter: 'confirmed' }
-      if (s === 'queued') return { label: 'Queued', color: 'blue', priority: 4, runId, filter: 'queued' }
-      if (s === 'pending') return { label: 'Pending', color: 'slate', priority: 5, runId, filter: 'pending' }
-      if (s === 'applied') return { label: 'Applied', color: 'green', priority: 6, runId, filter: 'applied' }
-      if (s === 'planned' && planOnly) return { label: 'Planned', color: 'green', priority: 7, runId, filter: 'planned' }
-      if (s === 'canceled') return { label: 'Canceled', color: 'slate', priority: 8, runId, filter: 'canceled' }
-      if (s === 'discarded') return { label: 'Discarded', color: 'slate', priority: 8, runId, filter: 'discarded' }
+  // Per-status counts on the unfiltered workspace list, memoised so the
+  // dropdown render is a constant lookup. Recomputes only when the
+  // workspace data changes.
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const ws of workspaces) {
+      const f = resolveStatus(ws).def?.filter
+      if (f) counts[f] = (counts[f] || 0) + 1
     }
-    return { label: '\u2014', color: 'gray', priority: 9, runId: null, filter: null }
-  }
+    return counts
+  }, [workspaces])
 
   const badgeColors: Record<string, string> = {
     amber: 'bg-amber-900/50 text-amber-300',
@@ -230,7 +181,7 @@ function WorkspacesPageInner() {
         case 'mode': return item.attributes['execution-mode']
         case 'pool': return item.attributes['agent-pool-name'] || ''
         case 'resources': return item.attributes['resource-cpu']
-        case 'status': return resolveStatus(item).label
+        case 'status': return resolveStatus(item).def?.label ?? '\u2014'
         case 'created': return item.attributes['created-at']
       }
     }, []),
@@ -569,19 +520,7 @@ function WorkspacesPageInner() {
         })()}
 
         {!loading && workspaces.length > 0 && (() => {
-          // Per-status counts on the unfiltered workspace list — answers
-          // "what would I find if I picked this option?" before clicking.
-          // Compute once; the dropdown is closed most of the time so this
-          // stays cheap.
-          const statusCounts: Record<string, number> = {}
-          for (const ws of workspaces) {
-            const f = resolveStatus(ws).filter
-            if (f) statusCounts[f] = (statusCounts[f] || 0) + 1
-          }
-          const activeStatusValues = parsedFilter.terms
-            .filter(t => t.kind === 'status')
-            .map(t => (t as { kind: 'status'; value: string }).value)
-          const activeCount = activeStatusValues.length
+          const activeStatusCount = parsedFilter.terms.filter(t => t.kind === 'status').length
           return (
             <div className="mb-4">
               <div className="flex items-center gap-2">
@@ -604,15 +543,15 @@ function WorkspacesPageInner() {
                     onClick={() => setStatusMenuOpen(o => !o)}
                     className={
                       'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ' +
-                      (activeCount > 0
+                      (activeStatusCount > 0
                         ? 'bg-slate-700/60 text-slate-100 border-slate-600'
                         : 'bg-slate-800/50 text-slate-300 border-slate-700/50 hover:bg-slate-700/60')
                     }
                   >
                     <span>Status</span>
-                    {activeCount > 0 && (
+                    {activeStatusCount > 0 && (
                       <span className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
-                        {activeCount}
+                        {activeStatusCount}
                       </span>
                     )}
                     <svg className={'w-3 h-3 transition-transform ' + (statusMenuOpen ? 'rotate-180' : '')} viewBox="0 0 12 12" fill="currentColor" aria-hidden>
@@ -624,16 +563,16 @@ function WorkspacesPageInner() {
                       role="menu"
                       className="absolute right-0 z-10 mt-1 w-64 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-96 overflow-y-auto"
                     >
-                      {STATUS_FILTER_OPTIONS.map(opt => {
-                        const active = hasStatusTerm(parsedFilter, opt.value)
-                        const count = statusCounts[opt.value] || 0
+                      {WORKSPACE_STATUSES.map(opt => {
+                        const active = hasStatusTerm(parsedFilter, opt.filter)
+                        const count = statusCounts[opt.filter] || 0
                         return (
                           <button
-                            key={opt.value}
+                            key={opt.filter}
                             type="button"
                             role="menuitemcheckbox"
                             aria-checked={active}
-                            onClick={() => setFilterInput(serializeFilter(toggleStatusTerm(parsedFilter, opt.value)))}
+                            onClick={() => setFilterInput(serializeFilter(toggleStatusTerm(parsedFilter, opt.filter)))}
                             className={
                               'w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors ' +
                               (active ? 'bg-slate-700/60 text-slate-100' : 'text-slate-300 hover:bg-slate-700/40')
@@ -717,7 +656,7 @@ function WorkspacesPageInner() {
               </thead>
               <tbody className="divide-y divide-slate-700/30">
                 {sortedWorkspaces.map((ws) => {
-                  const status = resolveStatus(ws)
+                  const { def, runId } = resolveStatus(ws)
                   return (
                   <tr key={ws.id} className="hover:bg-slate-700/20 transition-colors">
                     <td className="px-4 py-3">
@@ -742,18 +681,18 @@ function WorkspacesPageInner() {
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
-                      {status.color === 'gray' ? (
-                        <span className="text-xs text-slate-500">{status.label}</span>
-                      ) : status.runId ? (
+                      {!def ? (
+                        <span className="text-xs text-slate-500">&mdash;</span>
+                      ) : runId ? (
                         <Link
-                          href={`/workspaces/${ws.id}/runs/${status.runId}`}
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium hover:opacity-80 transition-opacity ${badgeColors[status.color]}`}
+                          href={`/workspaces/${ws.id}/runs/${runId}`}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium hover:opacity-80 transition-opacity ${badgeColors[def.color]}`}
                         >
-                          {status.label}
+                          {def.label}
                         </Link>
                       ) : (
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColors[status.color]}`}>
-                          {status.label}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColors[def.color]}`}>
+                          {def.label}
                         </span>
                       )}
                     </td>

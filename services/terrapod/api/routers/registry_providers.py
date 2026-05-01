@@ -35,9 +35,9 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_non_runner
+from terrapod.api.labels import validate_labels
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services.label_validation import validate_labels
 from terrapod.services.platform_provider_service import (
     get_download_info as platform_get_download_info,
 )

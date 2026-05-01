@@ -314,19 +314,21 @@ A small set of label keys are reserved as **virtual filter fields** in the works
 | Reserved key | Maps to | Filter status |
 |---|---|---|
 | `status` | derived run status (`errored`, `needs-confirm`, `drifted`, `applied`, …) | implemented |
-| `pool` | `agent_pool_name` | reserved (future virtual) |
-| `mode` | `execution_mode` (`local`/`agent`) | reserved (future virtual) |
-| `backend` | `execution_backend` (`tofu`/`terraform`) | reserved (future virtual) |
-| `owner` | `owner_email` | reserved (future virtual) |
-| `drift` | `drift_status` (`drifted`/`in_sync`/`never_checked`) | reserved (future virtual) |
-| `version` | `terraform_version` | reserved (future virtual) |
-| `vcs` | true if the workspace has a VCS connection | reserved (future virtual) |
-| `locked` | `locked` boolean | reserved (future virtual) |
-| `branch` | `vcs_branch` | reserved (future virtual) |
+| `pool` | `agent_pool_name` | reserved (planned virtual) |
+| `mode` | `execution_mode` (`local`/`agent`) | reserved (planned virtual) |
+| `backend` | `execution_backend` (`tofu`/`terraform`) | reserved (planned virtual) |
+| `owner` | `owner_email` | reserved (planned virtual) |
+| `drift` | `drift_status` (`drifted`/`in_sync`/`never_checked`) | reserved (planned virtual) |
+| `version` | `terraform_version` | reserved (planned virtual) |
+| `vcs` | `true`/`false` — has VCS connection | reserved (planned virtual) |
+| `locked` | `true`/`false` — currently locked | reserved (planned virtual) |
+| `branch` | `vcs_branch` | reserved (planned virtual) |
 
-If you have an existing label with one of these keys (from a deployment that pre-dates this restriction), reads and existing rows continue to work, but the next create or update of that resource that includes the reserved key in its `labels` field will be rejected. Migrate by renaming — for example, swap `pool: shared` for `team-pool: shared` (or simply drop it if the same data is already on `agent_pool_id`).
+The set is intentionally aggressive: reserving a key today is near-zero cost (no virtual implementation required), but adding a reservation later — once the key is in customer use as a literal label — is a migration.
 
-The list lives in `terrapod.services.label_validation.RESERVED_LABEL_KEYS`. Adding to it is a behaviour change for any deployment with existing labels using the new key.
+If you have an existing label with one of the reserved keys, reads and existing rows continue to work, but the next create or update of that resource that includes the reserved key in its `labels` field will be rejected with a 422 that names the offending key. Migrate by renaming — for example, swap `version: 1.11` for `tf-version: 1.11` (or drop it if the same data is already on `terraform_version`).
+
+The list lives in `terrapod.services.label_validation.RESERVED_LABEL_KEYS`. Adding to it is a behaviour change for any deployment with existing labels using the new key — update both the constant and this table together.
 
 ### Labels are also Tags
 
