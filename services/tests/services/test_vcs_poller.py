@@ -597,7 +597,7 @@ class TestPollCycleParallel:
         max_in_flight: list[int] = [0]
         entered = 0
 
-        async def fake_owned_poll(ws_id, semaphore, cache=None):
+        async def fake_owned_poll(ws_id, semaphore, cache=None, paths_unions=None):
             import asyncio as _a
 
             nonlocal entered
@@ -614,6 +614,11 @@ class TestPollCycleParallel:
             patch(
                 "terrapod.services.vcs_poller._poll_workspace_owned",
                 side_effect=fake_owned_poll,
+            ),
+            patch(
+                "terrapod.services.vcs_poller._compute_paths_unions",
+                new_callable=AsyncMock,
+                return_value={},
             ),
         ):
             await poll_cycle()
@@ -669,7 +674,7 @@ class TestPollCycleParallel:
 
         polled: list[uuid.UUID] = []
 
-        async def fake_owned_poll(ws_id, semaphore, cache=None):
+        async def fake_owned_poll(ws_id, semaphore, cache=None, paths_unions=None):
             polled.append(ws_id)
 
         with (
@@ -677,6 +682,11 @@ class TestPollCycleParallel:
             patch(
                 "terrapod.services.vcs_poller._poll_workspace_owned",
                 side_effect=fake_owned_poll,
+            ),
+            patch(
+                "terrapod.services.vcs_poller._compute_paths_unions",
+                new_callable=AsyncMock,
+                return_value={},
             ),
         ):
             await handle_immediate_poll({"repo": "markupai/scalable-language-servers"})
@@ -714,7 +724,7 @@ class TestPollCycleParallel:
 
         polled: list[uuid.UUID] = []
 
-        async def fake_owned_poll(ws_id, semaphore, cache=None):
+        async def fake_owned_poll(ws_id, semaphore, cache=None, paths_unions=None):
             polled.append(ws_id)
 
         with (
@@ -722,6 +732,11 @@ class TestPollCycleParallel:
             patch(
                 "terrapod.services.vcs_poller._poll_workspace_owned",
                 side_effect=fake_owned_poll,
+            ),
+            patch(
+                "terrapod.services.vcs_poller._compute_paths_unions",
+                new_callable=AsyncMock,
+                return_value={},
             ),
         ):
             await handle_immediate_poll({"repo": "ns/my_repo_v2"})
@@ -758,7 +773,7 @@ class TestPollCycleParallel:
 
         polled: list[uuid.UUID] = []
 
-        async def fake_owned_poll(ws_id, semaphore, cache=None):
+        async def fake_owned_poll(ws_id, semaphore, cache=None, paths_unions=None):
             polled.append(ws_id)
 
         with (
@@ -767,12 +782,18 @@ class TestPollCycleParallel:
                 "terrapod.services.vcs_poller._poll_workspace_owned",
                 side_effect=fake_owned_poll,
             ),
+            patch(
+                "terrapod.services.vcs_poller._compute_paths_unions",
+                new_callable=AsyncMock,
+                return_value={},
+            ),
         ):
             await handle_immediate_poll({"repo": "ns/repo", "provider": "github"})
 
-        # Inspect the emitted SQL to confirm the provider filter is there
-        # — the actual scoping happens in SQL, not in Python.
-        stmt = mock_db.execute.await_args[0][0]
+        # Inspect the emitted SQL on the FIRST execute call (workspace-id select)
+        # to confirm the provider filter is there — the actual scoping happens
+        # in SQL, not in Python. (The compute-paths-unions call is patched out.)
+        stmt = mock_db.execute.await_args_list[0][0][0]
         compiled = str(stmt.compile(compile_kwargs={"literal_binds": True}))
         assert "vcs_connections.provider = 'github'" in compiled
         assert polled == [github_match]

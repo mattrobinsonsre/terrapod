@@ -42,6 +42,8 @@ kubernetes = "^35.0.0"
 pgpy = "^0.6.0"
 # GitHub App JWT signing for VCS integration
 pyjwt = {extras = ["crypto"], version = "^2.8.0"}
+# Pure-Python git client for partial-clone + sparse-checkout VCS fetches
+dulwich = "^1.2"
 # Async SMTP for email notifications
 aiosmtplib = "^5.1.0"
 # SSE (Server-Sent Events) for real-time run status updates
@@ -114,5 +116,6 @@ module = [
     "kubernetes.*",
     "pgpy.*",
     "aiosmtplib",
+    "dulwich.*",
 ]
 ignore_missing_imports = true

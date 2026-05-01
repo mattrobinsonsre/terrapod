@@ -44,13 +44,19 @@ Terrapod's background poller checks your VCS providers every 60 seconds (configu
 - **No inbound connections required** -- Terrapod only makes outbound HTTPS calls to VCS provider APIs, so it works behind firewalls and NATs without any ingress configuration.
 - **Webhooks are optional** (GitHub only, currently) -- if you want faster feedback (sub-second instead of up to 60s), you can configure GitHub webhooks. The webhook tells the poller to check immediately rather than waiting for the next cycle.
 
-### Streaming + caching
+### Sparse fetch + caching
 
-VCS tarball downloads stream from the provider through a local file pipeline (download → strip top-level dir → upload to object storage), never buffering the whole archive in process memory. Multi-hundred-MB monorepo tarballs stay under ~10 MB of process memory. The api pod requires per-pod ephemeral storage (`api.ephemeralStorage.enabled: true`, default 10 GiB) to back this pipeline — see [Deployment: VCS archive streaming and ephemeral storage](deployment.md#vcs-archive-streaming-and-ephemeral-storage-required-for-monorepo-workspaces).
+VCS archive fetches use git's smart-HTTP partial-clone protocol (via [dulwich](https://www.dulwich.io/)) — Terrapod fetches only the commit, trees, and the blobs reachable under the configured `working-directory` ∪ `trigger-prefixes`. For a workspace tracking a single subdirectory of a monorepo, the wire fetch is bounded by that subdirectory rather than the whole repo.
 
-Stripped tarballs are cached in object storage at `vcs_archives/{conn_id}/{owner}/{repo}/{sha}.tar.gz`. Multiple workspaces tracking the same `(repo, sha)` only trigger one provider download per cycle (single-flight in-process + storage cache across cycles). The cache is content-addressed (commit SHA = key) and evicted by the artifact-retention sweeper after `vcs.archive_cache_retention_days` (default 7).
+For each `(connection, repo)` the poll cycle pre-computes a single union of every workspace's narrowing paths and shares one fetch across all of them. If any workspace under that group has no narrowing configured, the union collapses to "whole repo" — that workspace's plan/apply must see all files outside its declared paths, so we cannot narrow.
 
-If the api pod's ephemeral PVC nears capacity (e.g. previous-pod orphans, very large concurrent downloads), the cache automatically sweeps the oldest tarball temp files older than 5 minutes before reserving more disk. Tunable via `vcs.tmpdir_min_free_bytes` (default 2 GiB).
+The fetched files are streamed directly to object storage as a gzipped tarball — repo-rooted entries, no wrapper directory — via a kernel pipe. Peak process memory is bounded by the largest single blob plus a 64 KiB chunk; clone state lives on the api pod's ephemeral PVC. The api pod requires per-pod ephemeral storage (`api.ephemeralStorage.enabled: true`, default 10 GiB) to back this pipeline — see [Deployment: VCS archive streaming and ephemeral storage](deployment.md#vcs-archive-streaming-and-ephemeral-storage-required-for-monorepo-workspaces).
+
+Tarballs are cached in object storage at `vcs_archives/{conn_id}/{owner}/{repo}/{sha}-{paths_hash}.tar.gz`. The cache is content-addressed by `(commit SHA, paths hash)` — different path-narrowing sets produce different cache entries. Two callers must agree on the same path set to share a cache entry; the poll cycle's union pre-computation is what makes this happen for a monorepo with multiple workspaces. Entries are evicted by the artifact-retention sweeper after `vcs.archive_cache_retention_days` (default 7).
+
+If the api pod's ephemeral PVC nears capacity (e.g. previous-pod orphans, very large concurrent fetches), the cache automatically sweeps stale tarball temp files AND orphan clone directories older than 5 minutes before reserving more disk. Tunable via `vcs.tmpdir_min_free_bytes` (default 2 GiB).
+
+**Server requirements.** GitHub.com and GitLab.com both support the partial-clone capabilities Terrapod uses (`uploadpack.allowFilter`, `uploadpack.allowAnySHA1InWant`). Self-hosted GitLab >= 13.0 and GitHub Enterprise Server >= 3.0 support them too. If a server rejects a fetch with a capability error, the poller logs and retries on the next cycle — no silent fallback to a full-repo fetch, since that would mask broken servers.
 
 ### Provider Dispatch
 
@@ -357,9 +363,12 @@ Now commits to `modules/vpc/main.tf` will trigger runs for this workspace.
 
 **Notes:**
 - Maximum 20 entries
+- Paths are evaluated **relative to the repo root**, not relative to `working-directory`
 - Paths are normalized (leading/trailing slashes stripped)
 - When `trigger-prefixes` is set, the working directory is NOT automatically included — add it explicitly if needed
 - Set to `[]` (empty list) to revert to default working directory filtering
+
+**Sparse fetch implication.** `working-directory` and `trigger-prefixes` also narrow the actual git fetch — Terrapod only downloads blobs reachable under those paths. For a workspace tracking `environments/dev` of a 500 MB monorepo, the wire fetch is bounded by the size of `environments/dev/` plus any declared `trigger-prefixes`, not the full repo.
 
 ### Supported URL Formats
 
