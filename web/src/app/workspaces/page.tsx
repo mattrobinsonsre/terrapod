@@ -97,17 +97,32 @@ function WorkspacesPageInner() {
     }
   }, [statusMenuOpen])
 
-  // Sync the input back to the URL whenever the parsed shape changes.
+  // Sync the input to the URL whenever the parsed filter changes.
+  //
+  // Dedup via `lastSyncedQueryRef` — we track the last query string we
+  // wrote and skip redundant `router.replace` calls. We deliberately do
+  // NOT compare against `searchParams.get('q')`: `useSearchParams()` is
+  // updated by Next.js asynchronously after `router.replace`, so its
+  // value in the effect closure can be one render behind the URL we
+  // just wrote. That stale read was the cause of the workspaces filter
+  // sync being "hit and miss" — it would early-return on a comparison
+  // against an out-of-date `current`, leaving the address bar stuck.
+  // The ref is written-once-per-real-update and never reads back from
+  // the URL, so it can't go stale.
+  //
+  // Initialised to the URL's current `q` so that mounting on a page
+  // already loaded with `?q=...` (refresh, shared link) doesn't fire a
+  // redundant `router.replace` over the unchanged URL on first render.
+  const lastSyncedQueryRef = useRef<string | null>(searchParams.get('q') || '')
   useEffect(() => {
     const serialized = serializeFilter(parsedFilter)
-    const current = searchParams.get('q') || ''
-    if (serialized === current) return
-    const params = new URLSearchParams(Array.from(searchParams.entries()))
-    if (serialized) params.set('q', serialized)
-    else params.delete('q')
-    const qs = params.toString()
-    router.replace(qs ? `/workspaces?${qs}` : '/workspaces', { scroll: false })
-  }, [parsedFilter, router, searchParams])
+    if (lastSyncedQueryRef.current === serialized) return
+    lastSyncedQueryRef.current = serialized
+    const url = serialized
+      ? `/workspaces?q=${encodeURIComponent(serialized)}`
+      : '/workspaces'
+    router.replace(url, { scroll: false })
+  }, [parsedFilter, router])
 
   const filteredWorkspaces = useMemo(() => {
     if (parsedFilter.terms.length === 0) return workspaces
