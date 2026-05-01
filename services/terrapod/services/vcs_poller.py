@@ -34,7 +34,6 @@ from terrapod.db.models import Run, VCSConnection, Workspace, utc_now
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import github_service, gitlab_service, run_service
-from terrapod.services.archive_utils import strip_archive_top_level_dir_async
 from terrapod.services.vcs_archive_cache import VCSArchiveCache, materialize_archive
 from terrapod.services.vcs_provider import PullRequest
 from terrapod.storage import get_storage
@@ -176,9 +175,6 @@ async def _resolve_branch(conn: VCSConnection, ws: Workspace, owner: str, repo: 
     return None
 
 
-_strip_top_level_dir = strip_archive_top_level_dir_async  # alias for internal use
-
-
 async def _stream_cv_upload_from_cache(
     cache_storage_key: str, workspace_id: uuid.UUID, cv_id: uuid.UUID
 ) -> None:
@@ -212,6 +208,7 @@ async def _create_vcs_run(
     pr_number: int | None = None,
     message: str = "",
     cache: VCSArchiveCache | None = None,
+    fetch_paths: list[str] | None = None,
 ) -> Run | None:
     """Download archive (via cache + streaming), create ConfigurationVersion and Run.
 
@@ -251,7 +248,7 @@ async def _create_vcs_run(
         cache = VCSArchiveCache()
 
     try:
-        cache_storage_key = await cache.get_or_fetch(conn, owner, repo, sha)
+        cache_storage_key = await cache.get_or_fetch(conn, owner, repo, sha, paths=fetch_paths)
     except Exception as e:
         logger.error(
             "Failed to fetch repo archive into cache",
@@ -311,6 +308,7 @@ async def _poll_workspace_branch(
     repo: str,
     branch: str,
     cache: VCSArchiveCache | None = None,
+    fetch_paths: list[str] | None = None,
 ) -> None:
     """Check the tracked branch for new commits and create a run."""
     sha = await _get_branch_sha(conn, owner, repo, branch)
@@ -399,6 +397,7 @@ async def _poll_workspace_branch(
         branch,
         message=f"Triggered by commit {sha[:8]} on {branch}",
         cache=cache,
+        fetch_paths=fetch_paths,
     )
 
     if run:
@@ -421,6 +420,7 @@ async def _poll_workspace_prs(
     repo: str,
     branch: str,
     cache: VCSArchiveCache | None = None,
+    fetch_paths: list[str] | None = None,
 ) -> None:
     """Check open PRs/MRs targeting the tracked branch for speculative plans."""
     prs = await _list_open_prs(conn, owner, repo, branch)
@@ -516,6 +516,7 @@ async def _poll_workspace_prs(
             pr_number=pr.number,
             message=f"Speculative plan for PR #{pr.number}: {pr.title}",
             cache=cache,
+            fetch_paths=fetch_paths,
         )
 
         if run:
@@ -534,12 +535,18 @@ async def _poll_workspace(
     db: AsyncSession,
     ws: Workspace,
     cache: VCSArchiveCache | None = None,
+    paths_unions: "PathsUnionMap | None" = None,
 ) -> None:
     """Poll a single workspace: check branch for pushes and PRs for speculative plans.
 
-    `cache` coalesces concurrent (conn, sha) downloads across workspaces in the
-    same poll cycle. Pass None for one-shot calls; a fresh cache is built inside
-    `_create_vcs_run` so streaming + per-call disk-temp behaviour still applies.
+    `cache` coalesces concurrent (conn, sha, paths) fetches across workspaces
+    in the same poll cycle. Pass None for one-shot calls; a fresh cache is
+    built inside `_create_vcs_run` so streaming + per-call disk-temp
+    behaviour still applies.
+
+    `paths_unions` is the per-`(conn, owner, repo)` union map; we look up
+    this workspace's group and pass the resolved path list to
+    `_create_vcs_run` so the partial-clone fetch is narrowed.
     """
     if not ws.vcs_repo_url or not ws.vcs_connection_id:
         return
@@ -575,12 +582,16 @@ async def _poll_workspace(
         ws.vcs_last_error_at = utc_now()
         return
 
+    fetch_paths: list[str] | None = None
+    if paths_unions is not None:
+        fetch_paths = paths_unions.get((conn.id, owner, repo))
+
     try:
         # 1. Check tracked branch for new commits → real runs
-        await _poll_workspace_branch(db, ws, conn, owner, repo, branch, cache)
+        await _poll_workspace_branch(db, ws, conn, owner, repo, branch, cache, fetch_paths)
 
         # 2. Check open PRs/MRs targeting the tracked branch → speculative plans
-        await _poll_workspace_prs(db, ws, conn, owner, repo, branch, cache)
+        await _poll_workspace_prs(db, ws, conn, owner, repo, branch, cache, fetch_paths)
 
         # Success: update last-polled timestamp and clear any previous error
         ws.vcs_last_polled_at = utc_now()
@@ -610,6 +621,7 @@ async def _poll_workspace_owned(
     ws_id: uuid.UUID,
     semaphore: asyncio.Semaphore,
     cache: VCSArchiveCache | None = None,
+    paths_unions: "PathsUnionMap | None" = None,
 ) -> None:
     """Poll a single workspace in its own DB session, bounded by a semaphore.
 
@@ -618,14 +630,18 @@ async def _poll_workspace_owned(
     so one workspace's failure doesn't sink the whole cycle.
 
     `cache` is shared across all workspaces in this cycle so concurrent polls
-    of the same (conn, sha) coalesce on a single tarball download.
+    of the same (conn, sha, paths) coalesce on a single fetch.
+
+    `paths_unions` is the per-`(conn, owner, repo)` union of every
+    workspace's `working_directory ∪ trigger_prefixes` for this cycle.
+    Used to narrow the partial-clone fetch.
     """
     async with semaphore, get_db_session() as db:
         ws = await db.get(Workspace, ws_id)
         if ws is None:
             return
         try:
-            await _poll_workspace(db, ws, cache)
+            await _poll_workspace(db, ws, cache, paths_unions)
             await db.commit()
         except Exception as e:
             logger.error(
@@ -711,6 +727,98 @@ async def _select_workspace_ids(
     return matched
 
 
+PathsUnionMap = dict[tuple[uuid.UUID, str, str], list[str]]
+
+
+async def _compute_paths_unions(db: AsyncSession, workspace_ids: list[uuid.UUID]) -> PathsUnionMap:
+    """Compute the union of working_directory + trigger_prefixes per
+    (connection_id, owner, repo) across the cycle's workspaces.
+
+    Returned map is keyed by (connection_id, owner, repo); the value is
+    the sorted, deduplicated, prefix-collapsed path list. An empty list
+    means "fetch the whole repo" (some workspace under that key has no
+    narrowing configured).
+
+    This drives the partial-clone fetch in `git_fetch.py`. Path narrowing
+    only applies when EVERY workspace under the same (conn, owner, repo)
+    has a non-empty `working_directory ∪ trigger_prefixes`. If any one
+    workspace wants the whole repo, we fetch the whole repo for that
+    cache entry — otherwise that workspace's plan/apply would miss
+    files outside its declared paths.
+    """
+    if not workspace_ids:
+        return {}
+    stmt = (
+        select(
+            Workspace.id,
+            Workspace.vcs_connection_id,
+            Workspace.vcs_repo_url,
+            Workspace.working_directory,
+            Workspace.trigger_prefixes,
+            VCSConnection.provider,
+        )
+        .join(VCSConnection, Workspace.vcs_connection_id == VCSConnection.id)
+        .where(Workspace.id.in_(workspace_ids))
+    )
+    rows = (await db.execute(stmt)).all()
+
+    # Per-key accumulator. None as the value means "whole repo wanted by
+    # at least one workspace under this key" — we collapse to [] at the end.
+    accum: dict[tuple[uuid.UUID, str, str], set[str] | None] = {}
+    for _ws_id, conn_id, repo_url, wd, tp, provider in rows:
+        if conn_id is None or not repo_url:
+            continue
+        if provider not in _KNOWN_VCS_PROVIDERS:
+            continue
+        parse = (
+            gitlab_service.parse_repo_url if provider == "gitlab" else github_service.parse_repo_url
+        )
+        parsed = parse(repo_url)
+        if parsed is None:
+            continue
+        owner, repo_name = parsed
+        key = (conn_id, owner, repo_name)
+
+        ws_paths: list[str] = []
+        if wd:
+            ws_paths.append(wd.strip("/ "))
+        if tp:
+            ws_paths.extend(p.strip("/ ") for p in tp if p)
+        ws_paths = [p for p in ws_paths if p]
+
+        if not ws_paths:
+            # Workspace wants the whole repo → poison the union for this key.
+            # Trade-off: any other workspace under the same (conn, owner, repo)
+            # could in principle have narrowed independently, but they'd then
+            # need their own cache entry — losing the cross-workspace fetch
+            # coalescing this map exists to provide. Correctness wins: we
+            # fetch the union (= whole repo) once and serve all of them.
+            accum[key] = None
+            continue
+        existing = accum.get(key, set())
+        if existing is None:
+            continue  # already poisoned
+        existing.update(ws_paths)
+        accum[key] = existing
+
+    out: PathsUnionMap = {}
+    for key, val in accum.items():
+        if val is None:
+            out[key] = []  # whole-repo sentinel
+        else:
+            # Drop entries that are strict prefixes of others (the shorter
+            # subsumes). git_fetch.normalize_paths does the same; we duplicate
+            # here so the map values are already canonical for logging.
+            sorted_paths = sorted(val)
+            collapsed: list[str] = []
+            for p in sorted_paths:
+                if any(p != prev and p.startswith(prev + "/") for prev in collapsed):
+                    continue
+                collapsed.append(p)
+            out[key] = collapsed
+    return out
+
+
 async def poll_cycle() -> None:
     """Execute one poll cycle: check all VCS-enabled workspaces in parallel.
 
@@ -720,19 +828,24 @@ async def poll_cycle() -> None:
     start = time_mod.monotonic()
     async with get_db_session() as db:
         workspace_ids = await _select_workspace_ids(db)
+        paths_unions = await _compute_paths_unions(db, workspace_ids)
 
     if not workspace_ids:
         VCS_POLL_DURATION.labels(provider="all").observe(time_mod.monotonic() - start)
         return
 
-    logger.debug("VCS poll cycle", workspace_count=len(workspace_ids))
+    logger.debug(
+        "VCS poll cycle",
+        workspace_count=len(workspace_ids),
+        union_groups=len(paths_unions),
+    )
 
-    # One cache instance per cycle — coalesces concurrent (conn, sha) tarball
-    # downloads across all workspace polls in this cycle.
+    # One cache instance per cycle — coalesces concurrent (conn, sha, paths)
+    # fetches across all workspace polls in this cycle.
     cache = VCSArchiveCache()
     semaphore = asyncio.Semaphore(_MAX_PARALLEL_WORKSPACE_POLLS)
     await asyncio.gather(
-        *[_poll_workspace_owned(wid, semaphore, cache) for wid in workspace_ids],
+        *[_poll_workspace_owned(wid, semaphore, cache, paths_unions) for wid in workspace_ids],
         return_exceptions=True,
     )
 
@@ -763,6 +876,7 @@ async def handle_immediate_poll(payload: dict) -> None:
             repo=repo or None,
             provider=provider,
         )
+        paths_unions = await _compute_paths_unions(db, workspace_ids)
 
     if not workspace_ids:
         logger.info("Immediate poll: no workspaces match repo", repo=repo)
@@ -780,7 +894,7 @@ async def handle_immediate_poll(payload: dict) -> None:
     cache = VCSArchiveCache()
     semaphore = asyncio.Semaphore(_MAX_PARALLEL_WORKSPACE_POLLS)
     await asyncio.gather(
-        *[_poll_workspace_owned(wid, semaphore, cache) for wid in workspace_ids],
+        *[_poll_workspace_owned(wid, semaphore, cache, paths_unions) for wid in workspace_ids],
         return_exceptions=True,
     )
 

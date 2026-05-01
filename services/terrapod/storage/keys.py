@@ -126,13 +126,18 @@ def module_override_key(commit_sha: str, namespace: str, name: str, provider: st
 # --- VCS Archive Cache ---
 
 
-def vcs_archive_key(connection_id: str, owner: str, repo: str, sha: str) -> str:
-    """Key for a cached, top-level-stripped VCS archive tarball.
+def vcs_archive_key(
+    connection_id: str, owner: str, repo: str, sha: str, paths_hash: str = "full"
+) -> str:
+    """Key for a cached VCS archive tarball.
 
     Scoped by `connection_id` so two VCS connections that happen to point
     at the same repo (e.g. one Terrapod app + one personal app for testing)
     can't see each other's cache entries. Content is content-addressed by
-    commit SHA — same SHA = same tarball, safe to share across workspaces
-    using the same connection.
+    commit SHA + a hash of the path-narrowing set — same SHA + same paths
+    means byte-identical tarball, safe to share across workspaces using
+    the same connection.
+
+    `paths_hash` defaults to `"full"` for the legacy whole-repo case.
     """
-    return f"vcs_archives/{connection_id}/{owner}/{repo}/{sha}.tar.gz"
+    return f"vcs_archives/{connection_id}/{owner}/{repo}/{sha}-{paths_hash}.tar.gz"

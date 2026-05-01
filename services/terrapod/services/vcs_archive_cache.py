@@ -3,24 +3,31 @@
 Why this exists
 ---------------
 Without coordination, every workspace that polls a VCS repo at a given
-commit SHA does its own GitHub/GitLab tarball download — even when the
-SHA is identical across workspaces (typical with multiple workspaces in
-one mono-repo). With N workspaces tracking a single mono-repo at the
-same SHA, that means N simultaneous downloads + N in-memory buffers per
-poll cycle. For non-trivial repos (hundreds of MB), the api pod runs
-out of memory and gets OOM-killed.
+commit SHA + path set does its own git fetch — even when the
+(SHA, paths) is identical across workspaces (typical with multiple
+workspaces in one monorepo sharing the same `working_directory` /
+`trigger_prefixes` union).
 
 The cache solves this with two layers:
 
 1. **In-process single-flight** — concurrent workspace polls within ONE
-   replica's poll cycle coalesce on a single download. First requestor
+   replica's poll cycle coalesce on a single fetch. First requestor
    takes a per-key `asyncio.Lock`; the others wait, then either pull from
    the in-memory dict or read the now-populated storage cache.
 
-2. **Object storage cache** — stripped tarballs persisted at
-   `vcs_archives/{conn_id}/{owner}/{repo}/{sha}.tar.gz`. Survives across
-   poll cycles and replicas. The artifact-retention sweeper evicts entries
-   older than `vcs.archive_cache_retention_days`.
+2. **Object storage cache** — narrowed tarballs persisted at
+   `vcs_archives/{conn_id}/{owner}/{repo}/{sha}-{paths_hash}.tar.gz`.
+   Survives across poll cycles and replicas. The artifact-retention
+   sweeper evicts entries older than `vcs.archive_cache_retention_days`.
+
+Path narrowing
+--------------
+Each fetch is scoped to a path set — typically the union of every
+workspace's `working_directory ∪ trigger_prefixes` for the same
+`(connection, repo)` in the cycle. Only blobs under those paths are
+fetched (via dulwich partial clone + sparse selection in
+`git_fetch.py`). Different path sets produce different cache keys; the
+caller is responsible for stable path-set computation per cycle.
 
 Multi-replica safety
 --------------------
@@ -29,33 +36,48 @@ Multi-replica safety
 - The runs.py UI vcs-ref override path runs in request handlers on any
   replica. The in-process lock won't dedup cross-replica requests there,
   but the storage `head()` check plus the partial-failure cleanup in
-  `_download_strip_upload` keeps the cache consistent: cloud backends
+  `_fetch_and_upload` keeps the cache consistent: cloud backends
   (S3 multipart-complete, Azure commit-block-list, GCS resumable finalize)
   are atomic on success, and the filesystem backend's non-atomic write is
   caught by the try/except and the partial entry deleted. Worst case: two
-  replicas do the same download once and overwrite the same content-
+  replicas do the same fetch once and overwrite the same content-
   addressed key with byte-identical content.
 
 Memory profile
 --------------
-Bounded by per-chunk buffers (1 MiB stream chunk + tarfile per-member
-buffer). A 500 MB tarball stays under ~10 MB of process memory at any
-moment; the rest lives on the api pod's ephemeral PVC.
+The git CLI does the fetch on disk (clone dir on the api pod's
+ephemeral PVC; no in-memory pack buffering). Tar production reads
+files one at a time via `tarfile.add` and streams gzip output
+through an `os.pipe` to `storage.put_stream` — kernel pipe buffer
+provides backpressure. Peak memory at any moment:
+
+* one blob in flight (Python's `tarfile.add` reads the source file
+  through a buffered reader, so the file's bytes don't all land in
+  memory at once — but the gzip writer's internal block buffer can
+  hold up to ~64 KiB of output)
+* one 64 KiB pipe chunk being consumed
+* zlib state for the gzip stream (small, kilobytes)
+
+For a repo of small terraform files this stays well under 10 MB. A
+single very large file (e.g. a multi-hundred-MB binary asset) would
+be streamed through the gzip writer in 64 KiB chunks — the file
+itself is never fully resident.
 """
 
 from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 import tempfile
 import time as time_mod
+from collections.abc import Iterable
 from contextlib import asynccontextmanager
 
 from terrapod.config import settings
 from terrapod.db.models import VCSConnection
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service
-from terrapod.services.archive_utils import strip_archive_top_level_dir_file_async
+from terrapod.services import git_fetch
 from terrapod.storage import get_storage
 from terrapod.storage.keys import vcs_archive_key
 from terrapod.storage.protocol import ObjectNotFoundError
@@ -87,20 +109,43 @@ def _free_bytes(path: str) -> int:
     return stat.f_bavail * stat.f_frsize
 
 
+_CLONE_DIR_PREFIX = "vcs-clone-"
+
+
+def _dir_size_bytes(path: str) -> int:
+    """Best-effort recursive size for a directory; 0 on errors."""
+    total = 0
+    try:
+        for root, _dirs, files in os.walk(path):
+            for f in files:
+                fp = os.path.join(root, f)
+                try:
+                    total += os.path.getsize(fp)
+                except OSError:
+                    continue
+    except OSError:
+        return total
+    return total
+
+
 def _ensure_tmpdir_space(tmpdir: str | None) -> None:
     """Best-effort: free up space in `tmpdir` if free space is below threshold.
 
-    Scans for orphan tarball-like temp files older than `_ORPHAN_AGE_SECONDS`
-    (anything actively being used should be younger), deletes oldest first
-    until we hit `vcs.tmpdir_min_free_bytes` free or run out of candidates.
+    Scans for orphans older than `_ORPHAN_AGE_SECONDS` and deletes oldest
+    first until we hit `vcs.tmpdir_min_free_bytes` free or run out of
+    candidates. Two orphan classes:
 
-    A previous pod crash can leave NamedTemporaryFile orphans behind even
-    though the file descriptors went away — those files keep their disk
-    blocks until something deletes them. Without this sweep the PVC fills
-    up over time and every subsequent download fails with ENOSPC.
+    * Tarball-shaped files (`*.tar.gz`) left behind by NamedTemporaryFile
+      after a pod crash before the context exit cleanup ran.
+    * Clone directories (`vcs-clone-*`) left behind by an aborted
+      git_fetch — TemporaryDirectory normally cleans them up, but a hard
+      kill (OOM, SIGKILL) skips the cleanup hook.
+
+    Without this sweep the PVC fills up over time and every subsequent
+    fetch fails with ENOSPC.
 
     Best-effort: failures here are logged and swallowed. The actual
-    download will surface a real ENOSPC if there's still no space.
+    fetch will surface a real ENOSPC if there's still no space.
     """
     if tmpdir is None:
         # System tempdir — assume the OS handles its own cleanup
@@ -115,29 +160,28 @@ def _ensure_tmpdir_space(tmpdir: str | None) -> None:
         return
 
     logger.warning(
-        "VCS tmpdir below free-space threshold; sweeping orphan tarballs",
+        "VCS tmpdir below free-space threshold; sweeping orphans",
         path=tmpdir,
         free_bytes=free,
         threshold_bytes=threshold,
     )
 
     cutoff = time_mod.time() - _ORPHAN_AGE_SECONDS
-    candidates: list[tuple[float, str]] = []
+    # `kind` ∈ {"file", "dir"} — we delete with different syscalls.
+    candidates: list[tuple[float, str, str]] = []
     try:
         for entry in os.scandir(tmpdir):
-            if not entry.is_file(follow_symlinks=False):
-                continue
-            name = entry.name
-            # Only sweep files that look like our tarballs — avoid nuking
-            # anything else mounted into this directory by accident.
-            if not name.endswith(".tar.gz"):
-                continue
             try:
                 mtime = entry.stat(follow_symlinks=False).st_mtime
             except OSError:
                 continue
-            if mtime < cutoff:
-                candidates.append((mtime, entry.path))
+            if mtime >= cutoff:
+                continue
+            name = entry.name
+            if entry.is_file(follow_symlinks=False) and name.endswith(".tar.gz"):
+                candidates.append((mtime, entry.path, "file"))
+            elif entry.is_dir(follow_symlinks=False) and name.startswith(_CLONE_DIR_PREFIX):
+                candidates.append((mtime, entry.path, "dir"))
     except OSError as e:
         logger.warning("scandir failed on tmpdir", path=tmpdir, error=str(e))
         return
@@ -145,10 +189,14 @@ def _ensure_tmpdir_space(tmpdir: str | None) -> None:
     candidates.sort()  # oldest first
     deleted = 0
     bytes_freed = 0
-    for _mtime, path in candidates:
+    for _mtime, path, kind in candidates:
         try:
-            sz = os.path.getsize(path)
-            os.unlink(path)
+            if kind == "file":
+                sz = os.path.getsize(path)
+                os.unlink(path)
+            else:
+                sz = _dir_size_bytes(path)
+                shutil.rmtree(path, ignore_errors=True)
             deleted += 1
             bytes_freed += sz
         except OSError:
@@ -163,28 +211,23 @@ def _ensure_tmpdir_space(tmpdir: str | None) -> None:
     logger.info(
         "VCS tmpdir sweep complete",
         path=tmpdir,
-        deleted_files=deleted,
+        deleted_orphans=deleted,
         bytes_freed=bytes_freed,
         free_bytes_after=free,
     )
 
 
-async def _stream_download_to_file(
-    conn: VCSConnection, owner: str, repo: str, sha: str, dest_path: str
-) -> int:
-    """Dispatch to the appropriate provider's streaming download."""
-    if conn.provider == "gitlab":
-        return await gitlab_service.download_archive_to_file(conn, owner, repo, sha, dest_path)
-    return await github_service.download_repo_archive_to_file(conn, owner, repo, sha, dest_path)
-
-
 async def _file_chunks(path: str, chunk_size: int = 1 << 20):
     """Async-iterate a file's contents in `chunk_size` chunks.
+
+    Used by the cv-upload-from-cache path in `vcs_poller`: a workspace's
+    config-version is uploaded to its own storage key by streaming bytes
+    from the materialised cache file rather than re-fetching.
 
     Read I/O happens in a thread so the event loop isn't blocked on each
     read. The file handle lives in this generator's frame for the lifetime
     of the consumer — if the consumer aborts mid-iteration the handle
-    closes via the generator's `with` block on GC.
+    closes via the finally block on GC.
     """
 
     def _read(f):  # noqa: ANN001
@@ -234,14 +277,22 @@ class VCSArchiveCache:
         owner: str,
         repo: str,
         sha: str,
+        paths: Iterable[str] | None = None,
     ) -> str:
-        """Ensure the stripped tarball for (conn, owner, repo, sha) is in storage.
+        """Ensure the narrowed tarball for (conn, owner, repo, sha, paths) is in storage.
 
-        Returns the storage key. Concurrent calls for the same (conn, sha)
-        coalesce — exactly one performs the download, the others wait and
-        re-use the result.
+        Returns the storage key. Concurrent calls for the same
+        (conn, sha, paths) coalesce — exactly one performs the fetch,
+        the others wait and re-use the result.
+
+        `paths` is the union of repo-rooted paths (working_directory ∪
+        trigger_prefixes) the caller wants in the tarball. None or empty
+        means "whole repo" (full clone, all blobs). Two callers must
+        agree on the same path set to share a cache entry — typically
+        achieved by pre-computing the union at the poll-cycle level.
         """
-        cache_key = f"{conn.id}:{owner}/{repo}@{sha}"
+        ph = git_fetch.paths_hash(paths)
+        cache_key = f"{conn.id}:{owner}/{repo}@{sha}#{ph}"
         if cache_key in self._known:
             return self._known[cache_key]
 
@@ -251,7 +302,7 @@ class VCSArchiveCache:
             if cache_key in self._known:
                 return self._known[cache_key]
 
-            storage_key = vcs_archive_key(str(conn.id), owner, repo, sha)
+            storage_key = vcs_archive_key(str(conn.id), owner, repo, sha, ph)
             storage = get_storage()
 
             # Storage cache hit (previous cycle or another replica wrote it).
@@ -264,32 +315,36 @@ class VCSArchiveCache:
                     owner=owner,
                     repo=repo,
                     sha=sha[:8],
+                    paths_hash=ph,
                 )
                 return storage_key
             except ObjectNotFoundError:
                 pass
 
-            # Miss → download, strip, upload.
-            await self._download_strip_upload(conn, owner, repo, sha, storage_key)
+            # Miss → fetch + upload.
+            await self._fetch_and_upload(conn, owner, repo, sha, paths, storage_key)
             self._known[cache_key] = storage_key
             return storage_key
 
-    async def _download_strip_upload(
+    async def _fetch_and_upload(
         self,
         conn: VCSConnection,
         owner: str,
         repo: str,
         sha: str,
+        paths: Iterable[str] | None,
         storage_key: str,
     ) -> None:
-        """Stream from VCS → strip → upload to object storage. No memory buffer.
+        """Sparse-fetch from VCS via dulwich and stream-upload to object storage.
 
-        Transactional w.r.t. the storage cache: if `put_stream` raises after
-        partially uploading, we best-effort `delete(storage_key)` so a future
-        `head()` won't return OK on a truncated tarball. Without this, a
-        corrupt entry would be silently served to subsequent workspaces and
-        the runner would fail with a cryptic tarball error far from the
-        upload site.
+        Wraps the clone in a TemporaryDirectory so the on-disk dulwich
+        object store is cleaned up regardless of success. The clone dir
+        name is prefixed `vcs-clone-` so `_ensure_tmpdir_space` can
+        identify and sweep stragglers from prior pod crashes.
+
+        Transactional w.r.t. the storage cache: if upload raises after
+        partially writing, we best-effort `delete(storage_key)` so a
+        future `head()` won't return OK on a truncated tarball.
         """
         storage = get_storage()
         tmpdir = _resolve_tmpdir()
@@ -297,22 +352,19 @@ class VCSArchiveCache:
         # the sweep only does real work when we're below the threshold.
         await asyncio.to_thread(_ensure_tmpdir_space, tmpdir)
 
-        with (
-            tempfile.NamedTemporaryFile(suffix=".raw.tar.gz", dir=tmpdir) as raw_f,
-            tempfile.NamedTemporaryFile(suffix=".stripped.tar.gz", dir=tmpdir) as stripped_f,
-        ):
-            raw_path = raw_f.name
-            stripped_path = stripped_f.name
-
-            bytes_in = await _stream_download_to_file(conn, owner, repo, sha, raw_path)
-            await strip_archive_top_level_dir_file_async(raw_path, stripped_path)
-            bytes_out = await asyncio.to_thread(os.path.getsize, stripped_path)
-
+        clone_parent = await asyncio.to_thread(
+            tempfile.mkdtemp, prefix=_CLONE_DIR_PREFIX, dir=tmpdir
+        )
+        try:
             try:
-                await storage.put_stream(
+                bytes_uploaded = await git_fetch.sparse_archive_to_storage(
+                    conn,
+                    owner,
+                    repo,
+                    sha,
+                    paths,
                     storage_key,
-                    _file_chunks(stripped_path),
-                    content_type="application/x-tar",
+                    clone_dir=clone_parent,
                 )
             except Exception as e:
                 # Partial upload: a future head() might return OK on a
@@ -320,7 +372,7 @@ class VCSArchiveCache:
                 # consistent. We swallow secondary errors — re-raise the
                 # original.
                 logger.warning(
-                    "VCS archive upload failed; deleting partial cache entry",
+                    "VCS archive fetch/upload failed; deleting partial cache entry",
                     storage_key=storage_key,
                     error=str(e),
                 )
@@ -340,10 +392,11 @@ class VCSArchiveCache:
                 owner=owner,
                 repo=repo,
                 sha=sha[:8],
-                raw_bytes=bytes_in,
-                stripped_bytes=bytes_out,
+                bytes_uploaded=bytes_uploaded,
                 storage_key=storage_key,
             )
+        finally:
+            await asyncio.to_thread(shutil.rmtree, clone_parent, True)
 
 
 @asynccontextmanager
