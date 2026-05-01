@@ -45,11 +45,23 @@ Multi-replica safety
 
 Memory profile
 --------------
-The dulwich-based fetch keeps trees + (filtered) blobs in dulwich's
-object store, which is on-disk. Tar streaming uses a kernel pipe (one
-chunk in flight, ~64 KiB). Peak memory is bounded by the largest
-single blob (loaded into bytes for tarfile.addfile) plus a 64 KiB
-chunk. A repo full of small terraform files stays under ~10 MB.
+The git CLI does the fetch on disk (clone dir on the api pod's
+ephemeral PVC; no in-memory pack buffering). Tar production reads
+files one at a time via `tarfile.add` and streams gzip output
+through an `os.pipe` to `storage.put_stream` — kernel pipe buffer
+provides backpressure. Peak memory at any moment:
+
+* one blob in flight (Python's `tarfile.add` reads the source file
+  through a buffered reader, so the file's bytes don't all land in
+  memory at once — but the gzip writer's internal block buffer can
+  hold up to ~64 KiB of output)
+* one 64 KiB pipe chunk being consumed
+* zlib state for the gzip stream (small, kilobytes)
+
+For a repo of small terraform files this stays well under 10 MB. A
+single very large file (e.g. a multi-hundred-MB binary asset) would
+be streamed through the gzip writer in 64 KiB chunks — the file
+itself is never fully resident.
 """
 
 from __future__ import annotations

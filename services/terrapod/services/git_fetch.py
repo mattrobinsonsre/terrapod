@@ -75,9 +75,11 @@ servers).
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import json
 import os
+import re
 import tarfile
 from collections.abc import AsyncIterator, Iterable
 from pathlib import Path
@@ -91,6 +93,15 @@ from terrapod.storage import get_storage
 logger = get_logger(__name__)
 
 _CHUNK_SIZE = 64 * 1024
+# Defence-in-depth: validate the SHA is hex-only before passing to git.
+# After `origin`, git treats positional args as refspecs (not flags), so
+# flag injection isn't reachable — but rejecting non-hex SHAs eliminates
+# a class of malformed-input attack and surfaces upstream API anomalies
+# (e.g. a misbehaving GitHub mock returning a non-SHA) as a clear error
+# instead of an opaque git-fetch failure. Lengths covered: SHA-1 (40),
+# SHA-256 (64), and partial prefixes 4–64 for forward-compat with
+# `core.abbrev` server configs.
+_SHA_RE = re.compile(r"^[0-9a-f]{4,64}$")
 # `git` honours these env vars to suppress credential prompts and
 # terminal interaction — important when running in a container with no
 # TTY. `GIT_TERMINAL_PROMPT=0` makes auth failures fail fast instead of
@@ -178,8 +189,6 @@ async def _resolve_auth(conn: VCSConnection) -> str:
     We base64-encode `user:pass` and emit the `Basic ...` header.
     The Bearer token used for the REST API would be silently rejected.
     """
-    import base64
-
     if conn.provider == "gitlab":
         userpass = f"oauth2:{conn.token or ''}"
     else:
@@ -265,6 +274,10 @@ async def sparse_archive_to_storage(
     (`vcs_archive_cache._fetch_and_upload`) is responsible for
     deleting the storage key on partial-upload failures.
     """
+    if not _SHA_RE.match(sha):
+        raise ValueError(
+            f"refusing to git-fetch a non-hex SHA: {sha!r} (expected 4-64 lowercase hex chars)"
+        )
     norm_paths = normalize_paths(paths)
     auth_header = await _resolve_auth(conn)
     host = _resolve_clone_host(conn.provider, conn.server_url)

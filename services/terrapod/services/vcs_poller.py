@@ -788,6 +788,11 @@ async def _compute_paths_unions(db: AsyncSession, workspace_ids: list[uuid.UUID]
 
         if not ws_paths:
             # Workspace wants the whole repo → poison the union for this key.
+            # Trade-off: any other workspace under the same (conn, owner, repo)
+            # could in principle have narrowed independently, but they'd then
+            # need their own cache entry — losing the cross-workspace fetch
+            # coalescing this map exists to provide. Correctness wins: we
+            # fetch the union (= whole repo) once and serve all of them.
             accum[key] = None
             continue
         existing = accum.get(key, set())

@@ -290,45 +290,19 @@ class TestSparseArchiveAgainstBareRepo:
     served via `file://`. No network involved."""
 
     @pytest.mark.asyncio
-    async def test_fetches_requested_sha_not_head(
-        self, two_commit_bare_repo, tmp_path, monkeypatch
-    ):
-        file_url, sha1, sha2 = two_commit_bare_repo
+    async def test_fetches_requested_sha_not_head(self, two_commit_bare_repo, tmp_path):
+        """Drive the production helper `_run_git` directly against a bare
+        repo served via `file://`. The full `sparse_archive_to_storage`
+        path composes an `https://...` URL from the connection's host
+        configuration; redirecting that to a `file://` URL would mean
+        monkeypatching the URL builder, which doesn't add coverage over
+        running the same git steps directly. Auth resolution is covered
+        in `TestResolveAuth` separately.
+        """
+        file_url, sha1, _sha2 = two_commit_bare_repo
         clone_dir = tmp_path / "clone1"
         clone_dir.mkdir()
 
-        # Patch the URL builder to return our file:// URL regardless of
-        # the connection, and the auth resolver to return an empty
-        # header (file:// transport ignores http.extraheader anyway).
-        monkeypatch.setattr(git_fetch, "_resolve_clone_host", lambda *a, **k: "ignored")
-
-        async def _no_auth(_conn):
-            return ""
-
-        monkeypatch.setattr(git_fetch, "_resolve_auth", _no_auth)
-
-        # Override the URL composition by patching at the call site —
-        # the function builds `https://{host}/{owner}/{repo}.git`. We
-        # need a `file://` URL. Cleanest: monkeypatch a helper. Simpler:
-        # monkeypatch the function itself.
-        original = git_fetch.sparse_archive_to_storage
-
-        async def patched_sparse(conn, owner, repo, sha, paths, key, *, clone_dir):
-            # Re-implement the body but with our file:// URL. Smaller
-            # to just call the original after monkeypatching the URL
-            # composition. Approach: shim via a wrapper that prepares
-            # the clone dir as a working git repo with our origin set.
-            return await original(conn, owner, repo, sha, paths, key, clone_dir=clone_dir)
-
-        # The simplest way to point sparse_archive_to_storage at our
-        # bare repo is to patch URL composition. We do that by
-        # patching urlparse-via-_resolve_clone_host AND by having the
-        # caller construct the URL differently. Simpler: run the steps
-        # by hand and test the composed flow at a slightly lower level.
-        #
-        # Drive the production helpers directly: _run_git is the only
-        # subprocess driver, and the storage step uses the same pipe
-        # plumbing whether the URL is http or file://.
         await git_fetch._run_git(["init", "--quiet", str(clone_dir)])
         await git_fetch._run_git(["-C", str(clone_dir), "remote", "add", "origin", file_url])
         await git_fetch._run_git(
@@ -338,7 +312,7 @@ class TestSparseArchiveAgainstBareRepo:
         await git_fetch._run_git(
             ["-C", str(clone_dir), "config", "remote.origin.partialclonefilter", "blob:none"]
         )
-        # Fetch sha1 (NOT HEAD = sha2). file:// transport doesn't
+        # Fetch sha1 (NOT HEAD = _sha2). file:// transport doesn't
         # always honour --depth on local clones, so we omit it here —
         # the assertion is on which SHA's tree we get, not on shallow
         # clone correctness (which is a git CLI concern).
@@ -348,7 +322,7 @@ class TestSparseArchiveAgainstBareRepo:
         await git_fetch._run_git(["-C", str(clone_dir), "checkout", "--quiet", sha1])
 
         # At sha1, only top.tf exists. If we'd been silently fetching
-        # HEAD (sha2), `infra/` and `modules/` would be present.
+        # HEAD (_sha2), `infra/` and `modules/` would be present.
         files = sorted(
             str(p.relative_to(clone_dir))
             for p in clone_dir.rglob("*")
@@ -395,6 +369,52 @@ class TestSparseArchiveAgainstBareRepo:
         """Bogus arg → non-zero exit → stderr captured in exception."""
         with pytest.raises(RuntimeError, match="git"):
             await git_fetch._run_git(["this-is-not-a-git-subcommand"])
+
+    @pytest.mark.asyncio
+    async def test_non_hex_sha_rejected_before_running_git(self, tmp_path):
+        """Defence-in-depth: non-hex SHAs are rejected at the entry
+        point, before we ever shell out. Belt-and-braces against any
+        future change in git's argument parsing."""
+        from unittest.mock import MagicMock
+
+        conn = MagicMock()
+        conn.provider = "github"
+        with pytest.raises(ValueError, match="non-hex SHA"):
+            await git_fetch.sparse_archive_to_storage(
+                conn,
+                "o",
+                "r",
+                "--upload-pack=evil",
+                None,
+                "key",
+                clone_dir=str(tmp_path),
+            )
+
+    @pytest.mark.asyncio
+    async def test_short_hex_sha_accepted(self, tmp_path, monkeypatch):
+        """4-64 hex chars passes validation. We don't actually fetch
+        here — we trip on auth resolution after the validator (which
+        proves the validator passed)."""
+        from unittest.mock import MagicMock
+
+        conn = MagicMock()
+        conn.provider = "github"
+
+        async def boom(_conn):
+            raise RuntimeError("auth-reached")
+
+        monkeypatch.setattr(git_fetch, "_resolve_auth", boom)
+
+        with pytest.raises(RuntimeError, match="auth-reached"):
+            await git_fetch.sparse_archive_to_storage(
+                conn,
+                "o",
+                "r",
+                "abc1234",
+                None,
+                "key",
+                clone_dir=str(tmp_path),
+            )
 
 
 # ── Pipe + producer plumbing (no git) ──────────────────────────────────
