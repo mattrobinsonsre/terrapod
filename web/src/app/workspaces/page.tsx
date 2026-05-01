@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState, useCallback, useMemo } from 'react'
+import { Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
@@ -13,7 +13,15 @@ import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { useWorkspaceListEvents } from '@/lib/use-workspace-list-events'
-import { matchWorkspace, parseFilterQuery, removeTerm, serializeFilter } from '@/lib/workspace-filter'
+import {
+  hasStatusTerm,
+  matchWorkspace,
+  parseFilterQuery,
+  removeTerm,
+  serializeFilter,
+  toggleStatusTerm,
+} from '@/lib/workspace-filter'
+import { WORKSPACE_STATUSES, resolveStatus } from '@/lib/workspace-status'
 
 interface LatestRun {
   id: string
@@ -67,6 +75,28 @@ function WorkspacesPageInner() {
   const [filterInput, setFilterInput] = useState(searchParams.get('q') || '')
   const parsedFilter = useMemo(() => parseFilterQuery(filterInput), [filterInput])
 
+  // Status dropdown state. Closes on outside-click and Escape — same pattern
+  // used for the run-actions menu so the page feels consistent.
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false)
+  const statusMenuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!statusMenuOpen) return
+    const onClick = (e: MouseEvent) => {
+      if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) {
+        setStatusMenuOpen(false)
+      }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setStatusMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [statusMenuOpen])
+
   // Sync the input back to the URL whenever the parsed shape changes.
   useEffect(() => {
     const serialized = serializeFilter(parsedFilter)
@@ -79,10 +109,15 @@ function WorkspacesPageInner() {
     router.replace(qs ? `/workspaces?${qs}` : '/workspaces', { scroll: false })
   }, [parsedFilter, router, searchParams])
 
-  const filteredWorkspaces = useMemo(
-    () => (parsedFilter.terms.length === 0 ? workspaces : workspaces.filter(ws => matchWorkspace(ws, parsedFilter))),
-    [workspaces, parsedFilter],
-  )
+  const filteredWorkspaces = useMemo(() => {
+    if (parsedFilter.terms.length === 0) return workspaces
+    return workspaces.filter(ws => {
+      // Status terms need the resolved status; pass it conditionally so
+      // workspaces without a status (— display) don't accidentally match
+      // an empty `status:` predicate.
+      return matchWorkspace(ws, parsedFilter, resolveStatus(ws).def?.filter ?? undefined)
+    })
+  }, [workspaces, parsedFilter])
 
   // Create form
   const [showCreate, setShowCreate] = useState(false)
@@ -114,44 +149,20 @@ function WorkspacesPageInner() {
 
   type WsSortKey = 'name' | 'mode' | 'pool' | 'resources' | 'status' | 'created'
 
-  // Resolved status. `runId` is the run that *defined* the status — set
-  // when the status comes from `latest-run`. For workspace-level
-  // conditions (state-diverged, vcs-error, drifted, no-runs) there's
-  // no single defining run so runId stays null and the pill doesn't
-  // link anywhere.
-  function resolveStatus(ws: Workspace): {
-    label: string
-    color: string
-    priority: number
-    runId: string | null
-  } {
-    const drift = ws.attributes['drift-status']
-    const run = ws.attributes['latest-run']
+  // resolveStatus + WORKSPACE_STATUSES are imported from workspace-status.ts
+  // — single source of truth for both the row pill and the filter dropdown.
 
-    if (ws.attributes['state-diverged'])
-      return { label: 'State Diverged', color: 'red', priority: 0, runId: null }
-    if (ws.attributes['vcs-last-error'])
-      return { label: 'VCS Error', color: 'red', priority: 0, runId: null }
-    if (drift === 'drifted')
-      return { label: 'Drifted', color: 'amber', priority: 1, runId: null }
-    if (run) {
-      const s = run.status
-      const planOnly = run['plan-only']
-      const runId = run.id
-      if (s === 'errored') return { label: 'Errored', color: 'red', priority: 2, runId }
-      if (s === 'planned' && !planOnly) return { label: 'Needs Confirm', color: 'amber', priority: 3, runId }
-      if (s === 'planning') return { label: 'Planning', color: 'blue', priority: 4, runId }
-      if (s === 'applying') return { label: 'Applying', color: 'blue', priority: 4, runId }
-      if (s === 'confirmed') return { label: 'Confirmed', color: 'blue', priority: 4, runId }
-      if (s === 'queued') return { label: 'Queued', color: 'blue', priority: 4, runId }
-      if (s === 'pending') return { label: 'Pending', color: 'slate', priority: 5, runId }
-      if (s === 'applied') return { label: 'Applied', color: 'green', priority: 6, runId }
-      if (s === 'planned' && planOnly) return { label: 'Planned', color: 'green', priority: 7, runId }
-      if (s === 'canceled') return { label: 'Canceled', color: 'slate', priority: 8, runId }
-      if (s === 'discarded') return { label: 'Discarded', color: 'slate', priority: 8, runId }
+  // Per-status counts on the unfiltered workspace list, memoised so the
+  // dropdown render is a constant lookup. Recomputes only when the
+  // workspace data changes.
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const ws of workspaces) {
+      const f = resolveStatus(ws).def?.filter
+      if (f) counts[f] = (counts[f] || 0) + 1
     }
-    return { label: '\u2014', color: 'gray', priority: 9, runId: null }
-  }
+    return counts
+  }, [workspaces])
 
   const badgeColors: Record<string, string> = {
     amber: 'bg-amber-900/50 text-amber-300',
@@ -170,7 +181,7 @@ function WorkspacesPageInner() {
         case 'mode': return item.attributes['execution-mode']
         case 'pool': return item.attributes['agent-pool-name'] || ''
         case 'resources': return item.attributes['resource-cpu']
-        case 'status': return resolveStatus(item).label
+        case 'status': return resolveStatus(item).def?.label ?? '\u2014'
         case 'created': return item.attributes['created-at']
       }
     }, []),
@@ -508,56 +519,121 @@ function WorkspacesPageInner() {
           )
         })()}
 
-        {!loading && workspaces.length > 0 && (
-          <div className="mb-4">
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={filterInput}
-                onChange={e => setFilterInput(e.target.value)}
-                placeholder='Filter by name or label — e.g. "eu1" or "env:prod" or "repo:tf-aws-core eu1"'
-                aria-label="Filter workspaces"
-                className="flex-1 px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/50 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500"
-              />
+        {!loading && workspaces.length > 0 && (() => {
+          const activeStatusCount = parsedFilter.terms.filter(t => t.kind === 'status').length
+          return (
+            <div className="mb-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={filterInput}
+                  onChange={e => setFilterInput(e.target.value)}
+                  placeholder='Filter by name, label, or status — e.g. "eu1", "env:prod", "status:errored"'
+                  aria-label="Filter workspaces"
+                  className="flex-1 px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/50 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500"
+                />
+                {/* Status dropdown — single entry point for all status presets.
+                    Picks any combination via toggle; the existing chips below
+                    show what's active and let the user remove individually. */}
+                <div className="relative" ref={statusMenuRef}>
+                  <button
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded={statusMenuOpen}
+                    onClick={() => setStatusMenuOpen(o => !o)}
+                    className={
+                      'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ' +
+                      (activeStatusCount > 0
+                        ? 'bg-slate-700/60 text-slate-100 border-slate-600'
+                        : 'bg-slate-800/50 text-slate-300 border-slate-700/50 hover:bg-slate-700/60')
+                    }
+                  >
+                    <span>Status</span>
+                    {activeStatusCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
+                        {activeStatusCount}
+                      </span>
+                    )}
+                    <svg className={'w-3 h-3 transition-transform ' + (statusMenuOpen ? 'rotate-180' : '')} viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+                      <path d="M3 4.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  {statusMenuOpen && (
+                    <div
+                      role="menu"
+                      className="absolute right-0 z-10 mt-1 w-64 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-96 overflow-y-auto"
+                    >
+                      {WORKSPACE_STATUSES.map(opt => {
+                        const active = hasStatusTerm(parsedFilter, opt.filter)
+                        const count = statusCounts[opt.filter] || 0
+                        return (
+                          <button
+                            key={opt.filter}
+                            type="button"
+                            role="menuitemcheckbox"
+                            aria-checked={active}
+                            onClick={() => setFilterInput(serializeFilter(toggleStatusTerm(parsedFilter, opt.filter)))}
+                            className={
+                              'w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors ' +
+                              (active ? 'bg-slate-700/60 text-slate-100' : 'text-slate-300 hover:bg-slate-700/40')
+                            }
+                          >
+                            {/* Checkmark rail keeps the option labels aligned whether
+                                checked or not. */}
+                            <span className="w-3 inline-flex justify-center text-brand-400">
+                              {active ? '✓' : ''}
+                            </span>
+                            <span className={'w-1.5 h-1.5 rounded-full ' + opt.dot} />
+                            <span className="flex-1 text-left">{opt.label}</span>
+                            <span className={'text-xs ' + (count > 0 ? 'text-slate-400' : 'text-slate-600')}>{count}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+                {parsedFilter.terms.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterInput('')}
+                    className="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
               {parsedFilter.terms.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setFilterInput('')}
-                  className="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 transition-colors"
-                >
-                  Clear
-                </button>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {parsedFilter.terms.map((term, i) => {
+                    const label =
+                      term.kind === 'name'
+                        ? `name: ${term.value}`
+                        : term.kind === 'status'
+                          ? `status: ${term.value}`
+                          : term.value === null
+                            ? `${term.key}: (any)`
+                            : `${term.key}: ${term.value}`
+                    return (
+                      <button
+                        type="button"
+                        key={`${i}-${label}`}
+                        onClick={() => setFilterInput(serializeFilter(removeTerm(parsedFilter, i)))}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 transition-colors"
+                        title="Remove this term"
+                      >
+                        <span>{label}</span>
+                        <span aria-hidden className="text-slate-500">×</span>
+                      </button>
+                    )
+                  })}
+                  <span className="text-xs text-slate-500 self-center">
+                    Showing {filteredWorkspaces.length} of {workspaces.length}
+                  </span>
+                </div>
               )}
             </div>
-            {parsedFilter.terms.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {parsedFilter.terms.map((term, i) => {
-                  const label =
-                    term.kind === 'name'
-                      ? `name: ${term.value}`
-                      : term.value === null
-                        ? `${term.key}: (any)`
-                        : `${term.key}: ${term.value}`
-                  return (
-                    <button
-                      type="button"
-                      key={`${i}-${label}`}
-                      onClick={() => setFilterInput(serializeFilter(removeTerm(parsedFilter, i)))}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-slate-700/50 text-slate-300 hover:bg-slate-700 transition-colors"
-                      title="Remove this term"
-                    >
-                      <span>{label}</span>
-                      <span aria-hidden className="text-slate-500">×</span>
-                    </button>
-                  )
-                })}
-                <span className="text-xs text-slate-500 self-center">
-                  Showing {filteredWorkspaces.length} of {workspaces.length}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+          )
+        })()}
 
         {loading ? (
           <LoadingSpinner />
@@ -580,7 +656,7 @@ function WorkspacesPageInner() {
               </thead>
               <tbody className="divide-y divide-slate-700/30">
                 {sortedWorkspaces.map((ws) => {
-                  const status = resolveStatus(ws)
+                  const { def, runId } = resolveStatus(ws)
                   return (
                   <tr key={ws.id} className="hover:bg-slate-700/20 transition-colors">
                     <td className="px-4 py-3">
@@ -605,18 +681,18 @@ function WorkspacesPageInner() {
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
-                      {status.color === 'gray' ? (
-                        <span className="text-xs text-slate-500">{status.label}</span>
-                      ) : status.runId ? (
+                      {!def ? (
+                        <span className="text-xs text-slate-500">&mdash;</span>
+                      ) : runId ? (
                         <Link
-                          href={`/workspaces/${ws.id}/runs/${status.runId}`}
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium hover:opacity-80 transition-opacity ${badgeColors[status.color]}`}
+                          href={`/workspaces/${ws.id}/runs/${runId}`}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium hover:opacity-80 transition-opacity ${badgeColors[def.color]}`}
                         >
-                          {status.label}
+                          {def.label}
                         </Link>
                       ) : (
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColors[status.color]}`}>
-                          {status.label}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColors[def.color]}`}>
+                          {def.label}
                         </span>
                       )}
                     </td>

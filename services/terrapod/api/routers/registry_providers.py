@@ -35,6 +35,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_non_runner
+from terrapod.api.labels import validate_labels
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.platform_provider_service import (
@@ -314,7 +315,7 @@ async def create_provider_endpoint(
 
     provider = await create_provider(db, "default", attrs.name)
     provider.owner_email = user.email
-    provider.labels = attrs.labels
+    provider.labels = validate_labels(attrs.labels)
     await db.commit()
 
     logger.info("Registry provider created", name=attrs.name, owner=user.email)
@@ -434,7 +435,9 @@ async def update_provider_endpoint(
         provider.owner_email = attrs["owner-email"]
 
     if "labels" in attrs:
-        new_labels = attrs["labels"]
+        # Validate up-front (size limits + reserved-key check). Raises 422
+        # before any self-lockout logic.
+        new_labels = validate_labels(attrs["labels"])
         # Self-lockout check: warn if label change would reduce user's access
         if (
             new_labels != (provider.labels or {})
