@@ -47,11 +47,6 @@ export interface ParsedFilter {
   terms: FilterTerm[]
 }
 
-// Filter values for the two preset buttons. Kept as exported constants so
-// the buttons + matcher + tests stay in lockstep on the exact string used.
-export const STATUS_FILTER_ERRORED = 'errored'
-export const STATUS_FILTER_NEEDS_CONFIRM = 'needs-confirm'
-
 const SEPARATOR = /[:=]/
 
 export function parseFilterQuery(input: string): ParsedFilter {

@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState, useCallback, useMemo } from 'react'
+import { Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
@@ -14,8 +14,6 @@ import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { useWorkspaceListEvents } from '@/lib/use-workspace-list-events'
 import {
-  STATUS_FILTER_ERRORED,
-  STATUS_FILTER_NEEDS_CONFIRM,
   hasStatusTerm,
   matchWorkspace,
   parseFilterQuery,
@@ -23,6 +21,26 @@ import {
   serializeFilter,
   toggleStatusTerm,
 } from '@/lib/workspace-filter'
+
+// Status options for the filter dropdown — kept in lockstep with `resolveStatus`
+// below so the kebab-case filter value matches what the server-side derived
+// status would be. Order: most operationally interesting first.
+const STATUS_FILTER_OPTIONS: Array<{ value: string; label: string; dot: string }> = [
+  { value: 'errored', label: 'Errored', dot: 'bg-red-400' },
+  { value: 'needs-confirm', label: 'Needs Confirm', dot: 'bg-amber-400' },
+  { value: 'state-diverged', label: 'State Diverged', dot: 'bg-red-400' },
+  { value: 'vcs-error', label: 'VCS Error', dot: 'bg-red-400' },
+  { value: 'drifted', label: 'Drifted', dot: 'bg-amber-400' },
+  { value: 'planning', label: 'Planning', dot: 'bg-blue-400' },
+  { value: 'applying', label: 'Applying', dot: 'bg-blue-400' },
+  { value: 'confirmed', label: 'Confirmed', dot: 'bg-blue-400' },
+  { value: 'queued', label: 'Queued', dot: 'bg-blue-400' },
+  { value: 'applied', label: 'Applied', dot: 'bg-green-400' },
+  { value: 'planned', label: 'Planned', dot: 'bg-green-400' },
+  { value: 'pending', label: 'Pending', dot: 'bg-slate-500' },
+  { value: 'canceled', label: 'Canceled', dot: 'bg-slate-500' },
+  { value: 'discarded', label: 'Discarded', dot: 'bg-slate-500' },
+]
 
 interface LatestRun {
   id: string
@@ -75,6 +93,28 @@ function WorkspacesPageInner() {
   // label key set. Mirrored to the URL via ?q=… so refresh + share work.
   const [filterInput, setFilterInput] = useState(searchParams.get('q') || '')
   const parsedFilter = useMemo(() => parseFilterQuery(filterInput), [filterInput])
+
+  // Status dropdown state. Closes on outside-click and Escape — same pattern
+  // used for the run-actions menu so the page feels consistent.
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false)
+  const statusMenuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!statusMenuOpen) return
+    const onClick = (e: MouseEvent) => {
+      if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) {
+        setStatusMenuOpen(false)
+      }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setStatusMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [statusMenuOpen])
 
   // Sync the input back to the URL whenever the parsed shape changes.
   useEffect(() => {
@@ -529,13 +569,19 @@ function WorkspacesPageInner() {
         })()}
 
         {!loading && workspaces.length > 0 && (() => {
-          const erroredActive = hasStatusTerm(parsedFilter, STATUS_FILTER_ERRORED)
-          const needsConfirmActive = hasStatusTerm(parsedFilter, STATUS_FILTER_NEEDS_CONFIRM)
-          // Counts shown on the buttons answer "would clicking this find anything?".
-          // Cheap to compute on the unfiltered list — keeps the buttons honest if
-          // the filter input changes but these statuses are no longer present.
-          const erroredCount = workspaces.filter(w => resolveStatus(w).filter === STATUS_FILTER_ERRORED).length
-          const needsConfirmCount = workspaces.filter(w => resolveStatus(w).filter === STATUS_FILTER_NEEDS_CONFIRM).length
+          // Per-status counts on the unfiltered workspace list — answers
+          // "what would I find if I picked this option?" before clicking.
+          // Compute once; the dropdown is closed most of the time so this
+          // stays cheap.
+          const statusCounts: Record<string, number> = {}
+          for (const ws of workspaces) {
+            const f = resolveStatus(ws).filter
+            if (f) statusCounts[f] = (statusCounts[f] || 0) + 1
+          }
+          const activeStatusValues = parsedFilter.terms
+            .filter(t => t.kind === 'status')
+            .map(t => (t as { kind: 'status'; value: string }).value)
+          const activeCount = activeStatusValues.length
           return (
             <div className="mb-4">
               <div className="flex items-center gap-2">
@@ -547,6 +593,66 @@ function WorkspacesPageInner() {
                   aria-label="Filter workspaces"
                   className="flex-1 px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/50 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500"
                 />
+                {/* Status dropdown — single entry point for all status presets.
+                    Picks any combination via toggle; the existing chips below
+                    show what's active and let the user remove individually. */}
+                <div className="relative" ref={statusMenuRef}>
+                  <button
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded={statusMenuOpen}
+                    onClick={() => setStatusMenuOpen(o => !o)}
+                    className={
+                      'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ' +
+                      (activeCount > 0
+                        ? 'bg-slate-700/60 text-slate-100 border-slate-600'
+                        : 'bg-slate-800/50 text-slate-300 border-slate-700/50 hover:bg-slate-700/60')
+                    }
+                  >
+                    <span>Status</span>
+                    {activeCount > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
+                        {activeCount}
+                      </span>
+                    )}
+                    <svg className={'w-3 h-3 transition-transform ' + (statusMenuOpen ? 'rotate-180' : '')} viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+                      <path d="M3 4.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  {statusMenuOpen && (
+                    <div
+                      role="menu"
+                      className="absolute right-0 z-10 mt-1 w-64 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-96 overflow-y-auto"
+                    >
+                      {STATUS_FILTER_OPTIONS.map(opt => {
+                        const active = hasStatusTerm(parsedFilter, opt.value)
+                        const count = statusCounts[opt.value] || 0
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            role="menuitemcheckbox"
+                            aria-checked={active}
+                            onClick={() => setFilterInput(serializeFilter(toggleStatusTerm(parsedFilter, opt.value)))}
+                            className={
+                              'w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors ' +
+                              (active ? 'bg-slate-700/60 text-slate-100' : 'text-slate-300 hover:bg-slate-700/40')
+                            }
+                          >
+                            {/* Checkmark rail keeps the option labels aligned whether
+                                checked or not. */}
+                            <span className="w-3 inline-flex justify-center text-brand-400">
+                              {active ? '✓' : ''}
+                            </span>
+                            <span className={'w-1.5 h-1.5 rounded-full ' + opt.dot} />
+                            <span className="flex-1 text-left">{opt.label}</span>
+                            <span className={'text-xs ' + (count > 0 ? 'text-slate-400' : 'text-slate-600')}>{count}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
                 {parsedFilter.terms.length > 0 && (
                   <button
                     type="button"
@@ -556,40 +662,6 @@ function WorkspacesPageInner() {
                     Clear
                   </button>
                 )}
-              </div>
-              <div className="flex flex-wrap gap-2 mt-2">
-                <button
-                  type="button"
-                  onClick={() => setFilterInput(serializeFilter(toggleStatusTerm(parsedFilter, STATUS_FILTER_ERRORED)))}
-                  aria-pressed={erroredActive}
-                  className={
-                    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ' +
-                    (erroredActive
-                      ? 'bg-red-900/60 text-red-200 ring-1 ring-red-500/40'
-                      : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/60')
-                  }
-                  title={erroredActive ? 'Remove the errored filter' : 'Show only workspaces with a failed latest run'}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                  <span>Errored</span>
-                  <span className="text-[10px] text-slate-400">{erroredCount}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterInput(serializeFilter(toggleStatusTerm(parsedFilter, STATUS_FILTER_NEEDS_CONFIRM)))}
-                  aria-pressed={needsConfirmActive}
-                  className={
-                    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ' +
-                    (needsConfirmActive
-                      ? 'bg-amber-900/60 text-amber-200 ring-1 ring-amber-500/40'
-                      : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/60')
-                  }
-                  title={needsConfirmActive ? 'Remove the needs-confirm filter' : 'Show only workspaces with an apply waiting for confirmation'}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                  <span>Needs Confirm</span>
-                  <span className="text-[10px] text-slate-400">{needsConfirmCount}</span>
-                </button>
               </div>
               {parsedFilter.terms.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
