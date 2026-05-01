@@ -71,7 +71,7 @@ from collections.abc import AsyncIterator, Iterable
 from typing import Any
 from urllib.parse import quote, urlparse
 
-from dulwich.client import HttpGitClient
+from dulwich.client import get_transport_and_path
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.repo import Repo
 
@@ -165,19 +165,6 @@ async def _build_clone_url(conn: VCSConnection, owner: str, repo: str) -> str:
     return _build_clone_url_sync(conn.provider, conn.server_url, token, owner, repo)
 
 
-def _split_clone_url(clone_url: str) -> tuple[str, str]:
-    """Split a clone URL into (HttpGitClient base_url, repo_path).
-
-    HttpGitClient takes the host as base_url and the path-on-server as
-    a separate argument when calling fetch_pack. We pass the full URL
-    minus the trailing `.git` segment + path to be safe.
-    """
-    parsed = urlparse(clone_url)
-    base = f"{parsed.scheme}://{parsed.netloc}"
-    path = parsed.path  # leading slash, e.g. /owner/repo.git
-    return base, path
-
-
 def _path_matches(blob_path: bytes, paths: list[str]) -> bool:
     """True if `blob_path` (bytes, no leading slash) lives under any of `paths`.
 
@@ -242,15 +229,23 @@ def _fetch_partial(
     Returns (repo, blob_entries). `blob_entries` is the list returned by
     `_walk_tree_for_blobs` after pass 2 — ready for tar streaming.
 
+    `dulwich.client.get_transport_and_path` dispatches by URL scheme:
+    `https://` → `HttpGitClient`, `file://` → `LocalGitClient`. This
+    indirection lets the test suite exercise the same code path against
+    a local bare repo without needing a network.
+
     Synchronous: dulwich is sync. Caller wraps in asyncio.to_thread.
     """
-    base_url, repo_path = _split_clone_url(clone_url)
+    client, repo_path = get_transport_and_path(clone_url)
     repo = Repo.init(target_dir)
-    client = HttpGitClient(base_url)
     sha_bytes = sha.encode("ascii")
 
-    # Pass 1: commit + all trees, no blobs.
-    def determine_wants_pass1(refs: dict[bytes, bytes], **_: Any) -> list[bytes]:
+    # Pass 1: commit + all trees, no blobs. `determine_wants` returns the
+    # exact commit SHA we want — the server responds with a pack
+    # containing that commit (and, with depth=1, no ancestors) plus its
+    # trees. `filter_spec=blob:none` tells the server to omit blobs.
+    # The SHA is honoured verbatim — no HEAD or default-branch fallback.
+    def determine_wants_pass1(refs: dict[bytes, bytes], *_args: Any, **_kw: Any) -> list[bytes]:
         return [sha_bytes]
 
     client.fetch(
@@ -261,10 +256,18 @@ def _fetch_partial(
         filter_spec=_FILTER_BLOB_NONE,
     )
 
+    # Look up the commit at the EXACT SHA we requested. If the fetch
+    # silently fell through to HEAD or some other ref, repo[sha_bytes]
+    # would raise KeyError. We assert isinstance(Commit) to catch the
+    # "user passed an annotated-tag SHA" case where dulwich would return
+    # a Tag object whose `.tree` doesn't exist.
     commit = repo[sha_bytes]
     if not isinstance(commit, Commit):
-        raise RuntimeError(f"object {sha} is not a commit")
+        raise RuntimeError(f"object {sha} is not a commit (got {type(commit).__name__})")
 
+    # Walk the tree of the requested commit (commit.tree, not HEAD).
+    # `_walk_tree_for_blobs` recurses only into directories that
+    # intersect `paths`, so the cost is bounded by the requested subtree.
     blob_entries = _walk_tree_for_blobs(repo, commit.tree, paths)
     if not blob_entries:
         # Empty path narrowing → nothing to fetch in pass 2.
@@ -272,15 +275,16 @@ def _fetch_partial(
 
     needed_blob_shas = sorted({sha for _path, _mode, sha in blob_entries})
 
-    # Pass 2: fetch the specific blobs.
-    def determine_wants_pass2(refs: dict[bytes, bytes], **_: Any) -> list[bytes]:
+    # Pass 2: fetch the specific blobs identified above. No filter — we
+    # want the blob contents themselves. `determine_wants` returns the
+    # exact blob SHAs from the commit's tree, not from HEAD.
+    def determine_wants_pass2(refs: dict[bytes, bytes], *_args: Any, **_kw: Any) -> list[bytes]:
         return needed_blob_shas
 
     client.fetch(
         repo_path,
         repo,
         determine_wants=determine_wants_pass2,
-        # No filter — we want the blobs themselves.
     )
 
     return repo, blob_entries

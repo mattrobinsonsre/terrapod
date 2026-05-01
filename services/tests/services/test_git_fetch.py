@@ -2,9 +2,11 @@
 
 The pure helpers (path normalisation / hashing, prefix matching, tree
 walking, tar-producer behaviour) are exercised here against an
-in-process dulwich repo fixture. The network-facing
-`sparse_archive_to_storage` end-to-end against real GitHub/GitLab is
-validated in Tilt — out-of-scope for unit tests.
+in-process dulwich repo fixture. The two-pass `_fetch_partial` is
+exercised against a real local bare repo via `file://` URLs — that
+proves the SHA we ask for is the SHA we get (not HEAD, not the default
+branch). The network-facing `sparse_archive_to_storage` end-to-end
+against real GitHub/GitLab is validated in Tilt.
 """
 
 from __future__ import annotations
@@ -323,3 +325,104 @@ class TestBuildCloneUrl:
         # one `@` separator before the host.
         assert url.count("@") == 1
         assert url.startswith("https://oauth2:tok%2Fen%2Bwith%40chars@")
+
+
+# ── _fetch_partial against a real local bare repo ──────────────────────
+
+
+@pytest.fixture
+def two_commit_bare_repo(tmp_path) -> tuple[str, str, str]:
+    """Build a bare repo with TWO commits and return (file_url, sha1, sha2).
+
+    sha1 is the first commit (file `a.tf` only). sha2 is HEAD (adds
+    `b.tf`). The fetch test pulls sha1 — which is NOT HEAD — and
+    verifies the tarball contains only `a.tf`. If `_fetch_partial`
+    silently fell through to HEAD, `b.tf` would appear and the test
+    would fail.
+    """
+    bare_path = tmp_path / "bare.git"
+    bare_path.mkdir()
+    bare = Repo.init_bare(str(bare_path))
+
+    def _commit(parents: list[bytes], files: dict[str, bytes], msg: bytes) -> bytes:
+        tree = Tree()
+        for name, content in files.items():
+            blob = Blob.from_string(content)
+            bare.object_store.add_object(blob)
+            tree.add(name.encode(), 0o100644, blob.id)
+        bare.object_store.add_object(tree)
+        c = Commit()
+        c.tree = tree.id
+        c.parents = parents
+        c.author = c.committer = b"Test <test@example.com>"
+        c.author_time = c.commit_time = 1700000000
+        c.author_timezone = c.commit_timezone = 0
+        c.message = msg
+        bare.object_store.add_object(c)
+        return c.id
+
+    sha1 = _commit([], {"a.tf": b"# first\n"}, b"first\n")
+    sha2 = _commit([sha1], {"a.tf": b"# first\n", "b.tf": b"# second\n"}, b"second\n")
+    bare.refs[b"HEAD"] = sha2  # HEAD points at the SECOND commit
+
+    file_url = f"file://{bare_path}"
+    return file_url, sha1.decode(), sha2.decode()
+
+
+class TestFetchPartialAgainstBareRepo:
+    """Drives the real two-pass fetch via `LocalGitClient` (file://) so
+    the SHA-resolution path is end-to-end exercised without a network."""
+
+    def test_fetches_requested_sha_not_head(self, two_commit_bare_repo, tmp_path):
+        """Asking for sha1 must return sha1's tree, not HEAD's."""
+        file_url, sha1, sha2 = two_commit_bare_repo
+        clone_dir = tmp_path / "clone"
+        clone_dir.mkdir()
+
+        repo, blob_entries = git_fetch._fetch_partial(file_url, str(clone_dir), sha1, paths=[])
+
+        # Only a.tf at sha1 (no b.tf). If the fetch had silently used
+        # HEAD, b.tf would be in the entries and this assertion fails.
+        names = sorted(p.decode() for p, _, _ in blob_entries)
+        assert names == ["a.tf"]
+
+        # The commit we got back IS the one we asked for.
+        commit = repo[sha1.encode()]
+        assert commit.id.decode() == sha1
+        # And HEAD's commit was NOT the one we walked.
+        assert sha1 != sha2
+
+    def test_fetches_head_sha_returns_both_files(self, two_commit_bare_repo, tmp_path):
+        """Sanity check: asking for sha2 returns both files."""
+        file_url, _sha1, sha2 = two_commit_bare_repo
+        clone_dir = tmp_path / "clone2"
+        clone_dir.mkdir()
+
+        _repo, blob_entries = git_fetch._fetch_partial(file_url, str(clone_dir), sha2, paths=[])
+
+        names = sorted(p.decode() for p, _, _ in blob_entries)
+        assert names == ["a.tf", "b.tf"]
+
+    def test_paths_narrowing_filters_blobs(self, two_commit_bare_repo, tmp_path):
+        """Fetching sha2 with paths=['b.tf'] must return only b.tf."""
+        file_url, _sha1, sha2 = two_commit_bare_repo
+        clone_dir = tmp_path / "clone3"
+        clone_dir.mkdir()
+
+        _repo, blob_entries = git_fetch._fetch_partial(
+            file_url, str(clone_dir), sha2, paths=["b.tf"]
+        )
+
+        names = sorted(p.decode() for p, _, _ in blob_entries)
+        assert names == ["b.tf"]
+
+    def test_unknown_sha_raises(self, two_commit_bare_repo, tmp_path):
+        """A bogus SHA causes the fetch to fail loudly — no silent
+        fallback to HEAD."""
+        file_url, _sha1, _sha2 = two_commit_bare_repo
+        clone_dir = tmp_path / "clone4"
+        clone_dir.mkdir()
+
+        bogus = "0" * 40
+        with pytest.raises(Exception):  # noqa: B017 — dulwich raises various subclasses
+            git_fetch._fetch_partial(file_url, str(clone_dir), bogus, paths=[])
