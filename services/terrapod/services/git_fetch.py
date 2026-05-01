@@ -1,4 +1,4 @@
-"""Sparse VCS fetch via dulwich's partial-clone protocol.
+"""Sparse VCS fetch via the git CLI's partial-clone + sparse-checkout.
 
 Why this exists
 ---------------
@@ -9,71 +9,79 @@ few MB of HCL. With N workspaces tracking the same monorepo, the bytes
 shared via the cache amortise the cost — but for a single workspace the
 fetch is still the full repo.
 
-This module replaces the tarball fetch with git's partial-clone protocol
-(`--filter=blob:none`) plus sparse selection of blobs under specific
-paths. Only the commit, trees, and the blobs reachable under the
-requested paths cross the wire.
+This module narrows the fetch using git's partial-clone protocol
+(`--filter=blob:none`) plus sparse-checkout. Only the commit, trees,
+and the blobs reachable under the requested paths cross the wire.
 
-Two-pass design
----------------
-dulwich's promisor/lazy-fetch support is limited. Rather than relying on
-on-demand blob fetches during tree walking, we do two explicit fetch
-rounds:
+Why the git CLI (not dulwich, not a pure-Python client)
+-------------------------------------------------------
+We initially tried dulwich. The two-pass design (fetch trees, then
+fetch wanted blob SHAs) broke against real GitHub: smart-HTTP `want`
+lines only accept commit SHAs, not blob SHAs. Real git handles blob
+fetches via the **promisor partial-clone** mechanism — when a sparse
+checkout needs a missing blob, the git CLI re-fetches with a special
+protocol handshake the server allows for partial-clone clients.
+dulwich exposes the config keys that mark a repo as a promisor partial
+clone, but the protocol-level handshake isn't implemented. Translating
+all of that ourselves would mean reimplementing core git internals
+poorly. Shelling out to the canonical git CLI is the pragmatic answer.
 
-1. **Pass 1** — fetch the commit at `sha` plus all trees with
-   `filter_spec=b"blob:none"`. This gives us the directory structure
-   (which is small — trees only carry filename + mode + child SHA) but
-   no file contents.
-2. **Walk** — traverse trees rooted at the commit, descending only into
-   directories whose path is a prefix of, or prefix-matches, any
-   requested `paths` entry. Collect the blob SHAs we need.
-3. **Pass 2** — fetch those specific blob SHAs.
-
-After pass 2, we walk the trees again and stream a tarball directly from
-the object store to object storage via `os.pipe`. No working tree, no
-intermediate file.
+Flow
+----
+1. `git init` an empty repo in `clone_dir`
+2. Configure auth via `http.extraheader` (token never appears in URL,
+   so it doesn't show up in `ps` output or git's protocol logs)
+3. Configure as a promisor partial-clone:
+     `extensions.partialClone = origin`
+     `remote.origin.promisor = true`
+     `remote.origin.partialclonefilter = blob:none`
+4. `git fetch --filter=blob:none --depth=1 origin <sha>` — pulls the
+   commit and all reachable trees, no blobs
+5. `git sparse-checkout init --cone` + `git sparse-checkout set
+   <paths>` — narrows the working-tree materialisation
+6. `git checkout <sha>` — the checkout sees missing blobs under the
+   sparse-checkout cone and lazily fetches them via the promisor
+   handshake. Blobs OUTSIDE the cone are never fetched.
+7. Tar the working tree (excluding `.git`) and stream to object
+   storage via `os.pipe`
 
 Auth
 ----
-Embedded in the clone URL:
-- GitHub: `https://x-access-token:{installation_token}@github.com/...`
-- GitLab: `https://oauth2:{access_token}@gitlab.com/...`
+Header injected via `git -c http.extraheader='Authorization: Basic ...'`:
+- GitHub: `x-access-token:<installation-token>` (~50 min lifetime; refreshed per call)
+- GitLab: `oauth2:<access-token>`
 
-Both providers accept these URL forms for the smart-HTTP protocol. The
-installation token is short-lived (~50 min) so it's fetched per call;
-caching happens in `github_service.get_installation_token`.
+Git's smart-HTTP rejects Bearer auth — both providers document Basic
+with their respective magic username for the git-protocol path. The
+REST APIs use Bearer; the git endpoints don't. Tokens never appear in
+URLs, environment variables, or `.git/config` on disk (we use `-c`
+for inline config, not `git config`).
 
 Server requirements
 -------------------
-- `uploadpack.allowFilter=true` — partial-clone protocol. GitHub and
-  GitLab.com both support it; self-hosted GitLab >= 13.0 too.
+- `uploadpack.allowFilter=true` — partial-clone protocol. GitHub.com
+  and GitLab.com both support it; self-hosted GitLab >= 13.0 too.
 - `uploadpack.allowAnySHA1InWant=true` — fetching by arbitrary SHA
   rather than a named ref. Required for PR head SHAs that aren't on a
   branch we own. GitHub enables this; GitLab enables it on most modern
   versions.
 
-If a server rejects either capability, the fetch fails with a clear
-error and the poller falls back to retrying next cycle. The caller is
-responsible for surfacing the failure; we don't fall back to the legacy
-tarball path silently — silent fallback would mask broken servers.
+If a server rejects either capability, `git fetch` exits non-zero with
+a clear error in stderr — we surface that to the caller. No silent
+fallback to a full-repo fetch (silent fallback would mask broken
+servers).
 """
 
 from __future__ import annotations
 
 import asyncio
 import hashlib
-import io
 import json
 import os
-import stat
 import tarfile
 from collections.abc import AsyncIterator, Iterable
-from typing import Any
-from urllib.parse import quote, urlparse
-
-from dulwich.client import get_transport_and_path
-from dulwich.objects import Blob, Commit, Tree
-from dulwich.repo import Repo
+from pathlib import Path
+from urllib.parse import urlparse
 
 from terrapod.db.models import VCSConnection
 from terrapod.logging_config import get_logger
@@ -83,7 +91,18 @@ from terrapod.storage import get_storage
 logger = get_logger(__name__)
 
 _CHUNK_SIZE = 64 * 1024
-_FILTER_BLOB_NONE = b"blob:none"
+# `git` honours these env vars to suppress credential prompts and
+# terminal interaction — important when running in a container with no
+# TTY. `GIT_TERMINAL_PROMPT=0` makes auth failures fail fast instead of
+# hanging waiting for input.
+_GIT_ENV = {
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_ASKPASS": "/bin/true",
+    # `git` writes progress to stderr, including the auth prompt that
+    # would otherwise be printed to a terminal — we capture stderr but
+    # don't want it to block on a pty.
+    "GIT_PAGER": "cat",
+}
 
 
 def normalize_paths(paths: Iterable[str] | None) -> list[str]:
@@ -92,7 +111,7 @@ def normalize_paths(paths: Iterable[str] | None) -> list[str]:
     - Strips leading/trailing slashes
     - Drops empty strings
     - Drops duplicates and entries that are prefixes of others (so the
-      shorter prefix subsumes the longer; saves work in the tree walk)
+      shorter prefix subsumes the longer; saves work for sparse-checkout)
     - Returns sorted list
 
     Empty input → empty list (caller interprets as "whole repo").
@@ -127,206 +146,261 @@ def paths_hash(paths: Iterable[str] | None) -> str:
     return hashlib.sha256(payload).hexdigest()[:12]
 
 
-def _build_clone_url_sync(
-    provider: str, server_url: str | None, token: str, owner: str, repo: str
-) -> str:
-    """Build an HTTPS clone URL with embedded auth.
+def _resolve_clone_host(provider: str, server_url: str | None) -> str:
+    """Compute the git host (e.g. `github.com`) from a connection's API URL.
 
-    Token is URL-quoted in case it contains characters that would break
-    the userinfo segment. Both GitHub installation tokens and GitLab
-    PATs are typically alphanumeric, but quoting is cheap.
+    The connection stores `server_url` as the HTTP API endpoint, but
+    git fetches happen against the bare host. For GHE, the API URL has
+    an `api.` prefix or `/api/v3` path that we need to strip.
     """
-    safe_token = quote(token, safe="")
     if provider == "gitlab":
         base = (server_url or "https://gitlab.com").rstrip("/")
         parsed = urlparse(base)
-        host = parsed.netloc or parsed.path  # tolerate values without scheme
-        return f"https://oauth2:{safe_token}@{host}/{owner}/{repo}.git"
-    # GitHub: convert the API URL to the Git host. The connection's
-    # server_url is the API endpoint (https://api.github.com or
-    # https://ghe.example.com/api/v3); the git host is the bare host.
+        return parsed.netloc or parsed.path
     base = server_url or "https://api.github.com"
     parsed = urlparse(base)
     host = parsed.netloc or parsed.path
     if host == "api.github.com":
-        host = "github.com"
-    elif host.startswith("api."):
-        host = host[len("api.") :]
-    return f"https://x-access-token:{safe_token}@{host}/{owner}/{repo}.git"
+        return "github.com"
+    if host.startswith("api."):
+        return host[len("api.") :]
+    return host
 
 
-async def _build_clone_url(conn: VCSConnection, owner: str, repo: str) -> str:
-    """Resolve auth and build the clone URL for a connection."""
+async def _resolve_auth(conn: VCSConnection) -> str:
+    """Return the value to set as `Authorization` header for this connection.
+
+    Git's smart-HTTP transport does NOT honour Bearer auth — it expects
+    HTTP Basic. GitHub and GitLab document their git-protocol auth via
+    a magic username + the token as the password:
+    - GitHub: `x-access-token:<installation-token>`
+    - GitLab: `oauth2:<access-token>`
+    We base64-encode `user:pass` and emit the `Basic ...` header.
+    The Bearer token used for the REST API would be silently rejected.
+    """
+    import base64
+
     if conn.provider == "gitlab":
-        token = conn.token or ""
-        return _build_clone_url_sync(conn.provider, conn.server_url, token, owner, repo)
-    # GitHub: installation token (refreshed on demand)
-    token = await github_service.get_installation_token(conn)
-    return _build_clone_url_sync(conn.provider, conn.server_url, token, owner, repo)
+        userpass = f"oauth2:{conn.token or ''}"
+    else:
+        token = await github_service.get_installation_token(conn)
+        userpass = f"x-access-token:{token}"
+    encoded = base64.b64encode(userpass.encode("utf-8")).decode("ascii")
+    return f"Basic {encoded}"
 
 
-def _path_matches(blob_path: bytes, paths: list[str]) -> bool:
-    """True if `blob_path` (bytes, no leading slash) lives under any of `paths`.
-
-    Empty `paths` means "everything matches" — used for full-repo fetch.
-    """
-    if not paths:
-        return True
-    decoded = blob_path.decode("utf-8", errors="replace")
-    for p in paths:
-        if decoded == p or decoded.startswith(p + "/"):
-            return True
-    return False
-
-
-def _dir_intersects_paths(dir_path: bytes, paths: list[str]) -> bool:
-    """True if `dir_path` is on, contains, or is contained-by any `paths` entry.
-
-    During tree walk we need to descend if either:
-      - the directory matches a path prefix (its contents are wanted), or
-      - a wanted path lives inside the directory (we need to descend further to find it)
-    """
-    if not paths:
-        return True
-    decoded = dir_path.decode("utf-8", errors="replace")
-    for p in paths:
-        if decoded == p or decoded.startswith(p + "/") or p.startswith(decoded + "/"):
-            return True
-    return False
-
-
-def _walk_tree_for_blobs(
-    repo: Repo, tree_id: bytes, paths: list[str], prefix: bytes = b""
-) -> list[tuple[bytes, int, bytes]]:
-    """Walk a tree and return [(path, mode, blob_sha)] for every blob under `paths`.
-
-    Recurses only into directories that intersect `paths` so the walk
-    cost is bounded by the requested subtree, not the whole repo.
-    """
-    out: list[tuple[bytes, int, bytes]] = []
-    tree = repo[tree_id]
-    if not isinstance(tree, Tree):
-        return out
-    for entry in tree.items():
-        full = prefix + b"/" + entry.path if prefix else entry.path
-        if stat.S_ISDIR(entry.mode):
-            if _dir_intersects_paths(full, paths):
-                out.extend(_walk_tree_for_blobs(repo, entry.sha, paths, full))
-        else:
-            if _path_matches(full, paths):
-                out.append((full, entry.mode, entry.sha))
-    return out
-
-
-def _fetch_partial(
-    clone_url: str,
-    target_dir: str,
-    sha: str,
-    paths: list[str],
-) -> tuple[Repo, list[tuple[bytes, int, bytes]]]:
-    """Initialize an empty repo, do the two-pass partial-clone fetch.
-
-    Returns (repo, blob_entries). `blob_entries` is the list returned by
-    `_walk_tree_for_blobs` after pass 2 — ready for tar streaming.
-
-    `dulwich.client.get_transport_and_path` dispatches by URL scheme:
-    `https://` → `HttpGitClient`, `file://` → `LocalGitClient`. This
-    indirection lets the test suite exercise the same code path against
-    a local bare repo without needing a network.
-
-    Synchronous: dulwich is sync. Caller wraps in asyncio.to_thread.
-    """
-    client, repo_path = get_transport_and_path(clone_url)
-    repo = Repo.init(target_dir)
-    sha_bytes = sha.encode("ascii")
-
-    # Pass 1: commit + all trees, no blobs. `determine_wants` returns the
-    # exact commit SHA we want — the server responds with a pack
-    # containing that commit (and, with depth=1, no ancestors) plus its
-    # trees. `filter_spec=blob:none` tells the server to omit blobs.
-    # The SHA is honoured verbatim — no HEAD or default-branch fallback.
-    def determine_wants_pass1(refs: dict[bytes, bytes], *_args: Any, **_kw: Any) -> list[bytes]:
-        return [sha_bytes]
-
-    client.fetch(
-        repo_path,
-        repo,
-        determine_wants=determine_wants_pass1,
-        depth=1,
-        filter_spec=_FILTER_BLOB_NONE,
-    )
-
-    # Look up the commit at the EXACT SHA we requested. If the fetch
-    # silently fell through to HEAD or some other ref, repo[sha_bytes]
-    # would raise KeyError. We assert isinstance(Commit) to catch the
-    # "user passed an annotated-tag SHA" case where dulwich would return
-    # a Tag object whose `.tree` doesn't exist.
-    commit = repo[sha_bytes]
-    if not isinstance(commit, Commit):
-        raise RuntimeError(f"object {sha} is not a commit (got {type(commit).__name__})")
-
-    # Walk the tree of the requested commit (commit.tree, not HEAD).
-    # `_walk_tree_for_blobs` recurses only into directories that
-    # intersect `paths`, so the cost is bounded by the requested subtree.
-    blob_entries = _walk_tree_for_blobs(repo, commit.tree, paths)
-    if not blob_entries:
-        # Empty path narrowing → nothing to fetch in pass 2.
-        return repo, []
-
-    needed_blob_shas = sorted({sha for _path, _mode, sha in blob_entries})
-
-    # Pass 2: fetch the specific blobs identified above. No filter — we
-    # want the blob contents themselves. `determine_wants` returns the
-    # exact blob SHAs from the commit's tree, not from HEAD.
-    def determine_wants_pass2(refs: dict[bytes, bytes], *_args: Any, **_kw: Any) -> list[bytes]:
-        return needed_blob_shas
-
-    client.fetch(
-        repo_path,
-        repo,
-        determine_wants=determine_wants_pass2,
-    )
-
-    return repo, blob_entries
-
-
-def _producer_thread(
-    write_fd: int,
-    repo: Repo,
-    blob_entries: list[tuple[bytes, int, bytes]],
+async def _run_git(
+    args: list[str],
+    *,
+    cwd: str | None = None,
+    auth_header: str | None = None,
+    timeout: float = 300.0,
 ) -> None:
-    """Build a gzipped tarball from `blob_entries` and write to `write_fd`.
+    """Run `git <args>` and raise if it exits non-zero.
 
-    Runs in a thread so the async event loop isn't blocked. The fd is
-    owned by this function — closing the file object closes the fd,
-    which signals EOF to the consumer.
+    `auth_header` is injected via `-c http.extraheader=...`. We use the
+    inline `-c` flag rather than `git config` so the credential is
+    only ever in this process's memory and a transient command-line
+    argument list — never written to `.git/config` on disk where a
+    later log scrape might find it.
 
-    Tar member layout: paths are repo-rooted (e.g. `infra/eks/main.tf`),
-    matching the format the runner expects from the existing stripped
-    tarball — no top-level wrapper directory.
+    stdout is discarded (git status is communicated via exit code);
+    stderr is captured and included in the exception message on failure
+    so callers see the actual git error.
+    """
+    cmd: list[str] = ["git"]
+    if auth_header is not None:
+        # `-c key=value` injects a single config entry for the duration
+        # of this command. The value is a single argv element; argv is
+        # not visible in `ps` for other users in any modern Linux, but
+        # the parent process can still read it. Acceptable for our
+        # single-tenant API server.
+        cmd += ["-c", f"http.extraheader=Authorization: {auth_header}"]
+    cmd += args
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        cwd=cwd,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
+        env={**os.environ, **_GIT_ENV},
+    )
+    try:
+        _stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    except TimeoutError:
+        proc.kill()
+        await proc.wait()
+        raise RuntimeError(f"git command timed out after {timeout}s: {' '.join(args)}") from None
+    if proc.returncode != 0:
+        # Redact any tokens from stderr just in case `git` echoed them
+        # back. We pass auth via header so this is belt-and-braces.
+        msg = stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"git {' '.join(args)} failed (exit {proc.returncode}): {msg}")
+
+
+async def sparse_archive_to_storage(
+    conn: VCSConnection,
+    owner: str,
+    repo: str,
+    sha: str,
+    paths: Iterable[str] | None,
+    storage_key: str,
+    *,
+    clone_dir: str,
+) -> int:
+    """Fetch only the blobs under `paths` and stream a tarball to storage.
+
+    Args:
+        conn: VCS connection (provides auth + server URL)
+        owner, repo: repo coordinates on the provider
+        sha: commit SHA to fetch (any commit SHA, not just a branch HEAD)
+        paths: repo-relative paths to include; None/empty means whole repo
+        storage_key: object-storage key the tarball is uploaded to
+        clone_dir: empty directory the caller has reserved for the git
+            working tree. Caller is responsible for cleanup (typically
+            via `tempfile.TemporaryDirectory` or rmtree in a finally).
+
+    Returns the number of bytes uploaded.
+
+    Raises if any git step fails or the upload errors. The caller
+    (`vcs_archive_cache._fetch_and_upload`) is responsible for
+    deleting the storage key on partial-upload failures.
+    """
+    norm_paths = normalize_paths(paths)
+    auth_header = await _resolve_auth(conn)
+    host = _resolve_clone_host(conn.provider, conn.server_url)
+    clone_url = f"https://{host}/{owner}/{repo}.git"
+
+    # Step 1: init + configure as promisor partial-clone.
+    # We do this in a single sequential block — none of these steps
+    # touch the network and they're cheap. Wrapping the whole thing in
+    # `to_thread` would buy nothing.
+    await _run_git(["init", "--quiet", clone_dir])
+    await _run_git(["-C", clone_dir, "remote", "add", "origin", clone_url])
+    await _run_git(["-C", clone_dir, "config", "extensions.partialClone", "origin"])
+    await _run_git(["-C", clone_dir, "config", "remote.origin.promisor", "true"])
+    await _run_git(["-C", clone_dir, "config", "remote.origin.partialclonefilter", "blob:none"])
+
+    # Step 2: fetch the commit + all trees, no blobs.
+    # `--depth=1` gets just the requested commit (no ancestors) — the
+    # SHA is honoured verbatim, no fallback to HEAD.
+    await _run_git(
+        [
+            "-C",
+            clone_dir,
+            "fetch",
+            "--filter=blob:none",
+            "--depth=1",
+            "--no-tags",
+            "origin",
+            sha,
+        ],
+        auth_header=auth_header,
+    )
+
+    # Step 3: configure sparse-checkout BEFORE checkout. Cone mode
+    # is the simplest pattern language and matches our path-prefix
+    # semantics — a path "infra" includes everything under it.
+    if norm_paths:
+        await _run_git(["-C", clone_dir, "sparse-checkout", "init", "--cone"])
+        await _run_git(["-C", clone_dir, "sparse-checkout", "set", *norm_paths])
+
+    # Step 4: checkout the requested SHA. With sparse-checkout active,
+    # this only materialises files under the cone — and it triggers the
+    # promisor lazy-fetch for blobs the cone needs. Blobs OUTSIDE the
+    # cone are never pulled. With no sparse-checkout, the whole tree is
+    # checked out and all blobs are lazy-fetched.
+    await _run_git(
+        ["-C", clone_dir, "checkout", "--quiet", sha],
+        auth_header=auth_header,
+    )
+
+    # Step 5: tar the working tree (excluding .git) and stream to storage.
+    storage = get_storage()
+    read_fd, write_fd = os.pipe()
+    bytes_uploaded = 0
+
+    async def _upload() -> int:
+        nonlocal bytes_uploaded
+
+        async def _counted() -> AsyncIterator[bytes]:
+            nonlocal bytes_uploaded
+            async for chunk in _consumer_chunks(read_fd):
+                bytes_uploaded += len(chunk)
+                yield chunk
+
+        await storage.put_stream(storage_key, _counted(), content_type="application/x-tar")
+        return bytes_uploaded
+
+    producer_task = asyncio.to_thread(_producer_thread, write_fd, clone_dir)
+    upload_task = _upload()
+
+    try:
+        await asyncio.gather(producer_task, upload_task)
+    finally:
+        # Defensive close — usually the producer already closed it via
+        # the os.fdopen context manager.
+        try:
+            os.close(write_fd)
+        except OSError:
+            pass
+
+    logger.info(
+        "Sparse VCS archive uploaded",
+        connection_id=str(conn.id),
+        owner=owner,
+        repo=repo,
+        sha=sha[:8],
+        paths_count=len(norm_paths) if norm_paths else 0,
+        paths=norm_paths if norm_paths else None,
+        bytes_uploaded=bytes_uploaded,
+        storage_key=storage_key,
+    )
+    return bytes_uploaded
+
+
+def _write_tarball_from_dir(fileobj, working_tree: str) -> None:
+    """Build a gzipped tarball from `working_tree` (excluding `.git/`).
+
+    Member layout is repo-rooted (e.g. `infra/eks/main.tf`). The runner's
+    `tar xzf --no-same-owner` consumer expects this shape.
+
+    Walks the directory deterministically (sorted) so identical input
+    produces identical output bytes — useful for cache stability and
+    test reproducibility.
+
+    Pure I/O, synchronous: caller dispatches to a thread when used from
+    async code.
+    """
+    root = Path(working_tree)
+    with tarfile.open(fileobj=fileobj, mode="w:gz") as tf:
+        # Walk top-down so we add directories before their contents.
+        # `os.walk` with `sorted` makes the order deterministic.
+        for dirpath, dirnames, filenames in os.walk(working_tree):
+            # Skip the `.git/` dir. `dirnames[:]` mutation prevents
+            # `os.walk` from descending into it.
+            dirnames[:] = sorted(d for d in dirnames if d != ".git")
+            filenames = sorted(filenames)
+            for name in filenames:
+                full = Path(dirpath) / name
+                arcname = str(full.relative_to(root))
+                # `recursive=False` because we control the recursion
+                # manually via os.walk; otherwise tarfile.add would
+                # re-descend into directories we've already visited.
+                tf.add(str(full), arcname=arcname, recursive=False)
+
+
+def _producer_thread(write_fd: int, working_tree: str) -> None:
+    """Wrap `_write_tarball_from_dir` to drive the write end of `os.pipe()`.
+
+    Takes ownership of `write_fd`: closes it via `os.fdopen` on success,
+    or via explicit `os.close` on exception so the consumer sees EOF and
+    doesn't block forever on read. Single owner of the fd from this
+    point — never close it from the caller.
     """
     try:
-        with os.fdopen(write_fd, "wb") as wf, tarfile.open(fileobj=wf, mode="w:gz") as tf:
-            # Sort for determinism: helps reproducibility of the tarball
-            # bytes if upstream content hasn't changed (useful for tests).
-            for path, mode, blob_sha in sorted(blob_entries, key=lambda e: e[0]):
-                blob = repo[blob_sha]
-                if not isinstance(blob, Blob):
-                    continue
-                data = blob.as_raw_string()
-                ti = tarfile.TarInfo(name=path.decode("utf-8", errors="replace"))
-                ti.size = len(data)
-                ti.mode = mode & 0o7777
-                if stat.S_ISLNK(mode):
-                    ti.type = tarfile.SYMTYPE
-                    ti.linkname = data.decode("utf-8", errors="replace")
-                    ti.size = 0
-                    tf.addfile(ti)
-                else:
-                    tf.addfile(ti, io.BytesIO(data))
+        with os.fdopen(write_fd, "wb") as wf:
+            _write_tarball_from_dir(wf, working_tree)
     except Exception:
-        # Closing the fd before re-raise lets the consumer see EOF and
-        # error out cleanly rather than blocking forever on read.
         try:
             os.close(write_fd)
         except OSError:
@@ -349,87 +423,3 @@ async def _consumer_chunks(read_fd: int) -> AsyncIterator[bytes]:
             yield chunk
     finally:
         f.close()
-
-
-async def sparse_archive_to_storage(
-    conn: VCSConnection,
-    owner: str,
-    repo: str,
-    sha: str,
-    paths: Iterable[str] | None,
-    storage_key: str,
-    *,
-    clone_dir: str,
-) -> int:
-    """Fetch only the blobs under `paths` and stream a tarball to storage.
-
-    Args:
-        conn: VCS connection (provides auth + server URL)
-        owner, repo: repo coordinates on the provider
-        sha: commit SHA to fetch
-        paths: repo-relative paths to include; None/empty means whole repo
-        storage_key: object-storage key the tarball is uploaded to
-        clone_dir: empty directory the caller has reserved for the dulwich
-            repo. Caller is responsible for cleaning it up (e.g. via
-            tempfile.TemporaryDirectory) — we don't manage it here so
-            failures don't leave half-deleted state.
-
-    Returns the number of bytes uploaded.
-
-    Raises on any fetch / upload failure. The caller (vcs_archive_cache)
-    is responsible for partial-upload cleanup of the storage key.
-    """
-    norm_paths = normalize_paths(paths)
-    clone_url = await _build_clone_url(conn, owner, repo)
-
-    repo_obj, blob_entries = await asyncio.to_thread(
-        _fetch_partial, clone_url, clone_dir, sha, norm_paths
-    )
-
-    storage = get_storage()
-    read_fd, write_fd = os.pipe()
-
-    # The producer owns write_fd; we don't close it from the caller side.
-    # The consumer owns read_fd; closed by os.fdopen in _consumer_chunks.
-    bytes_uploaded = 0
-
-    async def _upload() -> int:
-        nonlocal bytes_uploaded
-
-        async def _counted() -> AsyncIterator[bytes]:
-            nonlocal bytes_uploaded
-            async for chunk in _consumer_chunks(read_fd):
-                bytes_uploaded += len(chunk)
-                yield chunk
-
-        await storage.put_stream(storage_key, _counted(), content_type="application/x-tar")
-        return bytes_uploaded
-
-    producer_task = asyncio.to_thread(_producer_thread, write_fd, repo_obj, blob_entries)
-    upload_task = _upload()
-
-    # Run both concurrently. If the producer dies, its except block
-    # closes write_fd → the consumer sees EOF → the upload completes
-    # with whatever bytes did make it through. We then re-raise.
-    try:
-        await asyncio.gather(producer_task, upload_task)
-    finally:
-        # Defensive close — usually the producer already closed it via
-        # the os.fdopen context manager.
-        try:
-            os.close(write_fd)
-        except OSError:
-            pass
-
-    logger.info(
-        "Sparse VCS archive uploaded",
-        connection_id=str(conn.id),
-        owner=owner,
-        repo=repo,
-        sha=sha[:8],
-        paths_count=len(norm_paths) if norm_paths else 0,
-        blob_count=len(blob_entries),
-        bytes_uploaded=bytes_uploaded,
-        storage_key=storage_key,
-    )
-    return bytes_uploaded

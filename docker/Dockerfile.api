@@ -37,8 +37,10 @@ LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapo
 
 # Runtime-only system libraries (no gcc, no -dev headers)
 # apt-get upgrade picks up security patches for base OS packages (e.g. glibc)
+# `git` is required for VCS sparse fetch (subprocess driver in services/git_fetch.py).
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     curl \
+    git \
     xmlsec1 \
     libxmlsec1-openssl \
     && rm -rf /var/lib/apt/lists/*
