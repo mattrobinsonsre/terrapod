@@ -30,6 +30,9 @@ def _mock_run(**kwargs):
     run.error_message = kwargs.get("error_message", "")
     run.vcs_commit_sha = kwargs.get("vcs_commit_sha", None)
     run.is_drift_detection = kwargs.get("is_drift_detection", False)
+    # Default `has_changes=True` so existing tests keep matching the
+    # "real plan with changes" path — only the no-op short-circuit cares.
+    run.has_changes = kwargs.get("has_changes", True)
     return run
 
 
@@ -163,6 +166,72 @@ class TestHandleSucceeded:
         assert mock_transition.call_count == 2
         assert mock_transition.call_args_list[0].args[2] == "planned"
         assert mock_transition.call_args_list[1].args[2] == "confirmed"
+
+    @patch(_PERSIST_PATCH, new_callable=AsyncMock)
+    @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service.transition_run", new_callable=AsyncMock)
+    async def test_plan_with_no_changes_skips_apply(
+        self, mock_transition, mock_stage, mock_persist
+    ):
+        """has_changes=False short-circuits planned → applied without an apply Job.
+
+        Regression for the state-upload 500 cycle: tofu apply of a no-changes
+        plan doesn't bump the state serial, so the runner's PUT
+        /artifacts/state hits the unique constraint on (workspace_id, serial)
+        and 500s. Skipping the apply Job entirely avoids the round-trip.
+        """
+        db = AsyncMock()
+        run = _mock_run(status="planning", auto_apply=False, plan_only=False, has_changes=False)
+        mock_stage.return_value = None
+        planned_run = _mock_run(
+            status="planned", auto_apply=False, plan_only=False, has_changes=False
+        )
+        applied_run = _mock_run(
+            status="applied", auto_apply=False, plan_only=False, has_changes=False
+        )
+        mock_transition.side_effect = [planned_run, applied_run]
+        ws = MagicMock()
+        ws.locked = True
+        db.get.return_value = ws
+
+        await _handle_succeeded(db, run)
+
+        # Two transitions: planning→planned, then planned→applied.
+        # Critically, NO transition to "confirmed" — the apply Job is never queued.
+        assert mock_transition.call_count == 2
+        assert mock_transition.call_args_list[0].args[2] == "planned"
+        assert mock_transition.call_args_list[1].args[2] == "applied"
+        assert ws.locked is False
+
+    @patch(_PERSIST_PATCH, new_callable=AsyncMock)
+    @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service.transition_run", new_callable=AsyncMock)
+    async def test_plan_with_no_changes_overrides_auto_apply(
+        self, mock_transition, mock_stage, mock_persist
+    ):
+        """auto_apply doesn't matter when has_changes=False — still skip to applied.
+
+        Without this, an auto-apply workspace with a no-op plan would queue a
+        confirm → applying transition and re-trigger the same 500 loop.
+        """
+        db = AsyncMock()
+        run = _mock_run(status="planning", auto_apply=True, plan_only=False, has_changes=False)
+        mock_stage.return_value = None
+        planned_run = _mock_run(
+            status="planned", auto_apply=True, plan_only=False, has_changes=False
+        )
+        applied_run = _mock_run(
+            status="applied", auto_apply=True, plan_only=False, has_changes=False
+        )
+        mock_transition.side_effect = [planned_run, applied_run]
+        db.get.return_value = MagicMock(locked=False)
+
+        await _handle_succeeded(db, run)
+
+        # Must be planned → applied, not planned → confirmed.
+        assert mock_transition.call_args_list[1].args[2] == "applied"
+        # No third transition — auto_apply path is bypassed.
+        assert mock_transition.call_count == 2
 
     @patch(_PERSIST_PATCH, new_callable=AsyncMock)
     @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)

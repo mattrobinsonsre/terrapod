@@ -38,6 +38,7 @@ interface RunAttrs {
   'vcs-commit-sha': string | null
   'vcs-branch': string | null
   'vcs-pull-request-number': number | null
+  'has-changes': boolean
   'workspace-name': string
   'workspace-has-vcs': boolean
   'module-overrides': Record<string, string> | null
@@ -582,6 +583,18 @@ export default function RunDetailPage() {
           <div className="mb-6 p-4 bg-red-900/20 rounded-lg border border-red-800/50">
             <h3 className="text-sm font-medium text-red-400 mb-1">Error</h3>
             <pre className="text-sm text-red-300 whitespace-pre-wrap font-mono">{attrs['error-message']}</pre>
+          </div>
+        )}
+
+        {/* No-changes notice — explains why Confirm & Apply isn't shown.
+            Only relevant for plan-and-apply runs (plan-only runs simply
+            report the plan and have no concept of an apply phase). */}
+        {attrs['has-changes'] === false && !attrs['plan-only'] && ['planned', 'applied'].includes(attrs.status) && (
+          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 text-sm text-slate-300">
+            <span className="font-medium text-slate-100">No changes.</span>{' '}
+            {attrs.status === 'applied'
+              ? 'Plan reported nothing to do; the apply was skipped automatically.'
+              : 'Plan reported nothing to do — there is nothing to apply.'}
           </div>
         )}
 

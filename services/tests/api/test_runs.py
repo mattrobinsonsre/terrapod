@@ -265,6 +265,41 @@ class TestConfirmRun:
             )
         assert resp.status_code == 409
 
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.confirm_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_confirm_no_changes_returns_422(
+        self, mock_get_run, mock_resolve, mock_confirm, *mocks
+    ):
+        """Confirm on a no-op plan must 422 — there is nothing to apply.
+
+        Reconciler short-circuits this case directly to `applied`, so under
+        normal conditions the endpoint never sees `planned` + has_changes=False.
+        Defensive check guards against legacy data and races, and pairs with
+        `is-confirmable=false` in the response so UI and API agree.
+        """
+        mock_resolve.return_value = "write"
+        run = _mock_run(status="planned")
+        run.has_changes = False
+        mock_get_run.return_value = run
+
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/v2/runs/run-{run.id}/actions/apply",
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+        assert "no changes" in resp.json()["detail"].lower()
+        # confirm_run service was NOT invoked — endpoint rejected before transition.
+        mock_confirm.assert_not_called()
+
 
 # ── Discard Run ────────────────────────────────────────────────────────
 
@@ -376,6 +411,37 @@ class TestRunJsonSerialization:
         # cancelable — the right actions are confirm or discard. Cancel
         # only applies to in-progress states.
         assert actions["is-cancelable"] is False
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_no_changes_hides_confirm_and_discard(self, mock_get_run, mock_resolve, *mocks):
+        """Planned run with has_changes=False must not advertise confirm/discard.
+
+        Frontend gates the buttons on these flags. If the backend says
+        is-confirmable=true on a no-op plan, the user can click and trigger
+        the state-upload 500 cycle. Keep both flags false (and the matching
+        permission booleans) so the API and the UI present the same answer.
+        """
+        mock_resolve.return_value = "read"
+        run = _mock_run(status="planned", auto_apply=False)
+        run.has_changes = False
+        mock_get_run.return_value = run
+
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/runs/run-{run.id}", headers=_AUTH)
+
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["actions"]["is-confirmable"] is False
+        assert attrs["actions"]["is-discardable"] is False
+        assert attrs["permissions"]["can-apply"] is False
+        assert attrs["permissions"]["can-discard"] is False
 
     @pytest.mark.parametrize(
         "status,expected",

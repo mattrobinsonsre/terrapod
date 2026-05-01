@@ -187,6 +187,21 @@ async def _handle_succeeded(db: AsyncSession, run: Run) -> None:
                 ws.locked = False
                 ws.lock_id = None
 
+        # No-op short-circuit: a plan that reports no changes has nothing
+        # for an apply Job to do. tofu wouldn't bump the state serial, so
+        # an apply Job would either no-op or — given a same-serial state
+        # upload — 500 on the unique constraint. Skip straight to applied
+        # without launching a Job. Applies regardless of auto_apply since
+        # the manual confirm path also has nothing meaningful to do.
+        if not run.plan_only and run.has_changes is False:
+            run = await run_service.transition_run(db, run, "applied")
+            ws = await db.get(Workspace, run.workspace_id)
+            if ws and ws.locked:
+                ws.locked = False
+                ws.lock_id = None
+            logger.info("Plan succeeded — no changes, skipping apply", run_id=str(run.id))
+            return
+
         # Auto-apply if configured
         if run.auto_apply and not run.plan_only:
             run = await run_service.transition_run(db, run, "confirmed")

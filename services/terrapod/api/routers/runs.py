@@ -120,11 +120,21 @@ def _run_json(
                 "created-at": _rfc3339(run.created_at),
                 "updated-at": _rfc3339(run.updated_at),
                 "created-by": run.created_by or "",
+                # Confirm/Discard are only meaningful for planned runs that
+                # actually have work to apply. A plan with has_changes=False
+                # is a no-op — the reconciler short-circuits it straight to
+                # `applied`, so seeing `planned` + has_changes=False here is
+                # only possible for legacy runs created before that fix.
+                # Hide the buttons so the UI doesn't push users into the
+                # state-upload 500 path.
                 "actions": {
                     "is-confirmable": run.status == "planned"
                     and not run.auto_apply
-                    and not run.plan_only,
-                    "is-discardable": run.status == "planned" and not run.plan_only,
+                    and not run.plan_only
+                    and run.has_changes is not False,
+                    "is-discardable": run.status == "planned"
+                    and not run.plan_only
+                    and run.has_changes is not False,
                     # Cancel only applies to in-progress states. In particular
                     # `planned` (awaiting confirmation) is NOT cancelable —
                     # the user should confirm or discard. Terminal states
@@ -134,9 +144,13 @@ def _run_json(
                     or (run.plan_only and run.status == "planned"),
                 },
                 "permissions": {
-                    "can-apply": run.status == "planned" and not run.plan_only,
+                    "can-apply": run.status == "planned"
+                    and not run.plan_only
+                    and run.has_changes is not False,
                     "can-cancel": run.status in _CANCELABLE_STATES,
-                    "can-discard": run.status == "planned" and not run.plan_only,
+                    "can-discard": run.status == "planned"
+                    and not run.plan_only
+                    and run.has_changes is not False,
                     "can-retry": run.status in run_service.TERMINAL_STATES
                     or (run.plan_only and run.status == "planned"),
                     "can-force-execute": False,
@@ -464,6 +478,17 @@ async def confirm_run(
     """Confirm a planned run for apply. Requires write."""
     run = await _get_run(run_id, db)
     await _require_run_ws_permission(run, "write", user, db)
+
+    # No-op apply guard: a plan with has_changes=False has nothing to apply.
+    # The reconciler short-circuits these directly to `applied`, so this
+    # endpoint should only see them in narrow races (or for legacy data
+    # predating that fix). Reject explicitly so the API and the UI surface
+    # the same answer.
+    if run.has_changes is False:
+        raise HTTPException(
+            status_code=422,
+            detail="Plan reported no changes — there is nothing to apply.",
+        )
 
     # Block apply for CLI-uploaded code on VCS-connected agent workspaces.
     # Destroy runs are exempt — they don't depend on uploaded code.
@@ -940,8 +965,18 @@ async def update_run_status(
     try:
         run = await run_service.transition_run(db, run, target_status, error_message=error_message)
 
+        # No-op short-circuit: a plan with has_changes=False has nothing for an
+        # apply Job to do. Skip straight to applied without an apply Job — see
+        # `run_reconciler._handle_succeeded` for the full rationale; the same
+        # logic applies here for listeners that PATCH planned directly.
+        if target_status == "planned" and not run.plan_only and run.has_changes is False:
+            run = await run_service.transition_run(db, run, "applied")
+            ws = await db.get(Workspace, run.workspace_id)
+            if ws and ws.locked:
+                ws.locked = False
+                ws.lock_id = None
         # Auto-apply if configured
-        if target_status == "planned" and run.auto_apply and not run.plan_only:
+        elif target_status == "planned" and run.auto_apply and not run.plan_only:
             run = await run_service.transition_run(db, run, "confirmed")
 
         # Unlock workspace when plan-only run reaches planned

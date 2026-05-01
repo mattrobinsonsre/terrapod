@@ -30,7 +30,13 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
     "pending": {"queued", "canceled", "errored"},
     "queued": {"planning", "canceled", "errored"},
     "planning": {"planned", "errored", "canceled"},
-    "planned": {"confirmed", "discarded", "errored", "canceled"},
+    # `planned → applied` is the no-op apply: when the plan reports
+    # has_changes=False there is nothing for an apply Job to do and
+    # no new state version to upload (tofu doesn't bump serial on a
+    # zero-change apply, so the upload would 500 on the unique
+    # constraint anyway). The reconciler short-circuits to applied
+    # without launching a Job.
+    "planned": {"confirmed", "applied", "discarded", "errored", "canceled"},
     "confirmed": {"applying", "errored", "canceled"},
     "applying": {"applied", "errored", "canceled"},
 }
