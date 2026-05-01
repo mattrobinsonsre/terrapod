@@ -381,6 +381,32 @@ async def transition_run(
     return run
 
 
+async def complete_planned_as_noop(db: AsyncSession, run: Run) -> Run:
+    """Transition a planned run directly to `applied` without an apply Job.
+
+    Used when the plan reports `has_changes=False`: tofu apply on a
+    zero-change plan does no work and doesn't bump the state serial, so
+    launching an apply Job is wasted compute and triggers the duplicate-
+    serial 500 on state upload. Skip straight to `applied`.
+
+    Sets `apply_started_at` before transitioning so `transition_run` sets
+    `apply_finished_at` in turn — the resulting run reports an
+    `applied-at` status timestamp, keeping the API response coherent for
+    UI timelines and TFE clients that expect both timestamps on a
+    terminal `applied` run. Apply duration recorded as 0s, which is
+    accurate (the apply phase was a no-op).
+
+    Releases the workspace lock since no Job will run.
+    """
+    run.apply_started_at = utc_now()
+    run = await transition_run(db, run, "applied")
+    ws = await db.get(Workspace, run.workspace_id)
+    if ws and ws.locked:
+        ws.locked = False
+        ws.lock_id = None
+    return run
+
+
 async def queue_run(db: AsyncSession, run: Run) -> Run:
     """Queue a run for execution."""
     return await transition_run(db, run, "queued")

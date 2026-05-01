@@ -24,6 +24,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
@@ -223,6 +224,16 @@ async def upload_state(
     # this path shouldn't be reached in steady state, but explicit 409 is
     # correct semantics regardless: a stale serial is a client-visible
     # conflict, not a server error.
+    #
+    # Two-layer check: (1) pre-INSERT lookup gives the common case a clean
+    # 409 with a helpful message; (2) IntegrityError catch on the INSERT
+    # closes the race window where a concurrent upload inserts between our
+    # SELECT and INSERT — the unique constraint is the source of truth.
+    _existing_serial_msg = (
+        f"State serial {serial} already exists for this workspace. "
+        "tofu apply did not bump the serial — likely a no-op apply that "
+        "should not have produced a state upload."
+    )
     existing = await db.execute(
         select(StateVersion).where(
             StateVersion.workspace_id == run.workspace_id,
@@ -230,14 +241,7 @@ async def upload_state(
         )
     )
     if existing.scalar_one_or_none() is not None:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"State serial {serial} already exists for this workspace. "
-                "tofu apply did not bump the serial — likely a no-op apply that "
-                "should not have produced a state upload."
-            ),
-        )
+        raise HTTPException(status_code=409, detail=_existing_serial_msg)
 
     # Create StateVersion record
     sv = StateVersion(
@@ -250,7 +254,14 @@ async def upload_state(
         created_by=run.created_by or None,
     )
     db.add(sv)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        # Race: another upload inserted the same (workspace_id, serial)
+        # between our SELECT and INSERT. Roll back so the session is
+        # usable for any caller-side cleanup, then return 409.
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=_existing_serial_msg) from None
 
     # Store at canonical key (same format used by download_state)
     storage = get_storage()

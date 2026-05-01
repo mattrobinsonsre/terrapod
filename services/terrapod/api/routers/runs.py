@@ -966,15 +966,10 @@ async def update_run_status(
         run = await run_service.transition_run(db, run, target_status, error_message=error_message)
 
         # No-op short-circuit: a plan with has_changes=False has nothing for an
-        # apply Job to do. Skip straight to applied without an apply Job — see
-        # `run_reconciler._handle_succeeded` for the full rationale; the same
-        # logic applies here for listeners that PATCH planned directly.
+        # apply Job to do. Use the shared helper so this path stays in lockstep
+        # with the reconciler's `_handle_succeeded` no-op skip.
         if target_status == "planned" and not run.plan_only and run.has_changes is False:
-            run = await run_service.transition_run(db, run, "applied")
-            ws = await db.get(Workspace, run.workspace_id)
-            if ws and ws.locked:
-                ws.locked = False
-                ws.lock_id = None
+            run = await run_service.complete_planned_as_noop(db, run)
         # Auto-apply if configured
         elif target_status == "planned" and run.auto_apply and not run.plan_only:
             run = await run_service.transition_run(db, run, "confirmed")

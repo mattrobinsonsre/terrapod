@@ -90,6 +90,44 @@ class TestUploadStateDuplicateSerial:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
+    async def test_race_window_falls_back_to_409(self, *_mocks):
+        """SELECT-then-INSERT race: another upload inserts between our
+        check and our flush. The unique constraint catches it; the
+        IntegrityError handler translates to 409 instead of letting it
+        surface as 500.
+        """
+        from sqlalchemy.exc import IntegrityError
+
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        # First db.execute is the proactive lookup — returns None (no row).
+        empty = MagicMock()
+        empty.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = empty
+        # The race: db.flush() raises IntegrityError as the constraint kicks in.
+        mock_db.flush.side_effect = IntegrityError("INSERT", {}, Exception("uq_state_versions"))
+
+        app = _make_app(_runner_user(run_id), mock_db)
+
+        state_json = json.dumps({"version": 4, "serial": 8, "lineage": "abc"})
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/v2/runs/{run.id}/artifacts/state",
+                content=state_json,
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 409
+        assert "serial 8 already exists" in resp.json()["detail"].lower()
+        # Rollback was issued so the session is usable for the caller.
+        mock_db.rollback.assert_awaited_once()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.run_artifacts.get_storage")
     async def test_new_serial_succeeds(self, mock_get_storage, *_mocks):
         """Sanity: a genuinely new serial still goes through (no false-positive 409)."""
