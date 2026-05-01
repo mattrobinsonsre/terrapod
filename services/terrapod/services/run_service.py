@@ -30,7 +30,13 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
     "pending": {"queued", "canceled", "errored"},
     "queued": {"planning", "canceled", "errored"},
     "planning": {"planned", "errored", "canceled"},
-    "planned": {"confirmed", "discarded", "errored", "canceled"},
+    # `planned → applied` is the no-op apply: when the plan reports
+    # has_changes=False there is nothing for an apply Job to do and
+    # no new state version to upload (tofu doesn't bump serial on a
+    # zero-change apply, so the upload would 500 on the unique
+    # constraint anyway). The reconciler short-circuits to applied
+    # without launching a Job.
+    "planned": {"confirmed", "applied", "discarded", "errored", "canceled"},
     "confirmed": {"applying", "errored", "canceled"},
     "applying": {"applied", "errored", "canceled"},
 }
@@ -372,6 +378,32 @@ async def transition_run(
     if run.is_drift_detection and target_status in drift_terminal:
         await _enqueue_drift_completed(run)
 
+    return run
+
+
+async def complete_planned_as_noop(db: AsyncSession, run: Run) -> Run:
+    """Transition a planned run directly to `applied` without an apply Job.
+
+    Used when the plan reports `has_changes=False`: tofu apply on a
+    zero-change plan does no work and doesn't bump the state serial, so
+    launching an apply Job is wasted compute and triggers the duplicate-
+    serial 500 on state upload. Skip straight to `applied`.
+
+    Sets `apply_started_at` before transitioning so `transition_run` sets
+    `apply_finished_at` in turn — the resulting run reports an
+    `applied-at` status timestamp, keeping the API response coherent for
+    UI timelines and TFE clients that expect both timestamps on a
+    terminal `applied` run. Apply duration recorded as 0s, which is
+    accurate (the apply phase was a no-op).
+
+    Releases the workspace lock since no Job will run.
+    """
+    run.apply_started_at = utc_now()
+    run = await transition_run(db, run, "applied")
+    ws = await db.get(Workspace, run.workspace_id)
+    if ws and ws.locked:
+        ws.locked = False
+        ws.lock_id = None
     return run
 
 

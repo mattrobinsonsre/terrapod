@@ -187,6 +187,16 @@ async def _handle_succeeded(db: AsyncSession, run: Run) -> None:
                 ws.locked = False
                 ws.lock_id = None
 
+        # No-op short-circuit: a plan that reports no changes has nothing
+        # for an apply Job to do. Skip straight to applied via the shared
+        # helper (sets apply_*_at, releases lock). Applies regardless of
+        # auto_apply since the manual confirm path also has nothing
+        # meaningful to do.
+        if not run.plan_only and run.has_changes is False:
+            run = await run_service.complete_planned_as_noop(db, run)
+            logger.info("Plan succeeded — no changes, skipping apply", run_id=str(run.id))
+            return
+
         # Auto-apply if configured
         if run.auto_apply and not run.plan_only:
             run = await run_service.transition_run(db, run, "confirmed")
