@@ -35,7 +35,7 @@ authlib = "^1.4.0"
 python3-saml = "^1.16.0"
 cryptography = ">=46.0.5,<48.0.0"
 zxcvbn = "^4.4.28"
-python-multipart = "^0.0.26"
+python-multipart = ">=0.0.26,<0.0.28"
 # Kubernetes (runner listener)
 kubernetes = "^35.0.0"
 # GPG key parsing for provider registry
