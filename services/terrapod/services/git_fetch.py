@@ -385,6 +385,12 @@ def _write_tarball_from_dir(fileobj, working_tree: str) -> None:
     async code.
     """
     root = Path(working_tree)
+    # nosem: terrapod-no-sync-tarfile-in-coroutine — this is a `def`, not
+    # an `async def`. The only caller is `_producer_thread`, which is
+    # invoked via `asyncio.to_thread(_producer_thread, …)` from
+    # `sparse_archive_to_storage` (see line ~334). The Semgrep rule flags
+    # any `tarfile.open` in a Python file because it can't trace call
+    # chains; the to-thread wrapping is the correctness story.
     with tarfile.open(fileobj=fileobj, mode="w:gz") as tf:
         # Walk top-down so we add directories before their contents.
         # `os.walk` with `sorted` makes the order deterministic.
