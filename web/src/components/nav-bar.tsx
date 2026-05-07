@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Users, Shield, Server, Variable, FileText, BookOpen, Code, LogOut, Menu, X } from 'lucide-react'
+import { Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Users, Shield, Server, Variable, FileText, BookOpen, Code, LogOut, Menu, X, Tags } from 'lucide-react'
 import { clearAuth, isAdmin, isAdminOrAudit } from '@/lib/auth'
 import { SessionExpiryBanner } from '@/components/session-expiry-banner'
 
@@ -78,6 +78,10 @@ export default function NavBar() {
       <NavLink href="/admin/agent-pools" onClick={closeMenu}>
         <Server size={16} />
         Agent Pools
+      </NavLink>
+      <NavLink href="/labels" onClick={closeMenu}>
+        <Tags size={16} />
+        Labels
       </NavLink>
       {admin && (
         <>

@@ -504,6 +504,11 @@ def create_application() -> FastAPI:
 
     app.include_router(agent_pools_router)
 
+    # Read-only labels browser (cross-entity: workspaces, pools, modules, providers)
+    from terrapod.api.routers.labels import router as labels_router
+
+    app.include_router(labels_router)
+
     # Run endpoints
     from terrapod.api.routers.runs import router as runs_router
 

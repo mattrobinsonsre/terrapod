@@ -39,6 +39,22 @@ def has_registry_permission(effective: str | None, required: str) -> bool:
     )
 
 
+async def fetch_custom_roles(
+    db: AsyncSession,
+    user_roles: list[str],
+) -> list[Role]:
+    """Fetch custom (non-builtin) Role objects for the given role names.
+
+    Use this to pre-load roles once before calling resolve_registry_permission
+    in a loop, passing the result as ``preloaded_roles`` to avoid N+1 queries.
+    """
+    custom_names = set(user_roles) - BUILTIN_ROLE_NAMES
+    if not custom_names:
+        return []
+    result = await db.execute(select(Role).where(Role.name.in_(custom_names)))
+    return list(result.scalars().all())
+
+
 async def resolve_registry_permission(
     db: AsyncSession,
     user_email: str,
@@ -47,6 +63,8 @@ async def resolve_registry_permission(
     resource_labels: dict,
     owner_email: str,
     auth_method: str = "",
+    *,
+    preloaded_roles: list[Role] | None = None,
 ) -> str | None:
     """Returns highest permission level (read/write/admin), or None.
 
@@ -58,6 +76,9 @@ async def resolve_registry_permission(
     5. Label-based RBAC (custom roles) → mapped workspace_permission
     6. 'everyone' role with access: everyone label → read
     7. Default → None (no access)
+
+    Pass ``preloaded_roles`` (from :func:`fetch_custom_roles`) to skip the
+    per-call DB query — useful when resolving permissions for many resources.
     """
     role_set = set(user_roles)
 
@@ -83,8 +104,11 @@ async def resolve_registry_permission(
     # 5. Label-based RBAC from custom roles
     custom_role_names = role_set - BUILTIN_ROLE_NAMES
     if custom_role_names:
-        result = await db.execute(select(Role).where(Role.name.in_(custom_role_names)))
-        roles = list(result.scalars().all())
+        if preloaded_roles is not None:
+            roles = [r for r in preloaded_roles if r.name in custom_role_names]
+        else:
+            result = await db.execute(select(Role).where(Role.name.in_(custom_role_names)))
+            roles = list(result.scalars().all())
 
         for role in roles:
             # Check deny first

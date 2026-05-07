@@ -27,11 +27,29 @@ def has_permission(effective: str | None, required: str) -> bool:
     return PERMISSION_HIERARCHY.get(effective, -1) >= PERMISSION_HIERARCHY.get(required, 99)
 
 
+async def fetch_custom_roles(
+    db: AsyncSession,
+    user_roles: list[str],
+) -> list[Role]:
+    """Fetch custom (non-builtin) Role objects for the given role names.
+
+    Use this to pre-load roles once before calling resolve_workspace_permission
+    in a loop, passing the result as ``preloaded_roles`` to avoid N+1 queries.
+    """
+    custom_names = set(user_roles) - BUILTIN_ROLE_NAMES
+    if not custom_names:
+        return []
+    result = await db.execute(select(Role).where(Role.name.in_(custom_names)))
+    return list(result.scalars().all())
+
+
 async def resolve_workspace_permission(
     db: AsyncSession,
     user_email: str,
     user_roles: list[str],
     workspace: Workspace,
+    *,
+    preloaded_roles: list[Role] | None = None,
 ) -> str | None:
     """Returns the highest permission level for a user on a workspace, or None.
 
@@ -42,6 +60,9 @@ async def resolve_workspace_permission(
     4. Label-based RBAC (custom roles) → role's workspace_permission (highest wins)
     5. 'everyone' role with access: everyone label → read
     6. Default → None (no access)
+
+    Pass ``preloaded_roles`` (from :func:`fetch_custom_roles`) to skip the
+    per-call DB query — useful when resolving permissions for many workspaces.
     """
     role_set = set(user_roles)
 
@@ -62,8 +83,11 @@ async def resolve_workspace_permission(
     # 4. Label-based RBAC from custom roles
     custom_role_names = role_set - BUILTIN_ROLE_NAMES
     if custom_role_names:
-        result = await db.execute(select(Role).where(Role.name.in_(custom_role_names)))
-        roles = list(result.scalars().all())
+        if preloaded_roles is not None:
+            roles = [r for r in preloaded_roles if r.name in custom_role_names]
+        else:
+            result = await db.execute(select(Role).where(Role.name.in_(custom_role_names)))
+            roles = list(result.scalars().all())
 
         resource_labels = workspace.labels or {}
         resource_name = workspace.name
