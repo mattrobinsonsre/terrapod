@@ -584,6 +584,17 @@ class ArtifactRetentionConfig(BaseModel):
         default=90,
         description="Days to keep config version tarballs (0 = disabled)",
     )
+    config_versions_keep: int = Field(
+        default=50,
+        description=(
+            "Number of configuration versions to keep per workspace beyond "
+            "what is referenced by an active run (0 = disabled). Mirrors "
+            "the registry-module retain-by-count pattern. Runs that "
+            "reference an older CV continue to render — the CV row "
+            "stays via the SET NULL FK — but the tarball is deleted "
+            "and the CV is no longer downloadable."
+        ),
+    )
     provider_cache_retention_days: int = Field(
         default=30,
         description="Days since last access before cached provider binaries are eligible for cleanup (0 = disabled)",

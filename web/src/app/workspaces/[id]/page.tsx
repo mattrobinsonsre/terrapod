@@ -119,6 +119,31 @@ interface StateVersionItem {
   }
 }
 
+interface ConfigurationVersionItem {
+  id: string
+  attributes: {
+    source: string
+    status: string
+    'auto-queue-runs': boolean
+    speculative: boolean
+    'created-at': string
+  }
+}
+
+interface CVDiffFile {
+  path: string
+  type: 'added' | 'removed' | 'modified' | 'binary-changed'
+  diff?: string
+}
+
+interface CVDiffResult {
+  'from-id': string
+  'to-id': string
+  files: CVDiffFile[]
+  oversized: string[]
+  'total-files-changed': number
+}
+
 interface RunTaskItem {
   id: string
   attributes: {
@@ -165,9 +190,9 @@ const ALL_TRIGGERS = [
 const ALL_STAGES = ['pre_plan', 'post_plan', 'pre_apply'] as const
 const ALL_ENFORCEMENT_LEVELS = ['mandatory', 'advisory'] as const
 
-type Tab = 'overview' | 'variables' | 'runs' | 'state' | 'notifications' | 'run-tasks'
+type Tab = 'overview' | 'variables' | 'runs' | 'state' | 'configurations' | 'notifications' | 'run-tasks'
 
-const VALID_TABS: Set<string> = new Set(['overview', 'variables', 'runs', 'state', 'notifications', 'run-tasks'])
+const VALID_TABS: Set<string> = new Set(['overview', 'variables', 'runs', 'state', 'configurations', 'notifications', 'run-tasks'])
 
 export default function WorkspaceDetailPage() {
   return (
@@ -269,6 +294,15 @@ function WorkspaceDetailContent() {
   const [stateLoading, setStateLoading] = useState(false)
   const [stateActionLoading, setStateActionLoading] = useState<string | null>(null)
   const [confirmStateAction, setConfirmStateAction] = useState<{ action: 'delete' | 'rollback'; sv: StateVersionItem } | null>(null)
+
+  // Configuration versions (Configurations tab)
+  const [cvs, setCvs] = useState<ConfigurationVersionItem[]>([])
+  const [cvCurrentId, setCvCurrentId] = useState<string | null>(null)
+  const [cvLoading, setCvLoading] = useState(false)
+  const [cvSelected, setCvSelected] = useState<Set<string>>(new Set())
+  const [cvDiff, setCvDiff] = useState<CVDiffResult | null>(null)
+  const [cvDiffLoading, setCvDiffLoading] = useState(false)
+  const [cvDiffError, setCvDiffError] = useState('')
 
   // Variable editing
   const [editingVarId, setEditingVarId] = useState<string | null>(null)
@@ -418,6 +452,7 @@ function WorkspaceDetailContent() {
     if (activeTab === 'variables') loadVariables()
     if (activeTab === 'runs') loadRuns()
     if (activeTab === 'state') loadStateVersions()
+    if (activeTab === 'configurations') loadConfigurations()
     if (activeTab === 'notifications') loadNotifications()
     if (activeTab === 'run-tasks') loadRunTasks()
   }, [activeTab, workspace, loadRuns])
@@ -468,6 +503,105 @@ function WorkspaceDetailContent() {
       setError(err instanceof Error ? err.message : 'Failed to load state versions')
     } finally {
       setStateLoading(false)
+    }
+  }
+
+  async function loadConfigurations() {
+    setCvLoading(true)
+    setCvDiff(null)
+    setCvDiffError('')
+    try {
+      const res = await apiFetch(
+        `/api/v2/workspaces/${workspaceId}/configuration-versions?page%5Bsize%5D=100`,
+      )
+      if (!res.ok) throw new Error('Failed to load configuration versions')
+      const data = await res.json()
+      setCvs(data.data || [])
+      setCvCurrentId(data.meta?.['current-id'] ?? null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load configuration versions')
+    } finally {
+      setCvLoading(false)
+    }
+  }
+
+  function toggleCvSelected(id: string) {
+    setCvSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      // Cap at two selections — clears the oldest when a third is picked
+      if (next.size > 2) {
+        const first = Array.from(next)[0]
+        next.delete(first)
+      }
+      return next
+    })
+    setCvDiff(null)
+    setCvDiffError('')
+  }
+
+  // Mint a short-lived ticket and let the browser stream the download
+  // natively to the user's save dialog. Plain navigation can't carry an
+  // Authorization header, so the ticket goes in the URL — bounded by a
+  // 5-min TTL and signed for this CV only. Avoids loading multi-MB
+  // tarballs into JS memory as a blob.
+  async function downloadCv(cvId: string) {
+    try {
+      const res = await apiFetch(
+        `/api/v2/configuration-versions/${cvId}/download-ticket`,
+        { method: 'POST' },
+      )
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}))
+        throw new Error(errBody.detail || `Download failed (${res.status})`)
+      }
+      const body = await res.json()
+      const url = body?.data?.attributes?.url
+      if (!url) throw new Error('Download ticket response missing URL')
+      // Trigger via an anchor so the page stays put — the
+      // Content-Disposition: attachment on the response makes the
+      // browser download rather than navigate.
+      const a = document.createElement('a')
+      a.href = url
+      a.rel = 'noopener'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Download failed')
+    }
+  }
+
+  async function compareSelectedCvs() {
+    if (cvSelected.size !== 2) return
+    setCvDiffLoading(true)
+    setCvDiffError('')
+    try {
+      // Order from-id (older) → to-id (newer) so the diff reads left-to-right
+      // chronologically. CVs are sorted desc by created-at; we reverse-find.
+      const ids = cvs
+        .map(c => c.id)
+        .filter(id => cvSelected.has(id))
+      // ids[] preserves cv list order (newest first); reverse to get older first
+      const [toId, fromId] = ids
+      const res = await apiFetch('/api/v2/configuration-versions/diff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: { type: 'configuration-version-diffs', attributes: { 'from-id': fromId, 'to-id': toId } },
+        }),
+      })
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}))
+        throw new Error(errBody.detail || `Diff failed (${res.status})`)
+      }
+      const data = await res.json()
+      setCvDiff(data.data.attributes)
+    } catch (err) {
+      setCvDiffError(err instanceof Error ? err.message : 'Diff failed')
+    } finally {
+      setCvDiffLoading(false)
     }
   }
 
@@ -1074,6 +1208,7 @@ function WorkspaceDetailContent() {
     { key: 'variables', label: 'Variables' },
     { key: 'runs', label: 'Runs' },
     { key: 'state', label: 'State' },
+    { key: 'configurations', label: 'Configurations' },
     { key: 'notifications', label: 'Notifications' },
     { key: 'run-tasks', label: 'Run Tasks' },
   ]
@@ -2230,6 +2365,172 @@ function WorkspaceDetailContent() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Configurations Tab */}
+        {activeTab === 'configurations' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-slate-400">
+                Uploaded source archives for this workspace, newest first. Pick two rows to compare.
+              </p>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-500">{cvSelected.size}/2 selected</span>
+                <button
+                  type="button"
+                  onClick={compareSelectedCvs}
+                  disabled={cvSelected.size !== 2 || cvDiffLoading}
+                  className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {cvDiffLoading ? 'Comparing…' : 'Compare'}
+                </button>
+              </div>
+            </div>
+
+            {cvLoading ? (
+              <LoadingSpinner />
+            ) : cvs.length === 0 ? (
+              <EmptyState message="No configuration versions yet. They appear here as soon as a `terraform plan` uploads or a VCS push triggers a run." />
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-slate-800">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-900/50 text-slate-400">
+                    <tr>
+                      <th className="w-8 px-2 py-3" aria-hidden />
+                      <th className="px-4 py-3 text-left font-medium">ID</th>
+                      <th className="px-4 py-3 text-left font-medium">Source</th>
+                      <th className="px-4 py-3 text-left font-medium">Status</th>
+                      <th className="px-4 py-3 text-left font-medium">Created</th>
+                      <th className="px-4 py-3 text-right font-medium">Download</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {cvs.map(cv => {
+                      const isCurrent = cv.id === cvCurrentId
+                      const isSelected = cvSelected.has(cv.id)
+                      const canDownload = cv.attributes.status === 'uploaded'
+                      return (
+                        <tr key={cv.id} className={isSelected ? 'bg-blue-900/20' : 'hover:bg-slate-900/30 transition-colors'}>
+                          <td className="px-2 py-3 align-middle">
+                            <input
+                              type="checkbox"
+                              aria-label={`Select ${cv.id} for compare`}
+                              checked={isSelected}
+                              onChange={() => toggleCvSelected(cv.id)}
+                              className="h-4 w-4"
+                              disabled={!canDownload}
+                            />
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs">
+                            <span className="text-slate-200">{cv.id}</span>
+                            {isCurrent && (
+                              <span className="ml-2 inline-flex items-center rounded bg-green-900/40 px-1.5 py-0.5 text-xs font-medium text-green-300">
+                                current
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-slate-300">{cv.attributes.source}</td>
+                          <td className="px-4 py-3 text-slate-400">{cv.attributes.status}</td>
+                          <td className="px-4 py-3 text-slate-400">
+                            {new Date(cv.attributes['created-at']).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {canDownload ? (
+                              <button
+                                type="button"
+                                onClick={() => downloadCv(cv.id)}
+                                className="text-blue-400 hover:text-blue-300 text-sm font-medium"
+                              >
+                                Download
+                              </button>
+                            ) : (
+                              <span className="text-slate-600 text-sm">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {cvDiffError && (
+              <div className="mt-4">
+                <ErrorBanner message={cvDiffError} />
+              </div>
+            )}
+
+            {cvDiff && (
+              <div className="mt-6 space-y-4">
+                <div className="flex items-baseline justify-between">
+                  <h3 className="text-lg font-medium text-slate-100">
+                    Diff <span className="text-slate-500 text-sm font-normal">{cvDiff['total-files-changed']} files changed</span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => { setCvDiff(null); setCvSelected(new Set()) }}
+                    className="text-sm text-slate-400 hover:text-slate-200"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                {cvDiff.oversized.length > 0 && (
+                  <div className="rounded-md border border-amber-900/50 bg-amber-900/20 px-4 py-3 text-sm text-amber-200">
+                    Skipped {cvDiff.oversized.length} oversized file
+                    {cvDiff.oversized.length > 1 ? 's' : ''}: {cvDiff.oversized.join(', ')}
+                  </div>
+                )}
+
+                {cvDiff.files.length === 0 ? (
+                  <p className="text-slate-500 text-sm italic">
+                    No content differences between these versions.
+                  </p>
+                ) : (
+                  cvDiff.files.map(f => (
+                    <div key={f.path} className="overflow-hidden rounded-lg border border-slate-800">
+                      <div className="flex items-center gap-3 bg-slate-900/50 px-4 py-2 text-sm">
+                        <span
+                          className={
+                            'inline-block w-20 text-center rounded px-1.5 py-0.5 text-xs font-medium ' +
+                            (f.type === 'added' ? 'bg-green-900/50 text-green-300' :
+                             f.type === 'removed' ? 'bg-red-900/50 text-red-300' :
+                             f.type === 'binary-changed' ? 'bg-slate-700 text-slate-300' :
+                             'bg-blue-900/50 text-blue-300')
+                          }
+                        >
+                          {f.type}
+                        </span>
+                        <span className="font-mono text-slate-200">{f.path}</span>
+                      </div>
+                      {f.diff ? (
+                        <pre className="overflow-x-auto bg-slate-950 px-4 py-3 text-xs leading-relaxed text-slate-300">
+                          {f.diff.split('\n').map((line, i) => (
+                            <div
+                              key={i}
+                              className={
+                                line.startsWith('+') && !line.startsWith('+++') ? 'text-green-300' :
+                                line.startsWith('-') && !line.startsWith('---') ? 'text-red-300' :
+                                line.startsWith('@@') ? 'text-cyan-400' :
+                                'text-slate-400'
+                              }
+                            >
+                              {line || '\u00a0'}
+                            </div>
+                          ))}
+                        </pre>
+                      ) : (
+                        <p className="px-4 py-3 text-sm text-slate-500 italic">
+                          Binary file changed — diff not rendered.
+                        </p>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             )}
           </div>

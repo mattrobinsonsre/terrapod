@@ -361,6 +361,14 @@ Pick the workspace at run time with `terraform workspace select <name>` or the `
 
 The web UI displays this field as **"Labels (tags)"** to make the dual purpose explicit.
 
+### Labels Browser
+
+Labels are also queryable as a first-class navigation surface via the **Labels** page in the web UI (and the `GET /api/v2/labels[/{key}[/{value}]]` endpoints — see [API Reference](api-reference.md#labels)). It lists every key in use, drills into the values for a key, and from a value lists every entity carrying it — workspaces, modules, providers, and pools.
+
+The browser is **read-only**: editing happens on each entity's own page. It is **RBAC-filtered**: a label only appears if you can `read` at least one entity that carries it, and the per-key/value listings only count entities you can see. There is no admin escape hatch — `admin`/`audit` see everything because their underlying RBAC grants them read on every entity, not because the labels page treats them specially.
+
+Use the labels browser when you want a project- or team-level view of resources that are otherwise scattered across the workspaces / modules / providers / pools sections. There is no separate "Projects" concept in Terrapod — labels with whatever key suits you (`project`, `team`, `cost-center`, `env`) cover the same need.
+
 ---
 
 ## Self-Lockout Protection on Label Changes

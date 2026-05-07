@@ -760,6 +760,190 @@ Content-Type: application/octet-stream
 
 No auth required (presigned URL).
 
+### Show Configuration Version
+
+```
+GET /api/v2/configuration-versions/{cv_id}
+```
+
+Returns a single CV's metadata.
+
+### List Configuration Versions
+
+```
+GET /api/v2/workspaces/{id}/configuration-versions
+```
+
+Newest first. Supports `page[size]` (default 20, max 100) and `page[number]`.
+
+**Response includes** `meta.current-id` — the CV id consumed by the most recent successful apply, or `null` if none. The UI uses this to badge the current row.
+
+**Required permission:** `read` on the workspace.
+
+### Download Configuration Version (Terrapod extension)
+
+```
+GET /api/v2/configuration-versions/{cv_id}/download
+```
+
+Streams the tarball bytes back as `application/x-tar` with a `Content-Disposition: attachment` header. Bearer auth.
+
+**Status codes:**
+- 200 — streaming tarball
+- 404 — CV doesn't exist or caller lacks `read`
+- 409 — CV exists but bytes haven't been uploaded yet
+- 410 — CV row exists but tarball was swept by retention
+
+**Required permission:** `read` on the owning workspace.
+
+### Mint Download Ticket (Terrapod extension)
+
+```
+POST /api/v2/configuration-versions/{cv_id}/download-ticket
+```
+
+Mints a short-lived, single-resource HMAC ticket the browser can paste into a plain `<a href>` to stream a download natively to the user's save dialog. **Opt-in** — the default download path above is the simple Bearer-auth flow; tickets exist because plain navigation can't carry an `Authorization` header.
+
+**Request body** (optional):
+```json
+{"data": {"attributes": {"ttl-seconds": 300}}}
+```
+
+TTL defaults to 300 s, hard-capped at 1800 s. Negative or zero values fall back to the default.
+
+**Response:**
+```json
+{
+  "data": {
+    "type": "download-tickets",
+    "attributes": {
+      "ticket": "dlticket:cv:{uuid}:...",
+      "url": "/api/v2/configuration-versions/download-by-ticket/dlticket:cv:...",
+      "expires-at": "2026-05-07T12:34:56Z"
+    }
+  }
+}
+```
+
+**Required permission:** `read` on the owning workspace (same gate as the direct download).
+
+### Download by Ticket (Terrapod extension)
+
+```
+GET /api/v2/configuration-versions/download-by-ticket/{ticket}
+```
+
+Streams the tarball — no `Authorization` header. The ticket is the auth: HMAC-SHA256 over the resource id, expiry, and minter email, signed with the same key class as runner tokens. Single-resource (a CV-X ticket cannot fetch CV-Y); short TTL bounds replay.
+
+**Status codes:**
+- 200 — streaming tarball
+- 401 — malformed, expired, or bad-signature ticket
+- 410 — CV bytes swept by retention since mint
+
+### Diff Configuration Versions (Terrapod extension)
+
+```
+POST /api/v2/configuration-versions/diff
+```
+
+Compares two CVs in the same workspace and returns per-file unified diffs.
+
+**Request body:**
+```json
+{
+  "data": {
+    "attributes": {
+      "from-id": "cv-...",
+      "to-id":   "cv-..."
+    }
+  }
+}
+```
+
+**Response shape:**
+```json
+{
+  "data": {
+    "type": "configuration-version-diffs",
+    "attributes": {
+      "from-id": "cv-...",
+      "to-id":   "cv-...",
+      "files": [
+        {"path": "main.tf", "type": "modified", "diff": "@@ ... @@"},
+        {"path": "vars.tf", "type": "added",    "diff": "..."},
+        {"path": "old.tf",  "type": "removed",  "diff": "..."},
+        {"path": "logo.png","type": "binary-changed"}
+      ],
+      "oversized": ["modules/big.zip"],
+      "total-files-changed": 4
+    }
+  }
+}
+```
+
+**Limits:** per-file 1 MiB (oversized files report only their path), per-pair 32 MiB total (refused with 413 if exceeded). Binary files (NUL byte in first 8 KiB) report only `binary-changed`.
+
+**Status codes:**
+- 200 — diff returned
+- 404 — either CV missing or caller lacks `read`
+- 409 — either CV not yet uploaded
+- 410 — bytes swept by retention
+- 413 — combined size exceeds the per-pair cap
+- 422 — missing ids or cross-workspace request
+
+**Required permission:** `read` on the workspace (both CVs must belong to the same workspace).
+
+---
+
+## Labels
+
+Read-only labels browser (Terrapod extension). All endpoints are RBAC-filtered: results only include labels carried by entities the caller has at least `read` on for that entity's permission model. Editing labels still happens on each entity's own edit page — there is no labels-admin surface.
+
+### List Label Keys
+
+```
+GET /api/v2/labels
+```
+
+Returns all label keys in use across readable workspaces, modules, providers, and pools, with per-type counts.
+
+**Response shape:**
+```json
+{
+  "data": [
+    {"key": "team", "value-count": 4, "by-type": {"workspaces": 12, "modules": 2, "providers": 0, "pools": 1}}
+  ]
+}
+```
+
+### List Values for a Key
+
+```
+GET /api/v2/labels/{key}
+```
+
+Returns distinct values for `key`, each with per-type counts. Empty `data` is a valid response.
+
+### List Entities for a Label
+
+```
+GET /api/v2/labels/{key}/{value}
+```
+
+Returns entities tagged with exactly `key=value`, grouped by type.
+
+**Response shape:**
+```json
+{
+  "data": {
+    "workspaces": [{"id": "ws-...", "name": "..."}],
+    "modules":    [{"id": "mod-...", "name": "...", "provider": "..."}],
+    "providers":  [{"id": "prov-...", "namespace": "...", "name": "..."}],
+    "pools":      [{"id": "pool-...", "name": "..."}]
+  }
+}
+```
+
 ---
 
 ## Variables

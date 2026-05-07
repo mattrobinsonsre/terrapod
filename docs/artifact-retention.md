@@ -12,7 +12,8 @@ When enabled, a daily background task (via the distributed scheduler) iterates s
 |---|---|---|---|
 | **State versions** | `state_versions_keep` | 20 per workspace | Excess state versions beyond the keep count (oldest first) |
 | **Run artifacts** | `run_artifacts_retention_days` | 90 days | Plan output, plan logs, and apply logs for terminal runs |
-| **Config versions** | `config_versions_retention_days` | 90 days | Uploaded configuration tarballs no longer referenced by active runs |
+| **Config versions (age)** | `config_versions_retention_days` | 90 days | Uploaded configuration tarballs no longer referenced by active runs, older than the threshold |
+| **Config versions (count)** | `config_versions_keep` | 50 per workspace | Excess CVs beyond the keep count (oldest first); CVs referenced by an active run are always preserved |
 | **Provider cache** | `provider_cache_retention_days` | 30 days | Cached upstream provider binaries not accessed within the retention window |
 | **Binary cache** | `binary_cache_retention_days` | 30 days | Cached terraform/tofu CLI binaries not accessed within the retention window |
 | **Module overrides** | `module_overrides_retention_days` | 14 days | Module impact analysis override tarballs from completed speculative runs |
@@ -34,7 +35,8 @@ api:
       batch_size: 100                       # max items processed per category per cycle
       state_versions_keep: 20              # state versions to keep per workspace
       run_artifacts_retention_days: 90     # days before run logs/plans are deleted
-      config_versions_retention_days: 90   # days before config tarballs are deleted
+      config_versions_retention_days: 90   # days before config tarballs are deleted (age-based)
+      config_versions_keep: 50             # CVs to keep per workspace (count-based; 0 disables)
       provider_cache_retention_days: 30    # days since last access before provider cache entry is deleted
       binary_cache_retention_days: 30      # days since last access before binary cache entry is deleted
       module_overrides_retention_days: 14  # days before module override tarballs are deleted
@@ -113,7 +115,7 @@ Three Prometheus metrics track retention activity:
 | `terrapod_retention_errors_total` | Counter | category | Per-item deletion errors |
 | `terrapod_retention_duration_seconds` | Histogram | -- | Wall-clock duration of the full cleanup cycle |
 
-Categories: `state_versions`, `run_artifacts`, `config_versions`, `provider_cache`, `binary_cache`, `module_overrides`.
+Categories: `state_versions`, `run_artifacts`, `config_versions`, `config_versions_count`, `provider_cache`, `binary_cache`, `module_overrides`.
 
 ### Recommended Alert
 

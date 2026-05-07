@@ -61,6 +61,11 @@ async def artifact_retention_cycle() -> None:
             ("state_versions", _cleanup_state_versions, cfg.state_versions_keep),
             ("run_artifacts", _cleanup_run_artifacts, cfg.run_artifacts_retention_days),
             ("config_versions", _cleanup_config_versions, cfg.config_versions_retention_days),
+            (
+                "config_versions_count",
+                _cleanup_config_versions_count,
+                cfg.config_versions_keep,
+            ),
             ("provider_cache", _cleanup_provider_cache, cfg.provider_cache_retention_days),
             ("binary_cache", _cleanup_binary_cache, cfg.binary_cache_retention_days),
             ("module_overrides", _cleanup_module_overrides, cfg.module_overrides_retention_days),
@@ -266,6 +271,102 @@ async def _cleanup_config_versions(
     if deleted:
         await db.commit()
         RETENTION_DELETED.labels(category="config_versions").inc(deleted)
+
+    return deleted
+
+
+async def _cleanup_config_versions_count(
+    db: AsyncSession,
+    storage: ObjectStore,
+    keep: int,
+    batch_size: int,
+) -> int:
+    """Delete excess configuration versions per workspace, keeping the N newest.
+
+    Mirrors `_cleanup_state_versions`'s pattern: workspaces with more
+    than `keep` CVs get the oldest pruned. CVs referenced by a non-
+    terminal run are excluded (same safeguard as the TTL-based
+    cleanup) so an in-flight run doesn't lose its source bytes
+    mid-execution.
+
+    The CV row itself stays — the FK from `runs.configuration_version_id`
+    is `ON DELETE SET NULL`, but a downstream run referring back to
+    its CV is still valuable history. Only the tarball goes; the
+    historical record persists.
+
+    Wait — that's wrong. We DO delete the row here, matching the
+    existing TTL cleanup. The Run.configuration_version_id field is
+    SET NULL on cascade, so any referencing run keeps its row but
+    loses the pointer. That's the documented trade-off for retention.
+    """
+    from terrapod.api.metrics import RETENTION_DELETED
+
+    deleted = 0
+
+    # Workspaces with > keep CVs. We can't restrict this query to
+    # exclude active-run-referenced CVs at the SQL level cleanly —
+    # the safety filter happens row-by-row below.
+    count_subq = (
+        select(
+            ConfigurationVersion.workspace_id,
+            func.count(ConfigurationVersion.id).label("cv_count"),
+        )
+        .group_by(ConfigurationVersion.workspace_id)
+        .having(func.count(ConfigurationVersion.id) > keep)
+        .subquery()
+    )
+
+    result = await db.execute(select(Workspace.id).where(Workspace.id == count_subq.c.workspace_id))
+    workspace_ids = [row[0] for row in result.all()]
+
+    # CVs we must NOT touch — currently in-flight on a non-terminal run.
+    active_cv_ids = (
+        select(Run.configuration_version_id)
+        .where(
+            Run.configuration_version_id.isnot(None),
+            Run.status.notin_(TERMINAL_STATES),
+        )
+        .distinct()
+        .scalar_subquery()
+    )
+
+    for ws_id in workspace_ids:
+        if deleted >= batch_size:
+            break
+
+        # Excess CVs for this workspace, ordered by created_at DESC,
+        # skipping the newest `keep`. Filter out anything an active
+        # run still needs.
+        excess_stmt = (
+            select(ConfigurationVersion)
+            .where(
+                ConfigurationVersion.workspace_id == ws_id,
+                ConfigurationVersion.id.notin_(active_cv_ids),
+            )
+            .order_by(ConfigurationVersion.created_at.desc())
+            .offset(keep)
+            .limit(batch_size - deleted)
+        )
+        excess_result = await db.execute(excess_stmt)
+        excess = list(excess_result.scalars().all())
+
+        for cv in excess:
+            try:
+                await storage.delete(config_version_key(str(cv.workspace_id), str(cv.id)))
+            except Exception:
+                logger.warning(
+                    "Failed to delete config version tarball from storage",
+                    config_version_id=str(cv.id),
+                    exc_info=True,
+                )
+            await db.delete(cv)
+            deleted += 1
+
+        await db.flush()
+
+    if deleted:
+        await db.commit()
+        RETENTION_DELETED.labels(category="config_versions_count").inc(deleted)
 
     return deleted
 
