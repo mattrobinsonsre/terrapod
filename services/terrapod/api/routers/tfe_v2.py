@@ -186,6 +186,28 @@ def _validate_workspace_name(name: str) -> str:
     return cleaned
 
 
+def _labels_to_tag_names(labels: dict | None) -> list[str]:
+    """Render a workspace's labels as the legacy `tag-names` array.
+
+    OpenTofu/Terraform's cloud backend reads `tag-names` to decide whether
+    a workspace already carries the tags declared in its cloud block. We
+    expose each label in both bare-key and `key=value` form so a cloud
+    block written either way matches without an extra round-trip.
+
+    Empty values are skipped on the `key=value` rendering only — a label
+    with key `foo` and value `""` still appears as `"foo"` (matches
+    `tags = ["foo"]`) but not `"foo="` (which no one would write).
+    """
+    if not labels:
+        return []
+    names: list[str] = []
+    for k, v in labels.items():
+        names.append(str(k))
+        if v not in (None, ""):
+            names.append(f"{k}={v}")
+    return names
+
+
 def _clamp_drift_interval(value: int) -> int:
     """Clamp drift detection interval to the configured minimum."""
     from terrapod.config import settings
@@ -535,6 +557,15 @@ def _workspace_json(
                 "agent-pool-name": ws.agent_pool.name if ws.agent_pool else None,
                 "vcs-connection-name": ws.vcs_connection.name if ws.vcs_connection else None,
                 "labels": ws.labels or {},
+                # `tag-names` is what OpenTofu/Terraform's cloud backend
+                # reads to decide whether the workspace already has the
+                # cloud-block tags. Without it, `workspaceTagsRequireUpdate`
+                # always returns true → fires `AddTags` (POST
+                # /relationships/tags) → 404 → init fails. We mirror each
+                # label as both bare-key and key=value form so cloud blocks
+                # written either way (`tags = ["foo"]` vs
+                # `tags = ["foo=bar"]`) match.
+                "tag-names": _labels_to_tag_names(ws.labels),
                 "owner-email": ws.owner_email,
                 "created-at": _rfc3339(ws.created_at),
                 "updated-at": _rfc3339(ws.updated_at),
@@ -893,8 +924,15 @@ async def list_workspace_tag_bindings(
     """
     ws, _ = await _require_ws_permission(workspace_id, "read", user, db)
 
+    # `id` is required by JSON:API and go-tfe's jsonapi parser silently
+    # drops entries that are missing it. Without an id, ListTagBindings
+    # returns an empty list, terraform-cli concludes the workspace has no
+    # tags, and tries to PATCH them in — which we don't support and
+    # don't want to. Synthesised from {workspace-id}:{key} so the id is
+    # stable per binding without requiring a separate row to track it.
     bindings = [
         {
+            "id": f"{ws.id}:{k}",
             "type": "tag-bindings",
             "attributes": {
                 "key": str(k),
@@ -923,8 +961,11 @@ async def list_workspace_effective_tag_bindings(
     """
     ws, _ = await _require_ws_permission(workspace_id, "read", user, db)
 
+    # See note on `id` in `list_workspace_tag_bindings` above — required by
+    # JSON:API or go-tfe drops the entry on parse.
     bindings = [
         {
+            "id": f"{ws.id}:{k}",
             "type": "effective-tag-bindings",
             "attributes": {
                 "key": str(k),
@@ -937,6 +978,47 @@ async def list_workspace_effective_tag_bindings(
         content={"data": bindings},
         headers=_tfe_headers(),
     )
+
+
+# ── Tag-binding writes — accept-and-ignore ──────────────────────────────
+#
+# In the common case `workspace.tag-names` (above) covers OpenTofu's
+# `workspaceTagsRequireUpdate`: if the workspace's labels already include
+# the cloud-block tags, the CLI skips writing entirely. These endpoints
+# only fire when the cloud-block declares a tag that the workspace
+# doesn't have — and in that case Terrapod's design is operator-controlled
+# labels (set via the terrapod-config provider). Clients can't mutate
+# them.
+#
+# So accept the request, ignore the body, return TFE-shaped success. The
+# init proceeds, no mutation happens, the operator stays in charge of
+# what tags exist. Subsequent runs from a misconfigured cloud block fail
+# at workspace-by-tag discovery (which IS tag-filtered) when the tags
+# genuinely don't exist anywhere.
+
+
+@router.post("/workspaces/{workspace_id}/relationships/tags", status_code=204)
+async def add_workspace_tag_names(
+    workspace_id: str = Path(...),
+    body: dict = Body(default={}),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Legacy POST tag-add — no-op."""
+    await _require_ws_permission(workspace_id, "read", user, db)
+    return Response(status_code=204, headers=_tfe_headers())
+
+
+@router.delete("/workspaces/{workspace_id}/relationships/tags", status_code=204)
+async def remove_workspace_tag_names(
+    workspace_id: str = Path(...),
+    body: dict = Body(default={}),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Legacy DELETE tag-remove — no-op."""
+    await _require_ws_permission(workspace_id, "read", user, db)
+    return Response(status_code=204, headers=_tfe_headers())
 
 
 @router.patch("/workspaces/{workspace_id}")

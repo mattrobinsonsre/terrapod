@@ -533,6 +533,37 @@ class TestPermissionsBlock:
 # ── Tag bindings (terraform key-value tag support probe) ───────────────
 
 
+class TestLabelsToTagNames:
+    """`tag-names` is the legacy attribute that OpenTofu/Terraform's cloud
+    backend reads on workspace lookup. Without it, the CLI thinks the
+    workspace has no tags, fires AddTags (POST /relationships/tags), 404s,
+    init fails. We render labels in both bare-key and key=value form so
+    cloud blocks written either way match."""
+
+    def test_empty_labels(self):
+        from terrapod.api.routers.tfe_v2 import _labels_to_tag_names
+
+        assert _labels_to_tag_names({}) == []
+        assert _labels_to_tag_names(None) == []
+
+    def test_renders_both_bare_and_kv_form(self):
+        from terrapod.api.routers.tfe_v2 import _labels_to_tag_names
+
+        names = _labels_to_tag_names({"env": "dev", "team": "platform"})
+        assert "env" in names
+        assert "env=dev" in names
+        assert "team" in names
+        assert "team=platform" in names
+
+    def test_empty_value_skips_kv_form(self):
+        """An empty-value label only appears in bare-key form."""
+        from terrapod.api.routers.tfe_v2 import _labels_to_tag_names
+
+        names = _labels_to_tag_names({"flag": ""})
+        assert "flag" in names
+        assert "flag=" not in names
+
+
 class TestWorkspaceTagBindings:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -556,6 +587,12 @@ class TestWorkspaceTagBindings:
             ("env", "dev"),
         }
         assert all(i["type"] == "tag-bindings" for i in items)
+        # JSON:API requires `id` on every resource. go-tfe's jsonapi parser
+        # silently drops entries that are missing it — leaving the CLI to
+        # think the workspace has no tags and try to PATCH them in.
+        assert all(i["id"] for i in items)
+        # IDs must be unique within the response (JSON:API requirement).
+        assert len({i["id"] for i in items}) == len(items)
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -615,6 +652,7 @@ class TestWorkspaceTagBindings:
         items = resp.json()["data"]
         assert items == [
             {
+                "id": f"{ws.id}:repo",
                 "type": "effective-tag-bindings",
                 "attributes": {"key": "repo", "value": "tf-aws-core"},
             }
