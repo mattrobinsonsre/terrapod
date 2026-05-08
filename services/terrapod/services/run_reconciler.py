@@ -158,61 +158,22 @@ async def _reconcile_one(db: AsyncSession, run: Run) -> None:
 
 
 async def _handle_succeeded(db: AsyncSession, run: Run) -> None:
-    """Handle a succeeded Job."""
-    from terrapod.services import run_service, run_task_service
+    """Handle a succeeded Job.
+
+    Thin wrapper around the shared `run_service.complete_plan` /
+    `complete_apply` helpers. Both helpers are idempotent — if the runner's
+    direct POST (`/plan-result` / `/apply-result`) already drove the
+    transition, this is a no-op.
+    """
+    from terrapod.services import run_service
 
     phase = "plan" if run.status == "planning" else "apply"
     await _persist_live_log_if_missing(run, phase)
 
     if run.status == "planning":
-        # Check post_plan task stage
-        ts = await run_task_service.create_task_stage(db, run.id, run.workspace_id, "post_plan")
-        if ts is not None:
-            # Task stage created — resolve it
-            stage_status = await run_task_service.resolve_stage(db, ts.id)
-            if stage_status not in ("passed", "overridden"):
-                if stage_status == "failed":
-                    await run_service.transition_run(
-                        db, run, "errored", error_message="Post-plan task stage failed"
-                    )
-                # Stage still pending/running — will be re-checked next cycle
-                return
-
-        run = await run_service.transition_run(db, run, "planned")
-
-        # Unlock workspace for plan-only runs
-        if run.plan_only:
-            ws = await db.get(Workspace, run.workspace_id)
-            if ws and ws.locked:
-                ws.locked = False
-                ws.lock_id = None
-
-        # No-op short-circuit: a plan that reports no changes has nothing
-        # for an apply Job to do. Skip straight to applied via the shared
-        # helper (sets apply_*_at, releases lock). Applies regardless of
-        # auto_apply since the manual confirm path also has nothing
-        # meaningful to do.
-        if not run.plan_only and run.has_changes is False:
-            run = await run_service.complete_planned_as_noop(db, run)
-            logger.info("Plan succeeded — no changes, skipping apply", run_id=str(run.id))
-            return
-
-        # Auto-apply if configured
-        if run.auto_apply and not run.plan_only:
-            run = await run_service.transition_run(db, run, "confirmed")
-
-        logger.info("Plan succeeded", run_id=str(run.id))
-
+        await run_service.complete_plan(db, run)
     elif run.status == "applying":
-        run = await run_service.transition_run(db, run, "applied")
-
-        # Unlock workspace
-        ws = await db.get(Workspace, run.workspace_id)
-        if ws and ws.locked:
-            ws.locked = False
-            ws.lock_id = None
-
-        logger.info("Apply succeeded", run_id=str(run.id))
+        await run_service.complete_apply(db, run)
 
 
 async def _handle_failed(db: AsyncSession, run: Run, error_message: str) -> None:

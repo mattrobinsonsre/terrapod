@@ -381,6 +381,95 @@ async def transition_run(
     return run
 
 
+async def complete_plan(
+    db: AsyncSession,
+    run: Run,
+    has_changes: bool | None = None,
+) -> Run:
+    """Drive a `planning` run to its post-plan terminal state.
+
+    Idempotent landing point shared by the two paths that can authoritatively
+    declare a plan finished:
+
+    1. The runner Job posting `/plan-result` (runner is source of truth — it
+       has the exit code and the diff in hand).
+    2. The reconciler observing the K8s Job as Completed via the listener
+       (indirect; covers the case where the runner died before posting).
+
+    Either path can race the other. The first one to win does the work; the
+    second sees `run.status != "planning"` and returns the run unchanged.
+
+    Mirrors the previous behaviour of `_handle_succeeded` in the reconciler:
+    optionally runs post-plan task stages, transitions to `planned`, releases
+    the lock for plan-only runs, short-circuits zero-change non-speculative
+    plans straight to `applied`, and auto-applies when configured.
+    """
+    from terrapod.services import run_task_service
+
+    # Idempotency guard — both callers can race; later one is a no-op.
+    if run.status != "planning":
+        return run
+
+    if has_changes is not None:
+        run.has_changes = has_changes
+
+    # Post-plan task stage gate. If the stage isn't passed/overridden yet,
+    # leave the run in `planning` for the next reconciler tick to re-check.
+    ts = await run_task_service.create_task_stage(db, run.id, run.workspace_id, "post_plan")
+    if ts is not None:
+        stage_status = await run_task_service.resolve_stage(db, ts.id)
+        if stage_status not in ("passed", "overridden"):
+            if stage_status == "failed":
+                await transition_run(
+                    db, run, "errored", error_message="Post-plan task stage failed"
+                )
+            return run
+
+    run = await transition_run(db, run, "planned")
+
+    # Unlock workspace for plan-only runs — they make no further state moves.
+    if run.plan_only:
+        ws = await db.get(Workspace, run.workspace_id)
+        if ws and ws.locked:
+            ws.locked = False
+            ws.lock_id = None
+
+    # Zero-change non-speculative plans short-circuit straight to `applied`.
+    # No apply Job is launched — the runner couldn't change anything anyway,
+    # and an empty apply triggers the duplicate-serial 500 on state upload.
+    if not run.plan_only and run.has_changes is False:
+        run = await complete_planned_as_noop(db, run)
+        logger.info("Plan succeeded — no changes, skipping apply", run_id=str(run.id))
+        return run
+
+    if run.auto_apply and not run.plan_only:
+        run = await transition_run(db, run, "confirmed")
+
+    logger.info("Plan succeeded", run_id=str(run.id))
+    return run
+
+
+async def complete_apply(db: AsyncSession, run: Run) -> Run:
+    """Drive an `applying` run to `applied`.
+
+    Idempotent counterpart to :func:`complete_plan`. Same dual-path rationale
+    — either the runner's `/apply-result` POST or the reconciler's listener
+    round-trip can win; whichever lands first does the transition.
+    """
+    if run.status != "applying":
+        return run
+
+    run = await transition_run(db, run, "applied")
+
+    ws = await db.get(Workspace, run.workspace_id)
+    if ws and ws.locked:
+        ws.locked = False
+        ws.lock_id = None
+
+    logger.info("Apply succeeded", run_id=str(run.id))
+    return run
+
+
 async def complete_planned_as_noop(db: AsyncSession, run: Run) -> Run:
     """Transition a planned run directly to `applied` without an apply Job.
 

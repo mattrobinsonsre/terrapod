@@ -1185,17 +1185,42 @@ async def report_plan_result(
     body: dict = Body(...),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Runner Job reports plan has_changes result.
+    """Runner Job reports plan completion.
 
-    Called by the runner entrypoint after plan completes. The has_changes
-    value is used by the reconciler to set the run's has_changes field.
+    Authoritative state-transition trigger: the runner has the exit code
+    and the diff in hand, so its successful POST here is sufficient
+    evidence that the plan finished. We update `has_changes` and drive the
+    `planning → planned` (or `applied` for zero-change non-speculative)
+    transition directly via `run_service.complete_plan`.
+
+    The reconciler's listener-driven path remains as a fallback for cases
+    where the runner can't post (OOM-killed before the entrypoint runs,
+    network partition, etc.). Both paths land in the same idempotent helper
+    so whichever wins, the second is a no-op.
     """
     run = await _get_run(run_id, db)
 
     has_changes = body.get("has_changes")
-    if has_changes is not None:
-        run.has_changes = has_changes
-        await db.commit()
+    await run_service.complete_plan(db, run, has_changes=has_changes)
+    await db.commit()
+
+    return JSONResponse(content={"status": "ok"})
+
+
+@router.post("/runs/{run_id}/apply-result")
+async def report_apply_result(
+    run_id: str = Path(...),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Runner Job reports apply completion.
+
+    Mirror of `plan-result`: authoritative transition trigger driven by the
+    runner's exit. Drives `applying → applied` via `run_service.complete_apply`,
+    which is idempotent against the listener-driven fallback.
+    """
+    run = await _get_run(run_id, db)
+    await run_service.complete_apply(db, run)
+    await db.commit()
 
     return JSONResponse(content={"status": "ok"})
 

@@ -15,6 +15,8 @@ from terrapod.services.run_service import (
     can_transition,
     cancel_run,
     claim_next_run,
+    complete_apply,
+    complete_plan,
     confirm_run,
     create_run,
     discard_run,
@@ -443,3 +445,146 @@ class TestPublishRunAvailable:
 
         # Should not raise
         await _publish_run_available(run)
+
+
+# ── complete_plan / complete_apply ────────────────────────────────────
+
+
+@pytest.fixture
+def _mock_db():
+    db = AsyncMock(spec=AsyncSession)
+    db.flush = AsyncMock()
+    db.get = AsyncMock(return_value=None)
+    return db
+
+
+class TestCompletePlan:
+    """`complete_plan` is the shared landing point for both the runner-driven
+    `/plan-result` POST and the reconciler-driven listener Job-status path.
+    Critical property: it is idempotent against re-entry from either path.
+    """
+
+    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    @patch(
+        "terrapod.services.run_task_service.create_task_stage",
+        new_callable=AsyncMock,
+        return_value=None,
+    )
+    async def test_no_op_when_already_past_planning(self, _stage, _avail, _evt, _mock_db):
+        """If the run is already `planned`, the call is a no-op — the racing
+        path won. No transition_run, no flush, run returned unchanged."""
+        run = _mock_run(status="planned")
+        result = await complete_plan(_mock_db, run)
+        assert result.status == "planned"
+        # transition_run was never called → no flush
+        _mock_db.flush.assert_not_called()
+
+    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    @patch(
+        "terrapod.services.run_task_service.create_task_stage",
+        new_callable=AsyncMock,
+        return_value=None,
+    )
+    async def test_clean_plan_transitions_to_planned(self, _stage, _avail, _evt, _mock_db):
+        run = _mock_run(status="planning", plan_started_at=datetime.now(UTC), plan_only=True)
+        run.has_changes = True
+        result = await complete_plan(_mock_db, run, has_changes=True)
+        assert result.status == "planned"
+        assert result.has_changes is True
+
+    @patch("terrapod.services.run_service.fire_run_triggers", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    @patch(
+        "terrapod.services.run_task_service.create_task_stage",
+        new_callable=AsyncMock,
+        return_value=None,
+    )
+    async def test_zero_change_non_speculative_short_circuits_to_applied(
+        self, _stage, _avail, _evt, _fire, _mock_db
+    ):
+        """A non-plan-only run that produced no changes goes straight to
+        `applied` (no apply Job needed; otherwise we d burn an empty apply
+        and trip the duplicate-serial 500 on state upload)."""
+        run = _mock_run(
+            status="planning", plan_started_at=datetime.now(UTC), plan_only=False, auto_apply=False
+        )
+        result = await complete_plan(_mock_db, run, has_changes=False)
+        assert result.status == "applied"
+
+    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    @patch(
+        "terrapod.services.run_task_service.create_task_stage",
+        new_callable=AsyncMock,
+        return_value=None,
+    )
+    async def test_auto_apply_advances_to_confirmed(self, _stage, _avail, _evt, _mock_db):
+        run = _mock_run(
+            status="planning", plan_started_at=datetime.now(UTC), plan_only=False, auto_apply=True
+        )
+        result = await complete_plan(_mock_db, run, has_changes=True)
+        assert result.status == "confirmed"
+
+    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    @patch("terrapod.services.run_task_service.resolve_stage", new_callable=AsyncMock)
+    @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
+    async def test_failed_post_plan_stage_errors_run(
+        self, mock_create, mock_resolve, _avail, _evt, _mock_db
+    ):
+        """A failed post-plan task stage transitions the run to `errored`
+        instead of `planned`."""
+        ts = MagicMock()
+        ts.id = uuid.uuid4()
+        mock_create.return_value = ts
+        mock_resolve.return_value = "failed"
+
+        run = _mock_run(status="planning", plan_started_at=datetime.now(UTC), plan_only=True)
+        result = await complete_plan(_mock_db, run, has_changes=True)
+        assert result.status == "errored"
+
+    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    @patch("terrapod.services.run_task_service.resolve_stage", new_callable=AsyncMock)
+    @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
+    async def test_pending_post_plan_stage_keeps_run_in_planning(
+        self, mock_create, mock_resolve, _avail, _evt, _mock_db
+    ):
+        """A still-pending post-plan stage leaves the run in `planning` so
+        the next reconciler tick re-checks. No transition fires."""
+        ts = MagicMock()
+        ts.id = uuid.uuid4()
+        mock_create.return_value = ts
+        mock_resolve.return_value = "running"
+
+        run = _mock_run(status="planning", plan_started_at=datetime.now(UTC), plan_only=True)
+        result = await complete_plan(_mock_db, run, has_changes=True)
+        assert result.status == "planning"
+
+
+class TestCompleteApply:
+    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    @patch(
+        "terrapod.services.run_service.fire_run_triggers",
+        new_callable=AsyncMock,
+    )
+    async def test_no_op_when_not_applying(self, _fire, _avail, _evt, _mock_db):
+        run = _mock_run(status="applied")
+        result = await complete_apply(_mock_db, run)
+        assert result.status == "applied"
+        _mock_db.flush.assert_not_called()
+
+    @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    @patch(
+        "terrapod.services.run_service.fire_run_triggers",
+        new_callable=AsyncMock,
+    )
+    async def test_applying_transitions_to_applied(self, _fire, _avail, _evt, _mock_db):
+        run = _mock_run(status="applying", apply_started_at=datetime.now(UTC))
+        result = await complete_apply(_mock_db, run)
+        assert result.status == "applied"

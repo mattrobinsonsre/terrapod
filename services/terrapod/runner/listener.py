@@ -39,6 +39,19 @@ logger = get_logger(__name__)
 # Shutdown flag
 _shutdown = asyncio.Event()
 
+# SSE read watchdog: API sends a keepalive comment every 1s, so any stretch
+# of silence longer than this means the stream has gone silent even though
+# the TCP socket is still open (e.g. API-side Redis pubsub detached, proxy
+# buffering). 30s is generous enough to absorb network jitter without
+# accidentally killing healthy streams.
+_SSE_READ_TIMEOUT = int(os.environ.get("TERRAPOD_SSE_READ_TIMEOUT", "30"))
+
+# Mandatory periodic reconnect — even a healthy connection is torn down
+# and rebuilt at this interval to guarantee no stale subscription state
+# survives forever. 10 minutes balances "cheap to reconnect" against
+# "don't churn unnecessarily."
+_SSE_MAX_AGE = int(os.environ.get("TERRAPOD_SSE_MAX_AGE", "600"))
+
 
 class RunnerListener:
     """Stateless Job launcher — ARC-pattern controller."""
@@ -427,7 +440,23 @@ class RunnerListener:
                 pass
 
     async def _sse_connect(self) -> None:
-        """Maintain a single SSE connection and dispatch events."""
+        """Maintain a single SSE connection and dispatch events.
+
+        Two recovery mechanisms guard against the silent-stall failure mode
+        observed in production where the TCP connection stays alive but
+        events stop reaching us (Redis pubsub on the API side detaches, the
+        proxy chain buffers, etc.):
+
+        1. **Read watchdog.** Every read of `aiter_lines()` is wrapped in a
+           timeout. The API yields a keepalive comment every second, so any
+           silence longer than `_SSE_READ_TIMEOUT` means the stream has
+           stalled even though the socket is still nominally open. Closing
+           the response triggers the outer reconnect loop in `_sse_loop`.
+        2. **Mandatory periodic reconnect.** Even a healthy-looking stream
+           is torn down and rebuilt every `_SSE_MAX_AGE` seconds. Cheap (one
+           HTTP roundtrip + Redis subscribe) and guarantees no stale
+           subscription survives indefinitely.
+        """
         url = (
             f"{self.identity.api_url}/api/v2/listeners/listener-{self.identity.listener_id}/events"
         )
@@ -436,12 +465,30 @@ class RunnerListener:
         async with self._sse_client.stream("GET", url, headers=self._auth_headers()) as response:
             response.raise_for_status()
             logger.info("SSE connected")
+            connected_at = time.monotonic()
 
             event_type = ""
             event_data = ""
 
-            async for line in response.aiter_lines():
+            line_iter = response.aiter_lines()
+            while True:
                 if _shutdown.is_set():
+                    return
+
+                # Mandatory periodic reconnect — return cleanly so the outer
+                # loop reopens a fresh connection (and a fresh Redis pubsub
+                # subscription on the API side).
+                if time.monotonic() - connected_at > _SSE_MAX_AGE:
+                    logger.info("SSE max-age reached, reconnecting", age=_SSE_MAX_AGE)
+                    return
+
+                try:
+                    line = await asyncio.wait_for(line_iter.__anext__(), timeout=_SSE_READ_TIMEOUT)
+                except StopAsyncIteration:
+                    return  # Stream closed by server — outer loop reconnects
+                except TimeoutError:
+                    # Silent stall — kill the connection, outer loop reconnects.
+                    logger.warning("SSE read timeout — stream stalled", timeout=_SSE_READ_TIMEOUT)
                     return
 
                 if line.startswith("event:"):
@@ -451,12 +498,14 @@ class RunnerListener:
                 elif line == "":
                     # Empty line = end of event
                     if event_type and event_data:
+                        logger.info("SSE event received", event_type=event_type)
                         task = asyncio.create_task(self._dispatch_event(event_type, event_data))
                         self._background_tasks.add(task)
                         task.add_done_callback(self._background_tasks.discard)
                     event_type = ""
                     event_data = ""
-                # Ignore comment lines (keepalives start with ":")
+                # Comment lines (keepalives start with ":") are ignored but
+                # still reset the read-watchdog by virtue of having yielded.
 
     # ── Poll Fallback Loop ─────────────────────────────────────────
 

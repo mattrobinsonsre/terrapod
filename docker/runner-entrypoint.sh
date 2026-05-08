@@ -496,6 +496,15 @@ elif [ "$TP_PHASE" = "apply" ]; then
             EXIT_CODE=1
         fi
     fi
+
+    # Report apply completion to API on success — drives the
+    # `applying → applied` transition without waiting for the listener-
+    # driven Job-status round-trip. Best-effort; the reconciler's listener
+    # path is the fallback.
+    if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ] && [ "$EXIT_CODE" = "0" ]; then
+        curl -sSf --max-time 10 -X POST -H "$AUTH_HEADER" \
+            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/apply-result" || true
+    fi
 fi
 
 echo "[entrypoint] Phase $TP_PHASE completed with exit code $EXIT_CODE"
