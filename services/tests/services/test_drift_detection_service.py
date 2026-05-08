@@ -277,3 +277,66 @@ class TestHandleDriftRunCompleted:
         # The one that fixes the detail-page-stays-stale bug
         assert f"tp:run_events:{ws.id}" in channels
         assert mock_publish.call_count == 3
+
+
+class TestCreateDriftRunNonVcs:
+    """Drift detection on non-VCS workspaces must plan against the CV from
+    the workspace's latest successful apply — i.e. the bytes that produced
+    the current state — not the latest uploaded CV (which may never have
+    been applied)."""
+
+    @patch(
+        "terrapod.services.drift_detection_service.run_service.queue_run", new_callable=AsyncMock
+    )
+    @patch(
+        "terrapod.services.drift_detection_service.run_service.create_run", new_callable=AsyncMock
+    )
+    async def test_uses_cv_from_latest_applied_run(self, mock_create, mock_queue):
+        """The selected CV is the one referenced by the most recent applied
+        run, even if a newer-but-unapplied CV exists."""
+        from terrapod.services.drift_detection_service import _create_drift_run_non_vcs
+
+        ws = _mock_workspace()
+
+        # Stub the join query to return a specific CV (the "applied" one).
+        applied_cv = MagicMock()
+        applied_cv.id = uuid.uuid4()
+
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = applied_cv
+        mock_db.execute.return_value = mock_result
+
+        new_run = MagicMock()
+        mock_create.return_value = new_run
+        mock_queue.return_value = new_run
+
+        result = await _create_drift_run_non_vcs(mock_db, ws)
+
+        assert result is new_run
+        # The run was created with the applied CV's id
+        kwargs = mock_create.call_args.kwargs
+        assert kwargs["configuration_version_id"] == applied_cv.id
+        assert kwargs["is_drift_detection"] is True
+        assert kwargs["plan_only"] is True
+        assert kwargs["source"] == "drift-detection"
+
+    @patch(
+        "terrapod.services.drift_detection_service.run_service.create_run", new_callable=AsyncMock
+    )
+    async def test_returns_none_when_workspace_never_applied(self, mock_create):
+        """A workspace that has never been applied has no reference CV — drift
+        is a no-op rather than picking some arbitrary uploaded CV."""
+        from terrapod.services.drift_detection_service import _create_drift_run_non_vcs
+
+        ws = _mock_workspace()
+
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+
+        result = await _create_drift_run_non_vcs(mock_db, ws)
+
+        assert result is None
+        mock_create.assert_not_called()

@@ -142,21 +142,33 @@ async def _create_drift_run_non_vcs(
 ) -> Run | None:
     """Create a drift detection run for a non-VCS workspace.
 
-    Uses the latest uploaded ConfigurationVersion.
+    Uses the configuration version from the latest successful apply —
+    i.e. the bytes that produced the workspace's current state. Picking
+    "latest uploaded" instead would compare live state against a config
+    that has never been applied, surfacing phantom diffs (between two
+    configs) rather than actual infrastructure drift.
+
+    Returns None if the workspace has never been applied — there's no
+    reference config to diff against, so drift detection is a no-op.
     """
     result = await db.execute(
         select(ConfigurationVersion)
+        .join(Run, Run.configuration_version_id == ConfigurationVersion.id)
         .where(
-            ConfigurationVersion.workspace_id == ws.id,
+            Run.workspace_id == ws.id,
+            Run.status == "applied",
             ConfigurationVersion.status == "uploaded",
         )
-        .order_by(ConfigurationVersion.created_at.desc())
+        .order_by(Run.apply_finished_at.desc())
         .limit(1)
     )
     cv = result.scalar_one_or_none()
 
     if cv is None:
-        logger.debug("No uploaded config version for drift check", workspace=ws.name)
+        logger.debug(
+            "No applied configuration version for drift check",
+            workspace=ws.name,
+        )
         return None
 
     run = await run_service.create_run(
