@@ -125,7 +125,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 - **Kubernetes-native** -- deployed exclusively via Helm chart; runner Jobs are ephemeral K8s Jobs
 - **ARC-pattern execution** -- listener creates Jobs on demand (like GitHub Actions Runner Controller)
 - **OpenTofu-first** -- [OpenTofu](https://opentofu.org/) is the recommended execution backend; `terraform` is also supported
-- **Single organization** -- one org per instance; the TFE V2 API accepts `{org}` in paths for CLI compatibility but only `default` is valid
+- **Single organization** -- one org per instance; every Terrapod API path that contains an organization segment uses the literal name `default`
 - **Native object storage** -- speaks each cloud provider's native SDK (S3, Azure Blob, GCS) with filesystem fallback for dev
 
 ---

@@ -76,7 +76,7 @@ class TestListRoles:
         mock_db.execute.return_value = mock_result
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/roles", headers=_AUTH)
+            resp = await c.get("/api/terrapod/v1/roles", headers=_AUTH)
         assert resp.status_code == 200
         data = resp.json()["data"]
         names = [r["name"] for r in data]
@@ -105,7 +105,7 @@ class TestListRoles:
         mock_db.execute.return_value = mock_result
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/roles", headers=_AUTH)
+            resp = await c.get("/api/terrapod/v1/roles", headers=_AUTH)
         assert resp.status_code == 200
         data = resp.json()["data"]
         custom_entry = next(r for r in data if r["name"] == "pool-role")
@@ -125,7 +125,7 @@ class TestListRoles:
         mock_db.execute.return_value = mock_result
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/roles", headers=_AUTH)
+            resp = await c.get("/api/terrapod/v1/roles", headers=_AUTH)
         assert resp.status_code == 200
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
@@ -136,7 +136,7 @@ class TestListRoles:
         app, _ = _make_app(user)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/roles", headers=_AUTH)
+            resp = await c.get("/api/terrapod/v1/roles", headers=_AUTH)
         assert resp.status_code == 403
 
 
@@ -158,7 +158,7 @@ class TestCreateRole:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                "/api/v2/roles",
+                "/api/terrapod/v1/roles",
                 json={
                     "data": {
                         "name": "new-role",
@@ -182,7 +182,7 @@ class TestCreateRole:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                "/api/v2/roles",
+                "/api/terrapod/v1/roles",
                 json={
                     "data": {
                         "name": "admin",
@@ -206,7 +206,7 @@ class TestCreateRole:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                "/api/v2/roles",
+                "/api/terrapod/v1/roles",
                 json={
                     "data": {
                         "name": "existing",
@@ -230,7 +230,7 @@ class TestCreateRole:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                "/api/v2/roles",
+                "/api/terrapod/v1/roles",
                 json={
                     "data": {
                         "name": "bad-role",
@@ -254,7 +254,7 @@ class TestCreateRole:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                "/api/v2/roles",
+                "/api/terrapod/v1/roles",
                 json={
                     "data": {
                         "name": "pool-admin-role",
@@ -280,7 +280,7 @@ class TestCreateRole:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                "/api/v2/roles",
+                "/api/terrapod/v1/roles",
                 json={
                     "data": {
                         "name": "bad-pool",
@@ -303,7 +303,7 @@ class TestCreateRole:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                "/api/v2/roles",
+                "/api/terrapod/v1/roles",
                 json={
                     "data": {
                         "name": "x",
@@ -326,7 +326,7 @@ class TestShowRole:
         app, _ = _make_app(_user(roles=["admin"]))
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/roles/admin", headers=_AUTH)
+            resp = await c.get("/api/terrapod/v1/roles/admin", headers=_AUTH)
         assert resp.status_code == 200
         assert resp.json()["data"]["attributes"]["built-in"] is True
 
@@ -341,7 +341,7 @@ class TestShowRole:
         mock_db.execute.return_value = mock_result
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/roles/my-role", headers=_AUTH)
+            resp = await c.get("/api/terrapod/v1/roles/my-role", headers=_AUTH)
         assert resp.status_code == 200
         assert resp.json()["data"]["attributes"]["workspace-permission"] == "write"
 
@@ -357,7 +357,7 @@ class TestShowRole:
         mock_db.execute.return_value = mock_result
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/roles/pool-role", headers=_AUTH)
+            resp = await c.get("/api/terrapod/v1/roles/pool-role", headers=_AUTH)
         assert resp.status_code == 200
         assert resp.json()["data"]["attributes"]["pool-permission"] == "write"
 
@@ -368,7 +368,7 @@ class TestShowRole:
         app, _ = _make_app(_user(roles=["admin"]))
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/roles/admin", headers=_AUTH)
+            resp = await c.get("/api/terrapod/v1/roles/admin", headers=_AUTH)
         assert resp.status_code == 200
         assert resp.json()["data"]["attributes"]["pool-permission"] == "admin"
 
@@ -379,7 +379,7 @@ class TestShowRole:
         app, _ = _make_app(_user(roles=["admin"]))
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/roles/everyone", headers=_AUTH)
+            resp = await c.get("/api/terrapod/v1/roles/everyone", headers=_AUTH)
         assert resp.status_code == 200
         assert resp.json()["data"]["attributes"]["pool-permission"] == "read"
 
@@ -393,7 +393,7 @@ class TestShowRole:
         mock_db.execute.return_value = mock_result
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/roles/nope", headers=_AUTH)
+            resp = await c.get("/api/terrapod/v1/roles/nope", headers=_AUTH)
         assert resp.status_code == 404
 
 
@@ -409,7 +409,7 @@ class TestUpdateRole:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
-                "/api/v2/roles/admin",
+                "/api/terrapod/v1/roles/admin",
                 json={"data": {"attributes": {"description": "hacked"}}},
                 headers=_AUTH,
             )
@@ -429,7 +429,7 @@ class TestUpdateRole:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
-                "/api/v2/roles/my-role",
+                "/api/terrapod/v1/roles/my-role",
                 json={"data": {"attributes": {"workspace-permission": "write"}}},
                 headers=_AUTH,
             )
@@ -447,7 +447,7 @@ class TestDeleteRole:
         app, _ = _make_app(_user(roles=["admin"]))
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.delete("/api/v2/roles/everyone", headers=_AUTH)
+            resp = await c.delete("/api/terrapod/v1/roles/everyone", headers=_AUTH)
         assert resp.status_code == 422
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
@@ -461,7 +461,7 @@ class TestDeleteRole:
         mock_db.execute.return_value = mock_result
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.delete("/api/v2/roles/temp-role", headers=_AUTH)
+            resp = await c.delete("/api/terrapod/v1/roles/temp-role", headers=_AUTH)
         assert resp.status_code == 204
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
@@ -474,7 +474,7 @@ class TestDeleteRole:
         mock_db.execute.return_value = mock_result
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.delete("/api/v2/roles/nope", headers=_AUTH)
+            resp = await c.delete("/api/terrapod/v1/roles/nope", headers=_AUTH)
         assert resp.status_code == 404
 
 
@@ -493,7 +493,7 @@ class TestRoleAssignments:
         mock_db.execute.return_value = mock_result
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/role-assignments", headers=_AUTH)
+            resp = await c.get("/api/terrapod/v1/role-assignments", headers=_AUTH)
         assert resp.status_code == 200
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
@@ -513,7 +513,7 @@ class TestRoleAssignments:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.put(
-                "/api/v2/role-assignments",
+                "/api/terrapod/v1/role-assignments",
                 json={
                     "data": {
                         "attributes": {
@@ -536,7 +536,7 @@ class TestRoleAssignments:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.put(
-                "/api/v2/role-assignments",
+                "/api/terrapod/v1/role-assignments",
                 json={
                     "data": {
                         "attributes": {

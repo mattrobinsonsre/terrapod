@@ -46,7 +46,7 @@ Requires `admin` permission on the workspace for create, update, and delete. Req
 #### Create Task
 
 ```
-POST /api/v2/workspaces/{id}/run-tasks
+POST /api/terrapod/v1/workspaces/{id}/run-tasks
 ```
 
 ```json
@@ -67,25 +67,25 @@ POST /api/v2/workspaces/{id}/run-tasks
 #### List Tasks
 
 ```
-GET /api/v2/workspaces/{id}/run-tasks
+GET /api/terrapod/v1/workspaces/{id}/run-tasks
 ```
 
 #### Show Task
 
 ```
-GET /api/v2/run-tasks/{id}
+GET /api/terrapod/v1/run-tasks/{id}
 ```
 
 #### Update Task
 
 ```
-PATCH /api/v2/run-tasks/{id}
+PATCH /api/terrapod/v1/run-tasks/{id}
 ```
 
 #### Delete Task
 
 ```
-DELETE /api/v2/run-tasks/{id}
+DELETE /api/terrapod/v1/run-tasks/{id}
 ```
 
 ### Task Stages
@@ -93,7 +93,7 @@ DELETE /api/v2/run-tasks/{id}
 #### List Stages for a Run
 
 ```
-GET /api/v2/runs/{run_id}/task-stages
+GET /api/terrapod/v1/runs/{run_id}/task-stages
 ```
 
 #### Show Stage (with Results)
@@ -115,7 +115,7 @@ Requires `admin` permission. Only works on stages with `failed` status. Sets the
 ### External Callback
 
 ```
-PATCH /api/v2/task-stage-results/{id}/callback
+PATCH /api/terrapod/v1/task-stage-results/{id}/callback
 ```
 
 No authentication header required — verified via `access_token` in the request body.
@@ -141,7 +141,7 @@ When a task fires, Terrapod sends an HTTP POST to the configured URL:
   "payload_version": 1,
   "stage": "pre_apply",
   "access_token": "result-id:timestamp:signature",
-  "task_result_callback_url": "https://terrapod.local/api/v2/task-stage-results/tsr-id/callback",
+  "task_result_callback_url": "https://terrapod.local/api/terrapod/v1/task-stage-results/tsr-id/callback",
   "run_id": "run-uuid",
   "run_status": "planning",
   "run_created_at": "2025-01-01T12:00:00Z",
@@ -279,7 +279,7 @@ def handle_task():
 
     # 2. Fetch plan JSON from Terrapod
     plan_resp = httpx.get(
-        f"https://terrapod.local/api/v2/runs/{run_id}/plan/json-output",
+        f"https://terrapod.local/api/terrapod/v1/runs/{run_id}/plan/json-output",
         headers={"Authorization": f"Bearer {TERRAPOD_TOKEN}"},
     )
     plan_json = plan_resp.json()
@@ -332,7 +332,7 @@ deny[msg] {
 2. Create a run task on the workspace:
 
 ```bash
-curl -X POST https://terrapod.local/api/v2/workspaces/ws-ID/run-tasks \
+curl -X POST https://terrapod.local/api/terrapod/v1/workspaces/ws-ID/run-tasks \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{

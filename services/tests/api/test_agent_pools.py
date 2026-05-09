@@ -89,7 +89,7 @@ class TestListenerHeartbeat:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
-                f"/api/v2/listeners/{lid}/heartbeat",
+                f"/api/terrapod/v1/listeners/{lid}/heartbeat",
                 json={"capacity": 5, "active_runs": 2, "pod_name": "listener-abc-123"},
                 headers={"X-Terrapod-Client-Cert": "irrelevant-mocked"},
             )
@@ -121,7 +121,7 @@ class TestListenerHeartbeat:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
-                f"/api/v2/listeners/{lid}/heartbeat",
+                f"/api/terrapod/v1/listeners/{lid}/heartbeat",
                 json={"capacity": 5, "active_runs": 0},
                 headers={"X-Terrapod-Client-Cert": "irrelevant-mocked"},
             )
@@ -145,7 +145,7 @@ class TestListenerHeartbeat:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
-                f"/api/v2/listeners/{lid}/heartbeat",
+                f"/api/terrapod/v1/listeners/{lid}/heartbeat",
                 json={"capacity": 3, "active_runs": 1},
                 headers={"X-Terrapod-Client-Cert": "irrelevant-mocked"},
             )
@@ -167,7 +167,7 @@ class TestListenerHeartbeat:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
-                f"/api/v2/listeners/{lid}/heartbeat",
+                f"/api/terrapod/v1/listeners/{lid}/heartbeat",
                 json={"capacity": 1},
                 headers={"X-Terrapod-Client-Cert": "irrelevant-mocked"},
             )
@@ -196,7 +196,7 @@ class TestListenerHeartbeat:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
-                f"/api/v2/listeners/{path_lid}/heartbeat",
+                f"/api/terrapod/v1/listeners/{path_lid}/heartbeat",
                 json={"capacity": 1},
                 headers={"X-Terrapod-Client-Cert": "irrelevant-mocked"},
             )
@@ -237,7 +237,7 @@ class TestListPoolsRBAC:
         app, _ = _make_app(user)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.get("/api/v2/organizations/default/agent-pools", headers=_AUTH)
+            res = await client.get("/api/terrapod/v1/agent-pools", headers=_AUTH)
 
         assert res.status_code == 200
         data = res.json()["data"]
@@ -271,7 +271,7 @@ class TestListPoolsRBAC:
         app, _ = _make_app(user)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.get("/api/v2/organizations/default/agent-pools", headers=_AUTH)
+            res = await client.get("/api/terrapod/v1/agent-pools", headers=_AUTH)
 
         assert res.status_code == 200
         data = res.json()["data"]
@@ -307,7 +307,7 @@ class TestPoolStatus:
 
         app, _ = _make_app(_user())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.get("/api/v2/organizations/default/agent-pools", headers=_AUTH)
+            res = await client.get("/api/terrapod/v1/agent-pools", headers=_AUTH)
 
         assert res.status_code == 200
         attrs = res.json()["data"][0]["attributes"]
@@ -339,7 +339,7 @@ class TestPoolStatus:
 
         app, _ = _make_app(_user())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.get("/api/v2/organizations/default/agent-pools", headers=_AUTH)
+            res = await client.get("/api/terrapod/v1/agent-pools", headers=_AUTH)
 
         assert res.json()["data"][0]["attributes"]["status"] == "offline"
 
@@ -364,7 +364,7 @@ class TestPoolStatus:
 
         app, _ = _make_app(_user())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.get(f"/api/v2/agent-pools/apool-{pool.id}", headers=_AUTH)
+            res = await client.get(f"/api/terrapod/v1/agent-pools/apool-{pool.id}", headers=_AUTH)
 
         assert res.json()["data"]["attributes"]["status"] == "online"
 
@@ -470,7 +470,7 @@ class TestDerivePoolStatus:
 
         app, _ = _make_app(_user())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.get("/api/v2/organizations/default/agent-pools", headers=_AUTH)
+            res = await client.get("/api/terrapod/v1/agent-pools", headers=_AUTH)
 
         assert res.json()["data"][0]["attributes"]["status"] == "degraded"
 
@@ -509,7 +509,9 @@ class TestListListenersReplicaCount:
 
         app, _ = _make_app(_user())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.get(f"/api/v2/agent-pools/apool-{pool.id}/listeners", headers=_AUTH)
+            res = await client.get(
+                f"/api/terrapod/v1/agent-pools/apool-{pool.id}/listeners", headers=_AUTH
+            )
 
         assert res.status_code == 200
         data = res.json()["data"]
@@ -547,7 +549,9 @@ class TestListListenersReplicaCount:
 
         app, _ = _make_app(_user())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.get(f"/api/v2/agent-pools/apool-{pool.id}/listeners", headers=_AUTH)
+            res = await client.get(
+                f"/api/terrapod/v1/agent-pools/apool-{pool.id}/listeners", headers=_AUTH
+            )
 
         assert res.status_code == 200
         attrs = res.json()["data"][0]["attributes"]
@@ -585,7 +589,9 @@ class TestListListenersReplicaCount:
 
         app, _ = _make_app(_user())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.get(f"/api/v2/agent-pools/apool-{pool.id}/listeners", headers=_AUTH)
+            res = await client.get(
+                f"/api/terrapod/v1/agent-pools/apool-{pool.id}/listeners", headers=_AUTH
+            )
 
         data = {item["id"]: item["attributes"] for item in res.json()["data"]}
         assert data[f"listener-{lid_new}"]["replica-count"] == 2
@@ -617,7 +623,7 @@ class TestShowPoolRBAC:
         app, _ = _make_app(user)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.get(f"/api/v2/agent-pools/apool-{pool.id}", headers=_AUTH)
+            res = await client.get(f"/api/terrapod/v1/agent-pools/apool-{pool.id}", headers=_AUTH)
 
         assert res.status_code == 200
         attrs = res.json()["data"]["attributes"]
@@ -644,7 +650,7 @@ class TestShowPoolRBAC:
         app, _ = _make_app(user)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.get(f"/api/v2/agent-pools/apool-{pool.id}", headers=_AUTH)
+            res = await client.get(f"/api/terrapod/v1/agent-pools/apool-{pool.id}", headers=_AUTH)
 
         assert res.status_code == 404
 
@@ -671,7 +677,7 @@ class TestCreatePoolRBAC:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
-                "/api/v2/organizations/default/agent-pools",
+                "/api/terrapod/v1/agent-pools",
                 json={
                     "data": {
                         "type": "agent-pools",
@@ -701,7 +707,7 @@ class TestCreatePoolRBAC:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
-                "/api/v2/organizations/default/agent-pools",
+                "/api/terrapod/v1/agent-pools",
                 json={
                     "data": {
                         "type": "agent-pools",
@@ -744,7 +750,7 @@ class TestUpdatePoolRBAC:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.patch(
-                f"/api/v2/agent-pools/apool-{pool.id}",
+                f"/api/terrapod/v1/agent-pools/apool-{pool.id}",
                 json={
                     "data": {
                         "attributes": {
@@ -776,7 +782,7 @@ class TestUpdatePoolRBAC:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.patch(
-                f"/api/v2/agent-pools/apool-{pool.id}",
+                f"/api/terrapod/v1/agent-pools/apool-{pool.id}",
                 json={"data": {"attributes": {"description": "updated"}}},
                 headers=_AUTH,
             )
@@ -812,7 +818,9 @@ class TestDeletePoolRBAC:
         mock_db.commit = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.delete(f"/api/v2/agent-pools/apool-{pool.id}", headers=_AUTH)
+            res = await client.delete(
+                f"/api/terrapod/v1/agent-pools/apool-{pool.id}", headers=_AUTH
+            )
 
         assert res.status_code == 204
 
@@ -833,7 +841,9 @@ class TestDeletePoolRBAC:
         app, _ = _make_app(user)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.delete(f"/api/v2/agent-pools/apool-{pool.id}", headers=_AUTH)
+            res = await client.delete(
+                f"/api/terrapod/v1/agent-pools/apool-{pool.id}", headers=_AUTH
+            )
 
         assert res.status_code == 404
 
@@ -859,7 +869,9 @@ class TestTokenEndpointRBAC:
         app, _ = _make_app(user)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.get(f"/api/v2/agent-pools/apool-{pool.id}/tokens", headers=_AUTH)
+            res = await client.get(
+                f"/api/terrapod/v1/agent-pools/apool-{pool.id}/tokens", headers=_AUTH
+            )
 
         assert res.status_code == 403
 
@@ -882,7 +894,7 @@ class TestTokenEndpointRBAC:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
-                f"/api/v2/agent-pools/apool-{pool.id}/tokens",
+                f"/api/terrapod/v1/agent-pools/apool-{pool.id}/tokens",
                 json={"data": {"attributes": {"description": "test"}}},
                 headers=_AUTH,
             )
@@ -916,7 +928,7 @@ class TestUpdatePoolSelfLockout:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.patch(
-                f"/api/v2/agent-pools/apool-{pool.id}",
+                f"/api/terrapod/v1/agent-pools/apool-{pool.id}",
                 json={"data": {"attributes": {"labels": {"team": "other"}}}},
                 headers=_AUTH,
             )
@@ -950,7 +962,7 @@ class TestUpdatePoolSelfLockout:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.patch(
-                f"/api/v2/agent-pools/apool-{pool.id}",
+                f"/api/terrapod/v1/agent-pools/apool-{pool.id}",
                 json={"data": {"attributes": {"labels": {"team": "other"}, "force": True}}},
                 headers=_AUTH,
             )
@@ -983,7 +995,7 @@ class TestUpdatePoolSelfLockout:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.patch(
-                f"/api/v2/agent-pools/apool-{pool.id}",
+                f"/api/terrapod/v1/agent-pools/apool-{pool.id}",
                 json={"data": {"attributes": {"labels": {}}}},
                 headers=_AUTH,
             )
@@ -1021,7 +1033,7 @@ class TestDeleteListenerRBAC:
         app, _ = _make_app(user)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.delete(f"/api/v2/listeners/{lid}", headers=_AUTH)
+            res = await client.delete(f"/api/terrapod/v1/listeners/{lid}", headers=_AUTH)
 
         assert res.status_code == 204
 
@@ -1049,7 +1061,7 @@ class TestDeleteListenerRBAC:
         app, _ = _make_app(user)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.delete(f"/api/v2/listeners/{lid}", headers=_AUTH)
+            res = await client.delete(f"/api/terrapod/v1/listeners/{lid}", headers=_AUTH)
 
         assert res.status_code == 403
 
@@ -1068,7 +1080,7 @@ class TestDeleteListenerRBAC:
         app, _ = _make_app(user)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.delete(f"/api/v2/listeners/{lid}", headers=_AUTH)
+            res = await client.delete(f"/api/terrapod/v1/listeners/{lid}", headers=_AUTH)
 
         assert res.status_code == 403
 
@@ -1123,7 +1135,7 @@ class TestRenewListenerCert:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
-                f"/api/v2/listeners/{lid}/renew",
+                f"/api/terrapod/v1/listeners/{lid}/renew",
                 headers={"X-Terrapod-Client-Cert": "irrelevant-mocked"},
             )
 
@@ -1146,7 +1158,7 @@ class TestRenewListenerCert:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
-                f"/api/v2/listeners/{path_lid}/renew",
+                f"/api/terrapod/v1/listeners/{path_lid}/renew",
                 headers={"X-Terrapod-Client-Cert": "irrelevant-mocked"},
             )
 

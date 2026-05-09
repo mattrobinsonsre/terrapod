@@ -1,6 +1,6 @@
 """Diff two configuration version tarballs.
 
-Used by `/api/v2/configuration-versions/diff` (Terrapod-only endpoint
+Used by `/api/terrapod/v1/configuration-versions/diff` (Terrapod-only endpoint
 backing the workspace UI's "compare two versions" view). Pure I/O +
 text diffing; no async networking on the hot path.
 

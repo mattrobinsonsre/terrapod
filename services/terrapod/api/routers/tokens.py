@@ -9,11 +9,11 @@ UX CONTRACT: Token endpoints are consumed by the web frontend:
   matched by corresponding updates to that frontend page.
 
 Endpoints:
-    POST   /api/v2/users/:user_id/authentication-tokens — create user token
-    GET    /api/v2/users/:user_id/authentication-tokens — list user tokens
-    GET    /api/v2/admin/authentication-tokens — list all tokens (admin only)
-    GET    /api/v2/authentication-tokens/:id — show token (value is null)
-    DELETE /api/v2/authentication-tokens/:id — revoke token
+    POST   /api/terrapod/v1/users/:user_id/authentication-tokens — create user token
+    GET    /api/terrapod/v1/users/:user_id/authentication-tokens — list user tokens
+    GET    /api/terrapod/v1/admin/authentication-tokens — list all tokens (admin only)
+    GET    /api/terrapod/v1/authentication-tokens/:id — show token (value is null)
+    DELETE /api/terrapod/v1/authentication-tokens/:id — revoke token
 """
 
 from datetime import timedelta
@@ -35,7 +35,7 @@ from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 
-router = APIRouter(prefix="/api/v2", tags=["tokens"])
+router = APIRouter(tags=["tokens"])
 logger = get_logger(__name__)
 
 

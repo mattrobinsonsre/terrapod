@@ -438,8 +438,8 @@ Enable encryption on your managed database and object storage services. For file
 
 The listener joins an agent pool on startup using the join token, then connects to the API via SSE (Server-Sent Events) to receive real-time events: run notifications, Job status queries, log streaming requests, and cancellations. The SSE connection is outbound from the listener — it works through firewalls without requiring inbound access. The pool must already exist (created by an admin via the API). To set up the listener:
 
-1. Create an agent pool via the API: `POST /api/v2/organizations/default/agent-pools`
-2. Create a join token for the pool: `POST /api/v2/agent-pools/{pool_id}/tokens`
+1. Create an agent pool via the API: `POST /api/terrapod/v1/agent-pools`
+2. Create a join token for the pool: `POST /api/terrapod/v1/agent-pools/{pool_id}/tokens`
 3. Store the raw token in a Kubernetes Secret:
 
 ```zsh

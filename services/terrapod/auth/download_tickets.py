@@ -14,7 +14,7 @@ do) or tokens embedded in the URL itself.
 This module generates the latter: short-lived, stateless cap tokens
 that callers exchange (server-side, with their normal Bearer token)
 for a public URL of the form
-`/api/v2/.../download-by-ticket/{ticket}`. Browser navigates plainly,
+`/api/terrapod/v1/.../download-by-ticket/{ticket}`. Browser navigates plainly,
 the ticket *is* the auth, the response streams to disk via
 `Content-Disposition: attachment` like any download has done forever.
 

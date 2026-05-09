@@ -4,10 +4,10 @@
 //
 //	JSON:API type: "users"
 //	ID: email (string, not a generated ID)
-//	Create:  POST   /api/v2/organizations/default/users
-//	Read:    GET    /api/v2/users/{email}
-//	Update:  PATCH  /api/v2/users/{email}
-//	Delete:  DELETE /api/v2/users/{email}
+//	Create:  POST   /api/terrapod/v1/users
+//	Read:    GET    /api/terrapod/v1/users/{email}
+//	Update:  PATCH  /api/terrapod/v1/users/{email}
+//	Delete:  DELETE /api/terrapod/v1/users/{email}
 //
 // Attribute mapping (JSON:API attribute -> Terraform schema attribute):
 //
@@ -162,7 +162,7 @@ func (r *userResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	data, err := r.client.Post(ctx, "/api/v2/organizations/default/users", body)
+	data, err := r.client.Post(ctx, "/api/terrapod/v1/users", body)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create user", err.Error())
 		return
@@ -185,7 +185,7 @@ func (r *userResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/v2/users/"+state.ID.ValueString())
+	data, err := r.client.Get(ctx, "/api/terrapod/v1/users/"+state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -230,7 +230,7 @@ func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	data, err := r.client.Patch(ctx, "/api/v2/users/"+state.ID.ValueString(), body)
+	data, err := r.client.Patch(ctx, "/api/terrapod/v1/users/"+state.ID.ValueString(), body)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update user", err.Error())
 		return
@@ -257,7 +257,7 @@ func (r *userResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v2/users/"+state.ID.ValueString())
+	err := r.client.Delete(ctx, "/api/terrapod/v1/users/"+state.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Failed to delete user", err.Error())
 	}

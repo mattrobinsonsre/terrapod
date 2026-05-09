@@ -1,12 +1,18 @@
 """GPG key management endpoints for provider signing.
 
-TFE uses the path prefix /api/registry/private/v2/gpg-keys.
+The CLI doesn't talk to these — `terraform init` reads provider GPG
+public keys from the provider download response, not from a separate
+admin endpoint. They're Terrapod-native management surface and live at
+`/api/terrapod/v1/gpg-keys`.
 
-Endpoints:
-    POST   /api/registry/private/v2/gpg-keys              — create
-    GET    /api/registry/private/v2/gpg-keys               — list
-    GET    /api/registry/private/v2/gpg-keys/{key_id}      — show
-    DELETE /api/registry/private/v2/gpg-keys/{key_id}      — delete
+The historical TFE path was `/api/registry/private/v2/gpg-keys`. That
+form is dual-mounted as a deprecated alias until v0.24.0 (see #278).
+
+Endpoints (canonical):
+    POST   /api/terrapod/v1/gpg-keys              — create
+    GET    /api/terrapod/v1/gpg-keys               — list
+    GET    /api/terrapod/v1/gpg-keys/{key_id}      — show
+    DELETE /api/terrapod/v1/gpg-keys/{key_id}      — delete
 """
 
 import uuid
@@ -69,7 +75,7 @@ def _gpg_key_to_jsonapi(key) -> dict:  # type: ignore[no-untyped-def]
 # --- Endpoints ---
 
 
-@router.post("/api/registry/private/v2/gpg-keys")
+@router.post("/gpg-keys")
 async def create_gpg_key_endpoint(
     body: CreateGPGKeyRequest,
     user: AuthenticatedUser = Depends(get_current_user),
@@ -98,7 +104,7 @@ async def create_gpg_key_endpoint(
     )
 
 
-@router.get("/api/registry/private/v2/gpg-keys")
+@router.get("/gpg-keys")
 async def list_gpg_keys_endpoint(
     filter_namespace: str | None = Query(None, alias="filter[namespace]"),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -111,7 +117,7 @@ async def list_gpg_keys_endpoint(
     )
 
 
-@router.get("/api/registry/private/v2/gpg-keys/{key_id}")
+@router.get("/gpg-keys/{key_id}")
 async def show_gpg_key_endpoint(
     key_id: str,
     user: AuthenticatedUser = Depends(get_current_user),
@@ -130,7 +136,7 @@ async def show_gpg_key_endpoint(
     return JSONResponse(content={"data": _gpg_key_to_jsonapi(key)})
 
 
-@router.delete("/api/registry/private/v2/gpg-keys/{key_id}")
+@router.delete("/gpg-keys/{key_id}")
 async def delete_gpg_key_endpoint(
     key_id: str,
     user: AuthenticatedUser = Depends(get_current_user),

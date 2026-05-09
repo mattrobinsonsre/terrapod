@@ -18,7 +18,7 @@ export function useRunEvents(
   onEvent: (event: RunEvent) => void,
 ) {
   return useSSE({
-    url: `/api/v2/workspaces/${workspaceId}/runs/events`,
+    url: `/api/terrapod/v1/workspaces/${workspaceId}/runs/events`,
     enabled: !!workspaceId,
     onEvent: onEvent as (data: Record<string, unknown>) => void,
     onReconnect: () => onEvent({ event: 'reconnect', workspace_id: workspaceId! }),

@@ -79,8 +79,8 @@ export default function TokensPage() {
     setLoading(true)
     try {
       const url = showAll
-        ? '/api/v2/admin/authentication-tokens'
-        : `/api/v2/users/${userId}/authentication-tokens`
+        ? '/api/terrapod/v1/admin/authentication-tokens'
+        : `/api/terrapod/v1/users/${userId}/authentication-tokens`
       const res = await apiFetch(url)
       if (!res.ok) throw new Error('Failed to load tokens')
       const data = await res.json()
@@ -98,7 +98,7 @@ export default function TokensPage() {
     setError('')
     setCreatedToken(null)
     try {
-      const res = await apiFetch(`/api/v2/users/${userId}/authentication-tokens`, {
+      const res = await apiFetch(`/api/terrapod/v1/users/${userId}/authentication-tokens`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -131,7 +131,7 @@ export default function TokensPage() {
   async function handleRevoke(tokenId: string) {
     setError('')
     try {
-      const res = await apiFetch(`/api/v2/authentication-tokens/${tokenId}`, {
+      const res = await apiFetch(`/api/terrapod/v1/authentication-tokens/${tokenId}`, {
         method: 'DELETE',
       })
       if (!res.ok && res.status !== 204) throw new Error(`Failed to revoke token (${res.status})`)
@@ -150,7 +150,7 @@ export default function TokensPage() {
     try {
       const ids = [...selected]
       await Promise.all(ids.map((id) =>
-        apiFetch(`/api/v2/authentication-tokens/${id}`, { method: 'DELETE' })
+        apiFetch(`/api/terrapod/v1/authentication-tokens/${id}`, { method: 'DELETE' })
       ))
       setSelected(new Set())
       await loadTokens()

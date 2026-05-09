@@ -45,7 +45,7 @@ class LocalConnector(SSOConnector):
         """Build redirect URL to the Web UI login page.
 
         The Web UI detects the cli_state parameter and renders a form that
-        POSTs to /api/v2/auth/local/login, which validates credentials and
+        POSTs to /api/terrapod/v1/auth/local/login, which validates credentials and
         redirects back to the CLI's localhost callback.
         """
         login_url = f"{settings.auth.callback_base_url}/login?cli_state={state}"

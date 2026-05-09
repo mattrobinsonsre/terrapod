@@ -4,11 +4,11 @@
 //
 //	JSON:API type: "roles"
 //	ID: role name (string, not UUID)
-//	Create:  POST   /api/v2/roles
-//	Read:    GET    /api/v2/roles/{name}
-//	Update:  PATCH  /api/v2/roles/{name}
-//	Delete:  DELETE /api/v2/roles/{name}
-//	List:    GET    /api/v2/roles
+//	Create:  POST   /api/terrapod/v1/roles
+//	Read:    GET    /api/terrapod/v1/roles/{name}
+//	Update:  PATCH  /api/terrapod/v1/roles/{name}
+//	Delete:  DELETE /api/terrapod/v1/roles/{name}
+//	List:    GET    /api/terrapod/v1/roles
 //
 // The API uses the role name as the resource identifier — there is no
 // UUID or prefixed ID. The "name" field in the JSON:API response sits
@@ -195,7 +195,7 @@ func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	data, err := r.client.Post(ctx, "/api/v2/roles", body)
+	data, err := r.client.Post(ctx, "/api/terrapod/v1/roles", body)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create role", err.Error())
 		return
@@ -218,7 +218,7 @@ func (r *roleResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/v2/roles/"+state.ID.ValueString())
+	data, err := r.client.Get(ctx, "/api/terrapod/v1/roles/"+state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -258,7 +258,7 @@ func (r *roleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	data, err := r.client.Patch(ctx, "/api/v2/roles/"+state.ID.ValueString(), body)
+	data, err := r.client.Patch(ctx, "/api/terrapod/v1/roles/"+state.ID.ValueString(), body)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update role", err.Error())
 		return
@@ -281,7 +281,7 @@ func (r *roleResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v2/roles/"+state.ID.ValueString())
+	err := r.client.Delete(ctx, "/api/terrapod/v1/roles/"+state.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Failed to delete role", err.Error())
 	}

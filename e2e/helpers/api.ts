@@ -24,7 +24,7 @@ export async function getSessionToken(
   const state = randomBytes(16).toString('hex');
 
   // Step 1: authorize
-  const authRes = await fetch(`${API_URL}/api/v2/auth/local/authorize`, {
+  const authRes = await fetch(`${API_URL}/api/terrapod/v1/auth/local/authorize`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -44,7 +44,7 @@ export async function getSessionToken(
   const { code } = await authRes.json();
 
   // Step 2: token exchange
-  const tokenRes = await fetch(`${API_URL}/api/v2/auth/token`, {
+  const tokenRes = await fetch(`${API_URL}/api/terrapod/v1/auth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -73,7 +73,7 @@ export async function createUser(
   displayName?: string,
 ): Promise<void> {
   const res = await fetch(
-    `${API_URL}/api/v2/organizations/default/users`,
+    `${API_URL}/api/terrapod/v1/users`,
     {
       method: 'POST',
       headers: {

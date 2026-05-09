@@ -4,9 +4,9 @@
 //
 //	JSON:API type: "gpg-keys"
 //	ID: UUID (no prefix)
-//	Create:  POST   /api/registry/private/v2/gpg-keys
-//	Read:    GET    /api/registry/private/v2/gpg-keys/{id}
-//	Delete:  DELETE /api/registry/private/v2/gpg-keys/{id}
+//	Create:  POST   /api/terrapod/v1/gpg-keys
+//	Read:    GET    /api/terrapod/v1/gpg-keys/{id}
+//	Delete:  DELETE /api/terrapod/v1/gpg-keys/{id}
 //	No update — immutable resource.
 //
 // Attribute mapping:
@@ -146,7 +146,7 @@ func (r *gpgKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	data, err := r.client.Post(ctx, "/api/registry/private/v2/gpg-keys", body)
+	data, err := r.client.Post(ctx, "/api/terrapod/v1/gpg-keys", body)
 	if err != nil {
 		resp.Diagnostics.AddError("Create failed", err.Error())
 		return
@@ -169,7 +169,7 @@ func (r *gpgKeyResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/registry/private/v2/gpg-keys/"+state.ID.ValueString())
+	data, err := r.client.Get(ctx, "/api/terrapod/v1/gpg-keys/"+state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -200,7 +200,7 @@ func (r *gpgKeyResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/registry/private/v2/gpg-keys/"+state.ID.ValueString())
+	err := r.client.Delete(ctx, "/api/terrapod/v1/gpg-keys/"+state.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Delete failed", err.Error())
 	}

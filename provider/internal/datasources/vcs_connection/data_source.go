@@ -1,6 +1,6 @@
 // Package vcs_connection implements the terrapod_vcs_connection data source.
 //
-// API Contract: GET /api/v2/organizations/default/vcs-connections
+// API Contract: GET /api/terrapod/v1/vcs-connections
 // Lists all connections, filters by name client-side.
 package vcs_connection
 
@@ -83,7 +83,7 @@ func (d *vcsConnectionDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 
-	data, err := d.client.Get(ctx, "/api/v2/organizations/default/vcs-connections")
+	data, err := d.client.Get(ctx, "/api/terrapod/v1/vcs-connections")
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to list VCS connections", err.Error())
 		return

@@ -216,13 +216,13 @@ function WorkspacesPageInner() {
   useEffect(() => {
     if (!showCreate) return
     if (!vcsConnectionsLoaded) {
-      apiFetch('/api/v2/organizations/default/vcs-connections')
+      apiFetch('/api/terrapod/v1/vcs-connections')
         .then(res => res.ok ? res.json() : { data: [] })
         .then(data => { setVcsConnections(data.data || []); setVcsConnectionsLoaded(true) })
         .catch(() => {})
     }
     if (!agentPoolsLoaded) {
-      apiFetch('/api/v2/organizations/default/agent-pools')
+      apiFetch('/api/terrapod/v1/agent-pools')
         .then(res => res.ok ? res.json() : { data: [] })
         .then(data => { setAgentPools(data.data || []); setAgentPoolsLoaded(true) })
         .catch(() => {})
@@ -232,7 +232,7 @@ function WorkspacesPageInner() {
   // Fetch version suggestions when backend changes and form is open
   useEffect(() => {
     if (!showCreate || newBackend === versionsBackend) return
-    apiFetch(`/api/v2/binary-cache/versions?tool=${newBackend}`)
+    apiFetch(`/api/terrapod/v1/binary-cache/versions?tool=${newBackend}`)
       .then(res => res.ok ? res.json() : { data: [] })
       .then(data => {
         setVersionSuggestions(data.data || [])

@@ -12,12 +12,12 @@ UX CONTRACT: Admin cache endpoints are consumed by the web frontend:
   matched by corresponding updates to that frontend page.
 
 Endpoints:
-    GET    /api/v2/binary-cache/{tool}/{version}/{os}/{arch}                        — download (redirect)
-    GET    /api/v2/admin/binary-cache                                                — list cached binaries
-    POST   /api/v2/admin/binary-cache/warm                                           — pre-warm binary
-    DELETE /api/v2/admin/binary-cache/{tool}/{version}                               — purge binary
-    GET    /api/v2/admin/provider-cache                                              — list cached providers
-    DELETE /api/v2/admin/provider-cache/{hostname}/{namespace}/{type}/{version}      — purge provider
+    GET    /api/terrapod/v1/binary-cache/{tool}/{version}/{os}/{arch}                        — download (redirect)
+    GET    /api/terrapod/v1/admin/binary-cache                                                — list cached binaries
+    POST   /api/terrapod/v1/admin/binary-cache/warm                                           — pre-warm binary
+    DELETE /api/terrapod/v1/admin/binary-cache/{tool}/{version}                               — purge binary
+    GET    /api/terrapod/v1/admin/provider-cache                                              — list cached providers
+    DELETE /api/terrapod/v1/admin/provider-cache/{hostname}/{namespace}/{type}/{version}      — purge provider
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -58,7 +58,7 @@ class WarmBinaryRequest(BaseModel):
 # --- Version suggestions ---
 
 
-@router.get("/api/v2/binary-cache/versions")
+@router.get("/binary-cache/versions")
 async def available_versions(
     tool: str = "tofu",
     user: AuthenticatedUser = Depends(get_current_user),
@@ -85,7 +85,7 @@ async def available_versions(
 # --- Runner-facing endpoint ---
 
 
-@router.get("/api/v2/binary-cache/{tool}/{version}/{os}/{arch}")
+@router.get("/binary-cache/{tool}/{version}/{os}/{arch}")
 async def download_binary(
     tool: str,
     version: str,
@@ -133,7 +133,7 @@ async def download_binary(
 # --- Admin endpoints ---
 
 
-@router.get("/api/v2/admin/binary-cache")
+@router.get("/admin/binary-cache")
 async def list_cached_binaries_endpoint(
     tool: str | None = None,
     user: AuthenticatedUser = Depends(require_admin),
@@ -163,7 +163,7 @@ async def list_cached_binaries_endpoint(
     )
 
 
-@router.post("/api/v2/admin/binary-cache/warm")
+@router.post("/admin/binary-cache/warm")
 async def warm_binary_endpoint(
     body: WarmBinaryRequest,
     user: AuthenticatedUser = Depends(require_admin),
@@ -194,7 +194,7 @@ async def warm_binary_endpoint(
     )
 
 
-@router.delete("/api/v2/admin/binary-cache/{tool}/{version}")
+@router.delete("/admin/binary-cache/{tool}/{version}")
 async def purge_binary_endpoint(
     tool: str,
     version: str,
@@ -213,7 +213,7 @@ async def purge_binary_endpoint(
 # --- Provider cache admin endpoints ---
 
 
-@router.get("/api/v2/admin/provider-cache")
+@router.get("/admin/provider-cache")
 async def list_cached_providers_endpoint(
     hostname: str | None = None,
     user: AuthenticatedUser = Depends(require_admin),
@@ -244,7 +244,7 @@ async def list_cached_providers_endpoint(
     )
 
 
-@router.delete("/api/v2/admin/provider-cache/{hostname}/{namespace}/{type}/{version}")
+@router.delete("/admin/provider-cache/{hostname}/{namespace}/{type}/{version}")
 async def purge_provider_endpoint(
     hostname: str,
     namespace: str,

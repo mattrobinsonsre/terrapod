@@ -15,7 +15,7 @@ export function usePoolEvents(
   onEvent: (event: PoolEvent) => void,
 ) {
   return useSSE({
-    url: `/api/v2/agent-pools/${poolId}/events`,
+    url: `/api/terrapod/v1/agent-pools/${poolId}/events`,
     enabled: !!poolId,
     onEvent: onEvent as (data: Record<string, unknown>) => void,
     onReconnect: () => onEvent({ event: 'reconnect' }),

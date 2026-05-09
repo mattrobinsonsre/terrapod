@@ -174,7 +174,7 @@ class TestTokenCRUD:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
-                "/api/v2/users/test/authentication-tokens",
+                "/api/terrapod/v1/users/test/authentication-tokens",
                 json={
                     "data": {
                         "type": "authentication-tokens",
@@ -225,7 +225,7 @@ class TestTokenCRUD:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get(
-                "/api/v2/users/test/authentication-tokens",
+                "/api/terrapod/v1/users/test/authentication-tokens",
                 headers={"Authorization": "Bearer dummy"},
             )
 
@@ -266,7 +266,7 @@ class TestTokenCRUD:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.delete(
-                "/api/v2/authentication-tokens/at-abc123",
+                "/api/terrapod/v1/authentication-tokens/at-abc123",
                 headers={"Authorization": "Bearer dummy"},
             )
 
@@ -299,7 +299,7 @@ class TestTokenCRUD:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.delete(
-                "/api/v2/authentication-tokens/at-abc123",
+                "/api/terrapod/v1/authentication-tokens/at-abc123",
                 headers={"Authorization": "Bearer dummy"},
             )
 
@@ -322,7 +322,7 @@ class TestTokenCRUD:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
-                "/api/v2/users/other-user/authentication-tokens",
+                "/api/terrapod/v1/users/other-user/authentication-tokens",
                 json={"data": {"type": "authentication-tokens", "attributes": {}}},
                 headers={"Authorization": "Bearer dummy"},
             )

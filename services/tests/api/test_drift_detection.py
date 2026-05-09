@@ -253,7 +253,7 @@ class TestDismissDriftAction:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{ws.id}/actions/dismiss-drift",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/actions/dismiss-drift",
                 headers=_AUTH,
             )
 
@@ -283,7 +283,7 @@ class TestDismissDriftAction:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{ws.id}/actions/dismiss-drift",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/actions/dismiss-drift",
                 headers=_AUTH,
             )
 
@@ -311,7 +311,7 @@ class TestDismissDriftAction:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{ws.id}/actions/dismiss-drift",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/actions/dismiss-drift",
                 headers=_AUTH,
             )
 

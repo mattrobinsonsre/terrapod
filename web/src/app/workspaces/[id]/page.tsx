@@ -432,7 +432,7 @@ function WorkspaceDetailContent() {
     if (vcsRefsLoaded || vcsRefsLoading) return
     setVcsRefsLoading(true)
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/vcs-refs`)
+      const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}/vcs-refs`)
       if (!res.ok) return
       const data = await res.json()
       setVcsBranches(data.branches || [])
@@ -549,7 +549,7 @@ function WorkspaceDetailContent() {
   async function downloadCv(cvId: string) {
     try {
       const res = await apiFetch(
-        `/api/v2/configuration-versions/${cvId}/download-ticket`,
+        `/api/terrapod/v1/configuration-versions/${cvId}/download-ticket`,
         { method: 'POST' },
       )
       if (!res.ok) {
@@ -585,7 +585,7 @@ function WorkspaceDetailContent() {
         .filter(id => cvSelected.has(id))
       // ids[] preserves cv list order (newest first); reverse to get older first
       const [toId, fromId] = ids
-      const res = await apiFetch('/api/v2/configuration-versions/diff', {
+      const res = await apiFetch('/api/terrapod/v1/configuration-versions/diff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -608,7 +608,7 @@ function WorkspaceDetailContent() {
   async function loadNotifications() {
     setNotifLoading(true)
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/notification-configurations`)
+      const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}/notification-configurations`)
       if (!res.ok) throw new Error('Failed to load notifications')
       const data = await res.json()
       setNotifications(data.data || [])
@@ -622,7 +622,7 @@ function WorkspaceDetailContent() {
   async function loadRunTasks() {
     setRunTasksLoading(true)
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/run-tasks`)
+      const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}/run-tasks`)
       if (!res.ok) throw new Error('Failed to load run tasks')
       const data = await res.json()
       setRunTasks(data.data || [])
@@ -647,7 +647,7 @@ function WorkspaceDetailContent() {
       }
       if (rtHmacKey) attrs['hmac-key'] = rtHmacKey
 
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/run-tasks`, {
+      const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}/run-tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'run-tasks', attributes: attrs } }),
@@ -672,7 +672,7 @@ function WorkspaceDetailContent() {
 
   async function handleToggleRunTask(rt: RunTaskItem) {
     try {
-      const res = await apiFetch(`/api/v2/run-tasks/${rt.id}`, {
+      const res = await apiFetch(`/api/terrapod/v1/run-tasks/${rt.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'run-tasks', attributes: { enabled: !rt.attributes.enabled } } }),
@@ -686,7 +686,7 @@ function WorkspaceDetailContent() {
 
   async function handleDeleteRunTask(rtId: string) {
     try {
-      const res = await apiFetch(`/api/v2/run-tasks/${rtId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/terrapod/v1/run-tasks/${rtId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete')
       setDeleteRtId(null)
       await loadRunTasks()
@@ -718,21 +718,21 @@ function WorkspaceDetailContent() {
     setEditVcsBranch(workspace.attributes['vcs-branch'] || '')
     setEditing(true)
     if (!poolsLoaded) {
-      apiFetch('/api/v2/organizations/default/agent-pools').then(res => res.ok ? res.json() : { data: [] }).then(data => {
+      apiFetch('/api/terrapod/v1/agent-pools').then(res => res.ok ? res.json() : { data: [] }).then(data => {
         const allPools: AgentPool[] = data.data || []
         setAgentPools(allPools.filter(p => p.attributes.permission === 'write' || p.attributes.permission === 'admin'))
         setPoolsLoaded(true)
       }).catch(() => {})
     }
     if (!vcsConnectionsLoaded) {
-      apiFetch('/api/v2/organizations/default/vcs-connections').then(res => res.ok ? res.json() : { data: [] }).then(data => {
+      apiFetch('/api/terrapod/v1/vcs-connections').then(res => res.ok ? res.json() : { data: [] }).then(data => {
         setVcsConnections(data.data || [])
         setVcsConnectionsLoaded(true)
       }).catch(() => {})
     }
     const backend = workspace.attributes['execution-backend'] || 'tofu'
     if (versionsBackend !== backend) {
-      apiFetch(`/api/v2/binary-cache/versions?tool=${backend}`)
+      apiFetch(`/api/terrapod/v1/binary-cache/versions?tool=${backend}`)
         .then(res => res.ok ? res.json() : { data: [] })
         .then(data => {
           setVersionSuggestions(data.data || [])
@@ -802,7 +802,7 @@ function WorkspaceDetailContent() {
     if (!workspace) return
     const action = workspace.attributes.locked ? 'unlock' : 'lock'
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/actions/${action}`, {
+      const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}/actions/${action}`, {
         method: 'POST',
       })
       if (!res.ok) throw new Error(`Failed to ${action} workspace`)
@@ -897,7 +897,7 @@ function WorkspaceDetailContent() {
     setError('')
     try {
       const res = await apiFetch(
-        `/api/v2/workspaces/${workspaceId}/actions/dismiss-drift`,
+        `/api/terrapod/v1/workspaces/${workspaceId}/actions/dismiss-drift`,
         { method: 'POST' }
       )
       if (!res.ok) {
@@ -915,7 +915,7 @@ function WorkspaceDetailContent() {
   async function handleDelete() {
     setDeleting(true)
     try {
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete workspace')
       router.push('/workspaces')
     } catch (err) {
@@ -1125,7 +1125,7 @@ function WorkspaceDetailContent() {
       if (notifType === 'generic' && notifToken) attrs.token = notifToken
       if (notifType === 'email') attrs['email-addresses'] = notifEmails.split(',').map(s => s.trim()).filter(Boolean)
 
-      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/notification-configurations`, {
+      const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}/notification-configurations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'notification-configurations', attributes: attrs } }),
@@ -1150,7 +1150,7 @@ function WorkspaceDetailContent() {
 
   async function handleToggleNotif(nc: NotificationConfig) {
     try {
-      const res = await apiFetch(`/api/v2/notification-configurations/${nc.id}`, {
+      const res = await apiFetch(`/api/terrapod/v1/notification-configurations/${nc.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'notification-configurations', attributes: { enabled: !nc.attributes.enabled } } }),
@@ -1164,7 +1164,7 @@ function WorkspaceDetailContent() {
 
   async function handleDeleteNotif(ncId: string) {
     try {
-      const res = await apiFetch(`/api/v2/notification-configurations/${ncId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/terrapod/v1/notification-configurations/${ncId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete')
       setDeleteNotifId(null)
       await loadNotifications()
@@ -1177,7 +1177,7 @@ function WorkspaceDetailContent() {
     setVerifyingId(ncId)
     setError('')
     try {
-      const res = await apiFetch(`/api/v2/notification-configurations/${ncId}/actions/verify`, { method: 'POST' })
+      const res = await apiFetch(`/api/terrapod/v1/notification-configurations/${ncId}/actions/verify`, { method: 'POST' })
       if (!res.ok) throw new Error('Verification failed')
       const data = await res.json()
       const success = data?.data?.attributes?.success
@@ -2204,13 +2204,13 @@ function WorkspaceDetailContent() {
                       setStateActionLoading(sv.id)
                       try {
                         if (action === 'delete') {
-                          const resp = await apiFetch(`/api/v2/state-versions/${sv.id}/manage`, { method: 'DELETE' })
+                          const resp = await apiFetch(`/api/terrapod/v1/state-versions/${sv.id}/manage`, { method: 'DELETE' })
                           if (!resp.ok) {
                             const err = await resp.json().catch(() => ({ detail: 'Failed' }))
                             throw new Error(err.detail || 'Failed to delete state version')
                           }
                         } else {
-                          const resp = await apiFetch(`/api/v2/state-versions/${sv.id}/actions/rollback`, { method: 'POST' })
+                          const resp = await apiFetch(`/api/terrapod/v1/state-versions/${sv.id}/actions/rollback`, { method: 'POST' })
                           if (!resp.ok) {
                             const err = await resp.json().catch(() => ({ detail: 'Failed' }))
                             throw new Error(err.detail || 'Failed to rollback state version')
@@ -2258,7 +2258,7 @@ function WorkspaceDetailContent() {
                       try {
                         const body = await file.text()
                         JSON.parse(body) // validate JSON
-                        const resp = await apiFetch(`/api/v2/workspaces/${workspaceId}/state-versions/actions/upload`, {
+                        const resp = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}/state-versions/actions/upload`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body,

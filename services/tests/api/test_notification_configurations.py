@@ -88,7 +88,7 @@ class TestCreateNotificationConfiguration:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{ws.id}/notification-configurations",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/notification-configurations",
                 json={
                     "data": {
                         "type": "notification-configurations",
@@ -121,7 +121,7 @@ class TestCreateNotificationConfiguration:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{ws.id}/notification-configurations",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/notification-configurations",
                 json={
                     "data": {
                         "type": "notification-configurations",
@@ -152,7 +152,7 @@ class TestCreateNotificationConfiguration:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{ws.id}/notification-configurations",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/notification-configurations",
                 json={
                     "data": {
                         "type": "notification-configurations",
@@ -185,7 +185,7 @@ class TestCreateNotificationConfiguration:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{ws.id}/notification-configurations",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/notification-configurations",
                 json={
                     "data": {
                         "type": "notification-configurations",
@@ -217,7 +217,7 @@ class TestCreateNotificationConfiguration:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{ws.id}/notification-configurations",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/notification-configurations",
                 json={
                     "data": {
                         "type": "notification-configurations",
@@ -249,7 +249,7 @@ class TestCreateNotificationConfiguration:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{ws.id}/notification-configurations",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/notification-configurations",
                 json={
                     "data": {
                         "type": "notification-configurations",
@@ -289,7 +289,7 @@ class TestListNotificationConfigurations:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
-                f"/api/v2/workspaces/ws-{ws.id}/notification-configurations",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/notification-configurations",
                 headers=_AUTH,
             )
         assert resp.status_code == 200
@@ -316,7 +316,7 @@ class TestShowNotificationConfiguration:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
-                f"/api/v2/notification-configurations/nc-{nc.id}",
+                f"/api/terrapod/v1/notification-configurations/nc-{nc.id}",
                 headers=_AUTH,
             )
         assert resp.status_code == 200
@@ -364,7 +364,7 @@ class TestUpdateNotificationConfiguration:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
-                f"/api/v2/notification-configurations/nc-{nc.id}",
+                f"/api/terrapod/v1/notification-configurations/nc-{nc.id}",
                 json={
                     "data": {
                         "type": "notification-configurations",
@@ -391,7 +391,7 @@ class TestUpdateNotificationConfiguration:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
-                f"/api/v2/notification-configurations/nc-{nc.id}",
+                f"/api/terrapod/v1/notification-configurations/nc-{nc.id}",
                 json={"data": {"type": "notification-configurations", "attributes": {"name": "X"}}},
                 headers=_AUTH,
             )
@@ -419,7 +419,7 @@ class TestDeleteNotificationConfiguration:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.delete(
-                f"/api/v2/notification-configurations/nc-{nc.id}",
+                f"/api/terrapod/v1/notification-configurations/nc-{nc.id}",
                 headers=_AUTH,
             )
         assert resp.status_code == 204
@@ -449,7 +449,7 @@ class TestVerifyNotificationConfiguration:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/notification-configurations/nc-{nc.id}/actions/verify",
+                f"/api/terrapod/v1/notification-configurations/nc-{nc.id}/actions/verify",
                 headers=_AUTH,
             )
         assert resp.status_code == 200

@@ -1,6 +1,6 @@
 // Package user implements the terrapod_user data source.
 //
-// API Contract: GET /api/v2/users/{email}
+// API Contract: GET /api/terrapod/v1/users/{email}
 // Looks up a single user by email.
 package user
 
@@ -73,7 +73,7 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	data, err := d.client.Get(ctx, "/api/v2/users/"+config.Email.ValueString())
+	data, err := d.client.Get(ctx, "/api/terrapod/v1/users/"+config.Email.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to read user", err.Error())
 		return

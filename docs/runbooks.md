@@ -39,7 +39,7 @@ A run is marked "stale" by the reconciler when it has been in `planning` or `app
    ```bash
    # Via API
    curl -H "Authorization: Bearer $TOKEN" \
-     https://<terrapod>/api/v2/agent-pools/<pool-id>/listeners
+     https://<terrapod>/api/terrapod/v1/agent-pools/<pool-id>/listeners
    ```
    If no listeners, see [Listener Offline](#listener-offline).
 
@@ -258,7 +258,7 @@ When no listener is available in a pool, runs cannot be claimed or executed. Que
    Listener logs will show "certificate expired" if the certificate wasn't renewed. The renewal happens at 50% of validity.
 
 5. **Check SSE connectivity:**
-   Listener connects to `GET /api/v2/listeners/{id}/events` via SSE. If the connection is being dropped:
+   Listener connects to `GET /api/terrapod/v1/listeners/{id}/events` via SSE. If the connection is being dropped:
    ```logql
    {namespace="<ns>", pod=~"terrapod-listener.*"} |= "SSE" |= "disconnect"
    ```
@@ -281,7 +281,7 @@ When no listener is available in a pool, runs cannot be claimed or executed. Que
 
 ### Verification
 
-- Listener appears in `GET /api/v2/agent-pools/<pool-id>/listeners`
+- Listener appears in `GET /api/terrapod/v1/agent-pools/<pool-id>/listeners`
 - `terrapod_listener_heartbeats_total{pool_id="..."}` incrementing
 - `terrapod_listener_identity_ready` gauge is 1
 - Queued runs start being claimed
@@ -303,13 +303,13 @@ Runs are accumulating in `pending` or `queued` status faster than they can be pr
 1. **Count queued runs:**
    ```bash
    curl -H "Authorization: Bearer $TOKEN" \
-     "https://<terrapod>/api/v2/admin/runs?filter[status]=queued" | jq '.meta.pagination.total-count'
+     "https://<terrapod>/api/terrapod/v1/admin/runs?filter[status]=queued" | jq '.meta.pagination.total-count'
    ```
 
 2. **Check listener capacity:**
    ```bash
    curl -H "Authorization: Bearer $TOKEN" \
-     https://<terrapod>/api/v2/agent-pools/<pool-id>/listeners | \
+     https://<terrapod>/api/terrapod/v1/agent-pools/<pool-id>/listeners | \
      jq '.data[] | {name: .attributes.name, active: .attributes["active-runs"], capacity: .attributes.capacity}'
    ```
 

@@ -5,9 +5,9 @@ state lifecycle operations consumed by the web UI: delete, rollback, and
 manual upload.
 
 Endpoints:
-    DELETE /api/v2/state-versions/{id}/manage — delete a non-current state version
-    POST   /api/v2/state-versions/{id}/actions/rollback — rollback to an older version
-    POST   /api/v2/workspaces/{id}/state-versions/actions/upload — manual state upload
+    DELETE /api/terrapod/v1/state-versions/{id}/manage — delete a non-current state version
+    POST   /api/terrapod/v1/state-versions/{id}/actions/rollback — rollback to an older version
+    POST   /api/terrapod/v1/workspaces/{id}/state-versions/actions/upload — manual state upload
 """
 
 import asyncio
@@ -27,7 +27,7 @@ from terrapod.services.workspace_rbac_service import has_permission, resolve_wor
 from terrapod.storage import get_storage
 from terrapod.storage.keys import state_key
 
-router = APIRouter(prefix="/api/v2", tags=["state-management"])
+router = APIRouter(tags=["state-management"])
 logger = get_logger(__name__)
 
 

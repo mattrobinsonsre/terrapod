@@ -62,6 +62,13 @@ from terrapod.storage import get_storage
 from terrapod.storage.keys import state_index_key, state_key
 
 router = APIRouter(prefix="/api/v2", tags=["tfe-v2"])
+
+# Workspace by-id DELETE is the one path on the workspaces resource that
+# the terraform/tofu CLI doesn't call (the legacy remote backend deletes
+# by name, the cloud backend never deletes at all). Treated as Terrapod-
+# native management and dual-mounted at /api/terrapod/v1 + a deprecated
+# /api/v2 alias (removed in v0.24.0 — see #278).
+extensions_router = APIRouter(tags=["tfe-v2-management"])
 logger = get_logger(__name__)
 
 TFP_API_VERSION = "2.6"
@@ -1209,7 +1216,7 @@ async def update_workspace(
     return JSONResponse(content=_workspace_json(ws, perm), headers=_tfe_headers())
 
 
-@router.delete("/workspaces/{workspace_id}")
+@extensions_router.delete("/workspaces/{workspace_id}")
 async def delete_workspace(
     workspace_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),

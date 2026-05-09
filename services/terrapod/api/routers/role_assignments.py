@@ -6,10 +6,10 @@ UX CONTRACT: Role assignment endpoints are consumed by the web frontend:
   matched by corresponding updates to that frontend page.
 
 Endpoints:
-    GET    /api/v2/role-assignments                       — list all assignments
-    GET    /api/v2/role-assignments/identities             — list known identities (for autocomplete)
-    PUT    /api/v2/role-assignments                       — set roles for (provider, email)
-    DELETE /api/v2/role-assignments/{provider}/{email}/{role} — remove single assignment
+    GET    /api/terrapod/v1/role-assignments                       — list all assignments
+    GET    /api/terrapod/v1/role-assignments/identities             — list known identities (for autocomplete)
+    PUT    /api/terrapod/v1/role-assignments                       — set roles for (provider, email)
+    DELETE /api/terrapod/v1/role-assignments/{provider}/{email}/{role} — remove single assignment
 """
 
 from datetime import UTC
@@ -26,7 +26,7 @@ from terrapod.db.models import PlatformRoleAssignment, Role, RoleAssignment, Use
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 
-router = APIRouter(prefix="/api/v2", tags=["role-assignments"])
+router = APIRouter(tags=["role-assignments"])
 logger = get_logger(__name__)
 
 

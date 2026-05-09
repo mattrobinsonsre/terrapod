@@ -113,7 +113,7 @@ class TestCreateRunTask:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{ws.id}/run-tasks",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/run-tasks",
                 json={
                     "data": {
                         "type": "run-tasks",
@@ -147,7 +147,7 @@ class TestCreateRunTask:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{ws.id}/run-tasks",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/run-tasks",
                 json={
                     "data": {
                         "type": "run-tasks",
@@ -179,7 +179,7 @@ class TestCreateRunTask:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{ws.id}/run-tasks",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/run-tasks",
                 json={
                     "data": {
                         "type": "run-tasks",
@@ -210,7 +210,7 @@ class TestCreateRunTask:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{ws.id}/run-tasks",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/run-tasks",
                 json={
                     "data": {
                         "type": "run-tasks",
@@ -250,7 +250,7 @@ class TestListRunTasks:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
-                f"/api/v2/workspaces/ws-{ws.id}/run-tasks",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/run-tasks",
                 headers=_AUTH,
             )
         assert resp.status_code == 200
@@ -277,7 +277,7 @@ class TestShowRunTask:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
-                f"/api/v2/run-tasks/task-{rt.id}",
+                f"/api/terrapod/v1/run-tasks/task-{rt.id}",
                 headers=_AUTH,
             )
         assert resp.status_code == 200
@@ -324,7 +324,7 @@ class TestUpdateRunTask:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
-                f"/api/v2/run-tasks/task-{rt.id}",
+                f"/api/terrapod/v1/run-tasks/task-{rt.id}",
                 json={
                     "data": {
                         "type": "run-tasks",
@@ -351,7 +351,7 @@ class TestUpdateRunTask:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
-                f"/api/v2/run-tasks/task-{rt.id}",
+                f"/api/terrapod/v1/run-tasks/task-{rt.id}",
                 json={"data": {"type": "run-tasks", "attributes": {"name": "X"}}},
                 headers=_AUTH,
             )
@@ -379,7 +379,7 @@ class TestDeleteRunTask:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.delete(
-                f"/api/v2/run-tasks/task-{rt.id}",
+                f"/api/terrapod/v1/run-tasks/task-{rt.id}",
                 headers=_AUTH,
             )
         assert resp.status_code == 204
@@ -408,7 +408,7 @@ class TestCallback:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
-                f"/api/v2/task-stage-results/tsr-{tsr.id}/callback",
+                f"/api/terrapod/v1/task-stage-results/tsr-{tsr.id}/callback",
                 json={
                     "access_token": "valid-token",
                     "status": "passed",
@@ -456,7 +456,7 @@ class TestCallback:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
-                f"/api/v2/task-stage-results/tsr-{tsr.id}/callback",
+                f"/api/terrapod/v1/task-stage-results/tsr-{tsr.id}/callback",
                 json={
                     "access_token": "valid-token",
                     "status": "maybe",

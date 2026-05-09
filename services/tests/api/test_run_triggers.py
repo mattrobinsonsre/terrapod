@@ -97,7 +97,7 @@ class TestCreateRunTrigger:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{dest_ws.id}/run-triggers",
+                f"/api/terrapod/v1/workspaces/ws-{dest_ws.id}/run-triggers",
                 json={
                     "data": {
                         "relationships": {
@@ -128,7 +128,7 @@ class TestCreateRunTrigger:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{ws.id}/run-triggers",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/run-triggers",
                 json={
                     "data": {
                         "relationships": {
@@ -167,7 +167,7 @@ class TestCreateRunTrigger:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{dest_ws.id}/run-triggers",
+                f"/api/terrapod/v1/workspaces/ws-{dest_ws.id}/run-triggers",
                 json={
                     "data": {
                         "relationships": {
@@ -210,7 +210,7 @@ class TestCreateRunTrigger:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{dest_ws.id}/run-triggers",
+                f"/api/terrapod/v1/workspaces/ws-{dest_ws.id}/run-triggers",
                 json={
                     "data": {
                         "relationships": {
@@ -241,7 +241,7 @@ class TestCreateRunTrigger:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
-                f"/api/v2/workspaces/ws-{ws.id}/run-triggers",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/run-triggers",
                 json={
                     "data": {
                         "relationships": {
@@ -279,7 +279,7 @@ class TestListRunTriggers:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
-                f"/api/v2/workspaces/ws-{ws.id}/run-triggers",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/run-triggers",
                 params={"filter[run-trigger][type]": "inbound"},
                 headers=_AUTH,
             )
@@ -305,7 +305,7 @@ class TestListRunTriggers:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
-                f"/api/v2/workspaces/ws-{ws.id}/run-triggers",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/run-triggers",
                 params={"filter[run-trigger][type]": "outbound"},
                 headers=_AUTH,
             )
@@ -328,7 +328,7 @@ class TestListRunTriggers:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
-                f"/api/v2/workspaces/ws-{ws.id}/run-triggers",
+                f"/api/terrapod/v1/workspaces/ws-{ws.id}/run-triggers",
                 headers=_AUTH,
             )
         assert resp.status_code == 422
@@ -352,7 +352,7 @@ class TestShowRunTrigger:
         mock_db.execute.return_value = mock_result
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get(f"/api/v2/run-triggers/rt-{trigger.id}", headers=_AUTH)
+            resp = await c.get(f"/api/terrapod/v1/run-triggers/rt-{trigger.id}", headers=_AUTH)
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert data["type"] == "run-triggers"
@@ -391,7 +391,7 @@ class TestDeleteRunTrigger:
         mock_db.delete = AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.delete(f"/api/v2/run-triggers/rt-{trigger.id}", headers=_AUTH)
+            resp = await c.delete(f"/api/terrapod/v1/run-triggers/rt-{trigger.id}", headers=_AUTH)
         assert resp.status_code == 204
 
 

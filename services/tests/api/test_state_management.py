@@ -115,7 +115,9 @@ class TestDeleteStateVersion:
 
         sv_id = f"sv-{sv.id}"
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            resp = await client.delete(f"/api/v2/state-versions/{sv_id}/manage", headers=_AUTH)
+            resp = await client.delete(
+                f"/api/terrapod/v1/state-versions/{sv_id}/manage", headers=_AUTH
+            )
 
         assert resp.status_code == 204
         mock_db.delete.assert_called_once_with(sv)
@@ -150,7 +152,9 @@ class TestDeleteStateVersion:
 
         sv_id = f"sv-{sv.id}"
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            resp = await client.delete(f"/api/v2/state-versions/{sv_id}/manage", headers=_AUTH)
+            resp = await client.delete(
+                f"/api/terrapod/v1/state-versions/{sv_id}/manage", headers=_AUTH
+            )
 
         assert resp.status_code == 409
         assert "current" in resp.json()["detail"].lower()
@@ -181,7 +185,9 @@ class TestDeleteStateVersion:
 
         sv_id = f"sv-{sv.id}"
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            resp = await client.delete(f"/api/v2/state-versions/{sv_id}/manage", headers=_AUTH)
+            resp = await client.delete(
+                f"/api/terrapod/v1/state-versions/{sv_id}/manage", headers=_AUTH
+            )
 
         assert resp.status_code == 403
 
@@ -237,7 +243,7 @@ class TestRollbackStateVersion:
         sv_id = f"sv-{sv.id}"
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             resp = await client.post(
-                f"/api/v2/state-versions/{sv_id}/actions/rollback", headers=_AUTH
+                f"/api/terrapod/v1/state-versions/{sv_id}/actions/rollback", headers=_AUTH
             )
 
         assert resp.status_code == 201
@@ -278,7 +284,7 @@ class TestRollbackStateVersion:
         sv_id = f"sv-{sv.id}"
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             resp = await client.post(
-                f"/api/v2/state-versions/{sv_id}/actions/rollback", headers=_AUTH
+                f"/api/terrapod/v1/state-versions/{sv_id}/actions/rollback", headers=_AUTH
             )
 
         assert resp.status_code == 404
@@ -331,7 +337,7 @@ class TestUploadState:
         ws_id_str = f"ws-{ws_id}"
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             resp = await client.post(
-                f"/api/v2/workspaces/{ws_id_str}/state-versions/actions/upload",
+                f"/api/terrapod/v1/workspaces/{ws_id_str}/state-versions/actions/upload",
                 content=state_json,
                 headers={**_AUTH, "Content-Type": "application/json"},
             )
@@ -365,7 +371,7 @@ class TestUploadState:
         ws_id_str = f"ws-{ws.id}"
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             resp = await client.post(
-                f"/api/v2/workspaces/{ws_id_str}/state-versions/actions/upload",
+                f"/api/terrapod/v1/workspaces/{ws_id_str}/state-versions/actions/upload",
                 content='{"version": 4}',
                 headers={**_AUTH, "Content-Type": "application/json"},
             )
@@ -396,7 +402,7 @@ class TestUploadState:
         ws_id_str = f"ws-{ws.id}"
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             resp = await client.post(
-                f"/api/v2/workspaces/{ws_id_str}/state-versions/actions/upload",
+                f"/api/terrapod/v1/workspaces/{ws_id_str}/state-versions/actions/upload",
                 content="not json {{{",
                 headers={**_AUTH, "Content-Type": "application/json"},
             )

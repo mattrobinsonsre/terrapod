@@ -365,7 +365,7 @@ export default function RunDetailPage() {
     const urlRef = phase === 'plan' ? planLogUrl : applyLogUrl
     if (urlRef.current) return urlRef.current
     const endpoint = phase === 'plan' ? 'plan' : 'apply'
-    const res = await apiFetch(`/api/v2/runs/${runId}/${endpoint}`)
+    const res = await apiFetch(`/api/terrapod/v1/runs/${runId}/${endpoint}`)
     if (!res.ok) return null
     const data = await res.json()
     const obj = data.data as PlanApply
@@ -458,7 +458,7 @@ export default function RunDetailPage() {
     try {
       // TFE V2 API uses "apply" to confirm a planned run
       const apiAction = action === 'confirm' ? 'apply' : action
-      const res = await apiFetch(`/api/v2/runs/${runId}/actions/${apiAction}`, { method: 'POST' })
+      const res = await apiFetch(`/api/terrapod/v1/runs/${runId}/actions/${apiAction}`, { method: 'POST' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.detail || `Failed to ${action} run`)

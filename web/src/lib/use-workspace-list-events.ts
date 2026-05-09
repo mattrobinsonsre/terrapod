@@ -13,7 +13,7 @@ export function useWorkspaceListEvents(
   onEvent: (event: WorkspaceListEvent) => void,
 ) {
   return useSSE({
-    url: '/api/v2/workspace-events',
+    url: '/api/terrapod/v1/workspace-events',
     enabled,
     onEvent: onEvent as (data: Record<string, unknown>) => void,
     onReconnect: () => onEvent({ event: 'reconnect' }),

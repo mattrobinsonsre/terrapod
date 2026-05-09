@@ -179,7 +179,7 @@ func (r *moduleWorkspaceLinkResource) ImportState(ctx context.Context, req resou
 }
 
 func linksPath(name, provider string) string {
-	return fmt.Sprintf("/api/v2/organizations/default/registry-modules/private/default/%s/%s/workspace-links", name, provider)
+	return fmt.Sprintf("/api/terrapod/v1/registry-modules/private/default/%s/%s/workspace-links", name, provider)
 }
 
 func readIntoModel(res *client.Resource, m *moduleWorkspaceLinkModel) {

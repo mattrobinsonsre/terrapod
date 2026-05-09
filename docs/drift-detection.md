@@ -112,7 +112,7 @@ When a workspace shows `drifted` or `errored` status — for example after you'v
 **API**:
 
 ```http
-POST /api/v2/workspaces/{workspace_id}/actions/dismiss-drift
+POST /api/terrapod/v1/workspaces/{workspace_id}/actions/dismiss-drift
 ```
 
 Effect:

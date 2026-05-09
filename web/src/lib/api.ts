@@ -3,6 +3,18 @@
  *
  * Automatically sets Bearer token from auth state. On 401, clears auth
  * and redirects to login.
+ *
+ * API path conventions: callers will see two prefixes mixed throughout
+ * the frontend.
+ *   - `/api/v2/...`         — the TFE V2 API surface that terraform/tofu
+ *                             and tfci consume directly. Permanent.
+ *   - `/api/terrapod/v1/...` — Terrapod-native management surface
+ *                             (auth, labels, listeners, audit, drift,
+ *                             etc.). Canonical home from v0.23.0.
+ *
+ * The split is documented in `docs/tfe-cli-surface.md`. If you're
+ * adding a new API call from the frontend: if it's CLI-consumed, hit
+ * `/api/v2/`; otherwise hit `/api/terrapod/v1/`.
  */
 
 import { clearAuth, getAuthState, loginRedirectUrl, updateExpiresAt } from '@/lib/auth'

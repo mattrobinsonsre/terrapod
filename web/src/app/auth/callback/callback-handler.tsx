@@ -51,7 +51,7 @@ export default function CallbackHandler() {
       code_verifier: verifier,
     })
 
-    fetch('/api/v2/auth/token', {
+    fetch('/api/terrapod/v1/auth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),

@@ -151,9 +151,15 @@ class TestFilesystemRoutes:
 
     @pytest.fixture
     def app(self, fs_store: FilesystemStore) -> FastAPI:
-        """Create a test FastAPI app with filesystem routes."""
+        """Create a test FastAPI app with filesystem routes.
+
+        Mounts under both the canonical /api/terrapod/v1 prefix (which is
+        what `filesystem.py` emits in presigned URLs) and the deprecated
+        /api/v2 alias, mirroring `app.py`'s `include_moved` behaviour.
+        """
         test_app = FastAPI()
         set_filesystem_store(fs_store)
+        test_app.include_router(router, prefix="/api/terrapod/v1")
         test_app.include_router(router, prefix="/api/v2")
         return test_app
 

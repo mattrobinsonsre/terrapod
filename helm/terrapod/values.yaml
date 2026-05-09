@@ -143,7 +143,7 @@ api:
 
       # Public callback URL for SSO redirects. Required when SSO is enabled.
       # Must be the externally-reachable URL of your Terrapod instance.
-      # The IDP callback lands at {callback_base_url}/api/v2/auth/callback.
+      # The IDP callback lands at {callback_base_url}/api/terrapod/v1/auth/callback.
       callback_base_url: ""
 
       session_ttl_hours: 12
@@ -287,7 +287,7 @@ api:
       # artifact uploads — throttling them causes plan failures. Raise if
       # you need a hard cap on a specific cluster.
       runner_requests_per_minute: 0
-      # Auth endpoints (/api/v2/auth/*, /oauth/*) — brute-force defence,
+      # Auth endpoints (/api/terrapod/v1/auth/*, /api/v2/auth/*, /oauth/*) — brute-force defence,
       # applies to all callers regardless of credentials.
       auth_requests_per_minute: 10
 

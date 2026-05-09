@@ -19,8 +19,10 @@ logger = get_logger(__name__)
 # Paths exempt from rate limiting
 _EXEMPT_PATHS = frozenset({"/health", "/ready", "/metrics"})
 
-# Auth endpoint prefixes (lower rate limit)
-_AUTH_PREFIXES = ("/api/v2/auth/", "/oauth/")
+# Auth endpoint prefixes (lower rate limit). Both the canonical
+# /api/terrapod/v1/auth/* and the deprecated /api/v2/auth/* aliases are
+# covered until the legacy paths are removed in v0.24.0 (see #278).
+_AUTH_PREFIXES = ("/api/terrapod/v1/auth/", "/api/v2/auth/", "/oauth/")
 
 
 def _is_auth_path(path: str) -> bool:
@@ -52,7 +54,7 @@ class RateLimitMiddleware:
       Interactive users and API-token automation rarely approach this, but
       it stops one noisy client taking the pool.
     - Unauthenticated: base limit (`requests_per_minute`).
-    - Auth endpoints (`/api/v2/auth/*`, `/oauth/*`): always `auth_requests_per_minute`
+    - Auth endpoints (`/api/terrapod/v1/auth/*`, `/api/v2/auth/*`, `/oauth/*`): always `auth_requests_per_minute`
       regardless of who's calling — brute-force defence on login.
     """
 

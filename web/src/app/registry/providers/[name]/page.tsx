@@ -118,7 +118,7 @@ export default function ProviderDetailPage() {
 
   usePollingInterval(!loading, 60_000, loadVersions)
 
-  const basePath = `/api/v2/organizations/default/registry-providers/private/default/${name}`
+  const basePath = `/api/terrapod/v1/registry-providers/private/default/${name}`
 
   async function loadVersions() {
     setLoading(true)

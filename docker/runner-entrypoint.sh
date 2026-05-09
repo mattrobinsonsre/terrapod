@@ -121,7 +121,7 @@ upload_log() {
              -H "$AUTH_HEADER" \
              -H "Content-Type: application/octet-stream" \
              --data-binary @"$COMBINED_LOG" \
-             "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/${_artifact}" \
+             "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/${_artifact}" \
              >/dev/null 2>&1; then
             return 0
         fi
@@ -166,9 +166,10 @@ tp_curl_download() {
                 # *.storage.googleapis.com) are left untouched.
                 if [ "$_redir_host" != "$_api_host" ]; then
                     _path=$(echo "$_location" | sed 's|^https\{0,1\}://[^/]*||')
-                    # Check if path is a filesystem presigned URL (/api/v2/storage/...)
+                    # Check if path is a filesystem presigned URL
+                    # (/api/terrapod/v1/storage/...).
                     case "$_path" in
-                        /api/v2/storage/*)
+                        /api/terrapod/v1/storage/*)
                             _location="${TP_API_URL}${_path}"
                             ;;
                     esac
@@ -198,7 +199,7 @@ case "$TP_ARCH" in
 esac
 
 if [ -n "$TP_API_URL" ] && [ -n "$TP_VERSION" ]; then
-    BINARY_URL="${TP_API_URL}/api/v2/binary-cache/${TP_BACKEND}/${TP_VERSION}/${TP_OS}/${TP_ARCH}"
+    BINARY_URL="${TP_API_URL}/api/terrapod/v1/binary-cache/${TP_BACKEND}/${TP_VERSION}/${TP_OS}/${TP_ARCH}"
     log "[entrypoint] Downloading $TP_BACKEND $TP_VERSION ($TP_OS/$TP_ARCH) from binary cache..."
     if ! tp_curl_download "/tmp/${TP_BACKEND}.zip" -H "$AUTH_HEADER" "$BINARY_URL"; then
         log "[entrypoint] Binary cache unavailable, downloading from upstream..."
@@ -233,7 +234,7 @@ fi
 if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
     log "[entrypoint] Downloading configuration..."
     tp_curl_download /tmp/config.tar.gz -H "$AUTH_HEADER" \
-        "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/config" 2>/dev/null || true
+        "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/config" 2>/dev/null || true
     if [ -f /tmp/config.tar.gz ] && [ -s /tmp/config.tar.gz ]; then
         # --no-same-owner: don't try to restore original UIDs (we run as non-root)
         # BusyBox tar returns non-zero on harmless utime/chmod warnings for "."
@@ -344,7 +345,7 @@ fi
 if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
     log "[entrypoint] Downloading current state..."
     tp_curl_download terraform.tfstate -H "$AUTH_HEADER" \
-        "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/state" 2>/dev/null || true
+        "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/state" 2>/dev/null || true
 fi
 
 # --- Initialize ---
@@ -441,7 +442,7 @@ if [ "$TP_PHASE" = "plan" ]; then
         curl -sSf --max-time 10 -X POST -H "$AUTH_HEADER" \
             -H "Content-Type: application/json" \
             -d "{\"has_changes\": $HAS_CHANGES_JSON}" \
-            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/plan-result" || true
+            "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/plan-result" || true
     fi
 
     # Append plan.log to combined; on_exit trap uploads the combined log.
@@ -452,7 +453,7 @@ if [ "$TP_PHASE" = "plan" ]; then
         curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @tfplan \
-            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-file" || true
+            "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/plan-file" || true
     fi
 
 elif [ "$TP_PHASE" = "apply" ]; then
@@ -463,7 +464,7 @@ elif [ "$TP_PHASE" = "apply" ]; then
     if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
         log "[entrypoint] Downloading plan file from plan phase..."
         tp_curl_download tfplan -H "$AUTH_HEADER" \
-            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/plan-file" 2>/dev/null || true
+            "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/plan-file" 2>/dev/null || true
     fi
 
     echo "[entrypoint] Running $TP_BACKEND apply..."
@@ -489,10 +490,10 @@ elif [ "$TP_PHASE" = "apply" ]; then
         if ! curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
             -H "Content-Type: application/octet-stream" \
             --data-binary @terraform.tfstate \
-            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/artifacts/state"; then
+            "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/state"; then
             echo "[entrypoint] FATAL: state upload failed — flagging workspace"
             curl -sS --max-time 5 -X POST -H "$AUTH_HEADER" \
-                "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/state-diverged" || true
+                "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/state-diverged" || true
             EXIT_CODE=1
         fi
     fi
@@ -503,7 +504,7 @@ elif [ "$TP_PHASE" = "apply" ]; then
     # path is the fallback.
     if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ] && [ "$EXIT_CODE" = "0" ]; then
         curl -sSf --max-time 10 -X POST -H "$AUTH_HEADER" \
-            "${TP_API_URL}/api/v2/runs/${TP_RUN_ID}/apply-result" || true
+            "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/apply-result" || true
     fi
 fi
 

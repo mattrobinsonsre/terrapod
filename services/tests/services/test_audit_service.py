@@ -28,7 +28,7 @@ class TestShouldAudit:
         assert should_audit("/api/openapi.json") is False
 
     def test_api_endpoint_included(self):
-        assert should_audit("/api/v2/workspaces") is True
+        assert should_audit("/api/terrapod/v1/workspaces") is True
 
     def test_oauth_endpoint_included(self):
         assert should_audit("/oauth/authorize") is True
@@ -54,7 +54,7 @@ class TestParseResource:
         assert rid == "run-xyz"
 
     def test_admin_audit_log(self):
-        rtype, rid = parse_resource("/api/v2/admin/audit-log")
+        rtype, rid = parse_resource("/api/terrapod/v1/admin/audit-log")
         assert rtype == "admin"
         assert rid == "audit-log"
 

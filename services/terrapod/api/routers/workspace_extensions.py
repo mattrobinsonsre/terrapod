@@ -4,9 +4,9 @@ These endpoints are NOT part of the TFE V2 API specification. They provide
 Terrapod-specific functionality consumed by the web UI.
 
 Endpoints:
-    GET  /api/v2/workspace-events — SSE stream for workspace list updates
-    GET  /api/v2/workspaces/{workspace_id}/vcs-refs — list VCS branches/tags
-    POST /api/v2/workspaces/{workspace_id}/actions/dismiss-drift — clear drift status
+    GET  /api/terrapod/v1/workspace-events — SSE stream for workspace list updates
+    GET  /api/terrapod/v1/workspaces/{workspace_id}/vcs-refs — list VCS branches/tags
+    POST /api/terrapod/v1/workspaces/{workspace_id}/actions/dismiss-drift — clear drift status
 """
 
 import asyncio
@@ -22,7 +22,7 @@ from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.workspace_rbac_service import has_permission, resolve_workspace_permission
 
-router = APIRouter(prefix="/api/v2", tags=["workspace-extensions"])
+router = APIRouter(tags=["workspace-extensions"])
 logger = get_logger(__name__)
 
 

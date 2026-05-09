@@ -71,7 +71,7 @@ Passwords are hashed with PBKDF2-SHA256 and validated with [zxcvbn](https://gith
 ### Login Flow
 
 ```
-POST /api/v2/auth/local/authorize
+POST /api/terrapod/v1/auth/local/authorize
   email=admin@example.com
   password=xxx
     |
@@ -127,7 +127,7 @@ The environment variable name follows the pattern `TERRAPOD_{UPPERCASE_NAME}_CLI
 | Setting | Value |
 |---|---|
 | Application Type | Regular Web Application |
-| Allowed Callback URLs | `https://terrapod.example.com/api/v2/auth/callback` |
+| Allowed Callback URLs | `https://terrapod.example.com/api/terrapod/v1/auth/callback` |
 | Allowed Logout URLs | `https://terrapod.example.com` |
 
 ### Okta Example
@@ -163,7 +163,7 @@ TERRAPOD_OKTA_CLIENT_SECRET="your-client-secret"
 |---|---|
 | Sign-in method | OIDC - OpenID Connect |
 | Application type | Web Application |
-| Sign-in redirect URI | `https://terrapod.example.com/api/v2/auth/callback` |
+| Sign-in redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/callback` |
 | Assignments | Assign to users/groups as needed |
 
 ### Azure AD (Entra ID) Example
@@ -193,7 +193,7 @@ TERRAPOD_AZURE_AD_CLIENT_SECRET="your-client-secret"
 
 | Setting | Value |
 |---|---|
-| Redirect URI | `https://terrapod.example.com/api/v2/auth/callback` (Web platform) |
+| Redirect URI | `https://terrapod.example.com/api/terrapod/v1/auth/callback` (Web platform) |
 | Token configuration | Add optional claim: `groups` |
 | API permissions | `openid`, `profile`, `email` |
 
@@ -244,7 +244,7 @@ api:
             display_name: "Azure AD (SAML)"
             metadata_url: "https://login.microsoftonline.com/{tenant-id}/federationmetadata/2007-06/federationmetadata.xml?appid={app-id}"
             entity_id: "https://terrapod.example.com"
-            acs_url: "https://terrapod.example.com/api/v2/auth/callback"
+            acs_url: "https://terrapod.example.com/api/terrapod/v1/auth/callback"
             role_prefixes: ["terrapod:"]
             claims_to_roles:
               - claim: "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups"
@@ -257,7 +257,7 @@ api:
 | Setting | Value |
 |---|---|
 | Identifier (Entity ID) | `https://terrapod.example.com` |
-| Reply URL (ACS URL) | `https://terrapod.example.com/api/v2/auth/callback` |
+| Reply URL (ACS URL) | `https://terrapod.example.com/api/terrapod/v1/auth/callback` |
 | Sign on URL | `https://terrapod.example.com/login` |
 | Claims | Name ID (email), groups |
 
@@ -339,7 +339,7 @@ Example: `abc123def456.tpod.ghijklmnopqrstuvwxyz0123456789`
 ### Creating Tokens via API
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/users/{user_id}/authentication-tokens \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/users/{user_id}/authentication-tokens \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -366,14 +366,14 @@ The response includes the raw token value in `attributes.token`. Store it secure
 ### Listing Tokens
 
 ```zsh
-curl https://terrapod.example.com/api/v2/authentication-tokens \
+curl https://terrapod.example.com/api/terrapod/v1/authentication-tokens \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
 ### Deleting Tokens
 
 ```zsh
-curl -X DELETE https://terrapod.example.com/api/v2/authentication-tokens/{token-id} \
+curl -X DELETE https://terrapod.example.com/api/terrapod/v1/authentication-tokens/{token-id} \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -418,14 +418,14 @@ Via the web UI: **Settings > Sessions**
 Via the API:
 
 ```zsh
-curl https://terrapod.example.com/api/v2/auth/sessions \
+curl https://terrapod.example.com/api/terrapod/v1/auth/sessions \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
 ### Logging Out
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/auth/logout \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/auth/logout \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 

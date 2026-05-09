@@ -5,7 +5,7 @@ and enqueues a triggered immediate poll via the distributed scheduler.
 The poller does all the real work.
 
 Endpoints:
-    POST /api/v2/vcs-events/github   (GitHub webhook receiver)
+    POST /api/terrapod/v1/vcs-events/github   (GitHub webhook receiver)
 """
 
 import json
@@ -18,7 +18,7 @@ from terrapod.logging_config import get_logger
 from terrapod.services.github_service import validate_webhook_signature
 from terrapod.services.scheduler import enqueue_trigger
 
-router = APIRouter(prefix="/api/v2", tags=["vcs-events"])
+router = APIRouter(tags=["vcs-events"])
 logger = get_logger(__name__)
 
 

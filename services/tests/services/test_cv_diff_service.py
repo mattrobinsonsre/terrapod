@@ -1,6 +1,6 @@
 """Tests for `cv_diff_service` — diffs between two CV tarballs.
 
-The service is the backing for `POST /api/v2/configuration-versions/diff`.
+The service is the backing for `POST /api/terrapod/v1/configuration-versions/diff`.
 These tests cover the pure tarball-walking + diffing layer; the
 storage round-trip is exercised via a real local filesystem store
 fixture so we touch the same `_stream_to_tempfile` path the API uses.

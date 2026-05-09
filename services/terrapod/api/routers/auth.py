@@ -12,13 +12,13 @@ UX CONTRACT: Auth endpoints are consumed by the web frontend:
 
 Consumers:
     Web UI:
-        GET  /api/v2/auth/providers         — login page provider list
-        POST /api/v2/auth/local/authorize   — direct JSON login (no redirect)
-        POST /api/v2/auth/token             — exchange code for session
-        POST /api/v2/auth/logout            — revoke current session
-        GET  /api/v2/auth/sessions          — sessions management page
-        GET  /api/v2/auth/sessions/all      — admin sessions view
-        DELETE /api/v2/auth/sessions/user/{email} — admin revoke
+        GET  /api/terrapod/v1/auth/providers         — login page provider list
+        POST /api/terrapod/v1/auth/local/authorize   — direct JSON login (no redirect)
+        POST /api/terrapod/v1/auth/token             — exchange code for session
+        POST /api/terrapod/v1/auth/logout            — revoke current session
+        GET  /api/terrapod/v1/auth/sessions          — sessions management page
+        GET  /api/terrapod/v1/auth/sessions/all      — admin sessions view
+        DELETE /api/terrapod/v1/auth/sessions/user/{email} — admin revoke
 """
 
 import base64

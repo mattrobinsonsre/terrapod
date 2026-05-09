@@ -4,9 +4,9 @@
 //
 //	JSON:API type: "vcs-connections"
 //	ID prefix: "vcs-"
-//	Create:  POST   /api/v2/organizations/default/vcs-connections
-//	Read:    GET    /api/v2/vcs-connections/{id}
-//	Delete:  DELETE /api/v2/vcs-connections/{id}
+//	Create:  POST   /api/terrapod/v1/vcs-connections
+//	Read:    GET    /api/terrapod/v1/vcs-connections/{id}
+//	Delete:  DELETE /api/terrapod/v1/vcs-connections/{id}
 //
 // This resource is immutable — there is no update (PATCH) endpoint.
 // Any attribute change forces replacement.
@@ -219,7 +219,7 @@ func (r *vcsConnectionResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	data, err := r.client.Post(ctx, "/api/v2/organizations/default/vcs-connections", body)
+	data, err := r.client.Post(ctx, "/api/terrapod/v1/vcs-connections", body)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create VCS connection", err.Error())
 		return
@@ -242,7 +242,7 @@ func (r *vcsConnectionResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/v2/vcs-connections/"+state.ID.ValueString())
+	data, err := r.client.Get(ctx, "/api/terrapod/v1/vcs-connections/"+state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -284,7 +284,7 @@ func (r *vcsConnectionResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v2/vcs-connections/"+state.ID.ValueString())
+	err := r.client.Delete(ctx, "/api/terrapod/v1/vcs-connections/"+state.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Failed to delete VCS connection", err.Error())
 	}

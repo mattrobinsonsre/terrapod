@@ -6,10 +6,10 @@ UX CONTRACT: Run trigger endpoints are consumed by the web frontend:
   matched by corresponding updates to that frontend page.
 
 Endpoints:
-    POST   /api/v2/workspaces/{id}/run-triggers      (create trigger)
-    GET    /api/v2/workspaces/{id}/run-triggers       (list inbound/outbound)
-    GET    /api/v2/run-triggers/{id}                   (show trigger)
-    DELETE /api/v2/run-triggers/{id}                   (delete trigger)
+    POST   /api/terrapod/v1/workspaces/{id}/run-triggers      (create trigger)
+    GET    /api/terrapod/v1/workspaces/{id}/run-triggers       (list inbound/outbound)
+    GET    /api/terrapod/v1/run-triggers/{id}                   (show trigger)
+    DELETE /api/terrapod/v1/run-triggers/{id}                   (delete trigger)
 """
 
 import uuid
@@ -27,7 +27,7 @@ from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.workspace_rbac_service import has_permission, resolve_workspace_permission
 
-router = APIRouter(prefix="/api/v2", tags=["run-triggers"])
+router = APIRouter(tags=["run-triggers"])
 logger = get_logger(__name__)
 
 MAX_SOURCES_PER_WORKSPACE = 20
@@ -62,7 +62,7 @@ def _trigger_json(trigger: RunTrigger) -> dict:
             },
         },
         "links": {
-            "self": f"/api/v2/run-triggers/{trigger_id}",
+            "self": f"/api/terrapod/v1/run-triggers/{trigger_id}",
         },
     }
 

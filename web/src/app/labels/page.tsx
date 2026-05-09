@@ -1,5 +1,5 @@
 // Labels browser — read-only cross-entity view over the
-// /api/v2/labels endpoints. Three view states, all on `/labels`,
+// /api/terrapod/v1/labels endpoints. Three view states, all on `/labels`,
 // driven by query string:
 //
 //   /labels                    → list distinct label keys
@@ -110,7 +110,7 @@ function KeysView() {
 
   useEffect(() => {
     let alive = true
-    apiFetch('/api/v2/labels')
+    apiFetch('/api/terrapod/v1/labels')
       .then(async r => {
         if (!r.ok) throw new Error(`Failed to load labels (${r.status})`)
         return r.json()
@@ -177,7 +177,7 @@ function ValuesView({ labelKey }: { labelKey: string }) {
 
   useEffect(() => {
     let alive = true
-    apiFetch(`/api/v2/labels/${encodeURIComponent(labelKey)}`)
+    apiFetch(`/api/terrapod/v1/labels/${encodeURIComponent(labelKey)}`)
       .then(async r => {
         if (!r.ok) throw new Error(`Failed to load values for ${labelKey} (${r.status})`)
         return r.json()
@@ -248,7 +248,7 @@ function EntitiesView({ labelKey, labelValue }: { labelKey: string; labelValue: 
   useEffect(() => {
     let alive = true
     apiFetch(
-      `/api/v2/labels/${encodeURIComponent(labelKey)}/${encodeURIComponent(labelValue)}`,
+      `/api/terrapod/v1/labels/${encodeURIComponent(labelKey)}/${encodeURIComponent(labelValue)}`,
     )
       .then(async r => {
         if (!r.ok) throw new Error(`Failed to load entities (${r.status})`)

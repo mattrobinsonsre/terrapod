@@ -6,11 +6,11 @@ UX CONTRACT: Role endpoints are consumed by the web frontend:
   matched by corresponding updates to that frontend page.
 
 Endpoints:
-    GET    /api/v2/roles               — list all roles (built-in + custom)
-    POST   /api/v2/roles               — create custom role
-    GET    /api/v2/roles/{name}        — show role
-    PATCH  /api/v2/roles/{name}        — update custom role
-    DELETE /api/v2/roles/{name}        — delete custom role
+    GET    /api/terrapod/v1/roles               — list all roles (built-in + custom)
+    POST   /api/terrapod/v1/roles               — create custom role
+    GET    /api/terrapod/v1/roles/{name}        — show role
+    PATCH  /api/terrapod/v1/roles/{name}        — update custom role
+    DELETE /api/terrapod/v1/roles/{name}        — delete custom role
 """
 
 from datetime import UTC
@@ -26,7 +26,7 @@ from terrapod.db.models import Role
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 
-router = APIRouter(prefix="/api/v2", tags=["roles"])
+router = APIRouter(tags=["roles"])
 logger = get_logger(__name__)
 
 VALID_PERMISSIONS = {"read", "plan", "write", "admin"}

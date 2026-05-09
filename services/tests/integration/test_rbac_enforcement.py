@@ -68,7 +68,7 @@ class TestAdminBypass:
         ws_id = create.json()["data"]["id"]
 
         set_auth(app, admin_user("admin-del@test.com"))
-        resp = await client.delete(f"/api/v2/workspaces/{ws_id}", headers=AUTH)
+        resp = await client.delete(f"/api/terrapod/v1/workspaces/{ws_id}", headers=AUTH)
         assert resp.status_code == 204
 
 
@@ -102,7 +102,7 @@ class TestOwnerPermissions:
         create = await client.post(WS_ENDPOINT, json=_ws_body("owner-del"), headers=AUTH)
         ws_id = create.json()["data"]["id"]
 
-        resp = await client.delete(f"/api/v2/workspaces/{ws_id}", headers=AUTH)
+        resp = await client.delete(f"/api/terrapod/v1/workspaces/{ws_id}", headers=AUTH)
         assert resp.status_code == 204
 
 
@@ -129,7 +129,7 @@ class TestRegularUserAccess:
         ws_id = create.json()["data"]["id"]
 
         set_auth(app, regular_user("dave@test.com"))
-        resp = await client.delete(f"/api/v2/workspaces/{ws_id}", headers=AUTH)
+        resp = await client.delete(f"/api/terrapod/v1/workspaces/{ws_id}", headers=AUTH)
         assert resp.status_code == 403
 
 

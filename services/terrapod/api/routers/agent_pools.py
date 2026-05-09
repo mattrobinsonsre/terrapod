@@ -7,16 +7,16 @@ UX CONTRACT: Pool/token/listener endpoints are consumed by the web frontend:
   matched by corresponding updates to those frontend pages.
 
 Endpoints:
-    GET/POST   /api/v2/organizations/default/agent-pools
-    GET/PATCH/DELETE /api/v2/agent-pools/{pool_id}
-    POST/GET   /api/v2/agent-pools/{pool_id}/tokens
-    DELETE     /api/v2/agent-pools/{pool_id}/tokens/{token_id}
-    GET        /api/v2/agent-pools/{pool_id}/listeners
-    POST       /api/v2/agent-pools/{pool_id}/listeners/join
-    GET        /api/v2/listeners/{id}/events                   (SSE channel)
-    POST       /api/v2/listeners/{id}/heartbeat
-    POST       /api/v2/listeners/{id}/renew
-    DELETE     /api/v2/listeners/{id}
+    GET/POST   /api/terrapod/v1/agent-pools
+    GET/PATCH/DELETE /api/terrapod/v1/agent-pools/{pool_id}
+    POST/GET   /api/terrapod/v1/agent-pools/{pool_id}/tokens
+    DELETE     /api/terrapod/v1/agent-pools/{pool_id}/tokens/{token_id}
+    GET        /api/terrapod/v1/agent-pools/{pool_id}/listeners
+    POST       /api/terrapod/v1/agent-pools/{pool_id}/listeners/join
+    GET        /api/terrapod/v1/listeners/{id}/events                   (SSE channel)
+    POST       /api/terrapod/v1/listeners/{id}/heartbeat
+    POST       /api/terrapod/v1/listeners/{id}/renew
+    DELETE     /api/terrapod/v1/listeners/{id}
 """
 
 import asyncio
@@ -49,7 +49,12 @@ from terrapod.services.pool_rbac_service import (
     resolve_pool_permission,
 )
 
-router = APIRouter(prefix="/api/v2", tags=["agent-pools"])
+router = APIRouter(tags=["agent-pools"])
+
+# Listener protocol — Terrapod-specific listener join/heartbeat/cert
+# renewal/SSE/admin. Dual-mounted under /api/terrapod/v1 (canonical) and
+# /api/v2 (deprecated, removed in v0.24.0 — see #278).
+listener_router = APIRouter(tags=["listener-protocol"])
 logger = get_logger(__name__)
 
 
@@ -250,7 +255,7 @@ async def _require_pool_permission(
 # ── Agent Pools ──────────────────────────────────────────────────────────
 
 
-@router.get("/organizations/default/agent-pools")
+@router.get("/agent-pools")
 async def list_pools(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -282,7 +287,7 @@ async def list_pools(
     return JSONResponse(content={"data": result})
 
 
-@router.post("/organizations/default/agent-pools", status_code=201)
+@router.post("/agent-pools", status_code=201)
 async def create_pool(
     body: dict = Body(...),
     user: AuthenticatedUser = Depends(require_admin),
@@ -490,7 +495,7 @@ async def delete_pool_token(
 # ── Listener Join ────────────────────────────────────────────────────────
 
 
-@router.post("/agent-pools/{pool_id}/listeners/join", status_code=201)
+@listener_router.post("/agent-pools/{pool_id}/listeners/join", status_code=201)
 async def join_listener(
     pool_id: str = Path(...),
     body: dict = Body(...),
@@ -532,7 +537,7 @@ async def join_listener(
     return JSONResponse(content={"data": result}, status_code=201)
 
 
-@router.post("/agent-pools/join", status_code=201)
+@listener_router.post("/agent-pools/join", status_code=201)
 async def join_listener_by_token(
     body: dict = Body(...),
     db: AsyncSession = Depends(get_db),
@@ -577,7 +582,7 @@ async def join_listener_by_token(
 # ── Listeners ────────────────────────────────────────────────────────────
 
 
-@router.get("/agent-pools/{pool_id}/listeners")
+@listener_router.get("/agent-pools/{pool_id}/listeners")
 async def list_pool_listeners(
     pool_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -619,7 +624,7 @@ async def list_pool_listeners(
     )
 
 
-@router.get("/agent-pools/{pool_id}/events")
+@listener_router.get("/agent-pools/{pool_id}/events")
 async def pool_events(
     request: Request,
     pool_id: str = Path(...),
@@ -668,7 +673,7 @@ async def pool_events(
     return EventSourceResponse(event_generator())
 
 
-@router.delete("/listeners/{listener_id}", status_code=204)
+@listener_router.delete("/listeners/{listener_id}", status_code=204)
 async def delete_listener(
     listener_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -699,7 +704,7 @@ async def delete_listener(
 # ── SSE Event Channel ────────────────────────────────────────────────────
 
 
-@router.get("/listeners/{listener_id}/events")
+@listener_router.get("/listeners/{listener_id}/events")
 async def listener_events(
     request: Request,
     listener_id: str = Path(...),
@@ -747,7 +752,7 @@ async def listener_events(
 # ── Heartbeat & Renewal ─────────────────────────────────────────────────
 
 
-@router.post("/listeners/{listener_id}/heartbeat")
+@listener_router.post("/listeners/{listener_id}/heartbeat")
 async def listener_heartbeat(
     listener_id: str = Path(...),
     body: dict = Body(...),
@@ -810,7 +815,7 @@ async def listener_heartbeat(
     return JSONResponse(content={"status": "ok"})
 
 
-@router.post("/listeners/{listener_id}/renew")
+@listener_router.post("/listeners/{listener_id}/renew")
 async def renew_listener_cert(
     listener_id: str = Path(...),
     identity: ListenerIdentity = Depends(get_listener_identity),
@@ -846,3 +851,31 @@ async def renew_listener_cert(
     )
 
     return JSONResponse(content={"data": result})
+
+
+# ── Legacy alias router (v0.22 → v0.24 deprecation window) ─────────────
+# Mounted only at /api/v2 by app.py with deprecated=True and
+# include_in_schema=False. Pre-v0.23 path shapes:
+#   - list/create: /api/v2/organizations/default/agent-pools
+#   - by-id, tokens: /api/v2/agent-pools/{pool_id}[/tokens[/{token_id}]]
+# Removed in v0.24.0 (#278).
+legacy_router = APIRouter(tags=["agent-pools-legacy"])
+legacy_router.add_api_route("/organizations/default/agent-pools", list_pools, methods=["GET"])
+legacy_router.add_api_route(
+    "/organizations/default/agent-pools", create_pool, methods=["POST"], status_code=201
+)
+legacy_router.add_api_route("/agent-pools/{pool_id}", show_pool, methods=["GET"])
+legacy_router.add_api_route("/agent-pools/{pool_id}", update_pool, methods=["PATCH"])
+legacy_router.add_api_route(
+    "/agent-pools/{pool_id}", delete_pool, methods=["DELETE"], status_code=204
+)
+legacy_router.add_api_route("/agent-pools/{pool_id}/tokens", list_pool_tokens, methods=["GET"])
+legacy_router.add_api_route(
+    "/agent-pools/{pool_id}/tokens", create_pool_token, methods=["POST"], status_code=201
+)
+legacy_router.add_api_route(
+    "/agent-pools/{pool_id}/tokens/{token_id}",
+    delete_pool_token,
+    methods=["DELETE"],
+    status_code=204,
+)

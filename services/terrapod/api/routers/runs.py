@@ -13,13 +13,13 @@ Endpoints:
     POST   /api/v2/runs/{run_id}/actions/apply        (confirm plan for apply)
     POST   /api/v2/runs/{run_id}/actions/discard      (discard plan)
     POST   /api/v2/runs/{run_id}/actions/cancel       (cancel run)
-    POST   /api/v2/runs/{run_id}/actions/retry        (retry run — create new run from terminal run)
-    GET    /api/v2/runs/{run_id}/plan                 (plan details)
+    POST   /api/terrapod/v1/runs/{run_id}/actions/retry        (retry run — create new run from terminal run)
+    GET    /api/terrapod/v1/runs/{run_id}/plan                 (plan details)
     GET    /api/v2/plans/{plan_id}                    (plan details by ID)
-    GET    /api/v2/runs/{run_id}/apply                (apply details)
+    GET    /api/terrapod/v1/runs/{run_id}/apply                (apply details)
     GET    /api/v2/applies/{apply_id}                 (apply details by ID)
-    PATCH  /api/v2/listeners/{id}/runs/{run_id}       (listener status update)
-    GET    /api/v2/listeners/{id}/runs/next            (poll for next run)
+    PATCH  /api/terrapod/v1/listeners/{id}/runs/{run_id}       (listener status update)
+    GET    /api/terrapod/v1/listeners/{id}/runs/next            (poll for next run)
 """
 
 import asyncio
@@ -51,6 +51,13 @@ from terrapod.storage.keys import apply_log_key, plan_log_key
 from terrapod.storage.protocol import ObjectNotFoundError
 
 router = APIRouter(prefix="/api/v2", tags=["runs"])
+
+# Terrapod-only run endpoints — listener protocol (claim/launch/status/log
+# streaming), runner-driven completion (plan-result, apply-result), SSE
+# event channels, and the retry action. Dual-mounted under
+# /api/terrapod/v1 (canonical) and /api/v2 (deprecated, removed in v0.24.0
+# — see #278).
+extensions_router = APIRouter(tags=["run-extensions"])
 logger = get_logger(__name__)
 
 # States where cancellation is a sensible action — the run is actively
@@ -178,7 +185,7 @@ def _run_json(
                     "data": {"id": f"apply-{run.id}", "type": "applies"},
                 },
                 "task-stages": {
-                    "links": {"related": f"/api/v2/runs/{run_id}/task-stages"},
+                    "links": {"related": f"/api/terrapod/v1/runs/{run_id}/task-stages"},
                 },
                 "created-state-version": {
                     "data": (
@@ -562,7 +569,7 @@ async def cancel_run(
     return JSONResponse(content=_run_json(run))
 
 
-@router.post("/runs/{run_id}/actions/retry")
+@extensions_router.post("/runs/{run_id}/actions/retry")
 async def retry_run(
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -747,7 +754,7 @@ async def show_plan_by_id(
     return JSONResponse(content=_plan_json(run))
 
 
-@router.get("/runs/{run_id}/plan")
+@extensions_router.get("/runs/{run_id}/plan")
 async def show_plan(
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -795,7 +802,7 @@ async def show_apply_by_id(
     return JSONResponse(content=_apply_json(run))
 
 
-@router.get("/runs/{run_id}/apply")
+@extensions_router.get("/runs/{run_id}/apply")
 async def show_apply(
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -810,7 +817,7 @@ async def show_apply(
 # ── SSE (Server-Sent Events) ─────────────────────────────────────────────
 
 
-@router.get("/workspaces/{workspace_id}/runs/events")
+@extensions_router.get("/workspaces/{workspace_id}/runs/events")
 async def run_events_stream(
     request: Request,
     workspace_id: str = Path(...),
@@ -869,7 +876,7 @@ async def run_events_stream(
 # ── Listener Run Queue ───────────────────────────────────────────────────
 
 
-@router.get("/listeners/{listener_id}/runs/next")
+@extensions_router.get("/listeners/{listener_id}/runs/next")
 async def next_run(
     listener_id: str = Path(...),
     identity: ListenerIdentity = Depends(get_listener_identity),
@@ -929,7 +936,7 @@ async def next_run(
     return JSONResponse(content=run_data)
 
 
-@router.patch("/listeners/{listener_id}/runs/{run_id}")
+@extensions_router.patch("/listeners/{listener_id}/runs/{run_id}")
 async def update_run_status(
     listener_id: str = Path(...),
     run_id: str = Path(...),
@@ -1012,7 +1019,7 @@ async def update_run_status(
 # ── Runner Token ──────────────────────────────────────────────────────
 
 
-@router.post("/listeners/{listener_id}/runs/{run_id}/runner-token")
+@extensions_router.post("/listeners/{listener_id}/runs/{run_id}/runner-token")
 async def create_runner_token(
     listener_id: str = Path(...),
     run_id: str = Path(...),
@@ -1049,7 +1056,7 @@ async def create_runner_token(
 # ── Job Lifecycle Callbacks ───────────────────────────────────────────────
 
 
-@router.post("/listeners/{listener_id}/runs/{run_id}/job-launched")
+@extensions_router.post("/listeners/{listener_id}/runs/{run_id}/job-launched")
 async def report_job_launched(
     listener_id: str = Path(...),
     run_id: str = Path(...),
@@ -1086,7 +1093,7 @@ async def report_job_launched(
     return JSONResponse(content={"status": "ok"})
 
 
-@router.post("/listeners/{listener_id}/runs/{run_id}/job-status")
+@extensions_router.post("/listeners/{listener_id}/runs/{run_id}/job-status")
 async def report_job_status(
     listener_id: str = Path(...),
     run_id: str = Path(...),
@@ -1121,7 +1128,7 @@ async def report_job_status(
     return JSONResponse(content={"status": "ok"})
 
 
-@router.put("/listeners/{listener_id}/runs/{run_id}/log-stream")
+@extensions_router.put("/listeners/{listener_id}/runs/{run_id}/log-stream")
 async def upload_log_stream(
     listener_id: str = Path(...),
     run_id: str = Path(...),
@@ -1179,7 +1186,7 @@ async def upload_log_stream(
     return Response(status_code=204)
 
 
-@router.post("/runs/{run_id}/plan-result")
+@extensions_router.post("/runs/{run_id}/plan-result")
 async def report_plan_result(
     run_id: str = Path(...),
     body: dict = Body(...),
@@ -1207,7 +1214,7 @@ async def report_plan_result(
     return JSONResponse(content={"status": "ok"})
 
 
-@router.post("/runs/{run_id}/apply-result")
+@extensions_router.post("/runs/{run_id}/apply-result")
 async def report_apply_result(
     run_id: str = Path(...),
     db: AsyncSession = Depends(get_db),

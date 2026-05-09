@@ -359,7 +359,7 @@ For managing variables across multiple workspaces, see variable sets (admin-only
 1. Create the module:
 
 ```zsh
-curl -X POST https://terrapod.local/api/v2/organizations/default/registry-modules \
+curl -X POST https://terrapod.local/api/terrapod/v1/registry-modules \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -376,7 +376,7 @@ curl -X POST https://terrapod.local/api/v2/organizations/default/registry-module
 2. Create a version:
 
 ```zsh
-curl -X POST https://terrapod.local/api/v2/organizations/default/registry-modules/private/default/vpc/aws/versions \
+curl -X POST https://terrapod.local/api/terrapod/v1/registry-modules/private/default/vpc/aws/versions \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{

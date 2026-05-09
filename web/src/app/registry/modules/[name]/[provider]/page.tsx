@@ -205,7 +205,7 @@ export default function ModuleDetailPage() {
     setLoading(true)
     try {
       const res = await apiFetch(
-        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}`
+        `/api/terrapod/v1/registry-modules/private/default/${name}/${provider}`
       )
       if (!res.ok) throw new Error('Module not found')
       const data = await res.json()
@@ -228,7 +228,7 @@ export default function ModuleDetailPage() {
 
   async function loadVcsConnections() {
     try {
-      const res = await apiFetch('/api/v2/organizations/default/vcs-connections')
+      const res = await apiFetch('/api/terrapod/v1/vcs-connections')
       if (res.ok) {
         const data = await res.json()
         setVcsConnections(data.data || [])
@@ -241,7 +241,7 @@ export default function ModuleDetailPage() {
   async function loadWorkspaceLinks() {
     try {
       const res = await apiFetch(
-        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/workspace-links`
+        `/api/terrapod/v1/registry-modules/private/default/${name}/${provider}/workspace-links`
       )
       if (res.ok) {
         const data = await res.json()
@@ -279,7 +279,7 @@ export default function ModuleDetailPage() {
     setError('')
     try {
       const res = await apiFetch(
-        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/workspace-links`,
+        `/api/terrapod/v1/registry-modules/private/default/${name}/${provider}/workspace-links`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/vnd.api+json' },
@@ -306,7 +306,7 @@ export default function ModuleDetailPage() {
     setError('')
     try {
       const res = await apiFetch(
-        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/workspace-links/${linkId}`,
+        `/api/terrapod/v1/registry-modules/private/default/${name}/${provider}/workspace-links/${linkId}`,
         { method: 'DELETE' }
       )
       if (!res.ok && res.status !== 204) {
@@ -338,7 +338,7 @@ export default function ModuleDetailPage() {
     try {
       const tarGz = await buildTarGz(selectedFiles)
       const res = await apiFetch(
-        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/versions/${uploadVersion}/upload`,
+        `/api/terrapod/v1/registry-modules/private/default/${name}/${provider}/versions/${uploadVersion}/upload`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/gzip' },
@@ -366,7 +366,7 @@ export default function ModuleDetailPage() {
     setError('')
     try {
       const res = await apiFetch(
-        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/vcs`,
+        `/api/terrapod/v1/registry-modules/private/default/${name}/${provider}/vcs`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/vnd.api+json' },
@@ -401,7 +401,7 @@ export default function ModuleDetailPage() {
     setError('')
     try {
       const res = await apiFetch(
-        `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/vcs`,
+        `/api/terrapod/v1/registry-modules/private/default/${name}/${provider}/vcs`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/vnd.api+json' },
@@ -436,8 +436,8 @@ export default function ModuleDetailPage() {
     setError('')
     try {
       const path = deleteTarget === 'module'
-        ? `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}`
-        : `/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}/${deleteTarget}`
+        ? `/api/terrapod/v1/registry-modules/private/default/${name}/${provider}`
+        : `/api/terrapod/v1/registry-modules/private/default/${name}/${provider}/${deleteTarget}`
 
       const res = await apiFetch(path, { method: 'DELETE' })
       if (!res.ok && res.status !== 204) {
@@ -469,7 +469,7 @@ export default function ModuleDetailPage() {
     setError('')
     setLockoutWarning('')
     try {
-      const res = await apiFetch(`/api/v2/organizations/default/registry-modules/private/default/${name}/${provider}`, {
+      const res = await apiFetch(`/api/terrapod/v1/registry-modules/private/default/${name}/${provider}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({

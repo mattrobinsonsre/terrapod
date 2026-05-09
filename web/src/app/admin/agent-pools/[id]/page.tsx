@@ -125,7 +125,7 @@ export default function AgentPoolDetailPage() {
 
   const loadPool = useCallback(async () => {
     try {
-      const res = await apiFetch(`/api/v2/agent-pools/${poolId}`)
+      const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}`)
       if (!res.ok) throw new Error('Failed to load pool')
       const data = await res.json()
       setPool(data.data)
@@ -150,7 +150,7 @@ export default function AgentPoolDetailPage() {
   async function loadTokens() {
     setTokensLoading(true)
     try {
-      const res = await apiFetch(`/api/v2/agent-pools/${poolId}/tokens`)
+      const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}/tokens`)
       if (!res.ok) throw new Error('Failed to load tokens')
       const data = await res.json()
       setTokens(data.data || [])
@@ -164,7 +164,7 @@ export default function AgentPoolDetailPage() {
   const loadListeners = useCallback(async () => {
     setListenersLoading(true)
     try {
-      const res = await apiFetch(`/api/v2/agent-pools/${poolId}/listeners`)
+      const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}/listeners`)
       if (!res.ok) throw new Error('Failed to load listeners')
       const data = await res.json()
       setListeners(data.data || [])
@@ -197,7 +197,7 @@ export default function AgentPoolDetailPage() {
     setError('')
     setSuccess('')
     try {
-      const res = await apiFetch(`/api/v2/agent-pools/${poolId}`, {
+      const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -227,7 +227,7 @@ export default function AgentPoolDetailPage() {
   async function handleDelete() {
     setDeleting(true)
     try {
-      const res = await apiFetch(`/api/v2/agent-pools/${poolId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete pool')
       router.push('/admin/agent-pools')
     } catch (err) {
@@ -247,7 +247,7 @@ export default function AgentPoolDetailPage() {
       if (tokenMaxUses) attrs['max-uses'] = parseInt(tokenMaxUses)
       if (tokenExpiry) attrs['expires-at'] = tokenExpiry
 
-      const res = await apiFetch(`/api/v2/agent-pools/${poolId}/tokens`, {
+      const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}/tokens`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'agent-pool-tokens', attributes: attrs } }),
@@ -274,7 +274,7 @@ export default function AgentPoolDetailPage() {
     setError('')
     setSuccess('')
     try {
-      const res = await apiFetch(`/api/v2/agent-pools/${poolId}/tokens/${tokenId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}/tokens/${tokenId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to revoke token')
       setSuccess('Token revoked')
       await loadTokens()
@@ -287,7 +287,7 @@ export default function AgentPoolDetailPage() {
     setError('')
     setSuccess('')
     try {
-      const res = await apiFetch(`/api/v2/listeners/${listenerId}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/terrapod/v1/listeners/${listenerId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete listener')
       setSuccess('Listener deleted')
       await loadListeners()

@@ -12,7 +12,7 @@ Endpoints:
     PATCH/DELETE   /api/v2/workspaces/{id}/vars/{var_id}
     POST/GET       /api/v2/organizations/default/varsets
     GET/PATCH/DELETE /api/v2/varsets/{varset_id}
-    POST/GET/PATCH/DELETE /api/v2/varsets/{varset_id}/relationships/vars[/{var_id}]
+    POST/GET/PATCH/DELETE /api/terrapod/v1/varsets/{varset_id}/relationships/vars[/{var_id}]
     POST/DELETE    /api/v2/varsets/{varset_id}/relationships/workspaces
 """
 

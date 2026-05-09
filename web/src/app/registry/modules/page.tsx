@@ -49,7 +49,7 @@ export default function ModulesPage() {
   async function loadModules() {
     setLoading(true)
     try {
-      const res = await apiFetch('/api/v2/organizations/default/registry-modules')
+      const res = await apiFetch('/api/terrapod/v1/registry-modules')
       if (!res.ok) throw new Error('Failed to load modules')
       const data = await res.json()
       setModules(data.data || [])
@@ -65,7 +65,7 @@ export default function ModulesPage() {
     setCreating(true)
     setError('')
     try {
-      const res = await apiFetch('/api/v2/organizations/default/registry-modules', {
+      const res = await apiFetch('/api/terrapod/v1/registry-modules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({

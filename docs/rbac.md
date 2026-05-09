@@ -127,7 +127,7 @@ Custom roles define access using allow/deny rules on labels and workspace names.
 ### Creating a Custom Role
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/roles \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/roles \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -171,7 +171,7 @@ curl -X POST https://terrapod.example.com/api/v2/roles \
 ### Listing Roles
 
 ```zsh
-curl https://terrapod.example.com/api/v2/roles \
+curl https://terrapod.example.com/api/terrapod/v1/roles \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -180,7 +180,7 @@ Returns both built-in and custom roles.
 ### Updating a Role
 
 ```zsh
-curl -X PATCH https://terrapod.example.com/api/v2/roles/developer \
+curl -X PATCH https://terrapod.example.com/api/terrapod/v1/roles/developer \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -197,7 +197,7 @@ curl -X PATCH https://terrapod.example.com/api/v2/roles/developer \
 ### Deleting a Role
 
 ```zsh
-curl -X DELETE https://terrapod.example.com/api/v2/roles/developer \
+curl -X DELETE https://terrapod.example.com/api/terrapod/v1/roles/developer \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -212,7 +212,7 @@ Role assignments bind a user (identified by provider + email) to a role.
 ### Setting Roles for a User
 
 ```zsh
-curl -X PUT https://terrapod.example.com/api/v2/role-assignments \
+curl -X PUT https://terrapod.example.com/api/terrapod/v1/role-assignments \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -230,7 +230,7 @@ curl -X PUT https://terrapod.example.com/api/v2/role-assignments \
 For platform roles (admin, audit):
 
 ```zsh
-curl -X PUT https://terrapod.example.com/api/v2/role-assignments \
+curl -X PUT https://terrapod.example.com/api/terrapod/v1/role-assignments \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -248,14 +248,14 @@ curl -X PUT https://terrapod.example.com/api/v2/role-assignments \
 ### Listing All Assignments
 
 ```zsh
-curl https://terrapod.example.com/api/v2/role-assignments \
+curl https://terrapod.example.com/api/terrapod/v1/role-assignments \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
 ### Removing a Single Assignment
 
 ```zsh
-curl -X DELETE https://terrapod.example.com/api/v2/role-assignments/local/alice@example.com/developer \
+curl -X DELETE https://terrapod.example.com/api/terrapod/v1/role-assignments/local/alice@example.com/developer \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -363,7 +363,7 @@ The web UI displays this field as **"Labels (tags)"** to make the dual purpose e
 
 ### Labels Browser
 
-Labels are also queryable as a first-class navigation surface via the **Labels** page in the web UI (and the `GET /api/v2/labels[/{key}[/{value}]]` endpoints — see [API Reference](api-reference.md#labels)). It lists every key in use, drills into the values for a key, and from a value lists every entity carrying it — workspaces, modules, providers, and pools.
+Labels are also queryable as a first-class navigation surface via the **Labels** page in the web UI (and the `GET /api/terrapod/v1/labels[/{key}[/{value}]]` endpoints — see [API Reference](api-reference.md#labels)). It lists every key in use, drills into the values for a key, and from a value lists every entity carrying it — workspaces, modules, providers, and pools.
 
 The browser is **read-only**: editing happens on each entity's own page. It is **RBAC-filtered**: a label only appears if you can `read` at least one entity that carries it, and the per-key/value listings only count entities you can see. There is no admin escape hatch — `admin`/`audit` see everything because their underlying RBAC grants them read on every entity, not because the labels page treats them specially.
 

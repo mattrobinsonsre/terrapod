@@ -1,6 +1,6 @@
 // Package role implements the terrapod_role data source.
 //
-// API Contract: GET /api/v2/roles/{name}
+// API Contract: GET /api/terrapod/v1/roles/{name}
 // Looks up a single role by name.
 package role
 
@@ -80,7 +80,7 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	data, err := d.client.Get(ctx, "/api/v2/roles/"+config.Name.ValueString())
+	data, err := d.client.Get(ctx, "/api/terrapod/v1/roles/"+config.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to read role", err.Error())
 		return

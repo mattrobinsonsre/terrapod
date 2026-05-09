@@ -53,7 +53,7 @@ export default function SessionsPage() {
   async function loadSessions(adminView: boolean) {
     setLoading(true)
     try {
-      const endpoint = adminView ? '/api/v2/auth/sessions/all' : '/api/v2/auth/sessions'
+      const endpoint = adminView ? '/api/terrapod/v1/auth/sessions/all' : '/api/terrapod/v1/auth/sessions'
       const res = await apiFetch(endpoint)
       if (!res.ok) throw new Error('Failed to load sessions')
       const data = await res.json()
@@ -68,7 +68,7 @@ export default function SessionsPage() {
   async function handleRevokeUser(email: string) {
     setError('')
     try {
-      const res = await apiFetch(`/api/v2/auth/sessions/user/${encodeURIComponent(email)}`, {
+      const res = await apiFetch(`/api/terrapod/v1/auth/sessions/user/${encodeURIComponent(email)}`, {
         method: 'DELETE',
       })
       if (!res.ok && res.status !== 204) throw new Error(`Failed to revoke sessions (${res.status})`)

@@ -63,12 +63,12 @@ class TestAuditLogRequiresAuth:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     async def test_no_auth_returns_401(self, *mocks):
-        """GET /api/v2/admin/audit-log without auth → 401."""
+        """GET /api/terrapod/v1/admin/audit-log without auth → 401."""
         app = create_app()
         app.dependency_overrides[get_db] = lambda: AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/admin/audit-log")
+            resp = await c.get("/api/terrapod/v1/admin/audit-log")
         assert resp.status_code == 401
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
@@ -80,7 +80,7 @@ class TestAuditLogRequiresAuth:
         app, _ = _make_app(user)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/admin/audit-log", headers=_AUTH)
+            resp = await c.get("/api/terrapod/v1/admin/audit-log", headers=_AUTH)
         assert resp.status_code == 403
 
 
@@ -96,7 +96,7 @@ class TestAuditLogReturnsEntries:
 
         app, _ = _make_app(_user())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/admin/audit-log", headers=_AUTH)
+            resp = await c.get("/api/terrapod/v1/admin/audit-log", headers=_AUTH)
 
         assert resp.status_code == 200
         body = resp.json()
@@ -117,7 +117,7 @@ class TestAuditLogReturnsEntries:
         app, _ = _make_app(user)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/admin/audit-log", headers=_AUTH)
+            resp = await c.get("/api/terrapod/v1/admin/audit-log", headers=_AUTH)
         assert resp.status_code == 200
 
 
@@ -133,7 +133,7 @@ class TestAuditLogPassesFilters:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
-                "/api/v2/admin/audit-log",
+                "/api/terrapod/v1/admin/audit-log",
                 params={
                     "filter[actor]": "admin@test.com",
                     "filter[resource-type]": "runs",
@@ -166,7 +166,7 @@ class TestAuditLogPagination:
         app, _ = _make_app(_user())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
-                "/api/v2/admin/audit-log",
+                "/api/terrapod/v1/admin/audit-log",
                 params={"page[number]": "2", "page[size]": "5"},
                 headers=_AUTH,
             )
@@ -187,7 +187,7 @@ class TestAuditLogPagination:
         app, _ = _make_app(_user())
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get("/api/v2/admin/audit-log", headers=_AUTH)
+            resp = await c.get("/api/terrapod/v1/admin/audit-log", headers=_AUTH)
         assert resp.status_code == 200
         body = resp.json()
         assert body["data"] == []

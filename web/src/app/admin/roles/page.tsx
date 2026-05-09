@@ -123,7 +123,7 @@ export default function RolesPage() {
   async function loadRoles() {
     setRolesLoading(true)
     try {
-      const res = await apiFetch('/api/v2/roles')
+      const res = await apiFetch('/api/terrapod/v1/roles')
       if (!res.ok) throw new Error('Failed to load roles')
       const data = await res.json()
       setRoles(data.data || [])
@@ -138,8 +138,8 @@ export default function RolesPage() {
     setAssignmentsLoading(true)
     try {
       const [assignRes, identRes] = await Promise.all([
-        apiFetch('/api/v2/role-assignments'),
-        apiFetch('/api/v2/role-assignments/identities'),
+        apiFetch('/api/terrapod/v1/role-assignments'),
+        apiFetch('/api/terrapod/v1/role-assignments/identities'),
       ])
       if (!assignRes.ok) throw new Error('Failed to load assignments')
       const assignData = await assignRes.json()
@@ -186,7 +186,7 @@ export default function RolesPage() {
       if (roleDenyLabels.trim()) attrs['deny-labels'] = parseLabels(roleDenyLabels)
       if (roleDenyNames.trim()) attrs['deny-names'] = roleDenyNames.split(',').map((s) => s.trim()).filter(Boolean)
 
-      const res = await apiFetch('/api/v2/roles', {
+      const res = await apiFetch('/api/terrapod/v1/roles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'roles', attributes: attrs } }),
@@ -239,7 +239,7 @@ export default function RolesPage() {
         'deny-labels': parseLabels(editRoleDenyLabels),
         'deny-names': editRoleDenyNames.split(',').map((s) => s.trim()).filter(Boolean),
       }
-      const res = await apiFetch(`/api/v2/roles/${editingRole}`, {
+      const res = await apiFetch(`/api/terrapod/v1/roles/${editingRole}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'roles', attributes: attrs } }),
@@ -262,7 +262,7 @@ export default function RolesPage() {
     setError('')
     setSuccess('')
     try {
-      const res = await apiFetch(`/api/v2/roles/${name}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/terrapod/v1/roles/${name}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete role')
       setDeleteRoleName(null)
       setSuccess(`Role "${name}" deleted`)
@@ -278,7 +278,7 @@ export default function RolesPage() {
     setError('')
     setSuccess('')
     try {
-      const res = await apiFetch('/api/v2/role-assignments', {
+      const res = await apiFetch('/api/terrapod/v1/role-assignments', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -312,7 +312,7 @@ export default function RolesPage() {
     setError('')
     setSuccess('')
     try {
-      const res = await apiFetch(`/api/v2/role-assignments/${encodeURIComponent(provider)}/${encodeURIComponent(email)}/${encodeURIComponent(roleName)}`, {
+      const res = await apiFetch(`/api/terrapod/v1/role-assignments/${encodeURIComponent(provider)}/${encodeURIComponent(email)}/${encodeURIComponent(roleName)}`, {
         method: 'DELETE',
       })
       if (!res.ok) throw new Error('Failed to delete assignment')

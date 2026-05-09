@@ -12,10 +12,10 @@ Endpoints:
     POST   /api/v2/workspaces/{id}/configuration-versions
     GET    /api/v2/workspaces/{id}/configuration-versions   (list, paginated)
     GET    /api/v2/configuration-versions/{cv_id}
-    GET    /api/v2/configuration-versions/{cv_id}/download  (tarball bytes)
-    POST   /api/v2/configuration-versions/{cv_id}/download-ticket
-    GET    /api/v2/configuration-versions/download-by-ticket/{ticket}
-    POST   /api/v2/configuration-versions/diff              (compare two CVs)
+    GET    /api/terrapod/v1/configuration-versions/{cv_id}/download  (tarball bytes)
+    POST   /api/terrapod/v1/configuration-versions/{cv_id}/download-ticket
+    GET    /api/terrapod/v1/configuration-versions/download-by-ticket/{ticket}
+    POST   /api/terrapod/v1/configuration-versions/diff              (compare two CVs)
     PUT    /api/v2/configuration-versions/{cv_id}/upload    (tarball upload, no auth)
 """
 
@@ -40,6 +40,13 @@ from terrapod.storage.keys import config_version_key
 from terrapod.storage.protocol import ObjectNotFoundError
 
 router = APIRouter(prefix="/api/v2", tags=["configuration-versions"])
+
+# Terrapod-only extensions on the configuration-versions surface
+# (download, download-ticket, download-by-ticket, diff). Dual-mounted
+# under /api/terrapod/v1 (canonical) and /api/v2 (deprecated, removed
+# in v0.24.0 — see #278).
+extensions_router = APIRouter(tags=["configuration-version-extensions"])
+
 logger = get_logger(__name__)
 
 # TFE convention. CV lists can include the run that consumed them; we
@@ -203,7 +210,7 @@ async def list_configuration_versions(
     )
 
 
-@router.get("/configuration-versions/{cv_id}/download")
+@extensions_router.get("/configuration-versions/{cv_id}/download")
 async def download_configuration_version(
     cv_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -259,7 +266,7 @@ async def download_configuration_version(
     )
 
 
-@router.post("/configuration-versions/{cv_id}/download-ticket")
+@extensions_router.post("/configuration-versions/{cv_id}/download-ticket")
 async def mint_download_ticket(
     cv_id: str = Path(...),
     body: dict | None = Body(default=None),
@@ -324,7 +331,7 @@ async def mint_download_ticket(
                 "type": "download-tickets",
                 "attributes": {
                     "ticket": ticket,
-                    "url": f"/api/v2/configuration-versions/download-by-ticket/{ticket}",
+                    "url": f"/api/terrapod/v1/configuration-versions/download-by-ticket/{ticket}",
                     "expires-at": expires_iso,
                 },
             }
@@ -332,7 +339,7 @@ async def mint_download_ticket(
     )
 
 
-@router.get("/configuration-versions/download-by-ticket/{ticket}")
+@extensions_router.get("/configuration-versions/download-by-ticket/{ticket}")
 async def download_by_ticket(
     ticket: str = Path(...),
     db: AsyncSession = Depends(get_db),
@@ -388,7 +395,7 @@ async def download_by_ticket(
     )
 
 
-@router.post("/configuration-versions/diff")
+@extensions_router.post("/configuration-versions/diff")
 async def diff_configuration_versions(
     body: dict = Body(...),
     user: AuthenticatedUser = Depends(get_current_user),

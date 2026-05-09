@@ -42,7 +42,7 @@ function CliCompleteInner() {
 
     const check = async () => {
       try {
-        const res = await fetch(`/api/v2/auth/cli-login-status?code=${encodeURIComponent(code)}`)
+        const res = await fetch(`/api/terrapod/v1/auth/cli-login-status?code=${encodeURIComponent(code)}`)
         if (res.ok) {
           const data = await res.json()
           if (data.complete) {

@@ -6,15 +6,15 @@ UX CONTRACT: Run task endpoints are consumed by the web frontend:
   matched by corresponding updates to that frontend page.
 
 Endpoints:
-    POST   /api/v2/workspaces/{id}/run-tasks          (create)
-    GET    /api/v2/workspaces/{id}/run-tasks            (list)
-    GET    /api/v2/run-tasks/{id}                       (show)
-    PATCH  /api/v2/run-tasks/{id}                       (update)
-    DELETE /api/v2/run-tasks/{id}                       (delete)
-    GET    /api/v2/runs/{run_id}/task-stages             (list stages for a run)
+    POST   /api/terrapod/v1/workspaces/{id}/run-tasks          (create)
+    GET    /api/terrapod/v1/workspaces/{id}/run-tasks            (list)
+    GET    /api/terrapod/v1/run-tasks/{id}                       (show)
+    PATCH  /api/terrapod/v1/run-tasks/{id}                       (update)
+    DELETE /api/terrapod/v1/run-tasks/{id}                       (delete)
+    GET    /api/terrapod/v1/runs/{run_id}/task-stages             (list stages for a run)
     GET    /api/v2/task-stages/{id}                      (show stage with results)
     POST   /api/v2/task-stages/{id}/actions/override     (override failed stage)
-    PATCH  /api/v2/task-stage-results/{id}/callback      (external callback)
+    PATCH  /api/terrapod/v1/task-stage-results/{id}/callback      (external callback)
 """
 
 import uuid
@@ -41,6 +41,13 @@ from terrapod.services.run_task_service import (
 from terrapod.services.workspace_rbac_service import has_permission, resolve_workspace_permission
 
 router = APIRouter(prefix="/api/v2", tags=["run-tasks"])
+
+# Terrapod-native run-task management — workspace-scoped task definitions
+# and the callback receiver. The CLI never touches these (it only reads
+# task-stages on the run via TaskStages.Read + Override at /api/v2/task-stages/...).
+# Dual-mounted at /api/terrapod/v1 (canonical) and /api/v2 (deprecated,
+# removed in v0.24.0 — see #278).
+extensions_router = APIRouter(tags=["run-tasks-management"])
 logger = get_logger(__name__)
 
 
@@ -72,7 +79,7 @@ def _run_task_json(rt: RunTask) -> dict:
             },
         },
         "links": {
-            "self": f"/api/v2/run-tasks/{rt_id}",
+            "self": f"/api/terrapod/v1/run-tasks/{rt_id}",
         },
     }
 
@@ -168,7 +175,7 @@ async def _get_run_task(rt_id: str, db: AsyncSession) -> RunTask:
 # ── Run Task CRUD ─────────────────────────────────────────────────────
 
 
-@router.post("/workspaces/{workspace_id}/run-tasks", status_code=201)
+@extensions_router.post("/workspaces/{workspace_id}/run-tasks", status_code=201)
 async def create_run_task(
     workspace_id: str = Path(...),
     body: dict = Body(...),
@@ -223,7 +230,7 @@ async def create_run_task(
     return JSONResponse(content={"data": _run_task_json(rt)}, status_code=201)
 
 
-@router.get("/workspaces/{workspace_id}/run-tasks")
+@extensions_router.get("/workspaces/{workspace_id}/run-tasks")
 async def list_run_tasks(
     workspace_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -244,7 +251,7 @@ async def list_run_tasks(
     return JSONResponse(content={"data": [_run_task_json(rt) for rt in tasks]})
 
 
-@router.get("/run-tasks/{rt_id}")
+@extensions_router.get("/run-tasks/{rt_id}")
 async def show_run_task(
     rt_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -256,7 +263,7 @@ async def show_run_task(
     return JSONResponse(content={"data": _run_task_json(rt)})
 
 
-@router.patch("/run-tasks/{rt_id}")
+@extensions_router.patch("/run-tasks/{rt_id}")
 async def update_run_task(
     rt_id: str = Path(...),
     body: dict = Body(...),
@@ -313,7 +320,7 @@ async def update_run_task(
     return JSONResponse(content={"data": _run_task_json(rt)})
 
 
-@router.delete("/run-tasks/{rt_id}", status_code=204)
+@extensions_router.delete("/run-tasks/{rt_id}", status_code=204)
 async def delete_run_task(
     rt_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -332,7 +339,7 @@ async def delete_run_task(
 # ── Task Stages ───────────────────────────────────────────────────────
 
 
-@router.get("/runs/{run_id}/task-stages")
+@extensions_router.get("/runs/{run_id}/task-stages")
 async def list_task_stages(
     run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
@@ -428,7 +435,7 @@ async def override_task_stage(
 # ── Callback (Unauthenticated, Token-Verified) ──────────────────────
 
 
-@router.patch("/task-stage-results/{tsr_id}/callback")
+@extensions_router.patch("/task-stage-results/{tsr_id}/callback")
 async def task_stage_result_callback(
     tsr_id: str = Path(...),
     body: dict = Body(...),

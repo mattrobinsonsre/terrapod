@@ -117,7 +117,7 @@ async def handle_run_task_call(payload: dict) -> None:
 
         # Build callback URL
         base = settings.auth.callback_base_url.rstrip("/")
-        callback_url = f"{base}/api/v2/task-stage-results/tsr-{tsr.id}/callback"
+        callback_url = f"{base}/api/terrapod/v1/task-stage-results/tsr-{tsr.id}/callback"
 
         # Build payload
         task_payload = build_task_callback_payload(

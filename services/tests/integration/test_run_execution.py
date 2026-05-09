@@ -22,7 +22,7 @@ pytestmark = pytest.mark.integration
 # ---------------------------------------------------------------------------
 
 WS_ENDPOINT = "/api/v2/organizations/default/workspaces"
-POOLS_ENDPOINT = "/api/v2/organizations/default/agent-pools"
+POOLS_ENDPOINT = "/api/terrapod/v1/agent-pools"
 RUNS_ENDPOINT = "/api/v2/runs"
 
 FAKE_PLAN_LOG = b"Terraform will perform the following actions:\n  + aws_instance.web\nPlan: 1 to add, 0 to change, 0 to destroy."
@@ -59,7 +59,7 @@ async def _create_pool(client, name="test-pool") -> str:
 async def _create_pool_token(client, pool_id: str) -> str:
     """Create a join token for a pool, return the raw token string."""
     resp = await client.post(
-        f"/api/v2/agent-pools/{pool_id}/tokens",
+        f"/api/terrapod/v1/agent-pools/{pool_id}/tokens",
         json={"data": {"attributes": {"description": "test token"}}},
         headers=AUTH,
     )
@@ -70,7 +70,7 @@ async def _create_pool_token(client, pool_id: str) -> str:
 async def _join_listener(client, pool_id: str, join_token: str, name="test-listener") -> dict:
     """Join a listener to a pool via token exchange, return result dict."""
     resp = await client.post(
-        f"/api/v2/agent-pools/{pool_id}/listeners/join",
+        f"/api/terrapod/v1/agent-pools/{pool_id}/listeners/join",
         json={"join_token": join_token, "name": name},
     )
     assert resp.status_code == 201, resp.text
@@ -121,7 +121,7 @@ async def _create_run(client, ws_id: str, **attrs) -> dict:
 
 async def _claim_run(client, listener_id: str):
     """Claim the next available run. Returns (data, phase) or None."""
-    resp = await client.get(f"/api/v2/listeners/{listener_id}/runs/next")
+    resp = await client.get(f"/api/terrapod/v1/listeners/{listener_id}/runs/next")
     if resp.status_code == 204:
         return None
     assert resp.status_code == 200, resp.text
@@ -133,7 +133,7 @@ async def _claim_run(client, listener_id: str):
 async def _report_job_launched(client, listener_id: str, run_id: str) -> None:
     """Report that a K8s Job was launched for a run."""
     resp = await client.post(
-        f"/api/v2/listeners/{listener_id}/runs/{run_id}/job-launched",
+        f"/api/terrapod/v1/listeners/{listener_id}/runs/{run_id}/job-launched",
         json={"job_name": f"tprun-{run_id[:8]}", "job_namespace": "terrapod-runners"},
     )
     assert resp.status_code == 200, resp.text
@@ -142,7 +142,7 @@ async def _report_job_launched(client, listener_id: str, run_id: str) -> None:
 async def _get_runner_token(client, listener_id: str, run_id: str) -> str:
     """Get a runner token for artifact uploads. Run must be claimed first."""
     resp = await client.post(
-        f"/api/v2/listeners/{listener_id}/runs/{run_id}/runner-token",
+        f"/api/terrapod/v1/listeners/{listener_id}/runs/{run_id}/runner-token",
         json={},
     )
     assert resp.status_code == 200, resp.text
@@ -160,7 +160,7 @@ async def _upload_artifact(
     """Upload an artifact with runner token auth. Returns status code."""
     bare_id = _bare_run_id(run_id)
     resp = await client.put(
-        f"/api/v2/runs/{bare_id}/artifacts/{artifact_type}",
+        f"/api/terrapod/v1/runs/{bare_id}/artifacts/{artifact_type}",
         content=data,
         headers={"Authorization": f"Bearer {runner_token}"},
     )
@@ -172,7 +172,7 @@ async def _report_job_status(
 ) -> None:
     """Report Job status (writes to Redis for reconciler)."""
     resp = await client.post(
-        f"/api/v2/listeners/{listener_id}/runs/{run_id}/job-status",
+        f"/api/terrapod/v1/listeners/{listener_id}/runs/{run_id}/job-status",
         json={"status": job_status, "phase": phase},
     )
     assert resp.status_code == 200, resp.text

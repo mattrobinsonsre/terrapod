@@ -13,10 +13,10 @@ from terrapod.auth.runner_tokens import generate_runner_token
 
 class TestHelpers:
     def test_is_auth_path(self):
-        assert _is_auth_path("/api/v2/auth/login") is True
-        assert _is_auth_path("/api/v2/auth/callback") is True
+        assert _is_auth_path("/api/terrapod/v1/auth/login") is True
+        assert _is_auth_path("/api/terrapod/v1/auth/callback") is True
         assert _is_auth_path("/oauth/authorize") is True
-        assert _is_auth_path("/api/v2/workspaces") is False
+        assert _is_auth_path("/api/terrapod/v1/workspaces") is False
         assert _is_auth_path("/health") is False
 
     def test_get_client_ip_forwarded(self):
@@ -78,11 +78,11 @@ def _make_app(
     async def health():
         return {"status": "ok"}
 
-    @app.get("/api/v2/workspaces")
+    @app.get("/api/terrapod/v1/workspaces")
     async def workspaces():
         return {"data": []}
 
-    @app.post("/api/v2/auth/login")
+    @app.post("/api/terrapod/v1/auth/login")
     async def login():
         return {"token": "test"}
 
@@ -112,7 +112,7 @@ class TestRateLimitMiddleware:
         mock_redis = _make_redis_mock(count=1)
         app = _make_app(get_redis=lambda: mock_redis, rpm=5)
         client = TestClient(app)
-        response = client.get("/api/v2/workspaces")
+        response = client.get("/api/terrapod/v1/workspaces")
         assert "X-Ratelimit-Limit" in response.headers
         assert "X-Ratelimit-Remaining" in response.headers
         assert response.headers["X-Ratelimit-Limit"] == "5"
@@ -123,7 +123,7 @@ class TestRateLimitMiddleware:
         mock_redis = _make_redis_mock(count=6)
         app = _make_app(get_redis=lambda: mock_redis, rpm=5)
         client = TestClient(app)
-        response = client.get("/api/v2/workspaces")
+        response = client.get("/api/terrapod/v1/workspaces")
         assert response.status_code == 429
         assert "Retry-After" in response.headers
         body = response.json()
@@ -134,7 +134,7 @@ class TestRateLimitMiddleware:
         mock_redis = _make_redis_mock(count=3)
         app = _make_app(get_redis=lambda: mock_redis, rpm=100, auth_rpm=2)
         client = TestClient(app)
-        response = client.post("/api/v2/auth/login")
+        response = client.post("/api/terrapod/v1/auth/login")
         assert response.status_code == 429
 
     def test_redis_failure_fails_open(self):
@@ -142,7 +142,7 @@ class TestRateLimitMiddleware:
         mock_redis = _make_redis_mock(error=Exception("Redis down"))
         app = _make_app(get_redis=lambda: mock_redis)
         client = TestClient(app)
-        response = client.get("/api/v2/workspaces")
+        response = client.get("/api/terrapod/v1/workspaces")
         assert response.status_code == 200
 
     def test_redis_not_initialized_fails_open(self):
@@ -153,7 +153,7 @@ class TestRateLimitMiddleware:
 
         app = _make_app(get_redis=raise_runtime_error)
         client = TestClient(app)
-        response = client.get("/api/v2/workspaces")
+        response = client.get("/api/terrapod/v1/workspaces")
         assert response.status_code == 200
 
     def test_runner_token_default_unlimited_bypasses_redis(self):
@@ -164,7 +164,7 @@ class TestRateLimitMiddleware:
         token = generate_runner_token(uuid.uuid4())
         for _ in range(10):
             response = client.get(
-                "/api/v2/workspaces", headers={"Authorization": f"Bearer {token}"}
+                "/api/terrapod/v1/workspaces", headers={"Authorization": f"Bearer {token}"}
             )
             assert response.status_code == 200
         # Bypass path must not touch Redis
@@ -176,7 +176,9 @@ class TestRateLimitMiddleware:
         app = _make_app(get_redis=lambda: mock_redis, runner_rpm=5, rpm=100)
         client = TestClient(app)
         token = generate_runner_token(uuid.uuid4())
-        response = client.get("/api/v2/workspaces", headers={"Authorization": f"Bearer {token}"})
+        response = client.get(
+            "/api/terrapod/v1/workspaces", headers={"Authorization": f"Bearer {token}"}
+        )
         assert response.status_code == 429
         # Verify the runner-specific key prefix was used
         incr_call = mock_redis.pipeline.return_value.incr.call_args
@@ -189,7 +191,7 @@ class TestRateLimitMiddleware:
         app = _make_app(get_redis=lambda: mock_redis, runner_rpm=0, authenticated_rpm=10)
         client = TestClient(app)
         response = client.get(
-            "/api/v2/workspaces",
+            "/api/terrapod/v1/workspaces",
             headers={"Authorization": "Bearer runtok:bogus:3600:0:deadbeef"},
         )
         assert response.status_code == 200
@@ -205,7 +207,7 @@ class TestRateLimitMiddleware:
         app = _make_app(get_redis=lambda: mock_redis, rpm=5, authenticated_rpm=500)
         client = TestClient(app)
         response = client.get(
-            "/api/v2/workspaces", headers={"Authorization": "Bearer some-api-token"}
+            "/api/terrapod/v1/workspaces", headers={"Authorization": "Bearer some-api-token"}
         )
         assert response.status_code == 200
         incr_call = mock_redis.pipeline.return_value.incr.call_args
@@ -217,7 +219,7 @@ class TestRateLimitMiddleware:
         mock_redis = _make_redis_mock(count=1)
         app = _make_app(get_redis=lambda: mock_redis, rpm=5, authenticated_rpm=500)
         client = TestClient(app)
-        response = client.get("/api/v2/workspaces")
+        response = client.get("/api/terrapod/v1/workspaces")
         assert response.status_code == 200
         incr_call = mock_redis.pipeline.return_value.incr.call_args
         key = incr_call[0][0]
@@ -230,7 +232,7 @@ class TestRateLimitMiddleware:
         mock_redis = _make_redis_mock(count=9999)
         app = _make_app(get_redis=lambda: mock_redis, rpm=0)
         client = TestClient(app)
-        response = client.get("/api/v2/workspaces")
+        response = client.get("/api/terrapod/v1/workspaces")
         assert response.status_code == 200
         mock_redis.pipeline.assert_not_called()
 
@@ -240,5 +242,7 @@ class TestRateLimitMiddleware:
         app = _make_app(get_redis=lambda: mock_redis, auth_rpm=2, runner_rpm=0)
         client = TestClient(app)
         token = generate_runner_token(uuid.uuid4())
-        response = client.post("/api/v2/auth/login", headers={"Authorization": f"Bearer {token}"})
+        response = client.post(
+            "/api/terrapod/v1/auth/login", headers={"Authorization": f"Bearer {token}"}
+        )
         assert response.status_code == 429

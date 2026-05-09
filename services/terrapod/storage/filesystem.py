@@ -264,7 +264,7 @@ class FilesystemStore:
         sig = self._sign("GET", key, expires)
 
         encoded_key = urllib.parse.quote(key, safe="")
-        url = f"{self._base_url}/api/v2/storage/get/{encoded_key}?expires={expires}&sig={sig}"
+        url = f"{self._base_url}/api/terrapod/v1/storage/get/{encoded_key}?expires={expires}&sig={sig}"
 
         return PresignedURL(
             url=url,
@@ -283,7 +283,7 @@ class FilesystemStore:
 
         encoded_key = urllib.parse.quote(key, safe="")
         url = (
-            f"{self._base_url}/api/v2/storage/put/{encoded_key}"
+            f"{self._base_url}/api/terrapod/v1/storage/put/{encoded_key}"
             f"?expires={expires}&sig={sig}&content_type={urllib.parse.quote(content_type)}"
         )
 

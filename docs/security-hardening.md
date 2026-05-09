@@ -194,7 +194,7 @@ Query the audit log API and forward events to your SIEM:
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" \
-  "https://terrapod.example.com/api/v2/admin/audit-log?page[size]=100"
+  "https://terrapod.example.com/api/terrapod/v1/admin/audit-log?page[size]=100"
 ```
 
 Integrate with your log aggregator (Elasticsearch, Splunk, Datadog) by polling this endpoint periodically.

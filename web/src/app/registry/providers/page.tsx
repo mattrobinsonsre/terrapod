@@ -42,7 +42,7 @@ export default function ProvidersPage() {
   async function loadProviders() {
     setLoading(true)
     try {
-      const res = await apiFetch('/api/v2/organizations/default/registry-providers')
+      const res = await apiFetch('/api/terrapod/v1/registry-providers')
       if (!res.ok) throw new Error('Failed to load providers')
       const data = await res.json()
       setProviders(data.data || [])
@@ -58,7 +58,7 @@ export default function ProvidersPage() {
     setCreating(true)
     setError('')
     try {
-      const res = await apiFetch('/api/v2/organizations/default/registry-providers', {
+      const res = await apiFetch('/api/terrapod/v1/registry-providers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({

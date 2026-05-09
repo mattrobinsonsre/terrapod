@@ -118,7 +118,7 @@ class TestWorkspaceLifecycle:
         create = await client.post(WS_ENDPOINT, json=_ws_body("del-ws"), headers=AUTH)
         ws_id = create.json()["data"]["id"]
 
-        resp = await client.delete(f"/api/v2/workspaces/{ws_id}", headers=AUTH)
+        resp = await client.delete(f"/api/terrapod/v1/workspaces/{ws_id}", headers=AUTH)
         assert resp.status_code == 204
 
         resp = await client.get(f"/api/v2/workspaces/{ws_id}", headers=AUTH)

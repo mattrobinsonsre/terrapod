@@ -65,7 +65,7 @@ Browser                Next.js (port 3000)         FastAPI API (port 8000)
   |    (page render)        |                              |
   |<--- HTML + JS ----------|                              |
   |                         |                              |
-  |--- GET /api/v2/... ---->|                              |
+  |--- GET /api/terrapod/v1/... ---->|                              |
   |    (data fetch)         |--- proxy /api/* ------------>|
   |                         |<-- JSON response ------------|
   |<--- JSON response ------|                              |
@@ -97,10 +97,10 @@ High-priority pages that users watch actively use SSE for instant updates. The A
 
 | Redis Channel | SSE Endpoint | Frontend Hook | Used By |
 |---|---|---|---|
-| `tp:run_events:{ws_id}` | `GET /api/v2/workspaces/{id}/runs/events` | `useRunEvents` | Workspace detail page |
-| `tp:workspace_list_events` | `GET /api/v2/workspace-events` | `useWorkspaceListEvents` | Workspace list page |
-| `tp:pool_events:{pool_id}` | `GET /api/v2/agent-pools/{id}/events` | `usePoolEvents` | Agent pool detail page |
-| `tp:listener_events:{pool_id}` | `GET /api/v2/listeners/{id}/events` | (listener code) | Runner listeners |
+| `tp:run_events:{ws_id}` | `GET /api/terrapod/v1/workspaces/{id}/runs/events` | `useRunEvents` | Workspace detail page |
+| `tp:workspace_list_events` | `GET /api/terrapod/v1/workspace-events` | `useWorkspaceListEvents` | Workspace list page |
+| `tp:pool_events:{pool_id}` | `GET /api/terrapod/v1/agent-pools/{id}/events` | `usePoolEvents` | Agent pool detail page |
+| `tp:listener_events:{pool_id}` | `GET /api/terrapod/v1/listeners/{id}/events` | (listener code) | Runner listeners |
 
 **Shared SSE engine (`use-sse.ts`):**
 
@@ -201,10 +201,10 @@ Terrapod's execution layer follows the Actions Runner Controller (ARC) pattern: 
         |
 2. API publishes "run_available" event to pool's SSE channel (Redis pub/sub)
         |
-3. Listener receives SSE event → claims run: GET /api/v2/listeners/{id}/runs/next
+3. Listener receives SSE event → claims run: GET /api/terrapod/v1/listeners/{id}/runs/next
         |
 4. Listener requests a runner token:
-   POST /api/v2/listeners/{id}/runs/{run_id}/runner-token
+   POST /api/terrapod/v1/listeners/{id}/runs/{run_id}/runner-token
    - Returns short-lived HMAC-signed token scoped to run_id
         |
 5. Listener creates K8s Job in runner namespace
@@ -274,7 +274,7 @@ T=120s: K8s SIGKILL deadline
 **Key design decisions:**
 - **SIGINT, not SIGTERM**: HashiCorp recommends SIGINT for container graceful shutdown. A second signal (INT or TERM) causes ungraceful abort that may skip state writing entirely
 - **SIGKILL watchdog**: Only one signal is ever sent. If terraform hangs, the watchdog escalates to SIGKILL after `CHILD_GRACE` seconds
-- **State upload is fatal**: If state upload fails after a successful apply, the entrypoint calls `POST /api/v2/runs/{run_id}/state-diverged` to flag the workspace and exits with code 1
+- **State upload is fatal**: If state upload fails after a successful apply, the entrypoint calls `POST /api/terrapod/v1/runs/{run_id}/state-diverged` to flag the workspace and exits with code 1
 - **Time budget**: `TP_TERMINATION_GRACE` env var (from Helm `runners.terminationGracePeriodSeconds`) partitions the K8s grace period between terraform shutdown and artifact uploads (25s reserved for uploads)
 
 The entrypoint script is at `docker/runner-entrypoint.sh`.
@@ -289,10 +289,10 @@ All listeners follow the same flow — there is no distinction between pool type
 2. An admin generates a **join token** for the pool (default: 2 uses, 1h expiry)
 3. The listener Deployment is configured with `TERRAPOD_JOIN_TOKEN` and `TERRAPOD_API_URL`
 4. On startup, each listener pod looks for a Kubernetes Secret named after the Deployment (`{release-fullname}-listener-credentials`, supplied via `TERRAPOD_CREDENTIALS_SECRET_NAME`) in its own namespace. If present and valid, it adopts the existing identity (cert, key, CA, listener-id) and skips the join entirely
-5. If no Secret exists, the pod calls `POST /api/v2/agent-pools/join` with the token. The API validates it (SHA-256 hash, expiry, `max_uses`), issues a short-lived X.509 certificate (Ed25519, 1h validity by default), and returns the listener ID, cert, and pool ID
+5. If no Secret exists, the pod calls `POST /api/terrapod/v1/agent-pools/join` with the token. The API validates it (SHA-256 hash, expiry, `max_uses`), issues a short-lived X.509 certificate (Ed25519, 1h validity by default), and returns the listener ID, cert, and pool ID
 6. The pod writes the credentials to the Secret. If the create returns `409 AlreadyExists` (another pod won the race), the loser re-reads the Secret and adopts the winner's identity
 7. The listener authenticates subsequent API calls via `X-Terrapod-Client-Cert` header (base64-encoded PEM)
-8. The listener connects to the SSE endpoint (`GET /api/v2/listeners/{id}/events`) — a persistent outbound HTTP stream for receiving events from the API
+8. The listener connects to the SSE endpoint (`GET /api/terrapod/v1/listeners/{id}/events`) — a persistent outbound HTTP stream for receiving events from the API
 9. Heartbeats every 60s (300s TTL in Redis), SSE event loop handles run claims, Job status queries, log streaming, and cancellation
 
 The Secret-backed identity model means a listener Deployment has **one shared identity across all pods**, surviving pod replacement and rolling updates without re-joining. See [Runners → Listener identity](runners.md#listener-identity) for the full bootstrap, renewal, and rotation lifecycle.
@@ -336,7 +336,7 @@ Listener Join Flow:
     2. Listener pod reads K8s Secret {fullname}-listener-credentials
        - If valid cert present: adopt and skip join
        - Otherwise: continue to step 3
-    3. Listener calls POST /api/v2/agent-pools/join with the token
+    3. Listener calls POST /api/terrapod/v1/agent-pools/join with the token
     4. API validates join token (SHA-256 hash, expiry, max_uses)
     5. API issues short-lived X.509 certificate (1h default) with SAN URIs:
        - terrapod://listener/{name}
@@ -354,7 +354,7 @@ Certificate Renewal (multi-pod safe):
     - Each pod sleeps until cert reaches its renewal threshold
       (validity/2 + per-pod splay 0..30s, hash of POD_NAME)
     - Re-read the Secret first: if another pod already renewed, adopt and skip /renew
-    - Otherwise: POST /api/v2/listeners/{id}/renew (3 attempts with backoff)
+    - Otherwise: POST /api/terrapod/v1/listeners/{id}/renew (3 attempts with backoff)
     - Write Secret with resourceVersion CAS — on conflict, re-read and adopt
     - On /renew 401/403: clear Secret, fall back to join-token bootstrap
 ```
@@ -377,7 +377,7 @@ Browser                  Next.js              API               IDP (OIDC/SAML)
   |<-- Login page ----------|                   |                     |
   |                         |                   |                     |
   |-- Click SSO button ---->|                   |                     |
-  |                         |-- GET /api/v2/auth/authorize ---------->|
+  |                         |-- GET /api/terrapod/v1/auth/authorize ---------->|
   |                         |<-- redirect URL --|                     |
   |<-- 302 redirect --------|                   |                     |
   |                         |                   |                     |
@@ -471,7 +471,7 @@ Terrapod uses a polling-first design for VCS integration. No inbound connections
 |  For each workspace with VCS:          +------------------+
 |  1. Check branch HEAD SHA              | Optional:        |
 |  2. Check open PRs/MRs                 | GitHub webhook   |
-|  3. If new SHA detected:               | POST /api/v2/    |
+|  3. If new SHA detected:               | POST /api/terrapod/v1/    |
 |     - Download tarball                 | vcs-events/github|
 |     - Create ConfigurationVersion      +--------+---------+
 |     - Queue Run                                 |

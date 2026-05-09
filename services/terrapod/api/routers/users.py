@@ -23,7 +23,7 @@ from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/api/v2", tags=["users"])
+router = APIRouter(tags=["users"])
 
 
 def _format_timestamp(dt) -> str | None:  # type: ignore[no-untyped-def]
@@ -69,7 +69,7 @@ class UserCreateRequest(BaseModel):
     data: UserCreateData
 
 
-@router.post("/organizations/default/users", status_code=status.HTTP_201_CREATED)
+@router.post("/users", status_code=status.HTTP_201_CREATED)
 async def create_user(
     body: UserCreateRequest,
     user: AuthenticatedUser = Depends(require_admin),
@@ -117,7 +117,7 @@ async def create_user(
     return {"data": _user_to_jsonapi(new_user)}
 
 
-@router.get("/organizations/default/users")
+@router.get("/users")
 async def list_users(
     user: AuthenticatedUser = Depends(require_admin_or_audit),
     db: AsyncSession = Depends(get_db),
@@ -256,3 +256,19 @@ async def delete_user(
     await db.delete(target)
     await db.commit()
     logger.info("Deleted user", target_email=email, by=user.email)
+
+
+# ── Legacy alias router (v0.22 → v0.24 deprecation window) ─────────────
+# Mounted only at /api/v2 by app.py with deprecated=True and
+# include_in_schema=False. Preserves the *exact* path shapes that
+# existed in v0.22 — list/create at /organizations/default/users,
+# by-email at /users/{email} — for clients still using those paths.
+# Removed in v0.24.0 (#278).
+legacy_router = APIRouter(tags=["users-legacy"])
+legacy_router.add_api_route(
+    "/organizations/default/users", create_user, methods=["POST"], status_code=201
+)
+legacy_router.add_api_route("/organizations/default/users", list_users, methods=["GET"])
+legacy_router.add_api_route("/users/{email}", show_user, methods=["GET"])
+legacy_router.add_api_route("/users/{email}", update_user, methods=["PATCH"])
+legacy_router.add_api_route("/users/{email}", delete_user, methods=["DELETE"], status_code=204)

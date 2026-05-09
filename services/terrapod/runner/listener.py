@@ -366,7 +366,7 @@ class RunnerListener:
         running this listener should set POD_NAME explicitly.
         """
         await self._http_client.post(
-            f"/api/v2/listeners/listener-{self.identity.listener_id}/heartbeat",
+            f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}/heartbeat",
             json={
                 "capacity": self._max_concurrent,
                 "active_runs": self._active_launches,
@@ -457,9 +457,7 @@ class RunnerListener:
            HTTP roundtrip + Redis subscribe) and guarantees no stale
            subscription survives indefinitely.
         """
-        url = (
-            f"{self.identity.api_url}/api/v2/listeners/listener-{self.identity.listener_id}/events"
-        )
+        url = f"{self.identity.api_url}/api/terrapod/v1/listeners/listener-{self.identity.listener_id}/events"
         logger.info("SSE connecting", url=url)
 
         async with self._sse_client.stream("GET", url, headers=self._auth_headers()) as response:
@@ -575,7 +573,7 @@ class RunnerListener:
             return
 
         response = await self._http_client.get(
-            f"/api/v2/listeners/listener-{self.identity.listener_id}/runs/next",
+            f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}/runs/next",
             headers=self._auth_headers(),
         )
 
@@ -675,7 +673,7 @@ class RunnerListener:
         # Report Job launched to the API
         try:
             await self._http_client.post(
-                f"/api/v2/listeners/listener-{self.identity.listener_id}"
+                f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}"
                 f"/runs/run-{run_id}/job-launched",
                 json={"job_name": job_name, "job_namespace": namespace},
                 headers=self._auth_headers(),
@@ -705,7 +703,7 @@ class RunnerListener:
         """
         try:
             await self._http_client.patch(
-                f"/api/v2/listeners/listener-{self.identity.listener_id}/runs/run-{run_id}",
+                f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}/runs/run-{run_id}",
                 json={"status": "errored", "error_message": error_message},
                 headers=self._auth_headers(),
             )
@@ -744,7 +742,7 @@ class RunnerListener:
 
         try:
             await self._http_client.post(
-                f"/api/v2/listeners/listener-{self.identity.listener_id}"
+                f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}"
                 f"/runs/run-{run_id}/job-status",
                 json={"status": status, "phase": phase},
                 headers=self._auth_headers(),
@@ -795,7 +793,7 @@ class RunnerListener:
 
         try:
             await self._http_client.put(
-                f"/api/v2/listeners/listener-{self.identity.listener_id}"
+                f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}"
                 f"/runs/run-{run_id}/log-stream",
                 params={"phase": phase},
                 content=log_bytes,
@@ -837,7 +835,7 @@ class RunnerListener:
     async def _get_runner_token(self, run_id: str) -> str:
         """Request a short-lived runner token from the API."""
         response = await self._http_client.post(
-            f"/api/v2/listeners/listener-{self.identity.listener_id}"
+            f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}"
             f"/runs/run-{run_id}/runner-token",
             json={},
             headers=self._auth_headers(),

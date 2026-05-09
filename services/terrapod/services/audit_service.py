@@ -25,8 +25,11 @@ _EXCLUDED_PREFIXES = (
     "/api/openapi.json",
 )
 
-# Pattern: /api/v2/{resource_type}/{resource_id}/...
-_RESOURCE_PATTERN = re.compile(r"^/api/v2/(?:organizations/[^/]+/)?([a-z_-]+?)(?:/([^/]+))?(?:/|$)")
+# Pattern: /api/{v2,terrapod/v1}/[organizations/default/]{resource_type}/{resource_id}/...
+# Terrapod is single-org; the only valid org segment is the literal "default".
+_RESOURCE_PATTERN = re.compile(
+    r"^/api/(?:v2|terrapod/v1)/(?:organizations/default/)?([a-z_-]+?)(?:/([^/]+))?(?:/|$)"
+)
 
 
 def should_audit(path: str) -> bool:
@@ -40,8 +43,12 @@ def parse_resource(path: str) -> tuple[str, str]:
     Examples:
         /api/v2/workspaces/ws-abc123 → ("workspaces", "ws-abc123")
         /api/v2/organizations/default/workspaces → ("workspaces", "")
-        /api/v2/admin/audit-log → ("audit-log", "")
+        /api/terrapod/v1/admin/audit-log → ("audit-log", "")
+        /api/terrapod/v1/users/admin@example.com → ("users", "admin@example.com")
         /oauth/authorize → ("oauth", "")
+
+    Both /api/v2 (CLI surface + deprecated aliases during the v0.23.x
+    window) and /api/terrapod/v1 (canonical) prefixes are recognised.
     """
     m = _RESOURCE_PATTERN.match(path)
     if m:

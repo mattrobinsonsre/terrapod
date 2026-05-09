@@ -15,7 +15,7 @@ from terrapod.api.dependencies import AuthenticatedUser, require_admin_or_audit
 from terrapod.db.session import get_db
 from terrapod.services.audit_service import query_audit_log
 
-router = APIRouter(prefix="/api/v2/admin", tags=["audit"])
+router = APIRouter(prefix="/admin", tags=["audit"])
 
 
 def _format_timestamp(dt: datetime) -> str:

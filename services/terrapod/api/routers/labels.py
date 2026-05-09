@@ -4,9 +4,9 @@ UX CONTRACT: consumed by `web/src/app/labels/page.tsx`. Changes to
 response shapes here MUST be matched by frontend updates.
 
 Endpoints:
-    GET /api/v2/labels                       — distinct keys + per-type counts
-    GET /api/v2/labels/{key}                 — distinct values for a key
-    GET /api/v2/labels/{key}/{value}         — entities tagged with key=value
+    GET /api/terrapod/v1/labels                       — distinct keys + per-type counts
+    GET /api/terrapod/v1/labels/{key}                 — distinct values for a key
+    GET /api/terrapod/v1/labels/{key}/{value}         — entities tagged with key=value
 
 All three are RBAC-filtered: results only include labels carried by
 entities the caller has at least `read` on for that entity's
@@ -22,7 +22,7 @@ from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.db.session import get_db
 from terrapod.services import labels_service
 
-router = APIRouter(prefix="/api/v2", tags=["labels"])
+router = APIRouter(tags=["labels"])
 
 
 @router.get("/labels")

@@ -15,10 +15,10 @@ CLI Protocol:
     GET  /api/v2/registry/providers/{namespace}/{name}/{version}/download/{os}/{arch}
 
 TFE V2 Management:
-    POST   /api/v2/organizations/default/registry-providers
-    GET    /api/v2/organizations/default/registry-providers
-    GET    /api/v2/organizations/default/registry-providers/private/default/{name}
-    DELETE /api/v2/organizations/default/registry-providers/private/default/{name}
+    POST   /api/terrapod/v1/registry-providers
+    GET    /api/terrapod/v1/registry-providers
+    GET    /api/terrapod/v1/registry-providers/private/default/{name}
+    DELETE /api/terrapod/v1/registry-providers/private/default/{name}
     POST   .../private/default/{name}/versions
     GET    .../private/default/{name}/versions
     DELETE .../private/default/{name}/versions/{ver}
@@ -67,7 +67,14 @@ from terrapod.services.registry_rbac_service import (
 from terrapod.storage import get_storage
 from terrapod.storage.protocol import ObjectStore
 
-router = APIRouter(tags=["registry-providers"])
+router = APIRouter(prefix="/api/v2", tags=["registry-providers"])
+
+# Terrapod-native provider-registry management — org-scoped CRUD on
+# private providers + their versions + per-platform binaries. The CLI
+# only uses the /api/v2/registry/providers/... download protocol on
+# `router`. Dual-mounted at /api/terrapod/v1 (canonical) and /api/v2
+# (deprecated alias removed in v0.24.0 — see #278).
+management_router = APIRouter(tags=["registry-providers-management"])
 logger = get_logger(__name__)
 
 
@@ -203,7 +210,7 @@ async def _require_provider_permission(
 # --- CLI Protocol Endpoints ---
 
 
-@router.get("/api/v2/registry/providers/{namespace}/{name}/versions")
+@router.get("/registry/providers/{namespace}/{name}/versions")
 async def list_provider_versions_cli(
     namespace: str,
     name: str,
@@ -252,7 +259,7 @@ async def list_provider_versions_cli(
     return JSONResponse(content={"versions": versions})
 
 
-@router.get("/api/v2/registry/providers/{namespace}/{name}/{version}/download/{os}/{arch}")
+@router.get("/registry/providers/{namespace}/{name}/{version}/download/{os}/{arch}")
 async def download_provider_cli(
     namespace: str,
     name: str,
@@ -299,12 +306,12 @@ async def download_provider_cli(
     return JSONResponse(content=info)
 
 
-# --- TFE V2 Management Endpoints ---
+# --- Management Endpoints (Terrapod-native) ---
 
-_ORG_PREFIX = "/api/v2/organizations/default/registry-providers"
+_BASE = "/registry-providers"
 
 
-@router.post(_ORG_PREFIX)
+@management_router.post(_BASE)
 async def create_provider_endpoint(
     body: CreateProviderRequest,
     user: AuthenticatedUser = Depends(require_non_runner),
@@ -326,7 +333,7 @@ async def create_provider_endpoint(
     )
 
 
-@router.get(_ORG_PREFIX)
+@management_router.get(_BASE)
 async def list_providers_endpoint(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -349,7 +356,7 @@ async def list_providers_endpoint(
     return JSONResponse(content={"data": visible})
 
 
-@router.get(_ORG_PREFIX + "/private/default/{name}")
+@management_router.get(_BASE + "/private/default/{name}")
 async def show_provider_endpoint(
     name: str,
     user: AuthenticatedUser = Depends(get_current_user),
@@ -375,7 +382,7 @@ async def show_provider_endpoint(
     return JSONResponse(content={"data": _provider_to_jsonapi(provider, perm)})
 
 
-@router.delete(_ORG_PREFIX + "/private/default/{name}")
+@management_router.delete(_BASE + "/private/default/{name}")
 async def delete_provider_endpoint(
     name: str,
     user: AuthenticatedUser = Depends(get_current_user),
@@ -397,7 +404,7 @@ async def delete_provider_endpoint(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.patch(_ORG_PREFIX + "/private/default/{name}")
+@management_router.patch(_BASE + "/private/default/{name}")
 async def update_provider_endpoint(
     name: str,
     body: dict,
@@ -484,7 +491,7 @@ async def update_provider_endpoint(
 # --- Version Management ---
 
 
-@router.post(_ORG_PREFIX + "/private/default/{name}/versions")
+@management_router.post(_BASE + "/private/default/{name}/versions")
 async def create_provider_version_endpoint(
     name: str,
     body: CreateProviderVersionRequest,
@@ -536,7 +543,7 @@ async def create_provider_version_endpoint(
     )
 
 
-@router.get(_ORG_PREFIX + "/private/default/{name}/versions")
+@management_router.get(_BASE + "/private/default/{name}/versions")
 async def list_provider_versions_endpoint(
     name: str,
     user: AuthenticatedUser = Depends(get_current_user),
@@ -565,7 +572,7 @@ async def list_provider_versions_endpoint(
     )
 
 
-@router.delete(_ORG_PREFIX + "/private/default/{name}/versions/{version}")
+@management_router.delete(_BASE + "/private/default/{name}/versions/{version}")
 async def delete_provider_version_endpoint(
     name: str,
     version: str,
@@ -589,7 +596,7 @@ async def delete_provider_version_endpoint(
 # --- Platform Management ---
 
 
-@router.post(_ORG_PREFIX + "/private/default/{name}/versions/{version}/platforms")
+@management_router.post(_BASE + "/private/default/{name}/versions/{version}/platforms")
 async def create_provider_platform_endpoint(
     name: str,
     version: str,
@@ -621,7 +628,7 @@ async def create_provider_platform_endpoint(
     )
 
 
-@router.get(_ORG_PREFIX + "/private/default/{name}/versions/{version}/platforms")
+@management_router.get(_BASE + "/private/default/{name}/versions/{version}/platforms")
 async def list_provider_platforms_endpoint(
     name: str,
     version: str,
@@ -655,7 +662,9 @@ async def list_provider_platforms_endpoint(
     )
 
 
-@router.put(_ORG_PREFIX + "/private/default/{name}/versions/{version}/platforms/{os}/{arch}/upload")
+@management_router.put(
+    _BASE + "/private/default/{name}/versions/{version}/platforms/{os}/{arch}/upload"
+)
 async def upload_provider_binary_endpoint(
     name: str,
     version: str,
@@ -695,7 +704,9 @@ async def upload_provider_binary_endpoint(
     )
 
 
-@router.delete(_ORG_PREFIX + "/private/default/{name}/versions/{version}/platforms/{os}/{arch}")
+@management_router.delete(
+    _BASE + "/private/default/{name}/versions/{version}/platforms/{os}/{arch}"
+)
 async def delete_provider_platform_endpoint(
     name: str,
     version: str,

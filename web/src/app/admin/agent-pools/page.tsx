@@ -72,7 +72,7 @@ export default function AgentPoolsPage() {
   async function loadPools() {
     setLoading(true)
     try {
-      const res = await apiFetch('/api/v2/organizations/default/agent-pools')
+      const res = await apiFetch('/api/terrapod/v1/agent-pools')
       if (!res.ok) throw new Error('Failed to load agent pools')
       const data = await res.json()
       setPools(data.data || [])
@@ -92,7 +92,7 @@ export default function AgentPoolsPage() {
       if (description) attrs.description = description
       if (Object.keys(createLabels).length > 0) attrs.labels = createLabels
 
-      const res = await apiFetch('/api/v2/organizations/default/agent-pools', {
+      const res = await apiFetch('/api/terrapod/v1/agent-pools', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'agent-pools', attributes: attrs } }),

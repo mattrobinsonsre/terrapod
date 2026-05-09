@@ -6,12 +6,12 @@ UX CONTRACT: Notification endpoints are consumed by the web frontend:
   matched by corresponding updates to that frontend page.
 
 Endpoints:
-    POST   /api/v2/workspaces/{id}/notification-configurations      (create)
-    GET    /api/v2/workspaces/{id}/notification-configurations      (list)
-    GET    /api/v2/notification-configurations/{id}                  (show)
-    PATCH  /api/v2/notification-configurations/{id}                  (update)
-    DELETE /api/v2/notification-configurations/{id}                  (delete)
-    POST   /api/v2/notification-configurations/{id}/actions/verify   (verify)
+    POST   /api/terrapod/v1/workspaces/{id}/notification-configurations      (create)
+    GET    /api/terrapod/v1/workspaces/{id}/notification-configurations      (list)
+    GET    /api/terrapod/v1/notification-configurations/{id}                  (show)
+    PATCH  /api/terrapod/v1/notification-configurations/{id}                  (update)
+    DELETE /api/terrapod/v1/notification-configurations/{id}                  (delete)
+    POST   /api/terrapod/v1/notification-configurations/{id}/actions/verify   (verify)
 """
 
 import uuid
@@ -35,7 +35,7 @@ from terrapod.services.notification_service import (
 )
 from terrapod.services.workspace_rbac_service import has_permission, resolve_workspace_permission
 
-router = APIRouter(prefix="/api/v2", tags=["notification-configurations"])
+router = APIRouter(tags=["notification-configurations"])
 logger = get_logger(__name__)
 
 
@@ -70,7 +70,7 @@ def _nc_json(nc: NotificationConfiguration) -> dict:
             },
         },
         "links": {
-            "self": f"/api/v2/notification-configurations/{nc_id}",
+            "self": f"/api/terrapod/v1/notification-configurations/{nc_id}",
         },
     }
 

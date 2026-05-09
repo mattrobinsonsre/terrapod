@@ -10,10 +10,10 @@ UX CONTRACT: VCS connection endpoints are consumed by the web frontend:
   matched by corresponding updates to that frontend page.
 
 Endpoints:
-    GET    /api/v2/organizations/default/vcs-connections   (list connections)
-    POST   /api/v2/organizations/default/vcs-connections   (create connection)
-    GET    /api/v2/vcs-connections/{id}                  (show connection)
-    DELETE /api/v2/vcs-connections/{id}                  (delete connection)
+    GET    /api/terrapod/v1/vcs-connections   (list connections)
+    POST   /api/terrapod/v1/vcs-connections   (create connection)
+    GET    /api/terrapod/v1/vcs-connections/{id}                  (show connection)
+    DELETE /api/terrapod/v1/vcs-connections/{id}                  (delete connection)
 """
 
 import uuid
@@ -29,7 +29,7 @@ from terrapod.db.models import VCSConnection, generate_uuid7
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 
-router = APIRouter(prefix="/api/v2", tags=["vcs-connections"])
+router = APIRouter(tags=["vcs-connections"])
 logger = get_logger(__name__)
 
 SUPPORTED_PROVIDERS = {"github", "gitlab"}
@@ -83,7 +83,7 @@ async def _get_connection(db: AsyncSession, connection_id: uuid.UUID) -> VCSConn
     return result.scalar_one_or_none()
 
 
-@router.get("/organizations/default/vcs-connections")
+@router.get("/vcs-connections")
 async def list_connections(
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
@@ -93,7 +93,7 @@ async def list_connections(
     return JSONResponse(content={"data": [_connection_json(c) for c in connections]})
 
 
-@router.post("/organizations/default/vcs-connections", status_code=201)
+@router.post("/vcs-connections", status_code=201)
 async def create_connection(
     body: dict = Body(...),
     user: AuthenticatedUser = Depends(require_admin),
@@ -212,3 +212,21 @@ async def delete_connection(
     await db.delete(conn)
     await db.commit()
     logger.info("VCS connection deleted", connection_id=str(conn.id))
+
+
+# ── Legacy alias router (v0.22 → v0.24 deprecation window) ─────────────
+# Mounted only at /api/v2 by app.py with deprecated=True and
+# include_in_schema=False. Preserves pre-v0.23 path shapes:
+# list/create were at /organizations/default/vcs-connections,
+# by-id at /vcs-connections/{id}. Removed in v0.24.0 (#278).
+legacy_router = APIRouter(tags=["vcs-connections-legacy"])
+legacy_router.add_api_route(
+    "/organizations/default/vcs-connections", list_connections, methods=["GET"]
+)
+legacy_router.add_api_route(
+    "/organizations/default/vcs-connections", create_connection, methods=["POST"], status_code=201
+)
+legacy_router.add_api_route("/vcs-connections/{connection_id}", show_connection, methods=["GET"])
+legacy_router.add_api_route(
+    "/vcs-connections/{connection_id}", delete_connection, methods=["DELETE"], status_code=204
+)

@@ -28,6 +28,11 @@ from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
 
 router = APIRouter(tags=["oauth"])
+
+# Terrapod-only CLI login completion check. Dual-mounted under
+# /api/terrapod/v1 (canonical) and /api/v2 (deprecated, removed in
+# v0.24.0 — see #278).
+extensions_router = APIRouter(tags=["oauth-extensions"])
 logger = get_logger(__name__)
 
 
@@ -172,7 +177,7 @@ async def oauth_token(
     )
 
 
-@router.get("/api/v2/auth/cli-login-status")
+@extensions_router.get("/auth/cli-login-status")
 async def cli_login_status(code: str = Query(...)) -> JSONResponse:
     """Check if a CLI login flow completed (token was created)."""
     redis = get_redis_client()

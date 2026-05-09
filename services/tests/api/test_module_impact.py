@@ -278,7 +278,7 @@ class TestRetryRunCopiesOverrides:
         app, _ = _make_app(_admin_user(), mock_db=mock_db)
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             resp = await client.post(
-                f"/api/v2/runs/run-{original.id}/actions/retry",
+                f"/api/terrapod/v1/runs/run-{original.id}/actions/retry",
                 headers=_AUTH,
             )
 
@@ -311,7 +311,7 @@ class TestWorkspaceLinkCRUD:
         app, _ = _make_app(_admin_user(), mock_db=mock_db)
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             resp = await client.get(
-                "/api/v2/organizations/default/registry-modules/private/default/eks/aws/workspace-links",
+                "/api/terrapod/v1/registry-modules/private/default/eks/aws/workspace-links",
                 headers=_AUTH,
             )
 
@@ -335,7 +335,7 @@ class TestWorkspaceLinkCRUD:
         app, _ = _make_app(_admin_user())
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             resp = await client.post(
-                "/api/v2/organizations/default/registry-modules/private/default/eks/aws/workspace-links",
+                "/api/terrapod/v1/registry-modules/private/default/eks/aws/workspace-links",
                 headers={**_AUTH, "Content-Type": "application/vnd.api+json"},
                 json={
                     "data": {

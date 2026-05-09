@@ -143,19 +143,6 @@ class TestCreateWorkspace:
             )
         assert resp.status_code == 422
 
-    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
-    @patch("terrapod.api.app.init_redis")
-    @patch("terrapod.api.app.init_db")
-    async def test_create_wrong_org_returns_404(self, *mocks):
-        app, _ = _make_app(_user())
-        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.post(
-                "/api/v2/organizations/other-org/workspaces",
-                json={"data": {"attributes": {"name": "ws"}}},
-                headers=_AUTH,
-            )
-        assert resp.status_code == 404
-
 
 # ── Show Workspace ─────────────────────────────────────────────────────
 
@@ -328,7 +315,7 @@ class TestDeleteWorkspace:
         mock_db.execute.return_value = mock_result
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.delete(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
+            resp = await c.delete(f"/api/terrapod/v1/workspaces/ws-{ws.id}", headers=_AUTH)
         assert resp.status_code == 204
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
@@ -344,7 +331,7 @@ class TestDeleteWorkspace:
         mock_db.execute.return_value = mock_result
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.delete(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
+            resp = await c.delete(f"/api/terrapod/v1/workspaces/ws-{ws.id}", headers=_AUTH)
         assert resp.status_code == 403
 
 

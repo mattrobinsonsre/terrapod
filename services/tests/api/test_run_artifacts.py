@@ -76,7 +76,7 @@ class TestUploadStateDuplicateSerial:
         state_json = json.dumps({"version": 4, "serial": 8, "lineage": "abc"})
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             resp = await client.put(
-                f"/api/v2/runs/{run.id}/artifacts/state",
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/state",
                 content=state_json,
                 headers={**_AUTH, "Content-Type": "application/json"},
             )
@@ -115,7 +115,7 @@ class TestUploadStateDuplicateSerial:
         state_json = json.dumps({"version": 4, "serial": 8, "lineage": "abc"})
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             resp = await client.put(
-                f"/api/v2/runs/{run.id}/artifacts/state",
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/state",
                 content=state_json,
                 headers={**_AUTH, "Content-Type": "application/json"},
             )
@@ -153,7 +153,7 @@ class TestUploadStateDuplicateSerial:
         state_json = json.dumps({"version": 4, "serial": 9, "lineage": "abc"})
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             resp = await client.put(
-                f"/api/v2/runs/{run.id}/artifacts/state",
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/state",
                 content=state_json,
                 headers={**_AUTH, "Content-Type": "application/json"},
             )

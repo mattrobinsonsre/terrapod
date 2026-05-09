@@ -7,13 +7,13 @@ Downloads return 302 redirects to presigned storage URLs.
 Uploads accept raw bytes and write to storage directly.
 
 Endpoints:
-    GET  /api/v2/runs/{run_id}/artifacts/config      — download config archive
-    GET  /api/v2/runs/{run_id}/artifacts/state        — download current state
-    GET  /api/v2/runs/{run_id}/artifacts/plan-file    — download plan file
-    PUT  /api/v2/runs/{run_id}/artifacts/plan-log     — upload plan log
-    PUT  /api/v2/runs/{run_id}/artifacts/plan-file    — upload plan file
-    PUT  /api/v2/runs/{run_id}/artifacts/apply-log    — upload apply log
-    PUT  /api/v2/runs/{run_id}/artifacts/state        — upload new state
+    GET  /api/terrapod/v1/runs/{run_id}/artifacts/config      — download config archive
+    GET  /api/terrapod/v1/runs/{run_id}/artifacts/state        — download current state
+    GET  /api/terrapod/v1/runs/{run_id}/artifacts/plan-file    — download plan file
+    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-log     — upload plan log
+    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-file    — upload plan file
+    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/apply-log    — upload apply log
+    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/state        — upload new state
 """
 
 import asyncio
@@ -40,7 +40,7 @@ from terrapod.storage.keys import (
     state_key,
 )
 
-router = APIRouter(prefix="/api/v2", tags=["run-artifacts"])
+router = APIRouter(tags=["run-artifacts"])
 logger = get_logger(__name__)
 
 

@@ -94,8 +94,8 @@ export default function CachePage() {
     setLoading(true)
     try {
       const [binaryRes, providerRes] = await Promise.all([
-        apiFetch('/api/v2/admin/binary-cache'),
-        apiFetch('/api/v2/admin/provider-cache'),
+        apiFetch('/api/terrapod/v1/admin/binary-cache'),
+        apiFetch('/api/terrapod/v1/admin/provider-cache'),
       ])
       if (!binaryRes.ok) throw new Error('Failed to load binary cache')
       const binaryData = await binaryRes.json()
@@ -116,7 +116,7 @@ export default function CachePage() {
     setError('')
     setSuccess('')
     try {
-      const res = await apiFetch(`/api/v2/admin/binary-cache/${tool}/${version}`, {
+      const res = await apiFetch(`/api/terrapod/v1/admin/binary-cache/${tool}/${version}`, {
         method: 'DELETE',
       })
       if (!res.ok) throw new Error(`Purge failed (${res.status})`)
@@ -132,7 +132,7 @@ export default function CachePage() {
     setError('')
     setSuccess('')
     try {
-      const res = await apiFetch(`/api/v2/admin/provider-cache/${hostname}/${namespace}/${type}/${version}`, {
+      const res = await apiFetch(`/api/terrapod/v1/admin/provider-cache/${hostname}/${namespace}/${type}/${version}`, {
         method: 'DELETE',
       })
       if (!res.ok) throw new Error(`Purge failed (${res.status})`)
@@ -191,7 +191,7 @@ export default function CachePage() {
       }
       let totalPurged = 0
       for (const { tool, version } of keys.values()) {
-        const res = await apiFetch(`/api/v2/admin/binary-cache/${tool}/${version}`, { method: 'DELETE' })
+        const res = await apiFetch(`/api/terrapod/v1/admin/binary-cache/${tool}/${version}`, { method: 'DELETE' })
         if (!res.ok) throw new Error(`Purge failed for ${tool} ${version}`)
         const data = await res.json()
         totalPurged += data.count || 0
@@ -226,7 +226,7 @@ export default function CachePage() {
       }
       let totalPurged = 0
       for (const { hostname, namespace, type, version } of keys.values()) {
-        const res = await apiFetch(`/api/v2/admin/provider-cache/${hostname}/${namespace}/${type}/${version}`, { method: 'DELETE' })
+        const res = await apiFetch(`/api/terrapod/v1/admin/provider-cache/${hostname}/${namespace}/${type}/${version}`, { method: 'DELETE' })
         if (!res.ok) throw new Error(`Purge failed for ${namespace}/${type} ${version}`)
         const data = await res.json()
         totalPurged += data.count || 0

@@ -99,7 +99,7 @@ export default function AuditLogPage() {
       if (filterSince) params.set('filter[since]', new Date(filterSince).toISOString())
       if (filterUntil) params.set('filter[until]', new Date(filterUntil).toISOString())
 
-      const res = await apiFetch(`/api/v2/admin/audit-log?${params.toString()}`)
+      const res = await apiFetch(`/api/terrapod/v1/admin/audit-log?${params.toString()}`)
       if (!res.ok) throw new Error('Failed to load audit log')
       const data = await res.json()
       setEntries(data.data || [])

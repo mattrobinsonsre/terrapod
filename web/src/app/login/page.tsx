@@ -41,7 +41,7 @@ function LoginContent() {
   const externalProviders = providers.filter((p) => p.type !== 'local')
 
   useEffect(() => {
-    fetch('/api/v2/auth/providers')
+    fetch('/api/terrapod/v1/auth/providers')
       .then(async (res) => {
         if (!res.ok) throw new Error('Failed to load providers')
         const data = await res.json()
@@ -61,7 +61,7 @@ function LoginContent() {
     if (cliState) {
       const form = document.createElement('form')
       form.method = 'POST'
-      form.action = '/api/v2/auth/local/login'
+      form.action = '/api/terrapod/v1/auth/local/login'
       for (const [k, v] of Object.entries({ state: cliState, email, password })) {
         const input = document.createElement('input')
         input.type = 'hidden'
@@ -78,7 +78,7 @@ function LoginContent() {
       const { verifier, challenge } = await generatePKCE()
       const state = generateState()
 
-      const authRes = await fetch('/api/v2/auth/local/authorize', {
+      const authRes = await fetch('/api/terrapod/v1/auth/local/authorize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -97,7 +97,7 @@ function LoginContent() {
 
       const { code } = await authRes.json()
 
-      const tokenRes = await fetch('/api/v2/auth/token', {
+      const tokenRes = await fetch('/api/terrapod/v1/auth/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         credentials: 'include',
@@ -132,7 +132,7 @@ function LoginContent() {
     // CLI login flow: redirect to the CLI SSO endpoint which carries
     // over the pending auth state from /oauth/authorize
     if (cliState) {
-      window.location.href = `/api/v2/auth/cli-sso-redirect?provider=${encodeURIComponent(providerName)}&cli_state=${encodeURIComponent(cliState)}`
+      window.location.href = `/api/terrapod/v1/auth/cli-sso-redirect?provider=${encodeURIComponent(providerName)}&cli_state=${encodeURIComponent(cliState)}`
       return
     }
 
@@ -155,7 +155,7 @@ function LoginContent() {
         response_type: 'code',
       })
 
-      window.location.href = `/api/v2/auth/authorize?${params.toString()}`
+      window.location.href = `/api/terrapod/v1/auth/authorize?${params.toString()}`
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start login')
     }

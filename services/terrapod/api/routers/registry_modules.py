@@ -15,12 +15,12 @@ CLI Protocol:
     GET  /api/v2/registry/modules/{namespace}/{name}/{provider}/{version}/download
 
 TFE V2 Management:
-    POST   /api/v2/organizations/default/registry-modules
-    GET    /api/v2/organizations/default/registry-modules
-    GET    /api/v2/organizations/default/registry-modules/private/default/{name}/{prov}
-    DELETE /api/v2/organizations/default/registry-modules/private/default/{name}/{prov}
-    POST   /api/v2/organizations/default/registry-modules/private/default/{name}/{prov}/versions
-    DELETE /api/v2/organizations/default/registry-modules/private/default/{name}/{prov}/{ver}
+    POST   /api/terrapod/v1/registry-modules
+    GET    /api/terrapod/v1/registry-modules
+    GET    /api/terrapod/v1/registry-modules/private/default/{name}/{prov}
+    DELETE /api/terrapod/v1/registry-modules/private/default/{name}/{prov}
+    POST   /api/terrapod/v1/registry-modules/private/default/{name}/{prov}/versions
+    DELETE /api/terrapod/v1/registry-modules/private/default/{name}/{prov}/{ver}
 """
 
 import uuid as _uuid
@@ -55,7 +55,20 @@ from terrapod.services.registry_rbac_service import (
 from terrapod.storage import get_storage
 from terrapod.storage.protocol import ObjectStore
 
-router = APIRouter(tags=["registry-modules"])
+router = APIRouter(prefix="/api/v2", tags=["registry-modules"])
+
+# Workspace-links — Terrapod extension on top of the TFE registry-modules
+# surface. Dual-mounted under /api/terrapod/v1 (canonical) and /api/v2
+# (deprecated, removed in v0.24.0 — see #278).
+workspace_links_router = APIRouter(tags=["module-workspace-links"])
+
+# Terrapod-native module-registry management — workspace-scoped CRUD on
+# private modules, version create/delete, direct tarball upload, and the
+# /vcs configuration endpoint. The CLI never calls these (it uses the
+# /api/v2/registry/modules/... download protocol on `router`). Dual-mounted
+# at /api/terrapod/v1 (canonical) and /api/v2 (deprecated alias removed in
+# v0.24.0 — see #278).
+management_router = APIRouter(tags=["registry-modules-management"])
 logger = get_logger(__name__)
 
 
@@ -156,7 +169,7 @@ def _module_to_jsonapi(module, effective_permission: str | None = None) -> dict:
 # --- CLI Protocol Endpoints ---
 
 
-@router.get("/api/v2/registry/modules/{namespace}/{name}/{provider}/versions")
+@router.get("/registry/modules/{namespace}/{name}/{provider}/versions")
 async def list_module_versions_cli(
     namespace: str,
     name: str,
@@ -193,7 +206,7 @@ async def list_module_versions_cli(
     )
 
 
-@router.get("/api/v2/registry/modules/{namespace}/{name}/{provider}/{version}/download")
+@router.get("/registry/modules/{namespace}/{name}/{provider}/{version}/download")
 async def download_module_cli(
     namespace: str,
     name: str,
@@ -239,7 +252,7 @@ async def download_module_cli(
 # --- TFE V2 Management Endpoints ---
 
 
-@router.post("/api/v2/organizations/default/registry-modules")
+@management_router.post("/registry-modules")
 async def create_module_endpoint(
     body: CreateModuleRequest,
     user: AuthenticatedUser = Depends(require_non_runner),
@@ -293,7 +306,7 @@ async def create_module_endpoint(
     )
 
 
-@router.get("/api/v2/organizations/default/registry-modules")
+@management_router.get("/registry-modules")
 async def list_modules_endpoint(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -316,7 +329,7 @@ async def list_modules_endpoint(
     return JSONResponse(content={"data": visible})
 
 
-@router.get("/api/v2/organizations/default/registry-modules/private/default/{name}/{provider}")
+@management_router.get("/registry-modules/private/default/{name}/{provider}")
 async def show_module_endpoint(
     name: str,
     provider: str,
@@ -343,7 +356,7 @@ async def show_module_endpoint(
     return JSONResponse(content={"data": _module_to_jsonapi(module, perm)})
 
 
-@router.delete("/api/v2/organizations/default/registry-modules/private/default/{name}/{provider}")
+@management_router.delete("/registry-modules/private/default/{name}/{provider}")
 async def delete_module_endpoint(
     name: str,
     provider: str,
@@ -379,7 +392,7 @@ async def delete_module_endpoint(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.patch("/api/v2/organizations/default/registry-modules/private/default/{name}/{provider}")
+@management_router.patch("/registry-modules/private/default/{name}/{provider}")
 async def update_module_endpoint(
     name: str,
     provider: str,
@@ -493,9 +506,7 @@ async def update_module_endpoint(
     return JSONResponse(content={"data": _module_to_jsonapi(module, perm)})
 
 
-@router.post(
-    "/api/v2/organizations/default/registry-modules/private/default/{name}/{provider}/versions"
-)
+@management_router.post("/registry-modules/private/default/{name}/{provider}/versions")
 async def create_module_version_endpoint(
     name: str,
     provider: str,
@@ -555,9 +566,7 @@ async def create_module_version_endpoint(
     )
 
 
-@router.delete(
-    "/api/v2/organizations/default/registry-modules/private/default/{name}/{provider}/{version}"
-)
+@management_router.delete("/registry-modules/private/default/{name}/{provider}/{version}")
 async def delete_module_version_endpoint(
     name: str,
     provider: str,
@@ -595,8 +604,8 @@ async def delete_module_version_endpoint(
 # --- Direct Upload ---
 
 
-@router.put(
-    "/api/v2/organizations/default/registry-modules/private/default/{name}/{provider}/versions/{version}/upload"
+@management_router.put(
+    "/registry-modules/private/default/{name}/{provider}/versions/{version}/upload"
 )
 async def upload_module_version_endpoint(
     name: str,
@@ -678,9 +687,7 @@ class UpdateModuleVCSRequest(BaseModel):
     data: Data
 
 
-@router.patch(
-    "/api/v2/organizations/default/registry-modules/private/default/{name}/{provider}/vcs"
-)
+@management_router.patch("/registry-modules/private/default/{name}/{provider}/vcs")
 async def update_module_vcs_endpoint(
     name: str,
     provider: str,
@@ -775,9 +782,7 @@ def _link_to_jsonapi(link: ModuleWorkspaceLink) -> dict:
     }
 
 
-@router.get(
-    "/api/v2/organizations/default/registry-modules/private/default/{name}/{provider}/workspace-links"
-)
+@workspace_links_router.get("/registry-modules/private/default/{name}/{provider}/workspace-links")
 async def list_workspace_links(
     name: str,
     provider: str,
@@ -811,9 +816,7 @@ async def list_workspace_links(
     return JSONResponse(content={"data": [_link_to_jsonapi(link) for link in links]})
 
 
-@router.post(
-    "/api/v2/organizations/default/registry-modules/private/default/{name}/{provider}/workspace-links"
-)
+@workspace_links_router.post("/registry-modules/private/default/{name}/{provider}/workspace-links")
 async def create_workspace_link(
     name: str,
     provider: str,
@@ -884,8 +887,8 @@ async def create_workspace_link(
     )
 
 
-@router.delete(
-    "/api/v2/organizations/default/registry-modules/private/default/{name}/{provider}/workspace-links/{link_id}"
+@workspace_links_router.delete(
+    "/registry-modules/private/default/{name}/{provider}/workspace-links/{link_id}"
 )
 async def delete_workspace_link(
     name: str,

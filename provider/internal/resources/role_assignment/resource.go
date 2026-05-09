@@ -6,12 +6,12 @@
 //	ID: composite — provider_name/email/role_name
 //
 //	Create: Read-modify-write via:
-//	  1. GET  /api/v2/role-assignments                        — list all, filter by provider+email
-//	  2. PUT  /api/v2/role-assignments                        — replace-all semantics for (provider, email)
+//	  1. GET  /api/terrapod/v1/role-assignments                        — list all, filter by provider+email
+//	  2. PUT  /api/terrapod/v1/role-assignments                        — replace-all semantics for (provider, email)
 //	     Body: {"data": {"attributes": {"provider-name": "...", "email": "...", "roles": ["admin", "custom"]}}}
 //
-//	Read:   GET    /api/v2/role-assignments                   — list all, find matching entry
-//	Delete: DELETE /api/v2/role-assignments/{provider}/{email}/{role}
+//	Read:   GET    /api/terrapod/v1/role-assignments                   — list all, find matching entry
+//	Delete: DELETE /api/terrapod/v1/role-assignments/{provider}/{email}/{role}
 //
 // Each Terraform resource instance represents ONE (provider, email, role)
 // triple. Create adds the role to the user's existing set; delete removes
@@ -228,7 +228,7 @@ func (r *roleAssignmentResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	deletePath := fmt.Sprintf("/api/v2/role-assignments/%s/%s/%s",
+	deletePath := fmt.Sprintf("/api/terrapod/v1/role-assignments/%s/%s/%s",
 		state.ProviderName.ValueString(),
 		state.Email.ValueString(),
 		state.RoleName.ValueString(),
@@ -264,7 +264,7 @@ type assignmentData struct {
 // listRolesForIdentity fetches all role assignments and returns the role names
 // for the given (provider, email) pair.
 func (r *roleAssignmentResource) listRolesForIdentity(ctx context.Context, providerName, email string) ([]string, error) {
-	data, err := r.client.Get(ctx, "/api/v2/role-assignments")
+	data, err := r.client.Get(ctx, "/api/terrapod/v1/role-assignments")
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +286,7 @@ func (r *roleAssignmentResource) listRolesForIdentity(ctx context.Context, provi
 // findAssignment looks up a specific (provider, email, role) triple in the
 // assignment list.
 func (r *roleAssignmentResource) findAssignment(ctx context.Context, providerName, email, roleName string) (*assignmentData, error) {
-	data, err := r.client.Get(ctx, "/api/v2/role-assignments")
+	data, err := r.client.Get(ctx, "/api/terrapod/v1/role-assignments")
 	if err != nil {
 		return nil, err
 	}
@@ -319,11 +319,11 @@ func (r *roleAssignmentResource) putRoles(ctx context.Context, providerName, ema
 		return fmt.Errorf("marshalling PUT body: %w", err)
 	}
 
-	_, err = r.client.Put(ctx, "/api/v2/role-assignments", body)
+	_, err = r.client.Put(ctx, "/api/terrapod/v1/role-assignments", body)
 	return err
 }
 
-// parseAssignmentList parses the GET /api/v2/role-assignments response.
+// parseAssignmentList parses the GET /api/terrapod/v1/role-assignments response.
 // The response has {"data": [{"type": "role-assignments", "attributes": {...}}, ...]}.
 func parseAssignmentList(data []byte) ([]assignmentData, error) {
 	var doc struct {

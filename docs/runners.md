@@ -230,7 +230,7 @@ This is intentional: scaling the Deployment must not require new join tokens or 
 On startup each pod runs the same flow:
 
 1. Read the credentials Secret (name supplied via `TERRAPOD_CREDENTIALS_SECRET_NAME`, set by Helm to the Deployment fullname + `-credentials`). If it exists and has a valid cert/key/listener-id, adopt that identity and skip everything below.
-2. If no Secret, call `POST /api/v2/agent-pools/join` with `TERRAPOD_JOIN_TOKEN`. The API issues a short-lived cert and returns the full identity.
+2. If no Secret, call `POST /api/terrapod/v1/agent-pools/join` with `TERRAPOD_JOIN_TOKEN`. The API issues a short-lived cert and returns the full identity.
 3. Try to `create` the credentials Secret with that identity. On `409 AlreadyExists` another pod won the race — re-read the Secret and adopt the winner's identity instead. The cert this pod was just issued is silently dropped.
 4. If the join token is exhausted (`401`/`403`) before this pod gets a chance, the pod backs off (1, 2, 4, ... up to 30s, ~3 min total budget) and re-reads the Secret. As soon as a peer pod's bootstrap completes, the loser adopts that identity. This is why the default `max_uses: 2` is enough even for large replica counts — only the first two pods ever consume token uses, the rest discover the Secret.
 
@@ -242,7 +242,7 @@ Each pod independently runs a renewal loop:
 
 - The renewal threshold is `cert_validity_seconds / 2 + pod_splay_seconds`, where `pod_splay_seconds` is a deterministic SHA-256 hash of `POD_NAME` in the range `[0, 30)`. The splay desynchronises pods that started in lockstep so they don't all hit `/renew` simultaneously.
 - When a pod reaches its threshold, it **re-reads the Secret first**. If the cert in the Secret still has more remaining lifetime than this pod's threshold (plus a 30s skew margin), another pod has already renewed it — adopt and reset the timer.
-- Otherwise call `POST /api/v2/listeners/{id}/renew` with up to 3 attempts (exponential backoff on 5xx / network errors; immediate failure on 401/403).
+- Otherwise call `POST /api/terrapod/v1/listeners/{id}/renew` with up to 3 attempts (exponential backoff on 5xx / network errors; immediate failure on 401/403).
 - On success, write the Secret with `resourceVersion` CAS. If another pod beat us to it (`409 Conflict`), re-read and adopt the peer's cert.
 - On `401`/`403` from `/renew`, the cert is rejected (revoked, listener deleted, etc.) — clear the Secret and fall back to the join-token bootstrap flow.
 

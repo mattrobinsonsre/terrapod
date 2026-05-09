@@ -546,7 +546,7 @@ async def _call_join(api_url: str, join_token: str, name: str) -> dict:
 
     async with httpx.AsyncClient(base_url=api_url, timeout=30) as client:
         r = await client.post(
-            "/api/v2/agent-pools/join",
+            "/api/terrapod/v1/agent-pools/join",
             json={"join_token": join_token, "name": name},
         )
     if r.status_code in (401, 403):
@@ -575,7 +575,7 @@ async def _call_renew_with_retries(identity: ListenerIdentity) -> dict | None:
         try:
             async with httpx.AsyncClient(base_url=identity.api_url, timeout=30) as client:
                 r = await client.post(
-                    f"/api/v2/listeners/listener-{identity.listener_id}/renew",
+                    f"/api/terrapod/v1/listeners/listener-{identity.listener_id}/renew",
                     headers=headers,
                 )
             if r.status_code == 200:

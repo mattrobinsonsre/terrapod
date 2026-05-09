@@ -114,7 +114,7 @@ GitHub integration uses a **GitHub App** for fine-grained permissions and org-le
 ### Step 1: Create a GitHub App
 
 1. Go to **GitHub Settings > Developer settings > GitHub Apps > New GitHub App**
-   - For an organization: `https://github.com/organizations/{org}/settings/apps/new`
+   - For an organization: `https://github.com/organizations/default/settings/apps/new`
    - For a personal account: `https://github.com/settings/apps/new`
 
 ![GitHub Apps List](images/github-app-list.png)
@@ -170,7 +170,7 @@ No platform-level GitHub configuration is needed beyond enabling VCS. The App ID
 ![VCS Connections](images/admin-vcs-connections.png)
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/organizations/default/vcs-connections \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/vcs-connections \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -237,7 +237,7 @@ GitLab integration uses a **Project or Group Access Token** for repository acces
 No platform-level configuration is needed for GitLab -- the access token is stored (encrypted) on the VCS connection itself.
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/organizations/default/vcs-connections \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/vcs-connections \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -261,7 +261,7 @@ Note the returned connection ID (e.g. `vcs-01234...`).
 For a self-hosted GitLab instance, include the `server-url`:
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/organizations/default/vcs-connections \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/vcs-connections \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -544,7 +544,7 @@ If Terrapod is accessible from GitHub (not behind a firewall), you can add webho
 
 1. Edit your GitHub App settings
 2. Check **Active** under Webhook
-3. Set **Webhook URL** to: `https://terrapod.example.com/api/v2/vcs-events/github`
+3. Set **Webhook URL** to: `https://terrapod.example.com/api/terrapod/v1/vcs-events/github`
 4. Set a **Webhook secret** (a random string)
 5. Subscribe to events: **Push**, **Pull request**
 6. Save
@@ -588,21 +588,21 @@ For full details on setup, tag patterns, and behaviour, see the [VCS-Driven Modu
 ### List Connections
 
 ```zsh
-curl https://terrapod.example.com/api/v2/organizations/default/vcs-connections \
+curl https://terrapod.example.com/api/terrapod/v1/vcs-connections \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
 ### Show a Connection
 
 ```zsh
-curl https://terrapod.example.com/api/v2/vcs-connections/vcs-{id} \
+curl https://terrapod.example.com/api/terrapod/v1/vcs-connections/vcs-{id} \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
 ### Delete a Connection
 
 ```zsh
-curl -X DELETE https://terrapod.example.com/api/v2/vcs-connections/vcs-{id} \
+curl -X DELETE https://terrapod.example.com/api/terrapod/v1/vcs-connections/vcs-{id} \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -651,7 +651,7 @@ Credentials are never returned in API responses.
 |---|---|---|---|
 | Outbound | HTTPS | GitHub API (`api.github.com` or GHE URL) | Branch SHA, PR list, tarball download |
 | Outbound | HTTPS | GitLab API (`gitlab.com` or self-hosted URL) | Branch SHA, MR list, tarball download |
-| Inbound (optional) | HTTPS | Terrapod API (`/api/v2/vcs-events/github`) | GitHub webhooks (faster feedback) |
+| Inbound (optional) | HTTPS | Terrapod API (`/api/terrapod/v1/vcs-events/github`) | GitHub webhooks (faster feedback) |
 
 No inbound connections are required for basic operation. The poller makes outbound HTTPS calls only.
 

@@ -34,7 +34,7 @@ Publish, version, and share Terraform modules internally.
 ### Creating a Module
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-modules \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-modules \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -51,7 +51,7 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-
 ### Creating a Version
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-modules/private/default/vpc/aws/versions \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-modules/private/default/vpc/aws/versions \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -94,7 +94,7 @@ The Terraform CLI discovers the module registry via `/.well-known/terraform.json
 ### Listing Modules
 
 ```zsh
-curl https://terrapod.example.com/api/v2/organizations/default/registry-modules \
+curl https://terrapod.example.com/api/terrapod/v1/registry-modules \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -106,14 +106,14 @@ curl https://terrapod.example.com/api/v2/registry/modules/default/vpc/aws/versio
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 
 # Show module details (TFE V2 API)
-curl https://terrapod.example.com/api/v2/organizations/default/registry-modules/private/default/vpc/aws \
+curl https://terrapod.example.com/api/terrapod/v1/registry-modules/private/default/vpc/aws \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
 ### Deleting a Module
 
 ```zsh
-curl -X DELETE https://terrapod.example.com/api/v2/organizations/default/registry-modules/private/default/vpc/aws \
+curl -X DELETE https://terrapod.example.com/api/terrapod/v1/registry-modules/private/default/vpc/aws \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -158,7 +158,7 @@ Instead of uploading tarballs manually, you can connect a module to a VCS reposi
 
 ```zsh
 # 1. Create the module
-curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-modules \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-modules \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -169,7 +169,7 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-
   }'
 
 # 2. Connect VCS
-curl -X PATCH https://terrapod.example.com/api/v2/organizations/default/registry-modules/private/default/vpc/aws/vcs \
+curl -X PATCH https://terrapod.example.com/api/terrapod/v1/registry-modules/private/default/vpc/aws/vcs \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -315,7 +315,7 @@ terraform import terrapod_module_workspace_link.vpc_prod vpc/aws/<link-uuid>
 
 ```zsh
 # Link a workspace
-curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-modules/private/default/vpc/aws/workspace-links \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-modules/private/default/vpc/aws/workspace-links \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -328,11 +328,11 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-
   }'
 
 # List linked workspaces
-curl https://terrapod.example.com/api/v2/organizations/default/registry-modules/private/default/vpc/aws/workspace-links \
+curl https://terrapod.example.com/api/terrapod/v1/registry-modules/private/default/vpc/aws/workspace-links \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 
 # Remove a link
-curl -X DELETE https://terrapod.example.com/api/v2/organizations/default/registry-modules/private/default/vpc/aws/workspace-links/<link-id> \
+curl -X DELETE https://terrapod.example.com/api/terrapod/v1/registry-modules/private/default/vpc/aws/workspace-links/<link-id> \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -430,7 +430,7 @@ curl https://terrapod.example.com/api/registry/private/v2/gpg-keys \
 ### Creating a Provider
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-providers \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-providers \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -446,7 +446,7 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-
 ### Creating a Version
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-providers/private/default/mycloud/versions \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-providers/private/default/mycloud/versions \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -465,7 +465,7 @@ curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-
 For each OS/architecture combination:
 
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/organizations/default/registry-providers/private/default/mycloud/versions/1.0.0/platforms \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-providers/private/default/mycloud/versions/1.0.0/platforms \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -591,7 +591,7 @@ The binary cache stores terraform and tofu CLI binaries so runner Jobs can fetch
 ### How It Works
 
 1. Runner Job starts with a generic image (no baked-in terraform/tofu binary)
-2. Runner entrypoint calls `GET /api/v2/binary-cache/{tool}/{version}/{os}/{arch}` with auth header (`Authorization: Bearer <runner-token>`)
+2. Runner entrypoint calls `GET /api/terrapod/v1/binary-cache/{tool}/{version}/{os}/{arch}` with auth header (`Authorization: Bearer <runner-token>`)
 3. API validates authentication, returns 302 redirect to presigned URL in object storage
 4. Cache miss: API fetches from upstream (`releases.hashicorp.com` for terraform, GitHub releases for tofu), stores, redirects
 5. Runner downloads binary and begins execution
@@ -629,7 +629,7 @@ Requesting a version whose tier is not permitted returns HTTP 400 with a clear m
 
 **Download binary (used by runners):**
 ```
-GET /api/v2/binary-cache/{tool}/{version}/{os}/{arch}
+GET /api/terrapod/v1/binary-cache/{tool}/{version}/{os}/{arch}
 Authorization: Bearer <token>
 ```
 
@@ -637,13 +637,13 @@ Returns 302 redirect to presigned URL. Authentication required.
 
 **List cached binaries (admin):**
 ```zsh
-curl https://terrapod.example.com/api/v2/admin/binary-cache \
+curl https://terrapod.example.com/api/terrapod/v1/admin/binary-cache \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
 **Pre-warm cache (admin):**
 ```zsh
-curl -X POST https://terrapod.example.com/api/v2/admin/binary-cache/warm \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/admin/binary-cache/warm \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -656,7 +656,7 @@ curl -X POST https://terrapod.example.com/api/v2/admin/binary-cache/warm \
 
 **Purge cached binary (admin):**
 ```zsh
-curl -X DELETE https://terrapod.example.com/api/v2/admin/binary-cache/terraform/1.9.8 \
+curl -X DELETE https://terrapod.example.com/api/terrapod/v1/admin/binary-cache/terraform/1.9.8 \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -670,13 +670,13 @@ cache/binaries/{tool}/{version}/{os}_{arch}
 
 **List cached provider binaries (admin):**
 ```zsh
-curl https://terrapod.example.com/api/v2/admin/provider-cache \
+curl https://terrapod.example.com/api/terrapod/v1/admin/provider-cache \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
 **Purge cached provider version (admin):**
 ```zsh
-curl -X DELETE https://terrapod.example.com/api/v2/admin/provider-cache/registry.terraform.io/hashicorp/aws/6.37.0 \
+curl -X DELETE https://terrapod.example.com/api/terrapod/v1/admin/provider-cache/registry.terraform.io/hashicorp/aws/6.37.0 \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
@@ -705,8 +705,8 @@ The `/.well-known/terraform.json` endpoint includes paths for both module and pr
 
 ```json
 {
-  "modules.v1": "/api/v2/registry/modules/",
-  "providers.v1": "/api/v2/registry/providers/"
+  "modules.v1": "/api/terrapod/v1/registry/modules/",
+  "providers.v1": "/api/terrapod/v1/registry/providers/"
 }
 ```
 

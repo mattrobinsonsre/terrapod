@@ -35,7 +35,7 @@ Logging is asynchronous — it does not block the API response.
 ## Query API
 
 ```
-GET /api/v2/admin/audit-log
+GET /api/terrapod/v1/admin/audit-log
 ```
 
 Requires `admin` or `audit` role.
@@ -63,7 +63,7 @@ All filters are optional and use JSON:API query parameter syntax:
 
 ```bash
 # Last 50 POST requests by a specific user
-curl "https://terrapod.local/api/v2/admin/audit-log?\
+curl "https://terrapod.local/api/terrapod/v1/admin/audit-log?\
 filter[actor]=admin@example.com&\
 filter[action]=POST&\
 page[size]=50" \

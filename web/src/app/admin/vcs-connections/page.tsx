@@ -80,7 +80,7 @@ export default function VCSConnectionsPage() {
   async function loadConnections() {
     setLoading(true)
     try {
-      const res = await apiFetch('/api/v2/organizations/default/vcs-connections')
+      const res = await apiFetch('/api/terrapod/v1/vcs-connections')
       if (!res.ok) throw new Error('Failed to load VCS connections')
       const data = await res.json()
       setConnections(data.data || [])
@@ -106,7 +106,7 @@ export default function VCSConnectionsPage() {
       } else {
         attrs.token = token
       }
-      const res = await apiFetch('/api/v2/organizations/default/vcs-connections', {
+      const res = await apiFetch('/api/terrapod/v1/vcs-connections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'vcs-connections', attributes: attrs } }),
@@ -135,7 +135,7 @@ export default function VCSConnectionsPage() {
     setError('')
     setSuccess('')
     try {
-      const res = await apiFetch(`/api/v2/vcs-connections/${id}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/terrapod/v1/vcs-connections/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete connection')
       setDeleteId(null)
       setSuccess('VCS connection deleted')

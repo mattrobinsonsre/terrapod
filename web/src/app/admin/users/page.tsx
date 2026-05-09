@@ -289,7 +289,7 @@ export default function UsersPage() {
   async function loadUsers() {
     setLoading(true)
     try {
-      const res = await apiFetch('/api/v2/organizations/default/users?page[size]=100')
+      const res = await apiFetch('/api/terrapod/v1/users?page[size]=100')
       if (!res.ok) throw new Error('Failed to load users')
       const data = await res.json()
       setUsers(data.data || [])
@@ -309,7 +309,7 @@ export default function UsersPage() {
       if (data.password) attrs.password = data.password
       if (data.displayName) attrs['display-name'] = data.displayName
 
-      const res = await apiFetch('/api/v2/organizations/default/users', {
+      const res = await apiFetch('/api/terrapod/v1/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'users', attributes: attrs } }),
@@ -340,7 +340,7 @@ export default function UsersPage() {
     setError('')
     setSuccess('')
     try {
-      const res = await apiFetch(`/api/v2/users/${encodeURIComponent(editingEmail)}`, {
+      const res = await apiFetch(`/api/terrapod/v1/users/${encodeURIComponent(editingEmail)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -365,7 +365,7 @@ export default function UsersPage() {
     setError('')
     setSuccess('')
     try {
-      const res = await apiFetch(`/api/v2/users/${encodeURIComponent(email)}`, {
+      const res = await apiFetch(`/api/terrapod/v1/users/${encodeURIComponent(email)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -385,7 +385,7 @@ export default function UsersPage() {
     setError('')
     setSuccess('')
     try {
-      const res = await apiFetch(`/api/v2/users/${encodeURIComponent(email)}`, {
+      const res = await apiFetch(`/api/terrapod/v1/users/${encodeURIComponent(email)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -410,7 +410,7 @@ export default function UsersPage() {
     setError('')
     setSuccess('')
     try {
-      const res = await apiFetch(`/api/v2/users/${encodeURIComponent(email)}`, { method: 'DELETE' })
+      const res = await apiFetch(`/api/terrapod/v1/users/${encodeURIComponent(email)}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete user')
       setDeleteEmail(null)
       if (resetEmail === email) setResetEmail(null)
