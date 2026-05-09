@@ -19,6 +19,7 @@ import (
 	workspacesDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/workspaces"
 	agentPoolRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/agent_pool"
 	agentPoolTokenRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/agent_pool_token"
+	autodiscoveryRuleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/autodiscovery_rule"
 	gpgKeyRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/gpg_key"
 	moduleWorkspaceLinkRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_workspace_link"
 	notificationConfigRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/notification_configuration"
@@ -134,6 +135,7 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 		vcsConnectionRes.NewResource,
 		agentPoolRes.NewResource,
 		agentPoolTokenRes.NewResource,
+		autodiscoveryRuleRes.NewResource,
 		registryModuleRes.NewResource,
 		registryProviderRes.NewResource,
 		moduleWorkspaceLinkRes.NewResource,

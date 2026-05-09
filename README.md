@@ -38,6 +38,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | Notifications | Implemented | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
 | Run Tasks | Implemented | Pre/post-plan webhook hooks for external validation |
 | Workspace Health | Implemented | Per-workspace health conditions, VCS polling status, drift detection indicators |
+| Workspace Autodiscovery | Implemented | Atlantis-style monorepo autodiscovery — pattern-matched rules auto-create workspaces on PRs to new directories |
 | Cloud Credentials | Implemented | Dynamic provider credentials via K8s workload identity (AWS IRSA, GCP WIF, Azure WI) |
 
 ### Screenshots
@@ -249,6 +250,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Deployment](docs/deployment.md) | Production Helm deployment, storage backends, scaling |
 | [Registry](docs/registry.md) | Private module/provider registry, caching layers |
 | [VCS Integration](docs/vcs-integration.md) | GitHub and GitLab setup, polling, webhooks |
+| [Autodiscovery](docs/autodiscovery.md) | Atlantis-style monorepo workspace autodiscovery |
 | [Drift Detection](docs/drift-detection.md) | Scheduled plan-only runs to detect infrastructure drift |
 | [Run Triggers](docs/run-triggers.md) | Cross-workspace dependency chains |
 | [Notifications](docs/notifications.md) | Webhook, Slack, and email alerts on run events |

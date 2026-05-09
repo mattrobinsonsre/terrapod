@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { LabelsEditor } from '@/components/labels-editor'
 import { getAuthState, isAdmin } from '@/lib/auth'
+import { useIsAdmin } from '@/lib/use-auth-roles'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { usePollingInterval } from '@/lib/use-polling-interval'
@@ -39,6 +40,11 @@ function statusDotClass(status: string | undefined): string {
 
 export default function AgentPoolsPage() {
   const router = useRouter()
+  // Auth-derived UI is gated on `isAdminClient` rather than `isAdmin()`
+  // so the first render matches SSR (no roles available) and the admin
+  // affordances appear on the post-mount re-render. Avoids hydration
+  // mismatches that Next.js dev mode reports as a blocking modal.
+  const isAdminClient = useIsAdmin()
   const [pools, setPools] = useState<AgentPool[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -120,7 +126,7 @@ export default function AgentPoolsPage() {
         <PageHeader
           title="Agent Pools"
           description="Manage runner agent pools and their listeners"
-          actions={isAdmin() ? (
+          actions={isAdminClient ? (
             <button
               onClick={() => setShowCreate(!showCreate)}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"

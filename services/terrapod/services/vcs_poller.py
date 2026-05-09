@@ -30,12 +30,13 @@ from terrapod.api.metrics import (
     VCS_PRS_DETECTED,
     VCS_RUNS_CREATED,
 )
-from terrapod.db.models import Run, VCSConnection, Workspace, utc_now
+from terrapod.db.models import AutodiscoveryRule, Run, VCSConnection, Workspace, utc_now
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import github_service, gitlab_service, run_service
 from terrapod.services.vcs_archive_cache import VCSArchiveCache, materialize_archive
 from terrapod.services.vcs_provider import PullRequest
+from terrapod.services.workspace_autodiscovery_service import autodiscover_for_paths
 from terrapod.storage import get_storage
 from terrapod.storage.keys import config_version_key
 
@@ -819,6 +820,160 @@ async def _compute_paths_unions(db: AsyncSession, workspace_ids: list[uuid.UUID]
     return out
 
 
+async def _poll_autodiscovery_for_connection(
+    db: AsyncSession,
+    conn: VCSConnection,
+    rules: list[AutodiscoveryRule],
+) -> int:
+    """Scan open PRs for one connection's rules and auto-create workspaces.
+
+    Returns the number of workspaces created. Per-connection scoping
+    means a single bad connection (auth issue, GitHub rate limit) does
+    not block other connections in the same cycle.
+    """
+    # Group rules by (repo_url, branch) so we don't re-fetch the same
+    # PR list once per rule.
+    by_repo_branch: dict[tuple[str, str], list[AutodiscoveryRule]] = {}
+    for rule in rules:
+        by_repo_branch.setdefault((rule.repo_url, rule.branch or ""), []).append(rule)
+
+    created_count = 0
+    for (repo_url, branch), group in by_repo_branch.items():
+        owner_repo = _parse_repo_url(conn, repo_url)
+        if owner_repo is None:
+            logger.warning(
+                "Autodiscovery: cannot parse repo URL",
+                connection_id=str(conn.id),
+                repo_url=repo_url,
+            )
+            continue
+        owner, repo = owner_repo
+
+        # Resolve the default branch if the rule didn't pin one.
+        target_branch = branch
+        if not target_branch:
+            try:
+                target_branch = await _get_default_branch(conn, owner, repo) or "main"
+            except Exception:
+                logger.warning(
+                    "Autodiscovery: failed to resolve default branch — skipping",
+                    connection_id=str(conn.id),
+                    repo_url=repo_url,
+                    exc_info=True,
+                )
+                continue
+
+        # Pull open PRs and the default-branch tip — both are sources of
+        # discoverable changed files.
+        try:
+            prs = await _list_open_prs(conn, owner, repo, target_branch)
+        except Exception:
+            logger.warning(
+                "Autodiscovery: failed to list PRs — skipping",
+                connection_id=str(conn.id),
+                repo_url=repo_url,
+                branch=target_branch,
+                exc_info=True,
+            )
+            continue
+
+        for pr in prs:
+            try:
+                changed = await _get_changed_files(conn, owner, repo, target_branch, pr.head_sha)
+            except Exception:
+                logger.warning(
+                    "Autodiscovery: failed to get changed files for PR — skipping",
+                    connection_id=str(conn.id),
+                    repo_url=repo_url,
+                    pr_number=pr.number,
+                    exc_info=True,
+                )
+                continue
+            new_workspaces = await autodiscover_for_paths(db, group, changed)
+            created_count += len(new_workspaces)
+
+    return created_count
+
+
+async def _poll_autodiscovery(
+    *, owner_repo: tuple[str, str] | None = None, provider: str | None = None
+) -> int:
+    """Run autodiscovery across every VCS connection that has at least
+    one enabled rule.
+
+    Auto-created workspaces are picked up by the *next* poll cycle's
+    workspace scan, which queues their first speculative run via the
+    existing PR/branch logic. We don't queue runs from here directly —
+    keeps the autodiscovery pass narrow (just creates workspaces) and
+    leaves run-creation to the existing well-tested code path.
+
+    `owner_repo` + `provider` filter rules to a single repo — used by
+    the webhook-triggered immediate poll so we don't fan out to every
+    connection on every webhook.
+    """
+    async with get_db_session() as db:
+        # Eager-load the connection so the per-rule code path doesn't
+        # need a second round-trip per connection.
+        result = await db.execute(
+            select(AutodiscoveryRule)
+            .where(AutodiscoveryRule.enabled.is_(True))
+            .order_by(AutodiscoveryRule.vcs_connection_id, AutodiscoveryRule.id)
+        )
+        rules = list(result.scalars().all())
+
+        # Webhook fast-path: keep only rules whose repo matches the
+        # webhook source. We do the filter Python-side because the
+        # repo URL form (https vs git@) and trailing-slash semantics
+        # differ across providers.
+        if owner_repo is not None:
+            owner, repo = owner_repo
+            match_pairs: set[tuple[str, str]] = {(owner, repo), (owner.lower(), repo.lower())}
+            filtered: list[AutodiscoveryRule] = []
+            for rule in rules:
+                conn = rule.vcs_connection
+                if provider is not None and conn is not None and conn.provider != provider:
+                    continue
+                if conn is None:
+                    continue
+                parsed = _parse_repo_url(conn, rule.repo_url)
+                if parsed is None:
+                    continue
+                if parsed in match_pairs or (parsed[0].lower(), parsed[1].lower()) in match_pairs:
+                    filtered.append(rule)
+            rules = filtered
+        if not rules:
+            return 0
+
+        # Group rules by connection so we open one VCSConnection load per
+        # connection rather than per rule.
+        by_conn: dict[uuid.UUID, list[AutodiscoveryRule]] = {}
+        for rule in rules:
+            by_conn.setdefault(rule.vcs_connection_id, []).append(rule)
+
+        total_created = 0
+        for conn_id, conn_rules in by_conn.items():
+            conn = await db.get(VCSConnection, conn_id)
+            if conn is None or conn.status != "active":
+                continue
+            try:
+                created = await _poll_autodiscovery_for_connection(db, conn, conn_rules)
+                total_created += created
+            except Exception:
+                # Per-connection isolation: log and continue.
+                logger.warning(
+                    "Autodiscovery: connection scan failed",
+                    connection_id=str(conn_id),
+                    exc_info=True,
+                )
+
+        if total_created:
+            logger.info(
+                "Autodiscovery created workspaces this cycle",
+                count=total_created,
+            )
+        return total_created
+
+
 async def poll_cycle() -> None:
     """Execute one poll cycle: check all VCS-enabled workspaces in parallel.
 
@@ -826,6 +981,15 @@ async def poll_cycle() -> None:
     replica runs this per interval across the entire deployment.
     """
     start = time_mod.monotonic()
+
+    # Autodiscovery first — any newly-created workspaces will be
+    # picked up by the workspace scan below (or, if their query
+    # snapshot already ran, by the next cycle).
+    try:
+        await _poll_autodiscovery()
+    except Exception:
+        logger.warning("Autodiscovery pass failed", exc_info=True)
+
     async with get_db_session() as db:
         workspace_ids = await _select_workspace_ids(db)
         paths_unions = await _compute_paths_unions(db, workspace_ids)
@@ -869,6 +1033,21 @@ async def handle_immediate_poll(payload: dict) -> None:
     # historical behaviour for any in-flight triggers.
     provider = payload.get("provider", "github")
     logger.info("Immediate poll triggered by webhook", repo=repo, provider=provider)
+
+    # Run autodiscovery scoped to this repo first so any newly-created
+    # workspaces get picked up by the workspace scan that follows. The
+    # repo string in the webhook payload is "owner/repo" — split for
+    # the autodiscovery filter.
+    if repo and "/" in repo:
+        owner, repo_name = repo.split("/", 1)
+        try:
+            await _poll_autodiscovery(owner_repo=(owner, repo_name), provider=provider)
+        except Exception:
+            logger.warning(
+                "Autodiscovery: webhook-triggered scan failed",
+                repo=repo,
+                exc_info=True,
+            )
 
     async with get_db_session() as db:
         workspace_ids = await _select_workspace_ids(

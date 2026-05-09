@@ -1345,6 +1345,79 @@ DELETE /api/terrapod/v1/vcs-connections/{id}
 
 ---
 
+## Autodiscovery Rules
+
+Connection-scoped rules that auto-create workspaces when a PR or default-branch push touches a path matching `pattern`. See [Autodiscovery](autodiscovery.md) for the full feature doc.
+
+All endpoints require `admin` role.
+
+### List Rules
+
+```
+GET /api/terrapod/v1/autodiscovery-rules
+```
+
+### Create Rule
+
+```
+POST /api/terrapod/v1/autodiscovery-rules
+```
+
+**Request body** (every attribute except `name`, `vcs-connection-id`, `repo-url`, `pattern` is optional):
+
+```json
+{
+  "data": {
+    "type": "autodiscovery-rules",
+    "attributes": {
+      "name": "monorepo",
+      "vcs-connection-id": "vcs-019e0e7b-...",
+      "repo-url": "https://github.com/myorg/monorepo",
+      "branch": "main",
+      "pattern": "accounts/*/**/*.tf",
+      "ignore-patterns": ["modules/**"],
+      "name-template": "ws-{path}",
+      "enabled": true,
+      "execution-mode": "agent",
+      "execution-backend": "tofu",
+      "agent-pool-id": "apool-019e01db-...",
+      "terraform-version": "1.11",
+      "resource-cpu": "1",
+      "resource-memory": "2Gi",
+      "auto-apply": false,
+      "labels": {"managed-by": "monorepo-autodiscover"},
+      "owner-email": "platform@example.com"
+    }
+  }
+}
+```
+
+Returns `201` with the created rule, or `409` if a rule with that name already exists for the connection.
+
+### Show Rule
+
+```
+GET /api/terrapod/v1/autodiscovery-rules/{id}
+```
+
+### Update Rule
+
+```
+PATCH /api/terrapod/v1/autodiscovery-rules/{id}
+```
+
+Same body shape as create; only the attributes you include are updated.
+
+### Delete Rule
+
+```
+DELETE /api/terrapod/v1/autodiscovery-rules/{id}
+```
+
+Workspaces auto-created by this rule keep working — their `autodiscovery-rule-id` foreign key is set to NULL.
+
+---
+
 ## VCS Events (Webhooks)
 
 ### GitHub Webhook Receiver

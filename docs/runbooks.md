@@ -550,3 +550,51 @@ Object storage (S3, Azure Blob, GCS, or filesystem) failures prevent state uploa
 - `terrapod_storage_errors_total` rate drops to zero
 - State uploads succeed (create a test state version)
 - Runner Jobs can download configs and upload artifacts
+
+---
+
+## Autodiscovery rule didn't fire
+
+**Symptom**: a PR added a directory matching what you thought your autodiscovery rule covers, but no workspace was auto-created.
+
+### Diagnosis
+
+Walk the rule evaluation logic from the outside in:
+
+1. **Is the rule enabled?**
+   ```sh
+   curl -sk -H "Authorization: Bearer $TOKEN" \
+     https://<terrapod>/api/terrapod/v1/autodiscovery-rules \
+     | jq '.data[] | {name: .attributes.name, enabled: .attributes.enabled, repo: .attributes."repo-url"}'
+   ```
+
+2. **Did the poller see the PR?** Search the API logs for the rule's repo:
+   ```sh
+   kubectl logs deploy/terrapod-api --tail=2000 | grep -E "Autodiscovery|<your-repo>"
+   ```
+   You should see `Autodiscovery created workspace` (success) or `Autodiscovery name collision`/`Autodiscovery: cannot parse repo URL`/`Autodiscovery: failed to list PRs` (each is a clear cause).
+
+3. **Does the rule's pattern actually match the file?** The pattern is matched against the *full path* (e.g. `accounts/alpha/network/main.tf`, not `main.tf`). Test the pattern in a Python REPL with the same engine:
+   ```python
+   from terrapod.services.workspace_autodiscovery_service import _match_glob
+   _match_glob("accounts/alpha/network/main.tf", "accounts/*/**/*.tf")  # True/False
+   ```
+
+4. **Is the file actually a terraform file?** Only `*.tf`, `*.tfvars`, `*.tf.json`, `*.tfvars.json`, `*.hcl` trigger autodiscovery. README/CI changes don't.
+
+5. **Is it caught by ignore_patterns?** Same `_match_glob` test against each ignore pattern.
+
+6. **Did the workspace name collide with an existing unrelated workspace?** Search logs for `Autodiscovery name collision`. The collision skip is logged but never errored to the user. Tighten `name-template` to disambiguate (e.g. `name-template: "monorepo-{path}"`).
+
+### Common gotchas
+
+- **GitHub App permissions**: requires `Pull requests: read` (not just `Contents`). If the install was created before commit-status reporting was enabled, the App may lack pull-request scope. Re-grant in GitHub App settings.
+- **Default-branch override**: a rule with `branch: ""` resolves to the repo's default branch. If you've renamed the default branch on GitHub but the rule was created before, the rule still tracks the default branch — no action needed. If you set `branch: "main"` literally and renamed to `master`, you need to update the rule.
+- **Webhook payloads**: webhook-driven autodiscovery only fires for the repo named in the webhook payload. If you've configured the webhook on a different repo (or org-level webhook with selective filters), autodiscovery may only run on the next 60s poll cycle.
+
+### Verification
+
+After fixing the rule:
+- Push a new commit to the test PR (small change to the `.tf` file is enough)
+- Within 60s (or sooner via webhook), see the workspace appear in the list
+- Workspace's `autodiscovery-rule-id` attribute references the rule

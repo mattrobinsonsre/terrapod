@@ -139,6 +139,8 @@ GitHub integration uses a **GitHub App** for fine-grained permissions and org-le
 
    ![GitHub App Permissions](images/github-app-permissions.png)
 
+   These permissions also cover [workspace autodiscovery](autodiscovery.md). No App reinstall is needed if you enable autodiscovery later — `Contents: read` and `Pull requests: read & write` are what the autodiscovery scanner uses.
+
 4. Under **Where can this GitHub App be installed?**, choose based on your needs:
    - **Only on this account** -- if all repos are in one org/account
    - **Any account** -- if repos span multiple orgs

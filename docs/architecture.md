@@ -476,6 +476,14 @@ Terrapod uses a polling-first design for VCS integration. No inbound connections
 |     - Create ConfigurationVersion      +--------+---------+
 |     - Queue Run                                 |
 |                                    triggers immediate poll
+|
+|  Then: autodiscovery pass — for every connection with enabled
+|  AutodiscoveryRule rows, scan open PRs and auto-create
+|  workspaces for changed paths matching `pattern` (and not
+|  matching `ignore_patterns`). Created workspaces are picked up
+|  by the next workspace-poll iteration via the normal flow.
+|  Webhooks call the same autodiscovery pass scoped to the
+|  webhook's repo.
 ```
 
 ### Provider Dispatch

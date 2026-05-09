@@ -732,6 +732,15 @@ def create_application() -> FastAPI:
         include_in_schema=False,
     )
 
+    # Autodiscovery rules — Terrapod-native, introduced in v0.24 (#283).
+    # No legacy alias: this surface didn't exist in v0.22, so /api/v2 has
+    # nothing to preserve.
+    from terrapod.api.routers.autodiscovery_rules import (
+        router as autodiscovery_rules_router,
+    )
+
+    app.include_router(autodiscovery_rules_router, prefix=TERRAPOD_PREFIX)
+
     # VCS webhook event receiver — Terrapod-specific.
     from terrapod.api.routers.vcs_events import router as vcs_events_router
 

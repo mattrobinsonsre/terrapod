@@ -790,12 +790,20 @@ class TestPollCycleParallel:
         ):
             await handle_immediate_poll({"repo": "ns/repo", "provider": "github"})
 
-        # Inspect the emitted SQL on the FIRST execute call (workspace-id select)
-        # to confirm the provider filter is there — the actual scoping happens
-        # in SQL, not in Python. (The compute-paths-unions call is patched out.)
-        stmt = mock_db.execute.await_args_list[0][0][0]
-        compiled = str(stmt.compile(compile_kwargs={"literal_binds": True}))
-        assert "vcs_connections.provider = 'github'" in compiled
+        # Find the workspace-id select among the emitted statements (the
+        # first `execute` is now the autodiscovery-rule fetch added by
+        # #283; the workspace-id select comes after).
+        provider_filtered = [
+            str(call[0][0].compile(compile_kwargs={"literal_binds": True}))
+            for call in mock_db.execute.await_args_list
+            if "workspaces" in str(call[0][0])
+            and "vcs_connections.provider"
+            in str(call[0][0].compile(compile_kwargs={"literal_binds": True}))
+        ]
+        assert provider_filtered, (
+            "expected at least one workspace SELECT with vcs_connections.provider filter"
+        )
+        assert "vcs_connections.provider = 'github'" in provider_filtered[0]
         assert polled == [github_match]
 
     @pytest.mark.asyncio

@@ -80,6 +80,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Authentication](authentication.md) | Local auth, OIDC, SAML, terraform login, API tokens |
 | [RBAC](rbac.md) | Permission model, label-based access control, custom roles |
 | [VCS Integration](vcs-integration.md) | GitHub and GitLab setup, polling, webhooks |
+| [Autodiscovery](autodiscovery.md) | Atlantis-style monorepo workspace autodiscovery |
 | [Drift Detection](drift-detection.md) | Scheduled plan-only runs to detect infrastructure drift |
 | [Run Triggers](run-triggers.md) | Cross-workspace dependency chains |
 | [Notifications](notifications.md) | Webhook, Slack, and email alerts on run events |

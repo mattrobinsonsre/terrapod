@@ -324,6 +324,16 @@ class Workspace(Base):
     # State divergence — set when an apply Job succeeds but state upload fails
     state_diverged: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
+    # Autodiscovery — set when this workspace was auto-created by an
+    # AutodiscoveryRule rather than manually. Used to attribute
+    # workspaces in the audit log and to skip re-creation on subsequent
+    # poll cycles.
+    autodiscovery_rule_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("autodiscovery_rules.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -772,6 +782,73 @@ class VCSConnection(Base):
         sa.UniqueConstraint(
             "provider", "github_installation_id", name="uq_vcs_connections_install"
         ),
+    )
+
+
+# --- Autodiscovery (Atlantis-style) ---
+
+
+class AutodiscoveryRule(Base):
+    """Connection-scoped rule that auto-creates a workspace when a PR
+    or default-branch push touches a path matching `pattern`.
+
+    Modelled on Atlantis's `repos.yaml` autodiscover block. Workspaces
+    are created with the rule's template fields (execution mode, agent
+    pool, terraform version, resources, labels, owner) inherited.
+    """
+
+    __tablename__ = "autodiscovery_rules"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+
+    # Scoping
+    vcs_connection_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("vcs_connections.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    vcs_connection: Mapped["VCSConnection"] = relationship(
+        "VCSConnection", foreign_keys=[vcs_connection_id], lazy="joined"
+    )
+    repo_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+
+    # Match
+    pattern: Mapped[str] = mapped_column(String(1024), nullable=False)
+    ignore_patterns: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+
+    # Identity
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    name_template: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    # Workspace template — defaults inherited by auto-created workspaces.
+    execution_mode: Mapped[str] = mapped_column(String(20), nullable=False, default="agent")
+    agent_pool_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("agent_pools.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    execution_backend: Mapped[str] = mapped_column(String(20), nullable=False, default="tofu")
+    terraform_version: Mapped[str] = mapped_column(String(50), nullable=False, default="1.11")
+    resource_cpu: Mapped[str] = mapped_column(String(20), nullable=False, default="1")
+    resource_memory: Mapped[str] = mapped_column(String(20), nullable=False, default="2Gi")
+    auto_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    owner_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # Audit
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+    __table_args__ = (
+        sa.UniqueConstraint("vcs_connection_id", "name", name="uq_autodiscovery_rule_name"),
     )
 
 
