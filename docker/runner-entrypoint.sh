@@ -456,6 +456,21 @@ if [ "$TP_PHASE" = "plan" ]; then
             "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/plan-file" || true
     fi
 
+    # Emit + upload structured JSON plan (`tofu show -json`). Best-effort:
+    # large plans can produce multi-MB JSON, and a failed upload here
+    # MUST NOT fail the run — the read endpoint just returns 404. The
+    # presence of `tfplan` is the right gate: -detailed-exitcode 1
+    # (errored) doesn't produce one; both 0 (no changes) and 2 (changes)
+    # do.
+    if [ -n "$TP_API_URL" ] && [ -f tfplan ]; then
+        if "$TP_BIN" show -json tfplan > /tmp/plan.json 2>/dev/null; then
+            curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
+                -H "Content-Type: application/json" \
+                --data-binary @/tmp/plan.json \
+                "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/plan-json-output" || true
+        fi
+    fi
+
 elif [ "$TP_PHASE" = "apply" ]; then
     # From here on, the trap uploads to /artifacts/apply-log rather than plan-log.
     UPLOAD_PHASE="apply"

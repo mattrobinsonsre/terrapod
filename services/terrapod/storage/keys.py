@@ -36,6 +36,11 @@ def plan_output_key(workspace_id: str, run_id: str) -> str:
     return f"plans/{workspace_id}/{run_id}.tfplan"
 
 
+def plan_json_output_key(workspace_id: str, run_id: str) -> str:
+    """Key for a run's structured JSON plan output (`tofu show -json tfplan`)."""
+    return f"plans/{workspace_id}/{run_id}.json-output"
+
+
 def config_version_key(workspace_id: str, config_version_id: str) -> str:
     """Key for a configuration version archive."""
     return f"config/{workspace_id}/{config_version_id}.tar.gz"

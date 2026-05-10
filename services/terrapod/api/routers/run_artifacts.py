@@ -12,6 +12,7 @@ Endpoints:
     GET  /api/terrapod/v1/runs/{run_id}/artifacts/plan-file    — download plan file
     PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-log     — upload plan log
     PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-file    — upload plan file
+    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-json-output — upload plan JSON
     PUT  /api/terrapod/v1/runs/{run_id}/artifacts/apply-log    — upload apply log
     PUT  /api/terrapod/v1/runs/{run_id}/artifacts/state        — upload new state
 """
@@ -35,6 +36,7 @@ from terrapod.storage import get_storage
 from terrapod.storage.keys import (
     apply_log_key,
     config_version_key,
+    plan_json_output_key,
     plan_log_key,
     plan_output_key,
     state_key,
@@ -165,6 +167,24 @@ async def upload_plan_file(
     body = await request.body()
     storage = get_storage()
     key = plan_output_key(str(run.workspace_id), str(run.id))
+    await storage.put(key, body)
+    return Response(status_code=204)
+
+
+@router.put("/runs/{run_id}/artifacts/plan-json-output")
+async def upload_plan_json_output(
+    run_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Upload the structured JSON plan output (`tofu show -json tfplan`)."""
+    _require_runner_for_run(user, run_id)
+    run = await _get_run(run_id, db)
+
+    body = await request.body()
+    storage = get_storage()
+    key = plan_json_output_key(str(run.workspace_id), str(run.id))
     await storage.put(key, body)
     return Response(status_code=204)
 

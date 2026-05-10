@@ -30,7 +30,7 @@ from datetime import UTC
 from typing import Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, Response, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
@@ -47,7 +47,7 @@ from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service, run_service
 from terrapod.services.workspace_rbac_service import has_permission, resolve_workspace_permission
 from terrapod.storage import get_storage
-from terrapod.storage.keys import apply_log_key, plan_log_key
+from terrapod.storage.keys import apply_log_key, plan_json_output_key, plan_log_key
 from terrapod.storage.protocol import ObjectNotFoundError
 
 router = APIRouter(prefix="/api/v2", tags=["runs"])
@@ -729,6 +729,7 @@ def _plan_json(run: Run) -> dict:
             "attributes": {
                 "status": _plan_status(run),
                 "log-read-url": f"{base}/api/v2/plans/{run.id}/log",
+                "json-output": f"{base}/api/v2/plans/{run.id}/json-output",
                 "has-changes": run.status in ("planned", "confirmed", "applying", "applied"),
             },
             "links": {
@@ -1279,6 +1280,35 @@ async def plan_log(
         limit=limit,
         strip_ansi=format == "plain",
     )
+
+
+@router.get("/plans/{plan_id}/json-output")
+async def plan_json_output(
+    plan_id: str = Path(...),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Serve the structured JSON plan output (`tofu show -json`).
+
+    go-tfe's `Plans.ReadJSONOutput` consumes this endpoint via
+    `tofu show -json` against a remote run. Response is raw JSON bytes;
+    auth is by capability (the plan UUID), matching `/plans/{id}/log`.
+    A 302 to a presigned storage URL is fine — `req.Do` follows
+    redirects.
+    """
+    try:
+        run_uuid = uuid.UUID(plan_id.removeprefix("plan-").removeprefix("run-"))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Plan not found") from None
+    run = await run_service.get_run(db, run_uuid)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    storage = get_storage()
+    key = plan_json_output_key(str(run.workspace_id), str(run.id))
+    if not await storage.exists(key):
+        raise HTTPException(status_code=404, detail="JSON plan output not available")
+    url = await storage.presigned_get_url(key)
+    return RedirectResponse(url=url.url, status_code=302)
 
 
 @router.get("/applies/{apply_id}/log")

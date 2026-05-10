@@ -161,3 +161,56 @@ class TestUploadStateDuplicateSerial:
         assert resp.status_code == 204
         mock_db.add.assert_called_once()
         mock_storage.put.assert_called_once()
+
+
+# ── upload_plan_json_output (#280) ─────────────────────────────────────
+
+
+class TestUploadPlanJsonOutput:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_writes_to_canonical_key(self, mock_get_storage, *_mocks):
+        run_id = uuid.uuid4()
+        ws_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id, ws_id=ws_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_storage = AsyncMock()
+        mock_get_storage.return_value = mock_storage
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        body = b'{"format_version":"1.2","resource_changes":[]}'
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=body,
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        mock_storage.put.assert_called_once()
+        key, payload = mock_storage.put.call_args.args
+        assert key == f"plans/{ws_id}/{run_id}.json-output"
+        assert payload == body
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_403_for_wrong_run_scope(self, *_mocks):
+        run_id = uuid.uuid4()
+        wrong_run_id = uuid.uuid4()  # token scoped to a different run
+        run = _mock_run(run_id=run_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+
+        app = _make_app(_runner_user(wrong_run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=b"{}",
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 403

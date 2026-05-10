@@ -777,3 +777,68 @@ class TestCLIApplyGuard:
                 headers=_AUTH,
             )
         assert resp.status_code == 200
+
+
+# ── /plans/{id}/json-output (#280) ─────────────────────────────────────
+
+
+class TestPlanJsonOutput:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.get_storage")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_redirects_to_presigned_url_when_present(
+        self, mock_get_run, mock_get_storage, *_mocks
+    ):
+        run = _mock_run()
+        mock_get_run.return_value = run
+
+        mock_storage = AsyncMock()
+        mock_storage.exists = AsyncMock(return_value=True)
+        presigned = MagicMock()
+        presigned.url = "https://storage.example/plans/x.json-output?sig=abc"
+        mock_storage.presigned_get_url = AsyncMock(return_value=presigned)
+        mock_get_storage.return_value = mock_storage
+
+        app, _db = _make_app(_user())
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url=_BASE, follow_redirects=False
+        ) as c:
+            resp = await c.get(f"/api/v2/plans/plan-{run.id}/json-output", headers=_AUTH)
+
+        assert resp.status_code == 302
+        assert resp.headers["location"] == presigned.url
+        mock_storage.exists.assert_awaited_once_with(
+            f"plans/{run.workspace_id}/{run.id}.json-output"
+        )
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.get_storage")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_404_when_object_missing(self, mock_get_run, mock_get_storage, *_mocks):
+        run = _mock_run()
+        mock_get_run.return_value = run
+
+        mock_storage = AsyncMock()
+        mock_storage.exists = AsyncMock(return_value=False)
+        mock_get_storage.return_value = mock_storage
+
+        app, _db = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/plans/plan-{run.id}/json-output", headers=_AUTH)
+
+        assert resp.status_code == 404
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_404_for_unknown_plan(self, mock_get_run, *_mocks):
+        mock_get_run.return_value = None
+        app, _db = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/plans/plan-{uuid.uuid4()}/json-output", headers=_AUTH)
+        assert resp.status_code == 404
