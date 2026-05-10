@@ -328,3 +328,66 @@ class TestTokenCRUD:
             )
 
         assert response.status_code == 403
+
+
+# ── Projects endpoints — clear 422 (#279) ────────────────────────────
+
+
+class TestProjectsUnsupported:
+    """Terrapod doesn't support TFC's project concept. The cloud backend
+    only calls these when `project = "..."` is set in the cloud block.
+    We surface a clear, actionable error instead of a generic 404.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_get_projects_returns_422_with_jsonapi_error(self, *_mocks):
+        user = AuthenticatedUser(
+            email="t@example.com",
+            display_name="T",
+            roles=["everyone"],
+            provider_name="local",
+            auth_method="session",
+        )
+        app = _make_app_with_auth(user)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get(
+                "/api/v2/organizations/default/projects",
+                headers={"Authorization": "Bearer dummy"},
+            )
+
+        assert response.status_code == 422
+        body = response.json()
+        assert "errors" in body
+        err = body["errors"][0]
+        assert err["status"] == "422"
+        assert err["title"] == "Projects are not supported"
+        # The detail must point at the actual fix.
+        assert "project" in err["detail"]
+        assert "cloud block" in err["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_post_projects_returns_422_with_jsonapi_error(self, *_mocks):
+        user = AuthenticatedUser(
+            email="t@example.com",
+            display_name="T",
+            roles=["everyone"],
+            provider_name="local",
+            auth_method="session",
+        )
+        app = _make_app_with_auth(user)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                "/api/v2/organizations/default/projects",
+                json={"data": {"type": "projects", "attributes": {"name": "anything"}}},
+                headers={"Authorization": "Bearer dummy"},
+            )
+
+        assert response.status_code == 422
+        body = response.json()
+        assert body["errors"][0]["title"] == "Projects are not supported"

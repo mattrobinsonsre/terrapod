@@ -14,6 +14,8 @@ Endpoints:
     GET  /api/v2/account/details — current user info
     GET  /api/v2/organizations/default — organization details
     GET  /api/v2/organizations/default/entitlement-set — feature entitlements
+    GET  /api/v2/organizations/default/projects — 422 (Terrapod has no projects; see #279)
+    POST /api/v2/organizations/default/projects — 422 (Terrapod has no projects; see #279)
     GET  /api/v2/organizations/default/workspaces — list workspaces
     GET  /api/v2/organizations/default/workspaces/{name} — workspace by name
     POST /api/v2/organizations/default/workspaces — create workspace
@@ -440,6 +442,50 @@ async def organization_entitlements(
             }
         },
         headers=_tfe_headers(),
+    )
+
+
+# ── Projects (unsupported — see #279) ────────────────────────────────────────
+
+# Terrapod is single-organization and has no project concept. The cloud
+# backend calls these endpoints when the user sets `project = "..."` in
+# their cloud block (see `cloud/backend.go:588, 676, 715` in OpenTofu).
+# Returning 404 from a missing route would surface as "endpoint not
+# found" with no actionable hint. Instead, return a 422 JSON:API error
+# that points at the actual fix: omit the `project` argument.
+
+_PROJECTS_NOT_SUPPORTED_BODY = {
+    "errors": [
+        {
+            "status": "422",
+            "title": "Projects are not supported",
+            "detail": (
+                "Terrapod is single-organization and has no project concept. "
+                "Remove the `project` argument from your cloud block — the "
+                "workspace lives directly under the organization."
+            ),
+        }
+    ]
+}
+
+
+@router.get("/organizations/default/projects")
+async def list_projects_unsupported(
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> JSONResponse:
+    """Reject project listings with a clear, actionable error."""
+    return JSONResponse(
+        status_code=422, content=_PROJECTS_NOT_SUPPORTED_BODY, headers=_tfe_headers()
+    )
+
+
+@router.post("/organizations/default/projects")
+async def create_project_unsupported(
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> JSONResponse:
+    """Reject project creation with a clear, actionable error."""
+    return JSONResponse(
+        status_code=422, content=_PROJECTS_NOT_SUPPORTED_BODY, headers=_tfe_headers()
     )
 
 

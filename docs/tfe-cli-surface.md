@@ -37,10 +37,10 @@ The discovery document points at:
 
 | Method | Path | go-tfe method | Caller |
 |---|---|---|---|
-| GET | `/api/v2/organizations/default/projects` | `Projects.List` | `cloud/backend.go:588, 676` |
-| POST | `/api/v2/organizations/default/projects` | `Projects.Create` | `cloud/backend.go:715` |
+| GET | `/api/v2/organizations/default/projects` | `Projects.List` | `cloud/backend.go:588, 676` (returns 422 — see below) |
+| POST | `/api/v2/organizations/default/projects` | `Projects.Create` | `cloud/backend.go:715` (returns 422 — see below) |
 
-Terrapod is single-organization with no project concept — see #279 for current handling.
+Terrapod is single-organization with no project concept. Both endpoints return `422 Projects are not supported` with a JSON:API error directing the caller to omit the `project` argument from the cloud block. See `docs/getting-started.md`. Label-based RBAC (`docs/rbac.md`) covers the same scoping use case projects served in TFC, and is more flexible — a workspace can match on any combination of label dimensions instead of a single project, and the same labels drive UI filtering of workspaces and other resources.
 
 ## Workspaces
 
