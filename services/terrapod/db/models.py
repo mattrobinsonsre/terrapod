@@ -1076,6 +1076,13 @@ class Run(Base):
     is_drift_detection: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     has_changes: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
+    # True once the runner has uploaded `tofu show -json` output to storage.
+    # Drives the optional `json-output` URL in plan responses so we don't
+    # advertise a 404 on errored / older / not-yet-uploaded runs.
+    has_json_output: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
+
     # Job tracking (populated by listener after launching K8s Job)
     job_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     job_namespace: Mapped[str | None] = mapped_column(String(255), nullable=True)

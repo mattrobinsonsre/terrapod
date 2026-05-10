@@ -722,16 +722,18 @@ def _plan_json(run: Run) -> dict:
     from terrapod.config import settings
 
     base = settings.auth.callback_base_url.rstrip("/")
+    attrs: dict = {
+        "status": _plan_status(run),
+        "log-read-url": f"{base}/api/v2/plans/{run.id}/log",
+        "has-changes": run.status in ("planned", "confirmed", "applying", "applied"),
+    }
+    if run.has_json_output:
+        attrs["json-output"] = f"{base}/api/v2/plans/{run.id}/json-output"
     return {
         "data": {
             "id": f"plan-{run.id}",
             "type": "plans",
-            "attributes": {
-                "status": _plan_status(run),
-                "log-read-url": f"{base}/api/v2/plans/{run.id}/log",
-                "json-output": f"{base}/api/v2/plans/{run.id}/json-output",
-                "has-changes": run.status in ("planned", "confirmed", "applying", "applied"),
-            },
+            "attributes": attrs,
             "links": {
                 "self": f"/api/v2/plans/plan-{run.id}",
             },

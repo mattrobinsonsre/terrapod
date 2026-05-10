@@ -463,11 +463,14 @@ if [ "$TP_PHASE" = "plan" ]; then
     # (errored) doesn't produce one; both 0 (no changes) and 2 (changes)
     # do.
     if [ -n "$TP_API_URL" ] && [ -f tfplan ]; then
-        if "$TP_BIN" show -json tfplan > /tmp/plan.json 2>/dev/null; then
+        if "$TP_BIN" show -json tfplan > /tmp/plan.json 2> /tmp/plan-show.err; then
             curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
                 -H "Content-Type: application/json" \
                 --data-binary @/tmp/plan.json \
-                "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/plan-json-output" || true
+                "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/plan-json-output" \
+                || log "[entrypoint] plan-json-output upload failed (non-fatal)"
+        else
+            log "[entrypoint] $TP_BIN show -json tfplan failed (non-fatal): $(head -c 500 /tmp/plan-show.err)"
         fi
     fi
 

@@ -67,6 +67,7 @@ def _mock_run(
     run.configuration_version_id = None
     run.module_overrides = None
     run.created_by = "test@example.com"
+    run.has_json_output = False
     return run
 
 
@@ -792,6 +793,7 @@ class TestPlanJsonOutput:
         self, mock_get_run, mock_get_storage, *_mocks
     ):
         run = _mock_run()
+        run.has_json_output = True
         mock_get_run.return_value = run
 
         mock_storage = AsyncMock()
@@ -842,3 +844,53 @@ class TestPlanJsonOutput:
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(f"/api/v2/plans/plan-{uuid.uuid4()}/json-output", headers=_AUTH)
         assert resp.status_code == 404
+
+
+# ── _plan_json json-output attribute gating (#280) ─────────────────────
+
+
+class TestPlanJsonAttribute:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_attribute_present_when_uploaded(self, mock_get_run, mock_resolve, *_mocks):
+        mock_resolve.return_value = "read"
+        run = _mock_run(status="planned")
+        run.has_json_output = True
+        mock_get_run.return_value = run
+
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/plans/plan-{run.id}", headers=_AUTH)
+
+        attrs = resp.json()["data"]["attributes"]
+        assert "json-output" in attrs
+        assert attrs["json-output"].endswith(f"/api/v2/plans/{run.id}/json-output")
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_attribute_absent_when_not_uploaded(self, mock_get_run, mock_resolve, *_mocks):
+        """Don't advertise a URL we know would 404. Older / errored / failed-upload
+        runs must not carry the `json-output` attribute."""
+        mock_resolve.return_value = "read"
+        run = _mock_run(status="planned")
+        run.has_json_output = False
+        mock_get_run.return_value = run
+
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/plans/plan-{run.id}", headers=_AUTH)
+
+        attrs = resp.json()["data"]["attributes"]
+        assert "json-output" not in attrs

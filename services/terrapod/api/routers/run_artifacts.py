@@ -178,7 +178,12 @@ async def upload_plan_json_output(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Upload the structured JSON plan output (`tofu show -json tfplan`)."""
+    """Upload the structured JSON plan output (`tofu show -json tfplan`).
+
+    Sets `runs.has_json_output = true` so plan responses can advertise
+    the read URL with confidence (errored / older / failed-upload runs
+    leave the flag at its default `false`).
+    """
     _require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
@@ -186,6 +191,9 @@ async def upload_plan_json_output(
     storage = get_storage()
     key = plan_json_output_key(str(run.workspace_id), str(run.id))
     await storage.put(key, body)
+
+    run.has_json_output = True
+    await db.commit()
     return Response(status_code=204)
 
 

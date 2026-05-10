@@ -99,7 +99,7 @@ Terrapod-only management on the configuration-versions surface (list, download, 
 | GET | `/api/v2/runs/{id}/run-events` | `RunEvents.List` | run progress polling |
 | GET | `/api/v2/plans/{id}` | `Plans.Read` | run status |
 | GET | `/api/v2/plans/{id}/log` | `Plans.Logs` (via `log-read-url`) | `cloud/backend_plan.go:428`, `remote/backend_plan.go:380` |
-| GET | `/api/v2/plans/{id}/json-output` | `Plans.ReadJSONOutput` | `cloud/backend_show.go:68` (gap — see #279) |
+| GET | `/api/v2/plans/{id}/json-output` | `Plans.ReadJSONOutput` | `cloud/backend_show.go:68` (302 → presigned storage URL; advertised via `json-output` attribute on the plan when present) |
 | GET | `/api/v2/applies/{id}` | `Applies.Read` | run status |
 | GET | `/api/v2/applies/{id}/log` | `Applies.Logs` (via `log-read-url`) | `cloud/backend_apply.go:229`, `remote/backend_apply.go:272` |
 

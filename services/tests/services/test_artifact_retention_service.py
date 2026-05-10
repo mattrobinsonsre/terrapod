@@ -203,9 +203,9 @@ class TestCleanupRunArtifacts:
         db.execute.return_value = _FakeResult(runs)
 
         deleted = await _cleanup_run_artifacts(db, storage, retention_days=90, batch_size=100)
-        # 3 artifacts per run (plan log, apply log, plan output)
-        assert deleted == 6
-        assert storage.delete.call_count == 6
+        # 4 artifacts per run (plan log, apply log, plan output, plan json output)
+        assert deleted == 8
+        assert storage.delete.call_count == 8
 
     @pytest.mark.asyncio
     async def test_no_old_runs_returns_zero(self):

@@ -35,6 +35,7 @@ from terrapod.storage.keys import (
     apply_log_key,
     binary_cache_key,
     config_version_key,
+    plan_json_output_key,
     plan_log_key,
     plan_output_key,
     provider_cache_key,
@@ -203,7 +204,7 @@ async def _cleanup_run_artifacts(
         run_id = str(run.id)
         artifact_count = 0
 
-        for key_fn in (plan_log_key, apply_log_key, plan_output_key):
+        for key_fn in (plan_log_key, apply_log_key, plan_output_key, plan_json_output_key):
             try:
                 await storage.delete(key_fn(ws_id, run_id))
                 artifact_count += 1
