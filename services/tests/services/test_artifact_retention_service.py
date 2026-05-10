@@ -37,6 +37,7 @@ def _make_run(
     cv_id=None,
     module_overrides=None,
     run_id=None,
+    has_json_output=False,
 ):
     run = MagicMock()
     run.id = run_id or _make_uuid()
@@ -45,6 +46,7 @@ def _make_run(
     run.created_at = created_at or datetime.now(UTC) - timedelta(days=120)
     run.configuration_version_id = cv_id
     run.module_overrides = module_overrides
+    run.has_json_output = has_json_output
     return run
 
 
@@ -206,6 +208,46 @@ class TestCleanupRunArtifacts:
         # 4 artifacts per run (plan log, apply log, plan output, plan json output)
         assert deleted == 8
         assert storage.delete.call_count == 8
+
+    @pytest.mark.asyncio
+    async def test_resets_has_json_output_flag_when_artifact_deleted(self):
+        """After retention deletes a run's `.json-output`, the row must stop
+        advertising the URL via `_plan_json` — i.e. `has_json_output` must
+        flip back to False, and the change must be committed.
+        """
+        ws_id = _make_uuid()
+        runs = [
+            _make_run(ws_id, status="applied", has_json_output=True),
+            _make_run(ws_id, status="applied", has_json_output=False),
+        ]
+
+        db = AsyncMock()
+        storage = AsyncMock()
+        db.execute.return_value = _FakeResult(runs)
+
+        await _cleanup_run_artifacts(db, storage, retention_days=90, batch_size=100)
+
+        # The `True` run was reset; the `False` run was untouched.
+        assert runs[0].has_json_output is False
+        assert runs[1].has_json_output is False
+        # One commit covers all flag changes in the batch.
+        db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_no_commit_when_no_flags_to_reset(self):
+        """If no run had `has_json_output=True`, retention must skip the
+        commit — no point burning a transaction on no-ops.
+        """
+        ws_id = _make_uuid()
+        runs = [_make_run(ws_id, status="applied", has_json_output=False)]
+
+        db = AsyncMock()
+        storage = AsyncMock()
+        db.execute.return_value = _FakeResult(runs)
+
+        await _cleanup_run_artifacts(db, storage, retention_days=90, batch_size=100)
+
+        db.commit.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_no_old_runs_returns_zero(self):

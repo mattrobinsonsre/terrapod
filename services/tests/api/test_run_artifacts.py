@@ -194,6 +194,9 @@ class TestUploadPlanJsonOutput:
         key, payload = mock_storage.put.call_args.args
         assert key == f"plans/{ws_id}/{run_id}.json-output"
         assert payload == body
+        # Flag flip is the source of truth for `_plan_json` advertising the URL.
+        assert run.has_json_output is True
+        mock_db.commit.assert_awaited_once()
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

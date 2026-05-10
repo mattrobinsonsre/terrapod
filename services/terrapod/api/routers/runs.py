@@ -16,6 +16,8 @@ Endpoints:
     POST   /api/terrapod/v1/runs/{run_id}/actions/retry        (retry run — create new run from terminal run)
     GET    /api/terrapod/v1/runs/{run_id}/plan                 (plan details)
     GET    /api/v2/plans/{plan_id}                    (plan details by ID)
+    GET    /api/v2/plans/{plan_id}/log                (plan log stream)
+    GET    /api/v2/plans/{plan_id}/json-output        (structured JSON plan; 302 → presigned)
     GET    /api/terrapod/v1/runs/{run_id}/apply                (apply details)
     GET    /api/v2/applies/{apply_id}                 (apply details by ID)
     PATCH  /api/terrapod/v1/listeners/{id}/runs/{run_id}       (listener status update)

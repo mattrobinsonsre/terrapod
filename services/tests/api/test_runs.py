@@ -821,7 +821,11 @@ class TestPlanJsonOutput:
     @patch("terrapod.api.routers.runs.get_storage")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_404_when_object_missing(self, mock_get_run, mock_get_storage, *_mocks):
+        """Belt-and-braces: flag is True but the object is gone (retention deleted
+        the artifact between the upload and now). Endpoint must 404, not 302 to
+        a signed URL pointing at nothing."""
         run = _mock_run()
+        run.has_json_output = True  # flag set; storage missing
         mock_get_run.return_value = run
 
         mock_storage = AsyncMock()
@@ -833,6 +837,33 @@ class TestPlanJsonOutput:
             resp = await c.get(f"/api/v2/plans/plan-{run.id}/json-output", headers=_AUTH)
 
         assert resp.status_code == 404
+        mock_storage.exists.assert_awaited_once()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.get_storage")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_fast_path_404_skips_storage_when_flag_false(
+        self, mock_get_run, mock_get_storage, *_mocks
+    ):
+        """When `has_json_output=False`, the endpoint must return 404 without
+        touching storage at all — that's the optimization the flag exists for."""
+        run = _mock_run()
+        run.has_json_output = False
+        mock_get_run.return_value = run
+
+        mock_storage = AsyncMock()
+        mock_storage.exists = AsyncMock(return_value=True)  # would lie if asked
+        mock_get_storage.return_value = mock_storage
+
+        app, _db = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/plans/plan-{run.id}/json-output", headers=_AUTH)
+
+        assert resp.status_code == 404
+        mock_storage.exists.assert_not_called()
+        mock_storage.presigned_get_url.assert_not_called()
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
