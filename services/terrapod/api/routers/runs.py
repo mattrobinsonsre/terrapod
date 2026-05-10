@@ -1305,8 +1305,16 @@ async def plan_json_output(
     if run is None:
         raise HTTPException(status_code=404, detail="Plan not found")
 
+    # Fast path: the flag is the source of truth. Avoid a storage call
+    # for runs that never produced JSON (errored, older, upload failed).
+    if not run.has_json_output:
+        raise HTTPException(status_code=404, detail="JSON plan output not available")
+
     storage = get_storage()
     key = plan_json_output_key(str(run.workspace_id), str(run.id))
+    # Belt-and-braces: retention may have deleted the artifact while
+    # leaving the flag intact, in which case we must not redirect to a
+    # signed URL pointing at a missing object.
     if not await storage.exists(key):
         raise HTTPException(status_code=404, detail="JSON plan output not available")
     url = await storage.presigned_get_url(key)

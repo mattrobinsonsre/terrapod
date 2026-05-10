@@ -190,8 +190,11 @@ async def upload_plan_json_output(
     body = await request.body()
     storage = get_storage()
     key = plan_json_output_key(str(run.workspace_id), str(run.id))
+    # Order matters: write storage first, then flip the flag. If the
+    # commit fails after a successful upload, the artifact is reachable
+    # only via retention sweep — annoying, but better than the reverse,
+    # which would advertise a URL pointing at nothing.
     await storage.put(key, body)
-
     run.has_json_output = True
     await db.commit()
     return Response(status_code=204)

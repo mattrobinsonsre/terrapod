@@ -199,6 +199,7 @@ async def _cleanup_run_artifacts(
     )
     runs = list(result.scalars().all())
 
+    flag_resets = 0
     for run in runs:
         ws_id = str(run.workspace_id)
         run_id = str(run.id)
@@ -216,7 +217,17 @@ async def _cleanup_run_artifacts(
                     exc_info=True,
                 )
 
+        # Keep the row's `has_json_output` flag honest: if the artifact
+        # is gone, the plan-show response must stop advertising a URL
+        # that would 404.
+        if run.has_json_output:
+            run.has_json_output = False
+            flag_resets += 1
+
         deleted += artifact_count
+
+    if flag_resets:
+        await db.commit()
 
     if deleted:
         RETENTION_DELETED.labels(category="run_artifacts").inc(deleted)
