@@ -131,11 +131,12 @@ GitHub integration uses a **GitHub App** for fine-grained permissions and org-le
 
    | Permission | Access | Purpose |
    |---|---|---|
-   | **Contents** | Read-only | Download repository archives |
+   | **Contents** | Read-only (read & write if using apply-then-merge auto-merge — see [VCS Workflows](vcs-workflows.md)) | Download repository archives; merging PRs creates a commit on the target branch |
    | **Metadata** | Read-only (auto-selected) | Repository metadata |
    | **Checks** | Read & write | Post check runs on commits |
    | **Commit statuses** | Read & write | Post plan/apply status to commits |
-   | **Pull requests** | Read & write | Post and update PR comments |
+   | **Pull requests** | Read & write | Post and update PR comments, read mergeability state |
+   | **Issues** | Read & write (only if using apply-then-merge) | Receive and post PR comments — GitHub serves PR comments through the Issues API |
 
    ![GitHub App Permissions](images/github-app-permissions.png)
 

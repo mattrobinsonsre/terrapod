@@ -125,11 +125,14 @@ If you configure webhooks, the same events arrive in seconds instead of up to on
 
 ## GitHub App permissions
 
-If you're moving an existing Terrapod installation onto apply-then-merge, the GitHub App needs one additional permission:
+If you're moving an existing Terrapod installation onto apply-then-merge, the GitHub App needs two permission upgrades:
 
 | Permission | Required for |
 |---|---|
 | **Issues: Read & Write** | Posting and reading PR comments (PR comments use GitHub's Issues API) |
+| **Contents: Read & Write** | Performing the auto-merge / `terrapod merge`. GitHub's `PUT /repos/{o}/{r}/pulls/{n}/merge` endpoint creates a commit on the target branch, which requires `contents: write` — verified via the `X-Accepted-GitHub-Permissions` response header. Note that this is *Contents*, not *Pull requests* (which `Read` is sufficient for, since the App reads PR state but doesn't modify it). |
+
+If you only need apply-then-merge without auto-merge or `terrapod merge`, `Contents: Read` is sufficient — the apply phase doesn't touch the merge API.
 
 Webhook event subscriptions:
 - `issue_comment` — receive `terrapod ...` commands sub-second
