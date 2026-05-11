@@ -47,6 +47,9 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.drift_last_checked_at = overrides.get("drift_last_checked_at", None)
     ws.drift_status = overrides.get("drift_status", "")
     ws.state_diverged = overrides.get("state_diverged", False)
+    ws.vcs_workflow = overrides.get("vcs_workflow", "merge_then_apply")
+    ws.auto_merge = overrides.get("auto_merge", False)
+    ws.auto_merge_strategy = overrides.get("auto_merge_strategy", "merge")
     ws.execution_backend = overrides.get("execution_backend", "tofu")
     ws.agent_pool = None
     ws.agent_pool_id = overrides.get("agent_pool_id", None)

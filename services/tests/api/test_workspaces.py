@@ -67,6 +67,9 @@ def _mock_workspace(
     ws.drift_last_checked_at = None
     ws.drift_status = ""
     ws.state_diverged = False
+    ws.vcs_workflow = "merge_then_apply"
+    ws.auto_merge = False
+    ws.auto_merge_strategy = "merge"
     ws.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     ws.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
     return ws
@@ -746,3 +749,216 @@ class TestParseTagFilters:
         )
         out = _parse_tag_filters(self._req(q))
         assert out == [("core", None), ("env", "prod")]
+
+
+# ── VCS workflow + auto-merge (#282 phase 1) ───────────────────────────
+
+
+class TestVcsWorkflowAttributes:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    async def test_default_workspace_serializes_default_workflow(self, mock_resolve, *_mocks):
+        """Default-mode regression: an existing workspace serializes with the
+        new attributes at default values. Frontend / providers must see the
+        new fields, but their values are inert."""
+        mock_resolve.return_value = "read"
+        ws = _mock_workspace()
+        app, mock_db = _make_app(_user())
+        ws_result = MagicMock()
+        ws_result.scalar_one_or_none.return_value = ws
+        no_run = MagicMock()
+        no_run.scalar_one_or_none.return_value = None
+        mock_db.execute.side_effect = [ws_result, no_run]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/workspaces/ws-{ws.id}", headers=_AUTH)
+
+        assert resp.status_code == 200
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["vcs-workflow"] == "merge_then_apply"
+        assert attrs["auto-merge"] is False
+        assert attrs["auto-merge-strategy"] == "merge"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    async def test_invalid_workflow_value_rejected(self, mock_resolve, *_mocks):
+        mock_resolve.return_value = "admin"
+        ws = _mock_workspace()
+        ws.vcs_connection_id = uuid.uuid4()
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"vcs-workflow": "nonsense"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+        assert "vcs-workflow" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    async def test_apply_then_merge_requires_vcs_connection(self, mock_resolve, *_mocks):
+        mock_resolve.return_value = "admin"
+        ws = _mock_workspace()  # no VCS connection
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"vcs-workflow": "apply_then_merge"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+        assert "VCS connection" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    async def test_apply_then_merge_incompatible_with_auto_apply(self, mock_resolve, *_mocks):
+        mock_resolve.return_value = "admin"
+        ws = _mock_workspace(auto_apply=True)
+        ws.vcs_connection_id = uuid.uuid4()
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"vcs-workflow": "apply_then_merge"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+        assert "auto-apply" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    async def test_combined_flip_off_auto_apply_and_into_apply_then_merge_succeeds(
+        self, mock_resolve, *_mocks
+    ):
+        """User may set vcs-workflow=apply_then_merge AND auto-apply=false in
+        one request — the validation evaluates the post-update state."""
+        mock_resolve.return_value = "admin"
+        ws = _mock_workspace(auto_apply=True)
+        ws.vcs_connection_id = uuid.uuid4()
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        # No active PR runs.
+        active_result = MagicMock()
+        active_result.all.return_value = []
+        mock_db.execute.side_effect = [mock_result, active_result]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={
+                    "data": {
+                        "attributes": {
+                            "vcs-workflow": "apply_then_merge",
+                            "auto-apply": False,
+                        }
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+        assert ws.vcs_workflow == "apply_then_merge"
+        assert ws.auto_apply is False
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    async def test_workflow_flip_blocked_by_active_pr_runs(self, mock_resolve, *_mocks):
+        """Q4 of the design: cannot flip vcs-workflow with PR runs in flight.
+        Operator must cancel/discard them first."""
+        mock_resolve.return_value = "admin"
+        ws = _mock_workspace()
+        ws.vcs_workflow = "apply_then_merge"
+        ws.vcs_connection_id = uuid.uuid4()
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        # Two PR runs in flight.
+        active_result = MagicMock()
+        active_result.all.return_value = [(uuid.uuid4(),), (uuid.uuid4(),)]
+        mock_db.execute.side_effect = [mock_result, active_result]
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"vcs-workflow": "merge_then_apply"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+        body = resp.json()["detail"]
+        assert "2 PR run(s)" in body
+        assert "Cancel" in body
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    async def test_invalid_auto_merge_strategy_rejected(self, mock_resolve, *_mocks):
+        mock_resolve.return_value = "admin"
+        ws = _mock_workspace()
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={"data": {"attributes": {"auto-merge-strategy": "ff"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+        assert "merge" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    async def test_auto_merge_toggle_persists(self, mock_resolve, *_mocks):
+        mock_resolve.return_value = "admin"
+        ws = _mock_workspace()
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/workspaces/ws-{ws.id}",
+                json={
+                    "data": {
+                        "attributes": {
+                            "auto-merge": True,
+                            "auto-merge-strategy": "squash",
+                        }
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+        assert ws.auto_merge is True
+        assert ws.auto_merge_strategy == "squash"

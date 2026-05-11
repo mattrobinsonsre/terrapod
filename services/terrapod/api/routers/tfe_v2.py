@@ -605,6 +605,9 @@ def _workspace_json(
                 "vcs-last-polled-at": _rfc3339(ws.vcs_last_polled_at),
                 "vcs-last-error": ws.vcs_last_error,
                 "vcs-last-error-at": _rfc3339(ws.vcs_last_error_at),
+                "vcs-workflow": ws.vcs_workflow,
+                "auto-merge": ws.auto_merge,
+                "auto-merge-strategy": ws.auto_merge_strategy,
                 "latest-run": latest_run_attr,
                 "agent-pool-id": f"apool-{ws.agent_pool_id}" if ws.agent_pool_id else None,
                 "agent-pool-name": ws.agent_pool.name if ws.agent_pool else None,
@@ -1119,6 +1122,76 @@ async def update_workspace(
         ws.execution_mode = attrs["execution-mode"]
     if "auto-apply" in attrs:
         ws.auto_apply = attrs["auto-apply"]
+
+    # VCS workflow + auto-merge (#282). We only validate when the relevant
+    # fields are actually being touched in this PATCH — unrelated updates
+    # (drift, pool assignment, labels) must not pay the cross-validation
+    # tax or fail it.
+    if "vcs-workflow" in attrs:
+        new_workflow = attrs["vcs-workflow"]
+        if new_workflow not in ("merge_then_apply", "apply_then_merge"):
+            raise HTTPException(
+                status_code=422,
+                detail="vcs-workflow must be 'merge_then_apply' or 'apply_then_merge'",
+            )
+        # Flipping vcs_workflow while PR runs are in-flight is rejected
+        # (Q4 in #282): the operator must explicitly cancel/discard them
+        # first.
+        if new_workflow != ws.vcs_workflow:
+            active = await db.execute(
+                select(Run.id).where(
+                    Run.workspace_id == ws.id,
+                    Run.vcs_pull_request_number.isnot(None),
+                    Run.status.in_(("pending", "queued", "planning", "planned", "applying")),
+                )
+            )
+            active_ids = [str(r[0]) for r in active.all()]
+            if active_ids:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"Cannot change vcs-workflow while {len(active_ids)} PR run(s) "
+                        "are in flight. Cancel or discard them first."
+                    ),
+                )
+        ws.vcs_workflow = new_workflow
+
+    # Cross-field invariants for apply_then_merge mode — checked against
+    # the post-update state so the user can flip vcs_workflow and
+    # auto_apply in one PATCH.
+    pending_workflow = ws.vcs_workflow
+    pending_auto_apply = attrs.get("auto-apply", ws.auto_apply)
+    if pending_workflow == "apply_then_merge" and (
+        "vcs-workflow" in attrs or "auto-apply" in attrs
+    ):
+        if ws.vcs_connection_id is None:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "vcs-workflow 'apply_then_merge' requires a VCS connection — "
+                    "configure the workspace's VCS settings first"
+                ),
+            )
+        if pending_auto_apply:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "vcs-workflow 'apply_then_merge' is incompatible with auto-apply — "
+                    "set auto-apply to false in the same request"
+                ),
+            )
+
+    if "auto-merge" in attrs:
+        ws.auto_merge = bool(attrs["auto-merge"])
+    if "auto-merge-strategy" in attrs:
+        strat = attrs["auto-merge-strategy"]
+        if strat not in ("merge", "squash", "rebase"):
+            raise HTTPException(
+                status_code=422,
+                detail="auto-merge-strategy must be 'merge', 'squash', or 'rebase'",
+            )
+        ws.auto_merge_strategy = strat
+
     if "execution-backend" in attrs:
         backend = attrs["execution-backend"]
         if backend not in ("terraform", "tofu"):

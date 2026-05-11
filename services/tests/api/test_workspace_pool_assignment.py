@@ -56,6 +56,9 @@ def _mock_workspace(ws_id=None, pool_id=None):
     ws.drift_last_checked_at = None
     ws.drift_status = ""
     ws.state_diverged = False
+    ws.vcs_workflow = "merge_then_apply"
+    ws.auto_merge = False
+    ws.auto_merge_strategy = "merge"
     ws.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     ws.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
     return ws
