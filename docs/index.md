@@ -18,6 +18,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | **Remote State Management** | Versioned state storage with locking, rollback, encryption at rest via CSP services |
 | **Agent Execution** | Plan/apply runs on the server via K8s Job-based runner infrastructure |
 | **VCS Integration** | GitHub (App) and GitLab (access token); polling-first with optional webhooks |
+| **VCS Workflows** | Default merge-then-apply (TFE standard) plus opt-in apply-then-merge mode (Atlantis-style: PR comments drive applies, `terrapod apply` from a PR comment, auto-merge after apply) |
 | **Variables & Secrets** | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets |
 | **RBAC** | Label-based role system with hierarchical workspace permissions (read/plan/write/admin) |
 | **Private Registry** | Publish, version, and share modules and providers internally with pull-through caching |
@@ -80,6 +81,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Authentication](authentication.md) | Local auth, OIDC, SAML, terraform login, API tokens |
 | [RBAC](rbac.md) | Permission model, label-based access control, custom roles |
 | [VCS Integration](vcs-integration.md) | GitHub and GitLab setup, polling, webhooks |
+| [VCS Workflows](vcs-workflows.md) | merge_then_apply (default) vs apply_then_merge (Atlantis-style, opt-in) |
 | [Autodiscovery](autodiscovery.md) | Atlantis-style monorepo workspace autodiscovery |
 | [Drift Detection](drift-detection.md) | Scheduled plan-only runs to detect infrastructure drift |
 | [Run Triggers](run-triggers.md) | Cross-workspace dependency chains |
