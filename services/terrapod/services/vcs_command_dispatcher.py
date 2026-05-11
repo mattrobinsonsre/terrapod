@@ -31,6 +31,7 @@ from terrapod.db.models import PRSession, Run, VCSConnection, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import run_service
+from terrapod.services.scheduler import enqueue_trigger
 from terrapod.services.vcs_command_parser import Command, parse
 
 logger = get_logger(__name__)
@@ -159,6 +160,14 @@ async def _route(
         await _route_plan(db, sess, candidates, actor_login, actor_user_id)
     elif cmd.verb == "unlock":
         await _route_unlock(db, candidates, actor_login, actor_user_id)
+
+    # Every command-driven mutation refreshes the status comment so the
+    # PR thread reflects the latest state in seconds.
+    await enqueue_trigger(
+        "vcs_status_comment_update",
+        {"session_id": str(sess.id)},
+        dedup_key=f"vcs_status:{sess.id}",
+    )
 
 
 async def _route_apply(

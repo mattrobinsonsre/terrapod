@@ -126,11 +126,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # VCS comment dispatcher (#282 apply-then-merge). Always registered —
     # it's a no-op for comments on PRs without an apply-then-merge workspace.
     from terrapod.services.vcs_command_dispatcher import handle_vcs_comment_dispatch
+    from terrapod.services.vcs_status_comment import handle_vcs_status_comment_update
 
     register_trigger_handler(
         "vcs_comment_dispatch",
         handler=handle_vcs_comment_dispatch,
         description="Parse and dispatch `terrapod ...` PR/MR comments",
+    )
+    register_trigger_handler(
+        "vcs_status_comment_update",
+        handler=handle_vcs_status_comment_update,
+        description="Edit-in-place PR status comment for apply-then-merge PRs",
     )
 
     # Notification delivery handler (always registered)

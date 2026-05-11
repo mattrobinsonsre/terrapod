@@ -41,6 +41,7 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import github_service, gitlab_service, run_service
+from terrapod.services.scheduler import enqueue_trigger
 from terrapod.services.vcs_archive_cache import VCSArchiveCache, materialize_archive
 from terrapod.services.vcs_provider import PullRequest
 from terrapod.services.workspace_autodiscovery_service import autodiscover_for_paths
@@ -647,7 +648,14 @@ async def _poll_workspace_prs(
             # later phases (status comment, dispatcher) can hang state
             # off a stable PRSession id without re-querying the VCS.
             if is_apply_then_merge:
-                await _upsert_pr_session(db, conn, f"{owner}/{repo}", pr.number, pr.head_sha)
+                sess = await _upsert_pr_session(db, conn, f"{owner}/{repo}", pr.number, pr.head_sha)
+                # Fire the status-comment refresh asynchronously so the
+                # poll cycle isn't blocked on the VCS API write.
+                await enqueue_trigger(
+                    "vcs_status_comment_update",
+                    {"session_id": str(sess.id)},
+                    dedup_key=f"vcs_status:{sess.id}",
+                )
             await db.commit()
             logger.info(
                 "Speculative run created for PR",
