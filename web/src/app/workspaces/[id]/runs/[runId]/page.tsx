@@ -609,10 +609,17 @@ export default function RunDetailPage() {
         {/* Plan summary badges — render whenever the runner has uploaded
             and parsed the JSON plan, regardless of run status. Sits
             immediately above the action row so the operator sees the
-            shape of the change next to Confirm & Apply. */}
-        {attrs['plan-summary'] && (
-          <PlanSummaryBadges summary={attrs['plan-summary']} />
-        )}
+            shape of the change next to Confirm & Apply.
+            Suppress when the bigger No-changes callout above will already
+            render (non-plan-only runs in planned/applied with has-changes
+            false) — the callout is the more explanatory surface and the
+            pill would just duplicate it. */}
+        {attrs['plan-summary'] &&
+          !(
+            attrs['has-changes'] === false &&
+            !attrs['plan-only'] &&
+            ['planned', 'applied'].includes(attrs.status)
+          ) && <PlanSummaryBadges summary={attrs['plan-summary']} />}
 
         {/* Action buttons */}
         {(actions['is-confirmable'] || actions['is-discardable'] || actions['is-cancelable'] || actions['is-retryable']) && (

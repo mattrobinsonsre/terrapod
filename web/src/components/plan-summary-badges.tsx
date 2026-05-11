@@ -28,11 +28,9 @@ export function PlanSummaryBadges({ summary, size = 'md' }: Props) {
 
   const containerCls = `flex flex-wrap items-center gap-1.5 ${size === 'sm' ? '' : 'mb-4'}`
 
-  // Zero-count case: render nothing. Callers that want a "No changes"
-  // pill (e.g. inline on the runs list) wrap a small inline render
-  // around this; the run detail page already has its own No-changes
-  // callout block, so a duplicate pill would just be noise.
   if (total === 0) {
+    // Plan-only runs don't trigger the page-level "No changes." callout,
+    // so the badge row is the only indicator. Always render the pill.
     if (size === 'sm') {
       return (
         <span
@@ -43,7 +41,16 @@ export function PlanSummaryBadges({ summary, size = 'md' }: Props) {
         </span>
       )
     }
-    return null
+    return (
+      <div className={containerCls}>
+        <span
+          className="inline-flex items-center rounded-full bg-slate-700/40 text-slate-300 px-2.5 py-1 text-sm"
+          title="Plan reported no resource changes"
+        >
+          No changes
+        </span>
+      </div>
+    )
   }
 
   const cls =
