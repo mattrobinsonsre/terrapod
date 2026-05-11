@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { LabelsEditor } from '@/components/labels-editor'
 import { HealthConditions } from '@/components/health-conditions'
+import { PlanSummaryBadges } from '@/components/plan-summary-badges'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
@@ -100,6 +101,13 @@ interface RunItem {
     'created-by': string
     'plan-started-at': string | null
     'apply-finished-at': string | null
+    'plan-summary': {
+      add: number
+      change: number
+      destroy: number
+      replace: number
+      import: number
+    } | null
     actions?: {
       'is-confirmable': boolean
       'is-discardable': boolean
@@ -2208,6 +2216,7 @@ function WorkspaceDetailContent() {
                       <SortableHeader label="Run ID" sortKey="id" sortState={runSortState} onSort={toggleRunSort} />
                       <SortableHeader label="Status" sortKey="status" sortState={runSortState} onSort={toggleRunSort} />
                       <SortableHeader label="Type" sortKey="type" sortState={runSortState} onSort={toggleRunSort} className="hidden sm:table-cell" />
+                      <th className="text-left px-4 py-2 text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Changes</th>
                       <SortableHeader label="Source" sortKey="source" sortState={runSortState} onSort={toggleRunSort} className="hidden sm:table-cell" />
                       <SortableHeader label="Triggered By" sortKey="created-by" sortState={runSortState} onSort={toggleRunSort} className="hidden lg:table-cell" />
                       <SortableHeader label="Created" sortKey="created-at" sortState={runSortState} onSort={toggleRunSort} className="hidden md:table-cell" />
@@ -2243,6 +2252,13 @@ function WorkspaceDetailContent() {
                             </span>
                           ) : (
                             <span className="text-xs text-slate-500">plan + apply</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 hidden md:table-cell">
+                          {run.attributes['plan-summary'] ? (
+                            <PlanSummaryBadges summary={run.attributes['plan-summary']} size="sm" />
+                          ) : (
+                            <span className="text-slate-600">&mdash;</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">

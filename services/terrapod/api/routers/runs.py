@@ -76,6 +76,24 @@ def _rfc3339(dt) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _plan_summary_attr(run: Run) -> dict[str, int] | None:
+    """Compact plan summary used by the UI to render the badge row.
+
+    Returns None when the runner hasn't uploaded a JSON plan yet, or the
+    upload was unparseable — the UI uses None to mean "we don't know"
+    and renders nothing, vs an all-zero dict which means "no changes".
+    """
+    if run.resource_additions is None:
+        return None
+    return {
+        "add": run.resource_additions or 0,
+        "change": run.resource_changes or 0,
+        "destroy": run.resource_destructions or 0,
+        "replace": run.resource_replacements or 0,
+        "import": run.resource_imports or 0,
+    }
+
+
 def _run_json(
     run: Run,
     *,
@@ -109,6 +127,7 @@ def _run_json(
                 "allow-empty-apply": run.allow_empty_apply,
                 "is-drift-detection": run.is_drift_detection,
                 "has-changes": run.has_changes,
+                "plan-summary": _plan_summary_attr(run),
                 "workspace-name": workspace_name,
                 "workspace-has-vcs": workspace_has_vcs,
                 "module-overrides": run.module_overrides,
@@ -737,6 +756,15 @@ def _plan_json(run: Run) -> dict:
     }
     if run.has_json_output:
         attrs["json-output"] = f"{base}/api/v2/plans/{run.id}/json-output"
+    # TFE-named counts on the Plan resource (additions / changes /
+    # destructions / imports). Replacements have no TFE-equivalent so
+    # the UI gets that from the Run resource instead. Surfaced only
+    # when the runner has uploaded and we parsed successfully.
+    if run.resource_additions is not None:
+        attrs["resource-additions"] = run.resource_additions
+        attrs["resource-changes"] = run.resource_changes
+        attrs["resource-destructions"] = run.resource_destructions
+        attrs["resource-imports"] = run.resource_imports
     return {
         "data": {
             "id": f"plan-{run.id}",

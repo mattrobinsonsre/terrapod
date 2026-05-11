@@ -32,6 +32,7 @@ from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.db.models import Run, StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services.plan_summary import summarize_plan_json
 from terrapod.storage import get_storage
 from terrapod.storage.keys import (
     apply_log_key,
@@ -196,6 +197,23 @@ async def upload_plan_json_output(
     # which would advertise a URL pointing at nothing.
     await storage.put(key, body)
     run.has_json_output = True
+    # Parse the plan in a thread so a multi-MB JSON doesn't block the
+    # event loop. A parse failure leaves the count columns null — the
+    # download URL is still served, just no UI summary.
+    summary = await asyncio.to_thread(summarize_plan_json, body)
+    if summary is not None:
+        run.resource_additions = summary["additions"]
+        run.resource_changes = summary["changes"]
+        run.resource_destructions = summary["destructions"]
+        run.resource_replacements = summary["replacements"]
+        run.resource_imports = summary["imports"]
+    else:
+        logger.warning(
+            "plan_json_output.summary_unparseable",
+            run_id=str(run.id),
+            workspace_id=str(run.workspace_id),
+            body_bytes=len(body),
+        )
     await db.commit()
     return Response(status_code=204)
 

@@ -1158,6 +1158,15 @@ class Run(Base):
         Boolean, nullable=False, server_default="false", default=False
     )
 
+    # Plan resource-change counts parsed from the JSON plan output on
+    # upload. Null until parsed (older runs, or parse failed); zero means
+    # parsed-and-no-resources-of-that-kind. The UI distinguishes the two.
+    resource_additions: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    resource_changes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    resource_destructions: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    resource_replacements: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    resource_imports: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     # Job tracking (populated by listener after launching K8s Job)
     job_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     job_namespace: Mapped[str | None] = mapped_column(String(255), nullable=True)

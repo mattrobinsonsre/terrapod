@@ -124,6 +124,11 @@ def _mock_run(
     run.resource_memory = "2Gi"
     run.configuration_version_id = None
     run.created_by = "test@example.com"
+    run.resource_additions = None
+    run.resource_changes = None
+    run.resource_destructions = None
+    run.resource_replacements = None
+    run.resource_imports = None
     return run
 
 

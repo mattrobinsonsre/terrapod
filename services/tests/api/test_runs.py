@@ -68,6 +68,11 @@ def _mock_run(
     run.module_overrides = None
     run.created_by = "test@example.com"
     run.has_json_output = False
+    run.resource_additions = None
+    run.resource_changes = None
+    run.resource_destructions = None
+    run.resource_replacements = None
+    run.resource_imports = None
     return run
 
 

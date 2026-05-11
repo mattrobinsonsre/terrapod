@@ -8,6 +8,7 @@ import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
+import { PlanSummaryBadges } from '@/components/plan-summary-badges'
 import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
@@ -39,6 +40,13 @@ interface RunAttrs {
   'vcs-branch': string | null
   'vcs-pull-request-number': number | null
   'has-changes': boolean
+  'plan-summary': {
+    add: number
+    change: number
+    destroy: number
+    replace: number
+    import: number
+  } | null
   'workspace-name': string
   'workspace-has-vcs': boolean
   'module-overrides': Record<string, string> | null
@@ -596,6 +604,14 @@ export default function RunDetailPage() {
               ? 'Plan reported nothing to do; the apply was skipped automatically.'
               : 'Plan reported nothing to do — there is nothing to apply.'}
           </div>
+        )}
+
+        {/* Plan summary badges — render whenever the runner has uploaded
+            and parsed the JSON plan, regardless of run status. Sits
+            immediately above the action row so the operator sees the
+            shape of the change next to Confirm & Apply. */}
+        {attrs['plan-summary'] && (
+          <PlanSummaryBadges summary={attrs['plan-summary']} />
         )}
 
         {/* Action buttons */}

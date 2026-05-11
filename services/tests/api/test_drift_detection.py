@@ -211,6 +211,11 @@ class TestRunDriftAttributes:
         run.resource_memory = "2Gi"
         run.module_overrides = None
         run.created_by = "test@example.com"
+        run.resource_additions = None
+        run.resource_changes = None
+        run.resource_destructions = None
+        run.resource_replacements = None
+        run.resource_imports = None
 
         ws = _mock_workspace(ws_id=ws_id)
 

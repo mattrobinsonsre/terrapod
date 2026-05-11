@@ -217,3 +217,78 @@ class TestUploadPlanJsonOutput:
             )
 
         assert resp.status_code == 403
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_populates_resource_counts_from_parsed_plan(self, mock_get_storage, *_mocks):
+        """Issue #301: the upload handler parses the JSON plan and writes
+        resource_additions / _changes / _destructions / _replacements /
+        _imports onto the run row so the UI can render a summary badge.
+        """
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        plan = {
+            "resource_changes": [
+                {"change": {"actions": ["create"]}},
+                {"change": {"actions": ["create"]}},
+                {"change": {"actions": ["update"]}},
+                {"change": {"actions": ["delete"]}},
+                {"change": {"actions": ["create", "delete"]}},
+                {"change": {"actions": ["update"], "importing": {"id": "i-abc"}}},
+            ]
+        }
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=json.dumps(plan).encode(),
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        assert run.resource_additions == 2
+        assert run.resource_changes == 2  # one plain update + one update-with-import
+        assert run.resource_destructions == 1
+        assert run.resource_replacements == 1
+        assert run.resource_imports == 1
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_malformed_plan_leaves_counts_null_but_still_204(self, mock_get_storage, *_mocks):
+        """A parse failure must not fail the upload — the download URL
+        is still served, the UI just won't show a summary.
+        """
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        # Sentinel: count columns start unset and must STAY unset after a
+        # malformed body.
+        run.resource_additions = None
+        run.resource_changes = None
+        run.resource_destructions = None
+        run.resource_replacements = None
+        run.resource_imports = None
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=b"not json at all",
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        assert run.has_json_output is True
+        assert run.resource_additions is None
+        assert run.resource_changes is None
