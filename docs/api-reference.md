@@ -12,11 +12,24 @@ The interactive API documentation is also available in the web UI under **API** 
 
 ### Base URL
 
-All API endpoints are prefixed with `/api/v2`. Example:
+Terrapod exposes two API surfaces:
+
+| Prefix | Contract | Audience |
+|---|---|---|
+| `/api/v2/` | **Stable** TFE V2 subset consumed by `terraform`, `tofu`, and `tfci`. Documented in [`docs/tfe-cli-surface.md`](tfe-cli-surface.md). |  Terraform/OpenTofu CLI, `tfci`, `go-tfe`-based clients |
+| `/api/terrapod/v1/` | Terrapod-native management API (workspaces management, runs, registry CRUD, agent pools, audit, etc.) | Web UI, the Terraform provider for Terrapod, automation |
+
+Example:
 
 ```
+# CLI-contract (cloud-block, state, etc.)
 https://terrapod.example.com/api/v2/organizations/default/workspaces
+
+# Terrapod-native management
+https://terrapod.example.com/api/terrapod/v1/workspaces
 ```
+
+A handful of endpoints (e.g. `/health`, `/ready`, `/.well-known/terraform.json`, OAuth flows, `/v1/...` registry CLI protocol) live at the root for protocol-compatibility reasons.
 
 ### Authentication
 
@@ -306,6 +319,14 @@ The following read-only attributes are included in workspace responses when drif
 |---|---|---|
 | `drift-last-checked-at` | string (RFC3339) or null | Timestamp of the last completed drift detection check |
 | `drift-status` | string | Current drift status: `""` (never checked), `"no_drift"`, `"drifted"`, or `"errored"` |
+
+### State Divergence Flag
+
+Workspaces also expose a read-only `state-diverged` boolean. It is set to `true` when the runner reports it could not upload state after a successful apply (the apply ran against the real provider, but the corresponding state version did not land in Terrapod), so Terrapod's view of the workspace state and the real-world infrastructure may have drifted. The UI surfaces this as a banner on the workspace detail page. Clear it by running a fresh apply or by manually uploading a state version that matches reality.
+
+```json
+"state-diverged": false
+```
 
 ### List VCS Refs (Terrapod Extension)
 
@@ -616,7 +637,17 @@ Server-Sent Events stream for the workspace list page. Emits events whenever any
 GET /api/terrapod/v1/runs/{run_id}/plan
 ```
 
-Returns plan metadata and log download URL.
+Returns plan metadata and log download URL. When the runner has uploaded a structured plan (`-out=tfplan` → `terraform show -json tfplan`), the response also carries a `json-output` attribute pointing at `/api/v2/plans/{run_id}/json-output`.
+
+### Plan JSON Output
+
+```
+GET /api/v2/plans/{plan_id}/json-output
+```
+
+Returns the structured JSON representation of the plan, as produced by `terraform show -json tfplan`. Useful for downstream tooling that wants to consume the resource changes without parsing the human-readable log. Responds **302** to a presigned object-storage URL.
+
+The endpoint is mounted at `/api/v2/` because `go-tfe` and Terraform's `cloud` block expect it there. Returns **404** if the runner never uploaded the JSON output (older runs, runs that errored before the plan completed).
 
 ### Apply Details
 

@@ -20,7 +20,11 @@ Each audit entry captures:
 | `timestamp` | Request time (RFC3339 UTC) |
 | `actor-email` | Authenticated user's email (empty if unauthenticated) |
 | `actor-ip` | Client IP address (IPv4 or IPv6) |
-| `action` | HTTP method (GET, POST, PATCH, DELETE) |
+| `actor-type` | `terrapod_user` for normal API/UI/CLI calls; `vcs_user` for PR-comment-driven actions in [apply-then-merge](vcs-workflows.md) |
+| `actor-login` | VCS-side display login (e.g. GitHub username) when `actor-type=vcs_user`; empty otherwise |
+| `actor-id` | Provider-side immutable user id (e.g. GitHub user id) when `actor-type=vcs_user`; empty otherwise |
+| `origin` | How the request entered the system: `api` (default), `terrapod_ui`, `pr_comment`, `system` |
+| `action` | HTTP method (GET, POST, PATCH, DELETE) or comment verb (e.g. `vcs_apply`, `vcs_plan`, `vcs_force_merge`) for `actor-type=vcs_user` |
 | `resource-type` | Extracted from URL (e.g. `workspaces`, `runs`) |
 | `resource-id` | Resource identifier from URL (empty for collection endpoints) |
 | `status-code` | HTTP response status code |
@@ -29,6 +33,10 @@ Each audit entry captures:
 | `detail` | Additional context (e.g. resource name, action detail) |
 
 Logging is asynchronous — it does not block the API response.
+
+### Dual-actor model
+
+Apply-then-merge workflows delegate authorization to the VCS provider (see [VCS Workflows](vcs-workflows.md#authorization-model-for-apply-then-merge--read-this-carefully)). Comment-driven actions (`terrapod plan`, `terrapod apply`, `terrapod merge`, etc.) are recorded with `actor-type=vcs_user` and the **VCS user's login and numeric id**, not a Terrapod identity. There is no mapping from VCS users to Terrapod users — the audit row is the authoritative trail of who acted, even if that person has no Terrapod account.
 
 ---
 
@@ -79,9 +87,13 @@ page[size]=50" \
       "id": "uuid",
       "type": "audit-log-entries",
       "attributes": {
-        "timestamp": "2025-03-05T14:32:10Z",
+        "timestamp": "2026-03-05T14:32:10Z",
         "actor-email": "admin@example.com",
         "actor-ip": "203.0.113.42",
+        "actor-type": "terrapod_user",
+        "actor-login": "",
+        "actor-id": "",
+        "origin": "api",
         "action": "POST",
         "resource-type": "workspaces",
         "resource-id": "ws-abc123",

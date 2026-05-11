@@ -137,6 +137,7 @@ If you only need apply-then-merge without auto-merge or `terrapod merge`, `Conte
 Webhook event subscriptions:
 - `issue_comment` — receive `terrapod ...` commands sub-second
 - `pull_request_review` — refresh mergeability after approvals
+- `pull_request` (events: `closed`) — release the workspace lock and reconcile PR-session state when a PR is merged or closed without an apply
 
 Existing installations have to accept the permission upgrade once via the GitHub org-admin UI. Until accepted, default-mode workflows are completely unaffected; apply-then-merge is simply unavailable.
 

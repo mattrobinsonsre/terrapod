@@ -145,6 +145,11 @@ listener:
   replicas: 1
   name: "production-listener"
   existingSecret: terrapod-listener-credentials  # K8s Secret with join_token key
+  # Each listener pod persists its certificate to a per-pod K8s Secret
+  # (`tplnr-<name>-identity`), so a restart re-uses the existing identity
+  # rather than re-joining the pool. Certificates auto-renew at 50% of
+  # validity. Multiple replicas form an active-active HA pool — any
+  # listener can answer Job-status queries for runs launched by any other.
 
 ingress:
   enabled: true

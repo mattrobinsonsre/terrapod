@@ -213,6 +213,17 @@ The entrypoint reads the following environment variables (set automatically by t
 
 Workspace variables (env and terraform) are also injected as environment variables on the Job pod.
 
+### Per-phase auth Secret
+
+Each runner Job phase gets its own short-lived runner token, stored in a Kubernetes Secret with an `ownerReference` to the Job (so the Secret is garbage-collected when the Job's TTL expires). The Secret is named per phase to avoid collisions when plan and apply Jobs overlap during a fast transition:
+
+```
+tprun-<run-short-id>-plan-auth     # plan-phase Job consumes this
+tprun-<run-short-id>-apply-auth    # apply-phase Job consumes this
+```
+
+The Job's pod spec references the token via `secretKeyRef` and exposes it as `TP_AUTH_TOKEN` — the raw token never appears in the Job spec, the listener logs, or `kubectl describe` output. The token is scoped to a single `run_id` and the matching phase, so a leaked apply token can't be replayed against an unrelated run or used to download a different workspace's state.
+
 ---
 
 ## Listener Identity

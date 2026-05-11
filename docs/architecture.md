@@ -613,17 +613,17 @@ The database schema is managed by Alembic migrations in `alembic/versions/`. Key
 | Model | Purpose |
 |---|---|
 | `User` | User accounts (email, provider, hashed password) |
-| `Role` | Custom roles with allow/deny labels and workspace_permission |
+| `Role` | Custom roles with allow/deny labels and three independent permission fields: `workspace_permission` (read/plan/write/admin), `registry_permission` (derived: plan→read), and `pool_permission` (read/write/admin) |
 | `RoleAssignment` | Maps (provider, email) to custom roles |
 | `PlatformRoleAssignment` | Maps (provider, email) to platform roles (admin, audit) |
 | `APIToken` | Long-lived API tokens (SHA-256 hashed) |
-| `Workspace` | Workspace config, VCS settings, labels, owner |
+| `Workspace` | Workspace config, VCS settings (incl. `vcs_workflow`, `auto_merge`, `auto_merge_strategy`), labels, owner, `state_diverged` flag |
 | `StateVersion` | State version metadata (serial, lineage, MD5) |
 | `Variable` | Per-workspace variables (sensitive values protected by database encryption-at-rest) |
 | `VariableSet` | Org-scoped variable sets with workspace assignments |
 | `ConfigurationVersion` | Uploaded configuration tarballs |
 | `Run` | Run lifecycle (status, timestamps, VCS metadata, resources) |
-| `AgentPool` | Named runner pool with service account |
+| `AgentPool` | Named runner pool with service account, labels (JSONB for RBAC), and owner_email |
 | `AgentPoolToken` | Join tokens for listener registration |
 | `CertificateAuthorityModel` | CA keypair for listener certificates |
 | `VCSConnection` | VCS provider auth config (GitHub App or GitLab token) |
@@ -633,7 +633,8 @@ The database schema is managed by Alembic migrations in `alembic/versions/`. Key
 | `CachedProviderPackage` | Pull-through provider cache entries |
 | `CachedBinary` | Pull-through CLI binary cache entries |
 | `RunTrigger` | Cross-workspace dependency chains |
-| `AuditLog` | Immutable API request log entries |
+| `AuditLog` | Immutable API request log entries. Includes dual-actor fields (`actor_type`, `actor_login`, `actor_id`, `origin`) so PR-comment-driven actions in apply-then-merge mode record the VCS user rather than a Terrapod identity |
+| `PRSession` | Per-PR conversation state for apply-then-merge: status-comment id, last processed comment/review cursors, current PR state |
 | `NotificationConfiguration` | Workspace notification configs (webhook/Slack/email) |
 | `RunTask` / `TaskStage` / `TaskStageResult` | Run task webhooks and callback tracking |
 | `ModuleWorkspaceLink` | Module-to-workspace links for impact analysis |

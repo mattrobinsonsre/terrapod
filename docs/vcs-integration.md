@@ -46,7 +46,7 @@ Terrapod's background poller checks your VCS providers every 60 seconds (configu
 
 ### Sparse fetch + caching
 
-VCS archive fetches use git's smart-HTTP partial-clone protocol (via [dulwich](https://www.dulwich.io/)) — Terrapod fetches only the commit, trees, and the blobs reachable under the configured `working-directory` ∪ `trigger-prefixes`. For a workspace tracking a single subdirectory of a monorepo, the wire fetch is bounded by that subdirectory rather than the whole repo.
+VCS archive fetches use git's smart-HTTP partial-clone protocol via the canonical `git` CLI (`--filter=blob:none` plus a `core.sparseCheckoutCone`-narrowed checkout) — Terrapod fetches only the commit, trees, and the blobs reachable under the configured `working-directory` ∪ `trigger-prefixes`. For a workspace tracking a single subdirectory of a monorepo, the wire fetch is bounded by that subdirectory rather than the whole repo. The CLI is invoked because git's **promisor partial-clone** mechanism (which lazily refetches missing blobs during checkout) is implemented inside the CLI itself; reproducing it in a pure-Python client would mean reimplementing core git internals.
 
 For each `(connection, repo)` the poll cycle pre-computes a single union of every workspace's narrowing paths and shares one fetch across all of them. If any workspace under that group has no narrowing configured, the union collapses to "whole repo" — that workspace's plan/apply must see all files outside its declared paths, so we cannot narrow.
 
@@ -549,7 +549,11 @@ If Terrapod is accessible from GitHub (not behind a firewall), you can add webho
 2. Check **Active** under Webhook
 3. Set **Webhook URL** to: `https://terrapod.example.com/api/terrapod/v1/vcs-events/github`
 4. Set a **Webhook secret** (a random string)
-5. Subscribe to events: **Push**, **Pull request**
+5. Subscribe to events:
+   - **Push** — accelerates branch push detection
+   - **Pull request** — accelerates new PR / new head SHA / PR-closed detection (the `closed` action releases workspace locks in apply-then-merge mode)
+   - **Issue comment** — only required for [apply-then-merge](vcs-workflows.md); delivers `terrapod ...` PR commands sub-second
+   - **Pull request review** — only required for apply-then-merge; refreshes mergeability after approvals
 6. Save
 
 ![GitHub App Webhook Settings](images/github-app-webhook.png)
