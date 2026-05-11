@@ -207,6 +207,17 @@ async def _route_apply(
                 pr_number=sess.pr_number,
                 actor_login=actor_login,
             )
+        except run_service.ApplyBlocked as e:
+            # Mergeability gate rejected. `vcs_apply_blocked_reason` is
+            # already persisted on the run by the gate — that's what the
+            # status comment (phase 6) reads to render the block message.
+            logger.info(
+                "apply: blocked by mergeability gate",
+                workspace=ws.name,
+                run_id=str(run.id),
+                pr_number=sess.pr_number,
+                reason=e.reason,
+            )
         except Exception as e:
             logger.warning(
                 "apply: confirm_run failed",

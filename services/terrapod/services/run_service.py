@@ -17,10 +17,12 @@ from terrapod.db.models import (
     ConfigurationVersion,
     Run,
     RunTrigger,
+    VCSConnection,
     Workspace,
     utc_now,
 )
 from terrapod.logging_config import get_logger
+from terrapod.services import github_service, gitlab_service
 from terrapod.services.notification_service import STATUS_TO_TRIGGER
 
 logger = get_logger(__name__)
@@ -549,10 +551,94 @@ async def fire_run_triggers(
         )
 
 
+class ApplyBlocked(Exception):
+    """Raised when confirm_run rejects an apply because the underlying
+    PR/MR isn't mergeable per the VCS provider's gate (#282).
+
+    The reason string is what gets surfaced on the PR status comment.
+    """
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+async def _check_mergeability_or_block(db: AsyncSession, run: Run) -> None:
+    """For apply-then-merge runs, query the VCS provider's mergeability
+    gate before allowing confirm. If blocked, persist the reason on the
+    run and raise ApplyBlocked.
+
+    No-op for runs that aren't PR-associated apply-then-merge runs
+    (default-mode runs, drift-detection runs, CLI runs). The branch is
+    gated to keep the default-mode `confirm_run` path zero-cost.
+    """
+    if run.vcs_pull_request_number is None:
+        return
+    workspace = await db.get(Workspace, run.workspace_id)
+    if workspace is None or workspace.vcs_workflow != "apply_then_merge":
+        return
+    if workspace.vcs_connection_id is None or not workspace.vcs_repo_url:
+        return
+    conn = await db.get(VCSConnection, workspace.vcs_connection_id)
+    if conn is None:
+        return
+
+    # Provider dispatch — github_service / gitlab_service expose
+    # get_pull_request_mergeability with the same signature.
+    if conn.provider == "github":
+        parsed = github_service.parse_repo_url(workspace.vcs_repo_url)
+        check = github_service.get_pull_request_mergeability
+    elif conn.provider == "gitlab":
+        parsed = gitlab_service.parse_repo_url(workspace.vcs_repo_url)
+        check = gitlab_service.get_pull_request_mergeability
+    else:
+        logger.warning(
+            "confirm_run: unknown VCS provider, skipping mergeability check",
+            provider=conn.provider,
+        )
+        return
+    if parsed is None:
+        logger.warning(
+            "confirm_run: could not parse repo URL, skipping mergeability check",
+            repo_url=workspace.vcs_repo_url,
+        )
+        return
+    owner, repo = parsed
+
+    try:
+        status = await check(conn, owner, repo, run.vcs_pull_request_number)
+    except Exception as e:
+        # If the provider call fails we don't want to silently apply —
+        # surface the error as a transient block so the user retries.
+        reason = f"Could not verify mergeability ({e}); retry shortly."
+        run.vcs_apply_blocked_reason = reason
+        raise ApplyBlocked(reason) from e
+
+    if status.unknown:
+        # GitHub returns mergeable=null for a few seconds after a push
+        # while it computes the merge check. Surface this as a transient
+        # block — caller / user retries within seconds.
+        reason = status.reason or "Mergeability is still being computed; retry shortly."
+        run.vcs_apply_blocked_reason = reason
+        raise ApplyBlocked(reason)
+    if not status.mergeable:
+        run.vcs_apply_blocked_reason = status.reason or f"PR is not mergeable ({status.state})."
+        raise ApplyBlocked(run.vcs_apply_blocked_reason)
+    # Mergeable now — clear any stale block reason from a previous attempt.
+    run.vcs_apply_blocked_reason = None
+
+
 async def confirm_run(db: AsyncSession, run: Run) -> Run:
-    """Confirm a planned run for apply."""
+    """Confirm a planned run for apply.
+
+    For apply-then-merge runs, the VCS provider's mergeability gate
+    fires first — if the PR isn't mergeable, this raises `ApplyBlocked`
+    with the provider's own language (`dirty` / `blocked` / `behind` /
+    `draft` / etc.) attached to the run for the status comment.
+    """
     if run.status != "planned":
         raise ValueError(f"Can only confirm runs in 'planned' status, got '{run.status}'")
+    await _check_mergeability_or_block(db, run)
     return await transition_run(db, run, "confirmed")
 
 

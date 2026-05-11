@@ -532,6 +532,12 @@ async def confirm_run(
     try:
         run = await run_service.confirm_run(db, run)
         await db.commit()
+    except run_service.ApplyBlocked as e:
+        # Mergeability gate rejected (apply-then-merge mode). `vcs_apply_blocked_reason`
+        # is already persisted on the run by the gate; the 422 surfaces the
+        # provider's own language to the API caller (web UI, terraform CLI).
+        await db.commit()
+        raise HTTPException(status_code=422, detail=str(e.reason)) from e
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return JSONResponse(content=_run_json(run))
