@@ -49,6 +49,9 @@ interface WorkspaceAttrs {
   'vcs-branch': string
   'vcs-connection-id': string | null
   'vcs-connection-name': string | null
+  'vcs-workflow': 'merge_then_apply' | 'apply_then_merge'
+  'auto-merge': boolean
+  'auto-merge-strategy': 'merge' | 'squash' | 'rebase'
   'drift-detection-enabled': boolean
   'drift-detection-interval-seconds': number
   'drift-last-checked-at': string
@@ -241,6 +244,13 @@ function WorkspaceDetailContent() {
   const [editVcsConnectionId, setEditVcsConnectionId] = useState<string | null>(null)
   const [editVcsRepoUrl, setEditVcsRepoUrl] = useState('')
   const [editVcsBranch, setEditVcsBranch] = useState('')
+  const [editVcsWorkflow, setEditVcsWorkflow] = useState<'merge_then_apply' | 'apply_then_merge'>(
+    'merge_then_apply'
+  )
+  const [editAutoMerge, setEditAutoMerge] = useState(false)
+  const [editAutoMergeStrategy, setEditAutoMergeStrategy] = useState<
+    'merge' | 'squash' | 'rebase'
+  >('merge')
   const [saving, setSaving] = useState(false)
 
   // Agent pools
@@ -716,6 +726,9 @@ function WorkspaceDetailContent() {
     setEditVcsConnectionId(workspace.attributes['vcs-connection-id'] || null)
     setEditVcsRepoUrl(workspace.attributes['vcs-repo-url'] || '')
     setEditVcsBranch(workspace.attributes['vcs-branch'] || '')
+    setEditVcsWorkflow(workspace.attributes['vcs-workflow'] || 'merge_then_apply')
+    setEditAutoMerge(workspace.attributes['auto-merge'] || false)
+    setEditAutoMergeStrategy(workspace.attributes['auto-merge-strategy'] || 'merge')
     setEditing(true)
     if (!poolsLoaded) {
       apiFetch('/api/terrapod/v1/agent-pools').then(res => res.ok ? res.json() : { data: [] }).then(data => {
@@ -767,6 +780,9 @@ function WorkspaceDetailContent() {
               'trigger-prefixes': editTriggerPrefixes,
               'vcs-repo-url': editVcsRepoUrl,
               'vcs-branch': editVcsBranch,
+              'vcs-workflow': editVcsWorkflow,
+              'auto-merge': editAutoMerge,
+              'auto-merge-strategy': editAutoMergeStrategy,
               labels: editLabels,
               ...(isAdmin() ? { 'owner-email': editOwner } : {}),
               ...(force ? { force: true } : {}),
@@ -1502,6 +1518,72 @@ function WorkspaceDetailContent() {
                     <input type="text" value={editVcsBranch} onChange={(e) => setEditVcsBranch(e.target.value)} placeholder="main (default)" className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{attrs['vcs-branch'] || 'Default'}</dd>
+                  )}
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">VCS Workflow</dt>
+                  {editing ? (
+                    <select
+                      value={editVcsWorkflow}
+                      onChange={(e) => setEditVcsWorkflow(e.target.value as 'merge_then_apply' | 'apply_then_merge')}
+                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    >
+                      <option value="merge_then_apply">merge_then_apply (default — TFE / HCP standard)</option>
+                      <option value="apply_then_merge">apply_then_merge (Atlantis standard — opt-in)</option>
+                    </select>
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['vcs-workflow']}</dd>
+                  )}
+                </div>
+                {editing && editVcsWorkflow === 'apply_then_merge' && (
+                  <div className="sm:col-span-2 rounded border border-amber-700 bg-amber-900/30 p-3 text-xs text-amber-100">
+                    <p className="font-medium">Authorization delegated to your VCS repository.</p>
+                    <p className="mt-1">
+                      Anyone who can merge the PR can apply. Branch protection rules (required reviews,
+                      status checks, code owner approval) become the gate. Terrapod role/label RBAC does
+                      <em> not</em> apply to comment-driven actions in this mode.
+                    </p>
+                    <p className="mt-1">
+                      <strong>Recommended:</strong> require linear history (rebase/squash before merge) so the
+                      commit you apply is the commit that lands.
+                    </p>
+                    <p className="mt-1">
+                      Credit: this workflow is modelled on{' '}
+                      <a href="https://www.runatlantis.io/" target="_blank" rel="noopener noreferrer" className="underline">Atlantis</a>.
+                      Atlantis remains the right tool for teams who only want PR-comment-driven applies and no platform UI.
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <dt className="text-xs text-slate-500">Auto-merge after apply</dt>
+                  {editing ? (
+                    <label className="mt-1 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={editAutoMerge}
+                        onChange={(e) => setEditAutoMerge(e.target.checked)}
+                        className="rounded border-slate-600 bg-slate-700 text-brand-600"
+                      />
+                      <span className="text-sm text-slate-200">{editAutoMerge ? 'Enabled' : 'Disabled'}</span>
+                    </label>
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['auto-merge'] ? 'Enabled' : 'Disabled'}</dd>
+                  )}
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">Auto-merge Strategy</dt>
+                  {editing ? (
+                    <select
+                      value={editAutoMergeStrategy}
+                      onChange={(e) => setEditAutoMergeStrategy(e.target.value as 'merge' | 'squash' | 'rebase')}
+                      className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    >
+                      <option value="merge">merge</option>
+                      <option value="squash">squash</option>
+                      <option value="rebase">rebase</option>
+                    </select>
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['auto-merge-strategy']}</dd>
                   )}
                 </div>
                 {attrs['vcs-connection-name'] && !editing && (

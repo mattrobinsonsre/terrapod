@@ -115,6 +115,30 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Description: "VCS connection ID (e.g. vcs-abc123).",
 				Optional:    true,
 			},
+			"vcs_workflow": schema.StringAttribute{
+				Description: "VCS workflow mode: `merge_then_apply` (default, TFE/HCP standard) or `apply_then_merge` (Atlantis-style; PR runs are full plan-and-apply that wait on a `terrapod apply` comment). Apply-then-merge requires a VCS connection and is incompatible with `auto_apply=true`.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"auto_merge": schema.BoolAttribute{
+				Description: "If true, Terrapod merges the PR/MR after a successful apply (subject to branch protection). Default: false.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"auto_merge_strategy": schema.StringAttribute{
+				Description: "Merge strategy for auto-merge: `merge` (default), `squash`, or `rebase`.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"agent_pool_id": schema.StringAttribute{
 				Description: "Agent pool ID for agent execution mode.",
 				Optional:    true,
@@ -356,6 +380,15 @@ func buildWorkspaceAttrs(m *workspaceModel) map[string]any {
 	if !m.VCSBranch.IsNull() {
 		attrs["vcs-branch"] = m.VCSBranch.ValueString()
 	}
+	if !m.VCSWorkflow.IsNull() && !m.VCSWorkflow.IsUnknown() {
+		attrs["vcs-workflow"] = m.VCSWorkflow.ValueString()
+	}
+	if !m.AutoMerge.IsNull() && !m.AutoMerge.IsUnknown() {
+		attrs["auto-merge"] = m.AutoMerge.ValueBool()
+	}
+	if !m.AutoMergeStrategy.IsNull() && !m.AutoMergeStrategy.IsUnknown() {
+		attrs["auto-merge-strategy"] = m.AutoMergeStrategy.ValueString()
+	}
 	if !m.AgentPoolID.IsNull() {
 		attrs["agent-pool-id"] = m.AgentPoolID.ValueString()
 	}
@@ -403,6 +436,9 @@ func readResourceIntoModel(ctx context.Context, res *client.Resource, m *workspa
 	m.WorkingDirectory = types.StringValue(client.GetStringAttr(res, "working-directory"))
 	m.ResourceCPU = types.StringValue(client.GetStringAttr(res, "resource-cpu"))
 	m.ResourceMemory = types.StringValue(client.GetStringAttr(res, "resource-memory"))
+	m.VCSWorkflow = types.StringValue(client.GetStringAttr(res, "vcs-workflow"))
+	m.AutoMerge = types.BoolValue(client.GetBoolAttr(res, "auto-merge"))
+	m.AutoMergeStrategy = types.StringValue(client.GetStringAttr(res, "auto-merge-strategy"))
 	m.OwnerEmail = types.StringValue(client.GetStringAttr(res, "owner-email"))
 	m.Locked = types.BoolValue(client.GetBoolAttr(res, "locked"))
 	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))

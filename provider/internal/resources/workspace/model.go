@@ -66,6 +66,9 @@ type workspaceModel struct {
 	VCSRepoURL                    types.String `tfsdk:"vcs_repo_url"`
 	VCSBranch                     types.String `tfsdk:"vcs_branch"`
 	VCSConnectionID               types.String `tfsdk:"vcs_connection_id"`
+	VCSWorkflow                   types.String `tfsdk:"vcs_workflow"`
+	AutoMerge                     types.Bool   `tfsdk:"auto_merge"`
+	AutoMergeStrategy             types.String `tfsdk:"auto_merge_strategy"`
 	AgentPoolID                   types.String `tfsdk:"agent_pool_id"`
 	VarFiles                      types.List   `tfsdk:"var_files"`
 	DriftDetectionEnabled         types.Bool   `tfsdk:"drift_detection_enabled"`
