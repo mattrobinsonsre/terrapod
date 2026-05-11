@@ -140,8 +140,33 @@ async def _route(
         return
 
     if cmd.verb == "merge":
-        # Force-merge lands with auto-merge in phase 8.
-        logger.info("vcs_comment_dispatch: merge requested (phase 8)", **audit_ctx)
+        # Force-merge: skip the cross-workspace gate, record the partial
+        # apply state at merge time in the audit log, then call the
+        # provider's merge API.
+        from terrapod.services.vcs_auto_merge import force_merge
+
+        merged, error_reason = await force_merge(
+            db, sess, conn, "merge", actor_login, actor_user_id
+        )
+        if merged:
+            logger.info(
+                "vcs_comment_dispatch: force-merged",
+                **audit_ctx,
+                strategy="merge",
+            )
+        else:
+            logger.info(
+                "vcs_comment_dispatch: force-merge rejected by provider",
+                **audit_ctx,
+                error_reason=error_reason,
+            )
+        # Refresh the status comment so the merge result is visible.
+        await db.commit()
+        await enqueue_trigger(
+            "vcs_status_comment_update",
+            {"session_id": str(sess.id)},
+            dedup_key=f"vcs_status:{sess.id}",
+        )
         return
 
     if not candidates:

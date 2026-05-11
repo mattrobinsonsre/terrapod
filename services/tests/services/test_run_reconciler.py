@@ -28,6 +28,7 @@ def _mock_run(**kwargs):
     run.auto_apply = kwargs.get("auto_apply", False)
     run.plan_only = kwargs.get("plan_only", False)
     run.error_message = kwargs.get("error_message", "")
+    run.vcs_pull_request_number = kwargs.get("vcs_pull_request_number", None)
     run.vcs_commit_sha = kwargs.get("vcs_commit_sha", None)
     run.is_drift_detection = kwargs.get("is_drift_detection", False)
     # Default `has_changes=True` so existing tests keep matching the

@@ -139,6 +139,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         description="Edit-in-place PR status comment for apply-then-merge PRs",
     )
 
+    from terrapod.services.vcs_auto_merge import handle_vcs_apply_completed
+
+    register_trigger_handler(
+        "vcs_apply_completed",
+        handler=handle_vcs_apply_completed,
+        description="Cross-workspace merge gate evaluation + auto-merge",
+    )
+
     # Notification delivery handler (always registered)
     from terrapod.services.notification_dispatcher import handle_notification_delivery
 

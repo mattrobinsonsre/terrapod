@@ -457,6 +457,11 @@ async def complete_apply(db: AsyncSession, run: Run) -> Run:
     Idempotent counterpart to :func:`complete_plan`. Same dual-path rationale
     — either the runner's `/apply-result` POST or the reconciler's listener
     round-trip can win; whichever lands first does the transition.
+
+    On successful apply for a PR-associated run, schedules cross-workspace
+    gate evaluation (#282 phase 8): invalidate stale sibling-PR plans on
+    the same workspace, refresh the status comment, and fire auto-merge
+    if every PR-affected workspace has met its required state.
     """
     if run.status != "applying":
         return run
@@ -469,7 +474,68 @@ async def complete_apply(db: AsyncSession, run: Run) -> Run:
         ws.lock_id = None
 
     logger.info("Apply succeeded", run_id=str(run.id))
+
+    # Apply-then-merge follow-ups: invalidate stale sibling-PR plans on
+    # the same workspace, then trigger cross-workspace gate evaluation
+    # for the PR this run was associated with. Enqueueing here keeps
+    # the transition synchronous and the gate evaluation async.
+    if run.vcs_pull_request_number is not None and ws is not None:
+        await _invalidate_sibling_pr_plans(db, ws.id, run.id, run.vcs_pull_request_number)
+        from terrapod.services.scheduler import enqueue_trigger
+
+        await enqueue_trigger(
+            "vcs_apply_completed",
+            {
+                "run_id": str(run.id),
+                "workspace_id": str(ws.id),
+                "pr_number": run.vcs_pull_request_number,
+            },
+            dedup_key=f"vcs_apply_completed:{run.id}",
+        )
     return run
+
+
+async def _invalidate_sibling_pr_plans(
+    db: AsyncSession,
+    workspace_id: uuid.UUID,
+    just_applied_run_id: uuid.UUID,
+    just_applied_pr_number: int,
+) -> None:
+    """Cancel any other-PR `planned` runs on this workspace.
+
+    After a successful state-mutating apply, sibling PR plans against
+    pre-apply state are no longer valid — `tofu apply tfplan` would
+    refuse with a state-lineage error. We cancel them proactively
+    (#282 cross-PR lock race section); the poller's next cycle will
+    re-plan against the new state once the workspace lock allows.
+    """
+    sibling_q = await db.execute(
+        select(Run).where(
+            Run.workspace_id == workspace_id,
+            Run.status == "planned",
+            Run.vcs_pull_request_number.isnot(None),
+            Run.vcs_pull_request_number != just_applied_pr_number,
+            Run.id != just_applied_run_id,
+        )
+    )
+    for sibling in sibling_q.scalars().all():
+        sibling.vcs_apply_blocked_reason = (
+            f"Plan superseded by apply of PR #{just_applied_pr_number}."
+        )
+        try:
+            await cancel_run(db, sibling, force=True)
+            logger.info(
+                "invalidated sibling-PR plan",
+                run_id=str(sibling.id),
+                workspace_id=str(workspace_id),
+                superseded_by_pr=just_applied_pr_number,
+            )
+        except Exception as e:
+            logger.warning(
+                "failed to cancel sibling-PR plan",
+                run_id=str(sibling.id),
+                error=str(e),
+            )
 
 
 async def complete_planned_as_noop(db: AsyncSession, run: Run) -> Run:
