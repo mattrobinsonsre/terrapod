@@ -1225,14 +1225,30 @@ class AuditLog(Base):
     actor_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     actor_ip: Mapped[str] = mapped_column(String(45), nullable=False, default="")
     action: Mapped[str] = mapped_column(
-        String(20), nullable=False
-    )  # HTTP method: GET, POST, PATCH, DELETE
+        String(40), nullable=False
+    )  # HTTP method for API events; verb (apply/plan/merge/...) for VCS events
     resource_type: Mapped[str] = mapped_column(String(63), nullable=False, default="")
     resource_id: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     status_code: Mapped[int] = mapped_column(Integer, nullable=False)
     request_id: Mapped[str] = mapped_column(String(63), nullable=False, default="")
     duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     detail: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    # Dual-actor model (#282).
+    # - actor_type: "terrapod_user" (HTTP/UI/API), "vcs_user" (PR comment),
+    #   "system" (background tasks).
+    # - origin: "api", "terrapod_ui", "pr_comment", "system".
+    # - actor_login: VCS-side display login (e.g. GitHub username) when
+    #   actor_type is vcs_user; empty otherwise.
+    # - actor_id: provider-side immutable user id (e.g. GitHub user id) when
+    #   actor_type is vcs_user; empty otherwise.
+    actor_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="terrapod_user"
+    )
+    origin: Mapped[str] = mapped_column(String(20), nullable=False, server_default="api")
+    actor_login: Mapped[str] = mapped_column(String(255), nullable=False, server_default="")
+    actor_id: Mapped[str] = mapped_column(String(64), nullable=False, server_default="")
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -1241,6 +1257,7 @@ class AuditLog(Base):
         Index("ix_audit_logs_timestamp", "timestamp"),
         Index("ix_audit_logs_actor_email", "actor_email"),
         Index("ix_audit_logs_resource", "resource_type", "resource_id"),
+        Index("ix_audit_logs_actor_type", "actor_type"),
     )
 
 

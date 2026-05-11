@@ -31,6 +31,7 @@ from terrapod.db.models import PRSession, Run, VCSConnection, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import run_service
+from terrapod.services.audit_service import log_vcs_action
 from terrapod.services.scheduler import enqueue_trigger
 from terrapod.services.vcs_command_parser import Command, parse
 
@@ -160,6 +161,24 @@ async def _route(
         await _route_plan(db, sess, candidates, actor_login, actor_user_id)
     elif cmd.verb == "unlock":
         await _route_unlock(db, candidates, actor_login, actor_user_id)
+
+    # Audit: one entry per affected workspace. Dual-actor model — see
+    # log_vcs_action / #282. Errors swallowed so audit failure never
+    # breaks the dispatch path.
+    for ws in candidates:
+        try:
+            await log_vcs_action(
+                db,
+                verb=cmd.verb,
+                workspace_id=str(ws.id),
+                actor_login=actor_login,
+                actor_user_id=actor_user_id,
+                pr_number=sess.pr_number,
+                repo=sess.repo,
+                detail=cmd.raw,
+            )
+        except Exception as e:
+            logger.warning("audit log failed", verb=cmd.verb, error=str(e))
 
     # Every command-driven mutation refreshes the status comment so the
     # PR thread reflects the latest state in seconds.

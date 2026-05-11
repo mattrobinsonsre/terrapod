@@ -70,8 +70,18 @@ async def log_audit_event(
     request_id: str = "",
     duration_ms: int = 0,
     detail: str = "",
+    actor_type: str = "terrapod_user",
+    origin: str = "api",
+    actor_login: str = "",
+    actor_id: str = "",
 ) -> None:
-    """Insert an audit log entry."""
+    """Insert an audit log entry.
+
+    Dual-actor model (#282): set `actor_type='vcs_user'` and pass the VCS
+    login + provider user id for PR-comment-driven actions. `origin`
+    distinguishes the surface that initiated the action (api /
+    terrapod_ui / pr_comment / system).
+    """
     entry = AuditLog(
         id=generate_uuid7(),
         actor_email=actor_email,
@@ -83,9 +93,45 @@ async def log_audit_event(
         request_id=request_id,
         duration_ms=duration_ms,
         detail=detail,
+        actor_type=actor_type,
+        origin=origin,
+        actor_login=actor_login,
+        actor_id=actor_id,
     )
     db.add(entry)
     await db.commit()
+
+
+async def log_vcs_action(
+    db: AsyncSession,
+    *,
+    verb: str,
+    workspace_id: str,
+    actor_login: str,
+    actor_user_id: str,
+    pr_number: int,
+    repo: str,
+    detail: str = "",
+    status_code: int = 200,
+) -> None:
+    """Audit a PR-comment-driven action (#282 phase 7).
+
+    Records the VCS user (login + provider id) as the actor, without any
+    Terrapod identity mapping — authorization in apply-then-merge mode is
+    delegated to VCS repo permissions, so the audit trail mirrors that.
+    """
+    await log_audit_event(
+        db,
+        actor_type="vcs_user",
+        origin="pr_comment",
+        actor_login=actor_login,
+        actor_id=actor_user_id,
+        action=verb,
+        resource_type="workspace",
+        resource_id=workspace_id,
+        status_code=status_code,
+        detail=f"PR {repo}#{pr_number}: {detail}" if detail else f"PR {repo}#{pr_number}",
+    )
 
 
 async def purge_old_entries(db: AsyncSession, retention_days: int) -> int:
