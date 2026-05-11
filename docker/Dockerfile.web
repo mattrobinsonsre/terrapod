@@ -6,7 +6,7 @@
 
 # Build on the native platform (avoids emulation segfaults in Next.js/SWC).
 # The output is pure JavaScript, so it's architecture-independent.
-FROM --platform=$BUILDPLATFORM node:24-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:26-alpine AS builder
 
 WORKDIR /app
 
@@ -28,7 +28,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # Production image — standalone mode (minimal, no full node_modules)
-FROM node:24-alpine
+FROM node:26-alpine
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
 WORKDIR /app
