@@ -30,7 +30,14 @@ from terrapod.api.metrics import (
     VCS_PRS_DETECTED,
     VCS_RUNS_CREATED,
 )
-from terrapod.db.models import AutodiscoveryRule, Run, VCSConnection, Workspace, utc_now
+from terrapod.db.models import (
+    AutodiscoveryRule,
+    PRSession,
+    Run,
+    VCSConnection,
+    Workspace,
+    utc_now,
+)
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import github_service, gitlab_service, run_service
@@ -413,6 +420,96 @@ async def _poll_workspace_branch(
         )
 
 
+async def _upsert_pr_session(
+    db: AsyncSession,
+    conn: VCSConnection,
+    repo: str,
+    pr_number: int,
+    head_sha: str,
+) -> PRSession:
+    """Find or create the PRSession row for this (connection, repo, PR).
+
+    Updates `head_sha` if the PR has new commits. Idempotent — designed
+    to be called every poll cycle that sees an open PR. Returns the
+    persisted row (flushed but not committed; caller drives the commit).
+    """
+    existing = await db.execute(
+        select(PRSession).where(
+            PRSession.vcs_connection_id == conn.id,
+            PRSession.repo == repo,
+            PRSession.pr_number == pr_number,
+        )
+    )
+    sess = existing.scalar_one_or_none()
+    if sess is None:
+        sess = PRSession(
+            vcs_connection_id=conn.id,
+            repo=repo,
+            pr_number=pr_number,
+            head_sha=head_sha,
+            state="open",
+        )
+        db.add(sess)
+        await db.flush()
+        return sess
+    if sess.head_sha != head_sha:
+        sess.head_sha = head_sha
+    if sess.state != "open":
+        sess.state = "open"
+    return sess
+
+
+async def _reconcile_closed_pr_sessions(
+    db: AsyncSession,
+    conn: VCSConnection,
+    repo: str,
+    open_pr_numbers: set[int],
+) -> None:
+    """Detect PRs that have been closed since the last poll and clean up.
+
+    For each open PRSession on this (connection, repo) that's no longer
+    in the VCS provider's open-PR list, cancel any active runs to release
+    the workspace lock and mark the session as `closed`. This is the
+    poll-cycle fallback for the `pull_request:closed` webhook (which
+    phase 4 wires up). Hook-and-poll per #282: webhooks accelerate, polling
+    is the source of truth.
+    """
+    sessions = await db.execute(
+        select(PRSession).where(
+            PRSession.vcs_connection_id == conn.id,
+            PRSession.repo == repo,
+            PRSession.state == "open",
+        )
+    )
+    for sess in sessions.scalars().all():
+        if sess.pr_number in open_pr_numbers:
+            continue
+        # PR no longer in the open list — cancel active runs, close session.
+        active = await db.execute(
+            select(Run).where(
+                Run.vcs_pull_request_number == sess.pr_number,
+                Run.status.notin_(run_service.TERMINAL_STATES),
+            )
+        )
+        for run in active.scalars().all():
+            try:
+                await run_service.cancel_run(db, run, force=True)
+                logger.info(
+                    "Canceled run for closed PR",
+                    run_id=str(run.id),
+                    pr_number=sess.pr_number,
+                    repo=repo,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to cancel run for closed PR",
+                    run_id=str(run.id),
+                    pr_number=sess.pr_number,
+                    error=str(e),
+                )
+        sess.state = "closed"
+
+
 async def _poll_workspace_prs(
     db: AsyncSession,
     ws: Workspace,
@@ -425,6 +522,16 @@ async def _poll_workspace_prs(
 ) -> None:
     """Check open PRs/MRs targeting the tracked branch for speculative plans."""
     prs = await _list_open_prs(conn, owner, repo, branch)
+
+    # Hook-and-poll fallback for `pull_request:closed` (#282): if any
+    # PRSession on this (connection, repo) is no longer in the open list,
+    # cancel its runs and mark closed. Releases workspace locks held by
+    # planned apply-then-merge runs on PRs the user just closed without
+    # merging. Skip when the workspace isn't apply-then-merge — default-
+    # mode PR runs are plan-only and don't hold locks worth reconciling.
+    if ws.vcs_workflow == "apply_then_merge":
+        open_pr_numbers = {pr.number for pr in prs}
+        await _reconcile_closed_pr_sessions(db, conn, f"{owner}/{repo}", open_pr_numbers)
 
     for pr in prs:
         # Check if we already have any run for this PR + SHA (avoid duplicates)
@@ -505,6 +612,20 @@ async def _poll_workspace_prs(
                     error=repr(e),
                 )
 
+        # Branch on workspace mode (#282).
+        # - merge_then_apply (default): PR run is speculative plan-only.
+        # - apply_then_merge: PR run is a full plan-and-apply that saves
+        #   the tfplan and sits in `planned` waiting on a user comment.
+        #   The non-speculative run holds the workspace lock through
+        #   `planned` (confirmed via Q8 in #282 — non-plan-only runs
+        #   only release the lock at terminal/applied/cancelled).
+        is_apply_then_merge = ws.vcs_workflow == "apply_then_merge"
+        speculative = not is_apply_then_merge
+        if is_apply_then_merge:
+            message = f"Plan for PR #{pr.number}: {pr.title}"
+        else:
+            message = f"Speculative plan for PR #{pr.number}: {pr.title}"
+
         run = await _create_vcs_run(
             db,
             ws,
@@ -513,15 +634,20 @@ async def _poll_workspace_prs(
             repo,
             pr.head_sha,
             pr.head_ref,
-            speculative=True,
+            speculative=speculative,
             pr_number=pr.number,
-            message=f"Speculative plan for PR #{pr.number}: {pr.title}",
+            message=message,
             cache=cache,
             fetch_paths=fetch_paths,
         )
 
         if run:
             VCS_RUNS_CREATED.labels(provider=conn.provider, type="pr").inc()
+            # For apply-then-merge, upsert the conversation-state row so
+            # later phases (status comment, dispatcher) can hang state
+            # off a stable PRSession id without re-querying the VCS.
+            if is_apply_then_merge:
+                await _upsert_pr_session(db, conn, f"{owner}/{repo}", pr.number, pr.head_sha)
             await db.commit()
             logger.info(
                 "Speculative run created for PR",
