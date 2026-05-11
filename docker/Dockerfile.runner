@@ -6,7 +6,11 @@
 FROM alpine:3.23.4
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
-RUN apk upgrade --no-cache \
+# Bump APK_REFRESH to invalidate the cached layer and pick up the latest
+# Alpine security patches (e.g. nghttp2 1.68.1 fix for CVE-2026-27135).
+ARG APK_REFRESH=2026-05-11
+RUN echo "apk-refresh=${APK_REFRESH}" \
+    && apk upgrade --no-cache \
     && apk add --no-cache \
     curl \
     tar \
