@@ -758,6 +758,10 @@ curl -s \
 
 ## Configuration Versions
 
+A workspace's uploaded source archives are also browsable from the UI — workspace detail → Configurations tab. The list highlights the current configuration with a `current` badge and supports download + side-by-side diff between any two versions.
+
+![Workspace Configurations](images/workspace-configurations.png)
+
 ### Create Configuration Version
 
 ```

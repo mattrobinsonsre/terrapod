@@ -2,6 +2,8 @@
 
 Modelled on [Atlantis's `autodiscover`](https://www.runatlantis.io/docs/server-side-repo-config.html#autodiscover) feature, autodiscovery auto-creates a Terrapod workspace the first time a PR (or default-branch push) touches a path matching one of your rules. Designed for monorepos where pre-provisioning a workspace per directory is impractical.
 
+![Autodiscovery rules](images/admin-autodiscovery.png)
+
 ## When you'd want this
 
 - A monorepo with hundreds of nested terraform root modules (one per AWS account, one per environment, etc.).
