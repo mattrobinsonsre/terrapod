@@ -16,6 +16,13 @@ import jwt
 from terrapod.config import settings
 from terrapod.db.models import VCSConnection
 from terrapod.logging_config import get_logger
+from terrapod.services.vcs_provider import (
+    MergeabilityStatus,
+    PRComment,
+    PRMergeResult,
+    PRReview,
+    PullRequest,
+)
 
 logger = get_logger(__name__)
 
@@ -582,6 +589,215 @@ async def list_pr_comments(
     )
     resp.raise_for_status()
     return resp.json()
+
+
+# ── Apply-then-merge surface (#282) ─────────────────────────────────────
+
+
+# GitHub `mergeable_state` values that we treat as "blocked". `clean` and
+# `has_hooks` are the green-light states. `unstable` means non-blocking
+# status checks are failing (e.g. CodeQL not required by protection) —
+# we allow apply since branch protection doesn't reject.
+# Documentation: https://docs.github.com/en/graphql/reference/enums#mergestatestatus
+_GITHUB_BLOCKING_STATES = frozenset({"dirty", "blocked", "behind"})
+_GITHUB_MERGEABLE_STATES = frozenset({"clean", "has_hooks", "unstable"})
+
+
+async def get_pull_request(
+    conn: VCSConnection, owner: str, repo: str, pr_number: int
+) -> PullRequest | None:
+    """Fetch a single PR's current state."""
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+    resp = await _github_request("GET", f"{api_url}/repos/{owner}/{repo}/pulls/{pr_number}", token)
+    if resp.status_code == 404:
+        return None
+    resp.raise_for_status()
+    pr = resp.json()
+    return PullRequest(
+        number=pr["number"],
+        head_sha=pr["head"]["sha"],
+        head_ref=pr["head"]["ref"],
+        title=pr["title"],
+        draft=bool(pr.get("draft", False)),
+        author_login=(pr.get("user") or {}).get("login", ""),
+    )
+
+
+async def get_pull_request_mergeability(
+    conn: VCSConnection, owner: str, repo: str, pr_number: int
+) -> MergeabilityStatus:
+    """Apply-gate query.
+
+    GitHub computes `mergeable` asynchronously after a push — it returns
+    `null` until the check completes (typically <2s). We surface that as
+    `unknown=True` so the caller can retry rather than treating it as a
+    permanent block.
+    """
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+    resp = await _github_request("GET", f"{api_url}/repos/{owner}/{repo}/pulls/{pr_number}", token)
+    resp.raise_for_status()
+    pr = resp.json()
+    if pr.get("draft", False):
+        return MergeabilityStatus(
+            mergeable=False,
+            state="draft",
+            reason="Pull request is in draft state; convert to ready for review first.",
+        )
+    if pr.get("state") != "open":
+        return MergeabilityStatus(
+            mergeable=False,
+            state=pr.get("state", "unknown"),
+            reason=f"Pull request is {pr.get('state')}.",
+        )
+    mergeable = pr.get("mergeable")
+    state = pr.get("mergeable_state", "unknown")
+    if mergeable is None:
+        return MergeabilityStatus(
+            mergeable=False,
+            state=state,
+            reason="GitHub is still computing mergeability; retry shortly.",
+            unknown=True,
+        )
+    if not mergeable or state in _GITHUB_BLOCKING_STATES:
+        reasons = {
+            "dirty": "Merge conflicts; resolve and push.",
+            "blocked": "Branch protection requirements not met (review, status checks, or code owner approval).",
+            "behind": "Branch is behind the base; rebase or merge the base in.",
+        }
+        return MergeabilityStatus(
+            mergeable=False,
+            state=state,
+            reason=reasons.get(state, f"GitHub reports mergeable_state={state}."),
+        )
+    if state not in _GITHUB_MERGEABLE_STATES:
+        # New / unknown state — be conservative and block, surface the raw state.
+        return MergeabilityStatus(
+            mergeable=False,
+            state=state,
+            reason=f"Unrecognised mergeable_state '{state}'.",
+        )
+    return MergeabilityStatus(mergeable=True, state=state, reason="")
+
+
+async def merge_pull_request(
+    conn: VCSConnection,
+    owner: str,
+    repo: str,
+    pr_number: int,
+    strategy: str,
+    commit_title: str = "",
+    commit_message: str = "",
+) -> PRMergeResult:
+    """Merge a PR via GitHub's merge API.
+
+    Strategy maps:
+      - merge → `merge_method=merge`
+      - squash → `merge_method=squash`
+      - rebase → `merge_method=rebase`
+
+    422 = "PR is not mergeable" per GitHub's own gate. 405 = "merge method
+    not allowed by repo settings" (e.g. repo disables squash). Both come
+    back as `merged=False` with the provider's error message in
+    `error_reason`.
+    """
+    if strategy not in ("merge", "squash", "rebase"):
+        return PRMergeResult(merged=False, error_reason=f"invalid strategy {strategy!r}")
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+    payload: dict = {"merge_method": strategy}
+    if commit_title:
+        payload["commit_title"] = commit_title
+    if commit_message:
+        payload["commit_message"] = commit_message
+    resp = await _github_request(
+        "PUT",
+        f"{api_url}/repos/{owner}/{repo}/pulls/{pr_number}/merge",
+        token,
+        json=payload,
+    )
+    if resp.status_code == 200:
+        body = resp.json()
+        return PRMergeResult(
+            merged=bool(body.get("merged")),
+            sha=body.get("sha", ""),
+            message=body.get("message", ""),
+        )
+    # GitHub returns the rejection reason in the body's `message`.
+    try:
+        msg = resp.json().get("message", resp.text)
+    except Exception:
+        msg = resp.text
+    return PRMergeResult(merged=False, error_reason=f"{resp.status_code}: {msg}")
+
+
+async def list_pr_comments_typed(
+    conn: VCSConnection,
+    owner: str,
+    repo: str,
+    pr_number: int,
+    since: str | None = None,
+) -> list[PRComment]:
+    """List PR comments, typed for the comment-dispatch path.
+
+    Distinct from the legacy `list_pr_comments` (returns raw dicts) which
+    other callers — notification dispatcher, status-comment lookup —
+    still use.
+    """
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+    params: dict = {"per_page": 100, "sort": "updated", "direction": "asc"}
+    if since:
+        params["since"] = since
+    resp = await _github_request(
+        "GET",
+        f"{api_url}/repos/{owner}/{repo}/issues/{pr_number}/comments",
+        token,
+        params=params,
+    )
+    resp.raise_for_status()
+    out: list[PRComment] = []
+    for c in resp.json():
+        user = c.get("user") or {}
+        out.append(
+            PRComment(
+                id=str(c["id"]),
+                body=c.get("body") or "",
+                author_login=user.get("login", ""),
+                author_user_id=str(user.get("id", "")),
+                created_at=c.get("created_at", ""),
+                updated_at=c.get("updated_at", ""),
+            )
+        )
+    return out
+
+
+async def list_pr_reviews(
+    conn: VCSConnection, owner: str, repo: str, pr_number: int
+) -> list[PRReview]:
+    """List reviews submitted on a PR (used for approval-state detection)."""
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+    resp = await _github_request(
+        "GET",
+        f"{api_url}/repos/{owner}/{repo}/pulls/{pr_number}/reviews",
+        token,
+        params={"per_page": 100},
+    )
+    resp.raise_for_status()
+    out: list[PRReview] = []
+    for r in resp.json():
+        user = r.get("user") or {}
+        out.append(
+            PRReview(
+                id=str(r["id"]),
+                state=(r.get("state") or "").lower(),
+                author_login=user.get("login", ""),
+                submitted_at=r.get("submitted_at") or "",
+            )
+        )
+    return out
 
 
 def parse_repo_url(repo_url: str) -> tuple[str, str] | None:

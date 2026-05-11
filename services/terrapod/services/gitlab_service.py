@@ -11,7 +11,13 @@ import httpx
 
 from terrapod.db.models import VCSConnection
 from terrapod.logging_config import get_logger
-from terrapod.services.vcs_provider import PullRequest
+from terrapod.services.vcs_provider import (
+    MergeabilityStatus,
+    PRComment,
+    PRMergeResult,
+    PRReview,
+    PullRequest,
+)
 
 logger = get_logger(__name__)
 
@@ -333,6 +339,223 @@ async def list_mr_comments(
         )
         resp.raise_for_status()
         return resp.json()
+
+
+# ── Apply-then-merge surface (#282) ─────────────────────────────────────
+
+
+# GitLab's `detailed_merge_status` values that mean "can merge". See
+# https://docs.gitlab.com/api/merge_requests/#merge-status — values
+# evolve across GitLab versions; we whitelist the safe ones and treat
+# anything else as a block to surface verbatim.
+_GITLAB_MERGEABLE_DETAILED = frozenset({"mergeable", "ci_must_pass", "ci_still_running"})
+
+
+async def get_pull_request(
+    conn: VCSConnection, owner: str, repo: str, mr_number: int
+) -> PullRequest | None:
+    """Fetch a single MR's current state."""
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{api}/projects/{project}/merge_requests/{mr_number}",
+            headers=_headers(conn),
+        )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+    mr = resp.json()
+    return PullRequest(
+        number=mr["iid"],
+        head_sha=mr.get("sha") or "",
+        head_ref=mr.get("source_branch") or "",
+        title=mr.get("title") or "",
+        draft=bool(mr.get("draft", False)),
+        author_login=(mr.get("author") or {}).get("username", ""),
+    )
+
+
+async def get_pull_request_mergeability(
+    conn: VCSConnection, owner: str, repo: str, mr_number: int
+) -> MergeabilityStatus:
+    """Apply-gate query.
+
+    GitLab returns `merge_status` ("can_be_merged" / "cannot_be_merged" /
+    "checking" / "unchecked") plus a `detailed_merge_status` (newer,
+    finer-grained). We prefer the detailed status when present.
+    `checking` / `unchecked` map to `unknown=True` so the caller retries.
+    """
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{api}/projects/{project}/merge_requests/{mr_number}",
+            headers=_headers(conn),
+        )
+        resp.raise_for_status()
+    mr = resp.json()
+    if mr.get("draft", False):
+        return MergeabilityStatus(
+            mergeable=False,
+            state="draft",
+            reason="Merge request is in draft state; mark as ready first.",
+        )
+    if mr.get("state") != "opened":
+        return MergeabilityStatus(
+            mergeable=False,
+            state=mr.get("state", "unknown"),
+            reason=f"Merge request is {mr.get('state')}.",
+        )
+    detailed = mr.get("detailed_merge_status") or ""
+    legacy = mr.get("merge_status") or ""
+    state = detailed or legacy
+    if legacy in ("checking", "unchecked"):
+        return MergeabilityStatus(
+            mergeable=False,
+            state=state,
+            reason="GitLab is still computing mergeability; retry shortly.",
+            unknown=True,
+        )
+    if detailed and detailed in _GITLAB_MERGEABLE_DETAILED:
+        return MergeabilityStatus(mergeable=True, state=state, reason="")
+    if legacy == "can_be_merged" and not detailed:
+        return MergeabilityStatus(mergeable=True, state=state, reason="")
+    # Anything else is a block — surface verbatim so the user sees
+    # GitLab's own language (e.g. `discussions_not_resolved`,
+    # `not_approved`, `conflict`).
+    return MergeabilityStatus(
+        mergeable=False,
+        state=state,
+        reason=f"GitLab reports merge status '{state}'.",
+    )
+
+
+async def merge_pull_request(
+    conn: VCSConnection,
+    owner: str,
+    repo: str,
+    mr_number: int,
+    strategy: str,
+    commit_title: str = "",
+    commit_message: str = "",
+) -> PRMergeResult:
+    """Merge an MR via GitLab's merge API.
+
+    Strategy mapping:
+      - merge → default GitLab behaviour (merge commit, unless project
+        is configured for fast-forward)
+      - squash → `squash=true` (still produces a merge commit on top of
+        the squashed commit unless project requires fast-forward)
+      - rebase → fast-forward merge attempt. If project doesn't allow
+        fast-forward, this falls back to the default and the caller
+        sees the GitLab error verbatim.
+    """
+    if strategy not in ("merge", "squash", "rebase"):
+        return PRMergeResult(merged=False, error_reason=f"invalid strategy {strategy!r}")
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+    payload: dict = {}
+    if strategy == "squash":
+        payload["squash"] = True
+        if commit_message:
+            payload["squash_commit_message"] = commit_message
+    if commit_title:
+        payload["merge_commit_message"] = commit_title
+    async with httpx.AsyncClient() as client:
+        resp = await client.put(
+            f"{api}/projects/{project}/merge_requests/{mr_number}/merge",
+            json=payload,
+            headers=_headers(conn),
+        )
+    if resp.status_code == 200:
+        body = resp.json()
+        return PRMergeResult(
+            merged=body.get("state") == "merged",
+            sha=body.get("merge_commit_sha") or body.get("squash_commit_sha") or "",
+            message=body.get("merge_commit_message", ""),
+        )
+    try:
+        msg = resp.json().get("message", resp.text)
+    except Exception:
+        msg = resp.text
+    return PRMergeResult(merged=False, error_reason=f"{resp.status_code}: {msg}")
+
+
+async def list_pr_comments_typed(
+    conn: VCSConnection,
+    owner: str,
+    repo: str,
+    mr_number: int,
+    since: str | None = None,
+) -> list[PRComment]:
+    """List MR notes, typed and filtered for the comment-dispatch path.
+
+    GitLab's notes API has no `since` parameter — we fetch with
+    `sort=asc&order_by=updated_at` and filter client-side. System notes
+    (state changes, assignment events) are filtered out — we only want
+    human comments.
+    """
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{api}/projects/{project}/merge_requests/{mr_number}/notes",
+            params={"per_page": 100, "sort": "asc", "order_by": "updated_at"},
+            headers=_headers(conn),
+        )
+        resp.raise_for_status()
+    out: list[PRComment] = []
+    for n in resp.json():
+        if n.get("system"):
+            continue
+        if since and (n.get("updated_at") or "") <= since:
+            continue
+        author = n.get("author") or {}
+        out.append(
+            PRComment(
+                id=str(n["id"]),
+                body=n.get("body") or "",
+                author_login=author.get("username", ""),
+                author_user_id=str(author.get("id", "")),
+                created_at=n.get("created_at", ""),
+                updated_at=n.get("updated_at", ""),
+            )
+        )
+    return out
+
+
+async def list_pr_reviews(
+    conn: VCSConnection, owner: str, repo: str, mr_number: int
+) -> list[PRReview]:
+    """Approvals on a GitLab MR, expressed as PRReview entries.
+
+    GitLab approvals aren't event-like (no list of individual review
+    submissions) — they're a snapshot. We synthesise one PRReview per
+    current approver so the consumer can count them; `submitted_at` is
+    left blank because the snapshot doesn't tell us when each approval
+    landed.
+    """
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{api}/projects/{project}/merge_requests/{mr_number}/approvals",
+            headers=_headers(conn),
+        )
+        resp.raise_for_status()
+    out: list[PRReview] = []
+    for a in resp.json().get("approved_by", []):
+        u = a.get("user") or {}
+        out.append(
+            PRReview(
+                id=str(u.get("id", "")),
+                state="approved",
+                author_login=u.get("username", ""),
+                submitted_at="",
+            )
+        )
+    return out
 
 
 def parse_repo_url(repo_url: str) -> tuple[str, str] | None:
