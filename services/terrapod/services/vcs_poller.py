@@ -460,6 +460,98 @@ async def _upsert_pr_session(
     return sess
 
 
+async def _poll_pr_comments(
+    db: AsyncSession,
+    conn: VCSConnection,
+    repo: str,
+) -> None:
+    """Poll-fallback for `issue_comment` / `note` webhooks (#282).
+
+    For each open PRSession on this (connection, repo), fetch comments
+    since the last processed comment id and dispatch any `terrapod ...`
+    commands via the scheduler. The scheduler's per-comment-id dedup
+    key ensures webhook+poll racing doesn't double-dispatch.
+
+    Required for deployments where the GitHub App doesn't have
+    `issue_comment` webhook delivery (firewalled installs, local dev
+    stacks, App permission upgrade not yet accepted) — webhooks
+    accelerate, polling is the source of truth.
+    """
+    sessions = await db.execute(
+        select(PRSession).where(
+            PRSession.vcs_connection_id == conn.id,
+            PRSession.repo == repo,
+            PRSession.state == "open",
+        )
+    )
+    open_sessions = list(sessions.scalars().all())
+    if not open_sessions:
+        return
+
+    owner, repo_name = repo.split("/", 1)
+    for sess in open_sessions:
+        try:
+            if conn.provider == "github":
+                comments = await github_service.list_pr_comments_typed(
+                    conn, owner, repo_name, sess.pr_number, since=None
+                )
+            elif conn.provider == "gitlab":
+                comments = await gitlab_service.list_pr_comments_typed(
+                    conn, owner, repo_name, sess.pr_number, since=None
+                )
+            else:
+                continue
+        except Exception as e:
+            logger.warning(
+                "comment poll: provider call failed",
+                repo=repo,
+                pr_number=sess.pr_number,
+                error=str(e),
+            )
+            continue
+
+        # Filter to comments newer than the last processed id (string
+        # compare is fine — GitHub + GitLab comment ids are
+        # monotonically increasing integers as strings).
+        new_comments = [
+            c
+            for c in comments
+            if sess.last_processed_comment_id is None
+            or int(c.id) > int(sess.last_processed_comment_id)
+        ]
+        for c in new_comments:
+            # Local import to avoid pulling the parser into the global
+            # import graph for this single use.
+            from terrapod.services.vcs_command_parser import is_command_comment
+
+            if not is_command_comment(c.body):
+                continue
+            await enqueue_trigger(
+                "vcs_comment_dispatch",
+                {
+                    "connection_id": str(conn.id),
+                    "repo": repo,
+                    "pr_number": sess.pr_number,
+                    "comment_id": c.id,
+                    "actor_login": c.author_login,
+                    "actor_user_id": c.author_user_id,
+                    "body": c.body,
+                },
+                dedup_key=f"vcs_cmd:{conn.id}:{repo}:{sess.pr_number}:{c.id}",
+            )
+            logger.info(
+                "comment poll: dispatched terrapod command",
+                repo=repo,
+                pr_number=sess.pr_number,
+                comment_id=c.id,
+                author=c.author_login,
+            )
+        if new_comments:
+            # Advance the cursor regardless of whether any comments
+            # matched the parser — saves us re-scanning prose comments.
+            sess.last_processed_comment_id = max((c.id for c in new_comments), key=lambda x: int(x))
+
+
 async def _reconcile_closed_pr_sessions(
     db: AsyncSession,
     conn: VCSConnection,
@@ -524,15 +616,16 @@ async def _poll_workspace_prs(
     """Check open PRs/MRs targeting the tracked branch for speculative plans."""
     prs = await _list_open_prs(conn, owner, repo, branch)
 
-    # Hook-and-poll fallback for `pull_request:closed` (#282): if any
-    # PRSession on this (connection, repo) is no longer in the open list,
-    # cancel its runs and mark closed. Releases workspace locks held by
-    # planned apply-then-merge runs on PRs the user just closed without
-    # merging. Skip when the workspace isn't apply-then-merge — default-
-    # mode PR runs are plan-only and don't hold locks worth reconciling.
+    # Hook-and-poll fallbacks (#282). Only run for apply-then-merge —
+    # default-mode PR runs are plan-only and don't drive any of this.
     if ws.vcs_workflow == "apply_then_merge":
         open_pr_numbers = {pr.number for pr in prs}
+        # PR-closed: cancel runs, release workspace locks.
         await _reconcile_closed_pr_sessions(db, conn, f"{owner}/{repo}", open_pr_numbers)
+        # Comment polling: dispatch any new `terrapod ...` commands the
+        # webhook either didn't deliver (no subscription, firewall) or
+        # raced with this poll cycle (dedup key in dispatcher handles the race).
+        await _poll_pr_comments(db, conn, f"{owner}/{repo}")
 
     for pr in prs:
         # Check if we already have any run for this PR + SHA (avoid duplicates)
