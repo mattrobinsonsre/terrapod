@@ -345,7 +345,7 @@ terraform {
     workspaces {
       tags = ["core"]                    # all workspaces with label key "core"
       # or
-      tags = { repo = "tf-aws-core" }    # all workspaces with label repo=tf-aws-core
+      tags = { repo = "aws-infra" }      # all workspaces with label repo=aws-infra
     }
   }
 }
@@ -359,7 +359,7 @@ Both forms are accepted:
 | List, key=value | `tags = ["env=prod"]` | workspaces with `env: prod` exactly |
 | Map | `tags = { env = "prod" }` | workspaces with `env: prod` exactly |
 
-Pick the workspace at run time with `terraform workspace select <name>` or the `TF_WORKSPACE` environment variable. This is how a single repo with multiple environments (e.g. `core-dev-eu1`, `core-stg-eu1`, `core-prod-eu1`) can use one `cloud {}` block and pick the env per CLI invocation.
+Pick the workspace at run time with `terraform workspace select <name>` or the `TF_WORKSPACE` environment variable. This is how a single repo with multiple environments (e.g. `network-dev`, `network-staging`, `network-prod`) can use one `cloud {}` block and pick the env per CLI invocation.
 
 The web UI displays this field as **"Labels (tags)"** to make the dual purpose explicit.
 

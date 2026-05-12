@@ -165,18 +165,18 @@ If you'd rather select a workspace at run time (typical when a single repo backs
 
 ```hcl
 workspaces {
-  tags = ["core"]                    # any workspace whose labels include "core"
+  tags = ["network"]                 # any workspace whose labels include "network"
   # or, for an exact match:
-  tags = { repo = "tf-aws-core" }
+  tags = { repo = "aws-infra" }
 }
 ```
 
 Then pick a specific workspace per invocation:
 
 ```zsh
-TF_WORKSPACE=core-stg-eu1 tofu plan
+TF_WORKSPACE=network-staging tofu plan
 # or
-tofu workspace select core-stg-eu1
+tofu workspace select network-staging
 ```
 
 If you have not already run `tofu login`:
