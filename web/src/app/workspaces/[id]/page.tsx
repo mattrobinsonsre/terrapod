@@ -826,7 +826,8 @@ function WorkspaceDetailContent() {
     if (!workspace) return
     const action = workspace.attributes.locked ? 'unlock' : 'lock'
     try {
-      const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}/actions/${action}`, {
+      // lock/unlock are TFE V2 CLI-contract endpoints — only at /api/v2/.
+      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/actions/${action}`, {
         method: 'POST',
       })
       if (!res.ok) throw new Error(`Failed to ${action} workspace`)

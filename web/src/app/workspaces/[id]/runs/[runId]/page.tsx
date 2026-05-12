@@ -464,9 +464,13 @@ export default function RunDetailPage() {
     setActionLoading(action)
     setError('')
     try {
-      // TFE V2 API uses "apply" to confirm a planned run
+      // TFE V2 API uses "apply" to confirm a planned run.
+      // confirm / discard / cancel are on the TFE V2 CLI contract surface
+      // (terraform/go-tfe call them) and live permanently at /api/v2/.
+      // retry is a Terrapod extension and lives at /api/terrapod/v1/.
       const apiAction = action === 'confirm' ? 'apply' : action
-      const res = await apiFetch(`/api/terrapod/v1/runs/${runId}/actions/${apiAction}`, { method: 'POST' })
+      const prefix = action === 'retry' ? '/api/terrapod/v1' : '/api/v2'
+      const res = await apiFetch(`${prefix}/runs/${runId}/actions/${apiAction}`, { method: 'POST' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.detail || `Failed to ${action} run`)
