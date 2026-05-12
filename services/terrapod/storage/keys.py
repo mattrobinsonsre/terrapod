@@ -41,6 +41,17 @@ def plan_json_output_key(workspace_id: str, run_id: str) -> str:
     return f"plans/{workspace_id}/{run_id}.json-output"
 
 
+def lock_file_key(workspace_id: str, run_id: str) -> str:
+    """Key for the `.terraform.lock.hcl` produced by the plan-phase init.
+
+    Carried to the apply phase so it inits with the same provider versions
+    instead of re-resolving the version constraint (which could pick up a
+    newer matching version published in the plan→apply window and cause
+    `apply tfplan` to fail with a recorded-plan mismatch). See #306.
+    """
+    return f"plans/{workspace_id}/{run_id}.terraform.lock.hcl"
+
+
 def config_version_key(workspace_id: str, config_version_id: str) -> str:
     """Key for a configuration version archive."""
     return f"config/{workspace_id}/{config_version_id}.tar.gz"

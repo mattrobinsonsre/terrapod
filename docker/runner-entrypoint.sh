@@ -259,8 +259,10 @@ if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
             { print }
             ' "$tf_file" > "${tf_file}.tmp" && mv "${tf_file}.tmp" "$tf_file"
         done
-        # Remove lock file — the runner resolves providers independently
-        rm -f "$STRIP_DIR/.terraform.lock.hcl"
+        # NB: we DO keep the user's committed `.terraform.lock.hcl` if
+        # present. It pins provider versions across plan/apply (see #306);
+        # discarding it makes plan-init and apply-init independent
+        # resolutions of the version constraint, which can drift.
         log "[entrypoint] Stripped cloud/backend blocks from uploaded config"
     else
         log "[entrypoint] No configuration archive (HTTP $HTTP_CODE)"
@@ -348,6 +350,28 @@ if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
         "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/state" 2>/dev/null || true
 fi
 
+# --- Apply phase: try to reuse the plan-phase lock file ---
+# Carrying .terraform.lock.hcl from plan to apply forces both inits to
+# resolve to the same provider versions — without this, the apply-phase
+# init re-evaluates the version constraint and may pick up a newer
+# matching version published in the plan→apply window (see #306).
+#
+# Best-effort: 404/network failures here just warn. The apply still
+# works (with the today-behaviour drift risk) if the plan ran on an
+# older runner that didn't upload a lock file, or an older API without
+# the /lock-file endpoint.
+if [ "$TP_PHASE" = "apply" ] && [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
+    LOCK_DL_HTTP=$(curl -sS -o .terraform.lock.hcl -w "%{http_code}" \
+        -H "$AUTH_HEADER" \
+        "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/lock-file" 2>/dev/null || echo "000")
+    if [ "$LOCK_DL_HTTP" = "302" ] || [ "$LOCK_DL_HTTP" = "200" ]; then
+        log "[entrypoint] Reusing .terraform.lock.hcl from plan phase"
+    else
+        rm -f .terraform.lock.hcl
+        log "[entrypoint] No plan-phase lock file available (HTTP $LOCK_DL_HTTP); apply init will resolve providers independently"
+    fi
+fi
+
 # --- Initialize ---
 log "[entrypoint] Running $TP_BACKEND init..."
 INIT_EXIT=0
@@ -358,6 +382,22 @@ if [ "$INIT_EXIT" != "0" ]; then
     log "[entrypoint] Init failed with exit code $INIT_EXIT"
     # Log uploaded by on_exit trap — no explicit upload here.
     exit "$INIT_EXIT"
+fi
+
+# --- Plan phase: upload the lock file produced (or augmented) by init ---
+# Apply phase will download this so its init resolves to the same
+# provider versions. Best-effort — a failure here just means the
+# apply phase falls back to today's behaviour.
+if [ "$TP_PHASE" = "plan" ] && [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ] && [ -f .terraform.lock.hcl ]; then
+    LOCK_UP_HTTP=$(curl -sS -o /dev/null -w "%{http_code}" \
+        -X PUT -H "$AUTH_HEADER" --max-time "${TP_UPLOAD_TIMEOUT:-60}" \
+        --data-binary @.terraform.lock.hcl \
+        "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/lock-file" 2>/dev/null || echo "000")
+    if [ "$LOCK_UP_HTTP" = "204" ] || [ "$LOCK_UP_HTTP" = "200" ]; then
+        log "[entrypoint] Uploaded .terraform.lock.hcl for apply-phase reuse"
+    else
+        log "[entrypoint] Lock file upload returned HTTP $LOCK_UP_HTTP (non-fatal); apply phase will resolve providers independently"
+    fi
 fi
 
 # --- Build -var-file arguments from TP_VAR_FILES JSON ---

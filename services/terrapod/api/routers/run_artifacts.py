@@ -10,8 +10,10 @@ Endpoints:
     GET  /api/terrapod/v1/runs/{run_id}/artifacts/config      — download config archive
     GET  /api/terrapod/v1/runs/{run_id}/artifacts/state        — download current state
     GET  /api/terrapod/v1/runs/{run_id}/artifacts/plan-file    — download plan file
+    GET  /api/terrapod/v1/runs/{run_id}/artifacts/lock-file    — download .terraform.lock.hcl from plan
     PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-log     — upload plan log
     PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-file    — upload plan file
+    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/lock-file    — upload .terraform.lock.hcl from plan
     PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-json-output — upload plan JSON
     PUT  /api/terrapod/v1/runs/{run_id}/artifacts/apply-log    — upload apply log
     PUT  /api/terrapod/v1/runs/{run_id}/artifacts/state        — upload new state
@@ -37,6 +39,7 @@ from terrapod.storage import get_storage
 from terrapod.storage.keys import (
     apply_log_key,
     config_version_key,
+    lock_file_key,
     plan_json_output_key,
     plan_log_key,
     plan_output_key,
@@ -133,6 +136,32 @@ async def download_plan_file(
     return RedirectResponse(url=url.url, status_code=302)
 
 
+@router.get("/runs/{run_id}/artifacts/lock-file")
+async def download_lock_file(
+    run_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Download the `.terraform.lock.hcl` produced by the plan-phase init.
+
+    Carried into the apply phase so apply's `terraform init` resolves to
+    the same provider versions plan used, rather than re-evaluating the
+    version constraint and potentially picking up a newer matching
+    version published in the plan→apply window. See #306.
+
+    The runner treats a 404/non-2xx here as a warning, not an error — the
+    apply phase still works (with the today-behaviour drift risk) when
+    the plan ran on an older runner that didn't upload a lock file.
+    """
+    _require_runner_for_run(user, run_id)
+    run = await _get_run(run_id, db)
+
+    storage = get_storage()
+    key = lock_file_key(str(run.workspace_id), str(run.id))
+    url = await storage.presigned_get_url(key)
+    return RedirectResponse(url=url.url, status_code=302)
+
+
 # ── Uploads (receive body, write to storage) ─────────────────────────────
 
 
@@ -168,6 +197,29 @@ async def upload_plan_file(
     body = await request.body()
     storage = get_storage()
     key = plan_output_key(str(run.workspace_id), str(run.id))
+    await storage.put(key, body)
+    return Response(status_code=204)
+
+
+@router.put("/runs/{run_id}/artifacts/lock-file")
+async def upload_lock_file(
+    run_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Upload the `.terraform.lock.hcl` produced by the plan-phase init.
+
+    See `download_lock_file` for the rationale. The runner treats this
+    upload as best-effort — a failure here just means the apply phase
+    falls back to re-resolving providers (today's behaviour).
+    """
+    _require_runner_for_run(user, run_id)
+    run = await _get_run(run_id, db)
+
+    body = await request.body()
+    storage = get_storage()
+    key = lock_file_key(str(run.workspace_id), str(run.id))
     await storage.put(key, body)
     return Response(status_code=204)
 

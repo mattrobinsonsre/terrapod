@@ -292,3 +292,93 @@ class TestUploadPlanJsonOutput:
         assert run.has_json_output is True
         assert run.resource_additions is None
         assert run.resource_changes is None
+
+
+# ── lock-file (#306) ─────────────────────────────────────────────────────
+
+
+class TestLockFile:
+    """The .terraform.lock.hcl from plan is carried to apply via these
+    endpoints so both phases resolve to the same provider versions.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_upload_writes_to_canonical_key(self, mock_get_storage, *_mocks):
+        run_id = uuid.uuid4()
+        ws_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id, ws_id=ws_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_storage = AsyncMock()
+        mock_get_storage.return_value = mock_storage
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        body = b'# This file is maintained automatically by "terraform init".\n'
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/lock-file",
+                content=body,
+                headers={**_AUTH, "Content-Type": "application/octet-stream"},
+            )
+
+        assert resp.status_code == 204
+        mock_storage.put.assert_called_once()
+        key, payload = mock_storage.put.call_args.args
+        assert key == f"plans/{ws_id}/{run_id}.terraform.lock.hcl"
+        assert payload == body
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_upload_403_for_wrong_run_scope(self, *_mocks):
+        run_id = uuid.uuid4()
+        wrong_run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+
+        app = _make_app(_runner_user(wrong_run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/lock-file",
+                content=b"",
+                headers={**_AUTH, "Content-Type": "application/octet-stream"},
+            )
+
+        assert resp.status_code == 403
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_download_redirects_to_presigned_url(self, mock_get_storage, *_mocks):
+        run_id = uuid.uuid4()
+        ws_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id, ws_id=ws_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+
+        mock_storage = AsyncMock()
+        presigned = MagicMock()
+        presigned.url = "https://example.invalid/presigned"
+        mock_storage.presigned_get_url.return_value = presigned
+        mock_get_storage.return_value = mock_storage
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url=_BASE, follow_redirects=False
+        ) as client:
+            resp = await client.get(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/lock-file",
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 302
+        assert resp.headers["location"] == "https://example.invalid/presigned"
+        # Hits the same per-run key the upload writes to.
+        mock_storage.presigned_get_url.assert_awaited_once_with(
+            f"plans/{ws_id}/{run_id}.terraform.lock.hcl"
+        )
