@@ -28,36 +28,21 @@ runs:
         ALSO_HELM: ${{ inputs.helm }}
       run: |
         set -u
-
-        attempt() {
-          local kind="$1"
-          shift
-          local i wait
-          for i in 1 2 3 4 5; do
-            if "$@"; then
-              echo "✓ $kind login succeeded on attempt $i"
-              return 0
-            fi
-            if [ "$i" -eq 5 ]; then
-              echo "::error::$kind login failed after 5 attempts"
-              return 1
-            fi
-            # 5s, 10s, 20s, 40s — total <= 75s, well under any reasonable timeout
-            wait=$(( 5 * (2 ** (i - 1)) ))
-            echo "::warning::$kind login attempt $i failed; retrying in ${wait}s"
-            sleep "$wait"
-          done
-        }
-
+        # docker / helm don't accept stdin pipes through `bash -c "..."`
+        # cleanly when invoked via with-retry.sh's `"$@"`, so wrap each
+        # login in a local shell function.
         do_docker_login() {
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
         }
-
         do_helm_login() {
           echo "$GHCR_TOKEN" | helm registry login ghcr.io --username "$GHCR_USER" --password-stdin
         }
+        export -f do_docker_login do_helm_login
 
-        attempt "docker" do_docker_login
+        "$GITHUB_WORKSPACE/.github/scripts/with-retry.sh" "docker login" -- \
+          bash -c do_docker_login
+
         if [ "$ALSO_HELM" = "true" ]; then
-          attempt "helm" do_helm_login
+          "$GITHUB_WORKSPACE/.github/scripts/with-retry.sh" "helm login" -- \
+            bash -c do_helm_login
         fi

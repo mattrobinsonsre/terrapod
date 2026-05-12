@@ -554,12 +554,15 @@ jobs:
           sha_short="${{ needs.prepare.outputs.sha_short }}"
           version="${{ needs.prepare.outputs.version }}"
 
+          # GHCR occasionally returns 5xx on manifest reads/writes during
+          # a retag — wrap with the shared 5/10/20/40s backoff helper.
           for image in terrapod-api terrapod-web terrapod-runner terrapod-listener terrapod-migrations; do
             echo "Retagging $image:sha-$sha_short -> $version + latest"
-            docker buildx imagetools create \
-              -t "$REGISTRY/$image:$version" \
-              -t "$REGISTRY/$image:latest" \
-              "$REGISTRY/$image:sha-$sha_short"
+            .github/scripts/with-retry.sh "imagetools create $image" -- \
+              docker buildx imagetools create \
+                -t "$REGISTRY/$image:$version" \
+                -t "$REGISTRY/$image:latest" \
+                "$REGISTRY/$image:sha-$sha_short"
           done
 
       - name: Publish Helm chart
@@ -570,7 +573,8 @@ jobs:
           helm package helm/terrapod --destination dist/ \
             --version "$chart_version" --app-version "$version"
 
-          helm push "dist/terrapod-${chart_version}.tgz" "oci://$REGISTRY"
+          .github/scripts/with-retry.sh "helm push" -- \
+            helm push "dist/terrapod-${chart_version}.tgz" "oci://$REGISTRY"
 
       - uses: actions/setup-go@v6
         with:
