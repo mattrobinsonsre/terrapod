@@ -131,8 +131,28 @@ docker_build(
 # Infrastructure (PostgreSQL + Redis)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# PostgreSQL for local development
+# PostgreSQL for local development.
+#
+# Data lives on a PVC so workspaces, runs, registry contents, etc.
+# survive `tilt down` / `tilt up` cycles and pod recreations.
+# `Recreate` strategy (rather than RollingUpdate) avoids two pods ever
+# trying to mount the same RWO PVC at once.
+#
+# Redis is *deliberately* left ephemeral below — sessions, listener
+# heartbeats, and scheduler locks should reset on Tilt restart.
 k8s_yaml(blob("""
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: terrapod-postgresql-data
+  namespace: terrapod
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -140,6 +160,8 @@ metadata:
   namespace: terrapod
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: terrapod-postgresql
@@ -160,6 +182,19 @@ spec:
               value: terrapod
             - name: POSTGRES_DB
               value: terrapod
+            # PVC's mount point is `/var/lib/postgresql/data`, which
+            # postgres's official entrypoint also wants to populate with
+            # config; point the actual DB cluster into a subdirectory so
+            # the lost+found dir at the PVC root doesn't confuse initdb.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: terrapod-postgresql-data
 ---
 apiVersion: v1
 kind: Service

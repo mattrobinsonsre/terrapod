@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.metrics import BINARY_CACHE_REQUESTS
@@ -149,7 +150,15 @@ async def get_or_cache_binary(
     key = binary_cache_key(tool, version, os_, arch)
     shasum, size_bytes = await _fetch_and_store_binary(storage, key, download_url)
 
-    # Record in database
+    # Record in database. Two concurrent cache misses for the same
+    # (tool, version, os, arch) — typical when two runners spin up
+    # within milliseconds of each other against an empty cache — both
+    # successfully stream the binary into object storage (object writes
+    # are idempotent: same content, same key) but only the first INSERT
+    # wins on the `uq_cached_binaries` unique constraint. The loser
+    # gets a `UniqueViolationError`; we treat that as "lost the race,
+    # serve from the row the winner just inserted" rather than letting
+    # it bubble out as a 5xx to the runner.
     entry = CachedBinary(
         tool=tool,
         version=version,
@@ -159,16 +168,26 @@ async def get_or_cache_binary(
         download_url=download_url,
     )
     db.add(entry)
-    await db.flush()
-
-    logger.info(
-        "Binary cached",
-        tool=tool,
-        version=version,
-        os=os_,
-        arch=arch,
-        size_bytes=size_bytes,
-    )
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        logger.info(
+            "Binary cache race — another fetcher won; serving from existing row",
+            tool=tool,
+            version=version,
+            os=os_,
+            arch=arch,
+        )
+    else:
+        logger.info(
+            "Binary cached",
+            tool=tool,
+            version=version,
+            os=os_,
+            arch=arch,
+            size_bytes=size_bytes,
+        )
 
     presigned = await storage.presigned_get_url(key)
     return presigned.url

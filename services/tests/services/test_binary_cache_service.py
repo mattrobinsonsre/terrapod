@@ -186,3 +186,45 @@ class TestGetOrCacheBinaryGatesPrereleases:
 
         url = await get_or_cache_binary(db, storage, "terraform", "1.14.8", "linux", "amd64")
         assert url == "https://example/presigned"
+
+
+class TestConcurrentCacheMissRace:
+    """Two concurrent cache-miss callers (typical when an empty cache faces
+    a burst of runner starts) both stream the binary into object storage,
+    then both try to INSERT the cached_binaries row. The unique constraint
+    catches the second one; the service swallows the IntegrityError and
+    falls back to serving from the row the winner just inserted, rather
+    than letting the 5xx bubble out to the runner.
+    """
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.binary_cache_service._fetch_and_store_binary", new_callable=AsyncMock)
+    @patch("terrapod.services.binary_cache_service._get_cached", new_callable=AsyncMock)
+    @patch("terrapod.services.binary_cache_service.settings")
+    async def test_integrity_error_on_flush_falls_back_to_presigned_get(
+        self,
+        mock_settings: MagicMock,
+        mock_get_cached: AsyncMock,
+        mock_fetch: AsyncMock,
+    ) -> None:
+        from sqlalchemy.exc import IntegrityError
+
+        mock_settings.registry.binary_cache.allow_prerelease = "none"
+        # First call: cache miss (returns None). The second-fetcher path
+        # below doesn't re-call _get_cached — the IntegrityError handler
+        # falls straight through to presigning the row the winner wrote.
+        mock_get_cached.return_value = None
+        mock_fetch.return_value = ("deadbeef" * 8, 30_000_000)
+
+        db = AsyncMock()
+        # Simulate the unique-constraint violation when flushing the INSERT.
+        db.flush.side_effect = IntegrityError("INSERT", {}, Exception("uq_cached_binaries"))
+
+        storage = AsyncMock()
+        presigned = MagicMock()
+        presigned.url = "https://example/presigned"
+        storage.presigned_get_url = AsyncMock(return_value=presigned)
+
+        url = await get_or_cache_binary(db, storage, "tofu", "1.11.7", "linux", "arm64")
+        assert url == "https://example/presigned"
+        db.rollback.assert_awaited_once()
