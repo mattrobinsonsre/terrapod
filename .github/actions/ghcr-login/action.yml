@@ -1,0 +1,63 @@
+name: GHCR login (with retry)
+description: |
+  Authenticate the Docker CLI (and optionally Helm) against ghcr.io with
+  exponential backoff so transient GHCR / Docker Hub blips don't fail an
+  otherwise-healthy build. Replaces `docker/login-action@v4`, which has
+  no retry knob.
+
+inputs:
+  token:
+    description: GHCR token (typically secrets.GITHUB_TOKEN)
+    required: true
+  username:
+    description: GHCR username (typically github.actor)
+    required: true
+  helm:
+    description: Also run `helm registry login` (set 'true' for jobs that push the Helm chart)
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: docker login ghcr.io (with retry)
+      shell: bash
+      env:
+        GHCR_TOKEN: ${{ inputs.token }}
+        GHCR_USER: ${{ inputs.username }}
+        ALSO_HELM: ${{ inputs.helm }}
+      run: |
+        set -u
+
+        attempt() {
+          local kind="$1"
+          shift
+          local i wait
+          for i in 1 2 3 4 5; do
+            if "$@"; then
+              echo "✓ $kind login succeeded on attempt $i"
+              return 0
+            fi
+            if [ "$i" -eq 5 ]; then
+              echo "::error::$kind login failed after 5 attempts"
+              return 1
+            fi
+            # 5s, 10s, 20s, 40s — total <= 75s, well under any reasonable timeout
+            wait=$(( 5 * (2 ** (i - 1)) ))
+            echo "::warning::$kind login attempt $i failed; retrying in ${wait}s"
+            sleep "$wait"
+          done
+        }
+
+        do_docker_login() {
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+        }
+
+        do_helm_login() {
+          echo "$GHCR_TOKEN" | helm registry login ghcr.io --username "$GHCR_USER" --password-stdin
+        }
+
+        attempt "docker" do_docker_login
+        if [ "$ALSO_HELM" = "true" ]; then
+          attempt "helm" do_helm_login
+        fi
