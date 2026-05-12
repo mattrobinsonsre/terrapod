@@ -6,10 +6,10 @@
 // auto-renders the new option, and the kebab-case `filter` value is
 // authoritative for `status:value` predicates in the workspace filter.
 //
-// Order matters: `resolveStatus` walks workspace-level conditions first
-// (`state-diverged`, `vcs-error`, `drifted`) then run statuses; the filter
-// dropdown shows the same order so the most operationally interesting
-// statuses surface at the top.
+// Order matters for the filter dropdown — most operationally interesting
+// statuses surface at the top. `resolveStatus` doesn't read this order
+// directly; see its docstring for the actual precedence rules
+// (`needs-confirm` wins over every workspace-level condition).
 
 export type StatusColor = 'red' | 'amber' | 'blue' | 'green' | 'slate' | 'gray'
 
@@ -75,31 +75,33 @@ export interface ResolvedStatus {
 
 /** Resolve a workspace's effective status from its signals.
  *
- * Workspace-level conditions (`state-diverged`, `vcs-error`, `drifted`)
- * take precedence over run statuses — they reflect divergence between the
- * desired state and reality, which is more urgent than any in-flight run.
+ * A planned non-plan-only run awaiting confirmation (`needs-confirm`) wins
+ * over every workspace-level condition: the operator has a button to click
+ * that resolves the divergence directly, and `needs-confirm` implicitly
+ * signals the state is divergent anyway (otherwise there'd be nothing to
+ * apply). Showing the alarm pill would just bury the actionable signal.
+ *
+ * Otherwise workspace-level conditions (`state-diverged`, `vcs-error`,
+ * `drifted`) take precedence over run statuses — they reflect divergence
+ * between the desired state and reality, which is more urgent than any
+ * other in-flight or completed run.
  *
  * Returns `def: null, runId: null` when there's no run and no condition
  * (typically a freshly-created workspace with no plan yet).
  */
 export function resolveStatus(ws: ResolveInput): ResolvedStatus {
   const a = ws.attributes
+  const run = a['latest-run']
+  // needs-confirm wins — actionable beats alarm.
+  if (run && run.status === 'planned' && !run['plan-only']) {
+    return { def: STATUS_BY_FILTER.get('needs-confirm') ?? null, runId: run.id }
+  }
   if (a['state-diverged']) return { def: STATUS_BY_FILTER.get('state-diverged') ?? null, runId: null }
   if (a['vcs-last-error']) return { def: STATUS_BY_FILTER.get('vcs-error') ?? null, runId: null }
   if (a['drift-status'] === 'drifted') return { def: STATUS_BY_FILTER.get('drifted') ?? null, runId: null }
-  const run = a['latest-run']
   if (!run) return { def: null, runId: null }
-  const planOnly = run['plan-only']
-  // Map run.status → status filter token. `planned` is special: a non
-  // plan-only planned run is awaiting confirmation; a plan-only one is
-  // a successful read of the world.
-  let filter: string
-  switch (run.status) {
-    case 'planned':
-      filter = planOnly ? 'planned' : 'needs-confirm'
-      break
-    default:
-      filter = run.status
-  }
+  // plan-only `planned` is a successful read of the world, not an
+  // awaiting-confirm signal.
+  const filter = run.status === 'planned' ? 'planned' : run.status
   return { def: STATUS_BY_FILTER.get(filter) ?? null, runId: run.id }
 }
