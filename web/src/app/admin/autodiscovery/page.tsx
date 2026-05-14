@@ -83,6 +83,27 @@ export default function AutodiscoveryPage() {
 
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
+  // Preview / on-demand scan modal (#311). Three lifecycle states:
+  //   { id: null }                          → modal closed
+  //   { id, loading: true }                  → fetching /preview
+  //   { id, entries: [...] }                 → preview loaded; awaiting confirm
+  //   { id, entries: [...], scanning: true } → user clicked Provision; running /scan
+  const [previewModal, setPreviewModal] = useState<{
+    id: string
+    ruleName: string
+    loading?: boolean
+    error?: string
+    ref?: string
+    filesWalked?: number
+    entries?: Array<{
+      workspace_name: string
+      working_directory: string
+      collision: boolean
+      existing_autodiscovered: boolean
+    }>
+    scanning?: boolean
+  } | null>(null)
+
   const accessor = useCallback((r: AutodiscoveryRule, key: SortKey) => {
     switch (key) {
       case 'name': return r.attributes.name
@@ -244,6 +265,58 @@ export default function AutodiscoveryPage() {
       loadAll()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete')
+    }
+  }
+
+  async function openPreview(id: string, ruleName: string) {
+    setPreviewModal({ id, ruleName, loading: true })
+    try {
+      const res = await apiFetch(`/api/terrapod/v1/autodiscovery-rules/${id}/preview`)
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.detail || `Preview failed (${res.status})`)
+      }
+      const json = await res.json()
+      const attrs = json?.data?.attributes ?? {}
+      setPreviewModal({
+        id,
+        ruleName,
+        ref: attrs.ref,
+        filesWalked: attrs['files-walked'],
+        entries: attrs.entries ?? [],
+      })
+    } catch (err) {
+      setPreviewModal({
+        id,
+        ruleName,
+        error: err instanceof Error ? err.message : 'Preview failed',
+      })
+    }
+  }
+
+  async function handleProvision() {
+    if (!previewModal) return
+    setPreviewModal({ ...previewModal, scanning: true, error: undefined })
+    try {
+      const res = await apiFetch(
+        `/api/terrapod/v1/autodiscovery-rules/${previewModal.id}/scan`,
+        { method: 'POST' },
+      )
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.detail || `Scan failed (${res.status})`)
+      }
+      const json = await res.json()
+      const created = json?.data?.attributes?.['workspaces-created'] ?? 0
+      setSuccess(`Created ${created} workspace${created === 1 ? '' : 's'} from "${previewModal.ruleName}"`)
+      setPreviewModal(null)
+      loadAll()
+    } catch (err) {
+      setPreviewModal({
+        ...previewModal,
+        scanning: false,
+        error: err instanceof Error ? err.message : 'Scan failed',
+      })
     }
   }
 
@@ -513,6 +586,13 @@ export default function AutodiscoveryPage() {
                   </td>
                   <td className="py-3 text-right">
                     <button
+                      onClick={() => openPreview(r.id, r.attributes.name)}
+                      className="text-brand-400 hover:text-brand-300 text-xs px-2 py-1"
+                      title="Walk the repo and preview which workspaces this rule would create"
+                    >
+                      Preview
+                    </button>
+                    <button
                       onClick={() => openEditForm(r)}
                       className="text-slate-400 hover:text-slate-200 text-xs px-2 py-1"
                     >
@@ -551,6 +631,105 @@ export default function AutodiscoveryPage() {
                 >
                   Delete
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {previewModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 max-w-3xl w-full max-h-[90vh] flex flex-col">
+              <h3 className="text-lg font-semibold text-slate-100 mb-1">
+                Preview: {previewModal.ruleName}
+              </h3>
+              <p className="text-xs text-slate-500 mb-4">
+                {previewModal.ref ? (
+                  <>
+                    Walked <span className="text-slate-300">{previewModal.filesWalked}</span> files on{' '}
+                    <span className="text-slate-300 font-mono">{previewModal.ref}</span>
+                  </>
+                ) : (
+                  'Walking repository…'
+                )}
+              </p>
+
+              {previewModal.loading && <LoadingSpinner />}
+
+              {previewModal.error && (
+                <div className="text-sm text-red-300 bg-red-900/20 border border-red-800/50 rounded p-3 mb-4">
+                  {previewModal.error}
+                </div>
+              )}
+
+              {previewModal.entries && previewModal.entries.length === 0 && (
+                <div className="text-sm text-slate-400 py-4">
+                  No directories in this repo match the rule&apos;s pattern. Nothing to create.
+                </div>
+              )}
+
+              {previewModal.entries && previewModal.entries.length > 0 && (
+                <div className="overflow-auto flex-1 mb-4 border border-slate-700/50 rounded">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-800/50 sticky top-0">
+                      <tr className="border-b border-slate-700/50">
+                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">Workspace</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">Directory</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700/30">
+                      {previewModal.entries.map(e => (
+                        <tr key={e.working_directory}>
+                          <td className="px-3 py-2 font-mono text-slate-200">{e.workspace_name}</td>
+                          <td className="px-3 py-2 font-mono text-slate-400">{e.working_directory || '(repo root)'}</td>
+                          <td className="px-3 py-2">
+                            {!e.collision ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/40 text-green-300">
+                                Create
+                              </span>
+                            ) : e.existing_autodiscovered ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/40 text-slate-300" title="Already created by this rule">
+                                Skip (already discovered)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/40 text-amber-300" title="A workspace with this name already exists for another reason">
+                                Skip (name collision)
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {previewModal.entries && previewModal.entries.length > 0 && (
+                <p className="text-xs text-slate-500 mb-4">
+                  {previewModal.entries.filter(e => !e.collision).length} workspace(s) will be created.{' '}
+                  Existing workspaces (collisions) are left untouched.
+                </p>
+              )}
+
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setPreviewModal(null)}
+                  disabled={previewModal.scanning}
+                  className="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm disabled:opacity-50"
+                >
+                  Close
+                </button>
+                {previewModal.entries && previewModal.entries.filter(e => !e.collision).length > 0 && (
+                  <button
+                    onClick={handleProvision}
+                    disabled={previewModal.scanning}
+                    className="px-4 py-2 rounded bg-brand-600 hover:bg-brand-500 text-white text-sm disabled:opacity-50"
+                  >
+                    {previewModal.scanning
+                      ? 'Provisioning…'
+                      : `Provision ${previewModal.entries.filter(e => !e.collision).length} workspace(s)`}
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -14,6 +14,8 @@ Endpoints:
     GET    /api/terrapod/v1/autodiscovery-rules/{id}           (show)
     PATCH  /api/terrapod/v1/autodiscovery-rules/{id}           (update)
     DELETE /api/terrapod/v1/autodiscovery-rules/{id}           (delete)
+    GET    /api/terrapod/v1/autodiscovery-rules/{id}/preview   (dry-run)
+    POST   /api/terrapod/v1/autodiscovery-rules/{id}/scan      (on-demand scan)
 """
 
 from __future__ import annotations
@@ -371,3 +373,190 @@ async def delete_rule(
         actor=user.email,
     )
     return Response(status_code=204)
+
+
+# ── Preview / on-demand scan (#311) ──────────────────────────────────────
+
+
+async def _walk_repo_for_rule(rule: AutodiscoveryRule) -> tuple[list[str], str]:
+    """Resolve the rule's target branch and return every file path in the
+    repo at that branch.
+
+    Lifted out so /preview and /scan share one provider-touching call.
+    Raises HTTPException on any user-facing failure (bad repo URL, can't
+    reach the provider, provider truncated the tree). Returns
+    (file_paths, resolved_branch) on success.
+    """
+    # Imports local to keep the router's import surface narrow.
+    from terrapod.services import github_service, gitlab_service
+
+    conn = rule.vcs_connection
+    if conn is None:
+        raise HTTPException(
+            status_code=422,
+            detail="rule has no VCS connection — cannot scan",
+        )
+
+    if conn.provider == "gitlab":
+        owner_repo = gitlab_service.parse_repo_url(rule.repo_url)
+    elif conn.provider == "github":
+        owner_repo = github_service.parse_repo_url(rule.repo_url)
+    else:
+        raise HTTPException(
+            status_code=422,
+            detail=f"unknown VCS provider: {conn.provider!r}",
+        )
+    if owner_repo is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"cannot parse repo URL: {rule.repo_url!r}",
+        )
+    owner, repo = owner_repo
+
+    # Resolve the rule's target branch — default-branch lookup if unset.
+    target_branch = rule.branch
+    if not target_branch:
+        try:
+            if conn.provider == "gitlab":
+                target_branch = await gitlab_service.get_default_branch(conn, owner, repo) or ""
+            else:
+                target_branch = (
+                    await github_service.get_repo_default_branch(conn, owner, repo) or ""
+                )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=f"failed to resolve default branch from VCS provider: {exc}",
+            ) from exc
+        if not target_branch:
+            raise HTTPException(
+                status_code=502,
+                detail="VCS provider returned no default branch",
+            )
+
+    try:
+        if conn.provider == "gitlab":
+            file_paths = await gitlab_service.list_repo_tree(conn, owner, repo, target_branch)
+        else:
+            file_paths = await github_service.list_repo_tree(conn, owner, repo, target_branch)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"failed to list repository tree: {exc}",
+        ) from exc
+
+    if file_paths is None:
+        # Provider truncated (GitHub > 100k entries, GitLab > 20k).
+        # Distinct from a regular error so the UI can render a specific
+        # "too large to scan" hint.
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                "repository tree was truncated by the VCS provider — "
+                "the repo is too large to scan in one pass. "
+                "Autodiscovery will continue to pick up changes as they "
+                "land on the tracked branch."
+            ),
+        )
+
+    return file_paths, target_branch
+
+
+@router.get("/autodiscovery-rules/{rule_id}/preview")
+async def preview_rule(
+    rule_id: str = Path(...),
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Dry-run: walk the repo and return what *would* be created.
+
+    No side effects. Admin only. Used by the UI's "Preview" action to
+    let operators see which workspaces a rule would materialise before
+    letting it loose on a monorepo.
+    """
+    from terrapod.services import workspace_autodiscovery_service
+
+    try:
+        rid = uuid.UUID(rule_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="autodiscovery rule not found") from None
+    rule = await db.get(AutodiscoveryRule, rid)
+    if rule is None:
+        raise HTTPException(status_code=404, detail="autodiscovery rule not found")
+
+    file_paths, target_branch = await _walk_repo_for_rule(rule)
+    preview = await workspace_autodiscovery_service.preview_for_paths(db, rule, file_paths)
+    return JSONResponse(
+        content={
+            "data": {
+                "type": "autodiscovery-rule-previews",
+                "attributes": {
+                    "ref": target_branch,
+                    "files-walked": len(file_paths),
+                    "entries": preview,
+                },
+            }
+        }
+    )
+
+
+@router.post("/autodiscovery-rules/{rule_id}/scan")
+async def scan_rule(
+    rule_id: str = Path(...),
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """On-demand full-repo scan + materialise.
+
+    Same walk as `/preview` but actually creates workspaces via the
+    existing `autodiscover_for_paths` machinery (idempotent, collision-
+    safe). Returns counts so the UI can show a clean confirmation.
+
+    Works regardless of the rule's `enabled` flag — this is an explicit
+    operator action, not a polling consequence. Admin only.
+    """
+    from terrapod.services import workspace_autodiscovery_service
+
+    try:
+        rid = uuid.UUID(rule_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="autodiscovery rule not found") from None
+    rule = await db.get(AutodiscoveryRule, rid)
+    if rule is None:
+        raise HTTPException(status_code=404, detail="autodiscovery rule not found")
+
+    file_paths, target_branch = await _walk_repo_for_rule(rule)
+    # autodiscover_for_paths skips rules with enabled=False; force-enable
+    # locally for the duration of this call so the explicit /scan action
+    # doesn't silently no-op on a disabled rule.
+    original_enabled = rule.enabled
+    rule.enabled = True
+    try:
+        created = await workspace_autodiscovery_service.autodiscover_for_paths(
+            db, [rule], file_paths
+        )
+    finally:
+        rule.enabled = original_enabled
+    await db.commit()
+    logger.info(
+        "Autodiscovery on-demand scan complete",
+        rule_id=rule_id,
+        rule_name=rule.name,
+        ref=target_branch,
+        files_walked=len(file_paths),
+        workspaces_created=len(created),
+        actor=user.email,
+    )
+    return JSONResponse(
+        content={
+            "data": {
+                "type": "autodiscovery-rule-scans",
+                "attributes": {
+                    "ref": target_branch,
+                    "files-walked": len(file_paths),
+                    "workspaces-created": len(created),
+                    "workspace-ids": [f"ws-{ws.id}" for ws in created],
+                },
+            }
+        }
+    )

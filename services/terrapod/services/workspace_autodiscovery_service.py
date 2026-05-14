@@ -30,6 +30,7 @@ from __future__ import annotations
 import re
 import uuid
 from pathlib import PurePosixPath
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -298,6 +299,68 @@ class AutodiscoveryNameCollision(RuntimeError):
 
 
 # ── Top-level entry point ────────────────────────────────────────────────
+
+
+# Side-effect-free preview entry. Same matching logic as
+# `autodiscover_for_paths`, but returns what *would* be created rather
+# than persisting. The UI's "Scan repo" preview hits this; an operator
+# can then confirm to fall through to materialisation.
+async def preview_for_paths(
+    db: AsyncSession,
+    rule: AutodiscoveryRule,
+    file_paths: list[str],
+) -> list[dict[str, Any]]:
+    """For a single rule + a walked file list, return the preview rows
+    the UI renders:
+
+    - `workspace_name` (post `name_template`, sanitised, truncated)
+    - `working_directory` (the file's dirname)
+    - `collision` — True iff a workspace with that name already exists
+      (so the operator knows the row would no-op rather than create)
+    - `existing_autodiscovered` — True iff the collision is itself an
+      autodiscovered workspace from this same rule (the common
+      already-backfilled case — distinct from a "real" name clash with
+      a user-created workspace)
+
+    The output is grouped by `(rule, root_directory)` so multiple files
+    in the same directory only appear once, matching the materialise path.
+    """
+    # Same grouping rule as autodiscover_for_paths.
+    roots: dict[str, str] = {}  # root_directory -> workspace_name
+    for path in file_paths:
+        if not rule.enabled:
+            break
+        if not rule_claims_path(rule, path):
+            continue
+        root = derive_root_directory(path)
+        if root in roots:
+            continue
+        roots[root] = derive_workspace_name(rule, root)
+
+    if not roots:
+        return []
+
+    # Single SELECT for collision check rather than one-per-row.
+    names = list(set(roots.values()))
+    result = await db.execute(
+        select(Workspace.name, Workspace.autodiscovery_rule_id).where(Workspace.name.in_(names))
+    )
+    existing: dict[str, uuid.UUID | None] = {row[0]: row[1] for row in result.all()}
+
+    preview: list[dict[str, Any]] = []
+    for root, name in roots.items():
+        rule_id = existing.get(name)
+        preview.append(
+            {
+                "workspace_name": name,
+                "working_directory": root,
+                "collision": name in existing,
+                "existing_autodiscovered": rule_id == rule.id,
+            }
+        )
+    # Stable ordering by working_directory so the UI table is deterministic.
+    preview.sort(key=lambda r: r["working_directory"])
+    return preview
 
 
 async def autodiscover_for_paths(

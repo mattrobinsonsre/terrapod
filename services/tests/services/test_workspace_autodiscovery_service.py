@@ -9,13 +9,16 @@ integration tests that run against a real session.
 from __future__ import annotations
 
 import uuid
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from terrapod.services.workspace_autodiscovery_service import (
     _is_terraform_file,
     _match_glob,
     derive_root_directory,
     derive_workspace_name,
+    preview_for_paths,
     rule_claims_path,
 )
 
@@ -175,3 +178,101 @@ class TestDeriveWorkspaceName:
         rule = _rule(name="monorepo")
         result = derive_workspace_name(rule, long_path.rstrip("/"))
         assert len(result) <= 90
+
+
+# ── Preview (#311) ───────────────────────────────────────────────────────
+
+
+def _preview_db(existing: dict[str, uuid.UUID | None]) -> AsyncMock:
+    """Build a mock AsyncSession whose execute() returns rows for the
+    workspace-name collision query.
+
+    `existing` maps workspace name → autodiscovery_rule_id (or None for
+    a manually-created workspace with no autodiscovery origin).
+    """
+    db = AsyncMock()
+    result = MagicMock()
+    result.all = MagicMock(return_value=list(existing.items()))
+    db.execute = AsyncMock(return_value=result)
+    return db
+
+
+class TestPreviewForPaths:
+    @pytest.mark.asyncio
+    async def test_groups_files_by_directory(self):
+        rule = _rule(pattern="accounts/*/**/*.tf")
+        files = [
+            "accounts/alpha/network/main.tf",
+            "accounts/alpha/network/variables.tf",  # same directory; should collapse
+            "accounts/beta/compute/main.tf",
+        ]
+        db = _preview_db({})
+        preview = await preview_for_paths(db, rule, files)
+        names = sorted(e["working_directory"] for e in preview)
+        assert names == ["accounts/alpha/network", "accounts/beta/compute"]
+
+    @pytest.mark.asyncio
+    async def test_flags_collision_with_user_workspace(self):
+        """A workspace name match where autodiscovery_rule_id is NULL
+        means a manually-created workspace happens to share the name —
+        the row is marked colliding but NOT existing_autodiscovered.
+        """
+        rule = _rule(pattern="accounts/*/**/*.tf")
+        files = ["accounts/alpha/network/main.tf"]
+        db = _preview_db({"accounts-alpha-network": None})  # not from a rule
+        preview = await preview_for_paths(db, rule, files)
+        assert len(preview) == 1
+        assert preview[0]["collision"] is True
+        assert preview[0]["existing_autodiscovered"] is False
+
+    @pytest.mark.asyncio
+    async def test_flags_existing_autodiscovered(self):
+        """The common already-backfilled case — same rule, repeated
+        preview. UI surfaces this distinctly so the operator knows the
+        row is a benign no-op, not a real name clash.
+        """
+        rule = _rule(pattern="accounts/*/**/*.tf")
+        files = ["accounts/alpha/network/main.tf"]
+        db = _preview_db({"accounts-alpha-network": rule.id})
+        preview = await preview_for_paths(db, rule, files)
+        assert preview[0]["collision"] is True
+        assert preview[0]["existing_autodiscovered"] is True
+
+    @pytest.mark.asyncio
+    async def test_disabled_rule_returns_nothing(self):
+        """A disabled rule has nothing to preview — short-circuit the
+        whole walk. The /scan endpoint force-enables for explicit user
+        action, but /preview should reflect the rule's actual state.
+        """
+        rule = _rule(enabled=False, pattern="accounts/*/**/*.tf")
+        files = ["accounts/alpha/network/main.tf"]
+        db = _preview_db({})
+        preview = await preview_for_paths(db, rule, files)
+        assert preview == []
+
+    @pytest.mark.asyncio
+    async def test_no_matches_returns_empty_without_db_query(self):
+        """If the matcher rejects everything we shouldn't even query the
+        DB for collisions. Saves a round trip on a misconfigured rule
+        against a huge repo."""
+        rule = _rule(pattern="this-prefix-matches-nothing/*.tf")
+        files = ["accounts/alpha/network/main.tf"]
+        db = _preview_db({})
+        preview = await preview_for_paths(db, rule, files)
+        assert preview == []
+        db.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_ignore_pattern_filters_out_matches(self):
+        rule = _rule(
+            pattern="accounts/*/**/*.tf",
+            ignore_patterns=["accounts/*/modules/**"],
+        )
+        files = [
+            "accounts/alpha/network/main.tf",
+            "accounts/alpha/modules/vpc/main.tf",  # ignored
+        ]
+        db = _preview_db({})
+        preview = await preview_for_paths(db, rule, files)
+        assert len(preview) == 1
+        assert preview[0]["working_directory"] == "accounts/alpha/network"
