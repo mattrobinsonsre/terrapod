@@ -97,6 +97,30 @@ async def _validate_pool(db: AsyncSession, pool_id: uuid.UUID | None) -> None:
         raise HTTPException(status_code=422, detail="agent-pool-id not found")
 
 
+def _reject_directory_pattern(pattern: str, *, field: str) -> None:
+    """Reject patterns that end in `/`.
+
+    File-path matching only sees file paths (`foo/bar/main.tf`), which
+    never end in `/`. A trailing-slash glob like `foo/*/` therefore
+    matches zero files and silently no-ops — the user typically wants
+    `foo/*/*.tf` (one-level subdir + tf file) or `foo/**` (any depth).
+    Flagging at rule-create time turns the silent-no-op into a clear
+    422 so the next user doesn't trip over the same gotcha. See #309.
+    """
+    if pattern.endswith("/"):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"{field} '{pattern}' ends in '/', which only matches "
+                "directory paths — autodiscovery evaluates file paths, "
+                "so this pattern would never match. Drop the trailing "
+                "slash and either spell out a file glob (e.g. "
+                f"'{pattern.rstrip('/')}/*.tf') or widen with '**' "
+                f"(e.g. '{pattern.rstrip('/')}/**')."
+            ),
+        )
+
+
 def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
     """Normalise + validate request attributes. Returns a dict suitable
     for `setattr` onto a model.
@@ -134,10 +158,13 @@ def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
         out["pattern"] = str(attrs["pattern"]).strip()
         if not out["pattern"]:
             raise HTTPException(status_code=422, detail="pattern must be non-empty")
+        _reject_directory_pattern(out["pattern"], field="pattern")
     if "ignore-patterns" in attrs:
         ip = attrs["ignore-patterns"]
         if not isinstance(ip, list) or not all(isinstance(p, str) for p in ip):
             raise HTTPException(status_code=422, detail="ignore-patterns must be a list of strings")
+        for p in ip:
+            _reject_directory_pattern(p, field="ignore-patterns")
         out["ignore_patterns"] = ip
     if "enabled" in attrs:
         out["enabled"] = bool(attrs["enabled"])

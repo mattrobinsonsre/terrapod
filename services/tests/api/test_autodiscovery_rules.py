@@ -171,6 +171,55 @@ class TestCreateRule:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
+    async def test_422_when_pattern_ends_in_slash(self, *_mocks):
+        """A trailing-slash pattern can never match a file path — reject
+        at create time with a clear hint instead of silently no-opping
+        (issue #309)."""
+        app, _db = _make_app(_admin())
+        body = {
+            "data": {
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{uuid.uuid4()}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "accounts/*/",
+                }
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post("/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH)
+        assert resp.status_code == 422
+        body = resp.json()
+        assert "ends in '/'" in body["detail"]
+        # Hint mentions both alternatives so the user can pick.
+        assert "accounts/*/*.tf" in body["detail"]
+        assert "accounts/*/**" in body["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_422_when_ignore_pattern_ends_in_slash(self, *_mocks):
+        """Same rule applies to entries in ignore-patterns."""
+        app, _db = _make_app(_admin())
+        body = {
+            "data": {
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{uuid.uuid4()}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "**/*.tf",
+                    "ignore-patterns": ["modules/"],
+                }
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post("/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH)
+        assert resp.status_code == 422
+        assert "ignore-patterns" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
     async def test_422_invalid_execution_mode(self, *_mocks):
         app, db = _make_app(_admin())
         body = {
