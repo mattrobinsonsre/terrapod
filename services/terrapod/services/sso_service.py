@@ -72,9 +72,9 @@ async def process_login(
             AUTH_LOGIN.labels(provider=identity.provider_name, outcome="disabled").inc()
             raise ValueError("User account is disabled")
         # Update last_login_at
-        from terrapod.db.models import utc_now
+        from terrapod.db.models import now_utc
 
-        user.last_login_at = utc_now()
+        user.last_login_at = now_utc()
         if identity.display_name and not user.display_name:
             user.display_name = identity.display_name
 

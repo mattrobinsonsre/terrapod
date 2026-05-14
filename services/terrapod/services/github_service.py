@@ -492,6 +492,43 @@ async def get_changed_files(
     return [f["filename"] for f in files]
 
 
+async def list_repo_tree(conn: VCSConnection, owner: str, repo: str, ref: str) -> list[str] | None:
+    """List every file path in the repo at `ref`.
+
+    Used by the autodiscovery initial-scan path (#309): when a rule is
+    first created or re-enabled, the poll cycle does a one-time full-tree
+    walk so existing matching directories get workspaces without waiting
+    for someone to touch each one.
+
+    Returns None when GitHub truncates the tree (>100k entries or
+    >7 MB) — callers should treat that as "can't backfill this repo
+    via tree API" and fall back to a manual scan when we have one.
+    """
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+
+    # `GET /repos/{owner}/{repo}/git/trees/{ref}?recursive=1` returns
+    # every blob path in one call. GitHub caps at 100k entries / 7 MB and
+    # sets `truncated: true` if it had to stop short.
+    resp = await _github_request(
+        "GET",
+        f"{api_url}/repos/{owner}/{repo}/git/trees/{ref}?recursive=1",
+        token,
+    )
+    resp.raise_for_status()
+
+    data = resp.json()
+    if data.get("truncated"):
+        logger.warning(
+            "GitHub tree response truncated — autodiscovery initial scan will be incomplete",
+            owner=owner,
+            repo=repo,
+            ref=ref,
+        )
+        return None
+    return [entry["path"] for entry in data.get("tree", []) if entry.get("type") == "blob"]
+
+
 async def create_commit_status(
     conn: VCSConnection,
     owner: str,

@@ -52,6 +52,7 @@ def _mock_rule(
     r.owner_email = "admin@example.com"
     r.created_at = datetime(2026, 5, 9, tzinfo=UTC)
     r.updated_at = datetime(2026, 5, 9, tzinfo=UTC)
+    r.first_scan_at = None
     return r
 
 
@@ -297,6 +298,61 @@ class TestUpdateRule:
         assert resp.status_code == 200
         assert rule.pattern == "envs/*/**/*.tf"
         assert rule.enabled is False
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_re_enable_clears_first_scan_at(self, *_mocks):
+        """Flipping enabled false → true clears first_scan_at so the next
+        poll cycle re-walks the repo (handles the 'disabled for a while,
+        repo grew, now re-enabling' case from issue #309).
+        """
+        from datetime import UTC, datetime
+
+        rule = _mock_rule()
+        rule.enabled = False
+        rule.first_scan_at = datetime(2026, 1, 1, tzinfo=UTC)
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        body = {"data": {"attributes": {"enabled": True}}}
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule.id}",
+                json=body,
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200
+        assert rule.enabled is True
+        assert rule.first_scan_at is None
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_no_op_enable_preserves_first_scan_at(self, *_mocks):
+        """If `enabled` was already True and the PATCH sets it to True
+        again, first_scan_at must NOT be reset — only the false → true
+        transition triggers a re-scan."""
+        from datetime import UTC, datetime
+
+        rule = _mock_rule()
+        rule.enabled = True
+        scanned = datetime(2026, 1, 1, tzinfo=UTC)
+        rule.first_scan_at = scanned
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        body = {"data": {"attributes": {"enabled": True}}}
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule.id}",
+                json=body,
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200
+        assert rule.first_scan_at == scanned
 
 
 # ── Delete ───────────────────────────────────────────────────────────────

@@ -19,7 +19,7 @@ from terrapod.db.models import (
     RunTrigger,
     VCSConnection,
     Workspace,
-    utc_now,
+    now_utc,
 )
 from terrapod.logging_config import get_logger
 from terrapod.services import github_service, gitlab_service
@@ -294,7 +294,7 @@ async def transition_run(
     if not can_transition(run.status, target_status):
         raise ValueError(f"Invalid transition: {run.status} → {target_status}")
 
-    now = utc_now()
+    now = now_utc()
     old_status = run.status
     run.status = target_status
 
@@ -555,7 +555,7 @@ async def complete_planned_as_noop(db: AsyncSession, run: Run) -> Run:
 
     Releases the workspace lock since no Job will run.
     """
-    run.apply_started_at = utc_now()
+    run.apply_started_at = now_utc()
     run = await transition_run(db, run, "applied")
     ws = await db.get(Workspace, run.workspace_id)
     if ws and ws.locked:

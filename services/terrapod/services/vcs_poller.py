@@ -36,7 +36,7 @@ from terrapod.db.models import (
     Run,
     VCSConnection,
     Workspace,
-    utc_now,
+    now_utc,
 )
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
@@ -111,6 +111,19 @@ async def _get_changed_files(
     if conn.provider == "gitlab":
         return await gitlab_service.get_changed_files(conn, owner, repo, base_sha, head_sha)
     return await github_service.get_changed_files(conn, owner, repo, base_sha, head_sha)
+
+
+async def _list_repo_tree(conn: VCSConnection, owner: str, repo: str, ref: str) -> list[str] | None:
+    """List every file path in the repo at `ref` via the appropriate provider.
+
+    Used by the autodiscovery initial-scan path (#309). Returns None when
+    the provider truncates / fails, signalling that the scan was
+    incomplete; callers should NOT stamp `first_scan_at` in that case
+    so the next poll cycle tries again.
+    """
+    if conn.provider == "gitlab":
+        return await gitlab_service.list_repo_tree(conn, owner, repo, ref)
+    return await github_service.list_repo_tree(conn, owner, repo, ref)
 
 
 def _changes_affect_prefixes(changed_files: list[str], prefixes: list[str]) -> bool:
@@ -782,7 +795,7 @@ async def _poll_workspace(
     conn = await db.get(VCSConnection, ws.vcs_connection_id)
     if not conn or conn.status != "active":
         ws.vcs_last_error = "VCS connection is not active"
-        ws.vcs_last_error_at = utc_now()
+        ws.vcs_last_error_at = now_utc()
         logger.warning(
             "VCS connection not active",
             workspace=ws.name,
@@ -793,7 +806,7 @@ async def _poll_workspace(
     parsed = _parse_repo_url(conn, ws.vcs_repo_url)
     if not parsed:
         ws.vcs_last_error = f"Cannot parse VCS repo URL: {ws.vcs_repo_url}"
-        ws.vcs_last_error_at = utc_now()
+        ws.vcs_last_error_at = now_utc()
         logger.warning(
             "Cannot parse VCS repo URL",
             workspace=ws.name,
@@ -807,7 +820,7 @@ async def _poll_workspace(
     branch = await _resolve_branch(conn, ws, owner, repo)
     if not branch:
         ws.vcs_last_error = "Cannot determine tracked branch"
-        ws.vcs_last_error_at = utc_now()
+        ws.vcs_last_error_at = now_utc()
         return
 
     fetch_paths: list[str] | None = None
@@ -822,7 +835,7 @@ async def _poll_workspace(
         await _poll_workspace_prs(db, ws, conn, owner, repo, branch, cache, fetch_paths)
 
         # Success: update last-polled timestamp and clear any previous error
-        ws.vcs_last_polled_at = utc_now()
+        ws.vcs_last_polled_at = now_utc()
         ws.vcs_last_error = None
         ws.vcs_last_error_at = None
     except Exception as e:
@@ -833,7 +846,7 @@ async def _poll_workspace(
             exc_info=e,
         )
         ws.vcs_last_error = str(e)[:500]
-        ws.vcs_last_error_at = utc_now()
+        ws.vcs_last_error_at = now_utc()
 
 
 # Bound the number of workspaces polled in parallel per cycle. Each workspace
@@ -1118,6 +1131,46 @@ async def _poll_autodiscovery_for_connection(
                 continue
             new_workspaces = await autodiscover_for_paths(db, group, changed)
             created_count += len(new_workspaces)
+
+        # Initial-scan path (#309): rules with `first_scan_at IS NULL`
+        # have never been backfilled, so this poll cycle does a one-time
+        # full-tree walk of the target branch and feeds every file path
+        # to the matcher. After a successful walk, stamp `first_scan_at`
+        # so we don't repeat the walk every cycle.
+        #
+        # Failures (`None` return) leave `first_scan_at` untouched so
+        # the next cycle retries. The change-driven walk above keeps
+        # working in the meantime — initial-scan failure doesn't block
+        # ongoing autodiscovery, it just delays the backfill.
+        unscanned = [r for r in group if r.first_scan_at is None]
+        if unscanned:
+            try:
+                all_files = await _list_repo_tree(conn, owner, repo, target_branch)
+            except Exception:
+                logger.warning(
+                    "Autodiscovery: initial-scan tree fetch failed — will retry next cycle",
+                    connection_id=str(conn.id),
+                    repo_url=repo_url,
+                    ref=target_branch,
+                    exc_info=True,
+                )
+                all_files = None
+            if all_files is not None:
+                new_workspaces = await autodiscover_for_paths(db, unscanned, all_files)
+                created_count += len(new_workspaces)
+                scanned_at = now_utc()
+                for rule in unscanned:
+                    rule.first_scan_at = scanned_at
+                await db.commit()
+                logger.info(
+                    "Autodiscovery: initial scan complete",
+                    connection_id=str(conn.id),
+                    repo_url=repo_url,
+                    ref=target_branch,
+                    rules_scanned=len(unscanned),
+                    workspaces_created=len(new_workspaces),
+                    files_walked=len(all_files),
+                )
 
     return created_count
 

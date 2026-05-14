@@ -445,7 +445,7 @@ async def task_stage_result_callback(
 
     Unauthenticated — verified via access_token in body.
     """
-    from terrapod.db.models import utc_now
+    from terrapod.db.models import now_utc
 
     access_token = body.get("access_token", "")
     if not access_token:
@@ -477,7 +477,7 @@ async def task_stage_result_callback(
 
     tsr.status = result_status
     tsr.message = body.get("message", "")
-    tsr.finished_at = utc_now()
+    tsr.finished_at = now_utc()
     await db.flush()
 
     # Resolve the parent stage

@@ -15,7 +15,7 @@ from terrapod.auth.ca import (
     serialize_private_key,
 )
 from terrapod.config import settings
-from terrapod.db.models import AgentPool, AgentPoolToken, utc_now
+from terrapod.db.models import AgentPool, AgentPoolToken, now_utc
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
 
@@ -149,7 +149,7 @@ async def validate_join_token(db: AsyncSession, raw_token: str) -> AgentPoolToke
         return None
 
     # Check expiry
-    if token.expires_at and utc_now() > token.expires_at:
+    if token.expires_at and now_utc() > token.expires_at:
         return None
 
     # Check max uses

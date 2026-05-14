@@ -15,7 +15,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.config import settings
-from terrapod.db.models import APIToken, utc_now
+from terrapod.db.models import APIToken, now_utc
 from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -102,7 +102,7 @@ async def validate_api_token(db: AsyncSession, raw_token: str) -> APIToken | Non
         return None
 
     # Check token lifetime: per-token lifespan takes precedence, else global max
-    now = utc_now()
+    now = now_utc()
     effective_ttl = (
         api_token.lifespan_hours
         if api_token.lifespan_hours is not None

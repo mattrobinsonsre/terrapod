@@ -731,9 +731,9 @@ def _compute_max_session_ttl(id_token_expires_at: datetime | None) -> int | None
     if id_token_expires_at is None:
         return None
 
-    from terrapod.db.models import utc_now
+    from terrapod.db.models import now_utc
 
-    remaining = (id_token_expires_at - utc_now()).total_seconds()
+    remaining = (id_token_expires_at - now_utc()).total_seconds()
     configured = settings.auth.session_ttl_hours * 3600
 
     if 0 < remaining < configured:

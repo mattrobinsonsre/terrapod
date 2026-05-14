@@ -43,7 +43,7 @@ def generate_uuid7() -> uuid.UUID:
     return uuid.UUID(bytes=uuid_bytes)
 
 
-def utc_now() -> datetime:
+def now_utc() -> datetime:
     """Get current UTC datetime."""
     return datetime.now(UTC)
 
@@ -72,10 +72,10 @@ class User(Base):
 
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
 
@@ -104,10 +104,10 @@ class Role(Base):
     )  # read, write, admin
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
 
@@ -126,7 +126,7 @@ class RoleAssignment(Base):
         String(63), ForeignKey("roles.name", ondelete="CASCADE"), primary_key=True
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
 
 
@@ -143,7 +143,7 @@ class PlatformRoleAssignment(Base):
     email: Mapped[str] = mapped_column(String(255), primary_key=True)
     role_name: Mapped[str] = mapped_column(String(63), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
 
 
@@ -166,7 +166,7 @@ class APIToken(Base):
     )  # "user", "organization"
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     lifespan_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
@@ -196,10 +196,10 @@ class AgentPool(Base):
     owner_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     tokens: Mapped[list["AgentPoolToken"]] = relationship(
@@ -230,7 +230,7 @@ class AgentPoolToken(Base):
     is_revoked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
 
@@ -355,10 +355,10 @@ class Workspace(Base):
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     state_versions: Mapped[list["StateVersion"]] = relationship(
@@ -403,7 +403,7 @@ class StateVersion(Base):
     created_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
 
     workspace: Mapped["Workspace"] = relationship(back_populates="state_versions")
@@ -450,10 +450,10 @@ class RegistryModule(Base):
     vcs_last_pr_shas: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     versions: Mapped[list["RegistryModuleVersion"]] = relationship(
@@ -487,10 +487,10 @@ class RegistryModuleVersion(Base):
     vcs_tag: Mapped[str] = mapped_column(String(255), nullable=False, default="")
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     module: Mapped["RegistryModule"] = relationship(back_populates="versions")
@@ -524,7 +524,7 @@ class ModuleWorkspaceLink(Base):
         nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     created_by: Mapped[str] = mapped_column(Text, nullable=False)
 
@@ -552,10 +552,10 @@ class RegistryProvider(Base):
     owner_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     versions: Mapped[list["RegistryProviderVersion"]] = relationship(
@@ -580,10 +580,10 @@ class GPGKey(Base):
     private_key: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     __table_args__ = (sa.UniqueConstraint("key_id", name="uq_gpg_keys"),)
@@ -615,10 +615,10 @@ class RegistryProviderVersion(Base):
     shasums_sig_uploaded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     provider: Mapped["RegistryProvider"] = relationship(back_populates="versions")
@@ -652,7 +652,7 @@ class RegistryProviderPlatform(Base):
     upload_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
 
     version: Mapped["RegistryProviderVersion"] = relationship(back_populates="platforms")
@@ -683,10 +683,10 @@ class CachedProviderPackage(Base):
     shasum: Mapped[str] = mapped_column(String(64), nullable=False)
     h1_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     cached_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     last_accessed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
 
     __table_args__ = (
@@ -718,10 +718,10 @@ class CachedBinary(Base):
     shasum: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     download_url: Mapped[str] = mapped_column(String(1000), nullable=False, default="")
     cached_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     last_accessed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
 
     __table_args__ = (
@@ -746,7 +746,7 @@ class CertificateAuthorityModel(Base):
     ca_cert: Mapped[str] = mapped_column(Text, nullable=False)
     ca_key_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
 
 
@@ -792,10 +792,10 @@ class VCSConnection(Base):
     )  # active, suspended, removed
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     __table_args__ = (
@@ -859,12 +859,21 @@ class AutodiscoveryRule(Base):
     labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     owner_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
+    # Set on first successful full-tree scan of the repo. NULL means the
+    # rule has never been backfilled — the poll cycle picks rules where
+    # this is NULL and walks the full repo tree once (in addition to its
+    # normal changed-files walk) so existing matching directories get
+    # workspaces without waiting for someone to touch each one. Cleared
+    # to NULL whenever `enabled` flips false → true so a re-enable also
+    # re-scans. See #309.
+    first_scan_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Audit
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     __table_args__ = (
@@ -915,10 +924,10 @@ class PRSession(Base):
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="open")
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     __table_args__ = (
@@ -958,10 +967,10 @@ class Variable(Base):
     version_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     workspace: Mapped["Workspace"] = relationship(back_populates="variables")
@@ -986,10 +995,10 @@ class VariableSet(Base):
     priority: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     variables: Mapped[list["VariableSetVariable"]] = relationship(
@@ -1024,10 +1033,10 @@ class VariableSetVariable(Base):
     version_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     variable_set: Mapped["VariableSet"] = relationship(back_populates="variables")
@@ -1083,7 +1092,7 @@ class ConfigurationVersion(Base):
     speculative: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
 
     __table_args__ = (Index("ix_configuration_versions_workspace_id", "workspace_id"),)
@@ -1198,10 +1207,10 @@ class Run(Base):
     created_by: Mapped[str] = mapped_column(String(255), nullable=False, default="")
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     workspace: Mapped["Workspace"] = relationship(back_populates="runs")
@@ -1229,7 +1238,7 @@ class AuditLog(Base):
         UUID(as_uuid=True), primary_key=True, default=generate_uuid7
     )
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     actor_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     actor_ip: Mapped[str] = mapped_column(String(45), nullable=False, default="")
@@ -1259,7 +1268,7 @@ class AuditLog(Base):
     actor_id: Mapped[str] = mapped_column(String(64), nullable=False, server_default="")
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
 
     __table_args__ = (
@@ -1298,7 +1307,7 @@ class RunTrigger(Base):
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
 
     workspace: Mapped["Workspace"] = relationship(foreign_keys=[workspace_id])
@@ -1342,10 +1351,10 @@ class NotificationConfiguration(Base):
     delivery_responses: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=list)
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     workspace: Mapped["Workspace"] = relationship()
@@ -1383,10 +1392,10 @@ class RunTask(Base):
     )  # mandatory, advisory
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     workspace: Mapped["Workspace"] = relationship()
@@ -1417,10 +1426,10 @@ class TaskStage(Base):
     )  # pending/running/passed/failed/errored/canceled/overridden
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
     )
 
     results: Mapped[list["TaskStageResult"]] = relationship(
@@ -1462,7 +1471,7 @@ class TaskStageResult(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, nullable=False
+        DateTime(timezone=True), default=now_utc, nullable=False
     )
 
     task_stage: Mapped["TaskStage"] = relationship(back_populates="results")

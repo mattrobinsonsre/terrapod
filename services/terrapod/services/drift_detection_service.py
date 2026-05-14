@@ -20,7 +20,7 @@ from terrapod.db.models import (
     StateVersion,
     VCSConnection,
     Workspace,
-    utc_now,
+    now_utc,
 )
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
@@ -193,7 +193,7 @@ async def drift_check_cycle() -> None:
     replica runs this per interval across the entire deployment.
     """
     min_interval = settings.drift_detection.min_workspace_interval_seconds
-    now = utc_now()
+    now = now_utc()
 
     async with get_db_session() as db:
         result = await db.execute(
@@ -296,7 +296,7 @@ async def handle_drift_run_completed(payload: dict) -> None:
         else:
             return
 
-        ws.drift_last_checked_at = utc_now()
+        ws.drift_last_checked_at = now_utc()
         await db.commit()
 
         logger.info(

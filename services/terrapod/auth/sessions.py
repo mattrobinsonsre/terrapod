@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 
 from terrapod.config import settings
-from terrapod.db.models import utc_now
+from terrapod.db.models import now_utc
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
 
@@ -67,7 +67,7 @@ async def create_session(
     ttl = _session_ttl()
     if max_ttl is not None and 0 < max_ttl < ttl:
         ttl = max_ttl
-    now = utc_now()
+    now = now_utc()
     expires_at = now + timedelta(seconds=ttl)
 
     session = Session(
@@ -124,7 +124,7 @@ async def refresh_session(token: str, session: Session) -> str:
     """
     redis = get_redis_client()
     ttl = _session_ttl()
-    now = utc_now()
+    now = now_utc()
 
     session_key = SESSION_PREFIX + token
     raw = await redis.get(session_key)
@@ -150,7 +150,7 @@ def _should_refresh_session(session: Session) -> bool:
     """Check if enough time has passed since last refresh."""
     try:
         last_active = datetime.fromisoformat(session.last_active_at)
-        return (utc_now() - last_active).total_seconds() > SESSION_REFRESH_INTERVAL
+        return (now_utc() - last_active).total_seconds() > SESSION_REFRESH_INTERVAL
     except (ValueError, TypeError):
         return True  # If we can't parse, refresh to be safe
 

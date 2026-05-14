@@ -97,7 +97,7 @@ async def handle_run_task_call(payload: dict) -> None:
         if ws is None:
             return
 
-        from terrapod.db.models import utc_now as _utc_now
+        from terrapod.db.models import now_utc as _utc_now
 
         rt = await db.get(RunTask, tsr.run_task_id) if tsr.run_task_id else None
         if rt is None:

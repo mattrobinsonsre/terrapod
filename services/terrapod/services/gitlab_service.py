@@ -248,6 +248,67 @@ async def get_changed_files(
     return list(files)
 
 
+async def list_repo_tree(conn: VCSConnection, owner: str, repo: str, ref: str) -> list[str] | None:
+    """List every file path in the repo at `ref`.
+
+    Used by the autodiscovery initial-scan path (#309). Paginates over
+    `/projects/:id/repository/tree?recursive=true` until the server
+    stops returning pages (or we hit a safety cap), collecting every
+    `type=blob` entry.
+
+    Returns None on a transport error so the caller can treat it the
+    same as GitHub's `truncated` flag — best-effort, no scan today.
+    """
+    api = _api_url(conn)
+    project = _project_path(owner, repo)
+    files: list[str] = []
+    page = 1
+    # Hard cap so a misconfigured huge repo doesn't fan us out forever.
+    # 200 pages × 100 per page = 20k files, plenty for realistic monorepos.
+    MAX_PAGES = 200
+    PER_PAGE = 100
+
+    async with httpx.AsyncClient() as client:
+        while page <= MAX_PAGES:
+            try:
+                resp = await client.get(
+                    f"{api}/projects/{project}/repository/tree",
+                    params={
+                        "ref": ref,
+                        "recursive": "true",
+                        "per_page": PER_PAGE,
+                        "page": page,
+                    },
+                    headers=_headers(conn),
+                )
+                resp.raise_for_status()
+            except httpx.HTTPError:
+                logger.warning(
+                    "GitLab tree listing failed — autodiscovery initial scan will be incomplete",
+                    project=f"{owner}/{repo}",
+                    ref=ref,
+                    page=page,
+                    exc_info=True,
+                )
+                return None
+            batch = resp.json()
+            if not batch:
+                return files
+            for entry in batch:
+                if entry.get("type") == "blob":
+                    files.append(entry["path"])
+            if len(batch) < PER_PAGE:
+                return files
+            page += 1
+
+    logger.warning(
+        "GitLab tree listing hit page cap — autodiscovery initial scan truncated",
+        project=f"{owner}/{repo}",
+        ref=ref,
+    )
+    return None
+
+
 async def create_commit_status(
     conn: VCSConnection,
     owner: str,

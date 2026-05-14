@@ -314,6 +314,12 @@ async def update_rule(
         await _validate_connection(db, fields["vcs_connection_id"])
     if "agent_pool_id" in fields:
         await _validate_pool(db, fields["agent_pool_id"])
+    # A disable → enable transition should re-scan the repo: the rule
+    # may have missed changes during the disabled window, so treat the
+    # re-enable like a fresh rule. NULL `first_scan_at` is the trigger
+    # the poll cycle uses for a full-tree walk (#309).
+    if "enabled" in fields and fields["enabled"] and not rule.enabled:
+        fields["first_scan_at"] = None
     for k, v in fields.items():
         setattr(rule, k, v)
     try:
