@@ -79,3 +79,4 @@ provider/terraform-provider-terrapod
 *.tfstate.backup
 terraform.tfvars
 ANNOUNCEMENT.md
+smoke-*
