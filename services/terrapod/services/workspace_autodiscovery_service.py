@@ -369,8 +369,10 @@ async def autodiscover_for_paths(
     changed_files: list[str],
 ) -> list[Workspace]:
     """For a set of changed files, return the list of workspaces that
-    should be created/used. New workspaces are persisted; existing
-    workspaces are returned untouched.
+    were *newly created* this call. Existing workspaces that the rule
+    would map to are looked up (so subsequent VCS polls bind their runs
+    to the right workspace) but excluded from the return — callers
+    use the return length as a "created this cycle" count.
 
     Idempotent across repeated calls with the same inputs.
     """
@@ -392,8 +394,9 @@ async def autodiscover_for_paths(
     created: list[Workspace] = []
     for (_rule_id, root), rule in matches.items():
         try:
-            ws, _ = await find_or_autocreate_workspace(db, rule, root)
-            created.append(ws)
+            ws, was_created = await find_or_autocreate_workspace(db, rule, root)
+            if was_created:
+                created.append(ws)
         except AutodiscoveryNameCollision:
             # Logged inside; skip to next match.
             continue

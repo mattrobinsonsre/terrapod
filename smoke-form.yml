@@ -1,0 +1,174 @@
+- generic [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e4]:
+      - link "Terrapod Terrapod 0.0.0" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "Terrapod" [ref=e6]
+        - generic [ref=e7]: Terrapod
+        - generic [ref=e8]: 0.0.0
+      - generic [ref=e9]:
+        - link "Workspaces" [ref=e10] [cursor=pointer]:
+          - /url: /workspaces
+          - img [ref=e11]
+          - text: Workspaces
+        - link "Modules" [ref=e15] [cursor=pointer]:
+          - /url: /registry/modules
+          - img [ref=e16]
+          - text: Modules
+        - link "Providers" [ref=e20] [cursor=pointer]:
+          - /url: /registry/providers
+          - img [ref=e21]
+          - text: Providers
+        - link "API Tokens" [ref=e24] [cursor=pointer]:
+          - /url: /settings/tokens
+          - img [ref=e25]
+          - text: API Tokens
+        - link "Sessions" [ref=e29] [cursor=pointer]:
+          - /url: /settings/sessions
+          - img [ref=e30]
+          - text: Sessions
+        - link "Agent Pools" [ref=e32] [cursor=pointer]:
+          - /url: /admin/agent-pools
+          - img [ref=e33]
+          - text: Agent Pools
+        - link "Labels" [ref=e36] [cursor=pointer]:
+          - /url: /labels
+          - img [ref=e37]
+          - text: Labels
+        - link "Cache" [ref=e41] [cursor=pointer]:
+          - /url: /admin/binary-cache
+          - img [ref=e42]
+          - text: Cache
+        - link "VCS" [ref=e44] [cursor=pointer]:
+          - /url: /admin/vcs-connections
+          - img [ref=e45]
+          - text: VCS
+        - link "Users" [ref=e49] [cursor=pointer]:
+          - /url: /admin/users
+          - img [ref=e50]
+          - text: Users
+        - link "Roles" [ref=e55] [cursor=pointer]:
+          - /url: /admin/roles
+          - img [ref=e56]
+          - text: Roles
+        - link "Variable Sets" [ref=e58] [cursor=pointer]:
+          - /url: /admin/variable-sets
+          - img [ref=e59]
+          - text: Variable Sets
+        - link "Autodiscovery" [ref=e64] [cursor=pointer]:
+          - /url: /admin/autodiscovery
+          - img [ref=e65]
+          - text: Autodiscovery
+        - link "Audit Log" [ref=e68] [cursor=pointer]:
+          - /url: /admin/audit-log
+          - img [ref=e69]
+          - text: Audit Log
+        - link "API" [ref=e72] [cursor=pointer]:
+          - /url: /api-docs
+          - img [ref=e73]
+          - text: API
+        - link "Docs" [ref=e76] [cursor=pointer]:
+          - /url: https://github.com/mattrobinsonsre/terrapod/blob/main/docs/index.md
+          - img [ref=e77]
+          - text: Docs
+      - button "Logout" [ref=e79]:
+        - img [ref=e80]
+        - text: Logout
+  - main [ref=e83]:
+    - generic [ref=e96]:
+      - generic [ref=e97]:
+        - heading "Autodiscovery" [level=1] [ref=e98]
+        - paragraph [ref=e99]: Auto-create workspaces in monorepos when PRs touch matching paths
+      - button "Cancel" [active] [ref=e141]
+    - generic [ref=e142]:
+      - heading "Create rule" [level=2] [ref=e143]
+      - generic [ref=e144]:
+        - generic [ref=e145]:
+          - generic [ref=e146]: Name
+          - textbox "monorepo" [ref=e147]
+        - generic [ref=e148]:
+          - generic [ref=e149]: VCS connection
+          - combobox [ref=e150]:
+            - option "Select connection" [selected]
+            - option "mattrobinsonsre-dev (github)"
+      - generic [ref=e151]:
+        - generic [ref=e152]:
+          - generic [ref=e153]: Repo URL
+          - textbox "https://github.com/org/monorepo" [ref=e154]
+        - generic [ref=e155]:
+          - generic [ref=e156]: Branch (empty = default)
+          - textbox "main" [ref=e157]
+      - generic [ref=e158]:
+        - generic [ref=e159]: Match pattern
+        - textbox "accounts/*/**/*.tf" [ref=e160]
+        - paragraph [ref=e161]:
+          - text: Gitignore-style globs.
+          - code [ref=e162]: "**"
+          - text: matches across path segments. Only
+          - code [ref=e163]: "*.tf*"
+          - text: files trigger autodiscovery.
+      - generic [ref=e164]:
+        - generic [ref=e165]: Ignore patterns (one per line)
+        - textbox "modules/** deprecated/**" [ref=e166]: modules/**
+      - generic [ref=e167]:
+        - generic [ref=e168]: Workspace name template (optional)
+        - 'textbox "ws-{path}" [ref=e169]'
+        - paragraph [ref=e170]:
+          - text: Use
+          - code [ref=e171]: "{path}"
+          - text: for the directory with
+          - code [ref=e172]: /
+          - text: replaced by
+          - code [ref=e173]: "-"
+          - text: ", or"
+          - code [ref=e174]: "{root}"
+          - text: for the directory as-is. Empty = default (just the dashed path).
+      - group [ref=e175]:
+        - generic "Workspace template defaults" [ref=e176] [cursor=pointer]
+        - option "(none)" [selected]
+        - option "dev"
+        - option "dev-pool"
+        - option "tofu" [selected]
+        - option "terraform"
+      - generic [ref=e177]:
+        - button "Create" [ref=e178]
+        - button "Preview" [ref=e179]
+        - button "Cancel" [ref=e180]
+    - table [ref=e102]:
+      - rowgroup [ref=e103]:
+        - row "Name Repo Pattern Enabled Created" [ref=e104]:
+          - columnheader "Name" [ref=e105] [cursor=pointer]:
+            - generic [ref=e106]:
+              - text: Name
+              - img [ref=e107]
+          - columnheader "Repo" [ref=e109] [cursor=pointer]:
+            - generic [ref=e110]:
+              - text: Repo
+              - img [ref=e111]
+          - columnheader "Pattern" [ref=e114] [cursor=pointer]:
+            - generic [ref=e115]:
+              - text: Pattern
+              - img [ref=e116]
+          - columnheader "Enabled" [ref=e119] [cursor=pointer]:
+            - generic [ref=e120]:
+              - text: Enabled
+              - img [ref=e121]
+          - columnheader "Created" [ref=e124] [cursor=pointer]:
+            - generic [ref=e125]:
+              - text: Created
+              - img [ref=e126]
+          - columnheader [ref=e129]
+      - rowgroup [ref=e130]:
+        - row "smoke-311 github.com/mattrobinsonsre/terrapod-vcs-test accounts/*/**/*.tf enabled 14/05/2026 Preview Edit Delete" [ref=e131]:
+          - cell "smoke-311" [ref=e132]
+          - cell "github.com/mattrobinsonsre/terrapod-vcs-test" [ref=e133]
+          - cell "accounts/*/**/*.tf" [ref=e134]
+          - cell "enabled" [ref=e135]
+          - cell "14/05/2026" [ref=e136]
+          - cell "Preview Edit Delete" [ref=e137]:
+            - button "Preview" [ref=e138]
+            - button "Edit" [ref=e139]
+            - button "Delete" [ref=e140]
+  - button "Open Next.js Dev Tools" [ref=e91] [cursor=pointer]:
+    - img [ref=e92]
+  - alert [ref=e95]

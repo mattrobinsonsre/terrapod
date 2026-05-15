@@ -294,6 +294,72 @@ export default function AutodiscoveryPage() {
     }
   }
 
+  // Preview an *unsaved* rule — the create/edit form's "Preview" button
+  // wires here so the operator can iterate on pattern + name_template +
+  // ignore_patterns before any persistence (which would trigger an
+  // immediate initial scan).
+  async function previewFormRule() {
+    if (!vcsConnectionId || !repoUrl || !pattern) {
+      setError('Set VCS connection, repo URL, and pattern before previewing')
+      return
+    }
+    // id is empty for the unsaved-rule preview; the modal hides the
+    // Provision button when collisions === 0 or when no id is set.
+    setPreviewModal({ id: '', ruleName: name || '(unsaved rule)', loading: true })
+    try {
+      const payload = {
+        data: {
+          type: 'autodiscovery-rules',
+          attributes: {
+            name: name || 'preview',
+            'vcs-connection-id': vcsConnectionId,
+            'repo-url': repoUrl,
+            branch,
+            pattern,
+            'ignore-patterns': ignorePatternsText
+              .split('\n')
+              .map(s => s.trim())
+              .filter(Boolean),
+            'name-template': nameTemplate,
+            'execution-mode': executionMode,
+            'agent-pool-id': agentPoolId || null,
+            'execution-backend': executionBackend,
+            'terraform-version': terraformVersion,
+            'resource-cpu': resourceCpu,
+            'resource-memory': resourceMemory,
+            'auto-apply': autoApply,
+            labels,
+            'owner-email': ownerEmail,
+          },
+        },
+      }
+      const res = await apiFetch('/api/terrapod/v1/autodiscovery-rules/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.detail || `Preview failed (${res.status})`)
+      }
+      const json = await res.json()
+      const attrs = json?.data?.attributes ?? {}
+      setPreviewModal({
+        id: '',
+        ruleName: name || '(unsaved rule)',
+        ref: attrs.ref,
+        filesWalked: attrs['files-walked'],
+        entries: attrs.entries ?? [],
+      })
+    } catch (err) {
+      setPreviewModal({
+        id: '',
+        ruleName: name || '(unsaved rule)',
+        error: err instanceof Error ? err.message : 'Preview failed',
+      })
+    }
+  }
+
   async function handleProvision() {
     if (!previewModal) return
     setPreviewModal({ ...previewModal, scanning: true, error: undefined })
@@ -541,6 +607,15 @@ export default function AutodiscoveryPage() {
               </button>
               <button
                 type="button"
+                onClick={previewFormRule}
+                disabled={submitting}
+                className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-100 text-sm disabled:opacity-50"
+                title="Walk the repo and preview which workspaces this rule WOULD create — no persistence"
+              >
+                Preview
+              </button>
+              <button
+                type="button"
                 onClick={() => { setShowForm(false); resetForm() }}
                 className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm"
               >
@@ -719,7 +794,7 @@ export default function AutodiscoveryPage() {
                 >
                   Close
                 </button>
-                {previewModal.entries && previewModal.entries.filter(e => !e.collision).length > 0 && (
+                {previewModal.id && previewModal.entries && previewModal.entries.filter(e => !e.collision).length > 0 && (
                   <button
                     onClick={handleProvision}
                     disabled={previewModal.scanning}
@@ -729,6 +804,11 @@ export default function AutodiscoveryPage() {
                       ? 'Provisioning…'
                       : `Provision ${previewModal.entries.filter(e => !e.collision).length} workspace(s)`}
                   </button>
+                )}
+                {!previewModal.id && previewModal.entries && previewModal.entries.length > 0 && (
+                  <span className="self-center text-xs text-slate-500 italic">
+                    Save the rule to provision these workspaces.
+                  </span>
                 )}
               </div>
             </div>

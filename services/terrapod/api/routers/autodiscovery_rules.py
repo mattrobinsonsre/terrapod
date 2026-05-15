@@ -9,13 +9,14 @@ UX CONTRACT: consumed by the web frontend at
 attribute names, or status codes MUST be matched there.
 
 Endpoints:
-    GET    /api/terrapod/v1/autodiscovery-rules                (list)
-    POST   /api/terrapod/v1/autodiscovery-rules                (create)
-    GET    /api/terrapod/v1/autodiscovery-rules/{id}           (show)
-    PATCH  /api/terrapod/v1/autodiscovery-rules/{id}           (update)
-    DELETE /api/terrapod/v1/autodiscovery-rules/{id}           (delete)
-    GET    /api/terrapod/v1/autodiscovery-rules/{id}/preview   (dry-run)
-    POST   /api/terrapod/v1/autodiscovery-rules/{id}/scan      (on-demand scan)
+    GET    /api/terrapod/v1/autodiscovery-rules                  (list)
+    POST   /api/terrapod/v1/autodiscovery-rules                  (create)
+    POST   /api/terrapod/v1/autodiscovery-rules/preview          (dry-run unsaved rule)
+    GET    /api/terrapod/v1/autodiscovery-rules/{id}             (show)
+    PATCH  /api/terrapod/v1/autodiscovery-rules/{id}             (update)
+    DELETE /api/terrapod/v1/autodiscovery-rules/{id}             (delete)
+    GET    /api/terrapod/v1/autodiscovery-rules/{id}/preview     (dry-run saved rule)
+    POST   /api/terrapod/v1/autodiscovery-rules/{id}/scan        (on-demand scan)
 """
 
 from __future__ import annotations
@@ -378,6 +379,91 @@ async def delete_rule(
 # ── Preview / on-demand scan (#311) ──────────────────────────────────────
 
 
+def _build_transient_rule(fields: dict[str, Any], conn: VCSConnection) -> AutodiscoveryRule:
+    """Build an AutodiscoveryRule with the supplied attributes and the
+    resolved connection, but never `db.add()` it. The transient rule is
+    fed to `_walk_repo_for_rule` + `preview_for_paths` the same way a
+    persisted rule would be; nothing is committed.
+
+    Used by `POST /autodiscovery-rules/preview` so operators can iterate
+    on pattern + name_template + ignore_patterns against a real repo
+    walk *before* saving (otherwise the bug-fix initial-scan path from
+    v0.23.4 starts materialising workspaces immediately on save, defeating
+    the purpose of a dry-run).
+    """
+    rule = AutodiscoveryRule(
+        # The transient rule still needs an id so `preview_for_paths`
+        # can flag the `existing_autodiscovered` case meaningfully when
+        # the operator already has a saved rule against the same repo.
+        id=uuid.uuid4(),
+        name=fields.get("name", "preview"),
+        vcs_connection_id=conn.id,
+        repo_url=fields["repo_url"],
+        branch=fields.get("branch", ""),
+        pattern=fields["pattern"],
+        ignore_patterns=fields.get("ignore_patterns", []),
+        name_template=fields.get("name_template", ""),
+        enabled=True,
+        # Template fields don't affect the preview itself but the model
+        # has NOT NULL constraints on some, so populate with reasonable
+        # defaults to satisfy the in-memory construction.
+        execution_mode=fields.get("execution_mode", "agent"),
+        execution_backend=fields.get("execution_backend", "tofu"),
+        terraform_version=fields.get("terraform_version", "1.11"),
+        resource_cpu=fields.get("resource_cpu", "1"),
+        resource_memory=fields.get("resource_memory", "2Gi"),
+        auto_apply=fields.get("auto_apply", False),
+        labels=fields.get("labels", {}),
+        owner_email=fields.get("owner_email"),
+        agent_pool_id=fields.get("agent_pool_id"),
+    )
+    # `_walk_repo_for_rule` reads `rule.vcs_connection`; set it directly
+    # since the rule was never loaded through the ORM relationship.
+    rule.vcs_connection = conn
+    return rule
+
+
+@router.post("/autodiscovery-rules/preview")
+async def preview_unsaved_rule(
+    body: dict = Body(...),
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Dry-run for a *prospective* rule — no persistence.
+
+    Body is the same JSON:API attribute shape as `POST /autodiscovery-rules`.
+    Validates with the same `_coerce_attrs` path so any validation error
+    (trailing-slash pattern, unknown agent pool, etc.) shows up at preview
+    time, before the operator commits to creating the rule.
+
+    Admin only.
+    """
+    from terrapod.services import workspace_autodiscovery_service
+
+    attrs = body.get("data", {}).get("attributes", {})
+    fields = _coerce_attrs(attrs, on_create=True)
+
+    # Same connection / pool validation the create path runs.
+    conn = await _validate_connection(db, fields["vcs_connection_id"])
+    await _validate_pool(db, fields.get("agent_pool_id"))
+
+    rule = _build_transient_rule(fields, conn)
+    file_paths, target_branch = await _walk_repo_for_rule(rule)
+    preview = await workspace_autodiscovery_service.preview_for_paths(db, rule, file_paths)
+    return JSONResponse(
+        content={
+            "data": {
+                "type": "autodiscovery-rule-previews",
+                "attributes": {
+                    "ref": target_branch,
+                    "files-walked": len(file_paths),
+                    "entries": preview,
+                },
+            }
+        }
+    )
+
+
 async def _walk_repo_for_rule(rule: AutodiscoveryRule) -> tuple[list[str], str]:
     """Resolve the rule's target branch and return every file path in the
     repo at that branch.
@@ -528,7 +614,9 @@ async def scan_rule(
     file_paths, target_branch = await _walk_repo_for_rule(rule)
     # autodiscover_for_paths skips rules with enabled=False; force-enable
     # locally for the duration of this call so the explicit /scan action
-    # doesn't silently no-op on a disabled rule.
+    # doesn't silently no-op on a disabled rule. The returned list is
+    # *newly-created* workspaces only — existing rows that the rule
+    # would map to are bound silently and excluded from the result.
     original_enabled = rule.enabled
     rule.enabled = True
     try:
