@@ -38,7 +38,15 @@ LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapo
 # Runtime-only system libraries (no gcc, no -dev headers)
 # apt-get upgrade picks up security patches for base OS packages (e.g. glibc)
 # `git` is required for VCS sparse fetch (subprocess driver in services/git_fetch.py).
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+#
+# Bump APT_REFRESH to invalidate the cached layer and re-pull Debian
+# security patches (e.g. libnghttp2-14 1.64.0-1.1+deb13u1 for
+# CVE-2026-27135). Without this the apt-upgrade layer is reused from
+# before the patch was published — same cache-staleness issue the
+# runner image's APK_REFRESH solves.
+ARG APT_REFRESH=2026-05-15
+RUN echo "apt-refresh=${APT_REFRESH}" \
+    && apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     curl \
     git \
     xmlsec1 \

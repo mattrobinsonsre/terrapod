@@ -18,12 +18,12 @@ RUN pip install --no-cache-dir .
 FROM python:3.14-slim
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
-# Pick up post-publish Debian security patches. Other Dockerfiles
-# (api, runner) already do this in their runtime stage; the migrations
-# image was inconsistent and inherited whatever security state the
-# python:3.14-slim base was published with at the moment Docker Hub
-# last republished. No new packages installed — just upgrades.
-RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+# Pick up post-publish Debian security patches. Bump APT_REFRESH to
+# bust the cached apt layer and re-pull patches (CVE-2026-27135 etc.) —
+# see Dockerfile.api. No new packages installed — just upgrades.
+ARG APT_REFRESH=2026-05-15
+RUN echo "apt-refresh=${APT_REFRESH}" \
+    && apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

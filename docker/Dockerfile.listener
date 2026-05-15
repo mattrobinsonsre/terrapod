@@ -19,7 +19,11 @@ RUN pip install --no-cache-dir .
 FROM python:3.14-slim
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+# Bump APT_REFRESH to bust the cached apt layer and re-pull Debian
+# security patches (CVE-2026-27135 etc.) — see Dockerfile.api.
+ARG APT_REFRESH=2026-05-15
+RUN echo "apt-refresh=${APT_REFRESH}" \
+    && apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
