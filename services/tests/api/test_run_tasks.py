@@ -297,7 +297,7 @@ class TestShowRunTask:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
-                f"/api/v2/run-tasks/task-{uuid.uuid4()}",
+                f"/api/terrapod/v1/run-tasks/task-{uuid.uuid4()}",
                 headers=_AUTH,
             )
         assert resp.status_code == 404
@@ -432,7 +432,7 @@ class TestCallback:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
-                f"/api/v2/task-stage-results/tsr-{uuid.uuid4()}/callback",
+                f"/api/terrapod/v1/task-stage-results/tsr-{uuid.uuid4()}/callback",
                 json={
                     "access_token": "bad-token",
                     "status": "passed",
@@ -474,7 +474,7 @@ class TestCallback:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
-                f"/api/v2/task-stage-results/tsr-{uuid.uuid4()}/callback",
+                f"/api/terrapod/v1/task-stage-results/tsr-{uuid.uuid4()}/callback",
                 json={"status": "passed"},
             )
         assert resp.status_code == 401

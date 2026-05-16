@@ -337,7 +337,7 @@ class TestShowNotificationConfiguration:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.get(
-                f"/api/v2/notification-configurations/nc-{uuid.uuid4()}",
+                f"/api/terrapod/v1/notification-configurations/nc-{uuid.uuid4()}",
                 headers=_AUTH,
             )
         assert resp.status_code == 404

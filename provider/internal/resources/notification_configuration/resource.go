@@ -111,7 +111,7 @@ func (r *notificationConfigResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	data, err := r.client.Post(ctx, fmt.Sprintf("/api/v2/workspaces/%s/notification-configurations", plan.WorkspaceID.ValueString()), body)
+	data, err := r.client.Post(ctx, fmt.Sprintf("/api/terrapod/v1/workspaces/%s/notification-configurations", plan.WorkspaceID.ValueString()), body)
 	if err != nil {
 		resp.Diagnostics.AddError("Create failed", err.Error())
 		return
@@ -134,7 +134,7 @@ func (r *notificationConfigResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/v2/notification-configurations/"+state.ID.ValueString())
+	data, err := r.client.Get(ctx, "/api/terrapod/v1/notification-configurations/"+state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -174,7 +174,7 @@ func (r *notificationConfigResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	data, err := r.client.Patch(ctx, "/api/v2/notification-configurations/"+state.ID.ValueString(), body)
+	data, err := r.client.Patch(ctx, "/api/terrapod/v1/notification-configurations/"+state.ID.ValueString(), body)
 	if err != nil {
 		resp.Diagnostics.AddError("Update failed", err.Error())
 		return
@@ -197,7 +197,7 @@ func (r *notificationConfigResource) Delete(ctx context.Context, req resource.De
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v2/notification-configurations/"+state.ID.ValueString())
+	err := r.client.Delete(ctx, "/api/terrapod/v1/notification-configurations/"+state.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Delete failed", err.Error())
 	}

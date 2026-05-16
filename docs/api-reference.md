@@ -1178,10 +1178,10 @@ All provider responses (show and list) include a `permissions` object:
 ### GPG Keys
 
 ```
-GET    /api/registry/private/v2/gpg-keys
-POST   /api/registry/private/v2/gpg-keys
-GET    /api/registry/private/v2/gpg-keys/{namespace}/{key_id}
-DELETE /api/registry/private/v2/gpg-keys/{namespace}/{key_id}
+GET    /api/terrapod/v1/gpg-keys
+POST   /api/terrapod/v1/gpg-keys
+GET    /api/terrapod/v1/gpg-keys/{namespace}/{key_id}
+DELETE /api/terrapod/v1/gpg-keys/{namespace}/{key_id}
 ```
 
 ---

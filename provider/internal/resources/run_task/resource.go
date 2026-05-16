@@ -104,7 +104,7 @@ func (r *runTaskResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	data, err := r.client.Post(ctx, fmt.Sprintf("/api/v2/workspaces/%s/run-tasks", plan.WorkspaceID.ValueString()), body)
+	data, err := r.client.Post(ctx, fmt.Sprintf("/api/terrapod/v1/workspaces/%s/run-tasks", plan.WorkspaceID.ValueString()), body)
 	if err != nil {
 		resp.Diagnostics.AddError("Create failed", err.Error())
 		return
@@ -127,7 +127,7 @@ func (r *runTaskResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/v2/run-tasks/"+state.ID.ValueString())
+	data, err := r.client.Get(ctx, "/api/terrapod/v1/run-tasks/"+state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -167,7 +167,7 @@ func (r *runTaskResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	data, err := r.client.Patch(ctx, "/api/v2/run-tasks/"+state.ID.ValueString(), body)
+	data, err := r.client.Patch(ctx, "/api/terrapod/v1/run-tasks/"+state.ID.ValueString(), body)
 	if err != nil {
 		resp.Diagnostics.AddError("Update failed", err.Error())
 		return
@@ -190,7 +190,7 @@ func (r *runTaskResource) Delete(ctx context.Context, req resource.DeleteRequest
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v2/run-tasks/"+state.ID.ValueString())
+	err := r.client.Delete(ctx, "/api/terrapod/v1/run-tasks/"+state.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Delete failed", err.Error())
 	}

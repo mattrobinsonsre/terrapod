@@ -171,7 +171,7 @@ api:
       auth_requests_per_minute: 10
 ```
 
-Auth endpoints (`/api/v2/auth/*`, `/oauth/*`) have a separate, lower limit to protect against credential stuffing. Health, readiness, and metrics endpoints are exempt.
+Auth endpoints (`/api/terrapod/v1/auth/*`, `/oauth/*`) have a separate, lower limit to protect against credential stuffing. Health, readiness, and metrics endpoints are exempt.
 
 Rate limiting uses Redis for distributed counting across replicas and fails open if Redis is unavailable.
 

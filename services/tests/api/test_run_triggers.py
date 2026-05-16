@@ -367,7 +367,7 @@ class TestShowRunTrigger:
         mock_db.execute.return_value = mock_result
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get(f"/api/v2/run-triggers/rt-{uuid.uuid4()}", headers=_AUTH)
+            resp = await c.get(f"/api/terrapod/v1/run-triggers/rt-{uuid.uuid4()}", headers=_AUTH)
         assert resp.status_code == 404
 
 

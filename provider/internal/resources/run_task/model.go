@@ -5,9 +5,9 @@
 //	JSON:API type: "run-tasks"
 //	ID prefix: "task-"
 //	Create:  POST   /api/v2/workspaces/{workspace_id}/run-tasks
-//	Read:    GET    /api/v2/run-tasks/{id}
-//	Update:  PATCH  /api/v2/run-tasks/{id}
-//	Delete:  DELETE /api/v2/run-tasks/{id}
+//	Read:    GET    /api/terrapod/v1/run-tasks/{id}
+//	Update:  PATCH  /api/terrapod/v1/run-tasks/{id}
+//	Delete:  DELETE /api/terrapod/v1/run-tasks/{id}
 //
 // Attribute mapping:
 //

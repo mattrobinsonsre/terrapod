@@ -180,7 +180,7 @@ class TestListenerHeartbeat:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
             res = await client.post(
-                f"/api/v2/listeners/{uuid.uuid4()}/heartbeat",
+                f"/api/terrapod/v1/listeners/{uuid.uuid4()}/heartbeat",
                 json={"capacity": 1},
             )
 
@@ -1176,7 +1176,7 @@ class TestRenewListenerCert:
         app.dependency_overrides[get_db] = lambda: AsyncMock()
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
-            res = await client.post(f"/api/v2/listeners/{uuid.uuid4()}/renew")
+            res = await client.post(f"/api/terrapod/v1/listeners/{uuid.uuid4()}/renew")
 
         assert res.status_code == 401
         assert "X-Terrapod-Client-Cert" in res.json()["detail"]

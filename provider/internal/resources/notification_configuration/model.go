@@ -5,9 +5,9 @@
 //	JSON:API type: "notification-configurations"
 //	ID prefix: "nc-"
 //	Create:  POST   /api/v2/workspaces/{workspace_id}/notification-configurations
-//	Read:    GET    /api/v2/notification-configurations/{id}
-//	Update:  PATCH  /api/v2/notification-configurations/{id}
-//	Delete:  DELETE /api/v2/notification-configurations/{id}
+//	Read:    GET    /api/terrapod/v1/notification-configurations/{id}
+//	Update:  PATCH  /api/terrapod/v1/notification-configurations/{id}
+//	Delete:  DELETE /api/terrapod/v1/notification-configurations/{id}
 //
 // Attribute mapping:
 //

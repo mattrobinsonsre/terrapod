@@ -4,10 +4,10 @@
 //
 //	JSON:API type: "registry-providers"
 //	ID: UUID (no prefix)
-//	Create:  POST   /api/v2/organizations/default/registry-providers
-//	Read:    GET    /api/v2/organizations/default/registry-providers/private/default/{name}
-//	Update:  PATCH  /api/v2/organizations/default/registry-providers/private/default/{name}
-//	Delete:  DELETE /api/v2/organizations/default/registry-providers/private/default/{name}
+//	Create:  POST   /api/terrapod/v1/registry-providers
+//	Read:    GET    /api/terrapod/v1/registry-providers/private/default/{name}
+//	Update:  PATCH  /api/terrapod/v1/registry-providers/private/default/{name}
+//	Delete:  DELETE /api/terrapod/v1/registry-providers/private/default/{name}
 //
 // Attribute mapping:
 //
@@ -114,7 +114,7 @@ func (r *registryProviderResource) Configure(_ context.Context, req resource.Con
 }
 
 func providerPath(name string) string {
-	return fmt.Sprintf("/api/v2/organizations/default/registry-providers/private/default/%s", name)
+	return fmt.Sprintf("/api/terrapod/v1/registry-providers/private/default/%s", name)
 }
 
 func (r *registryProviderResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -131,7 +131,7 @@ func (r *registryProviderResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	data, err := r.client.Post(ctx, "/api/v2/organizations/default/registry-providers", body)
+	data, err := r.client.Post(ctx, "/api/terrapod/v1/registry-providers", body)
 	if err != nil {
 		resp.Diagnostics.AddError("Create failed", err.Error())
 		return

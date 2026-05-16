@@ -741,7 +741,13 @@ class Settings(BaseSettings):
     )
 
     # API
+    # `api_prefix` is the TFE V2 CLI-contract surface (terraform / tofu /
+    # tfci / go-tfe). `terrapod_prefix` is the Terrapod-native surface
+    # (auth, admin, registry mgmt, etc.). The OAuth/SAML callback lives
+    # on the Terrapod-native surface — see auth.py — so its URL is built
+    # from `terrapod_prefix`, not `api_prefix`.
     api_prefix: str = Field(default="/api/v2")
+    terrapod_prefix: str = Field(default="/api/terrapod/v1")
 
     @classmethod
     def settings_customise_sources(

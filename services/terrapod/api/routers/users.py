@@ -256,19 +256,3 @@ async def delete_user(
     await db.delete(target)
     await db.commit()
     logger.info("Deleted user", target_email=email, by=user.email)
-
-
-# ── Legacy alias router (v0.22 → v0.24 deprecation window) ─────────────
-# Mounted only at /api/v2 by app.py with deprecated=True and
-# include_in_schema=False. Preserves the *exact* path shapes that
-# existed in v0.22 — list/create at /organizations/default/users,
-# by-email at /users/{email} — for clients still using those paths.
-# Removed in v0.24.0 (#278).
-legacy_router = APIRouter(tags=["users-legacy"])
-legacy_router.add_api_route(
-    "/organizations/default/users", create_user, methods=["POST"], status_code=201
-)
-legacy_router.add_api_route("/organizations/default/users", list_users, methods=["GET"])
-legacy_router.add_api_route("/users/{email}", show_user, methods=["GET"])
-legacy_router.add_api_route("/users/{email}", update_user, methods=["PATCH"])
-legacy_router.add_api_route("/users/{email}", delete_user, methods=["DELETE"], status_code=204)

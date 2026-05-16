@@ -401,33 +401,6 @@ def create_application() -> FastAPI:
 
         return response
 
-    # Deprecation-headers middleware. Stamps RFC 8594 Deprecation + Link
-    # headers on responses for routes flagged `deprecated=True` in the
-    # OpenAPI schema, plus a custom X-Removed-In header naming the version
-    # that drops the alias (RFC 8594's Sunset wants an HTTP-date which
-    # we'd rather not commit to for a release-train product).
-    #
-    # Also emits a structlog warning per legacy-path request so operators
-    # can grep their logs for any client still pointed at the old paths
-    # before the v0.24.0 cutover (see issues #269 + #278).
-    @app.middleware("http")
-    async def deprecation_headers(request: Request, call_next):  # type: ignore[no-untyped-def]
-        response = await call_next(request)
-        route = request.scope.get("route")
-        if route is not None and getattr(route, "deprecated", False):
-            response.headers["Deprecation"] = "true"
-            response.headers["Link"] = (
-                '<https://github.com/mattrobinsonsre/terrapod/issues/278>; rel="deprecation"'
-            )
-            response.headers["X-Removed-In"] = "v0.24.0"
-            logger.warning(
-                "Deprecated API path used",
-                path=request.url.path,
-                method=request.method,
-                user_agent=request.headers.get("user-agent", ""),
-            )
-        return response
-
     # Audit logging middleware
     @app.middleware("http")
     async def audit_logging(request: Request, call_next):  # type: ignore[no-untyped-def]
@@ -497,87 +470,37 @@ def create_application() -> FastAPI:
     #   sessions, etc.). All Terrapod-only endpoints live here from
     #   v0.23.0 onward.
     #
-    # During the v0.23.x deprecation window every Terrapod-only route is
-    # ALSO registered at its original `/api/v2/` location with FastAPI's
-    # `deprecated=True` flag — this lets v0.X-1 listeners/runners/the
-    # provider still hit a v0.X API while operators stagger upgrades.
-    # The legacy mounts get dropped in v0.24.0 (see #278). Internal code
-    # always targets the canonical `/api/terrapod/v1/` path.
+    # The legacy `/api/v2/` aliases for Terrapod-only routes (the
+    # transitional dual-mount #269 introduced and the v0.23.x release
+    # window kept) were removed in v0.24.0 — see #278. Terrapod-native
+    # endpoints are served *only* at `/api/terrapod/v1/`. `/api/v2/`
+    # remains the permanent home for the TFE V2 CLI surface that
+    # `terraform` / `tofu` / `tfci` consume (see docs/tfe-cli-surface.md);
+    # that is not deprecated and is unaffected by #278.
     TERRAPOD_PREFIX = "/api/terrapod/v1"
-    TFE_PREFIX = settings.api_prefix  # "/api/v2"
 
-    def include_with_org_legacy(router) -> None:
-        """Register a Terrapod-native router that pre-v0.23 lived under
-        `/api/v2/organizations/default/{resource}`.
-
-        Two mounts:
-        - Canonical: `/api/terrapod/v1/{resource}` (no
-          `organizations/default/` — see CLAUDE.md rule #9 and
-          `docs/tfe-cli-surface.md`).
-        - Legacy alias: `/api/v2/organizations/default/{resource}`
-          (the pre-v0.23 path, kept for v0.22.x callers).
-
-        We deliberately do NOT register a `/api/v2/{resource}` alias —
-        that shape was never published, isn't a TFE-V2 shape, and isn't
-        something we want to preserve. The router's own `prefix=` and
-        each route's path stack on these prefixes as usual.
-
-        Legacy mount is hidden from OpenAPI and emits Deprecation
-        headers via the middleware. Removed in v0.24.0 (#278).
+    def include_terrapod(router) -> None:
+        """Mount a Terrapod-native router at the canonical
+        `/api/terrapod/v1/` prefix. Any prefix on the router itself
+        stacks (e.g. audit's own `prefix="/admin"` becomes
+        `/api/terrapod/v1/admin/...`).
         """
         app.include_router(router, prefix=TERRAPOD_PREFIX)
-        app.include_router(
-            router,
-            prefix="/api/v2/organizations/default",
-            deprecated=True,
-            include_in_schema=False,
-        )
-
-    def include_moved(router, legacy_prefix: str = TFE_PREFIX) -> None:
-        """Register a router under both the canonical Terrapod prefix and
-        a legacy alias.
-
-        `legacy_prefix` defaults to `/api/v2/` since that's where every
-        TFE-V2-shaped route used to live; pass a different prefix for
-        routes that historically used a non-`/api/v2/` path (e.g. GPG
-        keys lived at `/api/registry/private/v2/`).
-
-        The legacy mount is `deprecated=True` (so the middleware emits
-        Deprecation/Link/X-Removed-In response headers + a structlog
-        warning per legacy-path request) AND `include_in_schema=False`
-        so the alias paths are hidden from OpenAPI / Swagger UI / ReDoc /
-        generated clients. The canonical `/api/terrapod/v1/...` paths
-        are the only ones documented; the alias is a transitional
-        compatibility-only mount.
-
-        Any prefix on the router itself stacks (e.g. audit's own
-        `prefix="/admin"` becomes `/api/terrapod/v1/admin/...` and
-        `/api/v2/admin/...`).
-        """
-        app.include_router(router, prefix=TERRAPOD_PREFIX)
-        app.include_router(
-            router,
-            prefix=legacy_prefix,
-            deprecated=True,
-            include_in_schema=False,
-        )
 
     # Health endpoints (no prefix)
     app.include_router(health_router)
 
     # Filesystem storage routes (presigned URL handlers) — Terrapod-only
-    # dev backend. Dual-mounted: filesystem.py emits canonical
-    # /api/terrapod/v1 URLs for new presigns; the /api/v2 alias keeps
-    # any URLs already in flight (or generated by older replicas during
-    # rollout) resolvable until v0.24.0 (#278).
+    # dev backend. Canonical at /api/terrapod/v1; filesystem.py emits
+    # presigned URLs under that prefix.
     from terrapod.storage.filesystem_routes import router as fs_router
 
-    include_moved(fs_router)
+    include_terrapod(fs_router)
 
     # Auth routes — Terrapod-specific session/SSO management.
     from terrapod.api.routers.auth import router as auth_router
 
-    include_moved(auth_router)
+    include_terrapod(auth_router)
 
     # OAuth2 routes (terraform login flow). The OAuth + service-discovery
     # paths stay at their canonical locations (/.well-known/terraform.json,
@@ -591,19 +514,19 @@ def create_application() -> FastAPI:
     )
 
     app.include_router(oauth_router)
-    include_moved(oauth_extensions_router)
+    include_terrapod(oauth_extensions_router)
 
     # Workspace extension routes (SSE, vcs-refs) — Terrapod-specific.
     # MUST come before tfe_v2 so /workspace-events isn't matched as a
     # workspace_id parameter on either prefix.
     from terrapod.api.routers.workspace_extensions import router as workspace_extensions_router
 
-    include_moved(workspace_extensions_router)
+    include_terrapod(workspace_extensions_router)
 
     # TFE V2 CLI-contract routes — the verified subset of the TFE V2 spec
     # that terraform/tofu/tfci consume (see docs/tfe-cli-surface.md).
     # The one workspace-management path the CLI doesn't call (DELETE by
-    # id) lives in extensions_router and dual-mounts under /api/terrapod/v1.
+    # id) lives in extensions_router, mounted only under /api/terrapod/v1.
     from terrapod.api.routers.tfe_v2 import (
         extensions_router as tfe_v2_extensions_router,
     )
@@ -612,23 +535,23 @@ def create_application() -> FastAPI:
     )
 
     app.include_router(tfe_v2_router)
-    include_moved(tfe_v2_extensions_router)
+    include_terrapod(tfe_v2_extensions_router)
 
     # State management routes — Terrapod-specific (delete, rollback, upload).
     from terrapod.api.routers.state_management import router as state_management_router
 
-    include_moved(state_management_router)
+    include_terrapod(state_management_router)
 
     # Token CRUD routes — Terrapod-native management surface (the CLI
     # creates tokens via the /oauth flow, never via these endpoints).
     from terrapod.api.routers.tokens import router as tokens_router
 
-    include_moved(tokens_router)
+    include_terrapod(tokens_router)
 
     # Registry routes — module CLI download protocol stays at /api/v2 (the
-    # CLI hits this on `terraform init`). Module management (org-scoped CRUD
-    # on private modules + version + /vcs) and workspace-links are
-    # Terrapod-native and dual-mount under /api/terrapod/v1.
+    # CLI hits this on `terraform init`). Module management (private-module
+    # CRUD + version + /vcs) and workspace-links are Terrapod-native and
+    # mounted only under /api/terrapod/v1.
     from terrapod.api.routers.registry_modules import (
         management_router as registry_modules_management_router,
     )
@@ -640,11 +563,11 @@ def create_application() -> FastAPI:
     )
 
     app.include_router(registry_modules_router)
-    include_with_org_legacy(registry_modules_management_router)
-    include_with_org_legacy(module_workspace_links_router)
+    include_terrapod(registry_modules_management_router)
+    include_terrapod(module_workspace_links_router)
 
-    # Provider registry — CLI download protocol stays at /api/v2; org-scoped
-    # management dual-mounts under /api/terrapod/v1.
+    # Provider registry — CLI download protocol stays at /api/v2; provider
+    # management is Terrapod-native under /api/terrapod/v1.
     from terrapod.api.routers.registry_providers import (
         management_router as registry_providers_management_router,
     )
@@ -653,15 +576,15 @@ def create_application() -> FastAPI:
     )
 
     app.include_router(registry_providers_router)
-    include_with_org_legacy(registry_providers_management_router)
+    include_terrapod(registry_providers_management_router)
 
     # GPG keys — Terrapod-native (the CLI reads provider GPG keys from the
     # provider download response, not via this admin endpoint). Canonical
-    # under /api/terrapod/v1; the historical TFE path /api/registry/private/v2
-    # is dual-mounted as the deprecated alias.
+    # under /api/terrapod/v1; the historical TFE path
+    # /api/registry/private/v2/gpg-keys was removed in v0.24.0 (#278).
     from terrapod.api.routers.gpg_keys import router as gpg_keys_router
 
-    include_moved(gpg_keys_router, legacy_prefix="/api/registry/private/v2")
+    include_terrapod(gpg_keys_router)
 
     # Caching routes (provider mirror, binary cache)
     from terrapod.api.routers.provider_mirror import router as provider_mirror_router
@@ -670,7 +593,7 @@ def create_application() -> FastAPI:
 
     from terrapod.api.routers.binary_cache import router as binary_cache_router
 
-    include_moved(binary_cache_router)
+    include_terrapod(binary_cache_router)
 
     # Variable endpoints
     from terrapod.api.routers.variables import router as variables_router
@@ -680,12 +603,7 @@ def create_application() -> FastAPI:
     # Agent pool endpoints — Terrapod-native management (pool CRUD,
     # token CRUD, listener-protocol). The CLI never manages pools, so
     # canonical paths drop the /organizations/default/ segment (Terrapod
-    # is single-org — see CLAUDE.md rule #9). Pre-v0.23 path shapes are
-    # preserved as deprecated aliases via legacy_router (mounted only on
-    # /api/v2).
-    from terrapod.api.routers.agent_pools import (
-        legacy_router as agent_pools_legacy_router,
-    )
+    # is single-org — see CLAUDE.md rule #9).
     from terrapod.api.routers.agent_pools import (
         listener_router as listener_protocol_router,
     )
@@ -694,22 +612,16 @@ def create_application() -> FastAPI:
     )
 
     app.include_router(agent_pools_router, prefix=TERRAPOD_PREFIX)
-    app.include_router(
-        agent_pools_legacy_router,
-        prefix=TFE_PREFIX,
-        deprecated=True,
-        include_in_schema=False,
-    )
-    include_moved(listener_protocol_router)
+    include_terrapod(listener_protocol_router)
 
     # Read-only labels browser (cross-entity: workspaces, pools, modules, providers).
     from terrapod.api.routers.labels import router as labels_router
 
-    include_moved(labels_router)
+    include_terrapod(labels_router)
 
     # Run endpoints — TFE-spec stays at /api/v2; Terrapod-only extensions
     # (listener protocol, runner-driven completion, SSE streams, retry)
-    # move to /api/terrapod/v1 with a deprecated /api/v2 alias.
+    # are Terrapod-native under /api/terrapod/v1.
     from terrapod.api.routers.runs import (
         extensions_router as runs_extensions_router,
     )
@@ -718,15 +630,16 @@ def create_application() -> FastAPI:
     )
 
     app.include_router(runs_router)
-    include_moved(runs_extensions_router)
+    include_terrapod(runs_extensions_router)
 
     # Run artifact endpoints (runner token auth) — Terrapod runner protocol.
     from terrapod.api.routers.run_artifacts import router as run_artifacts_router
 
-    include_moved(run_artifacts_router)
+    include_terrapod(run_artifacts_router)
 
     # Configuration version endpoints — TFE-spec stays at /api/v2; the
-    # Terrapod download/diff/ticket extensions move to /api/terrapod/v1.
+    # Terrapod download/diff/ticket extensions are Terrapod-native under
+    # /api/terrapod/v1.
     from terrapod.api.routers.config_versions import (
         extensions_router as config_version_extensions_router,
     )
@@ -735,26 +648,15 @@ def create_application() -> FastAPI:
     )
 
     app.include_router(config_versions_router)
-    include_moved(config_version_extensions_router)
+    include_terrapod(config_version_extensions_router)
 
     # VCS connection endpoints — Terrapod-native. Canonical paths at
-    # /api/terrapod/v1/vcs-connections{,/{id}}; legacy_router preserves
-    # the pre-v0.23 list/create at /api/v2/organizations/default/vcs-connections
-    # and by-id at /api/v2/vcs-connections/{id}.
-    from terrapod.api.routers.vcs_connections import (
-        legacy_router as vcs_connections_legacy_router,
-    )
+    # /api/terrapod/v1/vcs-connections{,/{id}}.
     from terrapod.api.routers.vcs_connections import (
         router as vcs_connections_router,
     )
 
     app.include_router(vcs_connections_router, prefix=TERRAPOD_PREFIX)
-    app.include_router(
-        vcs_connections_legacy_router,
-        prefix=TFE_PREFIX,
-        deprecated=True,
-        include_in_schema=False,
-    )
 
     # Autodiscovery rules — Terrapod-native, introduced in v0.24 (#283).
     # No legacy alias: this surface didn't exist in v0.22, so /api/v2 has
@@ -768,58 +670,47 @@ def create_application() -> FastAPI:
     # VCS webhook event receiver — Terrapod-specific.
     from terrapod.api.routers.vcs_events import router as vcs_events_router
 
-    include_moved(vcs_events_router)
+    include_terrapod(vcs_events_router)
 
     # Role CRUD — Terrapod-specific RBAC.
     from terrapod.api.routers.roles import router as roles_router
 
-    include_moved(roles_router)
+    include_terrapod(roles_router)
 
     # Role assignment management — Terrapod-specific RBAC.
     from terrapod.api.routers.role_assignments import router as role_assignments_router
 
-    include_moved(role_assignments_router)
+    include_terrapod(role_assignments_router)
 
     # Run trigger endpoints — Terrapod-native management (CLI doesn't use).
     from terrapod.api.routers.run_triggers import router as run_triggers_router
 
-    include_moved(run_triggers_router)
+    include_terrapod(run_triggers_router)
 
     # Audit log query endpoint — Terrapod-specific.
     from terrapod.api.routers.audit import router as audit_router
 
-    include_moved(audit_router)
+    include_terrapod(audit_router)
 
     # User management endpoints — Terrapod-native. Canonical paths at
-    # /api/terrapod/v1/users{,/{email}}; legacy_router preserves
-    # pre-v0.23 list/create at /api/v2/organizations/default/users and
-    # by-email at /api/v2/users/{email}.
-    from terrapod.api.routers.users import (
-        legacy_router as users_legacy_router,
-    )
+    # /api/terrapod/v1/users{,/{email}}.
     from terrapod.api.routers.users import (
         router as users_router,
     )
 
     app.include_router(users_router, prefix=TERRAPOD_PREFIX)
-    app.include_router(
-        users_legacy_router,
-        prefix=TFE_PREFIX,
-        deprecated=True,
-        include_in_schema=False,
-    )
 
     # Notification configuration endpoints — Terrapod-native management.
     from terrapod.api.routers.notification_configurations import (
         router as notification_configurations_router,
     )
 
-    include_moved(notification_configurations_router)
+    include_terrapod(notification_configurations_router)
 
     # Run task endpoints — task-stages (read + override) stay at /api/v2
     # because the CLI's cloud backend reads them on every run; everything
     # else (workspace-scoped task definition CRUD + callback receiver) is
-    # Terrapod-native and dual-mounts under /api/terrapod/v1.
+    # Terrapod-native under /api/terrapod/v1.
     from terrapod.api.routers.run_tasks import (
         extensions_router as run_tasks_extensions_router,
     )
@@ -828,7 +719,7 @@ def create_application() -> FastAPI:
     )
 
     app.include_router(run_tasks_router)
-    include_moved(run_tasks_extensions_router)
+    include_terrapod(run_tasks_extensions_router)
 
     return app
 

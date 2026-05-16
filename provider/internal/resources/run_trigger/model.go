@@ -5,8 +5,8 @@
 //	JSON:API type: "run-triggers"
 //	ID prefix: "rt-"
 //	Create:  POST   /api/v2/workspaces/{workspace_id}/run-triggers
-//	Read:    GET    /api/v2/run-triggers/{id}
-//	Delete:  DELETE /api/v2/run-triggers/{id}
+//	Read:    GET    /api/terrapod/v1/run-triggers/{id}
+//	Delete:  DELETE /api/terrapod/v1/run-triggers/{id}
 //	No update — immutable resource (delete + recreate).
 //
 // Attribute mapping:

@@ -1,6 +1,6 @@
 // Package agent_pool implements the terrapod_agent_pool data source.
 //
-// API Contract: GET /api/v2/organizations/default/agent-pools
+// API Contract: GET /api/terrapod/v1/agent-pools
 // Lists all pools, filters by name client-side.
 package agent_pool
 
@@ -74,7 +74,7 @@ func (d *agentPoolDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	data, err := d.client.Get(ctx, "/api/v2/organizations/default/agent-pools")
+	data, err := d.client.Get(ctx, "/api/terrapod/v1/agent-pools")
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to list agent pools", err.Error())
 		return

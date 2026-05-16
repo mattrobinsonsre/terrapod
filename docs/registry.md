@@ -404,7 +404,7 @@ Before publishing providers, register a GPG key for signature verification:
 gpg --armor --export your-key-id > public-key.asc
 
 # Register with Terrapod
-curl -X POST https://terrapod.example.com/api/registry/private/v2/gpg-keys \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/gpg-keys \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d "{
@@ -423,7 +423,7 @@ The key ID is automatically extracted from the ASCII armor using `pgpy` (pure Py
 ### Listing GPG Keys
 
 ```zsh
-curl https://terrapod.example.com/api/registry/private/v2/gpg-keys \
+curl https://terrapod.example.com/api/terrapod/v1/gpg-keys \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 

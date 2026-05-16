@@ -851,31 +851,3 @@ async def renew_listener_cert(
     )
 
     return JSONResponse(content={"data": result})
-
-
-# ── Legacy alias router (v0.22 → v0.24 deprecation window) ─────────────
-# Mounted only at /api/v2 by app.py with deprecated=True and
-# include_in_schema=False. Pre-v0.23 path shapes:
-#   - list/create: /api/v2/organizations/default/agent-pools
-#   - by-id, tokens: /api/v2/agent-pools/{pool_id}[/tokens[/{token_id}]]
-# Removed in v0.24.0 (#278).
-legacy_router = APIRouter(tags=["agent-pools-legacy"])
-legacy_router.add_api_route("/organizations/default/agent-pools", list_pools, methods=["GET"])
-legacy_router.add_api_route(
-    "/organizations/default/agent-pools", create_pool, methods=["POST"], status_code=201
-)
-legacy_router.add_api_route("/agent-pools/{pool_id}", show_pool, methods=["GET"])
-legacy_router.add_api_route("/agent-pools/{pool_id}", update_pool, methods=["PATCH"])
-legacy_router.add_api_route(
-    "/agent-pools/{pool_id}", delete_pool, methods=["DELETE"], status_code=204
-)
-legacy_router.add_api_route("/agent-pools/{pool_id}/tokens", list_pool_tokens, methods=["GET"])
-legacy_router.add_api_route(
-    "/agent-pools/{pool_id}/tokens", create_pool_token, methods=["POST"], status_code=201
-)
-legacy_router.add_api_route(
-    "/agent-pools/{pool_id}/tokens/{token_id}",
-    delete_pool_token,
-    methods=["DELETE"],
-    status_code=204,
-)

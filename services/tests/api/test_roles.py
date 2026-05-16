@@ -565,7 +565,7 @@ class TestRoleAssignments:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.delete(
-                "/api/v2/role-assignments/local/user@test.com/admin",
+                "/api/terrapod/v1/role-assignments/local/user@test.com/admin",
                 headers=_AUTH,
             )
         assert resp.status_code == 204
@@ -581,7 +581,7 @@ class TestRoleAssignments:
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.delete(
-                "/api/v2/role-assignments/local/nobody@test.com/admin",
+                "/api/terrapod/v1/role-assignments/local/nobody@test.com/admin",
                 headers=_AUTH,
             )
         assert resp.status_code == 404

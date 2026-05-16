@@ -93,7 +93,7 @@ func (r *runTriggerResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	data, err := r.client.Post(ctx, fmt.Sprintf("/api/v2/workspaces/%s/run-triggers", plan.WorkspaceID.ValueString()), body)
+	data, err := r.client.Post(ctx, fmt.Sprintf("/api/terrapod/v1/workspaces/%s/run-triggers", plan.WorkspaceID.ValueString()), body)
 	if err != nil {
 		resp.Diagnostics.AddError("Create failed", err.Error())
 		return
@@ -116,7 +116,7 @@ func (r *runTriggerResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/v2/run-triggers/"+state.ID.ValueString())
+	data, err := r.client.Get(ctx, "/api/terrapod/v1/run-triggers/"+state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -147,7 +147,7 @@ func (r *runTriggerResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v2/run-triggers/"+state.ID.ValueString())
+	err := r.client.Delete(ctx, "/api/terrapod/v1/run-triggers/"+state.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Delete failed", err.Error())
 	}

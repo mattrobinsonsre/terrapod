@@ -5,8 +5,8 @@ public keys from the provider download response, not from a separate
 admin endpoint. They're Terrapod-native management surface and live at
 `/api/terrapod/v1/gpg-keys`.
 
-The historical TFE path was `/api/registry/private/v2/gpg-keys`. That
-form is dual-mounted as a deprecated alias until v0.24.0 (see #278).
+The historical TFE-shaped path was `/api/registry/private/v2/gpg-keys`;
+it was removed in v0.24.0 (see #278) and is no longer routable.
 
 Endpoints (canonical):
     POST   /api/terrapod/v1/gpg-keys              — create

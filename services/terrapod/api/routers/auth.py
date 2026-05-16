@@ -158,7 +158,7 @@ async def authorize(
     idp_state = generate_state()
 
     # Build callback URL for the IDP
-    callback_url = f"{settings.auth.callback_base_url}{settings.api_prefix}/auth/callback"
+    callback_url = f"{settings.auth.callback_base_url}{settings.terrapod_prefix}/auth/callback"
 
     # Build authorization request to the provider
     auth_request = await connector.build_authorization_request(
@@ -344,7 +344,7 @@ async def cli_sso_redirect(
         )
 
     idp_state = generate_state()
-    callback_url = f"{settings.auth.callback_base_url}{settings.api_prefix}/auth/callback"
+    callback_url = f"{settings.auth.callback_base_url}{settings.terrapod_prefix}/auth/callback"
 
     auth_request = await connector.build_authorization_request(
         callback_url=callback_url,
@@ -393,7 +393,7 @@ async def callback(
             detail=f"Provider {auth_state.provider_name} no longer configured",
         )
 
-    callback_url = f"{settings.auth.callback_base_url}{settings.api_prefix}/auth/callback"
+    callback_url = f"{settings.auth.callback_base_url}{settings.terrapod_prefix}/auth/callback"
 
     try:
         identity = await connector.handle_callback(
@@ -478,7 +478,7 @@ async def saml_acs(
             detail=f"Provider {auth_state.provider_name} no longer configured",
         )
 
-    acs_url = f"{settings.auth.callback_base_url}{settings.api_prefix}/auth/saml/acs"
+    acs_url = f"{settings.auth.callback_base_url}{settings.terrapod_prefix}/auth/saml/acs"
 
     try:
         identity = await connector.handle_callback(

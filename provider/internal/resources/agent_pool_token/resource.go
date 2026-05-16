@@ -4,9 +4,9 @@
 //
 //	JSON:API type: "authentication-tokens"
 //	ID prefix: "at-"
-//	Create:  POST   /api/v2/agent-pools/{pool_id}/tokens
-//	Read:    GET    /api/v2/agent-pools/{pool_id}/tokens (list, find by ID)
-//	Delete:  DELETE /api/v2/agent-pools/{pool_id}/tokens/{token_id}
+//	Create:  POST   /api/terrapod/v1/agent-pools/{pool_id}/tokens
+//	Read:    GET    /api/terrapod/v1/agent-pools/{pool_id}/tokens (list, find by ID)
+//	Delete:  DELETE /api/terrapod/v1/agent-pools/{pool_id}/tokens/{token_id}
 //
 // This resource is immutable — there is no update (PATCH) endpoint.
 // Any attribute change forces replacement.
@@ -187,7 +187,7 @@ func (r *agentPoolTokenResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	endpoint := "/api/v2/agent-pools/" + plan.PoolID.ValueString() + "/tokens"
+	endpoint := "/api/terrapod/v1/agent-pools/" + plan.PoolID.ValueString() + "/tokens"
 	data, err := r.client.Post(ctx, endpoint, body)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create agent pool token", err.Error())
@@ -219,7 +219,7 @@ func (r *agentPoolTokenResource) Read(ctx context.Context, req resource.ReadRequ
 
 	// The API does not have a single-token GET endpoint. List all tokens
 	// for the pool and find the one matching our ID.
-	endpoint := "/api/v2/agent-pools/" + state.PoolID.ValueString() + "/tokens"
+	endpoint := "/api/terrapod/v1/agent-pools/" + state.PoolID.ValueString() + "/tokens"
 	data, err := r.client.Get(ctx, endpoint)
 	if err != nil {
 		if client.IsNotFound(err) {
@@ -274,7 +274,7 @@ func (r *agentPoolTokenResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	endpoint := "/api/v2/agent-pools/" + state.PoolID.ValueString() + "/tokens/" + state.ID.ValueString()
+	endpoint := "/api/terrapod/v1/agent-pools/" + state.PoolID.ValueString() + "/tokens/" + state.ID.ValueString()
 	err := r.client.Delete(ctx, endpoint)
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Failed to delete agent pool token", err.Error())

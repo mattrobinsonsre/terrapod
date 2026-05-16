@@ -4,10 +4,10 @@
 //
 //	JSON:API type: "agent-pools"
 //	ID prefix: "apool-"
-//	Create:  POST   /api/v2/organizations/default/agent-pools
-//	Read:    GET    /api/v2/agent-pools/{id}
-//	Update:  PATCH  /api/v2/agent-pools/{id}
-//	Delete:  DELETE /api/v2/agent-pools/{id}
+//	Create:  POST   /api/terrapod/v1/agent-pools
+//	Read:    GET    /api/terrapod/v1/agent-pools/{id}
+//	Update:  PATCH  /api/terrapod/v1/agent-pools/{id}
+//	Delete:  DELETE /api/terrapod/v1/agent-pools/{id}
 //
 // Attribute mapping (JSON:API attribute -> Terraform schema attribute):
 //
@@ -158,7 +158,7 @@ func (r *agentPoolResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	data, err := r.client.Post(ctx, "/api/v2/organizations/default/agent-pools", body)
+	data, err := r.client.Post(ctx, "/api/terrapod/v1/agent-pools", body)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create agent pool", err.Error())
 		return
@@ -181,7 +181,7 @@ func (r *agentPoolResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/v2/agent-pools/"+state.ID.ValueString())
+	data, err := r.client.Get(ctx, "/api/terrapod/v1/agent-pools/"+state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -222,7 +222,7 @@ func (r *agentPoolResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	data, err := r.client.Patch(ctx, "/api/v2/agent-pools/"+state.ID.ValueString(), body)
+	data, err := r.client.Patch(ctx, "/api/terrapod/v1/agent-pools/"+state.ID.ValueString(), body)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update agent pool", err.Error())
 		return
@@ -245,7 +245,7 @@ func (r *agentPoolResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v2/agent-pools/"+state.ID.ValueString())
+	err := r.client.Delete(ctx, "/api/terrapod/v1/agent-pools/"+state.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Failed to delete agent pool", err.Error())
 	}

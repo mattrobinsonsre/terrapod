@@ -212,21 +212,3 @@ async def delete_connection(
     await db.delete(conn)
     await db.commit()
     logger.info("VCS connection deleted", connection_id=str(conn.id))
-
-
-# ── Legacy alias router (v0.22 → v0.24 deprecation window) ─────────────
-# Mounted only at /api/v2 by app.py with deprecated=True and
-# include_in_schema=False. Preserves pre-v0.23 path shapes:
-# list/create were at /organizations/default/vcs-connections,
-# by-id at /vcs-connections/{id}. Removed in v0.24.0 (#278).
-legacy_router = APIRouter(tags=["vcs-connections-legacy"])
-legacy_router.add_api_route(
-    "/organizations/default/vcs-connections", list_connections, methods=["GET"]
-)
-legacy_router.add_api_route(
-    "/organizations/default/vcs-connections", create_connection, methods=["POST"], status_code=201
-)
-legacy_router.add_api_route("/vcs-connections/{connection_id}", show_connection, methods=["GET"])
-legacy_router.add_api_route(
-    "/vcs-connections/{connection_id}", delete_connection, methods=["DELETE"], status_code=204
-)

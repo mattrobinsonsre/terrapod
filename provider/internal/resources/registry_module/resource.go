@@ -4,10 +4,10 @@
 //
 //	JSON:API type: "registry-modules"
 //	ID: UUID (no prefix)
-//	Create:  POST   /api/v2/organizations/default/registry-modules
-//	Read:    GET    /api/v2/organizations/default/registry-modules/private/default/{name}/{provider}
-//	Update:  PATCH  /api/v2/organizations/default/registry-modules/private/default/{name}/{provider}
-//	Delete:  DELETE /api/v2/organizations/default/registry-modules/private/default/{name}/{provider}
+//	Create:  POST   /api/terrapod/v1/registry-modules
+//	Read:    GET    /api/terrapod/v1/registry-modules/private/default/{name}/{provider}
+//	Update:  PATCH  /api/terrapod/v1/registry-modules/private/default/{name}/{provider}
+//	Delete:  DELETE /api/terrapod/v1/registry-modules/private/default/{name}/{provider}
 //
 // Attribute mapping:
 //
@@ -144,7 +144,7 @@ func (r *registryModuleResource) Configure(_ context.Context, req resource.Confi
 }
 
 func (r *registryModuleResource) modulePath(m *registryModuleModel) string {
-	return fmt.Sprintf("/api/v2/organizations/default/registry-modules/private/default/%s/%s",
+	return fmt.Sprintf("/api/terrapod/v1/registry-modules/private/default/%s/%s",
 		m.Name.ValueString(), m.ProviderName.ValueString())
 }
 
@@ -162,7 +162,7 @@ func (r *registryModuleResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	data, err := r.client.Post(ctx, "/api/v2/organizations/default/registry-modules", body)
+	data, err := r.client.Post(ctx, "/api/terrapod/v1/registry-modules", body)
 	if err != nil {
 		resp.Diagnostics.AddError("Create failed", err.Error())
 		return
