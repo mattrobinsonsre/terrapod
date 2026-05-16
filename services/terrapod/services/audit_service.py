@@ -47,8 +47,9 @@ def parse_resource(path: str) -> tuple[str, str]:
         /api/terrapod/v1/users/admin@example.com → ("users", "admin@example.com")
         /oauth/authorize → ("oauth", "")
 
-    Both /api/v2 (CLI surface + deprecated aliases during the v0.23.x
-    window) and /api/terrapod/v1 (canonical) prefixes are recognised.
+    Both /api/v2 (the permanent TFE V2 CLI surface) and
+    /api/terrapod/v1 (the Terrapod-native surface) prefixes are
+    recognised so mutations on either are attributed in the audit log.
     """
     m = _RESOURCE_PATTERN.match(path)
     if m:

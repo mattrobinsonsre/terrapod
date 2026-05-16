@@ -29,8 +29,8 @@ from terrapod.redis.client import get_redis_client
 
 router = APIRouter(tags=["oauth"])
 
-# Terrapod-only CLI login completion check. Dual-mounted under
-# /api/terrapod/v1 (canonical) and /api/v2 (deprecated, removed in
+# Terrapod-only CLI login completion check. Terrapod-native: mounted
+# only under /api/terrapod/v1 (the /api/v2 alias was removed in
 # v0.24.0 — see #278).
 extensions_router = APIRouter(tags=["oauth-extensions"])
 logger = get_logger(__name__)

@@ -287,7 +287,7 @@ api:
       # artifact uploads — throttling them causes plan failures. Raise if
       # you need a hard cap on a specific cluster.
       runner_requests_per_minute: 0
-      # Auth endpoints (/api/terrapod/v1/auth/*, /api/v2/auth/*, /oauth/*) — brute-force defence,
+      # Auth endpoints (/api/terrapod/v1/auth/*, /oauth/*) — brute-force defence,
       # applies to all callers regardless of credentials.
       auth_requests_per_minute: 10
 
