@@ -344,7 +344,7 @@ function WorkspacesPageInner() {
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   required
-                  pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*"
+                  pattern="[a-zA-Z0-9][a-zA-Z0-9_\-]*"
                   title="Letters, numbers, hyphens, and underscores only. Must start with a letter or number."
                   placeholder="my-workspace"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"

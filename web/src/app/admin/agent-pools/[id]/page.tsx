@@ -396,7 +396,7 @@ export default function AgentPoolDetailPage() {
                   <dt className="text-xs text-slate-500">Name</dt>
                   {editing ? (
                     <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
-                      pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*"
+                      pattern="[a-zA-Z0-9][a-zA-Z0-9_\-]*"
                       title="Letters, numbers, hyphens, and underscores only. Must start with a letter or number."
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (

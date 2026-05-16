@@ -51,9 +51,34 @@ export default function VCSConnectionsPage() {
   // GitLab fields
   const [token, setToken] = useState('')
   const [creating, setCreating] = useState(false)
+  // When set, the form is editing this connection (PATCH) rather than creating.
+  const [editId, setEditId] = useState<string | null>(null)
 
   // Delete confirmation
   const [deleteId, setDeleteId] = useState<string | null>(null)
+
+  function resetForm() {
+    setName(''); setServerUrl(''); setAppId(''); setInstallationId('')
+    setPrivateKey(''); setToken(''); setProvider('github'); setEditId(null)
+  }
+
+  function startEdit(conn: VCSConnection) {
+    setEditId(conn.id)
+    setName(conn.attributes.name)
+    setProvider(conn.attributes.provider as 'github' | 'gitlab')
+    setServerUrl(conn.attributes['server-url'] || '')
+    setAppId(conn.attributes['github-app-id'] ? String(conn.attributes['github-app-id']) : '')
+    setInstallationId(
+      conn.attributes['github-installation-id']
+        ? String(conn.attributes['github-installation-id'])
+        : '',
+    )
+    // Credentials are write-only — never returned. Leave blank = keep.
+    setPrivateKey('')
+    setToken('')
+    setShowCreate(true)
+    setError(''); setSuccess('')
+  }
 
   const vcsAccessor = useCallback((item: VCSConnection, key: VCSSortKey) => {
     switch (key) {
@@ -91,41 +116,46 @@ export default function VCSConnectionsPage() {
     }
   }
 
-  async function handleCreate(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setCreating(true)
     setError('')
     setSuccess('')
     try {
-      const attrs: Record<string, unknown> = { name, provider }
-      if (serverUrl) attrs['server-url'] = serverUrl
+      const editing = editId !== null
+      const attrs: Record<string, unknown> = { name }
+      if (!editing) attrs.provider = provider
+      if (serverUrl || editing) attrs['server-url'] = serverUrl
       if (provider === 'github') {
         attrs['github-app-id'] = appId
         attrs['github-installation-id'] = installationId
-        attrs['private-key'] = privateKey
+        // On edit, credentials are optional — only send when rotating.
+        if (privateKey) attrs['private-key'] = privateKey
+        else if (!editing) attrs['private-key'] = privateKey
       } else {
-        attrs.token = token
+        if (token) attrs.token = token
+        else if (!editing) attrs.token = token
       }
-      const res = await apiFetch('/api/terrapod/v1/vcs-connections', {
-        method: 'POST',
+      const url = editing
+        ? `/api/terrapod/v1/vcs-connections/${editId}`
+        : '/api/terrapod/v1/vcs-connections'
+      const res = await apiFetch(url, {
+        method: editing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'vcs-connections', attributes: attrs } }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to create connection (${res.status})`)
+        throw new Error(
+          data.detail || `Failed to ${editing ? 'update' : 'create'} connection (${res.status})`,
+        )
       }
-      setSuccess(`VCS connection "${name}" created`)
-      setName('')
-      setServerUrl('')
-      setAppId('')
-      setInstallationId('')
-      setPrivateKey('')
-      setToken('')
+      setSuccess(`VCS connection "${name}" ${editing ? 'updated' : 'created'}`)
+      resetForm()
       setShowCreate(false)
       await loadConnections()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create connection')
+      setError(err instanceof Error ? err.message : 'Failed to save connection')
     } finally {
       setCreating(false)
     }
@@ -166,7 +196,10 @@ export default function VCSConnectionsPage() {
           description="Manage version control system integrations"
           actions={
             <button
-              onClick={() => setShowCreate(!showCreate)}
+              onClick={() => {
+                if (showCreate) { setShowCreate(false); resetForm() }
+                else { resetForm(); setShowCreate(true) }
+              }}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
             >
               {showCreate ? 'Cancel' : 'New Connection'}
@@ -180,20 +213,22 @@ export default function VCSConnectionsPage() {
         )}
 
         {showCreate && (
-          <form onSubmit={handleCreate} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
+          <form onSubmit={handleSubmit} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label htmlFor="vcs-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
                 <input id="vcs-name" type="text" value={name} onChange={(e) => setName(e.target.value)} required
-                  pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*"
+                  pattern="[a-zA-Z0-9][a-zA-Z0-9_\-]*"
                   title="Letters, numbers, hyphens, and underscores only. Must start with a letter or number."
                   placeholder="my-github-app"
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
               </div>
               <div>
                 <label htmlFor="vcs-provider" className="block text-sm font-medium text-slate-300 mb-1">Provider</label>
-                <select id="vcs-provider" value={provider} onChange={(e) => setProvider(e.target.value as 'github' | 'gitlab')}
-                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                <select id="vcs-provider" value={provider} disabled={editId !== null}
+                  onChange={(e) => setProvider(e.target.value as 'github' | 'gitlab')}
+                  title={editId !== null ? 'Provider is immutable — delete and recreate to change it' : undefined}
+                  className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                   <option value="github">GitHub</option>
                   <option value="gitlab">GitLab</option>
                 </select>
@@ -236,8 +271,10 @@ export default function VCSConnectionsPage() {
                     <input ref={pemFileRef} type="file" accept=".pem,.key" className="hidden"
                       onChange={(e) => { const f = e.target.files?.[0]; if (f) f.text().then(t => setPrivateKey(t)) }} />
                   </div>
-                  <textarea id="gh-key" value={privateKey} onChange={(e) => setPrivateKey(e.target.value)} required rows={4}
-                    placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;&#10;Drop a .pem file here or click Browse"
+                  <textarea id="gh-key" value={privateKey} onChange={(e) => setPrivateKey(e.target.value)} required={editId === null} rows={4}
+                    placeholder={editId !== null
+                      ? 'Leave blank to keep the current key — paste a new PEM to rotate'
+                      : '-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;&#10;Drop a .pem file here or click Browse'}
                     className={`w-full px-3 py-2 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent font-mono text-xs transition-colors ${pemDragOver ? 'border-2 border-dashed border-brand-400 bg-brand-900/20' : 'border border-slate-600'}`}
                     onDragOver={(e) => { e.preventDefault(); setPemDragOver(true) }}
                     onDragLeave={() => setPemDragOver(false)}
@@ -253,15 +290,17 @@ export default function VCSConnectionsPage() {
             ) : (
               <div>
                 <label htmlFor="gl-token" className="block text-sm font-medium text-slate-300 mb-1">Access Token</label>
-                <input id="gl-token" type="password" value={token} onChange={(e) => setToken(e.target.value)} required
-                  placeholder="glpat-..."
+                <input id="gl-token" type="password" value={token} onChange={(e) => setToken(e.target.value)} required={editId === null}
+                  placeholder={editId !== null ? 'Leave blank to keep the current token' : 'glpat-...'}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
               </div>
             )}
 
             <button type="submit" disabled={creating}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
-              {creating ? 'Creating...' : 'Create Connection'}
+              {creating
+                ? (editId !== null ? 'Saving...' : 'Creating...')
+                : (editId !== null ? 'Save Changes' : 'Create Connection')}
             </button>
           </form>
         )}
@@ -310,7 +349,10 @@ export default function VCSConnectionsPage() {
                           <button onClick={() => handleDelete(conn.id)} className="text-xs text-red-400 hover:text-red-300">Confirm</button>
                         </div>
                       ) : (
-                        <button onClick={() => setDeleteId(conn.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
+                        <div className="flex justify-end gap-3">
+                          <button onClick={() => startEdit(conn)} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
+                          <button onClick={() => setDeleteId(conn.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
+                        </div>
                       )}
                     </td>
                   </tr>

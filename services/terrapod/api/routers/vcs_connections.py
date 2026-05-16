@@ -198,6 +198,93 @@ async def show_connection(
     return JSONResponse(content={"data": _connection_json(conn)})
 
 
+@router.patch("/vcs-connections/{connection_id}")
+async def update_connection(
+    connection_id: str = Path(...),
+    body: dict = Body(...),
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Update a VCS connection (admin only).
+
+    Partial update — only attributes present in the request are
+    changed. `provider` is immutable (a different provider is a
+    different connection; delete + recreate instead). Credentials are
+    write-only: pass `private-key` (GitHub) or `token` (GitLab) to
+    rotate; omit them to leave the stored credential untouched. Editable
+    fields: name, server-url, status, and the GitHub App identifiers.
+    """
+    conn_uuid = uuid.UUID(connection_id.removeprefix("vcs-"))
+    conn = await _get_connection(db, conn_uuid)
+    if conn is None:
+        raise HTTPException(status_code=404, detail="VCS connection not found")
+
+    attrs = body.get("data", {}).get("attributes", {})
+
+    if "provider" in attrs and attrs["provider"] != conn.provider:
+        raise HTTPException(
+            status_code=422,
+            detail="provider is immutable — delete and recreate to change it",
+        )
+
+    if "name" in attrs:
+        new_name = (attrs.get("name") or "").strip()
+        if not new_name:
+            raise HTTPException(status_code=422, detail="Connection name cannot be empty")
+        conn.name = new_name
+    if "server-url" in attrs:
+        conn.server_url = attrs.get("server-url") or ""
+    if "status" in attrs:
+        status = attrs.get("status") or ""
+        if status not in ("active", "disabled"):
+            raise HTTPException(status_code=422, detail="status must be 'active' or 'disabled'")
+        conn.status = status
+
+    if conn.provider == "github":
+        if "github-app-id" in attrs:
+            conn.github_app_id = int(attrs.get("github-app-id") or 0)
+        if "github-account-login" in attrs:
+            conn.github_account_login = attrs.get("github-account-login") or ""
+        if "github-account-type" in attrs:
+            conn.github_account_type = attrs.get("github-account-type") or ""
+        if "github-installation-id" in attrs:
+            new_install = int(attrs.get("github-installation-id") or 0)
+            if new_install != conn.github_installation_id:
+                dup = await db.execute(
+                    select(VCSConnection).where(
+                        VCSConnection.provider == "github",
+                        VCSConnection.github_installation_id == new_install,
+                        VCSConnection.id != conn.id,
+                    )
+                )
+                if dup.scalar_one_or_none():
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"GitHub installation {new_install} is already connected",
+                    )
+                conn.github_installation_id = new_install
+        # Credential rotation: only when a non-empty key is supplied.
+        new_key = attrs.get("private-key") or ""
+        if new_key:
+            conn.token = new_key
+    elif conn.provider == "gitlab":
+        new_token = attrs.get("token") or ""
+        if new_token:
+            conn.token = new_token
+
+    await db.commit()
+    await db.refresh(conn)
+
+    logger.info(
+        "VCS connection updated",
+        connection_id=str(conn.id),
+        name=conn.name,
+        provider=conn.provider,
+    )
+
+    return JSONResponse(content={"data": _connection_json(conn)})
+
+
 @router.delete("/vcs-connections/{connection_id}", status_code=204)
 async def delete_connection(
     connection_id: str = Path(...),
