@@ -1372,6 +1372,29 @@ POST /api/terrapod/v1/vcs-connections
 GET /api/terrapod/v1/vcs-connections/{id}
 ```
 
+### Update Connection
+
+```
+PATCH /api/terrapod/v1/vcs-connections/{id}
+```
+
+Partial update — only the attributes you include are changed. Notes:
+
+- `provider` is **immutable**. A different provider is a different connection; delete and recreate to change it (sending a different `provider` returns `422`).
+- Credentials (`private-key` for GitHub, `token` for GitLab) are **write-only**: they are never returned, and are only rotated when you send a non-empty value. Omit them to change the name/server-url/status without touching the stored credential.
+- Editable: `name`, `server-url`, `status` (`active`/`disabled`), and the GitHub App identifiers (`github-app-id`, `github-installation-id`, `github-account-login`, `github-account-type`). Changing `github-installation-id` to one already used by another connection returns `422`.
+
+```json
+{
+  "data": {
+    "type": "vcs-connections",
+    "attributes": { "name": "renamed", "server-url": "https://github.example.com/api/v3" }
+  }
+}
+```
+
+**Required permission:** Platform `admin`.
+
 ### Delete Connection
 
 ```
@@ -1429,6 +1452,8 @@ POST /api/terrapod/v1/autodiscovery-rules
 
 Returns `201` with the created rule, or `409` if a rule with that name already exists for the connection.
 
+> **Reserved label keys:** `labels` is validated like any other label write — reserved keys (`status`, `pool`, `mode`, `backend`, `owner`, `drift`, `version`, `vcs`, `locked`, `branch`) are rejected with `422`. This is enforced at rule create/update so the rule can't materialise workspaces that later become uneditable.
+
 ### Show Rule
 
 ```
@@ -1450,6 +1475,25 @@ DELETE /api/terrapod/v1/autodiscovery-rules/{id}
 ```
 
 Workspaces auto-created by this rule keep working — their `autodiscovery-rule-id` foreign key is set to NULL.
+
+### Preview (dry-run)
+
+Walk the repo and return exactly which workspaces a rule *would* create against the current state of the tracked branch, with no side effects. Used by the admin UI's "Preview" modal.
+
+```
+GET  /api/terrapod/v1/autodiscovery-rules/{id}/preview      # preview a saved rule
+POST /api/terrapod/v1/autodiscovery-rules/preview           # preview an unsaved rule (same attributes body as Create)
+```
+
+Each entry reports `workspace_name`, `working_directory`, `collision` (the row would no-op — a workspace is already bound to that directory or the derived name is taken), and `existing_autodiscovered` (the no-op is a reuse of a workspace this same rule already materialised). Returns `413` if the VCS provider truncated the repo tree (repo too large to scan in one pass).
+
+### Scan (on-demand materialise)
+
+```
+POST /api/terrapod/v1/autodiscovery-rules/{id}/scan
+```
+
+Runs the same walk as Preview but actually creates the workspaces (idempotent, collision-safe). Force-enables the rule for the duration of the call so an explicit operator action doesn't silently no-op on a disabled rule. New workspaces are seeded with the tracked-branch HEAD as their last-seen commit, so the first real plan+apply fires when the branch next advances (e.g. the PR merge) — not immediately against a branch where the directory doesn't exist yet.
 
 ---
 

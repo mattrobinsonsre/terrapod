@@ -58,7 +58,7 @@ Rules are scoped to a single VCS connection + repo. A rule has:
 | `terraform-version` | string | no | Default `1.11`. |
 | `resource-cpu` / `resource-memory` | string | no | Defaults `1` / `2Gi`. |
 | `auto-apply` | bool | no | Default `false`. |
-| `labels` | map | no | Inherited by created workspaces — feeds Terrapod's label-based RBAC and filtering. |
+| `labels` | map | no | Inherited by created workspaces — feeds Terrapod's label-based RBAC and filtering. Reserved keys (`status`, `pool`, `mode`, `backend`, `owner`, `drift`, `version`, `vcs`, `locked`, `branch`) are rejected with `422` at rule create/update — they are virtual filter terms and would otherwise produce workspaces that can't be saved. |
 | `owner-email` | string | no | Inherited by created workspaces; if unset, created workspaces have no owner and label-RBAC alone determines access. |
 
 ## Pattern syntax
@@ -99,6 +99,7 @@ A workspace created by a rule:
 - Has `working-directory` set to the matched file's parent.
 - Has `trigger-prefixes` set to `[working_directory]` so subsequent PRs that touch the same dir route to the same workspace via the regular PR-scan path (not via re-running autodiscovery).
 - Tracks `autodiscovery-rule-id` so you can audit which rule created it.
+- Is seeded with the **tracked-branch HEAD** as its last-seen commit (`vcs-last-commit-sha`). Autodiscovery is PR-driven — the matched directory exists on the PR branch but not yet on the tracked branch — so without this baseline the next branch poll would fire a full plan+apply against a branch where the directory doesn't exist, which errors. With the baseline, the speculative plan-only run for the open PR still happens, and the first real plan+apply fires when the tracked branch actually advances (typically the PR merge).
 
 If you delete the rule later, existing workspaces keep working — the foreign key sets to NULL on cascade.
 
@@ -153,6 +154,18 @@ GET    /api/terrapod/v1/autodiscovery-rules/{id}
 PATCH  /api/terrapod/v1/autodiscovery-rules/{id}
 DELETE /api/terrapod/v1/autodiscovery-rules/{id}
 ```
+
+### Preview and on-demand scan
+
+Beyond passively waiting for the poller, you can dry-run a rule and provision on demand:
+
+```
+GET  /api/terrapod/v1/autodiscovery-rules/{id}/preview   # what a saved rule would create — no side effects
+POST /api/terrapod/v1/autodiscovery-rules/preview        # same, for an unsaved rule (Create body) — iterate before saving
+POST /api/terrapod/v1/autodiscovery-rules/{id}/scan      # walk now and actually create the workspaces (idempotent)
+```
+
+Preview walks the tracked branch and returns, per directory: `workspace_name`, `working_directory`, `collision` (would no-op — a workspace is already bound to that directory, or the derived name is taken), and `existing_autodiscovered` (the no-op is a reuse of a workspace this same rule already made). The admin UI surfaces this as a per-row badge (Create / Skip already-discovered / Skip name-collision) and a "Provision N workspaces" confirm whose count is exactly the non-colliding rows. A `413` means the provider truncated the repo tree (too large to scan in one pass). `scan` force-enables the rule for the call so an explicit operator action doesn't silently no-op on a disabled rule.
 
 JSON:API request body example:
 

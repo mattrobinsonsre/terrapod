@@ -184,7 +184,7 @@ policies/{policy_set_id}/{version_id}.tar.gz              # Policy set bundles
 
 File uploads and downloads for the **registry** (module tarballs, provider binaries, state version content) use presigned URLs. The API generates time-limited URLs; clients upload/download directly to/from storage. This keeps large files off the API server.
 
-**Runner artifacts** (config archives, state files, plan files, logs) use a different pattern: authenticated API endpoints at `/api/v2/runs/{run_id}/artifacts/*` that require a runner token. Downloads return 302 redirects to presigned storage URLs; uploads are received directly by the API and written to storage. This eliminates the need for presigned URL env vars in runner Jobs.
+**Runner artifacts** (config archives, state files, plan files, logs) use a different pattern: authenticated API endpoints at `/api/terrapod/v1/runs/{run_id}/artifacts/*` that require a runner token. Downloads return 302 redirects to presigned storage URLs; uploads are received directly by the API and written to storage. This eliminates the need for presigned URL env vars in runner Jobs.
 
 For the filesystem backend, URLs are HMAC-signed and served by `storage/filesystem_routes.py` endpoints on the API server itself.
 
@@ -384,9 +384,9 @@ Browser                  Next.js              API               IDP (OIDC/SAML)
   |-- Follow redirect ------------------------------------------------>|
   |<-- IDP login page ------------------------------------------------|
   |-- Authenticate -------------------------------------------------->|
-  |<-- 302 to /auth/callback?code=xxx&state=yyy ----------------------|
+  |<-- 302 to /api/terrapod/v1/auth/callback?code=xxx&state=yyy -------|
   |                         |                   |                     |
-  |-- GET /auth/callback?...                    |                     |
+  |-- GET /api/terrapod/v1/auth/callback?...    |                     |
   |                         |-- validate state -->                    |
   |                         |-- exchange code --->                    |
   |                         |<-- session token --|                    |

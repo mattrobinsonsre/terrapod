@@ -410,3 +410,293 @@ class TestDeleteRule:
                 f"/api/terrapod/v1/autodiscovery-rules/{uuid.uuid4()}", headers=_AUTH
             )
         assert resp.status_code == 404
+
+
+# ── Preview / on-demand scan (#311 / #312 / #313 / #316) ─────────────────
+
+
+def _conn(provider="github"):
+    """A minimal VCSConnection-shaped object for the walk helper."""
+    c = MagicMock()
+    c.id = uuid.uuid4()
+    c.provider = provider
+    c.server_url = ""
+    c.token = "tok"
+    return c
+
+
+def _saved_rule_with_conn(provider="github"):
+    rule = _mock_rule()
+    rule.branch = ""  # force default-branch resolution
+    rule.vcs_connection = _conn(provider)
+    rule.vcs_connection_id = rule.vcs_connection.id
+    return rule
+
+
+class TestPreviewSavedRule:
+    @patch("terrapod.services.github_service.get_repo_branch_sha", new_callable=AsyncMock)
+    @patch("terrapod.services.github_service.list_repo_tree", new_callable=AsyncMock)
+    @patch("terrapod.services.github_service.get_repo_default_branch", new_callable=AsyncMock)
+    @patch("terrapod.services.github_service.parse_repo_url")
+    @patch(
+        "terrapod.services.workspace_autodiscovery_service.preview_for_paths",
+        new_callable=AsyncMock,
+    )
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_200_returns_entries(
+        self,
+        _init_db,
+        _init_redis,
+        _init_storage,
+        m_preview,
+        m_parse,
+        m_default_branch,
+        m_tree,
+        m_sha,
+    ):
+        rule = _saved_rule_with_conn()
+        m_parse.return_value = ("example", "repo")
+        m_default_branch.return_value = "main"
+        m_tree.return_value = ["accounts/a/main.tf", "accounts/b/main.tf"]
+        m_sha.return_value = "abc123"
+        m_preview.return_value = [
+            {"workspace_name": "a", "working_directory": "accounts/a", "collision": False},
+            {"workspace_name": "b", "working_directory": "accounts/b", "collision": False},
+        ]
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule.id}/preview", headers=_AUTH
+            )
+        assert resp.status_code == 200, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["ref"] == "main"
+        assert attrs["files-walked"] == 2
+        assert len(attrs["entries"]) == 2
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_404_missing_rule(self, *_mocks):
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=None)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                f"/api/terrapod/v1/autodiscovery-rules/{uuid.uuid4()}/preview", headers=_AUTH
+            )
+        assert resp.status_code == 404
+
+
+class TestPreviewUnsavedRule:
+    @patch("terrapod.services.github_service.get_repo_branch_sha", new_callable=AsyncMock)
+    @patch("terrapod.services.github_service.list_repo_tree", new_callable=AsyncMock)
+    @patch("terrapod.services.github_service.get_repo_default_branch", new_callable=AsyncMock)
+    @patch("terrapod.services.github_service.parse_repo_url")
+    @patch(
+        "terrapod.services.workspace_autodiscovery_service.preview_for_paths",
+        new_callable=AsyncMock,
+    )
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_200_unsaved_body(
+        self,
+        _init_db,
+        _init_redis,
+        _init_storage,
+        m_preview,
+        m_parse,
+        m_default_branch,
+        m_tree,
+        m_sha,
+    ):
+        m_parse.return_value = ("example", "repo")
+        m_default_branch.return_value = "main"
+        m_tree.return_value = ["accounts/a/main.tf"]
+        m_sha.return_value = "deadbeef"
+        m_preview.return_value = [
+            {"workspace_name": "a", "working_directory": "accounts/a", "collision": False}
+        ]
+        conn_id = uuid.uuid4()
+        app, db = _make_app(_admin())
+        # _validate_connection uses db.get(VCSConnection, ...)
+        db.get = AsyncMock(return_value=_conn())
+
+        body = {
+            "data": {
+                "type": "autodiscovery-rules",
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{conn_id}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "accounts/*/**/*.tf",
+                    "ignore-patterns": ["modules/**"],
+                    "execution-mode": "agent",
+                },
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/autodiscovery-rules/preview", json=body, headers=_AUTH
+            )
+        assert resp.status_code == 200, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["ref"] == "main"
+        assert attrs["files-walked"] == 1
+        assert len(attrs["entries"]) == 1
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_422_reserved_label_key(self, *_mocks):
+        """#316: the unsaved-preview path must run the same reserved-key
+        label guard the create path runs — fail before any repo walk."""
+        app, _db = _make_app(_admin())
+        body = {
+            "data": {
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{uuid.uuid4()}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "accounts/*/**/*.tf",
+                    "execution-mode": "agent",
+                    "labels": {"owner": "foundations"},
+                }
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/autodiscovery-rules/preview", json=body, headers=_AUTH
+            )
+        assert resp.status_code == 422
+        assert "owner" in resp.json()["detail"]
+
+
+class TestScanRule:
+    @patch(
+        "terrapod.services.workspace_autodiscovery_service.autodiscover_for_paths",
+        new_callable=AsyncMock,
+    )
+    @patch("terrapod.services.github_service.get_repo_branch_sha", new_callable=AsyncMock)
+    @patch("terrapod.services.github_service.list_repo_tree", new_callable=AsyncMock)
+    @patch("terrapod.services.github_service.get_repo_default_branch", new_callable=AsyncMock)
+    @patch("terrapod.services.github_service.parse_repo_url")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_scan_passes_head_sha_as_baseline(
+        self,
+        _init_db,
+        _init_redis,
+        _init_storage,
+        m_parse,
+        m_default_branch,
+        m_tree,
+        m_sha,
+        m_autodiscover,
+    ):
+        """#313: /scan must seed new workspaces with the resolved HEAD
+        sha so the branch poll doesn't fire a premature plan+apply."""
+        rule = _saved_rule_with_conn()
+        m_parse.return_value = ("example", "repo")
+        m_default_branch.return_value = "main"
+        m_tree.return_value = ["accounts/a/main.tf"]
+        m_sha.return_value = "cafef00d"
+        created_ws = MagicMock()
+        created_ws.id = uuid.uuid4()
+        m_autodiscover.return_value = [created_ws]
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+        db.commit = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule.id}/scan", headers=_AUTH
+            )
+        assert resp.status_code == 200, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["ref"] == "main"
+        assert attrs["files-walked"] == 1
+        assert attrs["workspaces-created"] == 1
+        assert attrs["workspace-ids"] == [f"ws-{created_ws.id}"]
+        # The #313 wiring: baseline_sha == the head sha from _walk_repo_for_rule.
+        m_autodiscover.assert_awaited_once()
+        assert m_autodiscover.await_args.kwargs["baseline_sha"] == "cafef00d"
+
+
+class TestWalkRepoErrorBranches:
+    @patch("terrapod.services.github_service.list_repo_tree", new_callable=AsyncMock)
+    @patch("terrapod.services.github_service.get_repo_default_branch", new_callable=AsyncMock)
+    @patch("terrapod.services.github_service.parse_repo_url")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_413_tree_truncated(
+        self, _init_db, _init_redis, _init_storage, m_parse, m_default_branch, m_tree
+    ):
+        rule = _saved_rule_with_conn()
+        m_parse.return_value = ("example", "repo")
+        m_default_branch.return_value = "main"
+        m_tree.return_value = None  # provider truncated the tree
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule.id}/preview", headers=_AUTH
+            )
+        assert resp.status_code == 413
+        assert "truncated" in resp.json()["detail"]
+
+    @patch("terrapod.services.github_service.parse_repo_url")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_422_bad_repo_url(self, _init_db, _init_redis, _init_storage, m_parse):
+        rule = _saved_rule_with_conn()
+        m_parse.return_value = None  # unparseable repo URL
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule.id}/preview", headers=_AUTH
+            )
+        assert resp.status_code == 422
+        assert "cannot parse repo URL" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_422_unknown_provider(self, *_mocks):
+        rule = _saved_rule_with_conn(provider="bitbucket")
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule.id}/preview", headers=_AUTH
+            )
+        assert resp.status_code == 422
+        assert "unknown VCS provider" in resp.json()["detail"]
+
+    @patch("terrapod.services.github_service.get_repo_default_branch", new_callable=AsyncMock)
+    @patch("terrapod.services.github_service.parse_repo_url")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_502_default_branch_failure(
+        self, _init_db, _init_redis, _init_storage, m_parse, m_default_branch
+    ):
+        rule = _saved_rule_with_conn()
+        m_parse.return_value = ("example", "repo")
+        m_default_branch.side_effect = RuntimeError("provider down")
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule.id}/preview", headers=_AUTH
+            )
+        assert resp.status_code == 502
+        assert "default branch" in resp.json()["detail"]
