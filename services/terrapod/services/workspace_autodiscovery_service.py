@@ -187,11 +187,24 @@ async def find_or_autocreate_workspace(
     db: AsyncSession,
     rule: AutodiscoveryRule,
     root_directory: str,
+    baseline_sha: str | None = None,
 ) -> tuple[Workspace, bool]:
     """Look up the workspace this rule + directory should map to, or
     create it if it doesn't exist.
 
     Returns `(workspace, created)`.
+
+    `baseline_sha` seeds the new workspace's `vcs_last_commit_sha`
+    (#313). Autodiscovery is driven by *open PRs* — the directory
+    exists on the PR branch but not yet on the tracked branch. Without
+    a baseline, the next branch poll sees `vcs_last_commit_sha = NULL`,
+    treats the tracked-branch HEAD as "new", and fires a full
+    plan+apply for a directory that doesn't exist there yet — which
+    errors, racing the legitimate plan-only PR run. Seeding the current
+    tracked-branch HEAD baselines the branch path so the first real run
+    fires when the branch actually advances (the PR merge), and also
+    arms the subdirectory-change filter (skipped while `old_sha` is
+    None).
 
     Idempotent — concurrent autodiscovery on the same rule + path
     will not create duplicates. We commit the new workspace
@@ -261,6 +274,9 @@ async def find_or_autocreate_workspace(
         vcs_connection_id=rule.vcs_connection_id,
         vcs_repo_url=rule.repo_url,
         vcs_branch=rule.branch,
+        # Baseline against the tracked-branch HEAD so the branch poll
+        # doesn't fire a premature plan+apply before the PR merges (#313).
+        vcs_last_commit_sha=baseline_sha or None,
         autodiscovery_rule_id=rule.id,
         # trigger_prefixes scoped tightly to the discovered directory so
         # the regular VCS poller treats this workspace as a normal
@@ -418,12 +434,17 @@ async def autodiscover_for_paths(
     db: AsyncSession,
     rules: list[AutodiscoveryRule],
     changed_files: list[str],
+    baseline_sha: str | None = None,
 ) -> list[Workspace]:
     """For a set of changed files, return the list of workspaces that
     were *newly created* this call. Existing workspaces that the rule
     would map to are looked up (so subsequent VCS polls bind their runs
     to the right workspace) but excluded from the return — callers
     use the return length as a "created this cycle" count.
+
+    `baseline_sha` is the current tracked-branch HEAD; it seeds new
+    workspaces' `vcs_last_commit_sha` so the branch poll doesn't fire a
+    premature plan+apply before the PR merges (#313).
 
     Idempotent across repeated calls with the same inputs.
     """
@@ -445,7 +466,9 @@ async def autodiscover_for_paths(
     created: list[Workspace] = []
     for (_rule_id, root), rule in matches.items():
         try:
-            ws, was_created = await find_or_autocreate_workspace(db, rule, root)
+            ws, was_created = await find_or_autocreate_workspace(
+                db, rule, root, baseline_sha=baseline_sha
+            )
             if was_created:
                 created.append(ws)
         except AutodiscoveryNameCollision:

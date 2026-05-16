@@ -9,13 +9,14 @@ integration tests that run against a real session.
 from __future__ import annotations
 
 import uuid
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from terrapod.services.workspace_autodiscovery_service import (
     _is_terraform_file,
     _match_glob,
+    autodiscover_for_paths,
     derive_root_directory,
     derive_workspace_name,
     preview_for_paths,
@@ -331,3 +332,40 @@ class TestPreviewForPaths:
         preview = await preview_for_paths(db, rule, files)
         assert len(preview) == 1
         assert preview[0]["working_directory"] == "accounts/alpha/network"
+
+
+class TestAutodiscoverBaselineSha:
+    """#313: the tracked-branch HEAD must be forwarded to
+    find_or_autocreate_workspace so new workspaces are baselined and
+    the branch poll doesn't fire a premature plan+apply.
+    """
+
+    @pytest.mark.asyncio
+    async def test_baseline_sha_forwarded_to_find_or_autocreate(self):
+        rule = _rule(pattern="accounts/*/**/*.tf")
+        db = AsyncMock()
+        with patch(
+            "terrapod.services.workspace_autodiscovery_service.find_or_autocreate_workspace",
+            new_callable=AsyncMock,
+        ) as foc:
+            foc.return_value = (MagicMock(), True)
+            await autodiscover_for_paths(
+                db,
+                [rule],
+                ["accounts/alpha/network/main.tf"],
+                baseline_sha="deadbeefcafe",
+            )
+        assert foc.await_count == 1
+        assert foc.await_args.kwargs["baseline_sha"] == "deadbeefcafe"
+
+    @pytest.mark.asyncio
+    async def test_baseline_sha_defaults_none(self):
+        rule = _rule(pattern="accounts/*/**/*.tf")
+        db = AsyncMock()
+        with patch(
+            "terrapod.services.workspace_autodiscovery_service.find_or_autocreate_workspace",
+            new_callable=AsyncMock,
+        ) as foc:
+            foc.return_value = (MagicMock(), True)
+            await autodiscover_for_paths(db, [rule], ["accounts/a/network/main.tf"])
+        assert foc.await_args.kwargs["baseline_sha"] is None

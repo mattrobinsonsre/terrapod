@@ -451,7 +451,7 @@ async def preview_unsaved_rule(
     await _validate_pool(db, fields.get("agent_pool_id"))
 
     rule = _build_transient_rule(fields, conn)
-    file_paths, target_branch = await _walk_repo_for_rule(rule)
+    file_paths, target_branch, _head_sha = await _walk_repo_for_rule(rule)
     preview = await workspace_autodiscovery_service.preview_for_paths(db, rule, file_paths)
     return JSONResponse(
         content={
@@ -548,7 +548,18 @@ async def _walk_repo_for_rule(rule: AutodiscoveryRule) -> tuple[list[str], str]:
             ),
         )
 
-    return file_paths, target_branch
+    # Resolve the tracked-branch HEAD so /scan can baseline new
+    # workspaces (#313) — same rationale as the poller. None on
+    # failure: callers fall back to the prior NULL-seed behaviour.
+    try:
+        if conn.provider == "gitlab":
+            head_sha = await gitlab_service.get_branch_sha(conn, owner, repo, target_branch)
+        else:
+            head_sha = await github_service.get_repo_branch_sha(conn, owner, repo, target_branch)
+    except Exception:
+        head_sha = None
+
+    return file_paths, target_branch, head_sha
 
 
 @router.get("/autodiscovery-rules/{rule_id}/preview")
@@ -573,7 +584,7 @@ async def preview_rule(
     if rule is None:
         raise HTTPException(status_code=404, detail="autodiscovery rule not found")
 
-    file_paths, target_branch = await _walk_repo_for_rule(rule)
+    file_paths, target_branch, _head_sha = await _walk_repo_for_rule(rule)
     preview = await workspace_autodiscovery_service.preview_for_paths(db, rule, file_paths)
     return JSONResponse(
         content={
@@ -614,7 +625,7 @@ async def scan_rule(
     if rule is None:
         raise HTTPException(status_code=404, detail="autodiscovery rule not found")
 
-    file_paths, target_branch = await _walk_repo_for_rule(rule)
+    file_paths, target_branch, head_sha = await _walk_repo_for_rule(rule)
     # autodiscover_for_paths skips rules with enabled=False; force-enable
     # locally for the duration of this call so the explicit /scan action
     # doesn't silently no-op on a disabled rule. The returned list is
@@ -624,7 +635,7 @@ async def scan_rule(
     rule.enabled = True
     try:
         created = await workspace_autodiscovery_service.autodiscover_for_paths(
-            db, [rule], file_paths
+            db, [rule], file_paths, baseline_sha=head_sha
         )
     finally:
         rule.enabled = original_enabled

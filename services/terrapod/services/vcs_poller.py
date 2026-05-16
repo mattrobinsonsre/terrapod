@@ -1103,6 +1103,13 @@ async def _poll_autodiscovery_for_connection(
                 )
                 continue
 
+        # Resolve the tracked-branch HEAD once. New workspaces are
+        # seeded with this so their first branch poll baselines instead
+        # of firing a premature plan+apply for a directory that only
+        # exists on the (still-open) PR branch (#313). None on failure —
+        # falls back to the prior NULL-seed behaviour.
+        baseline_sha = await _get_branch_sha(conn, owner, repo, target_branch)
+
         # Pull open PRs and the default-branch tip — both are sources of
         # discoverable changed files.
         try:
@@ -1129,7 +1136,9 @@ async def _poll_autodiscovery_for_connection(
                     exc_info=True,
                 )
                 continue
-            new_workspaces = await autodiscover_for_paths(db, group, changed)
+            new_workspaces = await autodiscover_for_paths(
+                db, group, changed, baseline_sha=baseline_sha
+            )
             created_count += len(new_workspaces)
 
         # Initial-scan path (#309): rules with `first_scan_at IS NULL`
@@ -1156,7 +1165,9 @@ async def _poll_autodiscovery_for_connection(
                 )
                 all_files = None
             if all_files is not None:
-                new_workspaces = await autodiscover_for_paths(db, unscanned, all_files)
+                new_workspaces = await autodiscover_for_paths(
+                    db, unscanned, all_files, baseline_sha=baseline_sha
+                )
                 created_count += len(new_workspaces)
                 scanned_at = now_utc()
                 for rule in unscanned:
