@@ -32,6 +32,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, require_admin
+from terrapod.api.labels import validate_labels
 from terrapod.db.models import AgentPool, AutodiscoveryRule, VCSConnection
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -208,10 +209,12 @@ def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
     if "auto-apply" in attrs:
         out["auto_apply"] = bool(attrs["auto-apply"])
     if "labels" in attrs:
-        labels = attrs["labels"]
-        if not isinstance(labels, dict):
-            raise HTTPException(status_code=422, detail="labels must be an object")
-        out["labels"] = labels
+        # Reserved-key guard at the source: a rule's labels are copied
+        # verbatim onto every workspace it materialises, and workspace
+        # PATCH re-validates labels — so a reserved key here (e.g.
+        # "owner") would create workspaces that are uneditable in the UI
+        # (#316). Reject it when the rule is defined instead.
+        out["labels"] = validate_labels(attrs["labels"])
     if "owner-email" in attrs:
         out["owner_email"] = (str(attrs["owner-email"]) or "").strip() or None
 

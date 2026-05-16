@@ -152,6 +152,32 @@ class TestCreateRule:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
+    async def test_422_reserved_label_key(self, *_mocks):
+        """#316: a reserved label key on the rule is rejected at the
+        source — otherwise every workspace it materialises carries the
+        key and becomes uneditable via PATCH.
+        """
+        app, _db = _make_app(_admin())
+        body = {
+            "data": {
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{uuid.uuid4()}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "accounts/*/**/*.tf",
+                    "execution-mode": "agent",
+                    "labels": {"owner": "foundations", "team": "x"},
+                }
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post("/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH)
+        assert resp.status_code == 422
+        assert "owner" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
     async def test_422_when_connection_does_not_exist(self, *_mocks):
         app, db = _make_app(_admin())
         db.get = AsyncMock(return_value=None)  # connection missing

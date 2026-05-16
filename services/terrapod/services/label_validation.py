@@ -88,3 +88,32 @@ def validate_labels(labels: dict | None) -> dict:
             )
         clean[k] = v
     return clean
+
+
+def sanitize_labels(labels: dict | None) -> tuple[dict[str, str], list[str]]:
+    """Best-effort variant of `validate_labels` for non-interactive
+    label-write paths that must not abort on bad input.
+
+    Returns `(clean_labels, dropped_keys)` — entries that fail the
+    shape/size/reserved checks are dropped rather than raising. Use this
+    only where rejecting would break an automated flow (e.g. autodiscovery
+    materialising a workspace from a rule that predates the create-time
+    reserved-key guard, #316). Interactive create/update paths must keep
+    using `validate_labels` so the operator is told to fix the input.
+    """
+    if not labels or not isinstance(labels, dict):
+        return {}, []
+    clean: dict[str, str] = {}
+    dropped: list[str] = []
+    for k, v in list(labels.items())[:MAX_LABELS]:
+        if (
+            not isinstance(k, str)
+            or not isinstance(v, str)
+            or len(k) > MAX_LABEL_KEY_LEN
+            or len(v) > MAX_LABEL_VALUE_LEN
+            or k in RESERVED_LABEL_KEYS
+        ):
+            dropped.append(str(k))
+            continue
+        clean[k] = v
+    return clean, dropped

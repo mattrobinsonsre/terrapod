@@ -8,6 +8,7 @@ from terrapod.services.label_validation import (
     MAX_LABELS,
     RESERVED_LABEL_KEYS,
     LabelValidationError,
+    sanitize_labels,
     validate_labels,
 )
 
@@ -116,3 +117,36 @@ class TestReservedKeys:
             "managed-by": "terrapod-provider",
         }
         assert validate_labels(labels) == labels
+
+
+class TestSanitizeLabels:
+    """Best-effort variant for non-interactive paths (#316): drops bad
+    keys instead of raising, and reports what was dropped.
+    """
+
+    def test_none_and_non_dict_return_empty(self):
+        assert sanitize_labels(None) == ({}, [])
+        assert sanitize_labels("nope") == ({}, [])
+
+    def test_clean_labels_pass_through_nothing_dropped(self):
+        labels = {"team": "platform", "env": "prod"}
+        assert sanitize_labels(labels) == (labels, [])
+
+    def test_reserved_key_dropped_not_raised(self):
+        clean, dropped = sanitize_labels({"owner": "foundations", "team": "x"})
+        assert clean == {"team": "x"}
+        assert dropped == ["owner"]
+
+    def test_every_reserved_key_dropped(self):
+        bad = dict.fromkeys(RESERVED_LABEL_KEYS, "v")
+        bad["keepme"] = "yes"
+        clean, dropped = sanitize_labels(bad)
+        assert clean == {"keepme": "yes"}
+        assert sorted(dropped) == sorted(RESERVED_LABEL_KEYS)
+
+    def test_oversize_and_non_string_dropped(self):
+        clean, dropped = sanitize_labels(
+            {"k" * (MAX_LABEL_KEY_LEN + 1): "v", "ok": "v", "bad": 123}
+        )
+        assert clean == {"ok": "v"}
+        assert set(dropped) == {"k" * (MAX_LABEL_KEY_LEN + 1), "bad"}

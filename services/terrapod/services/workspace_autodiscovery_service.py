@@ -38,6 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import AutodiscoveryRule, Workspace
 from terrapod.logging_config import get_logger
+from terrapod.services.label_validation import sanitize_labels
 
 logger = get_logger(__name__)
 
@@ -229,6 +230,21 @@ async def find_or_autocreate_workspace(
         )
         raise AutodiscoveryNameCollision(name)
 
+    # Defensive reserved-key guard (#316). Rule create/update rejects
+    # reserved label keys at the source, but a rule that predates that
+    # guard may still carry one — copying it verbatim would create a
+    # workspace that's uneditable via PATCH. Strip-and-log rather than
+    # raise, so a legacy rule doesn't break the autodiscovery poll cycle.
+    safe_labels, dropped = sanitize_labels(rule.labels)
+    if dropped:
+        logger.warning(
+            "Autodiscovery dropped reserved/invalid label keys from rule",
+            rule_id=str(rule.id),
+            rule_name=rule.name,
+            dropped_keys=dropped,
+            working_directory=root_directory,
+        )
+
     ws = Workspace(
         id=uuid.uuid4(),  # generate_uuid7 default also fine; explicit for log clarity
         name=name,
@@ -240,7 +256,7 @@ async def find_or_autocreate_workspace(
         auto_apply=rule.auto_apply,
         working_directory=root_directory,
         agent_pool_id=rule.agent_pool_id,
-        labels=dict(rule.labels or {}),
+        labels=safe_labels,
         owner_email=rule.owner_email or "",
         vcs_connection_id=rule.vcs_connection_id,
         vcs_repo_url=rule.repo_url,
