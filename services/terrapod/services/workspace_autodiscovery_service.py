@@ -315,12 +315,24 @@ async def preview_for_paths(
 
     - `workspace_name` (post `name_template`, sanitised, truncated)
     - `working_directory` (the file's dirname)
-    - `collision` — True iff a workspace with that name already exists
-      (so the operator knows the row would no-op rather than create)
-    - `existing_autodiscovered` — True iff the collision is itself an
-      autodiscovered workspace from this same rule (the common
+    - `collision` — True iff this row would NOT create a workspace
+      (it would reuse a workspace already bound to the directory, or
+      it would be skipped because the derived name clashes with an
+      unrelated workspace). False iff the scan would create it.
+    - `existing_autodiscovered` — True iff the no-op is a reuse of a
+      workspace this same rule already materialised (the common
       already-backfilled case — distinct from a "real" name clash with
-      a user-created workspace)
+      a user- or other-rule-created workspace)
+
+    This must predict `find_or_autocreate_workspace` exactly so the
+    "Provision N" count matches what the scan creates. That function
+    resolves in two stages and so must this preview:
+      1. reuse any workspace already claiming
+         `(vcs_connection_id, vcs_repo_url, working_directory)` —
+         regardless of its name;
+      2. otherwise, if the derived name is taken by an unrelated
+         workspace, skip (name collision);
+      3. otherwise, create.
 
     The output is grouped by `(rule, root_directory)` so multiple files
     in the same directory only appear once, matching the materialise path.
@@ -340,22 +352,45 @@ async def preview_for_paths(
     if not roots:
         return []
 
-    # Single SELECT for collision check rather than one-per-row.
-    names = list(set(roots.values()))
-    result = await db.execute(
-        select(Workspace.name, Workspace.autodiscovery_rule_id).where(Workspace.name.in_(names))
+    # Stage 1 (mirrors find_or_autocreate_workspace Lookup #1): one SELECT
+    # for every workspace already bound to this rule's (connection, repo)
+    # at any of the candidate directories — reuse-by-directory wins over
+    # name regardless of how the workspace was created.
+    dir_bound_result = await db.execute(
+        select(Workspace.working_directory, Workspace.autodiscovery_rule_id).where(
+            Workspace.vcs_connection_id == rule.vcs_connection_id,
+            Workspace.vcs_repo_url == rule.repo_url,
+            Workspace.working_directory.in_(list(roots.keys())),
+        )
     )
-    existing: dict[str, uuid.UUID | None] = {row[0]: row[1] for row in result.all()}
+    dir_bound: dict[str, uuid.UUID | None] = {row[0]: row[1] for row in dir_bound_result.all()}
+
+    # Stage 2 (mirrors Lookup #2): names already taken by *any* workspace.
+    names = list(set(roots.values()))
+    name_taken_result = await db.execute(select(Workspace.name).where(Workspace.name.in_(names)))
+    name_taken: set[str] = {row[0] for row in name_taken_result.all()}
 
     preview: list[dict[str, Any]] = []
     for root, name in roots.items():
-        rule_id = existing.get(name)
+        if root in dir_bound:
+            # Reuse-by-directory: scan no-ops, no workspace created.
+            collision = True
+            existing_autodiscovered = dir_bound[root] == rule.id
+        elif name in name_taken:
+            # Derived name clashes with an unrelated workspace: scan
+            # raises AutodiscoveryNameCollision and skips this row.
+            collision = True
+            existing_autodiscovered = False
+        else:
+            # Scan will create this workspace.
+            collision = False
+            existing_autodiscovered = False
         preview.append(
             {
                 "workspace_name": name,
                 "working_directory": root,
-                "collision": name in existing,
-                "existing_autodiscovered": rule_id == rule.id,
+                "collision": collision,
+                "existing_autodiscovered": existing_autodiscovered,
             }
         )
     # Stable ordering by working_directory so the UI table is deterministic.
