@@ -1439,7 +1439,7 @@ POST /api/terrapod/v1/autodiscovery-rules
       "execution-mode": "agent",
       "execution-backend": "tofu",
       "agent-pool-id": "apool-019e01db-...",
-      "terraform-version": "1.11",
+      "terraform-version": "1.12",
       "resource-cpu": "1",
       "resource-memory": "2Gi",
       "auto-apply": false,

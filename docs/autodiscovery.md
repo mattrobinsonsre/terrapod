@@ -55,7 +55,7 @@ Rules are scoped to a single VCS connection + repo. A rule has:
 | `execution-mode` | enum | no | Must be `agent` (default). Autodiscovery is VCS-driven; `local` mode would create workspaces with queued runs and no executor. |
 | `agent-pool-id` | UUID | no | Inherited by created workspaces in `agent` mode. |
 | `execution-backend` | enum | no | `tofu` or `terraform`. Default `tofu`. |
-| `terraform-version` | string | no | Default `1.11`. |
+| `terraform-version` | string | no | Default `1.12`. |
 | `resource-cpu` / `resource-memory` | string | no | Defaults `1` / `2Gi`. |
 | `auto-apply` | bool | no | Default `false`. |
 | `labels` | map | no | Inherited by created workspaces — feeds Terrapod's label-based RBAC and filtering. Reserved keys (`status`, `pool`, `mode`, `backend`, `owner`, `drift`, `version`, `vcs`, `locked`, `branch`) are rejected with `422` at rule create/update — they are virtual filter terms and would otherwise produce workspaces that can't be saved. |
