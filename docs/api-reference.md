@@ -1495,6 +1495,83 @@ POST /api/terrapod/v1/autodiscovery-rules/{id}/scan
 
 Runs the same walk as Preview but actually creates the workspaces (idempotent, collision-safe). Force-enables the rule for the duration of the call so an explicit operator action doesn't silently no-op on a disabled rule. New workspaces are seeded with the tracked-branch HEAD as their last-seen commit, so the first real plan+apply fires when the branch next advances (e.g. the PR merge) — not immediately against a branch where the directory doesn't exist yet.
 
+### Rule templating (run tasks / notifications / var files)
+
+`POST`/`PATCH` rule bodies accept three additional attributes that are **materialised onto every workspace the rule creates**, so autodiscovered workspaces are fully configured at creation:
+
+- `var-files` — list of var-file paths.
+- `run-task-templates` — list of run-task specs (same shape as the bulk-update `run-tasks`, below): `{name, url, hmac-key?, stage, enforcement-level?, enabled?}`.
+- `notification-templates` — list of notification specs: `{name, destination-type, url?, token?, triggers?, email-addresses?, enabled?}`.
+
+These use the **identical spec shape** as the bulk-update endpoint, so a run task defined once can be applied to existing workspaces (bulk-update) *and* auto-applied to future ones (this template).
+
+---
+
+## Bulk Workspace Operations
+
+Terrapod-native, **admin only**. Server-side selection + atomic fleet updates (#318).
+
+### Search
+
+```
+POST /api/terrapod/v1/workspaces/actions/search
+```
+
+Resolve a structured filter to the matching workspaces — no side effects (the discovery half of the bulk workflow).
+
+```json
+{ "filter": {
+    "labels": {"team": "foundations"},
+    "name-prefix": "terrapod-testing-",
+    "execution-backend": "terraform",
+    "agent-pool-id": "apool-...", "vcs-connection-id": "vcs-...",
+    "owner-email": "...", "drift-status": "...", "locked": false, "has-vcs": true,
+    "workspace-ids": ["ws-..."],
+    "all": false } }
+```
+
+Dimensions are **AND-combined** (narrower = safer). An empty/omitted `filter` is a `422` (typo guard); matching the whole fleet requires explicit `"all": true`. Returns `{matched, workspaces:[...]}`.
+
+### Bulk Update
+
+```
+POST /api/terrapod/v1/workspaces/actions/bulk-update
+```
+
+Apply `update` to every workspace matching `filter`, in a **single all-or-nothing transaction**.
+
+```json
+{ "filter": { "labels": {"team": "foundations"} },
+  "update": {
+    "terraform-version": "1.12",
+    "execution-backend": "tofu",
+    "auto-apply": false,
+    "agent-pool-id": "apool-...",
+    "resource-cpu": "1", "resource-memory": "2Gi",
+    "var-files": ["envs/prod.tfvars"],
+    "labels": {"reviewed": "2026-q2"},
+    "run-tasks": [
+      { "name": "opa-policy-check", "url": "http://opa:8080/webhook",
+        "hmac-key": "secret", "stage": "post_plan", "enforcement-level": "mandatory" }
+    ],
+    "notification-configurations": [
+      { "name": "slack-prod", "destination-type": "slack",
+        "url": "https://hooks.slack.com/...", "triggers": ["run:errored"] }
+    ]
+  },
+  "dry_run": true }
+```
+
+Semantics:
+
+- **Validated once up front** — field enums, `labels` reserved-key check, run-task/notification specs, and `agent-pool-id` existence + caller pool-`write` RBAC. Any error ⇒ `422`, **zero mutation**.
+- `run-tasks` / `notification-configurations` **upsert by `(workspace, name)`**: created if absent, updated in place if present (so re-running with a changed `url` rotates it across the fleet).
+- **All-or-nothing**: the whole batch commits or nothing does. `dry_run` (default `true`, not enforced) runs the identical code path and rolls back — the preview is exactly what apply would do, with provably zero side effects.
+- **Triggers no runs** — pure config write; the change lands on each workspace's next normal run. Reversible (it only writes settings rows).
+- Per-workspace audit entries.
+
+Response: dry-run `{dry_run:true, matched, would_change:[{id,name,diff}], unchanged}`; apply `{dry_run:false, matched, applied, changes, unchanged, errors:[]}`; any failure ⇒ `409`/`422` and **nothing applied**.
+
 ---
 
 ## VCS Events (Webhooks)

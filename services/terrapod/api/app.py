@@ -667,6 +667,12 @@ def create_application() -> FastAPI:
 
     app.include_router(autodiscovery_rules_router, prefix=TERRAPOD_PREFIX)
 
+    # Bulk workspace operations — Terrapod-native admin (#318): search +
+    # all-or-nothing bulk-update of fields/run-tasks/notifications.
+    from terrapod.api.routers.workspace_bulk import router as workspace_bulk_router
+
+    app.include_router(workspace_bulk_router, prefix=TERRAPOD_PREFIX)
+
     # VCS webhook event receiver — Terrapod-specific.
     from terrapod.api.routers.vcs_events import router as vcs_events_router
 

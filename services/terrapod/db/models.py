@@ -858,6 +858,15 @@ class AutodiscoveryRule(Base):
     auto_apply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     owner_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # #318: settings provisioned on every workspace this rule materialises,
+    # so autodiscovered workspaces are fully configured at creation.
+    var_files: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+    run_task_templates: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, nullable=False
+    )
+    notification_templates: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, nullable=False
+    )
 
     # Set on first successful full-tree scan of the repo. NULL means the
     # rule has never been backfilled — the poll cycle picks rules where

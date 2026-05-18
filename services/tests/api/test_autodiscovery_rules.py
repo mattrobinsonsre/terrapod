@@ -700,3 +700,146 @@ class TestWalkRepoErrorBranches:
             )
         assert resp.status_code == 502
         assert "default branch" in resp.json()["detail"]
+
+
+# ── #318: run-task / notification / var-file templates ───────────────────
+
+
+class TestRuleTemplates318:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_201_with_templates_echoed_back(self, *_mocks):
+        """#318: a rule can carry run-task / notification / var-file
+        templates; `_rule_json` round-trips them in the create response."""
+        conn_id = uuid.uuid4()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(side_effect=[MagicMock(id=conn_id)])
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+
+        body = {
+            "data": {
+                "type": "autodiscovery-rules",
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{conn_id}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "accounts/*/**/*.tf",
+                    "execution-mode": "agent",
+                    "var-files": ["common.tfvars", "env/prod.tfvars"],
+                    "run-task-templates": [
+                        {
+                            "name": "policy-scan",
+                            "url": "https://scanner.example.com/hook",
+                            "stage": "pre_plan",
+                            "enforcement-level": "mandatory",
+                        }
+                    ],
+                    "notification-templates": [
+                        {
+                            "name": "slack-alerts",
+                            "destination-type": "slack",
+                            "url": "https://hooks.slack.com/x",
+                            "triggers": ["run:errored"],
+                        }
+                    ],
+                },
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post("/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH)
+        assert resp.status_code == 201, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["var-files"] == ["common.tfvars", "env/prod.tfvars"]
+        assert len(attrs["run-task-templates"]) == 1
+        rt = attrs["run-task-templates"][0]
+        assert rt["name"] == "policy-scan"
+        assert rt["url"] == "https://scanner.example.com/hook"
+        assert rt["stage"] == "pre_plan"
+        assert rt["enforcement_level"] == "mandatory"
+        assert len(attrs["notification-templates"]) == 1
+        nt = attrs["notification-templates"][0]
+        assert nt["name"] == "slack-alerts"
+        assert nt["destination_type"] == "slack"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_422_invalid_run_task_template_bad_stage(self, *_mocks):
+        """A run-task template with an unknown stage is rejected at rule
+        create time (same `validate_run_task_specs` chokepoint as bulk)."""
+        app, _db = _make_app(_admin())
+        body = {
+            "data": {
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{uuid.uuid4()}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "accounts/*/**/*.tf",
+                    "execution-mode": "agent",
+                    "run-task-templates": [
+                        {
+                            "name": "scan",
+                            "url": "https://x",
+                            "stage": "post_apply",
+                        }
+                    ],
+                }
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post("/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH)
+        assert resp.status_code == 422
+        assert "stage" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_422_invalid_notification_template_bad_destination(self, *_mocks):
+        app, _db = _make_app(_admin())
+        body = {
+            "data": {
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{uuid.uuid4()}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "accounts/*/**/*.tf",
+                    "execution-mode": "agent",
+                    "notification-templates": [{"name": "n1", "destination-type": "smoke-signal"}],
+                }
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post("/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH)
+        assert resp.status_code == 422
+        assert "destination-type" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_422_reserved_label_key_still_rejected_with_templates(self, *_mocks):
+        """#316 guard is unaffected by the #318 template additions — a
+        reserved label key is still a 422 even when templates are present.
+        """
+        app, _db = _make_app(_admin())
+        body = {
+            "data": {
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{uuid.uuid4()}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "accounts/*/**/*.tf",
+                    "execution-mode": "agent",
+                    "labels": {"owner": "foundations"},
+                    "var-files": ["common.tfvars"],
+                    "run-task-templates": [
+                        {"name": "scan", "url": "https://x", "stage": "pre_plan"}
+                    ],
+                }
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post("/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH)
+        assert resp.status_code == 422
+        assert "owner" in resp.json()["detail"]

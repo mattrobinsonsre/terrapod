@@ -36,7 +36,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.db.models import AutodiscoveryRule, Workspace
+from terrapod.db.models import (
+    AutodiscoveryRule,
+    NotificationConfiguration,
+    RunTask,
+    Workspace,
+)
 from terrapod.logging_config import get_logger
 from terrapod.services.label_validation import sanitize_labels
 
@@ -271,6 +276,7 @@ async def find_or_autocreate_workspace(
         agent_pool_id=rule.agent_pool_id,
         labels=safe_labels,
         owner_email=rule.owner_email or "",
+        var_files=list(rule.var_files or []),
         vcs_connection_id=rule.vcs_connection_id,
         vcs_repo_url=rule.repo_url,
         vcs_branch=rule.branch,
@@ -303,6 +309,15 @@ async def find_or_autocreate_workspace(
             return ws, False
         # Different integrity violation we don't expect — surface it.
         raise exc
+
+    # #318: materialise the rule's run-task / notification templates onto
+    # the new workspace, so it's fully configured at creation (same spec
+    # shape the bulk-update endpoint applies to existing workspaces).
+    for spec in rule.run_task_templates or []:
+        db.add(RunTask(workspace_id=ws.id, **spec))
+    for spec in rule.notification_templates or []:
+        db.add(NotificationConfiguration(workspace_id=ws.id, **spec))
+
     await db.commit()
 
     logger.info(

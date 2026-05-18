@@ -9,6 +9,13 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { LabelsEditor } from '@/components/labels-editor'
+import {
+  StringListEditor,
+  RunTaskTemplatesEditor,
+  NotificationTemplatesEditor,
+  type RunTaskSpec,
+  type NotificationSpec,
+} from '@/components/template-editors'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
@@ -33,6 +40,9 @@ interface AutodiscoveryRule {
     'auto-apply': boolean
     labels: Record<string, string>
     'owner-email': string
+    'var-files': string[]
+    'run-task-templates': RunTaskSpec[]
+    'notification-templates': NotificationSpec[]
     'created-at': string
     'updated-at': string
   }
@@ -79,6 +89,9 @@ export default function AutodiscoveryPage() {
   const [autoApply, setAutoApply] = useState(false)
   const [labels, setLabels] = useState<Record<string, string>>({})
   const [ownerEmail, setOwnerEmail] = useState('')
+  const [varFiles, setVarFiles] = useState<string[]>([])
+  const [runTaskTemplates, setRunTaskTemplates] = useState<RunTaskSpec[]>([])
+  const [notificationTemplates, setNotificationTemplates] = useState<NotificationSpec[]>([])
   const [submitting, setSubmitting] = useState(false)
 
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -169,6 +182,9 @@ export default function AutodiscoveryPage() {
     setAutoApply(false)
     setLabels({})
     setOwnerEmail('')
+    setVarFiles([])
+    setRunTaskTemplates([])
+    setNotificationTemplates([])
   }
 
   function openCreateForm() {
@@ -196,6 +212,9 @@ export default function AutodiscoveryPage() {
     setAutoApply(a['auto-apply'])
     setLabels(a.labels || {})
     setOwnerEmail(a['owner-email'] || '')
+    setVarFiles(a['var-files'] || [])
+    setRunTaskTemplates(a['run-task-templates'] || [])
+    setNotificationTemplates(a['notification-templates'] || [])
     setShowForm(true)
   }
 
@@ -228,6 +247,9 @@ export default function AutodiscoveryPage() {
       'auto-apply': autoApply,
       labels,
       'owner-email': ownerEmail,
+      'var-files': varFiles.map(s => s.trim()).filter(Boolean),
+      'run-task-templates': runTaskTemplates,
+      'notification-templates': notificationTemplates,
     }
 
     try {
@@ -594,6 +616,27 @@ export default function AutodiscoveryPage() {
               <div className="mt-4">
                 <label className="block text-sm text-slate-300 mb-1">Labels (inherited by created workspaces)</label>
                 <LabelsEditor labels={labels} onChange={setLabels} />
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <label className="block text-sm text-slate-300 mb-1">Var files (inherited by created workspaces)</label>
+                <p className="text-xs text-slate-500 mb-2">Relative <code>.tfvars</code> paths passed to plan/apply.</p>
+                <StringListEditor
+                  values={varFiles}
+                  onChange={setVarFiles}
+                  placeholder="env/prod.tfvars"
+                  addLabel="Add var file"
+                />
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <label className="block text-sm text-slate-300 mb-1">Run task templates (created on each new workspace)</label>
+                <RunTaskTemplatesEditor items={runTaskTemplates} onChange={setRunTaskTemplates} />
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <label className="block text-sm text-slate-300 mb-1">Notification templates (created on each new workspace)</label>
+                <NotificationTemplatesEditor
+                  items={notificationTemplates}
+                  onChange={setNotificationTemplates}
+                />
               </div>
             </details>
 

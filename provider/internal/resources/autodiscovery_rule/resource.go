@@ -29,6 +29,16 @@
 //	"auto-apply"         -> auto_apply          (bool, optional, default false)
 //	"labels"             -> labels              (map[string]string, optional)
 //	"owner-email"        -> owner_email         (string, optional)
+//	"var-files"          -> var_files           (list of strings, optional)
+//	"run-task-templates" -> run_task_templates  (list of objects, optional)
+//	    each: name (string, req), url (string, req), hmac-key (string, opt),
+//	          stage (string, req), enforcement-level (string, opt),
+//	          enabled (bool, opt)
+//	"notification-templates" -> notification_templates (list of objects, optional)
+//	    each: name (string, req), destination-type (string, req),
+//	          url (string, opt), token (string, opt),
+//	          triggers (list of strings, opt),
+//	          email-addresses (list of strings, opt), enabled (bool, opt)
 //
 // Read-only:
 //
@@ -40,8 +50,10 @@ package autodiscovery_rule
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -84,8 +96,35 @@ type autodiscoveryRuleModel struct {
 	Labels           types.Map    `tfsdk:"labels"`
 	OwnerEmail       types.String `tfsdk:"owner_email"`
 
+	VarFiles              types.List `tfsdk:"var_files"`
+	RunTaskTemplates      types.List `tfsdk:"run_task_templates"`
+	NotificationTemplates types.List `tfsdk:"notification_templates"`
+
 	CreatedAt types.String `tfsdk:"created_at"`
 	UpdatedAt types.String `tfsdk:"updated_at"`
+}
+
+// runTaskTemplateAttrTypes is the object attribute type map for a single
+// element of run_task_templates. Used for nested list (un)marshalling.
+var runTaskTemplateAttrTypes = map[string]attr.Type{
+	"name":              types.StringType,
+	"url":               types.StringType,
+	"hmac_key":          types.StringType,
+	"stage":             types.StringType,
+	"enforcement_level": types.StringType,
+	"enabled":           types.BoolType,
+}
+
+// notificationTemplateAttrTypes is the object attribute type map for a
+// single element of notification_templates.
+var notificationTemplateAttrTypes = map[string]attr.Type{
+	"name":             types.StringType,
+	"destination_type": types.StringType,
+	"url":              types.StringType,
+	"token":            types.StringType,
+	"triggers":         types.ListType{ElemType: types.StringType},
+	"email_addresses":  types.ListType{ElemType: types.StringType},
+	"enabled":          types.BoolType,
 }
 
 type autodiscoveryRuleResource struct {
@@ -222,6 +261,84 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
+			},
+
+			"var_files": schema.ListAttribute{
+				Description: "List of .tfvars file paths inherited by created workspaces as -var-file arguments.",
+				Optional:    true,
+				ElementType: types.StringType,
+			},
+			"run_task_templates": schema.ListNestedAttribute{
+				Description: "Run task definitions auto-applied to workspaces created by this rule.",
+				Optional:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							Description: "Run task name.",
+							Required:    true,
+						},
+						"url": schema.StringAttribute{
+							Description: "Run task webhook URL.",
+							Required:    true,
+						},
+						"hmac_key": schema.StringAttribute{
+							Description: "Optional HMAC signing key for the run task webhook.",
+							Optional:    true,
+							Sensitive:   true,
+						},
+						"stage": schema.StringAttribute{
+							Description: "Run stage the task runs at (e.g. pre_plan, post_plan, pre_apply).",
+							Required:    true,
+						},
+						"enforcement_level": schema.StringAttribute{
+							Description: "Enforcement level: mandatory or advisory. Defaults to mandatory.",
+							Optional:    true,
+						},
+						"enabled": schema.BoolAttribute{
+							Description: "Whether the run task is enabled. Defaults to true.",
+							Optional:    true,
+						},
+					},
+				},
+			},
+			"notification_templates": schema.ListNestedAttribute{
+				Description: "Notification configurations auto-applied to workspaces created by this rule.",
+				Optional:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							Description: "Notification name.",
+							Required:    true,
+						},
+						"destination_type": schema.StringAttribute{
+							Description: "Destination type: generic, slack, or email.",
+							Required:    true,
+						},
+						"url": schema.StringAttribute{
+							Description: "Webhook URL (for generic/slack destination types).",
+							Optional:    true,
+						},
+						"token": schema.StringAttribute{
+							Description: "Optional HMAC or auth token.",
+							Optional:    true,
+							Sensitive:   true,
+						},
+						"triggers": schema.ListAttribute{
+							Description: "Run event triggers.",
+							Optional:    true,
+							ElementType: types.StringType,
+						},
+						"email_addresses": schema.ListAttribute{
+							Description: "Email addresses (for the email destination type).",
+							Optional:    true,
+							ElementType: types.StringType,
+						},
+						"enabled": schema.BoolAttribute{
+							Description: "Whether the notification is enabled. Defaults to true.",
+							Optional:    true,
+						},
+					},
+				},
 			},
 
 			// Read-only
@@ -435,7 +552,89 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		attrs["owner-email"] = m.OwnerEmail.ValueString()
 	}
 
+	// Optional templating fields (#318): omit entirely when unset so a
+	// rule without them is left unchanged on the server.
+	if !m.VarFiles.IsNull() && !m.VarFiles.IsUnknown() {
+		varFiles := make([]string, 0, len(m.VarFiles.Elements()))
+		for _, v := range m.VarFiles.Elements() {
+			varFiles = append(varFiles, v.(types.String).ValueString())
+		}
+		attrs["var-files"] = varFiles
+	}
+
+	if !m.RunTaskTemplates.IsNull() && !m.RunTaskTemplates.IsUnknown() {
+		tasks := make([]map[string]any, 0, len(m.RunTaskTemplates.Elements()))
+		for _, e := range m.RunTaskTemplates.Elements() {
+			obj := e.(types.Object)
+			a := obj.Attributes()
+			task := map[string]any{
+				"name":  objStr(a, "name"),
+				"url":   objStr(a, "url"),
+				"stage": objStr(a, "stage"),
+			}
+			// Server validators read the hyphenated input keys.
+			if s, ok := a["hmac_key"].(types.String); ok && !s.IsNull() && !s.IsUnknown() {
+				task["hmac-key"] = s.ValueString()
+			}
+			if s, ok := a["enforcement_level"].(types.String); ok && !s.IsNull() && !s.IsUnknown() && s.ValueString() != "" {
+				task["enforcement-level"] = s.ValueString()
+			}
+			if b, ok := a["enabled"].(types.Bool); ok && !b.IsNull() && !b.IsUnknown() {
+				task["enabled"] = b.ValueBool()
+			}
+			tasks = append(tasks, task)
+		}
+		attrs["run-task-templates"] = tasks
+	}
+
+	if !m.NotificationTemplates.IsNull() && !m.NotificationTemplates.IsUnknown() {
+		notifs := make([]map[string]any, 0, len(m.NotificationTemplates.Elements()))
+		for _, e := range m.NotificationTemplates.Elements() {
+			obj := e.(types.Object)
+			a := obj.Attributes()
+			notif := map[string]any{
+				"name":             objStr(a, "name"),
+				"destination-type": objStr(a, "destination_type"),
+			}
+			if s, ok := a["url"].(types.String); ok && !s.IsNull() && !s.IsUnknown() {
+				notif["url"] = s.ValueString()
+			}
+			if s, ok := a["token"].(types.String); ok && !s.IsNull() && !s.IsUnknown() {
+				notif["token"] = s.ValueString()
+			}
+			if l, ok := a["triggers"].(types.List); ok && !l.IsNull() && !l.IsUnknown() {
+				notif["triggers"] = objStrList(l)
+			}
+			if l, ok := a["email_addresses"].(types.List); ok && !l.IsNull() && !l.IsUnknown() {
+				notif["email-addresses"] = objStrList(l)
+			}
+			if b, ok := a["enabled"].(types.Bool); ok && !b.IsNull() && !b.IsUnknown() {
+				notif["enabled"] = b.ValueBool()
+			}
+			notifs = append(notifs, notif)
+		}
+		attrs["notification-templates"] = notifs
+	}
+
 	return attrs
+}
+
+// objStr reads a required string field out of a nested object's attribute
+// map, returning "" if absent/null.
+func objStr(a map[string]attr.Value, key string) string {
+	if s, ok := a[key].(types.String); ok && !s.IsNull() && !s.IsUnknown() {
+		return s.ValueString()
+	}
+	return ""
+}
+
+// objStrList flattens a types.List of strings into a []string.
+func objStrList(l types.List) []string {
+	out := make([]string, 0, len(l.Elements()))
+	for _, v := range l.Elements() {
+		out = append(out, v.(types.String).ValueString())
+	}
+	return out
 }
 
 // readAutodiscoveryRuleIntoModel maps a JSON:API resource into the
@@ -478,8 +677,132 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *client.Resource, m
 	m.Labels = mv
 
 	m.OwnerEmail = types.StringValue(client.GetStringAttr(res, "owner-email"))
+
+	// Optional templating fields (#318). Tolerate missing/empty: an
+	// absent attribute leaves the model field null so a rule that never
+	// set them produces no spurious diff.
+	if varFiles := client.GetListAttr(res, "var-files"); len(varFiles) > 0 {
+		v, d := types.ListValueFrom(ctx, types.StringType, varFiles)
+		diags.Append(d...)
+		m.VarFiles = v
+	} else {
+		m.VarFiles = types.ListNull(types.StringType)
+	}
+
+	rtObjType := types.ObjectType{AttrTypes: runTaskTemplateAttrTypes}
+	if rawTasks := parseRawObjectList(res, "run-task-templates"); len(rawTasks) > 0 {
+		elems := make([]attr.Value, 0, len(rawTasks))
+		for _, t := range rawTasks {
+			ov, d := types.ObjectValue(runTaskTemplateAttrTypes, map[string]attr.Value{
+				"name":              rawStr(t, "name"),
+				"url":               rawStr(t, "url"),
+				"hmac_key":          rawStr(t, "hmac_key", "hmac-key"),
+				"stage":             rawStr(t, "stage"),
+				"enforcement_level": rawStr(t, "enforcement_level", "enforcement-level"),
+				"enabled":           rawBool(t, "enabled"),
+			})
+			diags.Append(d...)
+			elems = append(elems, ov)
+		}
+		lv, d := types.ListValue(rtObjType, elems)
+		diags.Append(d...)
+		m.RunTaskTemplates = lv
+	} else {
+		m.RunTaskTemplates = types.ListNull(rtObjType)
+	}
+
+	ntObjType := types.ObjectType{AttrTypes: notificationTemplateAttrTypes}
+	if rawNotifs := parseRawObjectList(res, "notification-templates"); len(rawNotifs) > 0 {
+		elems := make([]attr.Value, 0, len(rawNotifs))
+		for _, n := range rawNotifs {
+			trig, dt := rawStrList(ctx, n, "triggers")
+			diags.Append(dt...)
+			emails, de := rawStrList(ctx, n, "email_addresses", "email-addresses")
+			diags.Append(de...)
+			ov, d := types.ObjectValue(notificationTemplateAttrTypes, map[string]attr.Value{
+				"name":             rawStr(n, "name"),
+				"destination_type": rawStr(n, "destination_type", "destination-type"),
+				"url":              rawStr(n, "url"),
+				"token":            rawStr(n, "token"),
+				"triggers":         trig,
+				"email_addresses":  emails,
+				"enabled":          rawBool(n, "enabled"),
+			})
+			diags.Append(d...)
+			elems = append(elems, ov)
+		}
+		lv, d := types.ListValue(ntObjType, elems)
+		diags.Append(d...)
+		m.NotificationTemplates = lv
+	} else {
+		m.NotificationTemplates = types.ListNull(ntObjType)
+	}
+
 	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
 	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
 
 	return diags
+}
+
+// parseRawObjectList decodes a JSON:API attribute that is a list of
+// objects into a slice of generic maps. Returns nil on missing/empty/
+// non-list so callers can null the model field.
+func parseRawObjectList(res *client.Resource, key string) []map[string]any {
+	raw, ok := res.Attributes[key]
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var out []map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil
+	}
+	return out
+}
+
+// rawStr reads the first present string key from a decoded object,
+// returning a null types.String if none of the keys are present or the
+// value is not a string.
+func rawStr(m map[string]any, keys ...string) types.String {
+	for _, k := range keys {
+		if v, ok := m[k]; ok && v != nil {
+			if s, ok := v.(string); ok {
+				return types.StringValue(s)
+			}
+		}
+	}
+	return types.StringNull()
+}
+
+// rawBool reads a bool key from a decoded object, returning a null
+// types.Bool if absent or not a bool.
+func rawBool(m map[string]any, key string) types.Bool {
+	if v, ok := m[key]; ok && v != nil {
+		if b, ok := v.(bool); ok {
+			return types.BoolValue(b)
+		}
+	}
+	return types.BoolNull()
+}
+
+// rawStrList reads the first present list-of-strings key from a decoded
+// object into a types.List. Absent/empty yields a null list.
+func rawStrList(ctx context.Context, m map[string]any, keys ...string) (types.List, diag.Diagnostics) {
+	for _, k := range keys {
+		v, ok := m[k]
+		if !ok || v == nil {
+			continue
+		}
+		arr, ok := v.([]any)
+		if !ok || len(arr) == 0 {
+			continue
+		}
+		strs := make([]string, 0, len(arr))
+		for _, e := range arr {
+			if s, ok := e.(string); ok {
+				strs = append(strs, s)
+			}
+		}
+		return types.ListValueFrom(ctx, types.StringType, strs)
+	}
+	return types.ListNull(types.StringType), nil
 }

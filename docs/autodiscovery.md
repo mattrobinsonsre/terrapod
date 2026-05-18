@@ -60,6 +60,9 @@ Rules are scoped to a single VCS connection + repo. A rule has:
 | `auto-apply` | bool | no | Default `false`. |
 | `labels` | map | no | Inherited by created workspaces — feeds Terrapod's label-based RBAC and filtering. Reserved keys (`status`, `pool`, `mode`, `backend`, `owner`, `drift`, `version`, `vcs`, `locked`, `branch`) are rejected with `422` at rule create/update — they are virtual filter terms and would otherwise produce workspaces that can't be saved. |
 | `owner-email` | string | no | Inherited by created workspaces; if unset, created workspaces have no owner and label-RBAC alone determines access. |
+| `var-files` | list | no | Var-file paths set on every created workspace. |
+| `run-task-templates` | list | no | Run-task specs (`{name, url, hmac-key?, stage, enforcement-level?, enabled?}`) materialised onto every created workspace — same shape as the bulk-update `run-tasks`. Define a policy gate once; it auto-applies to all future workspaces (#318). |
+| `notification-templates` | list | no | Notification specs (`{name, destination-type, url?, token?, triggers?, email-addresses?, enabled?}`) materialised onto every created workspace. |
 
 ## Pattern syntax
 
@@ -95,6 +98,7 @@ name-template: "ws-{root}"         →  ws-accounts-alpha-network  ({root} prese
 
 A workspace created by a rule:
 - Inherits all template fields above.
+- Has its `var-files`, plus a `run-task` / `notification-configuration` for each entry in the rule's `run-task-templates` / `notification-templates`, materialised at creation — so the workspace is fully configured with no second pass (#318).
 - Has `vcs-connection-id`, `vcs-repo-url`, `vcs-branch` set from the rule.
 - Has `working-directory` set to the matched file's parent.
 - Has `trigger-prefixes` set to `[working_directory]` so subsequent PRs that touch the same dir route to the same workspace via the regular PR-scan path (not via re-running autodiscovery).

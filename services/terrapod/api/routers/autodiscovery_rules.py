@@ -33,6 +33,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, require_admin
 from terrapod.api.labels import validate_labels
+from terrapod.api.routers.workspace_bulk import (
+    validate_notification_specs,
+    validate_run_task_specs,
+)
 from terrapod.db.models import AgentPool, AutodiscoveryRule, VCSConnection
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -73,6 +77,9 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "auto-apply": rule.auto_apply,
             "labels": dict(rule.labels or {}),
             "owner-email": rule.owner_email or "",
+            "var-files": list(rule.var_files or []),
+            "run-task-templates": list(rule.run_task_templates or []),
+            "notification-templates": list(rule.notification_templates or []),
             "created-at": _rfc3339(rule.created_at),
             "updated-at": _rfc3339(rule.updated_at),
         },
@@ -217,6 +224,18 @@ def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
         out["labels"] = validate_labels(attrs["labels"])
     if "owner-email" in attrs:
         out["owner_email"] = (str(attrs["owner-email"]) or "").strip() or None
+    if "var-files" in attrs:
+        vf = attrs["var-files"]
+        if not isinstance(vf, list):
+            raise HTTPException(status_code=422, detail="var-files must be a list")
+        out["var_files"] = [str(x) for x in vf]
+    # Run-task / notification templates use the SAME spec shape the
+    # bulk-update endpoint accepts (#318) — define the hook once, drive
+    # both "apply to existing" (bulk) and "auto-apply to future" (here).
+    if "run-task-templates" in attrs:
+        out["run_task_templates"] = validate_run_task_specs(attrs["run-task-templates"])
+    if "notification-templates" in attrs:
+        out["notification_templates"] = validate_notification_specs(attrs["notification-templates"])
 
     return out
 
