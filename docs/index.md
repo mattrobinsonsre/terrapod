@@ -32,6 +32,8 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | **Workspace Health** | Per-workspace health conditions with status indicators on workspace list |
 | **Cloud Credentials** | Dynamic provider credentials via Kubernetes workload identity (AWS IRSA, GCP WIF, Azure WI) |
 | **Binary Caching** | Pull-through cache for terraform/tofu CLI binaries |
+| **Workspace Autodiscovery** | Atlantis-style monorepo autodiscovery with rule templating; safe-by-default rename/delete/orphan lifecycle (opt-in destroy) |
+| **Bulk Workspace Operations** | Server-side workspace search + all-or-nothing bulk settings update (dry-run by default; never triggers runs) |
 
 ---
 

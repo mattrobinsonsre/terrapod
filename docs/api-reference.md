@@ -320,6 +320,18 @@ The following read-only attributes are included in workspace responses when drif
 | `drift-last-checked-at` | string (RFC3339) or null | Timestamp of the last completed drift detection check |
 | `drift-status` | string | Current drift status: `""` (never checked), `"no_drift"`, `"drifted"`, or `"errored"` |
 
+### Lifecycle Attributes (Autodiscovery)
+
+Workspaces created by autodiscovery carry read-only lifecycle attributes that track rename/delete/orphan reconciliation. They are included in workspace responses and surfaced by the UI as a banner on the workspace detail page and a badge on the workspace list.
+
+| Attribute | Type | Description |
+|---|---|---|
+| `lifecycle-state` | string | `"active"` (normal), `"pending_deletion"` (the source directory was removed or the workspace was orphaned and the rule did not opt in to destroy — needs an explicit operator action), or `"archived"` (terminal: never-applied orphan auto-archived, or destroyed via an opt-in `destroy` rule, or a superseded speculative rename duplicate) |
+| `lifecycle-reason` | string | Human-readable explanation of the current state (e.g. `directory 'accounts/x' removed on 'main'`, `origin PR #14 closed unmerged; never applied — auto-archived`). Empty for `active` workspaces |
+| `autodiscovery-pr-number` | integer or null | The PR that created the workspace, while it is still speculative. Cleared (graduated) once that PR merges; `null` for non-autodiscovered workspaces |
+
+The owning autodiscovery rule's `on-directory-delete` policy (`flag` default, or opt-in `destroy`) governs what happens when a tracked directory is removed — see [autodiscovery.md](autodiscovery.md). A rename of a tracked directory moves the existing workspace in place (state and history preserved); it never destroys, even on a `destroy` rule.
+
 ### State Divergence Flag
 
 Workspaces also expose a read-only `state-diverged` boolean. It is set to `true` when the runner reports it could not upload state after a successful apply (the apply ran against the real provider, but the corresponding state version did not land in Terrapod), so Terrapod's view of the workspace state and the real-world infrastructure may have drifted. The UI surfaces this as a banner on the workspace detail page. Clear it by running a fresh apply or by manually uploading a state version that matches reality.

@@ -598,3 +598,46 @@ After fixing the rule:
 - Push a new commit to the test PR (small change to the `.tf` file is enough)
 - Within 60s (or sooner via webhook), see the workspace appear in the list
 - Workspace's `autodiscovery-rule-id` attribute references the rule
+
+## Autodiscovered workspace stuck in `pending_deletion`
+
+**Symptom**: an autodiscovered workspace shows a `Pending deletion` badge/banner and is not being acted on. This is **by design** — `pending_deletion` is the safe default (`on_directory_delete: flag`) and the terminal action is left to a human.
+
+### Diagnosis
+
+1. Read `lifecycle-reason` on the workspace (API attribute or the detail-page banner). Common reasons:
+   - `directory '<dir>' removed on '<branch>'` — the tracked directory was deleted on the branch and the rule did **not** opt in to destroy.
+   - `origin PR #<n> closed unmerged; workspace has state — needs an explicit operator action` — a speculative workspace that had already applied state, then its PR was abandoned.
+   - `rename <old>-><new> but a workspace already owns <new>; needs an operator decision` — an ambiguous rename collision.
+2. Decide intent: is the underlying infrastructure meant to be torn down, or was the directory removal a mistake?
+
+### Resolution
+
+- **Infra should be destroyed**: queue a destroy run on the workspace yourself (it still has its state), let it apply, then delete/archive the workspace. Do **not** flip the rule to `destroy` retroactively expecting it to pick up this workspace — the delete decision already happened; the rule policy is evaluated at branch-advance time.
+- **Removal was a mistake**: restore the directory on the branch. The workspace stays as-is (lifecycle reconcile never auto-resurrects); set `lifecycle_state` back to `active` via a direct update once the directory is back, or recreate the workspace.
+- Never bulk-destroy `pending_deletion` workspaces blindly — that state exists precisely so a human checks each one.
+
+### Verification
+
+- `lifecycle-state` is `active` (restored) or the workspace is gone (intentionally destroyed + deleted)
+- No orphaned state versions remain for a destroyed workspace
+
+## Reverting (or recovering from) a bad bulk-update
+
+**Symptom**: a fleet `POST /api/terrapod/v1/workspaces/actions/bulk-update` applied an unintended change across many workspaces.
+
+### Diagnosis
+
+1. The bulk-update is **all-or-nothing in a single transaction** and **never triggers runs** — it is a pure settings write. So the blast radius is the settings delta only; no plans/applies were kicked off by the bulk-update itself. The change lands on each workspace's *next normal run*.
+2. `dry_run` defaults to **on**. Confirm whether the offending call actually committed (`dry_run: false`) or was a preview.
+3. Identify the exact field(s) changed and the selection filter used (audit log captures the bulk-update call).
+
+### Resolution
+
+- Re-issue the inverse bulk-update with the **same selection filter** and the previous values (settings are reversible — Terrapod keeps versioned state, and no run was triggered, so reverting the setting before the next run is a no-op in infra terms).
+- If a normal run already picked up the unintended setting and applied it, treat that like any other unwanted apply: roll the workspace's state version back or apply a corrective change.
+
+### Verification
+
+- Re-query the affected workspaces (server-side workspace search) and confirm the field is restored
+- No unexpected runs were created by the revert (bulk-update never triggers runs — if you see runs, they came from VCS/drift, not the bulk-update)
