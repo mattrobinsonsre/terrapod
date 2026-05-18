@@ -462,6 +462,7 @@ async def get_pull_request(
             return None
         resp.raise_for_status()
     mr = resp.json()
+    mr_state = mr.get("state") or ""
     return PullRequest(
         number=mr["iid"],
         head_sha=mr.get("sha") or "",
@@ -469,6 +470,8 @@ async def get_pull_request(
         title=mr.get("title") or "",
         draft=bool(mr.get("draft", False)),
         author_login=(mr.get("author") or {}).get("username", ""),
+        state=mr_state,
+        merged=mr_state == "merged" or bool(mr.get("merged_at")),
     )
 
 

@@ -455,6 +455,7 @@ async def autodiscover_for_paths(
     changed_files: list[str],
     baseline_sha: str | None = None,
     pr_number: int | None = None,
+    skip_roots: set[str] | None = None,
 ) -> list[Workspace]:
     """For a set of changed files, return the list of workspaces that
     were *newly created* this call. Existing workspaces that the rule
@@ -466,8 +467,16 @@ async def autodiscover_for_paths(
     workspaces' `vcs_last_commit_sha` so the branch poll doesn't fire a
     premature plan+apply before the PR merges (#313).
 
+    `skip_roots` are directory roots that must NOT get a fresh
+    speculative workspace: they are the *new* side of a detected rename
+    of an existing autodiscovered workspace (#314). Creating one here
+    would duplicate the workspace and make the merge-time rename hit a
+    clash — the rename is reconciled by moving the existing workspace
+    in place instead.
+
     Idempotent across repeated calls with the same inputs.
     """
+    skip_roots = skip_roots or set()
     # Group `(rule, root_directory)` so multiple files in the same
     # directory only fire once.
     matches: dict[tuple[uuid.UUID, str], AutodiscoveryRule] = {}
@@ -478,6 +487,10 @@ async def autodiscover_for_paths(
             if not rule_claims_path(rule, path):
                 continue
             root = derive_root_directory(path)
+            if root in skip_roots:
+                # Rename target — handled by the merge-time in-place
+                # move, not by speculative creation (#314).
+                break
             matches[(rule.id, root)] = rule
             # First matching rule wins — don't fan out to multiple
             # rules for the same file.

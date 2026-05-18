@@ -1173,8 +1173,28 @@ async def _poll_autodiscovery_for_connection(
                     exc_info=True,
                 )
                 continue
+            # #314: status-bearing diff drives both rename suppression
+            # (don't speculatively create a workspace for a rename
+            # target) and the visibility reconcile below. Best-effort —
+            # None (truncated/failed) just means no suppression.
+            try:
+                fc = await _get_pr_file_changes(conn, owner, repo, target_branch, pr.head_sha)
+            except Exception:
+                fc = None
+            try:
+                suppress = await autodiscovery_lifecycle_service.rename_target_dirs_to_suppress(
+                    db, group, fc
+                )
+            except Exception:
+                suppress = set()
+
             new_workspaces = await autodiscover_for_paths(
-                db, group, changed, baseline_sha=baseline_sha, pr_number=pr.number
+                db,
+                group,
+                changed,
+                baseline_sha=baseline_sha,
+                pr_number=pr.number,
+                skip_roots=suppress,
             )
             created_count += len(new_workspaces)
 
@@ -1182,7 +1202,6 @@ async def _poll_autodiscovery_for_connection(
             # destroy plan + comment for deletes/renames). Best-effort:
             # never break the poll cycle.
             try:
-                fc = await _get_pr_file_changes(conn, owner, repo, target_branch, pr.head_sha)
                 for rule in group:
                     await autodiscovery_lifecycle_service.reconcile_open_pr(
                         db, rule, conn, owner, repo, pr.number, pr.head_sha, fc

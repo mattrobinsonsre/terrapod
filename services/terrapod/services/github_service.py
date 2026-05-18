@@ -695,6 +695,8 @@ async def get_pull_request(
         title=pr["title"],
         draft=bool(pr.get("draft", False)),
         author_login=(pr.get("user") or {}).get("login", ""),
+        state=pr.get("state", ""),
+        merged=bool(pr.get("merged", False) or pr.get("merged_at")),
     )
 
 

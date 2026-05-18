@@ -120,6 +120,84 @@ class TestClassifyDirChanges:
         assert cls["renamed"] == []
         assert cls["ambiguous"] == set()
 
+    def test_squash_merge_rename_inferred_from_add_remove_symmetry(self):
+        """Squash merge loses provider `renamed` status: the move shows
+        up as plain removed(old) + added(new) with identical basenames.
+        We MUST infer the rename, not classify it as a delete — a
+        `destroy`-opt-in rule would otherwise tear down a renamed
+        workspace (the #314 Test-2 bug)."""
+        cls = svc.classify_dir_changes(
+            [
+                _fc("removed", "accounts/a/main.tf"),
+                _fc("removed", "accounts/a/vars.tf"),
+                _fc("added", "accounts/b/main.tf"),
+                _fc("added", "accounts/b/vars.tf"),
+            ]
+        )
+        assert cls["renamed"] == [("accounts/a", "accounts/b")]
+        assert cls["deleted"] == set()
+        assert cls["ambiguous"] == set()
+
+    def test_inferred_rename_basename_mismatch_stays_deleted(self):
+        """No symmetry (different basenames) → the removed dir is a real
+        delete, the added dir is just new. Never falsely 'rename'."""
+        cls = svc.classify_dir_changes(
+            [
+                _fc("removed", "accounts/a/main.tf"),
+                _fc("added", "accounts/b/totally-different.tf"),
+            ]
+        )
+        assert cls["deleted"] == {"accounts/a"}
+        assert cls["renamed"] == []
+
+    def test_inferred_rename_ambiguous_when_two_added_dirs_match(self):
+        """Removed dir's basename set matches >1 added dir → ambiguous,
+        never auto-deleted or auto-renamed."""
+        cls = svc.classify_dir_changes(
+            [
+                _fc("removed", "accounts/a/main.tf"),
+                _fc("added", "accounts/b/main.tf"),
+                _fc("added", "accounts/c/main.tf"),
+            ]
+        )
+        assert cls["ambiguous"] == {"accounts/a"}
+        assert cls["renamed"] == []
+        assert "accounts/a" not in cls["deleted"]
+
+
+# ── rename_target_dirs_to_suppress (#314 duplicate prevention) ───────────
+
+
+class TestRenameTargetDirsToSuppress:
+    @patch.object(svc, "_autodiscovered_ws", new_callable=AsyncMock)
+    async def test_rename_with_existing_ws_suppresses_new_dir(self, m_ws):
+        """Old side has a rule-owned active workspace → the new dir must
+        be suppressed so open-PR autodiscovery doesn't create a
+        duplicate that the merge-time rename would then clash with."""
+        m_ws.return_value = _mock_ws()
+        out = await svc.rename_target_dirs_to_suppress(
+            AsyncMock(),
+            [_mock_rule()],
+            [_fc("renamed", "accounts/b/main.tf", old_path="accounts/a/main.tf")],
+        )
+        assert out == {"accounts/b"}
+
+    @patch.object(svc, "_autodiscovered_ws", new_callable=AsyncMock)
+    async def test_rename_without_existing_ws_suppresses_nothing(self, m_ws):
+        """No existing workspace on the old side → it's not really a
+        'move of a tracked workspace'; let normal autodiscovery run."""
+        m_ws.return_value = None
+        out = await svc.rename_target_dirs_to_suppress(
+            AsyncMock(),
+            [_mock_rule()],
+            [_fc("renamed", "accounts/b/main.tf", old_path="accounts/a/main.tf")],
+        )
+        assert out == set()
+
+    async def test_none_file_changes_suppresses_nothing(self):
+        out = await svc.rename_target_dirs_to_suppress(AsyncMock(), [_mock_rule()], None)
+        assert out == set()
+
 
 # ── reconcile_open_pr (visibility only) ──────────────────────────────────
 
@@ -138,8 +216,12 @@ class TestReconcileOpenPr:
         run = MagicMock()
         m_run_service.create_run = AsyncMock(return_value=run)
         db = AsyncMock()
-        # Dedup query: no existing run.
-        db.execute.return_value = _result(scalar_one_or_none=None)
+        # 1) run-dedup query → no existing run; 2) notify-seen query →
+        # not yet notified.
+        db.execute.side_effect = [
+            _result(scalar_one_or_none=None),
+            _result(scalar_one_or_none=None),
+        ]
 
         await svc.reconcile_open_pr(
             db,
@@ -164,14 +246,20 @@ class TestReconcileOpenPr:
     @patch.object(svc, "_post_comment", new_callable=AsyncMock)
     @patch.object(svc, "run_service")
     @patch.object(svc, "_autodiscovered_ws", new_callable=AsyncMock)
-    async def test_dedupe_existing_run_no_second_create(self, m_ws, m_run_service, m_comment):
+    async def test_dedupe_existing_run_still_comments_first_time(
+        self, m_ws, m_run_service, m_comment
+    ):
+        """Run already exists (no second plan) but this is the first
+        comment for this head_sha → comment IS posted."""
         rule = _mock_rule()
         conn = _mock_conn()
         m_ws.return_value = _mock_ws()
         m_run_service.create_run = AsyncMock()
         db = AsyncMock()
-        # Dedup query: a run already exists for this (ws, head_sha).
-        db.execute.return_value = _result(scalar_one_or_none=uuid.uuid4())
+        db.execute.side_effect = [
+            _result(scalar_one_or_none=uuid.uuid4()),  # run exists
+            _result(scalar_one_or_none=None),  # not yet notified
+        ]
 
         await svc.reconcile_open_pr(
             db,
@@ -185,8 +273,59 @@ class TestReconcileOpenPr:
         )
 
         m_run_service.create_run.assert_not_awaited()
-        # Comment is still posted (visibility) even when the run is deduped.
         m_comment.assert_awaited_once()
+
+    @patch.object(svc, "_post_comment", new_callable=AsyncMock)
+    @patch.object(svc, "run_service")
+    @patch.object(svc, "_autodiscovered_ws", new_callable=AsyncMock)
+    async def test_comment_deduped_when_already_notified(self, m_ws, m_run_service, m_comment):
+        """The cyclic poller must NOT re-post the same comment: once a
+        notify marker exists for (ws, head_sha) the comment is
+        suppressed even though reconcile runs again."""
+        rule = _mock_rule()
+        conn = _mock_conn()
+        m_ws.return_value = _mock_ws()
+        m_run_service.create_run = AsyncMock()
+        db = AsyncMock()
+        db.execute.side_effect = [
+            _result(scalar_one_or_none=uuid.uuid4()),  # run exists
+            _result(scalar_one_or_none=uuid.uuid4()),  # already notified
+        ]
+
+        await svc.reconcile_open_pr(
+            db,
+            rule,
+            conn,
+            "example",
+            "repo",
+            7,
+            "abc123",
+            [_fc("removed", "accounts/a/main.tf")],
+        )
+
+        m_run_service.create_run.assert_not_awaited()
+        m_comment.assert_not_awaited()
+
+    @patch.object(svc, "_post_comment", new_callable=AsyncMock)
+    @patch.object(svc, "_autodiscovered_ws", new_callable=AsyncMock)
+    async def test_rename_comment_deduped_when_already_notified(self, m_ws, m_comment):
+        """Rename comment is also deduped per (ws, head_sha)."""
+        m_ws.return_value = _mock_ws()
+        db = AsyncMock()
+        db.execute.return_value = _result(scalar_one_or_none=uuid.uuid4())  # notified
+
+        await svc.reconcile_open_pr(
+            db,
+            _mock_rule(),
+            _mock_conn(),
+            "example",
+            "repo",
+            7,
+            "abc123",
+            [_fc("renamed", "accounts/b/main.tf", old_path="accounts/a/main.tf")],
+        )
+
+        m_comment.assert_not_awaited()
 
     @patch.object(svc, "_post_comment", new_callable=AsyncMock)
     @patch.object(svc, "run_service")
@@ -281,6 +420,76 @@ class TestReconcileBranchAdvance:
         # Not moved.
         assert ws.working_directory == "accounts/a"
 
+    @patch.object(svc, "_has_state", new_callable=AsyncMock)
+    @patch.object(svc, "_dir_absent_on_branch", new_callable=AsyncMock)
+    @patch.object(svc, "_autodiscovered_ws", new_callable=AsyncMock)
+    async def test_rename_absorbs_speculative_duplicate_and_moves_original(
+        self, m_ws, m_absent, m_has_state
+    ):
+        """The common PR-driven rename: open-PR autodiscovery already
+        created a never-applied speculative workspace at the new dir.
+        That is NOT a real conflict — it must be absorbed (archived,
+        name/dir freed) and the original (state/history-bearing)
+        workspace moved in place. This is the #314 Test-2 bug."""
+        rule = _mock_rule()
+        original = _mock_ws(working_directory="accounts/a", name="accounts-a")
+        m_ws.return_value = original
+        dup = _mock_ws(working_directory="accounts/b", name="accounts-b", pr_number=8)
+        dup.autodiscovery_rule_id = rule.id  # rule-owned
+        m_has_state.return_value = False  # never applied
+        db = AsyncMock()
+        db.execute.return_value = _result(scalars_all=[dup])
+
+        await svc.reconcile_branch_advance(
+            db,
+            rule,
+            _mock_conn(),
+            "example",
+            "repo",
+            "main",
+            [_fc("renamed", "accounts/b/main.tf", old_path="accounts/a/main.tf")],
+        )
+
+        # Original moved in place, still active.
+        assert original.working_directory == "accounts/b"
+        assert original.lifecycle_state == "active"
+        # Speculative duplicate archived + name/dir freed (no clash).
+        assert dup.lifecycle_state == "archived"
+        assert dup.name.startswith("accounts-b-superseded-")
+        assert dup.working_directory.startswith("accounts/b#superseded-")
+
+    @patch.object(svc, "_has_state", new_callable=AsyncMock)
+    @patch.object(svc, "_dir_absent_on_branch", new_callable=AsyncMock)
+    @patch.object(svc, "_autodiscovered_ws", new_callable=AsyncMock)
+    async def test_rename_genuine_conflict_not_absorbed(self, m_ws, m_absent, m_has_state):
+        """A real workspace already owns the new dir (not a rule-owned
+        zero-state speculative dup) → must NOT be absorbed; the original
+        is flagged pending_deletion for an operator to decide."""
+        rule = _mock_rule()
+        original = _mock_ws(working_directory="accounts/a")
+        m_ws.return_value = original
+        other = _mock_ws(working_directory="accounts/b", name="real-b")
+        other.autodiscovery_rule_id = uuid.uuid4()  # different rule → not absorbable
+        db = AsyncMock()
+        db.execute.side_effect = [
+            _result(scalars_all=[other]),  # _absorbable_speculative_dup → None
+            _result(scalar_one_or_none=uuid.uuid4()),  # clash check → conflict
+        ]
+
+        await svc.reconcile_branch_advance(
+            db,
+            rule,
+            _mock_conn(),
+            "example",
+            "repo",
+            "main",
+            [_fc("renamed", "accounts/b/main.tf", old_path="accounts/a/main.tf")],
+        )
+
+        assert original.lifecycle_state == "pending_deletion"
+        assert original.working_directory == "accounts/a"  # not moved
+        assert other.lifecycle_state == "active"  # untouched
+
     @patch.object(svc, "run_service")
     @patch.object(svc, "_dir_absent_on_branch", new_callable=AsyncMock)
     @patch.object(svc, "_autodiscovered_ws", new_callable=AsyncMock)
@@ -374,14 +583,21 @@ class TestReconcileBranchAdvance:
 # ── reconcile_orphans ────────────────────────────────────────────────────
 
 
+def _pr(*, merged=False, state="closed"):
+    """A PR-like object exposing just what reconcile_orphans reads."""
+    return MagicMock(merged=merged, state=state)
+
+
 class TestReconcileOrphans:
+    @patch.object(svc, "_get_pull_request", new_callable=AsyncMock)
     @patch.object(svc, "_has_state", new_callable=AsyncMock)
     @patch.object(svc, "_dir_absent_on_branch", new_callable=AsyncMock)
-    async def test_closed_pr_dir_absent_no_state_archived(self, m_absent, m_state):
+    async def test_closed_unmerged_dir_absent_no_state_archived(self, m_absent, m_state, m_get_pr):
         rule = _mock_rule()
         ws = _mock_ws(pr_number=42)
         db = AsyncMock()
         db.execute.return_value = _result(scalars_all=[ws])
+        m_get_pr.return_value = _pr(merged=False, state="closed")
         m_absent.return_value = True
         m_state.return_value = False  # never applied
 
@@ -391,13 +607,17 @@ class TestReconcileOrphans:
 
         assert ws.lifecycle_state == "archived"
 
+    @patch.object(svc, "_get_pull_request", new_callable=AsyncMock)
     @patch.object(svc, "_has_state", new_callable=AsyncMock)
     @patch.object(svc, "_dir_absent_on_branch", new_callable=AsyncMock)
-    async def test_closed_pr_dir_absent_has_state_pending_deletion(self, m_absent, m_state):
+    async def test_closed_unmerged_dir_absent_has_state_pending_deletion(
+        self, m_absent, m_state, m_get_pr
+    ):
         rule = _mock_rule()
         ws = _mock_ws(pr_number=42)
         db = AsyncMock()
         db.execute.return_value = _result(scalars_all=[ws])
+        m_get_pr.return_value = _pr(merged=False, state="closed")
         m_absent.return_value = True
         m_state.return_value = True  # has applied state
 
@@ -407,9 +627,56 @@ class TestReconcileOrphans:
 
         assert ws.lifecycle_state == "pending_deletion"
 
+    @patch.object(svc, "_get_pull_request", new_callable=AsyncMock)
     @patch.object(svc, "_has_state", new_callable=AsyncMock)
     @patch.object(svc, "_dir_absent_on_branch", new_callable=AsyncMock)
-    async def test_pr_still_open_untouched(self, m_absent, m_state):
+    async def test_origin_pr_merged_graduates_and_is_never_orphaned(
+        self, m_absent, m_state, m_get_pr
+    ):
+        """The #314 Test-2 regression: a workspace whose origin PR
+        *merged* is a real graduated workspace, NOT an orphan. It must
+        shed its speculative PR link and be left active so a later
+        rename of its dir is moved in place (not archived here)."""
+        rule = _mock_rule()
+        ws = _mock_ws(pr_number=7)
+        db = AsyncMock()
+        db.execute.return_value = _result(scalars_all=[ws])
+        m_get_pr.return_value = _pr(merged=True, state="closed")
+
+        await svc.reconcile_orphans(
+            db, rule, _mock_conn(), "example", "repo", "main", open_pr_numbers=set()
+        )
+
+        assert ws.lifecycle_state == "active"
+        assert ws.autodiscovery_pr_number is None  # graduated
+        m_absent.assert_not_awaited()  # never even checks the tree
+        m_state.assert_not_awaited()
+
+    @patch.object(svc, "_get_pull_request", new_callable=AsyncMock)
+    @patch.object(svc, "_has_state", new_callable=AsyncMock)
+    @patch.object(svc, "_dir_absent_on_branch", new_callable=AsyncMock)
+    async def test_unknown_pr_state_fail_safe_no_action(self, m_absent, m_state, m_get_pr):
+        """PR fetch returns None (deleted/transient) → never archive on
+        uncertainty; leave untouched and retry next cycle."""
+        rule = _mock_rule()
+        ws = _mock_ws(pr_number=42)
+        db = AsyncMock()
+        db.execute.return_value = _result(scalars_all=[ws])
+        m_get_pr.return_value = None
+
+        await svc.reconcile_orphans(
+            db, rule, _mock_conn(), "example", "repo", "main", open_pr_numbers=set()
+        )
+
+        assert ws.lifecycle_state == "active"
+        assert ws.autodiscovery_pr_number == 42
+        m_absent.assert_not_awaited()
+        m_state.assert_not_awaited()
+
+    @patch.object(svc, "_get_pull_request", new_callable=AsyncMock)
+    @patch.object(svc, "_has_state", new_callable=AsyncMock)
+    @patch.object(svc, "_dir_absent_on_branch", new_callable=AsyncMock)
+    async def test_pr_still_open_untouched(self, m_absent, m_state, m_get_pr):
         rule = _mock_rule()
         ws = _mock_ws(pr_number=42)
         db = AsyncMock()
@@ -420,18 +687,21 @@ class TestReconcileOrphans:
         )
 
         assert ws.lifecycle_state == "active"
+        m_get_pr.assert_not_awaited()
         m_absent.assert_not_awaited()
         m_state.assert_not_awaited()
 
+    @patch.object(svc, "_get_pull_request", new_callable=AsyncMock)
     @patch.object(svc, "_has_state", new_callable=AsyncMock)
     @patch.object(svc, "_dir_absent_on_branch", new_callable=AsyncMock)
-    async def test_dir_still_present_untouched(self, m_absent, m_state):
-        """PR closed but the dir is still on the branch (legitimately
-        merged/pushed) — leave the workspace alone."""
+    async def test_closed_unmerged_dir_still_present_untouched(self, m_absent, m_state, m_get_pr):
+        """Origin PR closed unmerged but the dir is somehow on the
+        branch — leave the workspace alone."""
         rule = _mock_rule()
         ws = _mock_ws(pr_number=42)
         db = AsyncMock()
         db.execute.return_value = _result(scalars_all=[ws])
+        m_get_pr.return_value = _pr(merged=False, state="closed")
         m_absent.return_value = False  # dir present
 
         await svc.reconcile_orphans(

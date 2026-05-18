@@ -13,7 +13,16 @@ from terrapod.db.models import VCSConnection
 class PullRequest:
     """Minimal PR/MR representation shared across providers."""
 
-    __slots__ = ("number", "head_sha", "head_ref", "title", "draft", "author_login")
+    __slots__ = (
+        "number",
+        "head_sha",
+        "head_ref",
+        "title",
+        "draft",
+        "author_login",
+        "state",
+        "merged",
+    )
 
     def __init__(
         self,
@@ -23,6 +32,8 @@ class PullRequest:
         title: str,
         draft: bool = False,
         author_login: str = "",
+        state: str = "",
+        merged: bool = False,
     ) -> None:
         self.number = number
         self.head_sha = head_sha
@@ -30,6 +41,13 @@ class PullRequest:
         self.title = title
         self.draft = draft
         self.author_login = author_login
+        # `state` is provider-native ("open"/"closed" for GitHub;
+        # "opened"/"closed"/"merged"/"locked" for GitLab). `merged` is
+        # the normalised "did this PR/MR actually merge?" — used by the
+        # autodiscovery orphan reconciler to tell a merged origin PR
+        # (workspace graduated) from a closed-unmerged one (orphan).
+        self.state = state
+        self.merged = merged
 
 
 @dataclass(frozen=True)
