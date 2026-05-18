@@ -9,7 +9,7 @@ packages = [{include = "terrapod"}]
 [tool.poetry.dependencies]
 python = "^3.13"
 fastapi = ">=0.135.2,<0.137.0"
-uvicorn = {extras = ["standard"], version = ">=0.42,<0.47"}
+uvicorn = {extras = ["standard"], version = ">=0.42,<0.48"}
 pydantic = "^2.10.0"
 pydantic-settings = "^2.13.1"
 structlog = "^25.5.0"
@@ -35,7 +35,7 @@ authlib = "^1.4.0"
 python3-saml = "^1.16.0"
 cryptography = ">=46.0.5,<49.0.0"
 zxcvbn = "^4.4.28"
-python-multipart = ">=0.0.26,<0.0.29"
+python-multipart = ">=0.0.26,<0.0.30"
 # Kubernetes (runner listener)
 kubernetes = "^35.0.0"
 # GPG key parsing for provider registry
