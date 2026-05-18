@@ -524,6 +524,25 @@ async def reconcile_branch_advance(
                 directory=d,
             )
         else:  # rule explicitly opted in to destroy
+            # Idempotency: the flag path self-dedupes (it flips
+            # lifecycle_state so _autodiscovered_ws stops returning the
+            # ws), but the destroy path leaves the ws `active` until the
+            # run applies. Without this guard every branch advance of
+            # any workspace sharing this rule/repo would queue ANOTHER
+            # destroy → concurrent `terraform destroy` jobs for one
+            # workspace. Only re-queue if no destroy is in flight/done
+            # (a prior errored/canceled/discarded one may be retried).
+            existing = await db.execute(
+                select(Run.id).where(
+                    Run.workspace_id == ws.id,
+                    Run.is_destroy.is_(True),
+                    Run.plan_only.is_(False),
+                    Run.source == LIFECYCLE_SOURCE,
+                    Run.status.notin_(["errored", "canceled", "discarded"]),
+                )
+            )
+            if existing.scalar_one_or_none() is not None:
+                continue  # a destroy is already queued/running/done
             run = await run_service.create_run(
                 db,
                 workspace=ws,

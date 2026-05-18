@@ -526,6 +526,7 @@ class TestReconcileBranchAdvance:
         run.id = uuid.uuid4()
         m_run_service.create_run = AsyncMock(return_value=run)
         db = AsyncMock()
+        db.execute.return_value = _result(scalar_one_or_none=None)  # no destroy in flight
 
         await svc.reconcile_branch_advance(
             db,
@@ -542,6 +543,35 @@ class TestReconcileBranchAdvance:
         assert kwargs["is_destroy"] is True
         assert kwargs["plan_only"] is False
         assert kwargs["auto_apply"] is True
+
+    @patch.object(svc, "run_service")
+    @patch.object(svc, "_dir_absent_on_branch", new_callable=AsyncMock)
+    @patch.object(svc, "_autodiscovered_ws", new_callable=AsyncMock)
+    async def test_destroy_deduped_when_already_queued(self, m_ws, m_absent, m_run_service):
+        """Idempotency: every branch advance of any workspace sharing
+        the rule/repo re-runs reconcile. The destroy path must NOT queue
+        a second destroy while one is already in flight/done (otherwise
+        concurrent `terraform destroy` jobs for one workspace)."""
+        rule = _mock_rule(on_directory_delete="destroy")
+        ws = _mock_ws(working_directory="accounts/a")
+        m_ws.return_value = ws
+        m_absent.return_value = True
+        m_run_service.create_run = AsyncMock()
+        db = AsyncMock()
+        db.execute.return_value = _result(scalar_one_or_none=uuid.uuid4())  # already queued
+
+        await svc.reconcile_branch_advance(
+            db,
+            rule,
+            _mock_conn(),
+            "example",
+            "repo",
+            "main",
+            [_fc("removed", "accounts/a/main.tf")],
+        )
+
+        m_run_service.create_run.assert_not_awaited()
+        assert ws.lifecycle_reason == ""  # not re-stamped
 
     @patch.object(svc, "run_service")
     @patch.object(svc, "_dir_absent_on_branch", new_callable=AsyncMock)
