@@ -344,6 +344,21 @@ class Workspace(Base):
     # State divergence — set when an apply Job succeeds but state upload fails
     state_diverged: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
+    # Autodiscovery lifecycle (#314). lifecycle_state: active (normal) |
+    # pending_deletion (origin dir/PR gone — needs explicit operator
+    # action; NEVER auto-destroyed) | archived (soft-deleted after a
+    # successful opt-in destroy, or a never-applied orphan auto-cleaned).
+    lifecycle_state: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="active", default="active"
+    )
+    lifecycle_reason: Mapped[str] = mapped_column(
+        String(500), nullable=False, server_default="", default=""
+    )
+    # The PR that materialised this autodiscovered workspace (NULL for
+    # non-autodiscovered or initial-scan-created). Lets the poller
+    # reconcile when that PR is closed-unmerged / no longer matches.
+    autodiscovery_pr_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     # Autodiscovery — set when this workspace was auto-created by an
     # AutodiscoveryRule rather than manually. Used to attribute
     # workspaces in the audit log and to skip re-creation on subsequent
@@ -866,6 +881,14 @@ class AutodiscoveryRule(Base):
     )
     notification_templates: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, default=list, nullable=False
+    )
+    # #314 deletion lifecycle: what to do when a discovered directory is
+    # removed on the tracked branch. "flag" (default, safe) marks the
+    # workspace pending_deletion and requires an explicit operator
+    # action; "destroy" (opt-in, for ephemeral envs) queues a real
+    # destroy run then archives. NEVER silently destroys.
+    on_directory_delete: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="flag", server_default="flag"
     )
 
     # Set on first successful full-tree scan of the repo. NULL means the

@@ -53,6 +53,8 @@ interface Workspace {
     'state-diverged': boolean
     'vcs-last-error': string | null
     'health-conditions': HealthCondition[]
+    'lifecycle-state': 'active' | 'pending_deletion' | 'archived'
+    'lifecycle-reason': string
     'latest-run': LatestRun | null
     'created-at': string
     labels?: Record<string, string> | null
@@ -696,20 +698,32 @@ function WorkspacesPageInner() {
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
-                      {!def ? (
-                        <span className="text-xs text-slate-500">&mdash;</span>
-                      ) : runId ? (
-                        <Link
-                          href={`/workspaces/${ws.id}/runs/${runId}`}
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium hover:opacity-80 transition-opacity ${badgeColors[def.color]}`}
-                        >
-                          {def.label}
-                        </Link>
-                      ) : (
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColors[def.color]}`}>
-                          {def.label}
-                        </span>
-                      )}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {!def ? (
+                          <span className="text-xs text-slate-500">&mdash;</span>
+                        ) : runId ? (
+                          <Link
+                            href={`/workspaces/${ws.id}/runs/${runId}`}
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium hover:opacity-80 transition-opacity ${badgeColors[def.color]}`}
+                          >
+                            {def.label}
+                          </Link>
+                        ) : (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColors[def.color]}`}>
+                            {def.label}
+                          </span>
+                        )}
+                        {ws.attributes['lifecycle-state'] === 'pending_deletion' && (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColors.amber}`}>
+                            Pending deletion
+                          </span>
+                        )}
+                        {ws.attributes['lifecycle-state'] === 'archived' && (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColors.slate}`}>
+                            Archived
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 hidden xl:table-cell">
                       <span className="text-xs text-slate-500">

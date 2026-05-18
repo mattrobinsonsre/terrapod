@@ -601,6 +601,8 @@ def _workspace_json(
                 "drift-last-checked-at": _rfc3339(ws.drift_last_checked_at),
                 "drift-status": ws.drift_status,
                 "state-diverged": ws.state_diverged,
+                "lifecycle-state": ws.lifecycle_state,
+                "lifecycle-reason": ws.lifecycle_reason,
                 "health-conditions": _compute_health_conditions(ws),
                 "vcs-last-polled-at": _rfc3339(ws.vcs_last_polled_at),
                 "vcs-last-error": ws.vcs_last_error,

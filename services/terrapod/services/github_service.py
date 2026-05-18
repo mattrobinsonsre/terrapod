@@ -492,6 +492,43 @@ async def get_changed_files(
     return [f["filename"] for f in files]
 
 
+async def get_pr_file_changes(
+    conn: VCSConnection, owner: str, repo: str, base_sha: str, head_sha: str
+) -> list[dict[str, str | None]] | None:
+    """Per-file change records for rename/delete detection (#314).
+
+    Returns a list of ``{"status", "path", "old_path"}`` where status is
+    one of added|removed|modified|renamed. ``old_path`` is the previous
+    filename for renames, else None. Returns None on truncation — the
+    caller MUST then skip lifecycle detection (acting on a partial diff
+    could wrongly move/destroy a workspace).
+    """
+    token = await get_installation_token(conn)
+    api_url = _api_url(conn)
+    resp = await _github_request(
+        "GET",
+        f"{api_url}/repos/{owner}/{repo}/compare/{base_sha}...{head_sha}",
+        token,
+    )
+    resp.raise_for_status()
+    files = resp.json().get("files", [])
+    if len(files) >= 300:
+        return None
+    out: list[dict[str, str | None]] = []
+    for f in files:
+        status = {"added": "added", "removed": "removed", "renamed": "renamed"}.get(
+            f.get("status", "modified"), "modified"
+        )
+        out.append(
+            {
+                "status": status,
+                "path": f["filename"],
+                "old_path": f.get("previous_filename") if status == "renamed" else None,
+            }
+        )
+    return out
+
+
 async def list_repo_tree(conn: VCSConnection, owner: str, repo: str, ref: str) -> list[str] | None:
     """List every file path in the repo at `ref`.
 

@@ -38,6 +38,7 @@ interface AutodiscoveryRule {
     'resource-cpu': string
     'resource-memory': string
     'auto-apply': boolean
+    'on-directory-delete': 'flag' | 'destroy'
     labels: Record<string, string>
     'owner-email': string
     'var-files': string[]
@@ -87,6 +88,7 @@ export default function AutodiscoveryPage() {
   const [resourceCpu, setResourceCpu] = useState('1')
   const [resourceMemory, setResourceMemory] = useState('2Gi')
   const [autoApply, setAutoApply] = useState(false)
+  const [onDirectoryDelete, setOnDirectoryDelete] = useState<'flag' | 'destroy'>('flag')
   const [labels, setLabels] = useState<Record<string, string>>({})
   const [ownerEmail, setOwnerEmail] = useState('')
   const [varFiles, setVarFiles] = useState<string[]>([])
@@ -180,6 +182,7 @@ export default function AutodiscoveryPage() {
     setResourceCpu('1')
     setResourceMemory('2Gi')
     setAutoApply(false)
+    setOnDirectoryDelete('flag')
     setLabels({})
     setOwnerEmail('')
     setVarFiles([])
@@ -210,6 +213,7 @@ export default function AutodiscoveryPage() {
     setResourceCpu(a['resource-cpu'])
     setResourceMemory(a['resource-memory'])
     setAutoApply(a['auto-apply'])
+    setOnDirectoryDelete(a['on-directory-delete'] === 'destroy' ? 'destroy' : 'flag')
     setLabels(a.labels || {})
     setOwnerEmail(a['owner-email'] || '')
     setVarFiles(a['var-files'] || [])
@@ -245,6 +249,7 @@ export default function AutodiscoveryPage() {
       'resource-cpu': resourceCpu,
       'resource-memory': resourceMemory,
       'auto-apply': autoApply,
+      'on-directory-delete': onDirectoryDelete,
       labels,
       'owner-email': ownerEmail,
       'var-files': varFiles.map(s => s.trim()).filter(Boolean),
@@ -612,6 +617,25 @@ export default function AutodiscoveryPage() {
                     Enabled
                   </label>
                 </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <label className="block text-sm text-slate-300 mb-1">On directory delete</label>
+                <select
+                  value={onDirectoryDelete}
+                  onChange={e => setOnDirectoryDelete(e.target.value as 'flag' | 'destroy')}
+                  className="w-full sm:w-1/2 bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
+                >
+                  <option value="flag">Flag (safe — mark pending deletion, requires manual action)</option>
+                  <option value="destroy">Destroy (DANGER — tears down infrastructure then archives the workspace)</option>
+                </select>
+                <p className="text-xs text-slate-500 mt-1">
+                  What happens to an autodiscovered workspace when its directory is removed on the tracked branch.
+                </p>
+                {onDirectoryDelete === 'destroy' && (
+                  <p className="text-xs text-red-400 mt-2 font-medium">
+                    This will run a real terraform destroy on the workspace when its directory is removed on the tracked branch.
+                  </p>
+                )}
               </div>
               <div className="mt-4">
                 <label className="block text-sm text-slate-300 mb-1">Labels (inherited by created workspaces)</label>

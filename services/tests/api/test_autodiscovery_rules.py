@@ -48,6 +48,7 @@ def _mock_rule(
     r.resource_cpu = "1"
     r.resource_memory = "2Gi"
     r.auto_apply = False
+    r.on_directory_delete = "flag"
     r.labels = {"env": "monorepo"}
     r.owner_email = "admin@example.com"
     r.created_at = datetime(2026, 5, 9, tzinfo=UTC)
@@ -379,6 +380,81 @@ class TestUpdateRule:
             )
         assert resp.status_code == 200
         assert rule.first_scan_at == scanned
+
+
+# ── on-directory-delete (#314) ───────────────────────────────────────────
+
+
+class TestOnDirectoryDelete:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_with_destroy_echoed_back(self, *_mocks):
+        conn_id = uuid.uuid4()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(side_effect=[MagicMock(id=conn_id)])
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+
+        body = {
+            "data": {
+                "type": "autodiscovery-rules",
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{conn_id}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "accounts/*/**/*.tf",
+                    "execution-mode": "agent",
+                    "on-directory-delete": "destroy",
+                },
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post("/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH)
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["data"]["attributes"]["on-directory-delete"] == "destroy"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_patch_to_destroy_echoed_back(self, *_mocks):
+        rule = _mock_rule()
+        app, db = _make_app(_admin())
+        db.get = AsyncMock(return_value=rule)
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        body = {"data": {"attributes": {"on-directory-delete": "destroy"}}}
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/autodiscovery-rules/{rule.id}",
+                json=body,
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+        assert rule.on_directory_delete == "destroy"
+        assert resp.json()["data"]["attributes"]["on-directory-delete"] == "destroy"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_invalid_value_rejected_422(self, *_mocks):
+        app, _db = _make_app(_admin())
+        body = {
+            "data": {
+                "attributes": {
+                    "name": "monorepo",
+                    "vcs-connection-id": f"vcs-{uuid.uuid4()}",
+                    "repo-url": "https://github.com/example/repo",
+                    "pattern": "accounts/*/**/*.tf",
+                    "execution-mode": "agent",
+                    "on-directory-delete": "nuke",
+                }
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post("/api/terrapod/v1/autodiscovery-rules", json=body, headers=_AUTH)
+        assert resp.status_code == 422
+        assert "on-directory-delete" in resp.json()["detail"]
 
 
 # ── Delete ───────────────────────────────────────────────────────────────

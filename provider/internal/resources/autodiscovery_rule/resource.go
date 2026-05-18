@@ -29,6 +29,8 @@
 //	"auto-apply"         -> auto_apply          (bool, optional, default false)
 //	"labels"             -> labels              (map[string]string, optional)
 //	"owner-email"        -> owner_email         (string, optional)
+//	"on-directory-delete" -> on_directory_delete (string, optional;
+//	    "flag" (default, safe) or "destroy" (tears down infra then archives))
 //	"var-files"          -> var_files           (list of strings, optional)
 //	"run-task-templates" -> run_task_templates  (list of objects, optional)
 //	    each: name (string, req), url (string, req), hmac-key (string, opt),
@@ -78,23 +80,24 @@ var (
 type autodiscoveryRuleModel struct {
 	ID types.String `tfsdk:"id"`
 
-	Name             types.String `tfsdk:"name"`
-	NameTemplate     types.String `tfsdk:"name_template"`
-	VCSConnectionID  types.String `tfsdk:"vcs_connection_id"`
-	RepoURL          types.String `tfsdk:"repo_url"`
-	Branch           types.String `tfsdk:"branch"`
-	Pattern          types.String `tfsdk:"pattern"`
-	IgnorePatterns   types.List   `tfsdk:"ignore_patterns"`
-	Enabled          types.Bool   `tfsdk:"enabled"`
-	ExecutionMode    types.String `tfsdk:"execution_mode"`
-	ExecutionBackend types.String `tfsdk:"execution_backend"`
-	AgentPoolID      types.String `tfsdk:"agent_pool_id"`
-	TerraformVersion types.String `tfsdk:"terraform_version"`
-	ResourceCPU      types.String `tfsdk:"resource_cpu"`
-	ResourceMemory   types.String `tfsdk:"resource_memory"`
-	AutoApply        types.Bool   `tfsdk:"auto_apply"`
-	Labels           types.Map    `tfsdk:"labels"`
-	OwnerEmail       types.String `tfsdk:"owner_email"`
+	Name              types.String `tfsdk:"name"`
+	NameTemplate      types.String `tfsdk:"name_template"`
+	VCSConnectionID   types.String `tfsdk:"vcs_connection_id"`
+	RepoURL           types.String `tfsdk:"repo_url"`
+	Branch            types.String `tfsdk:"branch"`
+	Pattern           types.String `tfsdk:"pattern"`
+	IgnorePatterns    types.List   `tfsdk:"ignore_patterns"`
+	Enabled           types.Bool   `tfsdk:"enabled"`
+	ExecutionMode     types.String `tfsdk:"execution_mode"`
+	ExecutionBackend  types.String `tfsdk:"execution_backend"`
+	AgentPoolID       types.String `tfsdk:"agent_pool_id"`
+	TerraformVersion  types.String `tfsdk:"terraform_version"`
+	ResourceCPU       types.String `tfsdk:"resource_cpu"`
+	ResourceMemory    types.String `tfsdk:"resource_memory"`
+	AutoApply         types.Bool   `tfsdk:"auto_apply"`
+	Labels            types.Map    `tfsdk:"labels"`
+	OwnerEmail        types.String `tfsdk:"owner_email"`
+	OnDirectoryDelete types.String `tfsdk:"on_directory_delete"`
 
 	VarFiles              types.List `tfsdk:"var_files"`
 	RunTaskTemplates      types.List `tfsdk:"run_task_templates"`
@@ -261,6 +264,13 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
+			},
+			"on_directory_delete": schema.StringAttribute{
+				Description: "What to do with a discovered workspace when its source directory is deleted from the repository. " +
+					"\"flag\" (default, safe) marks the workspace and leaves infrastructure intact; " +
+					"\"destroy\" (opt-in) tears down the infrastructure then archives the workspace. " +
+					"Only \"flag\" or \"destroy\" are accepted; the server rejects other values with HTTP 422.",
+				Optional: true,
 			},
 
 			"var_files": schema.ListAttribute{
@@ -552,6 +562,12 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		attrs["owner-email"] = m.OwnerEmail.ValueString()
 	}
 
+	// Optional (#314): omit entirely when unset so a rule that never set
+	// it is left unchanged on the server (server defaults to "flag").
+	if !m.OnDirectoryDelete.IsNull() && !m.OnDirectoryDelete.IsUnknown() {
+		attrs["on-directory-delete"] = m.OnDirectoryDelete.ValueString()
+	}
+
 	// Optional templating fields (#318): omit entirely when unset so a
 	// rule without them is left unchanged on the server.
 	if !m.VarFiles.IsNull() && !m.VarFiles.IsUnknown() {
@@ -677,6 +693,15 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *client.Resource, m
 	m.Labels = mv
 
 	m.OwnerEmail = types.StringValue(client.GetStringAttr(res, "owner-email"))
+
+	// Optional (#314). Tolerate missing/empty: an absent attribute leaves
+	// the model field null so a rule that never set it produces no
+	// spurious diff.
+	if v := client.GetStringAttr(res, "on-directory-delete"); v != "" {
+		m.OnDirectoryDelete = types.StringValue(v)
+	} else {
+		m.OnDirectoryDelete = types.StringNull()
+	}
 
 	// Optional templating fields (#318). Tolerate missing/empty: an
 	// absent attribute leaves the model field null so a rule that never

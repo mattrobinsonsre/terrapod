@@ -193,6 +193,7 @@ async def find_or_autocreate_workspace(
     rule: AutodiscoveryRule,
     root_directory: str,
     baseline_sha: str | None = None,
+    pr_number: int | None = None,
 ) -> tuple[Workspace, bool]:
     """Look up the workspace this rule + directory should map to, or
     create it if it doesn't exist.
@@ -284,6 +285,9 @@ async def find_or_autocreate_workspace(
         # doesn't fire a premature plan+apply before the PR merges (#313).
         vcs_last_commit_sha=baseline_sha or None,
         autodiscovery_rule_id=rule.id,
+        # PR provenance (#314) — lets the poller reconcile this workspace
+        # if its origin PR is later closed unmerged / no longer matches.
+        autodiscovery_pr_number=pr_number,
         # trigger_prefixes scoped tightly to the discovered directory so
         # the regular VCS poller treats this workspace as a normal
         # working_directory-targeted one from now on.
@@ -450,6 +454,7 @@ async def autodiscover_for_paths(
     rules: list[AutodiscoveryRule],
     changed_files: list[str],
     baseline_sha: str | None = None,
+    pr_number: int | None = None,
 ) -> list[Workspace]:
     """For a set of changed files, return the list of workspaces that
     were *newly created* this call. Existing workspaces that the rule
@@ -482,7 +487,7 @@ async def autodiscover_for_paths(
     for (_rule_id, root), rule in matches.items():
         try:
             ws, was_created = await find_or_autocreate_workspace(
-                db, rule, root, baseline_sha=baseline_sha
+                db, rule, root, baseline_sha=baseline_sha, pr_number=pr_number
             )
             if was_created:
                 created.append(ws)

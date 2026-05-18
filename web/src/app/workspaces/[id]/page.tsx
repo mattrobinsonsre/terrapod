@@ -59,6 +59,8 @@ interface WorkspaceAttrs {
   'drift-status': string
   'state-diverged': boolean
   'health-conditions': { code: string; severity: 'error' | 'warning'; title: string; detail: string }[]
+  'lifecycle-state': 'active' | 'pending_deletion' | 'archived'
+  'lifecycle-reason': string
   'vcs-last-polled-at': string | null
   'vcs-last-error': string | null
   'vcs-last-error-at': string | null
@@ -1309,6 +1311,24 @@ function WorkspaceDetailContent() {
         />
 
         {error && <ErrorBanner message={error} />}
+
+        {attrs['lifecycle-state'] === 'pending_deletion' && (
+          <div className="mb-4 p-4 rounded-lg bg-amber-900/30 border border-amber-700/50">
+            <p className="text-sm font-semibold text-amber-300">Pending deletion</p>
+            <p className="text-sm text-amber-200/80 mt-1">
+              {attrs['lifecycle-reason'] || 'This workspace is marked for deletion and requires manual action.'}
+            </p>
+          </div>
+        )}
+
+        {attrs['lifecycle-state'] === 'archived' && (
+          <div className="mb-4 p-4 rounded-lg bg-slate-800/60 border border-slate-600/50">
+            <p className="text-sm font-semibold text-slate-300">Archived</p>
+            <p className="text-sm text-slate-400 mt-1">
+              {attrs['lifecycle-reason'] || 'This workspace has been archived.'}
+            </p>
+          </div>
+        )}
 
         {lastQueuedRunId && (
           <div className="mb-4 p-3 bg-brand-900/30 rounded-lg border border-brand-700/50 flex items-center justify-between">

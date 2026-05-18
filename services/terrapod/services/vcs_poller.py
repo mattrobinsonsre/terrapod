@@ -40,7 +40,12 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services import github_service, gitlab_service, run_service
+from terrapod.services import (
+    autodiscovery_lifecycle_service,
+    github_service,
+    gitlab_service,
+    run_service,
+)
 from terrapod.services.scheduler import enqueue_trigger
 from terrapod.services.vcs_archive_cache import VCSArchiveCache, materialize_archive
 from terrapod.services.vcs_provider import PullRequest
@@ -111,6 +116,17 @@ async def _get_changed_files(
     if conn.provider == "gitlab":
         return await gitlab_service.get_changed_files(conn, owner, repo, base_sha, head_sha)
     return await github_service.get_changed_files(conn, owner, repo, base_sha, head_sha)
+
+
+async def _get_pr_file_changes(
+    conn: VCSConnection, owner: str, repo: str, base_sha: str, head_sha: str
+) -> list[dict] | None:
+    """Enriched per-file change records (status/old_path) for the #314
+    lifecycle reconciler. None on truncation → caller must skip.
+    """
+    if conn.provider == "gitlab":
+        return await gitlab_service.get_pr_file_changes(conn, owner, repo, base_sha, head_sha)
+    return await github_service.get_pr_file_changes(conn, owner, repo, base_sha, head_sha)
 
 
 async def _list_repo_tree(conn: VCSConnection, owner: str, repo: str, ref: str) -> list[str] | None:
@@ -371,6 +387,27 @@ async def _poll_workspace_branch(
     # Keep the in-memory ORM state consistent with the DB.
     ws.vcs_last_commit_sha = sha
     await db.commit()
+
+    # #314 lifecycle on branch-advance: if this is an autodiscovered
+    # workspace and the tracked branch moved, apply rename-in-place /
+    # delete-policy for its rule. Re-verifies dir absence against the
+    # tree before any flag/destroy. Best-effort — never break the poll.
+    if ws.autodiscovery_rule_id and old_sha:
+        try:
+            rule = await db.get(AutodiscoveryRule, ws.autodiscovery_rule_id)
+            if rule is not None:
+                fc = await _get_pr_file_changes(conn, owner, repo, old_sha, sha)
+                await autodiscovery_lifecycle_service.reconcile_branch_advance(
+                    db, rule, conn, owner, repo, branch, fc
+                )
+                await db.commit()
+        except Exception:
+            await db.rollback()
+            logger.warning(
+                "Autodiscovery lifecycle: branch-advance reconcile failed",
+                workspace=ws.name,
+                exc_info=True,
+            )
 
     VCS_COMMITS_DETECTED.labels(provider=conn.provider).inc()
 
@@ -1137,9 +1174,44 @@ async def _poll_autodiscovery_for_connection(
                 )
                 continue
             new_workspaces = await autodiscover_for_paths(
-                db, group, changed, baseline_sha=baseline_sha
+                db, group, changed, baseline_sha=baseline_sha, pr_number=pr.number
             )
             created_count += len(new_workspaces)
+
+            # #314 lifecycle (visibility only on open PRs — speculative
+            # destroy plan + comment for deletes/renames). Best-effort:
+            # never break the poll cycle.
+            try:
+                fc = await _get_pr_file_changes(conn, owner, repo, target_branch, pr.head_sha)
+                for rule in group:
+                    await autodiscovery_lifecycle_service.reconcile_open_pr(
+                        db, rule, conn, owner, repo, pr.number, pr.head_sha, fc
+                    )
+            except Exception:
+                logger.warning(
+                    "Autodiscovery lifecycle: open-PR reconcile failed",
+                    connection_id=str(conn.id),
+                    pr_number=pr.number,
+                    exc_info=True,
+                )
+
+        # #314 orphan reconcile: autodiscovered workspaces whose origin
+        # PR is no longer open AND whose directory is gone from the
+        # tracked branch (zero-state → archived; has-state → flagged).
+        # Best-effort; never break the poll cycle.
+        try:
+            open_pr_numbers = {pr.number for pr in prs}
+            for rule in group:
+                await autodiscovery_lifecycle_service.reconcile_orphans(
+                    db, rule, conn, owner, repo, target_branch, open_pr_numbers
+                )
+        except Exception:
+            logger.warning(
+                "Autodiscovery lifecycle: orphan reconcile failed",
+                connection_id=str(conn.id),
+                repo_url=repo_url,
+                exc_info=True,
+            )
 
         # Initial-scan path (#309): rules with `first_scan_at IS NULL`
         # have never been backfilled, so this poll cycle does a one-time

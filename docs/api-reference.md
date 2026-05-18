@@ -1443,6 +1443,7 @@ POST /api/terrapod/v1/autodiscovery-rules
       "resource-cpu": "1",
       "resource-memory": "2Gi",
       "auto-apply": false,
+      "on-directory-delete": "flag",
       "labels": {"managed-by": "monorepo-autodiscover"},
       "owner-email": "platform@example.com"
     }

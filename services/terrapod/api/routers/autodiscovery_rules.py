@@ -75,6 +75,7 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "resource-cpu": rule.resource_cpu,
             "resource-memory": rule.resource_memory,
             "auto-apply": rule.auto_apply,
+            "on-directory-delete": rule.on_directory_delete,
             "labels": dict(rule.labels or {}),
             "owner-email": rule.owner_email or "",
             "var-files": list(rule.var_files or []),
@@ -215,6 +216,14 @@ def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
         out["resource_memory"] = str(attrs["resource-memory"])
     if "auto-apply" in attrs:
         out["auto_apply"] = bool(attrs["auto-apply"])
+    if "on-directory-delete" in attrs:
+        odd = str(attrs["on-directory-delete"])
+        if odd not in ("flag", "destroy"):
+            raise HTTPException(
+                status_code=422,
+                detail="on-directory-delete must be 'flag' or 'destroy'",
+            )
+        out["on_directory_delete"] = odd
     if "labels" in attrs:
         # Reserved-key guard at the source: a rule's labels are copied
         # verbatim onto every workspace it materialises, and workspace

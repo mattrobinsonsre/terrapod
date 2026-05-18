@@ -50,6 +50,9 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.vcs_workflow = overrides.get("vcs_workflow", "merge_then_apply")
     ws.auto_merge = overrides.get("auto_merge", False)
     ws.auto_merge_strategy = overrides.get("auto_merge_strategy", "merge")
+    ws.lifecycle_state = overrides.get("lifecycle_state", "active")
+    ws.lifecycle_reason = overrides.get("lifecycle_reason", "")
+    ws.autodiscovery_pr_number = overrides.get("autodiscovery_pr_number", None)
     ws.execution_backend = overrides.get("execution_backend", "tofu")
     ws.agent_pool = None
     ws.agent_pool_id = overrides.get("agent_pool_id", None)

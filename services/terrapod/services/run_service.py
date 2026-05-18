@@ -363,6 +363,20 @@ async def transition_run(
     if target_status == "applied" and not run.plan_only:
         await fire_run_triggers(db, run.workspace_id)
 
+    # #314: a successful opt-in autodiscovery destroy archives the
+    # workspace (soft-delete; retained for audit). Literal source
+    # compare avoids importing the lifecycle service (it imports us).
+    if (
+        target_status == "applied"
+        and run.is_destroy
+        and not run.plan_only
+        and run.source == "autodiscovery-lifecycle"
+    ):
+        ws = await db.get(Workspace, run.workspace_id)
+        if ws is not None and ws.lifecycle_state != "archived":
+            ws.lifecycle_state = "archived"
+            ws.lifecycle_reason = "autodiscovery destroy completed — archived"
+
     # Enqueue notification for this status change
     await _enqueue_notification(run, target_status)
 

@@ -44,6 +44,8 @@ type workspaceDataSourceModel struct {
 	OwnerEmail                    types.String `tfsdk:"owner_email"`
 	DriftStatus                   types.String `tfsdk:"drift_status"`
 	DriftLastCheckedAt            types.String `tfsdk:"drift_last_checked_at"`
+	LifecycleState                types.String `tfsdk:"lifecycle_state"`
+	LifecycleReason               types.String `tfsdk:"lifecycle_reason"`
 	Locked                        types.Bool   `tfsdk:"locked"`
 	CreatedAt                     types.String `tfsdk:"created_at"`
 	UpdatedAt                     types.String `tfsdk:"updated_at"`
@@ -62,29 +64,31 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 	resp.Schema = schema.Schema{
 		Description: "Look up a Terrapod workspace by name.",
 		Attributes: map[string]schema.Attribute{
-			"id":                                computedString("Workspace ID."),
-			"name":                              requiredString("Workspace name to look up."),
-			"execution_mode":                    computedString("Execution mode."),
-			"auto_apply":                        computedBool("Auto-apply setting."),
-			"execution_backend":                 computedString("Execution backend."),
-			"terraform_version":                 computedString("Terraform/tofu version."),
-			"working_directory":                 computedString("Working directory."),
-			"resource_cpu":                      computedString("CPU request."),
-			"resource_memory":                   computedString("Memory request."),
-			"labels":                            computedMap("Labels."),
-			"vcs_repo_url":                      computedString("VCS repo URL."),
-			"vcs_branch":                        computedString("VCS branch."),
-			"vcs_connection_id":                 computedString("VCS connection ID."),
-			"agent_pool_id":                     computedString("Agent pool ID."),
-			"var_files":                         computedList("Var files for -var-file arguments."),
-			"drift_detection_enabled":           computedBool("Drift detection enabled."),
-			"drift_detection_interval_seconds":  computedInt64("Drift detection interval."),
-			"owner_email":                       computedString("Owner email."),
-			"drift_status":                      computedString("Drift status."),
-			"drift_last_checked_at":             computedString("Last drift check."),
-			"locked":                            computedBool("Lock status."),
-			"created_at":                        computedString("Creation timestamp."),
-			"updated_at":                        computedString("Update timestamp."),
+			"id":                               computedString("Workspace ID."),
+			"name":                             requiredString("Workspace name to look up."),
+			"execution_mode":                   computedString("Execution mode."),
+			"auto_apply":                       computedBool("Auto-apply setting."),
+			"execution_backend":                computedString("Execution backend."),
+			"terraform_version":                computedString("Terraform/tofu version."),
+			"working_directory":                computedString("Working directory."),
+			"resource_cpu":                     computedString("CPU request."),
+			"resource_memory":                  computedString("Memory request."),
+			"labels":                           computedMap("Labels."),
+			"vcs_repo_url":                     computedString("VCS repo URL."),
+			"vcs_branch":                       computedString("VCS branch."),
+			"vcs_connection_id":                computedString("VCS connection ID."),
+			"agent_pool_id":                    computedString("Agent pool ID."),
+			"var_files":                        computedList("Var files for -var-file arguments."),
+			"drift_detection_enabled":          computedBool("Drift detection enabled."),
+			"drift_detection_interval_seconds": computedInt64("Drift detection interval."),
+			"owner_email":                      computedString("Owner email."),
+			"drift_status":                     computedString("Drift status."),
+			"drift_last_checked_at":            computedString("Last drift check."),
+			"lifecycle_state":                  computedString("Workspace lifecycle state (e.g. active, or flagged/destroying when its autodiscovery source directory was deleted)."),
+			"lifecycle_reason":                 computedString("Human-readable reason for the current lifecycle state."),
+			"locked":                           computedBool("Lock status."),
+			"created_at":                       computedString("Creation timestamp."),
+			"updated_at":                       computedString("Update timestamp."),
 		},
 	}
 }
@@ -147,6 +151,8 @@ func readDataSourceModel(ctx context.Context, res *client.Resource, m *workspace
 	setOptionalString(&m.AgentPoolID, client.GetStringAttr(res, "agent-pool-id"))
 	setOptionalString(&m.DriftStatus, client.GetStringAttr(res, "drift-status"))
 	setOptionalString(&m.DriftLastCheckedAt, client.GetStringAttr(res, "drift-last-checked-at"))
+	setOptionalString(&m.LifecycleState, client.GetStringAttr(res, "lifecycle-state"))
+	setOptionalString(&m.LifecycleReason, client.GetStringAttr(res, "lifecycle-reason"))
 
 	if v := client.GetRelationshipID(res, "vcs-connection"); v != "" {
 		m.VCSConnectionID = types.StringValue(v)
