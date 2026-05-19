@@ -277,6 +277,44 @@ class TestCreateRun:
         await create_run(db, ws)
         assert MockRun.call_args[1]["pool_id"] == pool_id
 
+    @patch("terrapod.services.binary_cache_service.resolve_version", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service.Run")
+    async def test_partial_version_resolved_and_pinned_on_run(self, MockRun, m_resolve):
+        """A workspace's partial version (e.g. '1.11') is resolved to an
+        exact x.y.z and snapshotted onto the run, so the runner's
+        upstream fallback gets a version that actually exists (#338)."""
+        db = AsyncMock(spec=AsyncSession)
+        ws = _mock_workspace(terraform_version="1.11")
+        ws.execution_backend = "tofu"
+        m_resolve.return_value = "1.11.9"
+        instance = MockRun.return_value
+        instance.id = uuid.uuid4()
+        instance.status = "pending"
+
+        await create_run(db, ws)
+
+        m_resolve.assert_awaited_once_with("tofu", "1.11")
+        assert MockRun.call_args[1]["terraform_version"] == "1.11.9"
+
+    @patch("terrapod.services.binary_cache_service.resolve_version", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service.Run")
+    async def test_version_resolution_failure_falls_back_to_requested(self, MockRun, m_resolve):
+        """Resolution must never block run creation — on failure the run
+        is still created, pinned to the requested version as-is."""
+        db = AsyncMock(spec=AsyncSession)
+        ws = _mock_workspace(terraform_version="1.12")
+        ws.execution_backend = "tofu"
+        m_resolve.side_effect = RuntimeError("upstream index unreachable")
+        instance = MockRun.return_value
+        instance.id = uuid.uuid4()
+        instance.status = "pending"
+
+        await create_run(db, ws)
+
+        MockRun.assert_called_once()
+        assert MockRun.call_args[1]["terraform_version"] == "1.12"
+        db.add.assert_called_once_with(instance)
+
 
 # ── confirm_run / discard_run / cancel_run ─────────────────────────────
 

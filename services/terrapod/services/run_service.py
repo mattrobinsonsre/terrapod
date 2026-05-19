@@ -241,6 +241,29 @@ async def create_run(
 
     pool_id = workspace.agent_pool_id
 
+    # Pin the execution version to an exact x.y.z at run creation, the
+    # same way CPU/memory are snapshotted. The workspace stores the
+    # operator's intent (e.g. "1.11" = "track the latest 1.11.x"); the
+    # run must carry a concrete version because a bare "1.11" only
+    # resolves inside the binary-cache API call — the runner's
+    # upstream fallback interpolates it verbatim into a release-artifact
+    # URL that requires x.y.z and 404s otherwise (#338). resolve_version
+    # is Redis-cached and returns its input unchanged if it can't reach
+    # the upstream index, so this never blocks run creation.
+    requested_version = terraform_version or workspace.terraform_version
+    from terrapod.services.binary_cache_service import resolve_version
+
+    try:
+        pinned_version = await resolve_version(workspace.execution_backend, requested_version)
+    except Exception:  # never block run creation on version resolution
+        logger.warning(
+            "Execution version resolution failed; pinning requested version as-is",
+            requested=requested_version,
+            backend=workspace.execution_backend,
+            exc_info=True,
+        )
+        pinned_version = requested_version
+
     run = Run(
         workspace_id=workspace.id,
         configuration_version_id=configuration_version_id,
@@ -251,7 +274,7 @@ async def create_run(
         plan_only=plan_only,
         source=source,
         execution_backend=workspace.execution_backend,
-        terraform_version=terraform_version or workspace.terraform_version,
+        terraform_version=pinned_version,
         resource_cpu=workspace.resource_cpu,
         resource_memory=workspace.resource_memory,
         pool_id=pool_id,

@@ -203,6 +203,24 @@ if [ -n "$TP_API_URL" ] && [ -n "$TP_VERSION" ]; then
     log "[entrypoint] Downloading $TP_BACKEND $TP_VERSION ($TP_OS/$TP_ARCH) from binary cache..."
     if ! tp_curl_download "/tmp/${TP_BACKEND}.zip" -H "$AUTH_HEADER" "$BINARY_URL"; then
         log "[entrypoint] Binary cache unavailable, downloading from upstream..."
+        # The upstream release artifact only exists for a fully-qualified
+        # x.y.z. The API resolves a partial workspace version (e.g.
+        # "1.11") to an exact one and pins it on the run, so TP_VERSION
+        # should already be exact here. If it isn't (older API, or
+        # resolution was unreachable at run creation), fail with an
+        # actionable message instead of a bare curl 404 (#338).
+        case "$TP_VERSION" in
+            [0-9]*.[0-9]*.[0-9]*) : ;;  # x.y.z (optionally -rc/-beta) — OK
+            *)
+                log "[entrypoint] ERROR: upstream fallback needs a fully-qualified" \
+                    "version but got '$TP_VERSION'. The binary cache normally" \
+                    "resolves partial versions; a non-exact version here means the" \
+                    "cache request failed AND the version was never pinned. Set the" \
+                    "workspace version to an exact x.y.z, or fix the runner->API" \
+                    "binary-cache path. See terrapod issue #338."
+                exit 1
+                ;;
+        esac
         if [ "$TP_BACKEND" = "terraform" ]; then
             _upstream="https://releases.hashicorp.com/terraform/${TP_VERSION}/terraform_${TP_VERSION}_${TP_OS}_${TP_ARCH}.zip"
         else
