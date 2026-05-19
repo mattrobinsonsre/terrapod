@@ -147,12 +147,23 @@ trap on_exit EXIT
 # terrapod.local) which may not resolve from inside the cluster. In that case
 # we rewrite the URL to use TP_API_URL (the internal service name) so the
 # download works.
+# Sets TP_LAST_HTTP to the most relevant HTTP status observed. On a
+# storage error (e.g. an SSE-KMS bucket rejecting a SigV2 presigned
+# URL) the storage response body is logged to stderr so the operator
+# sees the real cause instead of a silent failure (#339).
 tp_curl_download() {
     # $1 = output file, remaining args = curl options (URL last)
     _out="$1"; shift
-    # First request: don't follow redirects, capture Location header
-    _headers=$(curl -sSf -D - -o /dev/null "$@" 2>/dev/null)
+    TP_LAST_HTTP=""
+    # First request: don't follow redirects, capture Location header.
+    # No `-f` and no `2>/dev/null` — we want the status and any error
+    # surfaced, not swallowed.
+    if ! _headers=$(curl -sS -D - -o /dev/null "$@"); then
+        echo "[entrypoint] download: initial request failed (network/TLS/DNS)" >&2
+        return 1
+    fi
     _code=$(echo "$_headers" | head -1 | awk '{print $2}')
+    TP_LAST_HTTP="$_code"
     case "$_code" in
         301|302|303|307|308)
             _location=$(echo "$_headers" | grep -i '^location:' | sed 's/^[Ll]ocation:[[:space:]]*//' | tr -d '\r')
@@ -175,15 +186,34 @@ tp_curl_download() {
                     esac
                 fi
             fi
-            # Follow any further redirects (e.g. S3 region/path-style redirects)
-            curl -sSfL -o "$_out" "$_location"
+            # Follow any further redirects (e.g. S3 region/path-style
+            # redirects). NO `-f`: on a 4xx/5xx we want the response
+            # body (e.g. the S3 InvalidArgument XML) written out so we
+            # can show it, not a bare "curl: (22) ... 400".
+            _final=$(curl -sSL -o "$_out" -w '%{http_code}' "$_location" 2>/dev/null || echo 000)
+            TP_LAST_HTTP="$_final"
+            case "$_final" in
+                2*) : ;;  # success
+                *)
+                    echo "[entrypoint] download: storage returned HTTP $_final for the presigned URL" >&2
+                    echo "[entrypoint] storage response body (first 2KB):" >&2
+                    head -c 2048 "$_out" 2>/dev/null >&2 || true
+                    echo >&2
+                    rm -f "$_out"
+                    return 1
+                    ;;
+            esac
             ;;
         200)
             # No redirect — re-fetch with output (rare, but handle it)
-            curl -sSf -o "$_out" "$@"
+            if ! curl -sS -o "$_out" "$@"; then
+                echo "[entrypoint] download: direct fetch failed (HTTP $_code)" >&2
+                return 1
+            fi
             ;;
         *)
-            echo "[entrypoint] Unexpected HTTP $_code" >&2
+            echo "[entrypoint] download: unexpected HTTP $_code from ${*##* }" >&2
+            echo "$_headers" | head -1 >&2
             return 1
             ;;
     esac
@@ -251,8 +281,14 @@ fi
 # --- Download configuration archive ---
 if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
     log "[entrypoint] Downloading configuration..."
-    tp_curl_download /tmp/config.tar.gz -H "$AUTH_HEADER" \
-        "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/config" 2>/dev/null || true
+    # No `2>/dev/null || true`: a storage auth failure here (e.g. an
+    # SSE-KMS bucket rejecting a SigV2 presigned URL) must be visible,
+    # not masked into a later misleading "working directory not found"
+    # (#339). tp_curl_download surfaces the real status + body itself.
+    if ! tp_curl_download /tmp/config.tar.gz -H "$AUTH_HEADER" \
+        "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/config"; then
+        log "[entrypoint] Configuration archive download failed (HTTP ${TP_LAST_HTTP:-unknown}) — see storage error above"
+    fi
     if [ -f /tmp/config.tar.gz ] && [ -s /tmp/config.tar.gz ]; then
         # --no-same-owner: don't try to restore original UIDs (we run as non-root)
         # BusyBox tar returns non-zero on harmless utime/chmod warnings for "."
@@ -283,7 +319,7 @@ if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
         # resolutions of the version constraint, which can drift.
         log "[entrypoint] Stripped cloud/backend blocks from uploaded config"
     else
-        log "[entrypoint] No configuration archive (HTTP $HTTP_CODE)"
+        log "[entrypoint] No configuration archive (HTTP ${TP_LAST_HTTP:-none})"
     fi
 fi
 

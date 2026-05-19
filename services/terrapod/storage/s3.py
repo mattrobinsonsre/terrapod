@@ -1,9 +1,13 @@
 """
 AWS S3 storage backend for Terrapod.
 
-Uses aioboto3 for async I/O. Presigned URLs use SigV4 local signature
-generation (no API call). Auth relies on the SDK credential chain
-(IRSA in K8s, env vars or profile locally).
+Uses aioboto3 for async I/O. The S3 client is pinned to Signature
+Version 4 (`s3v4`) — botocore's implicit default varies by region,
+endpoint and SDK version, and a SigV2 presigned URL is rejected by S3
+for any SSE-KMS-encrypted object (and outright in GovCloud / newer
+regions). Pinning s3v4 makes presigned URLs deterministic and is
+universally backward-compatible. Auth relies on the SDK credential
+chain (IRSA in K8s, env vars or profile locally).
 """
 
 from __future__ import annotations
@@ -13,6 +17,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import aioboto3
+from botocore.config import Config
 
 from terrapod.logging_config import get_logger
 from terrapod.storage.protocol import (
@@ -70,6 +75,10 @@ class S3Store:
                 "s3",
                 region_name=self._region,
                 endpoint_url=self._endpoint_url,
+                # Pin SigV4: required for presigned GETs of SSE-KMS
+                # objects and in GovCloud/newer regions; harmless
+                # everywhere else (#339).
+                config=Config(signature_version="s3v4"),
             ).__aenter__()
             logger.info(
                 "S3 client initialized",
