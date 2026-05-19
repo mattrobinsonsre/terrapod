@@ -14,9 +14,18 @@
 # py/unnecessary-lambda                — FastAPI dependency overrides need fresh mock per request
 # py/multiple-definition               — intentional re-fetch after DB mutation
 # py/empty-except                      — intentional fail-open patterns (Redis, K8s, URL parsing)
+#
+# alembic/versions — Alembic migration boilerplate. The module globals
+# `revision`, `down_revision`, `branch_labels`, `depends_on` are required
+# by Alembic and read via module introspection, so CodeQL's
+# py/unused-global-variable flags every one as "unused" on every
+# migration. They are not unused and must not be removed; the whole
+# generated-migration directory is excluded rather than littering each
+# file with per-line suppressions on every new migration.
 
 paths-ignore:
   - e2e
+  - alembic/versions
 
 query-filters:
   - exclude:
