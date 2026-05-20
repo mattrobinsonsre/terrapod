@@ -34,6 +34,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | **Binary Caching** | Pull-through cache for terraform/tofu CLI binaries |
 | **Workspace Autodiscovery** | Atlantis-style monorepo autodiscovery with rule templating; safe-by-default rename/delete/orphan lifecycle (opt-in destroy) |
 | **Bulk Workspace Operations** | Server-side workspace search + all-or-nothing bulk settings update (dry-run by default; never triggers runs) |
+| **Cross-Workspace Remote State** | `terraform_remote_state` composition with a producer-controlled consumer allowlist (secure by default; secret-bearing state stays with its owner) |
 
 ---
 
@@ -87,6 +88,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Autodiscovery](autodiscovery.md) | Atlantis-style monorepo workspace autodiscovery |
 | [Drift Detection](drift-detection.md) | Scheduled plan-only runs to detect infrastructure drift |
 | [Run Triggers](run-triggers.md) | Cross-workspace dependency chains |
+| [Remote State](remote-state.md) | Cross-workspace `terraform_remote_state` composition with producer-controlled allowlist |
 | [Notifications](notifications.md) | Webhook, Slack, and email alerts on run events |
 | [Run Tasks](run-tasks.md) | Pre/post-plan webhook hooks for external validation |
 | [Audit Logging](audit-logging.md) | Immutable event log, query API, retention |

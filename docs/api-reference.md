@@ -386,6 +386,8 @@ GET /api/v2/workspaces/{id}/current-state-version
 
 **Required permission:** `read` on the workspace.
 
+For **agent-mode runs** reading another workspace's state via `data "terraform_remote_state"` (runner-token principals), authorization is by the producer-controlled consumer allowlist instead of per-user RBAC — see [Cross-Workspace Remote-State Consumers](#cross-workspace-remote-state-consumers) and [the composition guide](remote-state.md).
+
 ### Create State Version
 
 ```
@@ -423,6 +425,8 @@ GET /api/v2/state-versions/{id}/download
 Returns a redirect to a presigned URL for the raw state file.
 
 **Required permission:** `plan` on the workspace.
+
+For **agent-mode runs** reading another workspace's state via `data "terraform_remote_state"` (runner-token principals), authorization is by the producer-controlled consumer allowlist instead of per-user RBAC — see [Cross-Workspace Remote-State Consumers](#cross-workspace-remote-state-consumers).
 
 ### Upload State Content
 
@@ -668,6 +672,83 @@ GET /api/terrapod/v1/runs/{run_id}/apply
 ```
 
 Returns apply metadata and log download URL.
+
+---
+
+## Cross-Workspace Remote-State Consumers
+
+Producer-controlled allowlist of workspaces authorized to read this workspace's state via `data "terraform_remote_state"`. Default is empty (not shared) — secure by default. All mutations require **admin/write on the producer** (the state owner). Independent of run triggers — see [the composition guide](remote-state.md).
+
+When a runner-token principal (agent-mode run) hits `/api/v2/workspaces/{id}/current-state-version` or `/api/v2/state-versions/{id}/download` for another workspace, authorization is by this allowlist instead of per-user RBAC. User / API-token principals (CLI, UI, automation) continue through the existing per-user RBAC path.
+
+### List Consumers
+
+```
+GET /api/terrapod/v1/workspaces/{id}/remote-state-consumers?filter[remote-state-consumer][type]=outbound
+```
+
+`outbound` (default) — workspaces this workspace shares its state to (this workspace is the producer).
+`inbound` — workspaces whose state this workspace is authorized to read (this workspace is the consumer).
+
+**Required permission:** `read` on the workspace.
+
+### Authorize a Consumer
+
+```
+POST /api/terrapod/v1/workspaces/{producer_id}/remote-state-consumers
+```
+
+**Request body:**
+```json
+{
+  "data": {
+    "relationships": {
+      "consumer": {"data": {"id": "ws-CONSUMER", "type": "workspaces"}}
+    }
+  }
+}
+```
+
+**Required permission:** `admin` on the **producer** workspace. A consumer team cannot self-grant.
+
+Errors: `422` self-reference; `409` already authorized; `422` over the per-producer cap.
+
+### Replace Consumer Set (Declarative)
+
+```
+PUT /api/terrapod/v1/workspaces/{producer_id}/remote-state-consumers
+```
+
+Idempotent declarative replace of the producer's full consumer set in one atomic transaction. Supports the Terrapod provider's set-valued attribute. Body: `{"data": [{"type": "workspaces", "id": "ws-..."}, ...]}`.
+
+**Required permission:** `admin` on the producer.
+
+### Show Consumer Grant
+
+```
+GET /api/terrapod/v1/remote-state-consumers/{id}
+```
+
+**Required permission:** `read` on the producer.
+
+### Revoke a Consumer Grant
+
+```
+DELETE /api/terrapod/v1/remote-state-consumers/{id}
+```
+
+**Required permission:** `admin` on the producer. A consumer cannot self-revoke.
+
+### Consumer Grant Response Attributes
+
+| Attribute | Description |
+|---|---|
+| `producer-workspace-name` | Name of the producer workspace |
+| `consumer-workspace-name` | Name of the consumer workspace |
+| `created-at` | RFC3339 timestamp the grant was created |
+| `created-by` | Identity that created the grant |
+
+Plus relationships `producer` and `consumer` (both `workspaces`-typed).
 
 ---
 

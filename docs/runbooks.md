@@ -641,3 +641,28 @@ After fixing the rule:
 
 - Re-query the affected workspaces (server-side workspace search) and confirm the field is restored
 - No unexpected runs were created by the revert (bulk-update never triggers runs — if you see runs, they came from VCS/drift, not the bulk-update)
+
+## Cross-workspace `terraform_remote_state` returns 403
+
+**Symptom**: an agent-mode plan errors during init/refresh on a `data "terraform_remote_state"` data source pointing at another Terrapod workspace, with a 403 from `/api/v2/workspaces/{id}/current-state-version` or `/api/v2/state-versions/{id}/download`.
+
+**Why**: cross-workspace state reads in agent mode are gated by the **producer's consumer allowlist** — the producer workspace explicitly lists which consumer workspaces may read its (secret-bearing) state. Default is empty. The runner token doesn't satisfy per-user RBAC for another workspace, so without an allowlist entry every cross-workspace read 403s. This is the security design — see [the composition guide](remote-state.md) and the [API reference](api-reference.md#cross-workspace-remote-state-consumers).
+
+### Diagnosis
+
+1. Confirm the consumer is in agent mode — local-mode CLI runs use the user's token and a 403 there means the user lacks `plan` on the producer (label-RBAC), not the allowlist.
+2. Identify the producer workspace from the consumer's `terraform_remote_state` config (`workspaces.name`).
+3. List the producer's current consumers: `GET /api/terrapod/v1/workspaces/ws-PRODUCER/remote-state-consumers?filter[remote-state-consumer][type]=outbound`. If the consumer isn't there, that's the cause.
+
+### Resolution
+
+Have the **producer's admin** authorize the consumer — via the Terrapod provider's `terrapod_remote_state_consumer` resource, the API directly, the bulk-update endpoint, or (if the consumer is autodiscovered) the rule's template. The grant is producer-controlled by design: a consumer team cannot self-grant. See the composition guide for the three equivalent paths.
+
+### Verification
+
+- `GET /api/terrapod/v1/workspaces/ws-PRODUCER/remote-state-consumers?filter[remote-state-consumer][type]=outbound` lists the consumer
+- The consumer's next agent-mode plan proceeds past the `data "terraform_remote_state"` data source and resolves the outputs
+
+### Producer deleted or archived
+
+If the producer workspace was deleted, the grant rows cascade-deleted automatically and the consumer's next read returns 404 (no state). If the producer is `archived` via the [autodiscovery lifecycle](autodiscovery.md), the state is retained until purged — reads continue until then. Restoring an archived producer's grant requires recreating the workspace and re-authorizing the consumers.
