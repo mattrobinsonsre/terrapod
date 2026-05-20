@@ -693,6 +693,17 @@ def create_application() -> FastAPI:
 
     include_terrapod(run_triggers_router)
 
+    # Remote-state consumer allowlist — Terrapod-native management of the
+    # producer-controlled cross-workspace `terraform_remote_state` grants
+    # (#344). The CLI never manages these; the read-path authorization
+    # consuming the allowlist lives in tfe_v2.py on the existing
+    # CLI-contract endpoints.
+    from terrapod.api.routers.remote_state_consumers import (
+        router as remote_state_consumers_router,
+    )
+
+    include_terrapod(remote_state_consumers_router)
+
     # Audit log query endpoint — Terrapod-specific.
     from terrapod.api.routers.audit import router as audit_router
 

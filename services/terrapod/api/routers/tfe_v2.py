@@ -36,6 +36,7 @@ Endpoints:
 import hashlib
 import os
 import re
+import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response, status
@@ -50,7 +51,7 @@ from terrapod.api.dependencies import (
     require_non_runner,
 )
 from terrapod.api.labels import validate_labels
-from terrapod.db.models import Run, StateVersion, Workspace
+from terrapod.db.models import Run, StateVersion, Workspace, WorkspaceRemoteStateConsumer
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service as _agent_pool_service
@@ -939,6 +940,54 @@ async def _require_ws_permission(
     return ws, perm
 
 
+async def _runner_state_read_allowed(
+    db: AsyncSession, user: AuthenticatedUser, producer: Workspace
+) -> bool:
+    """Producer-controlled allowlist check for cross-workspace state
+    reads (#344).
+
+    Only applies to runner-token principals (agent-mode runs hitting
+    these CLI-contract endpoints via ``terraform_remote_state``). Grants
+    iff:
+    - the runner's own workspace IS the producer (self-read; harmless,
+      since a workspace's own run already holds its state via the
+      runner-artifact path), OR
+    - the runner's workspace appears in the producer's explicit consumer
+      allowlist (``workspace_remote_state_consumers``).
+
+    Returns False for any non-runner principal (those continue to the
+    existing user/API-token RBAC path, unchanged). Returns False on
+    any data issue (missing run, bad uuid) — fail safe.
+    """
+    if user.auth_method != "runner_token" or not user.run_id:
+        return False
+    try:
+        run_uuid = uuid.UUID(user.run_id)
+    except (ValueError, TypeError):
+        return False
+    row = (await db.execute(select(Run.workspace_id).where(Run.id == run_uuid))).first()
+    if row is None:
+        return False
+    consumer_ws_id = row[0]
+    if consumer_ws_id == producer.id:
+        return True  # self-read; runners already own their own state
+    grant = await db.execute(
+        select(WorkspaceRemoteStateConsumer.id).where(
+            WorkspaceRemoteStateConsumer.producer_workspace_id == producer.id,
+            WorkspaceRemoteStateConsumer.consumer_workspace_id == consumer_ws_id,
+        )
+    )
+    if grant.scalar_one_or_none() is None:
+        return False
+    logger.info(
+        "Cross-workspace state read authorized via consumer allowlist",
+        producer_workspace_id=str(producer.id),
+        consumer_workspace_id=str(consumer_ws_id),
+        run_id=user.run_id,
+    )
+    return True
+
+
 @router.get("/workspaces/{workspace_id}")
 async def show_workspace_by_id(
     workspace_id: str = Path(...),
@@ -1389,8 +1438,22 @@ async def current_state_version(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Get the current (latest) state version for a workspace."""
-    ws, _ = await _require_ws_permission(workspace_id, "read", user, db)
+    """Get the current (latest) state version for a workspace.
+
+    Runner-token principals (agent-mode runs reading another workspace
+    via ``terraform_remote_state``) are authorized by the producer's
+    explicit consumer allowlist (#344) when they are not the workspace
+    owner. All other principals continue through the standard
+    workspace RBAC path.
+    """
+    ws = await _get_workspace_by_id(workspace_id, db)
+    if not await _runner_state_read_allowed(db, user, ws):
+        perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+        if not has_permission(perm, "read"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Requires read permission on workspace",
+            )
 
     result = await db.execute(
         select(StateVersion)
@@ -1419,16 +1482,23 @@ async def download_state(
     if sv is None:
         raise HTTPException(status_code=404, detail="State version not found")
 
-    # Check plan permission on the workspace (raw state may contain secrets)
+    # Raw state may contain secrets. Authorization paths:
+    # * Runner-token principals (agent-mode runs hitting this endpoint
+    #   via `terraform_remote_state`) — producer-controlled consumer
+    #   allowlist (#344); a self-read or an explicit allowlist entry
+    #   grants. No fallback to user RBAC for runner tokens (they hold
+    #   only `everyone` and would 403 anyway).
+    # * Everything else — existing per-user `plan` permission.
     ws = await db.get(Workspace, sv.workspace_id)
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
-    if not has_permission(perm, "plan"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Requires plan permission on workspace",
-        )
+    if not await _runner_state_read_allowed(db, user, ws):
+        perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+        if not has_permission(perm, "plan"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Requires plan permission on workspace",
+            )
 
     storage = get_storage()
     key = state_key(str(sv.workspace_id), str(sv.id))

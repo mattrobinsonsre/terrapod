@@ -1351,6 +1351,56 @@ class RunTrigger(Base):
     )
 
 
+class WorkspaceRemoteStateConsumer(Base):
+    """Producer-controlled cross-workspace state-read grant (#344).
+
+    A row ``(producer_workspace_id, consumer_workspace_id)`` authorizes
+    the consumer workspace's agent runs to read the producer
+    workspace's state via ``terraform_remote_state``. Producer-owned:
+    only the producer workspace's admin may create/delete a row. No
+    rows for a producer ⇒ its state is not shared (secure by default).
+
+    Independent of ``RunTrigger`` — neither implies the other (a run
+    trigger is "re-run me when A applies"; this is "B may read A's
+    state"). Mirrors the run-trigger edge shape; the deliberate
+    difference is producer-side authorization.
+    """
+
+    __tablename__ = "workspace_remote_state_consumers"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    producer_workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    consumer_workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    created_by: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+
+    producer_workspace: Mapped["Workspace"] = relationship(foreign_keys=[producer_workspace_id])
+    consumer_workspace: Mapped["Workspace"] = relationship(foreign_keys=[consumer_workspace_id])
+
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "producer_workspace_id",
+            "consumer_workspace_id",
+            name="uq_workspace_remote_state_consumers",
+        ),
+        Index("ix_wrsc_consumer_workspace_id", "consumer_workspace_id"),
+        Index("ix_wrsc_producer_workspace_id", "producer_workspace_id"),
+    )
+
+
 # --- Notification Configurations ---
 
 
