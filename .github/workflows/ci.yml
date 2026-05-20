@@ -166,7 +166,15 @@ jobs:
         run: poetry export -f requirements.txt -o requirements.txt --without-hashes
         working-directory: services
       - name: Run pip-audit
-        run: pip install pip-audit && pip-audit -r services/requirements.txt --strict --desc
+        # PYSEC-2025-183 (pyjwt): disputed by the supplier — the advisory
+        # concerns weak HMAC keys, but key length is controlled by the
+        # application that uses the library, not by the library. No fix
+        # version is published. Suppress until a fix lands or the dispute
+        # is resolved upstream.
+        run: |
+          pip install pip-audit
+          pip-audit -r services/requirements.txt --strict --desc \
+            --ignore-vuln PYSEC-2025-183
 
   # ── Dependency Audit (npm) ────────────────────────────
   npm-audit:
