@@ -141,6 +141,117 @@ class TestRunnerStateReadAllowed:
         assert await _runner_state_read_allowed(db, user, producer) is False
 
 
+# ── HTTP: runner-authz helper is actually wired to the state endpoints ──
+
+
+class TestRunnerAuthzWiring:
+    """Confirm `current_state_version` and `download_state` actually
+    call `_runner_state_read_allowed` and respect its return value.
+    The helper itself is unit-tested above; these tests catch a future
+    refactor that drops the helper call from one endpoint without
+    breaking the helper's own tests."""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2._get_workspace_by_id", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.tfe_v2._runner_state_read_allowed", new_callable=AsyncMock)
+    async def test_current_state_version_grants_when_helper_returns_true(
+        self, m_helper, m_get_ws, m_resolve, *_
+    ):
+        """Helper True → endpoint skips user RBAC and proceeds past authz.
+
+        We use a "no state versions found" path to confirm the endpoint
+        got *past* authz (404 instead of 403) without having to fully
+        mock a serializable StateVersion. The wiring guarantee is what
+        this test exists for; the response shape is covered elsewhere.
+        """
+        producer = _mock_ws(name="producer")
+        m_get_ws.return_value = producer
+        m_helper.return_value = True
+
+        app, db = _make_app(_user(auth_method="runner_token", run_id=str(uuid.uuid4())))
+        # No SV exists → endpoint raises 404 *after* clearing authz.
+        no_sv = MagicMock()
+        no_sv.scalar_one_or_none.return_value = None
+        db.execute.return_value = no_sv
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                f"/api/v2/workspaces/ws-{producer.id}/current-state-version",
+                headers=_AUTH,
+            )
+
+        # 404 (cleared authz, no SV) confirms wiring; would be 403 without the helper True.
+        assert resp.status_code == 404
+        m_helper.assert_awaited_once()
+        # User RBAC fallback must NOT have been consulted (helper allowed).
+        m_resolve.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2._get_workspace_by_id", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.tfe_v2._runner_state_read_allowed", new_callable=AsyncMock)
+    async def test_current_state_version_falls_through_and_denies_runner(
+        self, m_helper, m_get_ws, m_resolve, *_
+    ):
+        """Helper False → user RBAC consulted. A runner principal carries
+        only `everyone`, so RBAC denies → 403. This is the negative wiring:
+        the endpoint must NOT 'fall open' when the helper returns False."""
+        producer = _mock_ws(name="producer")
+        m_get_ws.return_value = producer
+        m_helper.return_value = False
+        m_resolve.return_value = None  # everyone role → no permission
+
+        app, _db = _make_app(_user(auth_method="runner_token", run_id=str(uuid.uuid4())))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(
+                f"/api/v2/workspaces/ws-{producer.id}/current-state-version",
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 403
+        m_helper.assert_awaited_once()
+        m_resolve.assert_awaited_once()  # fallback was actually consulted
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2._runner_state_read_allowed", new_callable=AsyncMock)
+    async def test_download_state_falls_through_and_denies_runner(self, m_helper, m_resolve, *_):
+        """Same wiring guarantee for the download endpoint — helper
+        False, runner principal, RBAC denies → 403. Without this test, a
+        refactor that drops the helper call from download_state would
+        silently re-introduce the pre-#344 behaviour where a runner
+        token could not cross-read at all (but also where the helper
+        wasn't checked, masking a future regression of either kind)."""
+        producer = _mock_ws(name="producer")
+        m_helper.return_value = False
+        m_resolve.return_value = None
+
+        sv = MagicMock()
+        sv.id = uuid.uuid4()
+        sv.workspace_id = producer.id
+
+        app, db = _make_app(_user(auth_method="runner_token", run_id=str(uuid.uuid4())))
+        sv_result = MagicMock()
+        sv_result.scalar_one_or_none.return_value = sv
+        db.execute.return_value = sv_result
+        db.get = AsyncMock(return_value=producer)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/v2/state-versions/sv-{sv.id}/download", headers=_AUTH)
+
+        assert resp.status_code == 403
+        m_helper.assert_awaited_once()
+        m_resolve.assert_awaited_once()
+
+
 # ── HTTP: management router CRUD ─────────────────────────────────────────
 
 
@@ -150,7 +261,9 @@ class TestCreateConsumer:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission")
     async def test_create_happy_path(self, mock_resolve, *_):
-        """Admin on producer → 201."""
+        """Admin on producer → 201, and the response JSON carries the
+        producer + consumer names (i.e. the row's relationships actually
+        get populated)."""
         mock_resolve.return_value = "admin"
         producer = _mock_ws(name="producer")
         consumer = _mock_ws(name="consumer")
@@ -169,7 +282,15 @@ class TestCreateConsumer:
         r4 = MagicMock()
         r4.scalar_one.return_value = 0
         db.execute.side_effect = [r1, r2, r3, r4]
-        db.refresh = AsyncMock()
+
+        # Populate the relationship attributes the way db.refresh would in
+        # the real DB session — otherwise the response names fall through
+        # to "" and the test silently passes against a no-op refresh.
+        async def _refresh(row, attribute_names=None):
+            row.producer_workspace = producer
+            row.consumer_workspace = consumer
+
+        db.refresh = AsyncMock(side_effect=_refresh)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
@@ -184,7 +305,15 @@ class TestCreateConsumer:
                 headers=_AUTH,
             )
         assert resp.status_code == 201
-        assert resp.json()["data"]["type"] == "remote-state-consumers"
+        body = resp.json()
+        assert body["data"]["type"] == "remote-state-consumers"
+        attrs = body["data"]["attributes"]
+        assert attrs["producer-workspace-name"] == "producer"
+        assert attrs["consumer-workspace-name"] == "consumer"
+        # Relationship ids are present and prefixed
+        rels = body["data"]["relationships"]
+        assert rels["producer"]["data"]["id"] == f"ws-{producer.id}"
+        assert rels["consumer"]["data"]["id"] == f"ws-{consumer.id}"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

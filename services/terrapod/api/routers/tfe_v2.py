@@ -51,7 +51,14 @@ from terrapod.api.dependencies import (
     require_non_runner,
 )
 from terrapod.api.labels import validate_labels
-from terrapod.db.models import Run, StateVersion, Workspace, WorkspaceRemoteStateConsumer
+from terrapod.db.models import (
+    AuditLog,
+    Run,
+    StateVersion,
+    Workspace,
+    WorkspaceRemoteStateConsumer,
+    generate_uuid7,
+)
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service as _agent_pool_service
@@ -977,14 +984,40 @@ async def _runner_state_read_allowed(
             WorkspaceRemoteStateConsumer.consumer_workspace_id == consumer_ws_id,
         )
     )
-    if grant.scalar_one_or_none() is None:
+    grant_id = grant.scalar_one_or_none()
+    if grant_id is None:
         return False
     logger.info(
         "Cross-workspace state read authorized via consumer allowlist",
         producer_workspace_id=str(producer.id),
         consumer_workspace_id=str(consumer_ws_id),
+        grant_id=str(grant_id),
         run_id=user.run_id,
     )
+    # Audit the cross-workspace state consumption explicitly (#344 Phase 2).
+    # The request-level middleware records the HTTP call but cannot
+    # express the producer↔consumer↔grant context that compliance /
+    # forensics need; do it here where the resolved pair is in hand.
+    # Read endpoint has no other in-flight writes, so the explicit
+    # commit is safe and the audit row persists regardless of the
+    # endpoint's outcome below.
+    db.add(
+        AuditLog(
+            id=generate_uuid7(),
+            actor_email=user.email or "",
+            actor_type="system",
+            origin="system",
+            action="workspace.remote_state_read",
+            resource_type="workspace",
+            resource_id=f"ws-{producer.id}",
+            status_code=200,
+            detail=(
+                f"consumer ws-{consumer_ws_id} read producer state "
+                f"via grant rsc-{grant_id}; run {user.run_id}"
+            ),
+        )
+    )
+    await db.commit()
     return True
 
 
