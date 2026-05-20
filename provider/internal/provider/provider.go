@@ -25,6 +25,7 @@ import (
 	notificationConfigRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/notification_configuration"
 	registryModuleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/registry_module"
 	registryProviderRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/registry_provider"
+	remoteStateConsumerRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/remote_state_consumer"
 	roleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/role"
 	roleAssignmentRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/role_assignment"
 	runTaskRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/run_task"
@@ -127,6 +128,7 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 		variableSetVarRes.NewResource,
 		variableSetWsRes.NewResource,
 		runTriggerRes.NewResource,
+		remoteStateConsumerRes.NewResource,
 		notificationConfigRes.NewResource,
 		runTaskRes.NewResource,
 		roleRes.NewResource,
