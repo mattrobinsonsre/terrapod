@@ -203,9 +203,9 @@ const ALL_TRIGGERS = [
 const ALL_STAGES = ['pre_plan', 'post_plan', 'pre_apply'] as const
 const ALL_ENFORCEMENT_LEVELS = ['mandatory', 'advisory'] as const
 
-type Tab = 'overview' | 'variables' | 'runs' | 'state' | 'configurations' | 'notifications' | 'run-tasks'
+type Tab = 'overview' | 'variables' | 'runs' | 'state' | 'configurations' | 'notifications' | 'run-tasks' | 'sharing'
 
-const VALID_TABS: Set<string> = new Set(['overview', 'variables', 'runs', 'state', 'configurations', 'notifications', 'run-tasks'])
+const VALID_TABS: Set<string> = new Set(['overview', 'variables', 'runs', 'state', 'configurations', 'notifications', 'run-tasks', 'sharing'])
 
 export default function WorkspaceDetailPage() {
   return (
@@ -345,6 +345,22 @@ function WorkspaceDetailContent() {
   // Label lockout warning
   const [lockoutWarning, setLockoutWarning] = useState('')
 
+  // Remote-state sharing (#344, #349) — producer-controlled consumer allowlist
+  interface RemoteStateEdge {
+    id: string
+    producerName: string
+    producerId: string
+    consumerName: string
+    consumerId: string
+    createdAt: string
+    createdBy: string
+  }
+  const [rscOutbound, setRscOutbound] = useState<RemoteStateEdge[]>([])
+  const [rscInbound, setRscInbound] = useState<RemoteStateEdge[]>([])
+  const [rscLoading, setRscLoading] = useState(false)
+  const [rscAddName, setRscAddName] = useState('')
+  const [rscAdding, setRscAdding] = useState(false)
+
   // Notifications
   const [notifications, setNotifications] = useState<NotificationConfig[]>([])
   const [notifLoading, setNotifLoading] = useState(false)
@@ -472,6 +488,7 @@ function WorkspaceDetailContent() {
     if (activeTab === 'variables') loadVariables()
     if (activeTab === 'runs') loadRuns()
     if (activeTab === 'state') loadStateVersions()
+    if (activeTab === 'sharing') loadRemoteStateConsumers()
     if (activeTab === 'configurations') loadConfigurations()
     if (activeTab === 'notifications') loadNotifications()
     if (activeTab === 'run-tasks') loadRunTasks()
@@ -636,6 +653,89 @@ function WorkspaceDetailContent() {
       setError(err instanceof Error ? err.message : 'Failed to load notifications')
     } finally {
       setNotifLoading(false)
+    }
+  }
+
+  function _rscFromRow(row: { id: string; attributes: Record<string, string>; relationships: Record<string, { data: { id: string } }> }): RemoteStateEdge {
+    return {
+      id: row.id,
+      producerName: row.attributes['producer-workspace-name'] || '',
+      producerId: row.relationships?.producer?.data?.id || '',
+      consumerName: row.attributes['consumer-workspace-name'] || '',
+      consumerId: row.relationships?.consumer?.data?.id || '',
+      createdAt: row.attributes['created-at'] || '',
+      createdBy: row.attributes['created-by'] || '',
+    }
+  }
+
+  async function loadRemoteStateConsumers() {
+    setRscLoading(true)
+    try {
+      const base = `/api/terrapod/v1/workspaces/${workspaceId}/remote-state-consumers`
+      const [outRes, inRes] = await Promise.all([
+        apiFetch(`${base}?filter[remote-state-consumer][type]=outbound`),
+        apiFetch(`${base}?filter[remote-state-consumer][type]=inbound`),
+      ])
+      if (!outRes.ok) throw new Error('Failed to load outbound remote-state consumers')
+      if (!inRes.ok) throw new Error('Failed to load inbound remote-state consumers')
+      const outData = await outRes.json()
+      const inData = await inRes.json()
+      setRscOutbound((outData.data || []).map(_rscFromRow))
+      setRscInbound((inData.data || []).map(_rscFromRow))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load remote-state consumers')
+    } finally {
+      setRscLoading(false)
+    }
+  }
+
+  async function addRemoteStateConsumer() {
+    const name = rscAddName.trim()
+    if (!name) return
+    setRscAdding(true)
+    try {
+      // Resolve consumer workspace name → id via the by-name endpoint.
+      const lookup = await apiFetch(`/api/v2/organizations/default/workspaces/${encodeURIComponent(name)}`)
+      if (!lookup.ok) {
+        throw new Error(lookup.status === 404 ? `Workspace "${name}" not found` : 'Failed to resolve consumer workspace')
+      }
+      const wsBody = await lookup.json()
+      const consumerId = wsBody.data?.id
+      if (!consumerId) throw new Error('Workspace lookup returned no id')
+
+      const res = await apiFetch(
+        `/api/terrapod/v1/workspaces/${workspaceId}/remote-state-consumers`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/vnd.api+json' },
+          body: JSON.stringify({
+            data: { relationships: { consumer: { data: { id: consumerId, type: 'workspaces' } } } },
+          }),
+        },
+      )
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Failed to authorize consumer' }))
+        throw new Error(err.detail || 'Failed to authorize consumer')
+      }
+      setRscAddName('')
+      await loadRemoteStateConsumers()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to authorize consumer')
+    } finally {
+      setRscAdding(false)
+    }
+  }
+
+  async function revokeRemoteStateConsumer(edgeId: string) {
+    try {
+      const res = await apiFetch(`/api/terrapod/v1/remote-state-consumers/${edgeId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Failed to revoke' }))
+        throw new Error(err.detail || 'Failed to revoke')
+      }
+      await loadRemoteStateConsumers()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to revoke consumer')
     }
   }
 
@@ -1238,6 +1338,7 @@ function WorkspaceDetailContent() {
     { key: 'configurations', label: 'Configurations' },
     { key: 'notifications', label: 'Notifications' },
     { key: 'run-tasks', label: 'Run Tasks' },
+    { key: 'sharing', label: 'Sharing' },
   ]
 
   function statusColor(status: string): string {
@@ -2927,6 +3028,98 @@ function WorkspaceDetailContent() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Sharing Tab — cross-workspace remote-state allowlist (#344, #349) */}
+        {activeTab === 'sharing' && (
+          <div>
+            <div className="flex items-baseline justify-between mb-1">
+              <h3 className="text-lg font-semibold text-slate-200">Remote State Sharing</h3>
+              {rscLoading && <span className="text-xs text-slate-500">loading…</span>}
+            </div>
+            <p className="text-xs text-slate-500 mb-6">
+              Producer-controlled allowlist for cross-workspace{' '}
+              <code className="text-slate-400">terraform_remote_state</code>. State data is secret-bearing —
+              grant deliberately.{' '}
+              <a href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/remote-state.md" className="text-brand-400 hover:text-brand-300 underline" target="_blank" rel="noopener noreferrer">
+                Docs
+              </a>
+            </p>
+
+            {/* Outbound — workspaces I share my state to */}
+            <div className="mb-8">
+              <h4 className="text-sm font-medium text-slate-300 mb-2">Workspaces authorized to read this workspace&apos;s state</h4>
+              {rscOutbound.length === 0 ? (
+                <p className="text-sm text-slate-500 italic">This workspace&apos;s state is not shared with any other workspace.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {rscOutbound.map((e) => (
+                    <li key={e.id} className="flex items-center justify-between gap-3 rounded bg-slate-800/40 px-3 py-2 text-sm">
+                      <div>
+                        <a href={`/workspaces/${e.consumerId}`} className="text-brand-400 hover:text-brand-300 font-medium">
+                          {e.consumerName || e.consumerId}
+                        </a>
+                        {e.createdBy && (
+                          <span className="ml-2 text-xs text-slate-500">granted by {e.createdBy}</span>
+                        )}
+                      </div>
+                      {perms['can-update'] && (
+                        <button
+                          type="button"
+                          onClick={() => revokeRemoteStateConsumer(e.id)}
+                          className="rounded px-2 py-1 text-xs font-medium bg-red-900/40 text-red-200 hover:bg-red-900/60"
+                        >
+                          Revoke
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {perms['can-update'] && (
+                <form
+                  onSubmit={(e) => { e.preventDefault(); addRemoteStateConsumer() }}
+                  className="mt-3 flex items-center gap-2"
+                >
+                  <input
+                    type="text"
+                    value={rscAddName}
+                    onChange={(e) => setRscAddName(e.target.value)}
+                    placeholder="Authorize consumer workspace by name"
+                    className="flex-1 rounded border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500"
+                    disabled={rscAdding}
+                  />
+                  <button
+                    type="submit"
+                    disabled={rscAdding || !rscAddName.trim()}
+                    className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {rscAdding ? 'Authorizing…' : 'Authorize'}
+                  </button>
+                </form>
+              )}
+            </div>
+
+            {/* Inbound — workspaces I read state from */}
+            <div>
+              <h4 className="text-sm font-medium text-slate-300 mb-2">Workspaces this workspace is authorized to read state from</h4>
+              {rscInbound.length === 0 ? (
+                <p className="text-sm text-slate-500 italic">This workspace is not authorized to read state from any other workspace via terraform_remote_state.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {rscInbound.map((e) => (
+                    <li key={e.id} className="rounded bg-slate-800/40 px-3 py-2 text-sm">
+                      <a href={`/workspaces/${e.producerId}`} className="text-brand-400 hover:text-brand-300 font-medium">
+                        {e.producerName || e.producerId}
+                      </a>
+                      <span className="ml-2 text-xs text-slate-500">(producer; revoke from there)</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         )}
       </main>
