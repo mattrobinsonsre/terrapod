@@ -74,6 +74,14 @@ type workspaceModel struct {
 	DriftDetectionEnabled         types.Bool   `tfsdk:"drift_detection_enabled"`
 	DriftDetectionIntervalSeconds types.Int64  `tfsdk:"drift_detection_interval_seconds"`
 
+	// Set of workspace IDs authorized to read this workspace's state
+	// via `terraform_remote_state` (#344). Producer-controlled
+	// allowlist; mutations require admin/write on this (producer)
+	// workspace. Optional + Computed: leave null to opt out of
+	// managing the set here (server side is left intact); set to []
+	// to explicitly remove all consumers. See #348.
+	RemoteStateConsumers types.Set `tfsdk:"remote_state_consumers"`
+
 	// Read-only attributes
 	OwnerEmail         types.String `tfsdk:"owner_email"`
 	DriftStatus        types.String `tfsdk:"drift_status"`

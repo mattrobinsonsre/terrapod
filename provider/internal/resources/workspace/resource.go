@@ -2,8 +2,10 @@ package workspace
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -12,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -164,6 +167,15 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
+			"remote_state_consumers": schema.SetAttribute{
+				Description: "Workspace IDs authorized to read this workspace's state via `terraform_remote_state` (#344). Optional + Computed: leave null to opt out of managing the set here (server side is left intact — useful when consumers are managed via standalone `terrapod_remote_state_consumer` resources elsewhere). Set to `[]` to explicitly remove all consumers. **Do not mix this attribute with standalone `terrapod_remote_state_consumer` resources targeting the same producer** — the two will drift on every plan and fight each other. Mutations require admin/write on this (producer) workspace; a consumer team cannot self-grant.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
+				},
+			},
 
 			// Read-only
 			"owner_email": schema.StringAttribute{
@@ -241,6 +253,18 @@ func (r *workspaceResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	resp.Diagnostics.Append(readResourceIntoModel(ctx, res, &plan)...)
+
+	// Apply the consumer set from plan (if managed here), then refresh
+	// the attribute from the server (#344, #348). Null in plan ⇒
+	// unmanaged ⇒ no PUT but we still read for state consistency.
+	if err := applyConsumersFromPlan(ctx, r.client, plan.ID.ValueString(), plan.RemoteStateConsumers); err != nil {
+		resp.Diagnostics.AddError("Failed to apply remote_state_consumers", err.Error())
+		return
+	}
+	consumers, dgs := readRemoteStateConsumers(ctx, r.client, plan.ID.ValueString())
+	resp.Diagnostics.Append(dgs...)
+	plan.RemoteStateConsumers = consumers
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -268,6 +292,15 @@ func (r *workspaceResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 
 	resp.Diagnostics.Append(readResourceIntoModel(ctx, res, &state)...)
+
+	// Refresh the consumer set from server (#344, #348). Always read,
+	// even when the user manages this via standalone resources — the
+	// Optional+Computed schema means a null config value falls back
+	// to the state value during plan, so no spurious diff.
+	consumers, dgs := readRemoteStateConsumers(ctx, r.client, state.ID.ValueString())
+	resp.Diagnostics.Append(dgs...)
+	state.RemoteStateConsumers = consumers
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -305,6 +338,17 @@ func (r *workspaceResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 
 	resp.Diagnostics.Append(readResourceIntoModel(ctx, res, &plan)...)
+
+	// Apply the consumer set from plan if managed here, then refresh.
+	// Same null = unmanaged convention as Create (#344, #348).
+	if err := applyConsumersFromPlan(ctx, r.client, plan.ID.ValueString(), plan.RemoteStateConsumers); err != nil {
+		resp.Diagnostics.AddError("Failed to apply remote_state_consumers", err.Error())
+		return
+	}
+	consumers, dgs := readRemoteStateConsumers(ctx, r.client, plan.ID.ValueString())
+	resp.Diagnostics.Append(dgs...)
+	plan.RemoteStateConsumers = consumers
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -511,4 +555,66 @@ func readResourceIntoModel(ctx context.Context, res *client.Resource, m *workspa
 	}
 
 	return diags
+}
+
+// putRemoteStateConsumers declaratively replaces the producer's full
+// consumer set via the #344 PUT endpoint. Empty `ids` means "remove
+// all". Server-side enforces admin on the producer.
+func putRemoteStateConsumers(ctx context.Context, c *client.Client, workspaceID string, ids []string) error {
+	items := make([]map[string]any, len(ids))
+	for i, id := range ids {
+		items[i] = map[string]any{"type": "workspaces", "id": id}
+	}
+	body, err := json.Marshal(map[string]any{"data": items})
+	if err != nil {
+		return err
+	}
+	_, err = c.Put(ctx, fmt.Sprintf("/api/terrapod/v1/workspaces/%s/remote-state-consumers", workspaceID), body)
+	return err
+}
+
+// readRemoteStateConsumers reads the producer's outbound consumer
+// workspace IDs and returns them as a terraform Set<string>. A null
+// Set is returned on error (caller decides whether to surface it).
+func readRemoteStateConsumers(ctx context.Context, c *client.Client, workspaceID string) (types.Set, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	url := fmt.Sprintf("/api/terrapod/v1/workspaces/%s/remote-state-consumers?filter[remote-state-consumer][type]=outbound", workspaceID)
+	data, err := c.Get(ctx, url)
+	if err != nil {
+		diags.AddError("Failed to read remote_state_consumers", err.Error())
+		return types.SetNull(types.StringType), diags
+	}
+	items, err := client.ParseResourceList(data)
+	if err != nil {
+		diags.AddError("Failed to parse remote_state_consumers response", err.Error())
+		return types.SetNull(types.StringType), diags
+	}
+	vals := make([]attr.Value, 0, len(items))
+	for i := range items {
+		if v := client.GetRelationshipID(&items[i], "consumer"); v != "" {
+			vals = append(vals, types.StringValue(v))
+		}
+	}
+	s, d := types.SetValue(types.StringType, vals)
+	diags.Append(d...)
+	return s, diags
+}
+
+// applyConsumersFromPlan PUTs the plan's remote_state_consumers to the
+// server iff the attribute is non-null. Null in plan ⇒ unmanaged here
+// (server side left intact). Empty set ⇒ explicit "remove all".
+func applyConsumersFromPlan(ctx context.Context, c *client.Client, workspaceID string, plan types.Set) error {
+	if plan.IsNull() || plan.IsUnknown() {
+		return nil
+	}
+	elems := plan.Elements()
+	ids := make([]string, 0, len(elems))
+	for _, v := range elems {
+		s, ok := v.(types.String)
+		if !ok || s.IsNull() || s.IsUnknown() {
+			continue
+		}
+		ids = append(ids, s.ValueString())
+	}
+	return putRemoteStateConsumers(ctx, c, workspaceID, ids)
 }
