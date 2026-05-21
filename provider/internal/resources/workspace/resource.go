@@ -359,7 +359,10 @@ func (r *workspaceResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/v2/workspaces/"+state.ID.ValueString())
+	// Workspace delete lives on the Terrapod-native prefix (it isn't a
+	// CLI-consumed surface; the v2 alias was removed in #278). Calling
+	// /api/v2/workspaces/{id} returns 405 — see #353.
+	err := r.client.Delete(ctx, "/api/terrapod/v1/workspaces/"+state.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Failed to delete workspace", err.Error())
 	}
