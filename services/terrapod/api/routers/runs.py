@@ -208,6 +208,9 @@ def _run_json(
                 "task-stages": {
                     "links": {"related": f"/api/terrapod/v1/runs/{run_id}/task-stages"},
                 },
+                "policy-checks": {
+                    "links": {"related": f"/api/terrapod/v1/runs/{run_id}/policy-evaluations"},
+                },
                 "created-state-version": {
                     "data": (
                         {"id": state_version_id, "type": "state-versions"}

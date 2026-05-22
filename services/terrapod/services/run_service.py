@@ -464,6 +464,18 @@ async def complete_plan(
                 )
             return run
 
+    # Post-plan OPA policy gate (#343). A mandatory policy failure keeps
+    # the run in `planning` (surfaced via the run's policy-checks
+    # attribute) rather than erroring it — the idempotent complete_plan
+    # then re-drives the run once an admin overrides, with no reconciler
+    # race. GATE_PENDING means the plan JSON the runner uploads just
+    # after plan-result hasn't landed yet; retry on the next tick.
+    from terrapod.services import policy_set_service
+
+    gate = await policy_set_service.evaluate_post_plan(db, run)
+    if gate != policy_set_service.GATE_PASSED:
+        return run
+
     run = await transition_run(db, run, "planned")
 
     # Unlock workspace for plan-only runs — they make no further state moves.

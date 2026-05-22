@@ -704,6 +704,13 @@ def create_application() -> FastAPI:
 
     include_terrapod(remote_state_consumers_router)
 
+    # OPA policy-as-code enforcement — Terrapod-native management of
+    # policy sets + policies, plus per-run policy evaluations and the
+    # admin override action (#343).
+    from terrapod.api.routers.policy_sets import router as policy_sets_router
+
+    include_terrapod(policy_sets_router)
+
     # Audit log query endpoint — Terrapod-specific.
     from terrapod.api.routers.audit import router as audit_router
 

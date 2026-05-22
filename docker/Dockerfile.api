@@ -53,6 +53,22 @@ RUN echo "apt-refresh=${APT_REFRESH}" \
     libxmlsec1-openssl \
     && rm -rf /var/lib/apt/lists/*
 
+# OPA (Open Policy Agent) — the policy-as-code evaluation engine (#343).
+# Pinned, statically-linked binary, verified against its published SHA256.
+# Bumped deliberately with Terrapod releases (the operator controls the
+# OPA version via the image tag — see docs/policies.md). TARGETARCH is set
+# by buildx; fall back to dpkg for a plain `docker build`.
+ARG TARGETARCH
+ARG OPA_VERSION=1.16.2
+RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
+    && BASE="https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}" \
+    && curl -fsSL -o /usr/local/bin/opa "${BASE}/opa_linux_${ARCH}_static" \
+    && curl -fsSL -o /tmp/opa.sha256 "${BASE}/opa_linux_${ARCH}_static.sha256" \
+    && echo "$(cut -d' ' -f1 /tmp/opa.sha256)  /usr/local/bin/opa" | sha256sum -c - \
+    && rm /tmp/opa.sha256 \
+    && chmod 0755 /usr/local/bin/opa \
+    && /usr/local/bin/opa version
+
 WORKDIR /app
 
 # Copy installed Python packages from builder

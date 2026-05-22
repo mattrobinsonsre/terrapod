@@ -1560,3 +1560,131 @@ class TaskStageResult(Base):
     run_task: Mapped["RunTask | None"] = relationship()
 
     __table_args__ = (Index("ix_task_stage_results_task_stage_id", "task_stage_id"),)
+
+
+class PolicySet(Base):
+    """A named collection of OPA/Rego policies evaluated during a run (#343).
+
+    Scoping reuses the label-RBAC allow/deny model (same shape as Role):
+    a policy set applies to a workspace when ``global_scope`` is true, or
+    when the workspace's labels/name match the allow rules and don't match
+    the deny rules. There are no org/team/project concepts.
+
+    Policies must be written in Rego v1 (OPA 1.x) — Terrapod is a new
+    project with no legacy policies to support.
+    """
+
+    __tablename__ = "policy_sets"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    enforcement_level: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="advisory"
+    )  # advisory, mandatory
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    # Scoping. global_scope=True → applies to every workspace. Otherwise the
+    # label-RBAC allow/deny rules below decide (mirrors Role).
+    global_scope: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    allow_labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    allow_names: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+    deny_labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    deny_names: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+
+    created_by: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    policies: Mapped[list["Policy"]] = relationship(
+        back_populates="policy_set", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (Index("ix_policy_sets_name", "name"),)
+
+
+class Policy(Base):
+    """A single Rego policy belonging to a policy set (#343).
+
+    The Rego source is stored inline — policies are small text documents,
+    so there is no object-storage round trip.
+    """
+
+    __tablename__ = "policies"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    policy_set_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("policy_sets.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    rego: Mapped[str] = mapped_column(Text, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    policy_set: Mapped["PolicySet"] = relationship(back_populates="policies")
+
+    __table_args__ = (
+        sa.UniqueConstraint("policy_set_id", "name", name="uq_policies_set_name"),
+        Index("ix_policies_policy_set_id", "policy_set_id"),
+    )
+
+
+class PolicyEvaluation(Base):
+    """The outcome of evaluating one policy set against one run (#343).
+
+    One row per (run, policy set). ``result`` holds the per-policy detail
+    (pass/fail, deny messages). ``policy_set_id`` is SET NULL on policy-set
+    deletion so the evaluation history survives; ``policy_set_name`` is a
+    snapshot kept for display in that case.
+    """
+
+    __tablename__ = "policy_evaluations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    policy_set_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("policy_sets.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    policy_set_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    # Enforcement level snapshotted at evaluation time — a later edit of the
+    # policy set must not retroactively change a recorded run's gating.
+    enforcement_level: Mapped[str] = mapped_column(String(20), nullable=False)
+    outcome: Mapped[str] = mapped_column(String(20), nullable=False)  # passed, failed, errored
+    result: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+
+    overridden_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    overridden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        sa.UniqueConstraint("run_id", "policy_set_id", name="uq_policy_evaluations_run_set"),
+        Index("ix_policy_evaluations_run_id", "run_id"),
+        Index("ix_policy_evaluations_policy_set_id", "policy_set_id"),
+    )
