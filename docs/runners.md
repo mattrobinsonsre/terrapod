@@ -190,6 +190,27 @@ The time budget adapts to the configured `terminationGracePeriodSeconds`. The de
 
 ---
 
+## Backend Neutralisation (Override File)
+
+A workspace's committed configuration normally declares a `cloud {}` or `backend "remote" {}` block pointing at Terrapod. When that same configuration runs **inside a runner Job**, that block must not take effect — the runner executes locally and ships state back through the artifact endpoint. If the remote backend were honoured, the run would recursively call back into Terrapod.
+
+The runner neutralises the backend with a **terraform-native override file** rather than editing the user's `.tf` files. Before `init`, the entrypoint writes `zzzz_terrapod_backend_override.tf` into the working directory:
+
+```hcl
+terraform {
+  backend "local" {}
+}
+```
+
+Terraform and OpenTofu merge any file matching `*_override.tf` over the main configuration with *replacement* semantics, so this single block displaces whatever the main config declared — `cloud {}`, `backend "remote" {}`, `backend "s3" {}`, or nothing at all. The user's committed files are never modified, which keeps "why does my plan differ locally" diagnosable.
+
+**Our override always wins.** Local execution is a hard correctness requirement, so the override is written unconditionally — the runner never defers to a user-supplied backend declaration (deferring to a committed `cloud {}` or `backend "remote"` would hand the runner a remote backend and recurse). Two mechanisms enforce this:
+
+1. **Merge order.** Override files are merged in lexical order with the *last* file winning. The `zzzz` filename prefix sorts after `override.tf` and any realistic `*_override.tf`, so Terrapod's `backend "local"` is the one that takes effect. If the workspace does ship its own override file declaring a backend/cloud block, the runner logs a `takes precedence` note so the override is visible — but still writes and wins with its own.
+2. **Post-init backstop.** After `init`, the entrypoint reads the backend type that terraform/tofu actually configured (recorded in `.terraform/terraform.tfstate`). If it is anything other than `local` — the residual case of a pathological user file that sorts even later than `zzzz_…` — the run **fails immediately** with a clear error rather than executing against a remote backend.
+
+---
+
 ## Environment Variables
 
 The entrypoint reads the following environment variables (set automatically by the listener):

@@ -302,22 +302,60 @@ if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
             STRIP_DIR="$WORK_DIR/$TP_WORKING_DIR"
         fi
 
-        # Strip cloud {} and backend {} blocks from .tf files.
-        # Uploaded configs have cloud/backend blocks that would cause recursive
-        # backend use when running in remote execution mode.
-        for tf_file in "$STRIP_DIR"/*.tf; do
-            [ -f "$tf_file" ] || continue
-            awk '
-            /^[[:space:]]*(cloud|backend)[[:space:]]*(\{|"[^"]*"[[:space:]]*\{)/ { depth=1; next }
-            depth > 0 { if (/\{/) depth++; if (/\}/) depth--; next }
-            { print }
-            ' "$tf_file" > "${tf_file}.tmp" && mv "${tf_file}.tmp" "$tf_file"
-        done
+        # Force the runner to use the local backend by writing a terraform
+        # override file (#346). Override files (*_override.tf) are merged
+        # by terraform/tofu with replacement semantics: an override
+        # `terraform { backend "local" {} }` replaces the main config's
+        # `cloud {}` or `backend "x" {}` block, regardless of how the
+        # user wrote it. This avoids any in-place editing of user code.
+        #
+        # The runner MUST execute on the local backend — a remote backend
+        # inside the Job recurses straight back into Terrapod. So our
+        # override has to WIN, unconditionally. Two mechanisms:
+        #
+        #   1. Filename `zzzz_terrapod_backend_override.tf`. Override
+        #      files are merged in lexical order with the LAST file
+        #      winning, so the `zzzz` prefix makes ours win against a
+        #      user's `override.tf` or any realistic `*_override.tf`.
+        #      (We do NOT defer to a user-supplied backend override —
+        #      deferring to a user `cloud {}` / `backend "remote"` would
+        #      hand the runner a remote backend. Ours always wins.)
+        #
+        #   2. The post-init backstop below
+        #      (.terraform/terraform.tfstate backend.type check) — a
+        #      hard guarantee for the residual case of a user file that
+        #      sorts even later than ours.
+        #
+        # If the user did ship their own override file declaring a
+        # backend/cloud block, log it so the override is visible in the
+        # runner log — but still write (and win with) ours.
+        #
         # NB: we DO keep the user's committed `.terraform.lock.hcl` if
         # present. It pins provider versions across plan/apply (see #306);
         # discarding it makes plan-init and apply-init independent
         # resolutions of the version constraint, which can drift.
-        log "[entrypoint] Stripped cloud/backend blocks from uploaded config"
+        TP_OVERRIDE_FILE="$STRIP_DIR/zzzz_terrapod_backend_override.tf"
+        for tp_ov in "$STRIP_DIR"/override.tf "$STRIP_DIR"/*_override.tf; do
+            [ -f "$tp_ov" ] || continue
+            case "$tp_ov" in
+                "$TP_OVERRIDE_FILE") continue ;;
+            esac
+            if grep -qE '^[[:space:]]*terraform[[:space:]]*\{' "$tp_ov" \
+               && grep -qE '(^|[[:space:]])(backend[[:space:]]*"|cloud[[:space:]]*\{)' "$tp_ov"; then
+                log "[entrypoint] Note: user override $tp_ov declares a backend/cloud block — Terrapod's local-backend override takes precedence"
+            fi
+        done
+        cat > "$TP_OVERRIDE_FILE" <<'TPOVR'
+# Terrapod runner: force local backend for in-runner execution.
+# Override files (*_override.tf) are merged by terraform/tofu with
+# replacement semantics over the main config — this displaces any
+# `cloud {}` or `backend "x" {}` declared in the main config. The
+# `zzzz` prefix makes this file sort last so it wins the override merge.
+terraform {
+  backend "local" {}
+}
+TPOVR
+        log "[entrypoint] Wrote $TP_OVERRIDE_FILE (forces local backend via override)"
     else
         log "[entrypoint] No configuration archive (HTTP ${TP_LAST_HTTP:-none})"
     fi
@@ -437,6 +475,22 @@ if [ "$INIT_EXIT" != "0" ]; then
     # Log uploaded by on_exit trap — no explicit upload here.
     exit "$INIT_EXIT"
 fi
+
+# --- Backend backstop (#346) ---
+# The runner MUST execute on the local backend; a remote backend inside
+# the Job recurses straight back into Terrapod. The
+# zzzz_terrapod_backend_override.tf override file forces this by winning
+# the override-file merge. As a hard guarantee against a pathological
+# user file that sorts even later, verify the backend that init actually
+# configured — it is recorded in .terraform/terraform.tfstate.
+TP_CONFIGURED_BACKEND=$(jq -r '.backend.type // "MISSING"' .terraform/terraform.tfstate 2>/dev/null || echo "MISSING")
+if [ "$TP_CONFIGURED_BACKEND" != "local" ]; then
+    log "[entrypoint] FATAL: expected the local backend after init, got '$TP_CONFIGURED_BACKEND'."
+    log "[entrypoint] A user-supplied override file appears to have displaced the Terrapod backend override."
+    log "[entrypoint] Remove any committed override.tf / *_override.tf that declares a 'backend' or 'cloud' block."
+    exit 1
+fi
+log "[entrypoint] Backend verified: local"
 
 # --- Plan phase: upload the lock file produced (or augmented) by init ---
 # Apply phase will download this so its init resolves to the same
