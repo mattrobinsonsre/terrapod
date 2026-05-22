@@ -30,8 +30,9 @@ COPY services/terrapod ./terrapod
 COPY services/tests ./tests
 
 # Copy the runner entrypoint so tests can exercise its real shell logic
-# as a fixture (e.g. the cloud/backend block-stripping golden test for
-# #344). The entrypoint itself isn't executed here — it's read.
+# as a fixture (e.g. the backend-override + post-init backstop tests for
+# #346). The entrypoint itself isn't executed here — fragments are
+# extracted and run in isolation.
 COPY docker/runner-entrypoint.sh ./docker/runner-entrypoint.sh
 
 # Storage data directory for tests

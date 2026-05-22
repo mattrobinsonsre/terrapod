@@ -147,8 +147,9 @@ def test_writes_override_even_when_user_override_has_backend(tmp_path: Path) -> 
 
 def test_writes_override_when_user_suffix_override_has_cloud(tmp_path: Path) -> None:
     """User's ``*_override.tf`` declares a ``cloud {}`` override → ours is
-    still written. The ``zzzz`` prefix sorts after ``_user_dev`` so ours
-    wins the merge."""
+    still written and the user override is logged. ``_user_dev_override.tf``
+    sorts before ``zzzz_terrapod_backend_override.tf`` (``_`` 0x5F < ``z``
+    0x7A), so ours is the later file and wins the merge."""
     (tmp_path / "main.tf").write_text('terraform {\n  backend "remote" {}\n}\n')
     (tmp_path / "_user_dev_override.tf").write_text(
         'terraform {\n  cloud {\n    organization = "local"\n  }\n}\n'
@@ -266,3 +267,16 @@ def test_backstop_fails_when_state_file_missing(tmp_path: Path) -> None:
     result = _run_backstop(tmp_path)
     assert result.returncode == 1
     assert "FATAL" in result.stdout
+
+
+def test_backstop_fails_on_empty_state_file(tmp_path: Path) -> None:
+    """An empty ``.terraform/terraform.tfstate`` → ``jq`` exits 0 with no
+    output; the entrypoint normalises that to ``MISSING`` and the backstop
+    fails safe with a sensible diagnostic."""
+    tfdir = tmp_path / ".terraform"
+    tfdir.mkdir()
+    (tfdir / "terraform.tfstate").write_text("")
+    result = _run_backstop(tmp_path)
+    assert result.returncode == 1
+    assert "FATAL" in result.stdout
+    assert "MISSING" in result.stdout

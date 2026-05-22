@@ -206,8 +206,8 @@ Terraform and OpenTofu merge any file matching `*_override.tf` over the main con
 
 **Our override always wins.** Local execution is a hard correctness requirement, so the override is written unconditionally — the runner never defers to a user-supplied backend declaration (deferring to a committed `cloud {}` or `backend "remote"` would hand the runner a remote backend and recurse). Two mechanisms enforce this:
 
-1. **Merge order.** Override files are merged in lexical order with the *last* file winning. The `zzzz` filename prefix sorts after `override.tf` and any realistic `*_override.tf`, so Terrapod's `backend "local"` is the one that takes effect. If the workspace does ship its own override file declaring a backend/cloud block, the runner logs a `takes precedence` note so the override is visible — but still writes and wins with its own.
-2. **Post-init backstop.** After `init`, the entrypoint reads the backend type that terraform/tofu actually configured (recorded in `.terraform/terraform.tfstate`). If it is anything other than `local` — the residual case of a pathological user file that sorts even later than `zzzz_…` — the run **fails immediately** with a clear error rather than executing against a remote backend.
+1. **Merge order.** Override files are merged in lexical order with the *last* file winning. The `zzzz` filename prefix sorts after `override.tf` and the overwhelming majority of `*_override.tf` names, so Terrapod's `backend "local"` is the one that takes effect. If the workspace does ship its own override file declaring a backend/cloud block, the runner logs a `takes precedence` note so the override is visible — but still writes and wins with its own.
+2. **Post-init backstop.** Merge order alone is not a hard guarantee — a user file sorting even later than `zzzz_…` would still win — so this is the real safety net. After `init`, the entrypoint reads the backend type that terraform/tofu actually configured (recorded in `.terraform/terraform.tfstate`). If it is anything other than `local`, the run **fails immediately** with a clear error rather than executing against a remote backend.
 
 ---
 

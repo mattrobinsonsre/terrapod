@@ -484,6 +484,10 @@ fi
 # user file that sorts even later, verify the backend that init actually
 # configured — it is recorded in .terraform/terraform.tfstate.
 TP_CONFIGURED_BACKEND=$(jq -r '.backend.type // "MISSING"' .terraform/terraform.tfstate 2>/dev/null || echo "MISSING")
+# jq on an empty file exits 0 with empty output — normalise to MISSING so
+# the diagnostic below reads sensibly (the != local check fails safe
+# either way).
+[ -n "$TP_CONFIGURED_BACKEND" ] || TP_CONFIGURED_BACKEND="MISSING"
 if [ "$TP_CONFIGURED_BACKEND" != "local" ]; then
     log "[entrypoint] FATAL: expected the local backend after init, got '$TP_CONFIGURED_BACKEND'."
     log "[entrypoint] A user-supplied override file appears to have displaced the Terrapod backend override."
