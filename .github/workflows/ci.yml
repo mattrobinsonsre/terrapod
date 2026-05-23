@@ -467,6 +467,20 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           username: ${{ github.actor }}
 
+      # Human-readable findings step. Always prints the table of CVEs
+      # Trivy would gate on to the action log — so a failure in the
+      # gating step below can be diagnosed without downloading SARIF or
+      # re-running Trivy locally. exit-code: '0' keeps this informational.
+      - name: Trivy findings (table, informational)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: pentest/trivy/.trivyignore
+          exit-code: '0'
+
       - name: Scan with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
         with:
