@@ -666,3 +666,31 @@ Have the **producer's admin** authorize the consumer — via the Terrapod provid
 ### Producer deleted or archived
 
 If the producer workspace was deleted, the grant rows cascade-deleted automatically and the consumer's next read returns 404 (no state). If the producer is `archived` via the [autodiscovery lifecycle](autodiscovery.md), the state is retained until purged — reads continue until then. Restoring an archived producer's grant requires recreating the workspace and re-authorizing the consumers.
+
+---
+
+## Policy enforcement blocking all runs
+
+**Symptom**: after creating or editing an OPA policy set, runs across many (or all) workspaces stop advancing — they sit in `planning` and the run's **Policy Checks** panel shows a mandatory failure.
+
+**Why**: a **mandatory**, broadly-scoped (often `global`) policy set has a policy that denies the plans. A mandatory failure holds the run in `planning` rather than erroring it, so the blast radius is "nothing applies" — recoverable, not destructive. See [policies.md](policies.md).
+
+### Diagnosis
+
+1. Open a blocked run's Policy Checks panel — it names the failing policy set and the specific `deny` messages.
+2. Identify the set: `GET /api/terrapod/v1/policy-sets` — look for `enforcement-level: mandatory` and a broad scope (`global-scope: true` or wide allow-labels).
+3. Decide whether the policy is correct-but-the-infra-is-wrong (fix the Terraform), or the policy itself is wrong/too broad.
+
+### Resolution
+
+Pick the least-disruptive option that fits:
+
+- **Policy is wrong** — fix the Rego (`PATCH /api/terrapod/v1/policies/{id}`) or delete the offending policy. The next reconciler tick re-evaluates held runs automatically.
+- **Set is too broadly scoped** — narrow its allow-labels, or set `enabled: false` on the set (`PATCH /api/terrapod/v1/policy-sets/{id}`) to stop it being evaluated. Disabling does not delete it.
+- **Demote to advisory** — `PATCH` the set's `enforcement-level` to `advisory`; runs then proceed with a warning instead of a block. Note the enforcement level is *snapshotted per evaluation*, so already-recorded blocks are cleared by re-evaluation, not by the edit alone — held runs re-evaluate on the next tick.
+- **Single urgent run** — a workspace admin can override one run from its Policy Checks panel ("Override & Continue").
+
+### Verification
+
+- `GET /api/terrapod/v1/runs/{id}/policy-evaluations` for a previously-blocked run shows the mandatory set now `passed` (or `overridden`).
+- Held runs advance out of `planning` within one reconciler tick (~10s).

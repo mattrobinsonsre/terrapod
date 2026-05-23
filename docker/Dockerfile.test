@@ -15,6 +15,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxmlsec1-openssl \
     && rm -rf /var/lib/apt/lists/*
 
+# OPA — so the policy-engine tests (#343) exercise the real binary
+# rather than skipping. Kept in sync with docker/Dockerfile.api.
+ARG TARGETARCH
+ARG OPA_VERSION=1.16.2
+RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
+    && curl -fsSL -o /usr/local/bin/opa \
+       "https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}/opa_linux_${ARCH}_static" \
+    && chmod 0755 /usr/local/bin/opa \
+    && /usr/local/bin/opa version
+
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir poetry==1.8.4
 

@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { PlanSummaryBadges } from '@/components/plan-summary-badges'
-import { getAuthState } from '@/lib/auth'
+import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
 import { ChevronsDown, ChevronsUp, ArrowDownToLine, RefreshCw } from 'lucide-react'
@@ -598,6 +598,9 @@ export default function RunDetailPage() {
           </div>
         )}
 
+        {/* OPA policy evaluations (#343) */}
+        <PolicyPanel runId={runId} onChanged={loadRun} />
+
         {/* No-changes notice — explains why Confirm & Apply isn't shown.
             Only relevant for plan-and-apply runs (plan-only runs simply
             report the plan and have no concept of an apply phase). */}
@@ -845,5 +848,176 @@ export default function RunDetailPage() {
         )}
       </main>
     </>
+  )
+}
+
+// ── OPA policy evaluations panel (#343) ────────────────────────────────
+
+interface PolicyEvalResult {
+  policy: string
+  passed: boolean
+  violations: string[]
+  warnings: string[]
+  error: string | null
+}
+
+interface PolicyEval {
+  id: string
+  attributes: {
+    'policy-set-name': string
+    'enforcement-level': string
+    outcome: string
+    result: { policies?: PolicyEvalResult[]; error?: string }
+    'overridden-by': string | null
+  }
+}
+
+interface PolicySummary {
+  status: string
+  total: number
+  passed: number
+  failed: number
+}
+
+function outcomeBadge(outcome: string): string {
+  if (outcome === 'passed') return 'bg-green-900/50 text-green-300'
+  if (outcome === 'failed') return 'bg-red-900/50 text-red-300'
+  return 'bg-amber-900/50 text-amber-300' // errored
+}
+
+function PolicyPanel({ runId, onChanged }: { runId: string; onChanged: () => void }) {
+  const [evals, setEvals] = useState<PolicyEval[]>([])
+  const [summary, setSummary] = useState<PolicySummary | null>(null)
+  const [loaded, setLoaded] = useState(false)
+  const [overriding, setOverriding] = useState(false)
+  const [err, setErr] = useState('')
+
+  const load = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/api/terrapod/v1/runs/${runId}/policy-evaluations`)
+      if (res.ok) {
+        const data = await res.json()
+        setEvals(data.data || [])
+        setSummary(data.meta?.summary || null)
+      }
+    } catch {
+      /* policy checks are non-critical chrome — stay quiet on failure */
+    } finally {
+      setLoaded(true)
+    }
+  }, [runId])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  if (!loaded || evals.length === 0) return null
+
+  const blocked = summary?.status === 'blocked'
+
+  async function override() {
+    setOverriding(true)
+    setErr('')
+    try {
+      const res = await apiFetch(`/api/terrapod/v1/runs/${runId}/actions/override-policy`, {
+        method: 'POST',
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.detail || `Override failed (${res.status})`)
+      }
+      await load()
+      onChanged()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Override failed')
+    } finally {
+      setOverriding(false)
+    }
+  }
+
+  return (
+    <div className="mb-6 bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-slate-200">Policy Checks</h3>
+        {summary && (
+          <span className="text-xs text-slate-400">
+            {summary.passed}/{summary.total} passed
+          </span>
+        )}
+      </div>
+
+      {blocked && (
+        <div className="mb-3 p-3 bg-red-900/20 rounded-lg border border-red-800/50">
+          <p className="text-sm text-red-300">
+            This run is <strong>blocked by a mandatory policy set</strong>. It will not apply until
+            the failure is resolved or an admin overrides it.
+          </p>
+          {isAdmin() && (
+            <button
+              onClick={override}
+              disabled={overriding}
+              className="mt-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-900/60 hover:bg-red-800 disabled:opacity-50 text-red-100 transition-colors"
+            >
+              {overriding ? 'Overriding...' : 'Override & Continue'}
+            </button>
+          )}
+        </div>
+      )}
+      {err && <p className="mb-3 text-sm text-red-400">{err}</p>}
+
+      <div className="space-y-3">
+        {evals.map((ev) => {
+          const a = ev.attributes
+          const policies = a.result?.policies || []
+          return (
+            <div key={ev.id} className="border border-slate-700/40 rounded-lg p-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium text-slate-200">{a['policy-set-name']}</span>
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    a['enforcement-level'] === 'mandatory'
+                      ? 'bg-red-900/40 text-red-300'
+                      : 'bg-amber-900/40 text-amber-300'
+                  }`}
+                >
+                  {a['enforcement-level']}
+                </span>
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${outcomeBadge(a.outcome)}`}
+                >
+                  {a.outcome}
+                </span>
+                {a['overridden-by'] && (
+                  <span className="text-xs text-slate-500">overridden by {a['overridden-by']}</span>
+                )}
+              </div>
+              {a.result?.error && (
+                <p className="mt-2 text-xs text-amber-300 font-mono">{a.result.error}</p>
+              )}
+              {policies
+                .filter((p) => !p.passed || p.warnings.length > 0)
+                .map((p) => (
+                  <div key={p.policy} className="mt-2 text-xs">
+                    <span className="text-slate-300 font-medium">{p.policy}</span>
+                    {p.error && <span className="text-amber-300 font-mono"> — {p.error}</span>}
+                    <ul className="mt-1 ml-3 space-y-0.5">
+                      {p.violations.map((v, i) => (
+                        <li key={`v${i}`} className="text-red-300 font-mono">
+                          &bull; {v}
+                        </li>
+                      ))}
+                      {p.warnings.map((w, i) => (
+                        <li key={`w${i}`} className="text-amber-300 font-mono">
+                          &bull; {w}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }

@@ -4,6 +4,8 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from terrapod.services.run_reconciler import (
     DEFAULT_STALE_TIMEOUT_SECONDS,
     _check_stale,
@@ -132,6 +134,17 @@ _PERSIST_PATCH = "terrapod.services.run_reconciler._persist_live_log_if_missing"
 
 
 class TestHandleSucceeded:
+    @pytest.fixture(autouse=True)
+    def _stub_policy_gate(self):
+        """complete_plan now runs a post-plan OPA policy gate (#343).
+        These tests use a mock db, so stub the gate to a clean pass —
+        the gate has its own dedicated tests in test_policy_set_service."""
+        with patch(
+            "terrapod.services.policy_set_service.evaluate_post_plan",
+            new=AsyncMock(return_value="passed"),
+        ):
+            yield
+
     @patch(_PERSIST_PATCH, new_callable=AsyncMock)
     @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
     @patch("terrapod.services.run_service.transition_run", new_callable=AsyncMock)

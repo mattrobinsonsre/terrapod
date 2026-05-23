@@ -2160,6 +2160,92 @@ Sends a test payload to the configured destination and returns the delivery resp
 
 ---
 
+## Policy Sets
+
+OPA policy-as-code enforcement. Policy sets and their policies are admin-managed; per-run policy evaluations are readable by anyone with read on the run's workspace. See [policies.md](policies.md) for the Rego authoring contract.
+
+### List Policy Sets
+
+```
+GET /api/terrapod/v1/policy-sets
+```
+
+Returns all policy sets. **Required permission:** `admin` or `audit`.
+
+### Create Policy Set
+
+```
+POST /api/terrapod/v1/policy-sets
+```
+
+```json
+{
+  "data": {
+    "type": "policy-sets",
+    "attributes": {
+      "name": "production-guardrails",
+      "description": "Mandatory guardrails for production",
+      "enforcement-level": "mandatory",
+      "global-scope": false,
+      "allow-labels": {"env": ["prod"]},
+      "deny-names": ["prod-sandbox"]
+    }
+  }
+}
+```
+
+`enforcement-level` is `advisory` (default) or `mandatory`. Scoping is `global-scope: true` (every workspace) or the `allow-labels` / `allow-names` / `deny-labels` / `deny-names` rules (same label model as roles; deny wins). **Required permission:** `admin`.
+
+### Show / Update / Delete Policy Set
+
+```
+GET    /api/terrapod/v1/policy-sets/{id}     # policies embedded
+PATCH  /api/terrapod/v1/policy-sets/{id}     # partial update
+DELETE /api/terrapod/v1/policy-sets/{id}
+```
+
+Deleting a set removes its policies; recorded run evaluations are kept (set reference nulled, name snapshot retained). **Required permission:** `admin` (`admin`/`audit` for show).
+
+### Manage Policies
+
+```
+POST   /api/terrapod/v1/policy-sets/{id}/policies   # add a policy
+PATCH  /api/terrapod/v1/policies/{id}               # update
+DELETE /api/terrapod/v1/policies/{id}
+```
+
+```json
+{
+  "data": {
+    "type": "policies",
+    "attributes": {
+      "name": "no-public-buckets",
+      "rego": "package terrapod\n\ndeny contains msg if { ... }"
+    }
+  }
+}
+```
+
+The Rego is validated with `opa check` on create/update — broken Rego, or Rego that does not declare `package terrapod`, is rejected with 422. **Required permission:** `admin`.
+
+### List Run Policy Evaluations
+
+```
+GET /api/terrapod/v1/runs/{run_id}/policy-evaluations
+```
+
+Returns the policy evaluations recorded for a run, plus a `meta.summary` (`status`: `passed` / `advisory-failed` / `blocked`, and counts). Each evaluation's `result` carries the per-policy violations/warnings. This is the endpoint behind the run's `policy-checks` relationship link. **Required permission:** `read` on the run's workspace.
+
+### Override Run Policy
+
+```
+POST /api/terrapod/v1/runs/{run_id}/actions/override-policy
+```
+
+Overrides every failed/errored policy evaluation of a run and immediately re-drives a run held at the post-plan policy gate. **Required permission:** `admin` on the run's workspace.
+
+---
+
 ## Common Response Codes
 
 | Code | Meaning |
