@@ -39,7 +39,6 @@ from terrapod.api.dependencies import (
     AuthenticatedUser,
     get_current_user,
     require_admin,
-    require_admin_or_audit,
 )
 from terrapod.db.models import Policy, PolicyEvaluation, PolicySet, Run, Workspace
 from terrapod.db.session import get_db
@@ -52,9 +51,19 @@ logger = get_logger(__name__)
 
 VALID_ENFORCEMENT = {"advisory", "mandatory"}
 # A Terrapod policy must declare `package terrapod` — Terrapod queries
-# `data.terrapod.deny`. A policy in another package would silently
-# always pass, so this is rejected at write time.
-_PACKAGE_RE = re.compile(r"(?m)^\s*package\s+terrapod\b")
+# `data.terrapod.deny`. A policy in another package, including a sub-
+# package like `terrapod.aws.s3`, would silently always pass, so we
+# require the package to be *exactly* `terrapod` (trailing whitespace
+# or a comment is fine). `\b` alone matches at the `.` in `terrapod.foo`
+# so we anchor with `\s*$` / a `#` instead.
+_PACKAGE_RE = re.compile(r"(?m)^\s*package\s+terrapod\s*(#.*)?$")
+
+# A Terrapod policy must also actually define a `deny` rule — a policy
+# in `package terrapod` that doesn't define `deny` would silently
+# always pass. v1 syntax allows `deny contains msg if { ... }`,
+# `deny := [...]`, or `deny = ...`. The regex matches the rule head at
+# the start of a line.
+_DENY_RULE_RE = re.compile(r"(?m)^\s*deny\s+(contains|:=|=)")
 
 
 def _rfc3339(dt) -> str:
@@ -160,7 +169,7 @@ def _validate_enforcement(level: str) -> str:
 
 @router.get("/policy-sets")
 async def list_policy_sets(
-    user: AuthenticatedUser = Depends(require_admin_or_audit),
+    user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List all policy sets."""
@@ -217,7 +226,7 @@ async def create_policy_set(
 @router.get("/policy-sets/{ps_id}")
 async def show_policy_set(
     ps_id: str = Path(...),
-    user: AuthenticatedUser = Depends(require_admin_or_audit),
+    user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Show a policy set with its policies embedded."""
@@ -287,13 +296,32 @@ async def delete_policy_set(
 
 
 async def _validate_rego(rego: str) -> None:
-    """Reject Rego that won't compile or doesn't declare package terrapod."""
+    """Reject Rego that won't compile or doesn't declare package terrapod.
+
+    Three checks, cheapest first: non-empty, exact `package terrapod`
+    declaration, a `deny` rule head, then `opa check` for syntax. The
+    package + deny checks catch the silent-always-pass footguns (a
+    policy in the wrong package, or one that never defines a deny rule)
+    that `opa check` won't flag.
+    """
     if not rego or not rego.strip():
         raise HTTPException(status_code=422, detail="rego source is required")
     if not _PACKAGE_RE.search(rego):
         raise HTTPException(
             status_code=422,
-            detail="policy Rego must declare 'package terrapod'",
+            detail=(
+                "policy Rego must declare 'package terrapod' exactly "
+                "(sub-packages like 'package terrapod.foo' are not evaluated by Terrapod)"
+            ),
+        )
+    if not _DENY_RULE_RE.search(rego):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "policy Rego must define a 'deny' rule "
+                "(e.g. `deny contains msg if { ... }`); "
+                "a policy with no deny rule would silently always pass"
+            ),
         )
     err = await policy_engine.check_rego(rego)
     if err is not None:

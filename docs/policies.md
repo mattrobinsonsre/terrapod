@@ -115,7 +115,9 @@ A workspace **admin** can override a run blocked by a mandatory policy
 failure from the run's Policy Checks panel ("Override & Continue"). The
 override is recorded against each failed evaluation (`overridden_by`),
 and the run is released to continue immediately. Alternatively, the run
-can be discarded.
+can be cancelled — a policy-blocked run sits in `planning`, so `cancel`
+(not `discard`, which is for `planned` runs awaiting confirmation) is
+the right action.
 
 ## Managing policy sets
 

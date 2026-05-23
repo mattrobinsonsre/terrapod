@@ -29,10 +29,11 @@ from typing import Any
 
 import structlog
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from terrapod.db.models import PolicyEvaluation, PolicySet, Run, Workspace, now_utc
+from terrapod.db.models import PolicyEvaluation, PolicySet, Run, Workspace, generate_uuid7, now_utc
 from terrapod.services import policy_engine
 from terrapod.storage import get_storage
 from terrapod.storage.keys import plan_json_output_key
@@ -162,20 +163,46 @@ async def _evaluate_one_set(
     return outcome, {"policies": results, "evaluated_at": datetime.now(UTC).isoformat()}
 
 
+async def _insert_evaluations(db: AsyncSession, rows: list[dict[str, Any]]) -> None:
+    """Insert PolicyEvaluation rows with ``ON CONFLICT DO NOTHING``.
+
+    The post-plan gate can race across replicas: two reconcilers can
+    both observe ``already is None`` before either commits, then both
+    attempt to write the same ``(run_id, policy_set_id)`` rows. The
+    unique constraint ``uq_policy_evaluations_run_set`` would surface
+    that as IntegrityError → 500. Using Postgres ``ON CONFLICT DO
+    NOTHING`` makes the second writer's rows silent no-ops, leaving the
+    canonical state from whichever replica won. The wasted OPA work in
+    that narrow window is tolerated.
+    """
+    if not rows:
+        return
+    stmt = (
+        pg_insert(PolicyEvaluation)
+        .values(rows)
+        .on_conflict_do_nothing(index_elements=["run_id", "policy_set_id"])
+    )
+    await db.execute(stmt)
+
+
 async def _record_unavailable(db: AsyncSession, run: Run, sets: list[PolicySet]) -> None:
     """Record an ``errored`` evaluation per set when the plan JSON never
     arrived. Fail-closed: a mandatory set then blocks the run."""
-    for ps in sets:
-        db.add(
-            PolicyEvaluation(
-                run_id=run.id,
-                policy_set_id=ps.id,
-                policy_set_name=ps.name,
-                enforcement_level=ps.enforcement_level,
-                outcome="errored",
-                result={"error": "plan JSON was not available for policy evaluation"},
-            )
-        )
+    stamp = now_utc()
+    rows = [
+        {
+            "id": generate_uuid7(),
+            "run_id": run.id,
+            "policy_set_id": ps.id,
+            "policy_set_name": ps.name,
+            "enforcement_level": ps.enforcement_level,
+            "outcome": "errored",
+            "result": {"error": "plan JSON was not available for policy evaluation"},
+            "created_at": stamp,
+        }
+        for ps in sets
+    ]
+    await _insert_evaluations(db, rows)
     logger.warning(
         "Policy evaluation skipped — plan JSON unavailable",
         run_id=str(run.id),
@@ -225,18 +252,23 @@ async def evaluate_post_plan(db: AsyncSession, run: Run) -> str:
 
             if plan_json is not None:
                 context = _build_context(ws, run)
+                stamp = now_utc()
+                rows = []
                 for ps in sets:
                     outcome, result = await _evaluate_one_set(ps, plan_json, context)
-                    db.add(
-                        PolicyEvaluation(
-                            run_id=run.id,
-                            policy_set_id=ps.id,
-                            policy_set_name=ps.name,
-                            enforcement_level=ps.enforcement_level,
-                            outcome=outcome,
-                            result=result,
-                        )
+                    rows.append(
+                        {
+                            "id": generate_uuid7(),
+                            "run_id": run.id,
+                            "policy_set_id": ps.id,
+                            "policy_set_name": ps.name,
+                            "enforcement_level": ps.enforcement_level,
+                            "outcome": outcome,
+                            "result": result,
+                            "created_at": stamp,
+                        }
                     )
+                await _insert_evaluations(db, rows)
                 logger.info(
                     "Policy evaluation complete",
                     run_id=str(run.id),

@@ -449,6 +449,18 @@ async def complete_plan(
     if run.status != "planning":
         return run
 
+    # Stamp the plan-phase end timestamp now, before the run-task and policy
+    # gates can hold the run in `planning`. Semantically the plan phase is
+    # done (the runner posted plan-result or its Job reported success); the
+    # gates are a downstream platform concern. Doing this here gives the
+    # post-plan policy gate's grace-timer a stable anchor — without it,
+    # plan_finished_at would only be set when transition_run("planned")
+    # eventually fires, which the gate itself prevents (#343).
+    if run.plan_finished_at is None and run.plan_started_at is not None:
+        from terrapod.db.models import now_utc
+
+        run.plan_finished_at = now_utc()
+
     if has_changes is not None:
         run.has_changes = has_changes
 

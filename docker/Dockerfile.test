@@ -16,12 +16,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # OPA — so the policy-engine tests (#343) exercise the real binary
-# rather than skipping. Kept in sync with docker/Dockerfile.api.
+# rather than skipping. Kept in sync with docker/Dockerfile.api; both
+# pin and verify the same OPA_VERSION + SHA256 so a bump in one without
+# the other can't silently land an unverified binary in either image.
 ARG TARGETARCH
 ARG OPA_VERSION=1.16.2
 RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
-    && curl -fsSL -o /usr/local/bin/opa \
-       "https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}/opa_linux_${ARCH}_static" \
+    && BASE="https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}" \
+    && curl -fsSL -o /usr/local/bin/opa "${BASE}/opa_linux_${ARCH}_static" \
+    && curl -fsSL -o /tmp/opa.sha256 "${BASE}/opa_linux_${ARCH}_static.sha256" \
+    && echo "$(cut -d' ' -f1 /tmp/opa.sha256)  /usr/local/bin/opa" | sha256sum -c - \
+    && rm /tmp/opa.sha256 \
     && chmod 0755 /usr/local/bin/opa \
     && /usr/local/bin/opa version
 

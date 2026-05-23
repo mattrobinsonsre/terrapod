@@ -911,6 +911,19 @@ function PolicyPanel({ runId, onChanged }: { runId: string; onChanged: () => voi
     load()
   }, [load])
 
+  // Poll while we're still waiting for evaluations to land, or while the
+  // run is held blocked (an override could come from another admin in
+  // another tab). Once evaluations are recorded and the run isn't
+  // blocked, no further policy state changes are expected.
+  useEffect(() => {
+    if (!loaded) return
+    const needsPoll =
+      evals.length === 0 || summary?.status === 'blocked'
+    if (!needsPoll) return
+    const handle = window.setInterval(load, 10_000)
+    return () => window.clearInterval(handle)
+  }, [loaded, evals.length, summary?.status, load])
+
   if (!loaded || evals.length === 0) return null
 
   const blocked = summary?.status === 'blocked'

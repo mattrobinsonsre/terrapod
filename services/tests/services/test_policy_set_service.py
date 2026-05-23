@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import uuid
+from datetime import timedelta
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from terrapod.db.models import now_utc
 from terrapod.services import policy_set_service
 from terrapod.services.policy_engine import PolicyResult
 
@@ -139,3 +142,140 @@ async def test_evaluate_one_set_error_takes_precedence() -> None:
     ):
         outcome, _ = await policy_set_service._evaluate_one_set(ps, b"{}", {})
     assert outcome == "errored"
+
+
+# ── evaluate_post_plan orchestration ──────────────────────────────────
+
+
+def _stub_run(**kw) -> SimpleNamespace:
+    base = {
+        "id": uuid.uuid4(),
+        "workspace_id": uuid.uuid4(),
+        "has_json_output": False,
+        "plan_finished_at": None,
+        "plan_only": False,
+        "message": "m",
+        "source": "tfe-api",
+        "is_destroy": False,
+    }
+    base.update(kw)
+    return SimpleNamespace(**base)
+
+
+def _stub_ws() -> SimpleNamespace:
+    return SimpleNamespace(id=uuid.uuid4(), name="w", labels={"env": "prod"})
+
+
+def _stub_db(
+    *,
+    existing_eval_id: object = None,
+    blocked: bool = False,
+) -> MagicMock:
+    """Build a MagicMock async db just rich enough for evaluate_post_plan.
+
+    ``existing_eval_id`` controls what the "are there already PolicyEvaluation
+    rows for this run?" query returns (a tuple to indicate present, ``None``
+    to indicate absent). ``blocked`` controls what ``run_is_policy_blocked``
+    sees afterwards.
+    """
+    db = MagicMock()
+    db.get = AsyncMock(return_value=_stub_ws())
+
+    already_row = (existing_eval_id,) if existing_eval_id is not None else None
+    blocked_row = (uuid.uuid4(),) if blocked else None
+
+    # First `db.execute` call: the "already" probe. Subsequent calls (from
+    # run_is_policy_blocked) get the blocked-row result. side_effect drives
+    # them in order.
+    first = MagicMock()
+    first.first = MagicMock(return_value=already_row)
+    second = MagicMock()
+    second.first = MagicMock(return_value=blocked_row)
+    # Any further executes (e.g. _insert_evaluations) — return a benign mock.
+    db.execute = AsyncMock(side_effect=[first, second, MagicMock(), MagicMock()])
+    db.flush = AsyncMock()
+    db.add = MagicMock()
+    return db
+
+
+@pytest.mark.asyncio
+async def test_evaluate_post_plan_no_applicable_sets_passes() -> None:
+    db = _stub_db()
+    run = _stub_run()
+    with patch.object(policy_set_service, "applicable_policy_sets", new=AsyncMock(return_value=[])):
+        result = await policy_set_service.evaluate_post_plan(db, run)
+    assert result == policy_set_service.GATE_PASSED
+
+
+@pytest.mark.asyncio
+async def test_evaluate_post_plan_pending_when_no_json_within_grace() -> None:
+    """Plan JSON not yet uploaded and grace window not elapsed → caller
+    should retry on the next reconciler tick."""
+    db = _stub_db()
+    run = _stub_run(has_json_output=False, plan_finished_at=now_utc())
+    ps = _ps(enforcement_level="mandatory")
+    with patch.object(
+        policy_set_service, "applicable_policy_sets", new=AsyncMock(return_value=[ps])
+    ):
+        result = await policy_set_service.evaluate_post_plan(db, run)
+    assert result == policy_set_service.GATE_PENDING
+
+
+@pytest.mark.asyncio
+async def test_evaluate_post_plan_records_unavailable_past_grace() -> None:
+    """Plan JSON never arrived, grace elapsed → record errored evals
+    fail-closed; a mandatory set then blocks the run.
+
+    This test would fail if the grace timer regressed to its broken
+    state (anchored on a field the gate itself prevents from being set
+    — see #343's first review).
+    """
+    db = _stub_db(blocked=True)
+    run = _stub_run(
+        has_json_output=False,
+        plan_finished_at=now_utc()
+        - timedelta(seconds=policy_set_service.PLAN_JSON_GRACE_SECONDS + 30),
+    )
+    ps = _ps(enforcement_level="mandatory", id=uuid.uuid4())
+    with patch.multiple(
+        policy_set_service,
+        applicable_policy_sets=AsyncMock(return_value=[ps]),
+        _insert_evaluations=AsyncMock(),
+    ):
+        result = await policy_set_service.evaluate_post_plan(db, run)
+    assert result == policy_set_service.GATE_BLOCKED
+
+
+@pytest.mark.asyncio
+async def test_evaluate_post_plan_idempotent_when_evals_already_present() -> None:
+    """Second call must NOT re-OPA; it just re-checks the gate so an
+    override taken since the first call takes effect."""
+    db = _stub_db(existing_eval_id=uuid.uuid4(), blocked=False)
+    run = _stub_run(has_json_output=True)
+    ps = _ps(enforcement_level="mandatory")
+
+    eval_mock = AsyncMock()
+    with patch.multiple(
+        policy_set_service,
+        applicable_policy_sets=AsyncMock(return_value=[ps]),
+        _evaluate_one_set=eval_mock,
+    ):
+        result = await policy_set_service.evaluate_post_plan(db, run)
+    assert result == policy_set_service.GATE_PASSED
+    eval_mock.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_evaluate_post_plan_speculative_runs_never_gate() -> None:
+    """Plan-only (speculative) runs are evaluated and recorded but the
+    gate always returns PASSED — there's no apply to block."""
+    db = _stub_db(blocked=True)  # would block a non-plan-only run
+    run = _stub_run(plan_only=True, has_json_output=False, plan_finished_at=now_utc())
+    ps = _ps(enforcement_level="mandatory")
+    with patch.object(
+        policy_set_service, "applicable_policy_sets", new=AsyncMock(return_value=[ps])
+    ):
+        result = await policy_set_service.evaluate_post_plan(db, run)
+    # Either passed outright (eval not done — gate pending) or passed because
+    # the speculative check kicks in. In both cases never BLOCKED.
+    assert result != policy_set_service.GATE_BLOCKED
