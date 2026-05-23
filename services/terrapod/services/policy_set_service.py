@@ -30,6 +30,7 @@ from typing import Any
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from terrapod.db.models import PolicyEvaluation, PolicySet, Run, Workspace, now_utc
 from terrapod.services import policy_engine
@@ -88,8 +89,23 @@ def policy_set_applies(ps: PolicySet, ws_name: str, ws_labels: dict[str, Any]) -
 
 
 async def applicable_policy_sets(db: AsyncSession, ws: Workspace) -> list[PolicySet]:
-    """All enabled policy sets in scope for the given workspace."""
-    rows = (await db.execute(select(PolicySet).where(PolicySet.enabled.is_(True)))).scalars().all()
+    """All enabled policy sets in scope for the given workspace.
+
+    Eager-loads ``policies`` so the per-policy evaluation downstream does
+    not trigger a sync lazy-load (and the greenlet-spawn error) inside
+    the async event loop.
+    """
+    rows = (
+        (
+            await db.execute(
+                select(PolicySet)
+                .where(PolicySet.enabled.is_(True))
+                .options(selectinload(PolicySet.policies))
+            )
+        )
+        .scalars()
+        .all()
+    )
     return [ps for ps in rows if policy_set_applies(ps, ws.name, ws.labels or {})]
 
 
