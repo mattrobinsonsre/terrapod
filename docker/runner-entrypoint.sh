@@ -238,7 +238,12 @@ tp_evaluate_policies() {
     log "[entrypoint] Fetching policy bundle..."
     _bundle_http=""
     for _attempt in 1 2 3; do
+        # --max-time bounds each attempt at TP_UPLOAD_TIMEOUT (default
+        # 60s), matching every other curl in this script — otherwise
+        # a TCP-stalled connection could burn the full SIGTERM grace
+        # budget on three back-to-back hangs.
         _bundle_http=$(curl -sS -o /tmp/policy-bundle.json -w '%{http_code}' \
+            --max-time "${TP_UPLOAD_TIMEOUT:-60}" \
             -H "$AUTH_HEADER" \
             "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/policy-bundle" 2>/dev/null || echo 000)
         [ "$_bundle_http" = "200" ] && break
@@ -338,7 +343,10 @@ tp_evaluate_policies() {
     echo "$_results" | jq '{results: .}' > /tmp/policy-post.body
     _post_http=""
     for _attempt in 1 2 3; do
+        # --max-time bounds each attempt at TP_UPLOAD_TIMEOUT (see the
+        # bundle GET above for rationale).
         _post_http=$(curl -sS -o /tmp/policy-post.out -w '%{http_code}' \
+            --max-time "${TP_UPLOAD_TIMEOUT:-60}" \
             -X POST -H "$AUTH_HEADER" -H "Content-Type: application/json" \
             --data-binary @/tmp/policy-post.body \
             "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/policy-results" 2>/dev/null || echo 000)

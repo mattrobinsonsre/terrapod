@@ -657,12 +657,22 @@ async def post_policy_results(
         if not isinstance(result, dict):
             raise HTTPException(status_code=422, detail="result must be an object (got a non-dict)")
 
+        ps_name = (item.get("policy_set_name") or "").strip()
+        if not ps_name:
+            # The name is snapshotted onto the row and shown in the UI;
+            # an empty value would render as a blank set badge — a
+            # contract bug on the runner side.
+            raise HTTPException(
+                status_code=422,
+                detail="policy_set_name is required (must be a non-empty string)",
+            )
+
         rows.append(
             {
                 "id": generate_uuid7(),
                 "run_id": run_uuid,
                 "policy_set_id": ps_uuid,
-                "policy_set_name": (item.get("policy_set_name") or "").strip(),
+                "policy_set_name": ps_name,
                 "enforcement_level": enf,
                 "outcome": outcome,
                 "result": result,

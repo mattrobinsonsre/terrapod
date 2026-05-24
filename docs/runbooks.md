@@ -694,3 +694,28 @@ Pick the least-disruptive option that fits:
 
 - `GET /api/terrapod/v1/runs/{id}/policy-evaluations` for a previously-blocked run shows the mandatory set now `passed` (or `overridden`).
 - Held runs advance out of `planning` within one reconciler tick (~10s).
+
+---
+
+## Policy evaluation blocked: runner did not evaluate
+
+**Symptom**: a run is held in `planning` and the Policy Checks panel shows one or more mandatory sets with outcome `errored` and a message starting with **"Runner did not evaluate this mandatory policy set."**
+
+**Why**: OPA evaluation runs on the runner (since #343). For every applicable policy set, the runner is expected to POST a row to `/policy-results` before posting `plan-result`. The post-plan gate compares applicable sets to recorded rows and synthesises an `errored` row for any mandatory set that's missing one — fail-closed.
+
+This usually means **the runner image is from before #343 / does not know about policy-as-code**. Common during a Helm rolling upgrade when a node has a pre-#343 runner image cached and `imagePullPolicy: IfNotPresent` keeps using it until the cache is GC'd. Less commonly it can mean the runner crashed between fetching the bundle and posting results.
+
+### Diagnosis
+
+1. Confirm the runner image. Check the Job pod's image: `kubectl get pods -n terrapod -l app.kubernetes.io/component=runner -o jsonpath='{.items[*].spec.containers[*].image}'`. If you see a SHA / tag from before the Terrapod release that introduced #343, the runner is stale.
+2. Check the node's image cache: `kubectl describe pod <tprun-pod>` — the `Containers.runner.Image` and the events around `Pulled` / `Container image already present on machine` tell you whether the node pulled fresh or reused cache.
+
+### Resolution
+
+- **Roll the runner image forward.** Re-deploy with the matching Terrapod version (or restart the affected node so K8s pulls fresh). Future runs on this workspace will then evaluate cleanly.
+- **Release this specific run** — a workspace admin can override the synthetic errored evaluation from the Policy Checks panel; the run resumes immediately.
+
+### Verification
+
+- A fresh run on the same workspace shows the policy set with a real outcome (`passed` / `failed`) rather than the synthetic `errored` message.
+- The runner pod log includes `Fetching policy bundle...` / `Posting N policy evaluation result(s)` lines — confirms it's a post-#343 image.

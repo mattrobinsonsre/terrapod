@@ -150,56 +150,52 @@ async def _insert_evaluations(db: AsyncSession, rows: list[dict[str, Any]]) -> N
 async def evaluate_post_plan(db: AsyncSession, run: Run) -> str:
     """Post-plan policy gate.
 
-    Mostly a pure DB query — the runner has already fetched the bundle
-    from ``GET /policy-bundle``, run ``opa eval`` against the plan JSON
-    it produced locally, and POSTed the results to ``/policy-results``
-    *before* posting ``plan-result``. So when the API runs the gate the
-    evaluation rows exist (or there were no applicable sets, in which
-    case no rows is the correct answer).
+    The runner is expected to have POSTed an evaluation row per
+    applicable policy set to ``/policy-results`` *before* posting
+    ``plan-result``. The gate verifies that evidence directly rather
+    than trusting a single "the runner fetched the bundle" stamp — a
+    new-#343 runner that GETs the bundle and then fails to POST
+    results (entrypoint crash, a future runner refactor that reorders
+    things, an externally-modified entrypoint) would otherwise present
+    as "stamp set, no rows, pre-#343 → bypass" with the old fast path.
+    Comparing applicable sets to recorded rows closes that hole.
 
-    One non-trivial branch — rolling-upgrade safety. A pre-#343 runner
-    image (cached on a K8s node during a Helm upgrade) doesn't know
-    about ``/policy-bundle`` and never stamps ``policy_bundle_fetched_at``.
-    Treating "no rows" as PASSED in that case would silently bypass any
-    mandatory policy. So if applicable sets exist for this workspace
-    AND the bundle was never fetched AND no rows exist, we write a
-    synthetic ``errored`` evaluation per applicable set and block —
-    the run shows a clear "runner did not evaluate" message and an
-    admin can override.
+    For every applicable set that has **no** recorded row AND is
+    ``mandatory``, the gate writes a synthetic ``errored`` evaluation
+    and blocks — the Policy Checks panel surfaces the missing
+    evaluation and an admin can override. Missing advisory sets are
+    left unrecorded; the safety net exists to block, and advisory
+    rules don't block by design, so a missing advisory has no
+    enforcement effect to safeguard.
 
-    Speculative (plan-only) runs are evaluated and recorded but never
-    gated — there is no apply to block. ``GATE_PENDING`` is gone with
-    the JSON-wait window.
+    Speculative (plan-only) runs are never gated — there is no apply
+    to block. ``GATE_PENDING`` is gone with the JSON-wait window.
     """
     if run.plan_only:
         return GATE_PASSED
 
-    # Fast path: the runner reported.
-    if run.policy_bundle_fetched_at is not None:
-        return GATE_BLOCKED if await run_is_policy_blocked(db, run.id) else GATE_PASSED
-
-    # Slow path: the runner never fetched the bundle. Either there were
-    # never any applicable sets (legitimate — old API + old runner OR
-    # new API with no policies) or the runner is a pre-#343 image that
-    # doesn't know about policy eval. Check which.
     ws = await db.get(Workspace, run.workspace_id)
     if ws is None:
         return GATE_PASSED
+
     sets = await applicable_policy_sets(db, ws)
     if not sets:
         return GATE_PASSED
 
-    # Applicable sets exist but the runner never asked — fail closed
-    # by recording synthetic errored evaluations. Skip if rows already
-    # exist (a previous gate-call already recorded them).
-    existing = (
-        await db.execute(
-            select(PolicyEvaluation.id).where(PolicyEvaluation.run_id == run.id).limit(1)
-        )
-    ).first()
-    if existing is None:
+    # Which applicable sets have a recorded evaluation for this run?
+    recorded_q = await db.execute(
+        select(PolicyEvaluation.policy_set_id).where(PolicyEvaluation.run_id == run.id)
+    )
+    recorded_ids = {pid for (pid,) in recorded_q.all() if pid is not None}
+
+    # A missing *mandatory* set is the only case the safety net needs
+    # to act on. Advisory misses are silently dropped (see above).
+    missing_mandatory = [
+        ps for ps in sets if ps.id not in recorded_ids and ps.enforcement_level == "mandatory"
+    ]
+    if missing_mandatory:
         stamp = now_utc()
-        rows = [
+        synth_rows = [
             {
                 "id": uuid.uuid4(),
                 "run_id": run.id,
@@ -209,23 +205,24 @@ async def evaluate_post_plan(db: AsyncSession, run: Run) -> str:
                 "outcome": "errored",
                 "result": {
                     "error": (
-                        "Runner did not evaluate this policy set — the runner "
-                        "image is from before #343 / does not know about "
-                        "policy-as-code. Roll the runner image forward, then "
-                        "retry the run; or override to release this run."
+                        "Runner did not evaluate this mandatory policy set. "
+                        "If a Helm rolling upgrade is in progress, a pre-#343 "
+                        "runner image cached on this node may have skipped "
+                        "policy evaluation — roll the runner image forward "
+                        "and retry, or override to release this run."
                     )
                 },
                 "created_at": stamp,
             }
-            for ps in sets
+            for ps in missing_mandatory
         ]
-        await _insert_evaluations(db, rows)
+        await _insert_evaluations(db, synth_rows)
         await db.flush()
         logger.warning(
-            "Pre-#343 runner detected (no policy-bundle fetch) — "
-            "synthetic errored evaluations recorded to fail closed",
+            "Mandatory policy set(s) had no evaluation row from the runner — "
+            "synthetic errored rows recorded to fail closed",
             run_id=str(run.id),
-            sets=len(sets),
+            sets=len(missing_mandatory),
         )
 
     return GATE_BLOCKED if await run_is_policy_blocked(db, run.id) else GATE_PASSED

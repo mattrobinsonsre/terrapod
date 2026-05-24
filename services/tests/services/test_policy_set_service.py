@@ -129,32 +129,19 @@ def test_build_run_context_shape() -> None:
     assert ctx["run"]["message"] == "apply VPC"
 
 
-# ── evaluate_post_plan (simplified gate query) ────────────────────────
-
-
-def _stub_run(*, plan_only: bool = False, bundle_fetched: bool = True) -> SimpleNamespace:
-    """Run stub. By default the bundle was fetched — exercises the fast
-    path. Set ``bundle_fetched=False`` to drive the rolling-upgrade
-    safety branch."""
-    from datetime import UTC, datetime
-
-    fetched_at = datetime.now(UTC) if bundle_fetched else None
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        workspace_id=uuid.uuid4(),
-        plan_only=plan_only,
-        policy_bundle_fetched_at=fetched_at,
-    )
+# ── evaluate_post_plan (one branch — others covered alongside the runner-protocol HTTP tests in test_policy_runner_endpoints.py) ──
 
 
 @pytest.mark.asyncio
 async def test_evaluate_post_plan_speculative_runs_never_block() -> None:
     """A plan-only run is informational; the gate must always pass even
     if the runner recorded a mandatory failure (the UI shows it, but
-    there's no apply to block)."""
-    run = _stub_run(plan_only=True)
-    # `db` is unused on the plan-only branch — pass a benign mock.
-    db = MagicMock()
+    there's no apply to block). The plan-only short-circuit lives at
+    the top of the gate, so this test doesn't need the workspace,
+    applicable-sets, or row-evidence machinery the other gate tests
+    exercise in test_policy_runner_endpoints.py."""
+    run = SimpleNamespace(id=uuid.uuid4(), plan_only=True)
+    db = MagicMock()  # untouched on the plan-only branch
     with patch.object(
         policy_set_service, "run_is_policy_blocked", new=AsyncMock(return_value=True)
     ) as gate_query:
@@ -162,30 +149,3 @@ async def test_evaluate_post_plan_speculative_runs_never_block() -> None:
             await policy_set_service.evaluate_post_plan(db, run) == policy_set_service.GATE_PASSED
         )
     gate_query.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_evaluate_post_plan_blocked_when_mandatory_failure() -> None:
-    run = _stub_run()
-    db = MagicMock()
-    with patch.object(
-        policy_set_service, "run_is_policy_blocked", new=AsyncMock(return_value=True)
-    ):
-        assert (
-            await policy_set_service.evaluate_post_plan(db, run) == policy_set_service.GATE_BLOCKED
-        )
-
-
-@pytest.mark.asyncio
-async def test_evaluate_post_plan_passed_when_no_block() -> None:
-    """Includes the 'no applicable sets / no runner results' case —
-    ``run_is_policy_blocked`` returns False when no rows exist for the
-    run."""
-    run = _stub_run()
-    db = MagicMock()
-    with patch.object(
-        policy_set_service, "run_is_policy_blocked", new=AsyncMock(return_value=False)
-    ):
-        assert (
-            await policy_set_service.evaluate_post_plan(db, run) == policy_set_service.GATE_PASSED
-        )

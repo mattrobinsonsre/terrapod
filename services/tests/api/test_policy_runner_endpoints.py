@@ -17,7 +17,7 @@ the FastAPI test client + a runner token) live under ``tests/api/``.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -327,35 +327,40 @@ async def test_results_persists_valid_rows() -> None:
     assert captured_rows[0]["enforcement_level"] == "mandatory"
 
 
-# ── B1 — evaluate_post_plan rolling-upgrade safety ───────────────────
+# ── evaluate_post_plan — gate safety via row-vs-set evidence ────────
+
+
+def _mk_db_with_recorded_set_ids(run, ws, recorded_ids):
+    """Build a mock db where the policy_set_id recorded-rows query
+    returns the given ids — sized to the test scenario."""
+    db = _mock_db_with_run(run, ws)
+    result_mock = MagicMock()
+    result_mock.all = lambda: [(pid,) for pid in recorded_ids]
+    db.execute = AsyncMock(return_value=result_mock)
+    return db
 
 
 @pytest.mark.asyncio
-async def test_gate_pre343_runner_writes_synthetic_errored() -> None:
-    """If the runner never fetched the bundle but applicable sets
-    exist, the gate writes synthetic `errored` evaluations and blocks
-    — this is the safety net for a pre-#343 runner image cached on a
-    K8s node during a Helm rolling upgrade."""
+async def test_gate_missing_mandatory_writes_synthetic_errored() -> None:
+    """When an applicable mandatory set has no recorded evaluation row,
+    the gate synthesises an errored row and blocks. Covers both the
+    pre-#343 rolling-upgrade case and the SHF-1 "new runner stamped
+    but didn't POST" case — the safety net is row-count-vs-set-count,
+    not stamp-based."""
     from terrapod.services import policy_set_service
 
-    run = _run(policy_bundle_fetched_at=None)
+    run = _run()
     ws = _ws()
-    db = _mock_db_with_run(run, ws)
-    # The "any existing rows?" probe — return None on first call (no rows).
-    db.execute = AsyncMock(side_effect=[MagicMock(first=lambda: None)])
-    db.flush = AsyncMock()
+    db = _mk_db_with_recorded_set_ids(run, ws, [])  # no rows recorded
 
-    ps = MagicMock(
-        id=uuid.uuid4(),
-        name="prod-guardrails",
-        enforcement_level="mandatory",
-        policies=[],
-    )
+    ps_id = uuid.uuid4()
+    ps = MagicMock(id=ps_id, enforcement_level="mandatory", policies=[])
+    ps.name = "prod-guardrails"
 
-    captured_rows = []
+    captured = []
 
     async def _capture(_db, rows):
-        captured_rows.extend(rows)
+        captured.extend(rows)
 
     with patch.multiple(
         policy_set_service,
@@ -366,52 +371,120 @@ async def test_gate_pre343_runner_writes_synthetic_errored() -> None:
         result = await policy_set_service.evaluate_post_plan(db, run)
 
     assert result == policy_set_service.GATE_BLOCKED
-    assert len(captured_rows) == 1
-    assert captured_rows[0]["outcome"] == "errored"
-    assert (
-        "pre-#343" in captured_rows[0]["result"]["error"].lower()
-        or "did not evaluate" in captured_rows[0]["result"]["error"]
-    )
+    assert len(captured) == 1
+    assert captured[0]["outcome"] == "errored"
+    assert captured[0]["policy_set_id"] == ps_id
+    assert "did not evaluate" in captured[0]["result"]["error"].lower()
 
 
 @pytest.mark.asyncio
-async def test_gate_pre343_runner_with_no_sets_passes() -> None:
-    """Pre-#343 runner + no applicable sets — legitimate pass, no
-    synthetic rows written."""
+async def test_gate_missing_advisory_does_not_synthesise() -> None:
+    """A missing advisory row is silently dropped — advisory means
+    warn-not-block, so a missing advisory has no enforcement effect
+    to safeguard, and a ghost errored row would confuse the operator."""
     from terrapod.services import policy_set_service
 
-    run = _run(policy_bundle_fetched_at=None)
+    run = _run()
     ws = _ws()
-    db = _mock_db_with_run(run, ws)
+    db = _mk_db_with_recorded_set_ids(run, ws, [])
+
+    ps = MagicMock(id=uuid.uuid4(), enforcement_level="advisory", policies=[])
+    ps.name = "advisory-set"
+
+    captured = []
+
+    async def _capture(_db, rows):
+        captured.extend(rows)
 
     with patch.multiple(
         policy_set_service,
-        applicable_policy_sets=AsyncMock(return_value=[]),
-        _insert_evaluations=AsyncMock(),
-    ):
-        result = await policy_set_service.evaluate_post_plan(db, run)
-
-    assert result == policy_set_service.GATE_PASSED
-
-
-@pytest.mark.asyncio
-async def test_gate_new_runner_fast_path_query_only() -> None:
-    """When the runner fetched the bundle, the gate skips the
-    rolling-upgrade fallback — pure run_is_policy_blocked query."""
-    from terrapod.services import policy_set_service
-
-    stamp = datetime.now(__import__("datetime").timezone.utc) - timedelta(seconds=5)
-    run = _run(policy_bundle_fetched_at=stamp)
-    ws = _ws()
-    db = _mock_db_with_run(run, ws)
-
-    applicable_mock = AsyncMock(return_value=[])  # would be called by slow path
-    with patch.multiple(
-        policy_set_service,
-        applicable_policy_sets=applicable_mock,
+        applicable_policy_sets=AsyncMock(return_value=[ps]),
+        _insert_evaluations=AsyncMock(side_effect=_capture),
         run_is_policy_blocked=AsyncMock(return_value=False),
     ):
         result = await policy_set_service.evaluate_post_plan(db, run)
 
     assert result == policy_set_service.GATE_PASSED
-    applicable_mock.assert_not_called()  # fast path skipped the slow-path probe
+    assert captured == []  # no synthetic write for advisory
+
+
+@pytest.mark.asyncio
+async def test_gate_no_applicable_sets_passes() -> None:
+    """Workspace has no policy sets in scope — legitimate pass, no rows
+    written, no run_is_policy_blocked check needed."""
+    from terrapod.services import policy_set_service
+
+    run = _run()
+    ws = _ws()
+    db = _mock_db_with_run(run, ws)
+
+    insert_mock = AsyncMock()
+    with patch.multiple(
+        policy_set_service,
+        applicable_policy_sets=AsyncMock(return_value=[]),
+        _insert_evaluations=insert_mock,
+    ):
+        result = await policy_set_service.evaluate_post_plan(db, run)
+
+    assert result == policy_set_service.GATE_PASSED
+    insert_mock.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_gate_all_rows_present_skips_synthesis() -> None:
+    """When the runner posted a row for every applicable set, the
+    gate is a pure run_is_policy_blocked query — no synthetic writes."""
+    from terrapod.services import policy_set_service
+
+    run = _run()
+    ws = _ws()
+    ps_id = uuid.uuid4()
+    db = _mk_db_with_recorded_set_ids(run, ws, [ps_id])
+
+    ps = MagicMock(id=ps_id, enforcement_level="mandatory", policies=[])
+    ps.name = "prod-guardrails"
+
+    insert_mock = AsyncMock()
+    with patch.multiple(
+        policy_set_service,
+        applicable_policy_sets=AsyncMock(return_value=[ps]),
+        _insert_evaluations=insert_mock,
+        run_is_policy_blocked=AsyncMock(return_value=False),
+    ):
+        result = await policy_set_service.evaluate_post_plan(db, run)
+
+    assert result == policy_set_service.GATE_PASSED
+    insert_mock.assert_not_called()
+
+
+# ── NTH-4: empty policy_set_name rejected ─────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_results_rejects_empty_policy_set_name() -> None:
+    """Empty `policy_set_name` would render as a blank set badge in
+    the UI — the runner always fills it, so empty is a contract bug
+    and must 422."""
+    from fastapi import HTTPException
+
+    run = _run()
+    ws = _ws()
+    run_id = f"run-{run.id}"
+    db = _mock_db_with_run(run, ws)
+    user = _user(method="runner_token", run_id=run_id)
+
+    body = {
+        "results": [
+            {
+                "policy_set_id": f"polset-{uuid.uuid4()}",
+                "policy_set_name": "   ",  # whitespace-only, strips to empty
+                "enforcement_level": "mandatory",
+                "outcome": "passed",
+                "result": {},
+            }
+        ]
+    }
+    with pytest.raises(HTTPException) as exc:
+        await router.post_policy_results(run_id=run_id, body=body, user=user, db=db)
+    assert exc.value.status_code == 422
+    assert "policy_set_name" in exc.value.detail.lower()
