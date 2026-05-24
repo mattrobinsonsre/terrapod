@@ -148,24 +148,86 @@ async def _insert_evaluations(db: AsyncSession, rows: list[dict[str, Any]]) -> N
 
 
 async def evaluate_post_plan(db: AsyncSession, run: Run) -> str:
-    """Post-plan policy gate — a pure DB query.
+    """Post-plan policy gate.
 
-    The runner has already fetched the applicable policy bundle from
-    ``GET /policy-bundle``, run ``opa eval`` per policy against the
-    plan JSON it produced locally, and POSTed the results to
-    ``/policy-results`` *before* posting ``plan-result``. So by the
-    time the API gets here the evaluation rows exist (or there were no
-    applicable sets, in which case no rows is the correct answer).
+    Mostly a pure DB query — the runner has already fetched the bundle
+    from ``GET /policy-bundle``, run ``opa eval`` against the plan JSON
+    it produced locally, and POSTed the results to ``/policy-results``
+    *before* posting ``plan-result``. So when the API runs the gate the
+    evaluation rows exist (or there were no applicable sets, in which
+    case no rows is the correct answer).
+
+    One non-trivial branch — rolling-upgrade safety. A pre-#343 runner
+    image (cached on a K8s node during a Helm upgrade) doesn't know
+    about ``/policy-bundle`` and never stamps ``policy_bundle_fetched_at``.
+    Treating "no rows" as PASSED in that case would silently bypass any
+    mandatory policy. So if applicable sets exist for this workspace
+    AND the bundle was never fetched AND no rows exist, we write a
+    synthetic ``errored`` evaluation per applicable set and block —
+    the run shows a clear "runner did not evaluate" message and an
+    admin can override.
 
     Speculative (plan-only) runs are evaluated and recorded but never
-    gated — there is no apply to block.
-
-    Returns ``GATE_PASSED`` or ``GATE_BLOCKED``. ``GATE_PENDING`` is
-    gone — the runner-side flow eliminates the JSON-wait window and
-    its grace-timer machinery.
+    gated — there is no apply to block. ``GATE_PENDING`` is gone with
+    the JSON-wait window.
     """
     if run.plan_only:
         return GATE_PASSED
+
+    # Fast path: the runner reported.
+    if run.policy_bundle_fetched_at is not None:
+        return GATE_BLOCKED if await run_is_policy_blocked(db, run.id) else GATE_PASSED
+
+    # Slow path: the runner never fetched the bundle. Either there were
+    # never any applicable sets (legitimate — old API + old runner OR
+    # new API with no policies) or the runner is a pre-#343 image that
+    # doesn't know about policy eval. Check which.
+    ws = await db.get(Workspace, run.workspace_id)
+    if ws is None:
+        return GATE_PASSED
+    sets = await applicable_policy_sets(db, ws)
+    if not sets:
+        return GATE_PASSED
+
+    # Applicable sets exist but the runner never asked — fail closed
+    # by recording synthetic errored evaluations. Skip if rows already
+    # exist (a previous gate-call already recorded them).
+    existing = (
+        await db.execute(
+            select(PolicyEvaluation.id).where(PolicyEvaluation.run_id == run.id).limit(1)
+        )
+    ).first()
+    if existing is None:
+        stamp = now_utc()
+        rows = [
+            {
+                "id": uuid.uuid4(),
+                "run_id": run.id,
+                "policy_set_id": ps.id,
+                "policy_set_name": ps.name,
+                "enforcement_level": ps.enforcement_level,
+                "outcome": "errored",
+                "result": {
+                    "error": (
+                        "Runner did not evaluate this policy set — the runner "
+                        "image is from before #343 / does not know about "
+                        "policy-as-code. Roll the runner image forward, then "
+                        "retry the run; or override to release this run."
+                    )
+                },
+                "created_at": stamp,
+            }
+            for ps in sets
+        ]
+        await _insert_evaluations(db, rows)
+        await db.flush()
+        logger.warning(
+            "Pre-#343 runner detected (no policy-bundle fetch) — "
+            "synthetic errored evaluations recorded to fail closed",
+            run_id=str(run.id),
+            sets=len(sets),
+        )
+
     return GATE_BLOCKED if await run_is_policy_blocked(db, run.id) else GATE_PASSED
 
 

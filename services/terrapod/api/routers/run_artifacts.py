@@ -24,13 +24,13 @@ import hashlib
 import json
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_runner_for_run
 from terrapod.db.models import Run, StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -48,20 +48,6 @@ from terrapod.storage.keys import (
 
 router = APIRouter(tags=["run-artifacts"])
 logger = get_logger(__name__)
-
-
-def _require_runner_for_run(user: AuthenticatedUser, run_id: str) -> None:
-    """Verify the user is a runner token scoped to this run."""
-    if user.auth_method != "runner_token":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Runner token required",
-        )
-    if user.run_id != run_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Token not scoped to this run",
-        )
 
 
 async def _get_run(run_id: str, db: AsyncSession) -> Run:
@@ -82,7 +68,7 @@ async def download_config(
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
     """Download the configuration archive for a run."""
-    _require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
     if not run.configuration_version_id:
@@ -101,7 +87,7 @@ async def download_state(
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
     """Download the current state for the run's workspace."""
-    _require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
     result = await db.execute(
@@ -127,7 +113,7 @@ async def download_plan_file(
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
     """Download the plan file from the plan phase."""
-    _require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
     storage = get_storage()
@@ -153,7 +139,7 @@ async def download_lock_file(
     apply phase still works (with the today-behaviour drift risk) when
     the plan ran on an older runner that didn't upload a lock file.
     """
-    _require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
     storage = get_storage()
@@ -173,7 +159,7 @@ async def upload_plan_log(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Upload the plan log."""
-    _require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
     body = await request.body()
@@ -191,7 +177,7 @@ async def upload_plan_file(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Upload the plan file."""
-    _require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
     body = await request.body()
@@ -214,7 +200,7 @@ async def upload_lock_file(
     upload as best-effort — a failure here just means the apply phase
     falls back to re-resolving providers (today's behaviour).
     """
-    _require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
     body = await request.body()
@@ -237,7 +223,7 @@ async def upload_plan_json_output(
     the read URL with confidence (errored / older / failed-upload runs
     leave the flag at its default `false`).
     """
-    _require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
     body = await request.body()
@@ -278,7 +264,7 @@ async def upload_apply_log(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Upload the apply log."""
-    _require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
     body = await request.body()
@@ -301,7 +287,7 @@ async def upload_state(
     stores the state at the canonical key so that subsequent plans can
     find it via the standard state download path.
     """
-    _require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
     body = await request.body()
@@ -401,7 +387,7 @@ async def mark_state_diverged(
     Called by the runner entrypoint when a state upload fails after a
     successful apply. The workspace is flagged so the UI can warn users.
     """
-    _require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
     ws = await db.get(Workspace, run.workspace_id)

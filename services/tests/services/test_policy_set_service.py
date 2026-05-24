@@ -132,8 +132,19 @@ def test_build_run_context_shape() -> None:
 # ── evaluate_post_plan (simplified gate query) ────────────────────────
 
 
-def _stub_run(*, plan_only: bool = False) -> SimpleNamespace:
-    return SimpleNamespace(id=uuid.uuid4(), plan_only=plan_only)
+def _stub_run(*, plan_only: bool = False, bundle_fetched: bool = True) -> SimpleNamespace:
+    """Run stub. By default the bundle was fetched — exercises the fast
+    path. Set ``bundle_fetched=False`` to drive the rolling-upgrade
+    safety branch."""
+    from datetime import UTC, datetime
+
+    fetched_at = datetime.now(UTC) if bundle_fetched else None
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        workspace_id=uuid.uuid4(),
+        plan_only=plan_only,
+        policy_bundle_fetched_at=fetched_at,
+    )
 
 
 @pytest.mark.asyncio

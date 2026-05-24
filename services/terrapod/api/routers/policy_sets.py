@@ -33,7 +33,7 @@ import re
 import uuid
 from datetime import UTC
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -44,6 +44,7 @@ from terrapod.api.dependencies import (
     AuthenticatedUser,
     get_current_user,
     require_admin,
+    require_runner_for_run,
 )
 from terrapod.db.models import (
     Policy,
@@ -534,20 +535,6 @@ async def override_run_policy(
 # scoped to a single run_id by `auth_method == "runner_token"`).
 
 
-def _require_runner_for_run(user: AuthenticatedUser, run_id: str) -> None:
-    """Verify the caller is a runner token scoped to this run."""
-    if user.auth_method != "runner_token":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Runner token required",
-        )
-    if user.run_id != run_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Token not scoped to this run",
-        )
-
-
 @router.get("/runs/{run_id}/policy-bundle")
 async def get_policy_bundle(
     run_id: str = Path(...),
@@ -564,7 +551,7 @@ async def get_policy_bundle(
     runner does no evaluation and posts no results, which the API gate
     treats as PASSED.
     """
-    _require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id)
     try:
         run_uuid = uuid.UUID(run_id.removeprefix("run-"))
     except ValueError as exc:
@@ -578,6 +565,14 @@ async def get_policy_bundle(
 
     sets = await policy_set_service.applicable_policy_sets(db, ws)
     context = policy_set_service.build_run_context(ws, run)
+
+    # Stamp the run so the post-plan gate can distinguish "no applicable
+    # sets" from "pre-#343 runner never fetched the bundle" (#343
+    # rolling-upgrade safety). Done before we return — if the runner
+    # POSTs results we want to be sure we recognised the runner first.
+    if run.policy_bundle_fetched_at is None:
+        run.policy_bundle_fetched_at = now_utc()
+        await db.commit()
 
     return JSONResponse(
         content={
@@ -618,7 +613,7 @@ async def post_policy_results(
     via ON CONFLICT DO NOTHING on ``(run_id, policy_set_id)``, so a
     retried POST after a transient failure is safely idempotent.
     """
-    _require_runner_for_run(user, run_id)
+    require_runner_for_run(user, run_id)
     try:
         run_uuid = uuid.UUID(run_id.removeprefix("run-"))
     except ValueError as exc:

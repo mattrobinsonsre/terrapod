@@ -599,7 +599,7 @@ export default function RunDetailPage() {
         )}
 
         {/* OPA policy evaluations (#343) */}
-        <PolicyPanel runId={runId} onChanged={loadRun} />
+        <PolicyPanel runId={runId} runStatus={attrs.status} onChanged={loadRun} />
 
         {/* No-changes notice — explains why Confirm & Apply isn't shown.
             Only relevant for plan-and-apply runs (plan-only runs simply
@@ -885,7 +885,15 @@ function outcomeBadge(outcome: string): string {
   return 'bg-amber-900/50 text-amber-300' // errored
 }
 
-function PolicyPanel({ runId, onChanged }: { runId: string; onChanged: () => void }) {
+function PolicyPanel({
+  runId,
+  runStatus,
+  onChanged,
+}: {
+  runId: string
+  runStatus: string
+  onChanged: () => void
+}) {
   const [evals, setEvals] = useState<PolicyEval[]>([])
   const [summary, setSummary] = useState<PolicySummary | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -911,18 +919,22 @@ function PolicyPanel({ runId, onChanged }: { runId: string; onChanged: () => voi
     load()
   }, [load])
 
-  // Poll while we're still waiting for evaluations to land, or while the
-  // run is held blocked (an override could come from another admin in
-  // another tab). Once evaluations are recorded and the run isn't
-  // blocked, no further policy state changes are expected.
+  // Poll while the run is still in `planning` — that's the only window
+  // where evaluations could land for the first time, an override could
+  // come from another tab and unblock, or a runner re-post could land.
+  // Once the run leaves `planning` (planned, applying, applied, errored,
+  // cancelled, discarded), the policy state is settled and we stop —
+  // otherwise a workspace with no applicable policy sets would poll
+  // forever, since "no evals" looks the same as "evals not yet recorded".
   useEffect(() => {
     if (!loaded) return
+    if (runStatus !== 'planning') return
     const needsPoll =
       evals.length === 0 || summary?.status === 'blocked'
     if (!needsPoll) return
     const handle = window.setInterval(load, 10_000)
     return () => window.clearInterval(handle)
-  }, [loaded, evals.length, summary?.status, load])
+  }, [loaded, runStatus, evals.length, summary?.status, load])
 
   if (!loaded || evals.length === 0) return null
 

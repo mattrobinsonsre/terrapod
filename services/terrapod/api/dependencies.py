@@ -407,6 +407,27 @@ async def require_admin_or_audit(
     return user
 
 
+def require_runner_for_run(user: AuthenticatedUser, run_id: str) -> None:
+    """Reject the request unless the caller is a runner-token authenticated
+    for this exact run.
+
+    Used by runner-protocol endpoints (artifact upload/download, OPA
+    policy bundle/results) so a leaked token from one run can't drive
+    actions on another. Not a FastAPI dependency — call it inside the
+    handler with the path's ``run_id`` after resolving the user.
+    """
+    if user.auth_method != "runner_token":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Runner token required",
+        )
+    if user.run_id != run_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Token not scoped to this run",
+        )
+
+
 # ── Listener Certificate Auth ────────────────────────────────────────────
 
 

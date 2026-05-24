@@ -296,8 +296,17 @@ tp_evaluate_policies() {
                     '. + [{policy: $name, passed: false, violations: [], warnings: [], error: $err}]')
                 _set_outcome="errored"
             else
-                _deny=$(echo "$_opa_out" | jq '[(.result[0].expressions[0].value.deny // []) | .[] | tostring] | sort')
-                _warn=$(echo "$_opa_out" | jq '[(.result[0].expressions[0].value.warn // []) | .[] | tostring] | sort')
+                # Defensive jq: handles every shape OPA can serialise the
+                # rule values as — a missing query result (no matching
+                # rules), a missing `deny`/`warn`, an empty set, an array
+                # (the normal partial-set case `deny contains msg if ...`),
+                # OR a scalar (a misauthored `deny := true` or
+                # `deny := "msg"`). Without the coercion a scalar would
+                # error out `.[] | tostring`, the assignment would end up
+                # empty, and the policy would silently "pass" despite a
+                # would-be denial — defeating the whole gate.
+                _deny=$(echo "$_opa_out" | jq '.result // [] | .[0] // {} | .expressions // [] | .[0] // {} | .value // {} | .deny // [] | (if type == "array" then . else [.] end) | map(tostring) | sort')
+                _warn=$(echo "$_opa_out" | jq '.result // [] | .[0] // {} | .expressions // [] | .[0] // {} | .value // {} | .warn // [] | (if type == "array" then . else [.] end) | map(tostring) | sort')
                 _vlen=$(echo "$_deny" | jq 'length')
                 if [ "$_vlen" -gt 0 ] && [ "$_set_outcome" != "errored" ]; then
                     _set_outcome="failed"
@@ -322,12 +331,23 @@ tp_evaluate_policies() {
     done
 
     log "[entrypoint] Posting $(echo "$_results" | jq 'length') policy evaluation result(s)"
-    _post_http=$(echo "$_results" | jq '{results: .}' | curl -sS -o /tmp/policy-post.out \
-        -w '%{http_code}' -X POST -H "$AUTH_HEADER" -H "Content-Type: application/json" \
-        --data-binary @- \
-        "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/policy-results" 2>/dev/null || echo 000)
+    # Bounded retries on the POST: the API enforces ON CONFLICT DO NOTHING
+    # on (run_id, policy_set_id), so a retried POST after a transient
+    # 5xx / network drop is idempotent. Mirrors the bundle-GET retry —
+    # the asymmetry round 1 had was needless.
+    echo "$_results" | jq '{results: .}' > /tmp/policy-post.body
+    _post_http=""
+    for _attempt in 1 2 3; do
+        _post_http=$(curl -sS -o /tmp/policy-post.out -w '%{http_code}' \
+            -X POST -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+            --data-binary @/tmp/policy-post.body \
+            "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/policy-results" 2>/dev/null || echo 000)
+        [ "$_post_http" = "201" ] && break
+        log "[entrypoint] Policy results POST attempt $_attempt: HTTP $_post_http (will retry)"
+        sleep 3
+    done
     if [ "$_post_http" != "201" ]; then
-        log "[entrypoint] FATAL: policy results POST failed (HTTP $_post_http): $(head -c 500 /tmp/policy-post.out 2>/dev/null)"
+        log "[entrypoint] FATAL: policy results POST failed after 3 attempts (HTTP $_post_http): $(head -c 500 /tmp/policy-post.out 2>/dev/null)"
         return 1
     fi
     log "[entrypoint] Policy results recorded"

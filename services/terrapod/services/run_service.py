@@ -452,10 +452,11 @@ async def complete_plan(
     # Stamp the plan-phase end timestamp now, before the run-task and policy
     # gates can hold the run in `planning`. Semantically the plan phase is
     # done (the runner posted plan-result or its Job reported success); the
-    # gates are a downstream platform concern. Doing this here gives the
-    # post-plan policy gate's grace-timer a stable anchor — without it,
-    # plan_finished_at would only be set when transition_run("planned")
-    # eventually fires, which the gate itself prevents (#343).
+    # gates are a downstream platform concern. Doing this here keeps the
+    # `planned-at` UI timestamp tied to "plan finished" rather than "gates
+    # cleared", and makes the field available to anything else that wants
+    # it (metrics, confirm_run, drift detection) regardless of how long
+    # the run is held by a gate.
     if run.plan_finished_at is None and run.plan_started_at is not None:
         from terrapod.db.models import now_utc
 
@@ -476,12 +477,14 @@ async def complete_plan(
                 )
             return run
 
-    # Post-plan OPA policy gate (#343). A mandatory policy failure keeps
-    # the run in `planning` (surfaced via the run's policy-checks
-    # attribute) rather than erroring it — the idempotent complete_plan
-    # then re-drives the run once an admin overrides, with no reconciler
-    # race. GATE_PENDING means the plan JSON the runner uploads just
-    # after plan-result hasn't landed yet; retry on the next tick.
+    # Post-plan OPA policy gate (#343). The runner has already evaluated
+    # applicable policies and posted results to /policy-results before
+    # posting plan-result — so by the time we get here the
+    # policy_evaluation rows already exist (or there were no applicable
+    # sets). A mandatory unoverridden failure keeps the run in
+    # `planning` (surfaced via the run's policy-checks attribute) rather
+    # than erroring it — the idempotent complete_plan then re-drives
+    # the run once an admin overrides, with no reconciler race.
     from terrapod.services import policy_set_service
 
     gate = await policy_set_service.evaluate_post_plan(db, run)
