@@ -2244,6 +2244,62 @@ POST /api/terrapod/v1/runs/{run_id}/actions/override-policy
 
 Overrides every failed/errored policy evaluation of a run and immediately re-drives a run held at the post-plan policy gate. **Required permission:** `admin` on the run's workspace.
 
+### Runner protocol — Policy Bundle
+
+```
+GET /api/terrapod/v1/runs/{run_id}/policy-bundle
+```
+
+Returns the applicable policy sets + run/workspace context for a run. Used by the runner during the plan phase to drive OPA evaluation locally. Response shape is a flat JSON document (not JSON:API — the runner is the only consumer):
+
+```json
+{
+  "policy_sets": [
+    {
+      "id": "polset-...",
+      "name": "...",
+      "enforcement_level": "mandatory",
+      "policies": [
+        {"id": "pol-...", "name": "...", "rego": "package terrapod\n..."}
+      ]
+    }
+  ],
+  "context": {
+    "workspace": {"id": "...", "name": "...", "labels": {...}},
+    "run": {"id": "...", "message": "...", "source": "...", "is_destroy": false, "plan_only": false}
+  }
+}
+```
+
+`policy_sets` is an empty list when nothing is in scope for the workspace — the runner then skips evaluation entirely. **Required permission:** runner token scoped to this `run_id`.
+
+### Runner protocol — Policy Results
+
+```
+POST /api/terrapod/v1/runs/{run_id}/policy-results
+```
+
+```json
+{
+  "results": [
+    {
+      "policy_set_id": "polset-...",
+      "policy_set_name": "...",
+      "enforcement_level": "mandatory",
+      "outcome": "failed",
+      "result": {
+        "policies": [
+          {"policy": "...", "passed": false, "violations": ["..."], "warnings": [], "error": null}
+        ],
+        "evaluated_at": "2026-05-24T10:00:00Z"
+      }
+    }
+  ]
+}
+```
+
+Records the runner's policy-evaluation outcomes for the run. Persisted via Postgres `ON CONFLICT DO NOTHING` on `(run_id, policy_set_id)` so a retried POST after a transient failure is idempotent. The runner POSTs this **before** posting plan-result, so the API's post-plan gate sees the rows when it queries them. **Required permission:** runner token scoped to this `run_id`.
+
 ---
 
 ## Common Response Codes

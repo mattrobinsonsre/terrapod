@@ -24,7 +24,6 @@ visible, but never gated — there is no apply to block.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -33,22 +32,14 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from terrapod.db.models import PolicyEvaluation, PolicySet, Run, Workspace, generate_uuid7, now_utc
-from terrapod.services import policy_engine
-from terrapod.storage import get_storage
-from terrapod.storage.keys import plan_json_output_key
-from terrapod.storage.protocol import ObjectNotFoundError
+from terrapod.db.models import PolicyEvaluation, PolicySet, Run, Workspace, now_utc
 
 logger = structlog.get_logger(__name__)
 
-# How long to wait for the runner to upload the plan JSON (uploaded just
-# after it posts plan-result) before treating it as genuinely
-# unavailable. The common case resolves within one reconciler tick.
-PLAN_JSON_GRACE_SECONDS = 180
-
 # evaluate_post_plan return values (the gate contract with complete_plan).
+# GATE_PENDING is gone — the runner-on-side flow eliminates the JSON-wait
+# window the API used to need a "try again next tick" signal for.
 GATE_PASSED = "passed"
-GATE_PENDING = "pending"
 GATE_BLOCKED = "blocked"
 
 
@@ -113,7 +104,7 @@ async def applicable_policy_sets(db: AsyncSession, ws: Workspace) -> list[Policy
 # ── OPA input context ─────────────────────────────────────────────────
 
 
-def _build_context(ws: Workspace, run: Run) -> dict[str, Any]:
+def build_run_context(ws: Workspace, run: Run) -> dict[str, Any]:
     """Terrapod metadata exposed to policies as ``data.terrapod_context``."""
     return {
         "workspace": {
@@ -131,36 +122,7 @@ def _build_context(ws: Workspace, run: Run) -> dict[str, Any]:
     }
 
 
-# ── Evaluation orchestration ──────────────────────────────────────────
-
-
-async def _evaluate_one_set(
-    ps: PolicySet, plan_json: bytes, context: dict[str, Any]
-) -> tuple[str, dict[str, Any]]:
-    """Evaluate every policy in a set; return ``(outcome, result_json)``.
-
-    Outcome precedence: any policy that errors → ``errored``; else any
-    violations → ``failed``; else ``passed``. ``errored`` and ``failed``
-    both gate a mandatory set (fail-closed on an un-evaluable policy).
-    """
-    results = []
-    any_error = False
-    any_violation = False
-    for policy in ps.policies:
-        res = await policy_engine.evaluate_policy(policy.name, policy.rego, plan_json, context)
-        results.append(res.to_dict())
-        if res.error is not None:
-            any_error = True
-        elif res.violations:
-            any_violation = True
-
-    if any_error:
-        outcome = "errored"
-    elif any_violation:
-        outcome = "failed"
-    else:
-        outcome = "passed"
-    return outcome, {"policies": results, "evaluated_at": datetime.now(UTC).isoformat()}
+# ── Evaluation persistence ────────────────────────────────────────────
 
 
 async def _insert_evaluations(db: AsyncSession, rows: list[dict[str, Any]]) -> None:
@@ -185,101 +147,25 @@ async def _insert_evaluations(db: AsyncSession, rows: list[dict[str, Any]]) -> N
     await db.execute(stmt)
 
 
-async def _record_unavailable(db: AsyncSession, run: Run, sets: list[PolicySet]) -> None:
-    """Record an ``errored`` evaluation per set when the plan JSON never
-    arrived. Fail-closed: a mandatory set then blocks the run."""
-    stamp = now_utc()
-    rows = [
-        {
-            "id": generate_uuid7(),
-            "run_id": run.id,
-            "policy_set_id": ps.id,
-            "policy_set_name": ps.name,
-            "enforcement_level": ps.enforcement_level,
-            "outcome": "errored",
-            "result": {"error": "plan JSON was not available for policy evaluation"},
-            "created_at": stamp,
-        }
-        for ps in sets
-    ]
-    await _insert_evaluations(db, rows)
-    logger.warning(
-        "Policy evaluation skipped — plan JSON unavailable",
-        run_id=str(run.id),
-        sets=len(sets),
-    )
-
-
 async def evaluate_post_plan(db: AsyncSession, run: Run) -> str:
-    """Evaluate applicable policy sets for a run at the post-plan gate.
+    """Post-plan policy gate — a pure DB query.
 
-    Returns one of :data:`GATE_PASSED` / :data:`GATE_PENDING` /
-    :data:`GATE_BLOCKED`. Adds ``PolicyEvaluation`` rows to the session
-    (the caller commits). Idempotent — evaluation runs once; later calls
-    only re-check the gate (so an override takes effect).
+    The runner has already fetched the applicable policy bundle from
+    ``GET /policy-bundle``, run ``opa eval`` per policy against the
+    plan JSON it produced locally, and POSTed the results to
+    ``/policy-results`` *before* posting ``plan-result``. So by the
+    time the API gets here the evaluation rows exist (or there were no
+    applicable sets, in which case no rows is the correct answer).
+
+    Speculative (plan-only) runs are evaluated and recorded but never
+    gated — there is no apply to block.
+
+    Returns ``GATE_PASSED`` or ``GATE_BLOCKED``. ``GATE_PENDING`` is
+    gone — the runner-side flow eliminates the JSON-wait window and
+    its grace-timer machinery.
     """
-    ws = await db.get(Workspace, run.workspace_id)
-    if ws is None:
-        return GATE_PASSED
-
-    sets = await applicable_policy_sets(db, ws)
-    if not sets:
-        return GATE_PASSED
-
-    already = (
-        await db.execute(
-            select(PolicyEvaluation.id).where(PolicyEvaluation.run_id == run.id).limit(1)
-        )
-    ).first()
-
-    if already is None:
-        # First pass — evaluate. We need the plan JSON the runner uploads
-        # just after posting plan-result; wait a bounded time for it.
-        if not run.has_json_output:
-            finished = run.plan_finished_at
-            waited = (now_utc() - finished).total_seconds() if finished is not None else 0.0
-            if waited <= PLAN_JSON_GRACE_SECONDS:
-                return GATE_PENDING
-            await _record_unavailable(db, run, sets)
-        else:
-            try:
-                plan_json = await get_storage().get(
-                    plan_json_output_key(str(run.workspace_id), str(run.id))
-                )
-            except ObjectNotFoundError:
-                await _record_unavailable(db, run, sets)
-                plan_json = None
-
-            if plan_json is not None:
-                context = _build_context(ws, run)
-                stamp = now_utc()
-                rows = []
-                for ps in sets:
-                    outcome, result = await _evaluate_one_set(ps, plan_json, context)
-                    rows.append(
-                        {
-                            "id": generate_uuid7(),
-                            "run_id": run.id,
-                            "policy_set_id": ps.id,
-                            "policy_set_name": ps.name,
-                            "enforcement_level": ps.enforcement_level,
-                            "outcome": outcome,
-                            "result": result,
-                            "created_at": stamp,
-                        }
-                    )
-                await _insert_evaluations(db, rows)
-                logger.info(
-                    "Policy evaluation complete",
-                    run_id=str(run.id),
-                    sets=len(sets),
-                )
-        await db.flush()
-
-    # Speculative runs are recorded but never gated — there is no apply.
     if run.plan_only:
         return GATE_PASSED
-
     return GATE_BLOCKED if await run_is_policy_blocked(db, run.id) else GATE_PASSED
 
 

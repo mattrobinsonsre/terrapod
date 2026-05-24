@@ -20,6 +20,24 @@ RUN echo "apk-refresh=${APK_REFRESH}" \
     openssh-client \
     openssl
 
+# OPA (Open Policy Agent) — the policy-as-code evaluation engine (#343).
+# The runner evaluates applicable policy sets against the local plan JSON
+# and posts results to the API before reporting plan-result. Pinned,
+# statically-linked binary, SHA256-verified. Kept in sync with the same
+# OPA_VERSION baked into docker/Dockerfile.api and docker/Dockerfile.test.
+# TARGETARCH is set by buildx; fall back to `apk --print-arch` for plain
+# `docker build`.
+ARG TARGETARCH
+ARG OPA_VERSION=1.16.2
+RUN ARCH="${TARGETARCH:-$(apk --print-arch | sed 's/aarch64/arm64/;s/x86_64/amd64/')}" \
+    && BASE="https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}" \
+    && curl -fsSL -o /usr/local/bin/opa "${BASE}/opa_linux_${ARCH}_static" \
+    && curl -fsSL -o /tmp/opa.sha256 "${BASE}/opa_linux_${ARCH}_static.sha256" \
+    && echo "$(cut -d' ' -f1 /tmp/opa.sha256)  /usr/local/bin/opa" | sha256sum -c - \
+    && rm /tmp/opa.sha256 \
+    && chmod 0755 /usr/local/bin/opa \
+    && /usr/local/bin/opa version
+
 COPY docker/runner-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

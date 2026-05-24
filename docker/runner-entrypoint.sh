@@ -219,6 +219,120 @@ tp_curl_download() {
     esac
 }
 
+# --- OPA policy evaluation (#343) ---
+# Fetches the applicable policy bundle from the API, evaluates each
+# policy with `opa eval` against the local plan JSON, and posts the
+# results back BEFORE plan-result. The API's post-plan gate then just
+# queries the recorded rows — no JSON-wait dance, no in-API OPA.
+#
+# Uses /tmp/plan.json as input (produced earlier by `tofu show -json
+# tfplan`). If the JSON wasn't produced, every applicable set is
+# recorded as `errored` (fail-closed for mandatory sets).
+#
+# Bundle-fetch failure after bounded retries is fatal — refusing to
+# proceed is safer than silently skipping the gate.
+tp_evaluate_policies() {
+    [ -n "$TP_API_URL" ] || return 0
+    [ -n "$TP_RUN_ID" ] || return 0
+
+    log "[entrypoint] Fetching policy bundle..."
+    _bundle_http=""
+    for _attempt in 1 2 3; do
+        _bundle_http=$(curl -sS -o /tmp/policy-bundle.json -w '%{http_code}' \
+            -H "$AUTH_HEADER" \
+            "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/policy-bundle" 2>/dev/null || echo 000)
+        [ "$_bundle_http" = "200" ] && break
+        log "[entrypoint] Policy bundle fetch attempt $_attempt: HTTP $_bundle_http (will retry)"
+        sleep 3
+    done
+    if [ "$_bundle_http" != "200" ] || [ ! -s /tmp/policy-bundle.json ]; then
+        log "[entrypoint] FATAL: policy bundle fetch failed (HTTP $_bundle_http)"
+        return 1
+    fi
+
+    _set_count=$(jq '.policy_sets | length' /tmp/policy-bundle.json 2>/dev/null || echo 0)
+    if [ "$_set_count" = "0" ]; then
+        log "[entrypoint] No applicable policy sets — skipping evaluation"
+        return 0
+    fi
+
+    log "[entrypoint] Evaluating $_set_count policy set(s)..."
+
+    # data.terrapod_context — the Terrapod metadata exposed to policies.
+    jq '{terrapod_context: .context}' /tmp/policy-bundle.json > /tmp/policy-context.json
+
+    # Build results: one entry per policy set, with per-policy detail.
+    _results='[]'
+    _idx=0
+    while [ "$_idx" -lt "$_set_count" ]; do
+        _ps=$(jq ".policy_sets[$_idx]" /tmp/policy-bundle.json)
+        _ps_id=$(echo "$_ps" | jq -r '.id')
+        _ps_name=$(echo "$_ps" | jq -r '.name')
+        _ps_enf=$(echo "$_ps" | jq -r '.enforcement_level')
+        _p_count=$(echo "$_ps" | jq '.policies | length')
+
+        _policies_json='[]'
+        _set_outcome="passed"
+        _p_idx=0
+        while [ "$_p_idx" -lt "$_p_count" ]; do
+            _p_name=$(echo "$_ps" | jq -r ".policies[$_p_idx].name")
+            echo "$_ps" | jq -r ".policies[$_p_idx].rego" > /tmp/policy.rego
+            _opa_exit=0
+
+            if [ -s /tmp/plan.json ]; then
+                _opa_out=$(opa eval --format json --stdin-input \
+                    --data /tmp/policy.rego --data /tmp/policy-context.json \
+                    'data.terrapod' < /tmp/plan.json 2>/tmp/opa-err.txt) || _opa_exit=$?
+            else
+                _opa_exit=1
+                _opa_out=""
+                echo "plan JSON was not available for policy evaluation" > /tmp/opa-err.txt
+            fi
+
+            if [ "$_opa_exit" != "0" ]; then
+                _err_msg=$(head -c 1000 /tmp/opa-err.txt | jq -Rs .)
+                _policies_json=$(echo "$_policies_json" | jq \
+                    --arg name "$_p_name" --argjson err "$_err_msg" \
+                    '. + [{policy: $name, passed: false, violations: [], warnings: [], error: $err}]')
+                _set_outcome="errored"
+            else
+                _deny=$(echo "$_opa_out" | jq '[(.result[0].expressions[0].value.deny // []) | .[] | tostring] | sort')
+                _warn=$(echo "$_opa_out" | jq '[(.result[0].expressions[0].value.warn // []) | .[] | tostring] | sort')
+                _vlen=$(echo "$_deny" | jq 'length')
+                if [ "$_vlen" -gt 0 ] && [ "$_set_outcome" != "errored" ]; then
+                    _set_outcome="failed"
+                fi
+                _passed=$([ "$_vlen" = "0" ] && echo "true" || echo "false")
+                _policies_json=$(echo "$_policies_json" | jq \
+                    --arg name "$_p_name" --argjson deny "$_deny" \
+                    --argjson warn "$_warn" --argjson passed "$_passed" \
+                    '. + [{policy: $name, passed: $passed, violations: $deny, warnings: $warn, error: null}]')
+            fi
+            _p_idx=$((_p_idx + 1))
+        done
+
+        _entry=$(jq -n \
+            --arg ps_id "$_ps_id" --arg ps_name "$_ps_name" \
+            --arg enf "$_ps_enf" --arg outcome "$_set_outcome" \
+            --argjson policies "$_policies_json" \
+            --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{policy_set_id: $ps_id, policy_set_name: $ps_name, enforcement_level: $enf, outcome: $outcome, result: {policies: $policies, evaluated_at: $ts}}')
+        _results=$(echo "$_results" | jq --argjson r "$_entry" '. + [$r]')
+        _idx=$((_idx + 1))
+    done
+
+    log "[entrypoint] Posting $(echo "$_results" | jq 'length') policy evaluation result(s)"
+    _post_http=$(echo "$_results" | jq '{results: .}' | curl -sS -o /tmp/policy-post.out \
+        -w '%{http_code}' -X POST -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+        --data-binary @- \
+        "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/policy-results" 2>/dev/null || echo 000)
+    if [ "$_post_http" != "201" ]; then
+        log "[entrypoint] FATAL: policy results POST failed (HTTP $_post_http): $(head -c 500 /tmp/policy-post.out 2>/dev/null)"
+        return 1
+    fi
+    log "[entrypoint] Policy results recorded"
+}
+
 # --- Download binary from cache ---
 # Detect platform architecture for correct binary download
 TP_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -586,7 +700,35 @@ if [ "$TP_PHASE" = "plan" ]; then
         echo "[entrypoint] PLAN_HAS_CHANGES=false"
     fi
 
-    # Report has_changes to API (used by reconciler for drift detection)
+    # Emit the structured JSON plan ahead of plan-result (#343 OPA-on-runner).
+    # OPA policy evaluation runs against /tmp/plan.json; the same file is
+    # uploaded as the plan-json-output artifact for the UI. `show -json` is
+    # best-effort: failure is non-fatal here, but the policy gate will
+    # then record fail-closed `errored` outcomes for every applicable set.
+    # The presence of `tfplan` is the right gate: -detailed-exitcode 1
+    # (errored) doesn't produce one; both 0 (no changes) and 2 (changes) do.
+    if [ "$EXIT_CODE" = "0" ] && [ -f tfplan ]; then
+        if ! "$TP_BIN" show -json tfplan > /tmp/plan.json 2> /tmp/plan-show.err; then
+            log "[entrypoint] $TP_BIN show -json tfplan failed (non-fatal): $(head -c 500 /tmp/plan-show.err)"
+            rm -f /tmp/plan.json
+        fi
+    fi
+
+    # OPA policy evaluation (#343). Runs ONLY when the plan succeeded —
+    # an errored plan has no JSON to evaluate against, and the API gate
+    # never sees that run anyway (plan-result isn't posted below).
+    # Fail-closed for mandatory sets if the bundle fetch or results POST
+    # can't be completed.
+    if [ "$EXIT_CODE" = "0" ]; then
+        if ! tp_evaluate_policies; then
+            exit 1
+        fi
+    fi
+
+    # Report has_changes to API (used by reconciler for drift detection).
+    # The API's post-plan policy gate now runs against the rows the
+    # runner posted in tp_evaluate_policies above, so by the time
+    # complete_plan handles this plan-result the gate state is settled.
     if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ] && [ "$EXIT_CODE" = "0" ]; then
         HAS_CHANGES_JSON="$PLAN_HAS_CHANGES"
         curl -sSf --max-time 10 -X POST -H "$AUTH_HEADER" \
@@ -608,22 +750,15 @@ if [ "$TP_PHASE" = "plan" ]; then
             "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/plan-file" || true
     fi
 
-    # Emit + upload structured JSON plan (`tofu show -json`). Best-effort:
-    # large plans can produce multi-MB JSON, and a failed upload here
-    # MUST NOT fail the run — the read endpoint just returns 404. The
-    # presence of `tfplan` is the right gate: -detailed-exitcode 1
-    # (errored) doesn't produce one; both 0 (no changes) and 2 (changes)
-    # do.
-    if [ -n "$TP_API_URL" ] && [ -f tfplan ]; then
-        if "$TP_BIN" show -json tfplan > /tmp/plan.json 2> /tmp/plan-show.err; then
-            curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
-                -H "Content-Type: application/json" \
-                --data-binary @/tmp/plan.json \
-                "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/plan-json-output" \
-                || log "[entrypoint] plan-json-output upload failed (non-fatal)"
-        else
-            log "[entrypoint] $TP_BIN show -json tfplan failed (non-fatal): $(head -c 500 /tmp/plan-show.err)"
-        fi
+    # Upload structured JSON plan (already produced above for OPA).
+    # Best-effort: a failed upload here MUST NOT fail the run — the
+    # read endpoint just returns 404.
+    if [ -n "$TP_API_URL" ] && [ -s /tmp/plan.json ]; then
+        curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/plan.json \
+            "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/plan-json-output" \
+            || log "[entrypoint] plan-json-output upload failed (non-fatal)"
     fi
 
 elif [ "$TP_PHASE" = "apply" ]; then

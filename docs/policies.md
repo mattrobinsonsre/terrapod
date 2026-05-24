@@ -88,26 +88,39 @@ time.
 
 ## How enforcement works
 
-Policy evaluation happens at the **post-plan** boundary, after the
-runner has produced the plan and uploaded its JSON form:
+Policy evaluation runs **on the runner**, between the plan phase and
+posting plan-result. The runner already has the plan JSON locally (it
+just produced it with `tofu show -json`), so there's no JSON download,
+no JSON-wait timing, and no concurrent-eval CPU load on the API:
 
-1. The run finishes planning.
-2. Terrapod resolves which policy sets apply to the workspace.
-3. Each applicable set is evaluated against the plan JSON. One
-   `policy_evaluation` row is recorded per set.
-4. **Mandatory** set failed (or errored) → the run is held: it stays in
-   `planning` and will not advance to `planned`/apply. The block is
-   surfaced on the run's **Policy Checks** panel.
-5. **Advisory** set failed → the failure is recorded and shown, and the
-   run proceeds normally.
-6. All mandatory sets passed → the run advances as usual.
+1. The runner finishes the plan and runs `tofu show -json tfplan`.
+2. The runner fetches the applicable policy bundle from the API
+   (`GET /api/terrapod/v1/runs/{id}/policy-bundle`). The API answers
+   that one question — which sets apply to this workspace — using the
+   label-scope model above. An empty bundle means no policy sets in
+   scope; the runner skips evaluation entirely.
+3. For each applicable set, the runner runs `opa eval` once per policy
+   against the local plan JSON, building a per-policy result with
+   violation messages.
+4. The runner POSTs all results to
+   `POST /api/terrapod/v1/runs/{id}/policy-results`, **before** posting
+   plan-result. One `policy_evaluation` row is recorded per set.
+5. The runner posts plan-result. The API's post-plan gate is now just
+   a database query — "is there a mandatory unoverridden failure for
+   this run?":
+   - **No** → the run advances to `planned` / `confirmed` / apply.
+   - **Yes** → the run is held in `planning` (it is **not** errored).
+     The block is surfaced on the run's **Policy Checks** panel.
+6. **Advisory** set failures are recorded and shown but never block.
 
-Speculative (plan-only) runs are evaluated and their results shown, but
-they are never blocked — there is no apply to gate.
+Speculative (plan-only) runs are evaluated and recorded but never
+gated — there is no apply to block.
 
-If the runner could not produce the plan JSON, a mandatory set
-fails closed (the run is held) — Terrapod never applies a run it could
-not check.
+If the runner can't produce the plan JSON or `opa eval` itself fails
+on a policy, the runner records an `errored` outcome for that set
+(fail-closed for mandatory sets). If the runner can't fetch the
+bundle at all after bounded retries, the run fails — never silently
+skipping the gate.
 
 ## Overriding a blocked run
 
@@ -136,11 +149,14 @@ the set name is retained for display).
 
 ## Operational notes
 
-- The `opa` binary is **bundled in the API image** at a pinned version
-  (currently OPA 1.16.2). The operator controls the OPA version by
-  choosing the Terrapod image tag — there is no per-policy-set version
-  selection. Policy evaluation is entirely server-side; runners are not
-  involved.
+- The `opa` binary is **bundled in both the runner and the API images**
+  at a pinned version (currently OPA 1.16.2). The runner is where
+  evaluation actually happens — it has the plan JSON locally and scales
+  out with K8s. The API keeps OPA only for `opa check` (write-time Rego
+  validation, so broken syntax is rejected at policy save time rather
+  than at the next run). The operator controls the OPA version by
+  choosing the Terrapod image tag; there is no per-policy-set version
+  selection.
 - Policy enforcement is **opt-in**: with no policy sets defined, runs
   behave exactly as before.
 - See the [runbook](runbooks.md#policy-enforcement-blocking-all-runs)

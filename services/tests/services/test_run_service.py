@@ -502,6 +502,17 @@ class TestCompletePlan:
     Critical property: it is idempotent against re-entry from either path.
     """
 
+    @pytest.fixture(autouse=True)
+    def _stub_policy_gate(self):
+        """complete_plan calls the post-plan OPA policy gate (#343). These
+        tests use a MagicMock db, so stub the gate to a clean pass — the
+        gate has its own dedicated tests in test_policy_set_service."""
+        with patch(
+            "terrapod.services.policy_set_service.evaluate_post_plan",
+            new=AsyncMock(return_value="passed"),
+        ):
+            yield
+
     @patch("terrapod.services.run_service._publish_run_event", new_callable=AsyncMock)
     @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
     @patch(

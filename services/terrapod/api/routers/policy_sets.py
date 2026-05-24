@@ -12,23 +12,28 @@ and the run-detail policy panel. Changes to response shapes, attribute
 names, or status codes here MUST be matched by those pages.
 
 Endpoints (all under /api/terrapod/v1):
-    GET    /policy-sets                         list
-    POST   /policy-sets                         create
-    GET    /policy-sets/{id}                    show (policies embedded)
-    PATCH  /policy-sets/{id}                    update
-    DELETE /policy-sets/{id}                    delete
-    POST   /policy-sets/{id}/policies           add a policy (rego validated)
-    PATCH  /policies/{id}                       update a policy
-    DELETE /policies/{id}                       delete a policy
-    GET    /runs/{run_id}/policy-evaluations    list a run's evaluations
-    POST   /runs/{run_id}/actions/override-policy   admin override (workspace admin)
+    Management (admin):
+        GET    /policy-sets                         list
+        POST   /policy-sets                         create
+        GET    /policy-sets/{id}                    show (policies embedded)
+        PATCH  /policy-sets/{id}                    update
+        DELETE /policy-sets/{id}                    delete
+        POST   /policy-sets/{id}/policies           add a policy (rego validated)
+        PATCH  /policies/{id}                       update a policy
+        DELETE /policies/{id}                       delete a policy
+    Run lifecycle (workspace read/admin):
+        GET    /runs/{run_id}/policy-evaluations    list a run's evaluations
+        POST   /runs/{run_id}/actions/override-policy   admin override (workspace admin)
+    Runner protocol (runner token, run_id-scoped):
+        GET    /runs/{run_id}/policy-bundle         applicable sets + context
+        POST   /runs/{run_id}/policy-results        record evaluation outcomes
 """
 
 import re
 import uuid
 from datetime import UTC
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -40,7 +45,15 @@ from terrapod.api.dependencies import (
     get_current_user,
     require_admin,
 )
-from terrapod.db.models import Policy, PolicyEvaluation, PolicySet, Run, Workspace
+from terrapod.db.models import (
+    Policy,
+    PolicyEvaluation,
+    PolicySet,
+    Run,
+    Workspace,
+    generate_uuid7,
+    now_utc,
+)
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import policy_engine, policy_set_service, run_service
@@ -506,3 +519,167 @@ async def override_run_policy(
             "meta": {"overridden": count, "run-status": run.status},
         }
     )
+
+
+# ── Runner protocol (runner-token auth, run_id-scoped) ────────────────
+#
+# These two endpoints are the runner-side half of #343: the runner
+# fetches the applicable policy bundle for a run, evaluates it locally
+# (it already has the plan JSON on disk — no download), and POSTs the
+# results back BEFORE posting plan-result. By the time complete_plan
+# runs the gate query, the evaluation rows exist. This eliminates the
+# JSON-wait dance, the grace timer, and the in-API OPA subprocess.
+#
+# Both endpoints authenticate with the runner token (stateless HMAC,
+# scoped to a single run_id by `auth_method == "runner_token"`).
+
+
+def _require_runner_for_run(user: AuthenticatedUser, run_id: str) -> None:
+    """Verify the caller is a runner token scoped to this run."""
+    if user.auth_method != "runner_token":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Runner token required",
+        )
+    if user.run_id != run_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Token not scoped to this run",
+        )
+
+
+@router.get("/runs/{run_id}/policy-bundle")
+async def get_policy_bundle(
+    run_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Return the applicable policy sets + Terrapod context for this run.
+
+    Runner consumes this between `tofu show -json tfplan` and posting
+    `plan-result`. Response shape is a flat JSON (not JSON:API) — the
+    runner is the only consumer.
+
+    Empty `policy_sets` means nothing in scope for this workspace; the
+    runner does no evaluation and posts no results, which the API gate
+    treats as PASSED.
+    """
+    _require_runner_for_run(user, run_id)
+    try:
+        run_uuid = uuid.UUID(run_id.removeprefix("run-"))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Run not found") from exc
+    run = await db.get(Run, run_uuid)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    ws = await db.get(Workspace, run.workspace_id)
+    if ws is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    sets = await policy_set_service.applicable_policy_sets(db, ws)
+    context = policy_set_service.build_run_context(ws, run)
+
+    return JSONResponse(
+        content={
+            "policy_sets": [
+                {
+                    "id": f"polset-{ps.id}",
+                    "name": ps.name,
+                    "enforcement_level": ps.enforcement_level,
+                    "policies": [
+                        {"id": f"pol-{p.id}", "name": p.name, "rego": p.rego}
+                        for p in sorted(ps.policies, key=lambda x: x.name)
+                    ],
+                }
+                for ps in sets
+            ],
+            "context": context,
+        }
+    )
+
+
+# Outcomes the runner is allowed to report. Anything else is rejected at
+# the boundary so the database invariant ("outcome in passed/failed/errored")
+# is enforced before the row is built.
+_VALID_OUTCOMES = {"passed", "failed", "errored"}
+
+
+@router.post("/runs/{run_id}/policy-results", status_code=201)
+async def post_policy_results(
+    run_id: str = Path(...),
+    body: dict = Body(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Record the runner's policy-evaluation results for this run.
+
+    Body: ``{"results": [{policy_set_id, policy_set_name,
+    enforcement_level, outcome, result}, ...]}``. Each row is persisted
+    via ON CONFLICT DO NOTHING on ``(run_id, policy_set_id)``, so a
+    retried POST after a transient failure is safely idempotent.
+    """
+    _require_runner_for_run(user, run_id)
+    try:
+        run_uuid = uuid.UUID(run_id.removeprefix("run-"))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Run not found") from exc
+    run = await db.get(Run, run_uuid)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    results = body.get("results")
+    if not isinstance(results, list):
+        raise HTTPException(status_code=422, detail="`results` must be a list of evaluation rows")
+
+    stamp = now_utc()
+    rows: list[dict] = []
+    for item in results:
+        if not isinstance(item, dict):
+            raise HTTPException(status_code=422, detail="each result must be an object")
+        ps_id_raw = item.get("policy_set_id", "")
+        try:
+            ps_uuid = uuid.UUID(str(ps_id_raw).removeprefix("polset-"))
+        except (ValueError, AttributeError) as exc:
+            raise HTTPException(
+                status_code=422, detail=f"invalid policy_set_id: {ps_id_raw!r}"
+            ) from exc
+
+        outcome = item.get("outcome", "")
+        if outcome not in _VALID_OUTCOMES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"outcome must be one of {sorted(_VALID_OUTCOMES)}; got {outcome!r}",
+            )
+
+        enf = item.get("enforcement_level", "")
+        if enf not in ("advisory", "mandatory"):
+            raise HTTPException(
+                status_code=422,
+                detail=f"enforcement_level must be advisory or mandatory; got {enf!r}",
+            )
+
+        result = item.get("result", {})
+        if not isinstance(result, dict):
+            raise HTTPException(status_code=422, detail="result must be an object (got a non-dict)")
+
+        rows.append(
+            {
+                "id": generate_uuid7(),
+                "run_id": run_uuid,
+                "policy_set_id": ps_uuid,
+                "policy_set_name": (item.get("policy_set_name") or "").strip(),
+                "enforcement_level": enf,
+                "outcome": outcome,
+                "result": result,
+                "created_at": stamp,
+            }
+        )
+
+    await policy_set_service._insert_evaluations(db, rows)
+    await db.commit()
+    logger.info(
+        "Policy results recorded by runner",
+        run_id=str(run_uuid),
+        sets=len(rows),
+    )
+    return JSONResponse(content={"recorded": len(rows)}, status_code=201)

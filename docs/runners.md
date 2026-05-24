@@ -211,6 +211,25 @@ Terraform and OpenTofu merge any file matching `*_override.tf` over the main con
 
 ---
 
+## OPA Policy Evaluation
+
+Policy-as-code evaluation runs **on the runner**, between the plan phase and posting plan-result. The plan JSON is already on disk (just produced by `tofu show -json tfplan`), so the runner can evaluate OPA policies against it without a round-trip to storage and without any server-side concurrent-eval load. See [`docs/policies.md`](policies.md) for the authoring contract.
+
+Sequence inside `runner-entrypoint.sh`, after `tofu plan` completes successfully:
+
+1. `tofu show -json tfplan > /tmp/plan.json` — produces the JSON form used by both OPA and the `plan-json-output` artifact.
+2. `tp_evaluate_policies` (the shell function in the entrypoint):
+   - `GET /api/terrapod/v1/runs/{id}/policy-bundle` — fetches the policy sets in scope for this workspace, plus the run/workspace context. Bounded retries (3 attempts, 3s backoff); a persistent fetch failure is **fatal** to the run, never silently skipped.
+   - For each applicable set, for each policy: `opa eval --format json --stdin-input --data <rego> --data <context> 'data.terrapod' < /tmp/plan.json`. Parses `deny` / `warn` from the OPA output. One eval per policy preserves per-policy attribution in the UI.
+   - `POST /api/terrapod/v1/runs/{id}/policy-results` — uploads the aggregated results. Persisted via Postgres `ON CONFLICT DO NOTHING` on `(run_id, policy_set_id)` so retries are idempotent.
+3. The runner posts `plan-result`. The API's post-plan gate is now a pure DB query — by this point the policy_evaluation rows already exist (or there were no applicable sets, which is the right answer too).
+
+If `tofu show -json` failed but the plan succeeded, the runner records an `errored` outcome for every applicable set (fail-closed for mandatory sets). The OPA binary itself is pinned + SHA-verified in `docker/Dockerfile.runner` and the version is kept in sync with `Dockerfile.api` and `Dockerfile.test`.
+
+This places eval workload exactly where the plan workload already lives — same pod, same resource budget, same K8s autoscaling. The API server stays out of the per-run hot path entirely; its only policy responsibilities are CRUD, write-time validation, the bundle endpoint, the results endpoint, and the gate query.
+
+---
+
 ## Environment Variables
 
 The entrypoint reads the following environment variables (set automatically by the listener):
