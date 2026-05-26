@@ -9,25 +9,12 @@
 //	Update:  PATCH  /api/terrapod/v1/users/{email}
 //	Delete:  DELETE /api/terrapod/v1/users/{email}
 //
-// Attribute mapping (JSON:API attribute -> Terraform schema attribute):
-//
-//	"email"        -> email        (string, required, forces new — used as ID)
-//	"display-name" -> display_name (string, optional)
-//	"is-active"    -> is_active    (bool,   optional, default true)
-//	"password"     -> password     (string, optional, sensitive, write-only)
-//
-// Read-only attributes:
-//
-//	"has-password"  -> has_password  (bool,   computed)
-//	"last-login-at" -> last_login_at (string, computed)
-//	"created-at"    -> created_at    (string, computed)
-//	"updated-at"    -> updated_at    (string, computed)
-//
-// Import: by email (used directly as the resource ID).
+// Migrated to go-terrapod (#347).
 package user
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -38,6 +25,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -46,17 +34,14 @@ var (
 	_ resource.ResourceWithImportState = &userResource{}
 )
 
-// userModel maps the Terraform schema to Go types.
 type userModel struct {
 	ID types.String `tfsdk:"id"`
 
-	// Writable attributes
 	Email       types.String `tfsdk:"email"`
 	DisplayName types.String `tfsdk:"display_name"`
 	IsActive    types.Bool   `tfsdk:"is_active"`
 	Password    types.String `tfsdk:"password"`
 
-	// Read-only attributes
 	HasPassword types.Bool   `tfsdk:"has_password"`
 	LastLoginAt types.String `tfsdk:"last_login_at"`
 	CreatedAt   types.String `tfsdk:"created_at"`
@@ -65,9 +50,9 @@ type userModel struct {
 
 type userResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
-// NewResource returns a new user resource.
 func NewResource() resource.Resource {
 	return &userResource{}
 }
@@ -111,7 +96,6 @@ func (r *userResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Sensitive:   true,
 			},
 
-			// Read-only
 			"has_password": schema.BoolAttribute{
 				Description: "Whether the user has a password set.",
 				Computed:    true,
@@ -145,6 +129,13 @@ func (r *userResource) Configure(_ context.Context, req resource.ConfigureReques
 		return
 	}
 	r.client = c
+
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *userResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -154,27 +145,13 @@ func (r *userResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	attrs := buildUserAttrs(&plan)
-
-	body, err := client.MarshalResource("users", attrs, nil)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal request", err.Error())
-		return
-	}
-
-	data, err := r.client.Post(ctx, "/api/terrapod/v1/users", body)
+	u, err := r.tc.CreateUser(ctx, buildCreateUserRequest(&plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create user", err.Error())
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
-	readUserIntoModel(res, &plan)
+	readUserFromSDK(u, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -185,9 +162,10 @@ func (r *userResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/terrapod/v1/users/"+state.ID.ValueString())
+	u, err := r.tc.GetUser(ctx, state.ID.ValueString())
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -195,16 +173,9 @@ func (r *userResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
-	// Preserve the write-only password from state (API never returns it).
+	// Preserve the write-only password (API never returns it).
 	password := state.Password
-
-	readUserIntoModel(res, &state)
+	readUserFromSDK(u, &state)
 	state.Password = password
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -222,30 +193,14 @@ func (r *userResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	attrs := buildUserAttrs(&plan)
-
-	body, err := client.MarshalResourceWithID(state.ID.ValueString(), "users", attrs)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal request", err.Error())
-		return
-	}
-
-	data, err := r.client.Patch(ctx, "/api/terrapod/v1/users/"+state.ID.ValueString(), body)
+	u, err := r.tc.UpdateUser(ctx, state.ID.ValueString(), buildUpdateUserRequest(&plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update user", err.Error())
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
-	// Preserve the write-only password from plan.
 	password := plan.Password
-
-	readUserIntoModel(res, &plan)
+	readUserFromSDK(u, &plan)
 	plan.Password = password
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -257,59 +212,71 @@ func (r *userResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/terrapod/v1/users/"+state.ID.ValueString())
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Failed to delete user", err.Error())
+	err := r.tc.DeleteUser(ctx, state.ID.ValueString())
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Failed to delete user", err.Error())
+		}
 	}
 }
 
 func (r *userResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Import by email — the email IS the ID.
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 }
 
-// buildUserAttrs converts the Terraform model into JSON:API attributes.
-func buildUserAttrs(m *userModel) map[string]any {
-	attrs := map[string]any{
-		"email": m.Email.ValueString(),
+func buildCreateUserRequest(m *userModel) terrapod.CreateUserRequest {
+	req := terrapod.CreateUserRequest{
+		Email: m.Email.ValueString(),
 	}
-
 	if !m.DisplayName.IsNull() && !m.DisplayName.IsUnknown() {
-		attrs["display-name"] = m.DisplayName.ValueString()
+		req.DisplayName = m.DisplayName.ValueString()
 	}
 	if !m.IsActive.IsNull() && !m.IsActive.IsUnknown() {
-		attrs["is-active"] = m.IsActive.ValueBool()
+		v := m.IsActive.ValueBool()
+		req.IsActive = &v
 	}
 	if !m.Password.IsNull() && !m.Password.IsUnknown() {
-		attrs["password"] = m.Password.ValueString()
+		req.Password = m.Password.ValueString()
 	}
-
-	return attrs
+	return req
 }
 
-// readUserIntoModel populates the Terraform model from a JSON:API resource.
-func readUserIntoModel(res *client.Resource, m *userModel) {
-	// The user ID is the email address.
-	m.ID = types.StringValue(res.ID)
-	m.Email = types.StringValue(client.GetStringAttr(res, "email"))
+func buildUpdateUserRequest(m *userModel) terrapod.UpdateUserRequest {
+	req := terrapod.UpdateUserRequest{}
+	if !m.DisplayName.IsNull() && !m.DisplayName.IsUnknown() {
+		v := m.DisplayName.ValueString()
+		req.DisplayName = &v
+	}
+	if !m.IsActive.IsNull() && !m.IsActive.IsUnknown() {
+		v := m.IsActive.ValueBool()
+		req.IsActive = &v
+	}
+	if !m.Password.IsNull() && !m.Password.IsUnknown() {
+		req.Password = m.Password.ValueString()
+	}
+	return req
+}
 
-	if v := client.GetStringAttr(res, "display-name"); v != "" {
-		m.DisplayName = types.StringValue(v)
+func readUserFromSDK(u *terrapod.User, m *userModel) {
+	m.ID = types.StringValue(u.Email)
+	m.Email = types.StringValue(u.Email)
+
+	if u.DisplayName != "" {
+		m.DisplayName = types.StringValue(u.DisplayName)
 	} else {
 		m.DisplayName = types.StringNull()
 	}
 
-	m.IsActive = types.BoolValue(client.GetBoolAttr(res, "is-active"))
-	m.HasPassword = types.BoolValue(client.GetBoolAttr(res, "has-password"))
+	m.IsActive = types.BoolValue(u.IsActive)
+	m.HasPassword = types.BoolValue(u.HasPassword)
 
-	// Password is never returned by the API — leave it untouched (caller preserves it).
-
-	if v := client.GetStringAttr(res, "last-login-at"); v != "" {
-		m.LastLoginAt = types.StringValue(v)
+	if u.LastLoginAt != "" {
+		m.LastLoginAt = types.StringValue(u.LastLoginAt)
 	} else {
 		m.LastLoginAt = types.StringNull()
 	}
 
-	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
+	m.CreatedAt = types.StringValue(u.CreatedAt)
+	m.UpdatedAt = types.StringValue(u.UpdatedAt)
 }
