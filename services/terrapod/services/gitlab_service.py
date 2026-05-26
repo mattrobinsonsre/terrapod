@@ -24,6 +24,125 @@ logger = get_logger(__name__)
 DEFAULT_GITLAB_URL = "https://gitlab.com"
 
 
+# Retry tuning — mirrors `github_service._github_request` so VCS-side
+# resilience is symmetric across providers. Before #360 GitLab was a
+# single-shot httpx.post().raise_for_status(): one transient 5xx, 429,
+# or DNS blip silently dropped commit-status updates and PR-check
+# completion in the UI never landed.
+_MAX_RETRY_WAIT_SECONDS = 60.0
+_DEFAULT_BACKOFF_SECONDS = 5.0
+_MAX_RETRIES = 3
+# POST/PUT/PATCH/DELETE are retried on 5xx only when the caller asserts
+# idempotency (e.g. commit-status updates are last-write-wins on a
+# (sha, name) tuple). All methods retry on 429 / Retry-After-bearing
+# 5xx since those are pre-execution rejections with no server-side
+# effect to dedupe.
+_IDEMPOTENT_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+def _parse_retry_after(resp: httpx.Response) -> float:
+    """Compute the delay GitLab is asking us to honour before retrying.
+
+    GitLab sets `Retry-After` on 429 (rate-limit) responses; older
+    self-hosted versions occasionally set it on 503 during maintenance.
+    Accepts both delta-seconds and HTTP-date forms; falls back to a
+    fixed backoff. Clamped to ``_MAX_RETRY_WAIT_SECONDS``.
+    """
+    retry_after = resp.headers.get("Retry-After")
+    if retry_after:
+        try:
+            return max(1.0, min(float(retry_after), _MAX_RETRY_WAIT_SECONDS))
+        except ValueError:
+            # HTTP-date form — rare; fall through.
+            pass
+    return _DEFAULT_BACKOFF_SECONDS
+
+
+def _should_retry(resp: httpx.Response, method: str, retry_5xx: bool) -> bool:
+    """Same shape as `github_service._should_retry` for cross-provider parity."""
+    if resp.status_code == 429:
+        return True
+    if 500 <= resp.status_code < 600:
+        return retry_5xx or method.upper() in _IDEMPOTENT_METHODS
+    return False
+
+
+async def _gitlab_request(
+    method: str,
+    url: str,
+    conn: VCSConnection,
+    *,
+    follow_redirects: bool = False,
+    retry_5xx: bool = False,
+    timeout: float | httpx.Timeout | None = None,
+    **kwargs: object,
+) -> httpx.Response:
+    """Authenticated GitLab API request with retry on 429 / 5xx / transport.
+
+    Mirrors `github_service._github_request`. Auth headers are added
+    automatically; the response is NOT raise-for-statused so callers can
+    inspect 404s (etc.) without exception handling.
+    """
+    headers: dict[str, str] = dict(kwargs.pop("headers", {}) or {})  # type: ignore[arg-type]
+    headers.setdefault("PRIVATE-TOKEN", _token(conn))
+
+    client_kwargs: dict[str, object] = {"follow_redirects": follow_redirects}
+    if timeout is not None:
+        client_kwargs["timeout"] = timeout
+
+    async with httpx.AsyncClient(**client_kwargs) as client:  # type: ignore[arg-type]
+        resp: httpx.Response | None = None
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                resp = await client.request(method, url, headers=headers, **kwargs)  # type: ignore[arg-type]
+            except httpx.TransportError as e:
+                # Transport error — the request never landed, safe to
+                # replay on any method.
+                if attempt >= _MAX_RETRIES:
+                    logger.warning(
+                        "GitLab transport error, retries exhausted",
+                        method=method,
+                        url=url,
+                        error=str(e),
+                    )
+                    raise
+                backoff = min(_DEFAULT_BACKOFF_SECONDS * (2**attempt), _MAX_RETRY_WAIT_SECONDS)
+                logger.info(
+                    "GitLab transport error, retrying",
+                    method=method,
+                    url=url,
+                    attempt=attempt + 1,
+                    backoff_seconds=backoff,
+                )
+                await asyncio.sleep(backoff)
+                continue
+
+            if not _should_retry(resp, method, retry_5xx) or attempt >= _MAX_RETRIES:
+                return resp
+
+            wait = (
+                _parse_retry_after(resp)
+                if resp.status_code == 429
+                else (min(_DEFAULT_BACKOFF_SECONDS * (2**attempt), _MAX_RETRY_WAIT_SECONDS))
+            )
+            logger.info(
+                "GitLab response retryable, backing off",
+                method=method,
+                url=url,
+                status=resp.status_code,
+                attempt=attempt + 1,
+                backoff_seconds=wait,
+            )
+            await asyncio.sleep(wait)
+
+        # Loop exhausted without a returnable response. The transport-error
+        # branch raises, the success branch returns; the only way here is
+        # if every attempt was retryable but `attempt >= _MAX_RETRIES`
+        # never matched — defensive return of the last response.
+        assert resp is not None
+        return resp
+
+
 def _api_url(conn: VCSConnection) -> str:
     """Resolve the GitLab API base URL from the connection."""
     base = (conn.server_url or DEFAULT_GITLAB_URL).rstrip("/")
@@ -359,6 +478,12 @@ async def create_commit_status(
     Args:
         state: One of pending, running, success, failed, canceled.
         description: Status description text.
+
+    Routed through `_gitlab_request` with ``retry_5xx=True`` because
+    commit-status posts are last-write-wins on the (sha, name) tuple —
+    replaying after a transient 5xx just re-asserts the same status. A
+    one-shot post here used to silently drop the "completed" check
+    update on any blip (#360); the retry closes that hole.
     """
     api = _api_url(conn)
     project = _project_path(owner, repo)
@@ -371,13 +496,14 @@ async def create_commit_status(
     if target_url:
         params["target_url"] = target_url
 
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{api}/projects/{project}/statuses/{sha}",
-            json=params,
-            headers=_headers(conn),
-        )
-        resp.raise_for_status()
+    resp = await _gitlab_request(
+        "POST",
+        f"{api}/projects/{project}/statuses/{sha}",
+        conn,
+        json=params,
+        retry_5xx=True,
+    )
+    resp.raise_for_status()
 
     logger.debug(
         "GitLab commit status posted",

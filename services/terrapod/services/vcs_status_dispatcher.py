@@ -298,9 +298,22 @@ async def handle_vcs_commit_status(payload: dict) -> None:
                     context=context,
                 )
         except Exception as e:
-            logger.warning(
-                "Failed to post VCS commit status",
+            # ERROR (not warning) because by the time we reach this except,
+            # the underlying transport-level retry has already exhausted
+            # (3 retries for both GitHub `_github_request` and GitLab
+            # `_gitlab_request`). The handler has nothing left to fall
+            # back to — the commit status / PR check stays in its previous
+            # state, which is the user-visible symptom from #360. Bumping
+            # to error makes it visible in monitoring; alerting on this
+            # gives operators a chance to chase intermittent VCS-API
+            # incidents before users notice.
+            logger.error(
+                "Failed to post VCS commit status (transport retries exhausted)",
                 run_id=run_id_str,
+                workspace_id=workspace_id_str,
+                provider=conn.provider,
+                target_status=target_status,
+                sha=run.vcs_commit_sha[:12] if run.vcs_commit_sha else "",
                 error=str(e),
             )
 
