@@ -53,6 +53,7 @@ package autodiscovery_rule
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -69,6 +70,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -132,6 +134,7 @@ var notificationTemplateAttrTypes = map[string]attr.Type{
 
 type autodiscoveryRuleResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
 func NewResource() resource.Resource {
@@ -377,6 +380,13 @@ func (r *autodiscoveryRuleResource) Configure(_ context.Context, req resource.Co
 		return
 	}
 	r.client = c
+
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *autodiscoveryRuleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -388,19 +398,19 @@ func (r *autodiscoveryRuleResource) Create(ctx context.Context, req resource.Cre
 
 	attrs := buildAutodiscoveryRuleAttrs(&plan)
 
-	body, err := client.MarshalResource("autodiscovery-rules", attrs, nil)
+	body, err := terrapod.MarshalResource("autodiscovery-rules", attrs, nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to marshal request", err.Error())
 		return
 	}
 
-	data, err := r.client.Post(ctx, "/api/terrapod/v1/autodiscovery-rules", body)
+	data, err := r.tc.Post(ctx, "/api/terrapod/v1/autodiscovery-rules", body)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create autodiscovery rule", err.Error())
 		return
 	}
 
-	res, err := client.ParseResource(data)
+	res, err := terrapod.ParseResource(data)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to parse response", err.Error())
 		return
@@ -417,9 +427,10 @@ func (r *autodiscoveryRuleResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/terrapod/v1/autodiscovery-rules/"+state.ID.ValueString())
+	data, err := r.tc.Get(ctx, "/api/terrapod/v1/autodiscovery-rules/"+state.ID.ValueString())
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -427,7 +438,7 @@ func (r *autodiscoveryRuleResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	res, err := client.ParseResource(data)
+	res, err := terrapod.ParseResource(data)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to parse response", err.Error())
 		return
@@ -452,19 +463,19 @@ func (r *autodiscoveryRuleResource) Update(ctx context.Context, req resource.Upd
 
 	attrs := buildAutodiscoveryRuleAttrs(&plan)
 
-	body, err := client.MarshalResourceWithID(state.ID.ValueString(), "autodiscovery-rules", attrs)
+	body, err := terrapod.MarshalResourceWithID(state.ID.ValueString(), "autodiscovery-rules", attrs)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to marshal request", err.Error())
 		return
 	}
 
-	data, err := r.client.Patch(ctx, "/api/terrapod/v1/autodiscovery-rules/"+state.ID.ValueString(), body)
+	data, err := r.tc.Patch(ctx, "/api/terrapod/v1/autodiscovery-rules/"+state.ID.ValueString(), body)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update autodiscovery rule", err.Error())
 		return
 	}
 
-	res, err := client.ParseResource(data)
+	res, err := terrapod.ParseResource(data)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to parse response", err.Error())
 		return
@@ -481,9 +492,12 @@ func (r *autodiscoveryRuleResource) Delete(ctx context.Context, req resource.Del
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/terrapod/v1/autodiscovery-rules/"+state.ID.ValueString())
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Failed to delete autodiscovery rule", err.Error())
+	err := r.tc.Delete(ctx, "/api/terrapod/v1/autodiscovery-rules/"+state.ID.ValueString())
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Failed to delete autodiscovery rule", err.Error())
+		}
 	}
 }
 
@@ -655,19 +669,19 @@ func objStrList(l types.List) []string {
 
 // readAutodiscoveryRuleIntoModel maps a JSON:API resource into the
 // Terraform model.
-func readAutodiscoveryRuleIntoModel(ctx context.Context, res *client.Resource, m *autodiscoveryRuleModel) diag.Diagnostics {
+func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource, m *autodiscoveryRuleModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	m.ID = types.StringValue(res.ID)
 
-	m.Name = types.StringValue(client.GetStringAttr(res, "name"))
-	m.NameTemplate = types.StringValue(client.GetStringAttr(res, "name-template"))
-	m.VCSConnectionID = types.StringValue(client.GetStringAttr(res, "vcs-connection-id"))
-	m.RepoURL = types.StringValue(client.GetStringAttr(res, "repo-url"))
-	m.Branch = types.StringValue(client.GetStringAttr(res, "branch"))
-	m.Pattern = types.StringValue(client.GetStringAttr(res, "pattern"))
+	m.Name = types.StringValue(terrapod.GetStringAttr(res, "name"))
+	m.NameTemplate = types.StringValue(terrapod.GetStringAttr(res, "name-template"))
+	m.VCSConnectionID = types.StringValue(terrapod.GetStringAttr(res, "vcs-connection-id"))
+	m.RepoURL = types.StringValue(terrapod.GetStringAttr(res, "repo-url"))
+	m.Branch = types.StringValue(terrapod.GetStringAttr(res, "branch"))
+	m.Pattern = types.StringValue(terrapod.GetStringAttr(res, "pattern"))
 
-	patterns := client.GetListAttr(res, "ignore-patterns")
+	patterns := terrapod.GetListAttr(res, "ignore-patterns")
 	if patterns == nil {
 		patterns = []string{}
 	}
@@ -675,16 +689,16 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *client.Resource, m
 	diags.Append(d...)
 	m.IgnorePatterns = v
 
-	m.Enabled = types.BoolValue(client.GetBoolAttr(res, "enabled"))
-	m.ExecutionMode = types.StringValue(client.GetStringAttr(res, "execution-mode"))
-	m.ExecutionBackend = types.StringValue(client.GetStringAttr(res, "execution-backend"))
-	m.AgentPoolID = types.StringValue(client.GetStringAttr(res, "agent-pool-id"))
-	m.TerraformVersion = types.StringValue(client.GetStringAttr(res, "terraform-version"))
-	m.ResourceCPU = types.StringValue(client.GetStringAttr(res, "resource-cpu"))
-	m.ResourceMemory = types.StringValue(client.GetStringAttr(res, "resource-memory"))
-	m.AutoApply = types.BoolValue(client.GetBoolAttr(res, "auto-apply"))
+	m.Enabled = types.BoolValue(terrapod.GetBoolAttr(res, "enabled"))
+	m.ExecutionMode = types.StringValue(terrapod.GetStringAttr(res, "execution-mode"))
+	m.ExecutionBackend = types.StringValue(terrapod.GetStringAttr(res, "execution-backend"))
+	m.AgentPoolID = types.StringValue(terrapod.GetStringAttr(res, "agent-pool-id"))
+	m.TerraformVersion = types.StringValue(terrapod.GetStringAttr(res, "terraform-version"))
+	m.ResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "resource-cpu"))
+	m.ResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "resource-memory"))
+	m.AutoApply = types.BoolValue(terrapod.GetBoolAttr(res, "auto-apply"))
 
-	labels := client.GetMapAttr(res, "labels")
+	labels := terrapod.GetMapAttr(res, "labels")
 	if labels == nil {
 		labels = map[string]string{}
 	}
@@ -692,12 +706,12 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *client.Resource, m
 	diags.Append(dl...)
 	m.Labels = mv
 
-	m.OwnerEmail = types.StringValue(client.GetStringAttr(res, "owner-email"))
+	m.OwnerEmail = types.StringValue(terrapod.GetStringAttr(res, "owner-email"))
 
 	// Optional (#314). Tolerate missing/empty: an absent attribute leaves
 	// the model field null so a rule that never set it produces no
 	// spurious diff.
-	if v := client.GetStringAttr(res, "on-directory-delete"); v != "" {
+	if v := terrapod.GetStringAttr(res, "on-directory-delete"); v != "" {
 		m.OnDirectoryDelete = types.StringValue(v)
 	} else {
 		m.OnDirectoryDelete = types.StringNull()
@@ -706,7 +720,7 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *client.Resource, m
 	// Optional templating fields (#318). Tolerate missing/empty: an
 	// absent attribute leaves the model field null so a rule that never
 	// set them produces no spurious diff.
-	if varFiles := client.GetListAttr(res, "var-files"); len(varFiles) > 0 {
+	if varFiles := terrapod.GetListAttr(res, "var-files"); len(varFiles) > 0 {
 		v, d := types.ListValueFrom(ctx, types.StringType, varFiles)
 		diags.Append(d...)
 		m.VarFiles = v
@@ -763,8 +777,8 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *client.Resource, m
 		m.NotificationTemplates = types.ListNull(ntObjType)
 	}
 
-	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
+	m.CreatedAt = types.StringValue(terrapod.GetStringAttr(res, "created-at"))
+	m.UpdatedAt = types.StringValue(terrapod.GetStringAttr(res, "updated-at"))
 
 	return diags
 }
@@ -772,7 +786,7 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *client.Resource, m
 // parseRawObjectList decodes a JSON:API attribute that is a list of
 // objects into a slice of generic maps. Returns nil on missing/empty/
 // non-list so callers can null the model field.
-func parseRawObjectList(res *client.Resource, key string) []map[string]any {
+func parseRawObjectList(res *terrapod.Resource, key string) []map[string]any {
 	raw, ok := res.Attributes[key]
 	if !ok || len(raw) == 0 || string(raw) == "null" {
 		return nil
