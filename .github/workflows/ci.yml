@@ -146,6 +146,44 @@ jobs:
         run: go test ./... -v -count=1 -timeout 120s
         working-directory: provider
 
+  # ── go-terrapod Lint ──────────────────────────────────
+  # The public Go SDK lives in go-terrapod/ with its own go.mod (no
+  # provider/migrate-specific deps). Both terraform-provider-terrapod
+  # and terrapod-migrate import from here.
+  go-terrapod-lint:
+    name: go-terrapod Lint
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go-terrapod/go.mod
+          cache-dependency-path: go-terrapod/go.sum
+      - name: Vet
+        run: go vet ./...
+        working-directory: go-terrapod
+      - name: Build
+        run: go build ./...
+        working-directory: go-terrapod
+
+  # ── go-terrapod Test ──────────────────────────────────
+  go-terrapod-test:
+    name: go-terrapod Test
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go-terrapod/go.mod
+          cache-dependency-path: go-terrapod/go.sum
+      - name: Test
+        run: go test ./... -v -count=1 -timeout 120s
+        working-directory: go-terrapod
+
   # ── Migrate Lint ──────────────────────────────────────
   # The terrapod-migrate binary lives in migrate/ with its own go.mod
   # (the provider doesn't carry go-tfe or the HCL libs). Mirrors the
@@ -798,6 +836,8 @@ jobs:
       - frontend-lint
       - provider-lint
       - provider-test
+      - go-terrapod-lint
+      - go-terrapod-test
       - migrate-lint
       - migrate-test
       - python-test
@@ -823,6 +863,8 @@ jobs:
             "${{ needs.frontend-lint.result }}"
             "${{ needs.provider-lint.result }}"
             "${{ needs.provider-test.result }}"
+            "${{ needs.go-terrapod-lint.result }}"
+            "${{ needs.go-terrapod-test.result }}"
             "${{ needs.migrate-lint.result }}"
             "${{ needs.migrate-test.result }}"
             "${{ needs.python-test.result }}"
