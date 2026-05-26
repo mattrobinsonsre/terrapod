@@ -465,12 +465,17 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 }
 
 // buildUpdateWorkspaceRequest is the partial-update counterpart to
-// buildCreateWorkspaceRequest. Same translation logic minus the Name
-// field (immutable post-create).
+// buildCreateWorkspaceRequest. Same translation logic; Name is
+// included so a Terraform-driven rename round-trips via PATCH (the
+// API supports rename — terrapod-vcs-test moves between names
+// during e.g. the cutover smoke).
 func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrapod.UpdateWorkspaceRequest, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	req := terrapod.UpdateWorkspaceRequest{}
 
+	if !m.Name.IsNull() && !m.Name.IsUnknown() {
+		req.Name = m.Name.ValueString()
+	}
 	if !m.ExecutionMode.IsNull() && !m.ExecutionMode.IsUnknown() {
 		req.ExecutionMode = m.ExecutionMode.ValueString()
 	}

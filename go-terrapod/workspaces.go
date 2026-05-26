@@ -80,14 +80,16 @@ type CreateWorkspaceRequest struct {
 }
 
 // UpdateWorkspaceRequest is the input shape for Client.UpdateWorkspace.
-// Same fields as CreateWorkspaceRequest minus Name (which is set at
-// create time and not updateable via the standard PATCH endpoint).
+// Mirrors CreateWorkspaceRequest including Name — Terrapod's
+// workspace PATCH endpoint accepts a rename, so the SDK exposes it
+// here. Pass an empty string to leave the name alone.
 //
 // Pointer-typed bool fields let callers distinguish "leave alone"
 // (nil) from "set to false" (&false). Without that distinction we'd
 // flip a workspace's auto-apply to false on every PATCH that didn't
 // explicitly set it.
 type UpdateWorkspaceRequest struct {
+	Name                          string            `json:"name,omitempty"`
 	ExecutionMode                 string            `json:"execution-mode,omitempty"`
 	ExecutionBackend              string            `json:"execution-backend,omitempty"`
 	AutoApply                     *bool             `json:"auto-apply,omitempty"`
@@ -310,12 +312,16 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	return attrs
 }
 
-// workspaceUpdateAttrs is workspaceCreateAttrs minus Name + OwnerEmail.
-// Sharing code via a helper that strips fields would be fragile; the
-// duplication is shallow and the trade-off favours explicit type
-// boundaries.
+// workspaceUpdateAttrs mirrors workspaceCreateAttrs minus OwnerEmail
+// (which only platform admins can change, via a separate endpoint).
+// Name is included so PATCH can rename a workspace; the empty-string
+// check on every field is what makes the "leave alone" semantics work
+// on every PATCH.
 func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	attrs := map[string]any{}
+	if req.Name != "" {
+		attrs["name"] = req.Name
+	}
 	if req.ExecutionMode != "" {
 		attrs["execution-mode"] = req.ExecutionMode
 	}

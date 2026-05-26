@@ -86,23 +86,43 @@ func (s *Source) StateReader(opts StateOptions) writer.StateReader {
 	}
 }
 
-// projectDirForSourceID — the Emit step stamps each workspace's
-// SourceID as "<repo-url>:<dir-relative-to-repo-root>". This reverses
-// the encoding to find the absolute on-disk project directory under
-// SourcePath.
+// projectDirForSourceID resolves a workspace's SourceID to the
+// absolute on-disk project directory under SourcePath. SourceID is
+// what ProjectIdentifier emits — either the project's `name:` from
+// atlantis.yaml or its `dir` (with an optional `/<workspace>` suffix
+// when the project uses non-default Terraform workspaces).
+//
+// We walk the parsed atlantis.yaml to find the project the SourceID
+// belongs to (matching name first, then dir+workspace shape) and
+// return that project's directory joined with SourcePath. Tolerates
+// the dir-only IDs since the Atlantis Emit step stamps those
+// directly.
 func (s *Source) projectDirForSourceID(sourceID string) (string, error) {
 	if s == nil || s.SourcePath == "" {
 		return "", errors.New("atlantis source not loaded — call LoadDirectory first")
 	}
-	idx := strings.LastIndex(sourceID, ":")
-	if idx < 0 {
-		return "", fmt.Errorf("malformed atlantis source id %q (expected <repo>:<dir>)", sourceID)
+	if s.AtlantisYAML != nil {
+		for _, p := range s.AtlantisYAML.Projects {
+			if ProjectIdentifier(p) == sourceID {
+				dir := strings.TrimSpace(p.Dir)
+				if dir == "" || dir == "." {
+					return s.SourcePath, nil
+				}
+				return filepath.Join(s.SourcePath, dir), nil
+			}
+		}
 	}
-	rel := sourceID[idx+1:]
-	if rel == "" || rel == "." {
-		return s.SourcePath, nil
+	// Fallback for synthetic source IDs (tests, ad-hoc fixtures):
+	// treat the suffix after the last `:` as a directory relative
+	// to SourcePath.
+	if idx := strings.LastIndex(sourceID, ":"); idx >= 0 {
+		rel := sourceID[idx+1:]
+		if rel == "" || rel == "." {
+			return s.SourcePath, nil
+		}
+		return filepath.Join(s.SourcePath, rel), nil
 	}
-	return filepath.Join(s.SourcePath, rel), nil
+	return "", fmt.Errorf("atlantis source id %q does not match any project in atlantis.yaml", sourceID)
 }
 
 func fetchStateForBackend(ctx context.Context, backend *hcl.Backend, projectDir string, opts StateOptions) ([]byte, error) {

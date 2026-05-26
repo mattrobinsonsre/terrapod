@@ -72,8 +72,19 @@ func (r *agentPoolTokenResource) Schema(_ context.Context, _ resource.SchemaRequ
 				PlanModifiers: []planmodifier.Int64{int64planmodifier.RequiresReplace()},
 			},
 			"expires_at": schema.StringAttribute{
-				Description: "Expiration timestamp (RFC3339).", Optional: true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				// Optional + Computed because the Terrapod API auto-
+				// assigns an expiry (typically pool TTL + 1h) when
+				// the client doesn't supply one. Without Computed,
+				// tofu's PlanResourceChange sees the create-response
+				// expiry as drift against the plan's null value and
+				// fails with "Provider produced inconsistent result".
+				Description: "Expiration timestamp (RFC3339). Server-assigned when omitted.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"token": schema.StringAttribute{
 				Description: "Raw token value. Returned only on create.", Computed: true, Sensitive: true,

@@ -19,7 +19,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
@@ -42,10 +42,19 @@ logger = get_logger(__name__)
 class CreateGPGKeyRequest(BaseModel):
     class Data(BaseModel):
         class Attributes(BaseModel):
+            # JSON:API uses hyphenated attribute names by convention.
+            # Pydantic field names are snake_case; aliases below accept
+            # either `ascii-armor` / `source-url` (hyphenated, the
+            # convention every other Terrapod router follows) or the
+            # snake_case form (used by go-tfe + a handful of older
+            # clients). populate_by_name lets the alias OR the field
+            # name match.
             namespace: str
-            ascii_armor: str
+            ascii_armor: str = Field(..., alias="ascii-armor")
             source: str = "terrapod"
-            source_url: str | None = None
+            source_url: str | None = Field(default=None, alias="source-url")
+
+            model_config = {"populate_by_name": True}
 
         type: str = "gpg-keys"
         attributes: Attributes

@@ -68,6 +68,13 @@ type Options struct {
 	// is not — operators wire it up by hand). DryRun never invokes
 	// the callback.
 	StateForWorkspace StateReader
+
+	// DestHost is the Terrapod hostname (just the host, no scheme)
+	// the migration is writing into. Stamped onto the state file on
+	// the first apply so the rewrite subcommand can derive the
+	// `cloud { hostname = "..." }` value without the operator
+	// passing it again.
+	DestHost string
 }
 
 // Report is the structured summary of an Apply or DryRun. It's
@@ -175,8 +182,11 @@ func (w *Writer) Run(ctx context.Context, plan ir.Plan, opts Options) (*Report, 
 		w.state.SourceOrg = plan.SourceMetadata["org"]
 	}
 	// DestHost is recorded in the state file from the operator's
-	// --target flag at apply time; the writer leaves the field alone
-	// when not pre-set (tests don't need it).
+	// --target flag at apply time so the rewrite subcommand can
+	// derive `cloud { hostname }` without a second flag pass.
+	if w.state.DestHost == "" && opts.DestHost != "" {
+		w.state.DestHost = opts.DestHost
+	}
 
 	// VCS connections first: look up existing Terrapod connections
 	// that match each source connection's repo URL. The map keeps
@@ -287,10 +297,23 @@ func (w *Writer) applyWorkspace(ctx context.Context, ws *ir.Workspace, connByRef
 	}
 
 	// Idempotency: reuse the recorded TerrapodID if a prior run
-	// already created the workspace.
+	// already created the workspace. We still re-run state and
+	// variable application against the existing workspace —
+	// applyState short-circuits on (lineage, serial) match and
+	// applyVariable upserts.
 	if prior := w.state.WorkspaceBySourceID(ws.SourceID); prior != nil && prior.TerrapodID != "" {
 		out.State = "reused"
 		out.TerrapodID = prior.TerrapodID
+		if !opts.DryRun {
+			for i := range ws.Variables {
+				v := &ws.Variables[i]
+				vout := w.applyVariable(ctx, prior.TerrapodID, ws.SourceID, v, opts)
+				out.VarOutcomes = append(out.VarOutcomes, vout)
+			}
+			if opts.StateForWorkspace != nil {
+				out.StateOutcome = w.applyState(ctx, prior.TerrapodID, ws.SourceID, opts.StateForWorkspace)
+			}
+		}
 		return out
 	}
 

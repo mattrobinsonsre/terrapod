@@ -146,6 +146,7 @@ func applyCmd(args []string) int {
 		ToolVersion:          Version,
 		StateForWorkspace:    stateReader,
 		VCSConnectionIDByRef: connByRef,
+		DestHost:             hostFromRepoURL(*target),
 		SensitiveValueForVariable: func(workspaceSourceID, key string) (string, error) {
 			return "", fmt.Errorf("sensitive variable %q on workspace %q: source did not provide a value-loader (atlantis has no sensitive vars; tfe support pending)", key, workspaceSourceID)
 		},
@@ -192,21 +193,37 @@ func resolveVCSConnections(ctx context.Context, c *terrapod.Client, planConns []
 	}
 	for _, planConn := range planConns {
 		want := canonicaliseURL(planConn.ServerURL)
-		wantHost := hostFromRepoURL(planConn.ServerURL)
+		wantHost := canonicaliseGitHost(planConn.ServerURL)
 		for i := range existing {
 			ex := &existing[i]
 			if !strings.EqualFold(ex.Provider, planConn.Provider) {
 				continue
 			}
+			exHost := canonicaliseGitHost(ex.ServerURL)
 			if canonicaliseURL(ex.ServerURL) == want ||
 				(want == "" && ex.ServerURL == "") || // default-host on both sides
-				hostFromRepoURL(ex.ServerURL) == wantHost {
+				exHost == wantHost {
 				out[planConn.SourceID] = ex.ID
 				break
 			}
 		}
 	}
 	return out, nil
+}
+
+// canonicaliseGitHost collapses common shape differences between
+// Terrapod-side and source-side hostnames so the connection-matcher
+// hits even when only one side declares `api.` (GitHub's REST API
+// host is api.github.com but operators clone from github.com) or
+// includes a non-standard port.
+func canonicaliseGitHost(serverURL string) string {
+	host := hostFromRepoURL(serverURL)
+	// Strip a leading "api." since the GitHub App config commonly
+	// has `server_url: https://api.github.com` but repo URLs use
+	// `github.com`. GitLab self-hosted instances commonly use the
+	// same host for API + repos, so this only matters for GitHub.
+	host = strings.TrimPrefix(host, "api.")
+	return strings.ToLower(host)
 }
 
 func canonicaliseURL(u string) string {
