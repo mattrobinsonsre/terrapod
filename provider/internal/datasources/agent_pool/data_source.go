@@ -1,25 +1,23 @@
 // Package agent_pool implements the terrapod_agent_pool data source.
-//
-// API Contract: GET /api/terrapod/v1/agent-pools
-// Lists all pools, filters by name client-side.
+// Migrated to go-terrapod (#347).
 package agent_pool
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
 var _ datasource.DataSource = &agentPoolDataSource{}
 
 type agentPoolDataSource struct {
-	client *client.Client
+	tc *terrapod.Client
 }
 
 type agentPoolDataSourceModel struct {
@@ -64,7 +62,12 @@ func (d *agentPoolDataSource) Configure(_ context.Context, req datasource.Config
 		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *client.Client, got %T", req.ProviderData))
 		return
 	}
-	d.client = c
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	d.tc = tc
 }
 
 func (d *agentPoolDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -74,50 +77,40 @@ func (d *agentPoolDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	data, err := d.client.Get(ctx, "/api/terrapod/v1/agent-pools")
+	pools, err := d.tc.ListAgentPools(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to list agent pools", err.Error())
 		return
 	}
 
-	resources, err := client.ParseResourceList(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
 	name := config.Name.ValueString()
-	for _, r := range resources {
-		if client.GetStringAttr(&r, "name") == name {
-			config.ID = types.StringValue(r.ID)
-			config.Name = types.StringValue(client.GetStringAttr(&r, "name"))
-			config.Description = types.StringValue(client.GetStringAttr(&r, "description"))
-
-			// Labels — treat empty map {} as valid (not null)
-			if rawLabels, ok := r.Attributes["labels"]; ok && len(rawLabels) > 0 {
-				var labels map[string]string
-				if err := json.Unmarshal(rawLabels, &labels); err == nil {
-					val, d := types.MapValueFrom(ctx, types.StringType, labels)
-					resp.Diagnostics.Append(d...)
-					config.Labels = val
-				} else {
-					config.Labels = types.MapNull(types.StringType)
-				}
-			} else {
-				config.Labels = types.MapNull(types.StringType)
-			}
-
-			if v := client.GetStringAttr(&r, "owner-email"); v != "" {
-				config.OwnerEmail = types.StringValue(v)
-			} else {
-				config.OwnerEmail = types.StringNull()
-			}
-
-			config.CreatedAt = types.StringValue(client.GetStringAttr(&r, "created-at"))
-			config.UpdatedAt = types.StringValue(client.GetStringAttr(&r, "updated-at"))
-			resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
-			return
+	for i := range pools {
+		p := &pools[i]
+		if p.Name != name {
+			continue
 		}
+		config.ID = types.StringValue(p.ID)
+		config.Name = types.StringValue(p.Name)
+		config.Description = types.StringValue(p.Description)
+
+		if len(p.Labels) > 0 {
+			val, dl := types.MapValueFrom(ctx, types.StringType, p.Labels)
+			resp.Diagnostics.Append(dl...)
+			config.Labels = val
+		} else {
+			config.Labels = types.MapNull(types.StringType)
+		}
+
+		if p.OwnerEmail != "" {
+			config.OwnerEmail = types.StringValue(p.OwnerEmail)
+		} else {
+			config.OwnerEmail = types.StringNull()
+		}
+
+		config.CreatedAt = types.StringValue(p.CreatedAt)
+		config.UpdatedAt = types.StringValue(p.UpdatedAt)
+		resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
+		return
 	}
 
 	resp.Diagnostics.AddError("Agent pool not found", fmt.Sprintf("No agent pool named %q", name))

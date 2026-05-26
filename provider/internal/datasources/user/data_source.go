@@ -1,7 +1,5 @@
 // Package user implements the terrapod_user data source.
-//
-// API Contract: GET /api/terrapod/v1/users/{email}
-// Looks up a single user by email.
+// Migrated to go-terrapod (#347).
 package user
 
 import (
@@ -12,13 +10,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
 var _ datasource.DataSource = &userDataSource{}
 
 type userDataSource struct {
-	client *client.Client
+	tc *terrapod.Client
 }
 
 type userDataSourceModel struct {
@@ -63,7 +62,12 @@ func (d *userDataSource) Configure(_ context.Context, req datasource.ConfigureRe
 		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *client.Client, got %T", req.ProviderData))
 		return
 	}
-	d.client = c
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	d.tc = tc
 }
 
 func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -73,27 +77,21 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	data, err := d.client.Get(ctx, "/api/terrapod/v1/users/"+config.Email.ValueString())
+	u, err := d.tc.GetUser(ctx, config.Email.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to read user", err.Error())
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
+	config.Email = types.StringValue(u.Email)
+	config.DisplayName = types.StringValue(u.DisplayName)
+	config.IsActive = types.BoolValue(u.IsActive)
+	config.HasPassword = types.BoolValue(u.HasPassword)
+	config.CreatedAt = types.StringValue(u.CreatedAt)
+	config.UpdatedAt = types.StringValue(u.UpdatedAt)
 
-	config.Email = types.StringValue(client.GetStringAttr(res, "email"))
-	config.DisplayName = types.StringValue(client.GetStringAttr(res, "display-name"))
-	config.IsActive = types.BoolValue(client.GetBoolAttr(res, "is-active"))
-	config.HasPassword = types.BoolValue(client.GetBoolAttr(res, "has-password"))
-	config.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-	config.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
-
-	if v := client.GetStringAttr(res, "last-login-at"); v != "" {
-		config.LastLoginAt = types.StringValue(v)
+	if u.LastLoginAt != "" {
+		config.LastLoginAt = types.StringValue(u.LastLoginAt)
 	} else {
 		config.LastLoginAt = types.StringNull()
 	}
