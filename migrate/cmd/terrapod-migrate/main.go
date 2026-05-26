@@ -42,8 +42,7 @@ func main() {
 	case "rewrite":
 		os.Exit(rewriteCmd(rest))
 	case "verify":
-		fmt.Fprintf(os.Stderr, "%s: subcommand not yet implemented (placeholder; coming in subsequent increments)\n", os.Args[1])
-		os.Exit(1)
+		os.Exit(verifyCmd(rest))
 	case "version", "-v", "--version":
 		fmt.Println(Version)
 	case "help", "-h", "--help":
