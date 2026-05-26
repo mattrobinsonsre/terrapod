@@ -300,7 +300,7 @@ async def test_gate_missing_mandatory_writes_synthetic_errored() -> None:
     the gate synthesises an errored row and blocks. Safety net is
     row-count-vs-set-count — covers the rolling-upgrade case (an old
     runner image that doesn't know about policy-as-code) and any other
-    path that leaves the runner from POSTing for an applicable set."""
+    path that prevents the runner from POSTing for an applicable set."""
     from terrapod.services import policy_set_service
 
     run = _run()

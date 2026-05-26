@@ -156,7 +156,7 @@ async def evaluate_post_plan(db: AsyncSession, run: Run) -> str:
     the applicable sets to the recorded rows. The most common cause of
     a missing row is a runner image from before policy-as-code support
     that doesn't fetch or POST anything (Helm rolling upgrade, node
-    image cache); any other path that leaves a runner from POSTing
+    image cache); any other path that prevents a runner from POSTing
     for an applicable set lands here too.
 
     For every applicable set that has **no** recorded row AND is
