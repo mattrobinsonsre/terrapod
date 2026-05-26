@@ -1,37 +1,10 @@
 // Package variable_set_variable implements the terrapod_variable_set_variable resource.
-//
-// API Contract (Terrapod API <-> Terraform Provider):
-//
-//	JSON:API type: "vars"
-//	ID prefix: "var-"
-//	Create:  POST   /api/v2/varsets/{varset_id}/relationships/vars
-//	Read:    GET    /api/v2/varsets/{varset_id}/relationships/vars  (list, filter by ID)
-//	Update:  PATCH  /api/v2/varsets/{varset_id}/relationships/vars/{var_id}
-//	Delete:  DELETE /api/v2/varsets/{varset_id}/relationships/vars/{var_id}
-//
-// Attribute mapping (JSON:API -> Terraform):
-//
-//	"key"         -> key         (string, required)
-//	"value"       -> value       (string, optional, sensitive when sensitive=true)
-//	"category"    -> category    (string, required: "terraform" or "env")
-//	"hcl"         -> hcl         (bool, optional)
-//	"sensitive"   -> sensitive   (bool, optional)
-//	"description" -> description (string, optional)
-//
-// Read-only:
-//
-//	"version-id"  -> version_id  (string, computed)
-//	"created-at"  -> created_at  (string, computed)
-//	"updated-at"  -> updated_at  (string, computed)
-//
-// Note: When sensitive=true, the API returns value=null. The provider stores
-// the configured value in state and never reads it back from the API.
-//
-// Import: varset_id/variable_id
+// Migrated to go-terrapod (#347).
 package variable_set_variable
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -43,15 +16,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
-// variableSetVariableModel maps the Terraform schema to Go types.
 type variableSetVariableModel struct {
 	ID       types.String `tfsdk:"id"`
 	VarsetID types.String `tfsdk:"varset_id"`
 
-	// Writable attributes
 	Key         types.String `tfsdk:"key"`
 	Value       types.String `tfsdk:"value"`
 	Category    types.String `tfsdk:"category"`
@@ -59,7 +31,6 @@ type variableSetVariableModel struct {
 	Sensitive   types.Bool   `tfsdk:"sensitive"`
 	Description types.String `tfsdk:"description"`
 
-	// Read-only attributes
 	VersionID types.String `tfsdk:"version_id"`
 	CreatedAt types.String `tfsdk:"created_at"`
 	UpdatedAt types.String `tfsdk:"updated_at"`
@@ -72,12 +43,10 @@ var (
 
 type variableSetVariableResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
-// NewResource returns a new variable set variable resource.
-func NewResource() resource.Resource {
-	return &variableSetVariableResource{}
-}
+func NewResource() resource.Resource { return &variableSetVariableResource{} }
 
 func (r *variableSetVariableResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_variable_set_variable"
@@ -87,45 +56,17 @@ func (r *variableSetVariableResource) Schema(_ context.Context, _ resource.Schem
 	resp.Schema = schema.Schema{
 		Description: "Manages a variable within a Terrapod variable set.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Computed: true, Description: "Variable ID (e.g. var-abc123).",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"varset_id": schema.StringAttribute{
-				Required: true, Description: "Variable set ID this variable belongs to.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"key": schema.StringAttribute{
-				Required: true, Description: "Variable name.",
-			},
-			"value": schema.StringAttribute{
-				Optional: true, Sensitive: true, Description: "Variable value. Sensitive variables are write-only.",
-			},
-			"category": schema.StringAttribute{
-				Required: true, Description: "Category: terraform or env.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"hcl": schema.BoolAttribute{
-				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				Description: "Parse value as HCL.",
-			},
-			"sensitive": schema.BoolAttribute{
-				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				Description: "Mark as sensitive (value will not be returned by API).",
-			},
-			"description": schema.StringAttribute{
-				Optional: true, Description: "Description.",
-			},
-			"version_id": schema.StringAttribute{
-				Computed: true, Description: "Version identifier.",
-			},
-			"created_at": schema.StringAttribute{
-				Computed: true, Description: "Creation timestamp.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"updated_at": schema.StringAttribute{
-				Computed: true, Description: "Update timestamp.",
-			},
+			"id": schema.StringAttribute{Computed: true, Description: "Variable ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"varset_id": schema.StringAttribute{Required: true, Description: "Variable set ID this variable belongs to.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"key":         schema.StringAttribute{Required: true, Description: "Variable name."},
+			"value":       schema.StringAttribute{Optional: true, Sensitive: true, Description: "Variable value. Sensitive variables are write-only."},
+			"category":    schema.StringAttribute{Required: true, Description: "Category: terraform or env.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"hcl":         schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Parse value as HCL."},
+			"sensitive":   schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Mark as sensitive (value will not be returned by API)."},
+			"description": schema.StringAttribute{Optional: true, Description: "Description."},
+			"version_id":  schema.StringAttribute{Computed: true, Description: "Version identifier."},
+			"created_at":  schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"updated_at":  schema.StringAttribute{Computed: true, Description: "Update timestamp."},
 		},
 	}
 }
@@ -140,6 +81,12 @@ func (r *variableSetVariableResource) Configure(_ context.Context, req resource.
 		return
 	}
 	r.client = c
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *variableSetVariableResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -148,27 +95,12 @@ func (r *variableSetVariableResource) Create(ctx context.Context, req resource.C
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	attrs := buildAttrs(&plan)
-	body, err := client.MarshalResource("vars", attrs, nil)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
-	}
-
-	data, err := r.client.Post(ctx, fmt.Sprintf("/api/v2/varsets/%s/relationships/vars", plan.VarsetID.ValueString()), body)
+	v, err := r.tc.CreateVarsetVariable(ctx, plan.VarsetID.ValueString(), buildCreateVSVRequest(&plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Create failed", err.Error())
 		return
 	}
-
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	readIntoModel(res, &plan)
+	readVSVFromSDK(v, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -178,37 +110,21 @@ func (r *variableSetVariableResource) Read(ctx context.Context, req resource.Rea
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	// List all variables for the variable set and find ours by ID.
-	data, err := r.client.Get(ctx, fmt.Sprintf("/api/v2/varsets/%s/relationships/vars", state.VarsetID.ValueString()))
+	v, err := r.tc.GetVarsetVariable(ctx, state.VarsetID.ValueString(), state.ID.ValueString())
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
 		resp.Diagnostics.AddError("Read failed", err.Error())
 		return
 	}
-
-	resources, err := client.ParseResourceList(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	var found *client.Resource
-	for i := range resources {
-		if resources[i].ID == state.ID.ValueString() {
-			found = &resources[i]
-			break
-		}
-	}
-	if found == nil {
+	if v == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}
-
-	readIntoModel(found, &state)
+	readVSVFromSDK(v, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -218,33 +134,17 @@ func (r *variableSetVariableResource) Update(ctx context.Context, req resource.U
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 	var state variableSetVariableModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	attrs := buildAttrs(&plan)
-	body, err := client.MarshalResourceWithID(state.ID.ValueString(), "vars", attrs)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
-	}
-
-	data, err := r.client.Patch(ctx, fmt.Sprintf("/api/v2/varsets/%s/relationships/vars/%s", state.VarsetID.ValueString(), state.ID.ValueString()), body)
+	v, err := r.tc.UpdateVarsetVariable(ctx, state.VarsetID.ValueString(), state.ID.ValueString(), buildUpdateVSVRequest(&plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Update failed", err.Error())
 		return
 	}
-
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	readIntoModel(res, &plan)
+	readVSVFromSDK(v, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -254,15 +154,16 @@ func (r *variableSetVariableResource) Delete(ctx context.Context, req resource.D
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	err := r.client.Delete(ctx, fmt.Sprintf("/api/v2/varsets/%s/relationships/vars/%s", state.VarsetID.ValueString(), state.ID.ValueString()))
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete failed", err.Error())
+	err := r.tc.DeleteVarsetVariable(ctx, state.VarsetID.ValueString(), state.ID.ValueString())
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Delete failed", err.Error())
+		}
 	}
 }
 
 func (r *variableSetVariableResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Import format: varset_id/variable_id
 	parts := strings.SplitN(req.ID, "/", 2)
 	if len(parts) != 2 {
 		resp.Diagnostics.AddError("Invalid import ID", "Expected format: varset_id/variable_id")
@@ -272,50 +173,65 @@ func (r *variableSetVariableResource) ImportState(ctx context.Context, req resou
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[1])...)
 }
 
-func buildAttrs(m *variableSetVariableModel) map[string]any {
-	attrs := map[string]any{
-		"key":      m.Key.ValueString(),
-		"category": m.Category.ValueString(),
+func buildCreateVSVRequest(m *variableSetVariableModel) terrapod.CreateVarsetVariableRequest {
+	req := terrapod.CreateVarsetVariableRequest{
+		Key:      m.Key.ValueString(),
+		Category: m.Category.ValueString(),
 	}
 	if !m.Value.IsNull() {
-		attrs["value"] = m.Value.ValueString()
+		req.Value = m.Value.ValueString()
 	}
 	if !m.HCL.IsNull() && !m.HCL.IsUnknown() {
-		attrs["hcl"] = m.HCL.ValueBool()
+		req.HCL = m.HCL.ValueBool()
 	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
-		attrs["sensitive"] = m.Sensitive.ValueBool()
+		req.Sensitive = m.Sensitive.ValueBool()
 	}
 	if !m.Description.IsNull() {
-		attrs["description"] = m.Description.ValueString()
+		req.Description = m.Description.ValueString()
 	}
-	return attrs
+	return req
 }
 
-func readIntoModel(res *client.Resource, m *variableSetVariableModel) {
-	m.ID = types.StringValue(res.ID)
-	m.Key = types.StringValue(client.GetStringAttr(res, "key"))
-	m.Category = types.StringValue(client.GetStringAttr(res, "category"))
-	m.HCL = types.BoolValue(client.GetBoolAttr(res, "hcl"))
-	m.Sensitive = types.BoolValue(client.GetBoolAttr(res, "sensitive"))
-	m.VersionID = types.StringValue(client.GetStringAttr(res, "version-id"))
-	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
+func buildUpdateVSVRequest(m *variableSetVariableModel) terrapod.UpdateVarsetVariableRequest {
+	req := terrapod.UpdateVarsetVariableRequest{
+		Key:      m.Key.ValueString(),
+		Category: m.Category.ValueString(),
+	}
+	if !m.Value.IsNull() {
+		v := m.Value.ValueString()
+		req.Value = &v
+	}
+	if !m.HCL.IsNull() && !m.HCL.IsUnknown() {
+		v := m.HCL.ValueBool()
+		req.HCL = &v
+	}
+	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
+		v := m.Sensitive.ValueBool()
+		req.Sensitive = &v
+	}
+	if !m.Description.IsNull() {
+		v := m.Description.ValueString()
+		req.Description = &v
+	}
+	return req
+}
 
-	if v := client.GetStringAttr(res, "description"); v != "" {
-		m.Description = types.StringValue(v)
+func readVSVFromSDK(v *terrapod.VariableSetVariable, m *variableSetVariableModel) {
+	m.ID = types.StringValue(v.ID)
+	m.Key = types.StringValue(v.Key)
+	m.Category = types.StringValue(v.Category)
+	m.HCL = types.BoolValue(v.HCL)
+	m.Sensitive = types.BoolValue(v.Sensitive)
+	m.VersionID = types.StringValue(v.VersionID)
+	m.CreatedAt = types.StringValue(v.CreatedAt)
+	m.UpdatedAt = types.StringValue(v.UpdatedAt)
+	if v.Description != "" {
+		m.Description = types.StringValue(v.Description)
 	} else {
 		m.Description = types.StringNull()
 	}
-
-	// Sensitive variables: API returns null. Preserve configured value from state/plan.
-	if m.Sensitive.ValueBool() {
-		// Value stays as-is from plan (not overwritten by API null).
-	} else {
-		if v := client.GetStringAttr(res, "value"); v != "" {
-			m.Value = types.StringValue(v)
-		} else {
-			m.Value = types.StringNull()
-		}
+	if !v.Sensitive && v.Value != "" {
+		m.Value = types.StringValue(v.Value)
 	}
 }
