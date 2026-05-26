@@ -151,6 +151,14 @@ trap on_exit EXIT
 # storage error (e.g. an SSE-KMS bucket rejecting a SigV2 presigned
 # URL) the storage response body is logged to stderr so the operator
 # sees the real cause instead of a silent failure (#339).
+#
+# Manually follows redirects (vs `curl -L`) so the apply-phase lock-file
+# download against `/api/terrapod/v1/runs/{id}/artifacts/lock-file`
+# tolerates a 302 to presigned-URL storage and still surfaces the
+# original Authorization-bearing first hop in TP_LAST_HTTP for
+# diagnostics (#357). Cloud-storage redirect targets are left
+# untouched; same-server hostname rewrites (filesystem backend) are
+# normalised back to TP_API_URL.
 tp_curl_download() {
     # $1 = output file, remaining args = curl options (URL last)
     _out="$1"; shift

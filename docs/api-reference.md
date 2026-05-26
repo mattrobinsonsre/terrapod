@@ -548,6 +548,17 @@ POST /api/v2/runs
 
 **Required permission:** `plan` for plan-only runs, `write` for apply runs.
 
+#### Configuration version resolution
+
+The `configuration-version` relationship is optional. Resolution rules:
+
+- **Explicit CV in the request body** → used as-is.
+- **No CV + workspace has a VCS connection** → Terrapod fetches the latest commit (or the branch/tag from `vcs-ref`) and creates a fresh CV automatically.
+- **No CV + non-VCS workspace** → falls back to the **latest fully-uploaded, non-speculative CV** for the workspace. This is the path the UI's "Queue Plan" button takes.
+- **No CV + non-VCS workspace + no upload has ever succeeded** → `422 Unprocessable Entity` with detail `"Workspace has no uploaded configuration. Upload one via 'tofu plan' / 'tofu apply' (CLI), or POST a configuration version + tarball before queueing a run."`. The same response covers the misconfigured-workspace edge case where `vcs_connection_id` is set but `vcs_repo_url` is empty.
+
+The CLI plan/apply flow always supplies a CV (it uploads one first), so it's unaffected by the fallback.
+
 #### Optional Run Attributes
 
 | Attribute | Type | Default | Description |
@@ -2250,7 +2261,7 @@ Overrides every failed/errored policy evaluation of a run and immediately re-dri
 GET /api/terrapod/v1/runs/{run_id}/policy-bundle
 ```
 
-Returns the applicable policy sets + run/workspace context for a run. Used by the runner during the plan phase to drive OPA evaluation locally. Response shape is a flat JSON document (not JSON:API — the runner is the only consumer):
+Returns the applicable policy sets + run/workspace context for a run. Used by the runner during the plan phase to drive OPA evaluation locally. A persistent fetch failure on the runner is **fatal** to the run (see [`docs/runners.md` — OPA Policy Evaluation](runners.md)) — there is no silent skip. Response shape is a flat JSON document (not JSON:API — the runner is the only consumer):
 
 ```json
 {

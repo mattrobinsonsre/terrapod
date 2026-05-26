@@ -224,7 +224,7 @@ Sequence inside `runner-entrypoint.sh`, after `tofu plan` completes successfully
    - `POST /api/terrapod/v1/runs/{id}/policy-results` — uploads the aggregated results. Persisted via Postgres `ON CONFLICT DO NOTHING` on `(run_id, policy_set_id)` so retries are idempotent.
 3. The runner posts `plan-result`. The API's post-plan gate is now a pure DB query — by this point the policy_evaluation rows already exist (or there were no applicable sets, which is the right answer too).
 
-If `tofu show -json` failed but the plan succeeded, the runner records an `errored` outcome for every applicable set (fail-closed for mandatory sets). The OPA binary itself is pinned + SHA-verified in `docker/Dockerfile.runner` and the version is kept in sync with `Dockerfile.api` and `Dockerfile.test`.
+If `tofu show -json` failed but the plan succeeded, the runner records an `errored` outcome for every applicable set (fail-closed for mandatory sets). The OPA binary is pinned + SHA-verified in `docker/Dockerfile.runner` and the version is kept in sync with `Dockerfile.api` and `Dockerfile.test` — currently **OPA v1.16.2** with the **Rego v1 syntax** (`package … if {}` form). Bumping requires editing the `ARG OPA_VERSION=` in all three Dockerfiles and the matching `OPA_SHA256_*` constants.
 
 This places eval workload exactly where the plan workload already lives — same pod, same resource budget, same K8s autoscaling. The API server stays out of the per-run hot path entirely; its only policy responsibilities are CRUD, write-time validation, the bundle endpoint, the results endpoint, and the gate query.
 

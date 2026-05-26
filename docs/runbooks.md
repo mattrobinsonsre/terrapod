@@ -719,3 +719,36 @@ This usually means **the runner image is from before policy-as-code support / do
 
 - A fresh run on the same workspace shows the policy set with a real outcome (`passed` / `failed`) rather than the synthetic `errored` message.
 - The runner pod log includes `Fetching policy bundle...` / `Posting N policy evaluation result(s)` lines — confirms it's a post-#343 image.
+
+---
+
+## VCS commit status missing after run completion
+
+**Symptom**: a workspace run completes but the corresponding commit status / PR check on GitHub or GitLab stays in `pending` / `running` forever. The Terrapod UI shows the run as `applied` / `errored` / `planned`. The PR check never advances.
+
+**Why**: the dispatcher posting commit statuses (`vcs_status_dispatcher.py`) runs after a triggered task. Per-request retries (3 attempts on 429 / 5xx / transport errors) live in `github_service._github_request` and `gitlab_service._gitlab_request`. When those retries exhaust — typically a multi-minute VCS outage, an expired access token, or a token whose scopes were narrowed — the dispatcher logs an `error`-level line and moves on without re-enqueueing. The run itself is unaffected; only the upstream check display is.
+
+The structured fields on the error log are: `provider`, `target_status`, `workspace_id`, `sha` (first 12 chars), `error`. Alert on:
+
+```
+service=terrapod-api logger=terrapod.services.vcs_status_dispatcher
+  level=error
+  msg="Failed to post VCS commit status (transport retries exhausted)"
+```
+
+### Diagnosis
+
+1. **Check the access token validity.** For GitHub App connections, the App's installation token is fetched on-demand and cached for 50 minutes — if the App was uninstalled from the repo the next refresh 404s. For GitLab Project / Group access tokens, the token can expire or have its `read_repository` scope revoked.
+2. **Confirm the VCS provider isn't itself degraded.** Check the provider's status page (`status.github.com` / `status.gitlab.com`). If there's an ongoing incident, the retries are doing their job; the error is expected and self-clears.
+3. **Look for repeated entries for the same `(workspace_id, sha)`** — sustained failures across multiple runs point at auth, not transient. Single-run misses on different workspaces during the same window point at a VCS-side incident.
+
+### Resolution
+
+- **Token / scope issue**: rotate the token on the VCS connection (`/admin/vcs-connections`). For GitHub Apps, re-install the App with the necessary `Commit statuses: Write` permission.
+- **VCS-side incident**: nothing to do; status will not auto-recover for already-failed posts (no re-enqueue). The next run on the same SHA, or any branch update, posts a fresh status.
+- **Forcing a fresh post**: queue a no-op plan-only run on the same commit. This produces a new sequence of state transitions, each of which re-enqueues a commit-status update.
+
+### Verification
+
+- Run logs after the rotation show `level=info logger=terrapod.services.gitlab_service msg="GitLab commit status posted"` (or the equivalent for GitHub).
+- The PR check on the next pushed commit lands within ~30 seconds of the run completing.
