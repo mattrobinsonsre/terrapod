@@ -2,6 +2,7 @@ package variable
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -21,8 +23,14 @@ var (
 	_ resource.ResourceWithImportState = &variableResource{}
 )
 
+// variableResource — migrated to go-terrapod (#347). The legacy
+// *client.Client field is kept for the cross-resource path in case
+// other helpers in this package need it; CRUD goes entirely through
+// the typed `tc` client. The legacy field disappears once all
+// resources migrate.
 type variableResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
 func NewResource() resource.Resource {
@@ -90,6 +98,13 @@ func (r *variableResource) Configure(_ context.Context, req resource.ConfigureRe
 		return
 	}
 	r.client = c
+
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *variableResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -99,26 +114,13 @@ func (r *variableResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	attrs := buildAttrs(&plan)
-	body, err := client.MarshalResource("vars", attrs, nil)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
-	}
-
-	data, err := r.client.Post(ctx, fmt.Sprintf("/api/v2/workspaces/%s/vars", plan.WorkspaceID.ValueString()), body)
+	v, err := r.tc.CreateVariable(ctx, plan.WorkspaceID.ValueString(), buildCreateVariableRequest(&plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Create failed", err.Error())
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	readIntoModel(res, &plan)
+	readVariableIntoModel(v, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -129,10 +131,10 @@ func (r *variableResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	// List all variables for the workspace and find ours by ID.
-	data, err := r.client.Get(ctx, fmt.Sprintf("/api/v2/workspaces/%s/vars", state.WorkspaceID.ValueString()))
+	v, err := r.tc.GetVariable(ctx, state.WorkspaceID.ValueString(), state.ID.ValueString())
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -140,25 +142,7 @@ func (r *variableResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	resources, err := client.ParseResourceList(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	var found *client.Resource
-	for i := range resources {
-		if resources[i].ID == state.ID.ValueString() {
-			found = &resources[i]
-			break
-		}
-	}
-	if found == nil {
-		resp.State.RemoveResource(ctx)
-		return
-	}
-
-	readIntoModel(found, &state)
+	readVariableIntoModel(v, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -175,26 +159,17 @@ func (r *variableResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	attrs := buildAttrs(&plan)
-	body, err := client.MarshalResourceWithID(state.ID.ValueString(), "vars", attrs)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
-	}
-
-	data, err := r.client.Patch(ctx, fmt.Sprintf("/api/v2/workspaces/%s/vars/%s", state.WorkspaceID.ValueString(), state.ID.ValueString()), body)
+	v, err := r.tc.UpdateVariable(ctx,
+		state.WorkspaceID.ValueString(),
+		state.ID.ValueString(),
+		buildUpdateVariableRequest(&plan),
+	)
 	if err != nil {
 		resp.Diagnostics.AddError("Update failed", err.Error())
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	readIntoModel(res, &plan)
+	readVariableIntoModel(v, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -205,9 +180,12 @@ func (r *variableResource) Delete(ctx context.Context, req resource.DeleteReques
 		return
 	}
 
-	err := r.client.Delete(ctx, fmt.Sprintf("/api/v2/workspaces/%s/vars/%s", state.WorkspaceID.ValueString(), state.ID.ValueString()))
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete failed", err.Error())
+	err := r.tc.DeleteVariable(ctx, state.WorkspaceID.ValueString(), state.ID.ValueString())
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Delete failed", err.Error())
+		}
 	}
 }
 
@@ -222,50 +200,86 @@ func (r *variableResource) ImportState(ctx context.Context, req resource.ImportS
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[1])...)
 }
 
-func buildAttrs(m *variableModel) map[string]any {
-	attrs := map[string]any{
-		"key":      m.Key.ValueString(),
-		"category": m.Category.ValueString(),
+// buildCreateVariableRequest projects the Terraform model into the
+// SDK's typed CreateVariableRequest. Optional bool/string fields are
+// included only when explicitly set, matching the previous
+// map[string]any semantics.
+func buildCreateVariableRequest(m *variableModel) terrapod.CreateVariableRequest {
+	req := terrapod.CreateVariableRequest{
+		Key:      m.Key.ValueString(),
+		Category: m.Category.ValueString(),
 	}
 	if !m.Value.IsNull() {
-		attrs["value"] = m.Value.ValueString()
+		req.Value = m.Value.ValueString()
 	}
 	if !m.HCL.IsNull() && !m.HCL.IsUnknown() {
-		attrs["hcl"] = m.HCL.ValueBool()
+		req.HCL = m.HCL.ValueBool()
 	}
 	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
-		attrs["sensitive"] = m.Sensitive.ValueBool()
+		req.Sensitive = m.Sensitive.ValueBool()
 	}
 	if !m.Description.IsNull() {
-		attrs["description"] = m.Description.ValueString()
+		req.Description = m.Description.ValueString()
 	}
-	return attrs
+	return req
 }
 
-func readIntoModel(res *client.Resource, m *variableModel) {
-	m.ID = types.StringValue(res.ID)
-	m.Key = types.StringValue(client.GetStringAttr(res, "key"))
-	m.Category = types.StringValue(client.GetStringAttr(res, "category"))
-	m.HCL = types.BoolValue(client.GetBoolAttr(res, "hcl"))
-	m.Sensitive = types.BoolValue(client.GetBoolAttr(res, "sensitive"))
-	m.VersionID = types.StringValue(client.GetStringAttr(res, "version-id"))
-	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
+// buildUpdateVariableRequest is the partial-update shape. Pointer
+// fields on the SDK request preserve "leave alone" semantics — nil ↦
+// omit from body, &value ↦ set explicitly. Category is sent only on
+// update (the schema makes it RequiresReplace, but if Terraform asks
+// us to PATCH we honour that).
+func buildUpdateVariableRequest(m *variableModel) terrapod.UpdateVariableRequest {
+	req := terrapod.UpdateVariableRequest{
+		Key:      m.Key.ValueString(),
+		Category: m.Category.ValueString(),
+	}
+	if !m.Value.IsNull() {
+		v := m.Value.ValueString()
+		req.Value = &v
+	}
+	if !m.HCL.IsNull() && !m.HCL.IsUnknown() {
+		v := m.HCL.ValueBool()
+		req.HCL = &v
+	}
+	if !m.Sensitive.IsNull() && !m.Sensitive.IsUnknown() {
+		v := m.Sensitive.ValueBool()
+		req.Sensitive = &v
+	}
+	if !m.Description.IsNull() {
+		v := m.Description.ValueString()
+		req.Description = &v
+	}
+	return req
+}
 
-	if v := client.GetStringAttr(res, "description"); v != "" {
-		m.Description = types.StringValue(v)
+// readVariableIntoModel projects a SDK Variable into the Terraform
+// model. Sensitive values come back redacted from the server — we
+// don't overwrite the model's Value (which holds the operator's
+// configured value); other fields are refreshed.
+func readVariableIntoModel(v *terrapod.Variable, m *variableModel) {
+	m.ID = types.StringValue(v.ID)
+	m.Key = types.StringValue(v.Key)
+	m.Category = types.StringValue(v.Category)
+	m.HCL = types.BoolValue(v.HCL)
+	m.Sensitive = types.BoolValue(v.Sensitive)
+	m.VersionID = types.StringValue(v.VersionID)
+	m.CreatedAt = types.StringValue(v.CreatedAt)
+	m.UpdatedAt = types.StringValue(v.UpdatedAt)
+	if v.Description != "" {
+		m.Description = types.StringValue(v.Description)
 	} else {
 		m.Description = types.StringNull()
 	}
-
-	// Sensitive variables: API returns null. Preserve configured value from state/plan.
-	if m.Sensitive.ValueBool() {
-		// Value stays as-is from plan (not overwritten by API null).
-	} else {
-		if v := client.GetStringAttr(res, "value"); v != "" {
-			m.Value = types.StringValue(v)
-		} else {
-			m.Value = types.StringNull()
-		}
+	// Don't touch Value on a Sensitive read — server returns empty,
+	// the model's existing value (from plan) is the source of truth.
+	if !v.Sensitive && v.Value != "" {
+		m.Value = types.StringValue(v.Value)
 	}
 }
+
+// readIntoModel: removed; replaced by readVariableIntoModel above
+// (which works on the typed go-terrapod Variable rather than the raw
+// JSON:API Resource). The old function was the last consumer of the
+// `client.Resource` / `client.GetXAttr` helpers from this file, so
+// deleting it cleans up the import surface too.
