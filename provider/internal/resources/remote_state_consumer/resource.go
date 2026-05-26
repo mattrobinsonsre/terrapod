@@ -2,6 +2,7 @@ package remote_state_consumer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -10,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -17,6 +19,7 @@ var _ resource.Resource = &remoteStateConsumerResource{}
 
 type remoteStateConsumerResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
 func NewResource() resource.Resource {
@@ -29,7 +32,7 @@ func (r *remoteStateConsumerResource) Metadata(_ context.Context, req resource.M
 
 func (r *remoteStateConsumerResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Authorizes a consumer workspace's agent runs to read a producer workspace's state via terraform_remote_state. Producer-controlled allowlist (#344): mutations require admin on the PRODUCER workspace — a consumer team cannot self-grant. State data is secret-bearing; only grant deliberately.",
+		Description: "Authorizes a consumer workspace's agent runs to read a producer workspace's state via terraform_remote_state. Producer-controlled allowlist (#344): mutations require admin on the PRODUCER workspace.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed: true, Description: "Edge ID.",
@@ -73,6 +76,13 @@ func (r *remoteStateConsumerResource) Configure(_ context.Context, req resource.
 		return
 	}
 	r.client = c
+
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *remoteStateConsumerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -82,38 +92,16 @@ func (r *remoteStateConsumerResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	rels := map[string]any{
-		"consumer": map[string]any{
-			"data": map[string]any{
-				"id":   plan.ConsumerWorkspaceID.ValueString(),
-				"type": "workspaces",
-			},
-		},
-	}
-
-	body, err := client.MarshalResource("remote-state-consumers", map[string]any{}, rels)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
-	}
-
-	data, err := r.client.Post(
-		ctx,
-		fmt.Sprintf("/api/terrapod/v1/workspaces/%s/remote-state-consumers", plan.ProducerWorkspaceID.ValueString()),
-		body,
-	)
+	rsc, err := r.tc.CreateRemoteStateConsumer(ctx, terrapod.CreateRemoteStateConsumerRequest{
+		ProducerWorkspaceID: plan.ProducerWorkspaceID.ValueString(),
+		ConsumerWorkspaceID: plan.ConsumerWorkspaceID.ValueString(),
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("Create failed", err.Error())
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	readIntoModel(res, &plan)
+	readRSCFromSDK(rsc, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -124,9 +112,10 @@ func (r *remoteStateConsumerResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/terrapod/v1/remote-state-consumers/"+state.ID.ValueString())
+	rsc, err := r.tc.GetRemoteStateConsumer(ctx, state.ID.ValueString())
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -134,13 +123,7 @@ func (r *remoteStateConsumerResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	readIntoModel(res, &state)
+	readRSCFromSDK(rsc, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -155,23 +138,25 @@ func (r *remoteStateConsumerResource) Delete(ctx context.Context, req resource.D
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/terrapod/v1/remote-state-consumers/"+state.ID.ValueString())
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete failed", err.Error())
+	err := r.tc.DeleteRemoteStateConsumer(ctx, state.ID.ValueString())
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Delete failed", err.Error())
+		}
 	}
 }
 
-func readIntoModel(res *client.Resource, m *remoteStateConsumerModel) {
-	m.ID = types.StringValue(res.ID)
-	m.ProducerWorkspaceName = types.StringValue(client.GetStringAttr(res, "producer-workspace-name"))
-	m.ConsumerWorkspaceName = types.StringValue(client.GetStringAttr(res, "consumer-workspace-name"))
-	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-	m.CreatedBy = types.StringValue(client.GetStringAttr(res, "created-by"))
-
-	if v := client.GetRelationshipID(res, "producer"); v != "" {
-		m.ProducerWorkspaceID = types.StringValue(v)
+func readRSCFromSDK(rsc *terrapod.RemoteStateConsumer, m *remoteStateConsumerModel) {
+	m.ID = types.StringValue(rsc.ID)
+	m.ProducerWorkspaceName = types.StringValue(rsc.ProducerWorkspaceName)
+	m.ConsumerWorkspaceName = types.StringValue(rsc.ConsumerWorkspaceName)
+	m.CreatedAt = types.StringValue(rsc.CreatedAt)
+	m.CreatedBy = types.StringValue(rsc.CreatedBy)
+	if rsc.ProducerWorkspaceID != "" {
+		m.ProducerWorkspaceID = types.StringValue(rsc.ProducerWorkspaceID)
 	}
-	if v := client.GetRelationshipID(res, "consumer"); v != "" {
-		m.ConsumerWorkspaceID = types.StringValue(v)
+	if rsc.ConsumerWorkspaceID != "" {
+		m.ConsumerWorkspaceID = types.StringValue(rsc.ConsumerWorkspaceID)
 	}
 }
