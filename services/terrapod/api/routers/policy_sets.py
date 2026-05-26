@@ -566,14 +566,6 @@ async def get_policy_bundle(
     sets = await policy_set_service.applicable_policy_sets(db, ws)
     context = policy_set_service.build_run_context(ws, run)
 
-    # Stamp the run so the post-plan gate can distinguish "no applicable
-    # sets" from "pre-#343 runner never fetched the bundle" (#343
-    # rolling-upgrade safety). Done before we return — if the runner
-    # POSTs results we want to be sure we recognised the runner first.
-    if run.policy_bundle_fetched_at is None:
-        run.policy_bundle_fetched_at = now_utc()
-        await db.commit()
-
     return JSONResponse(
         content={
             "policy_sets": [

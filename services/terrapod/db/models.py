@@ -1199,17 +1199,6 @@ class Run(Base):
         Boolean, nullable=False, server_default="false", default=False
     )
 
-    # Rolling-upgrade safety signal for OPA policy enforcement (#343).
-    # Stamped by the GET /policy-bundle endpoint when the runner fetches
-    # the applicable bundle for this run. The post-plan gate uses this
-    # to distinguish "no applicable sets" from "pre-#343 runner image
-    # never fetched the bundle" — the latter must fail closed for
-    # mandatory sets, otherwise during a Helm rolling upgrade an old
-    # node-cached runner could silently bypass policy.
-    policy_bundle_fetched_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-
     # Plan resource-change counts parsed from the JSON plan output on
     # upload. Null until parsed (older runs, or parse failed); zero means
     # parsed-and-no-resources-of-that-kind. The UI distinguishes the two.

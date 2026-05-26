@@ -152,13 +152,12 @@ async def evaluate_post_plan(db: AsyncSession, run: Run) -> str:
 
     The runner is expected to have POSTed an evaluation row per
     applicable policy set to ``/policy-results`` *before* posting
-    ``plan-result``. The gate verifies that evidence directly rather
-    than trusting a single "the runner fetched the bundle" stamp — a
-    new-#343 runner that GETs the bundle and then fails to POST
-    results (entrypoint crash, a future runner refactor that reorders
-    things, an externally-modified entrypoint) would otherwise present
-    as "stamp set, no rows, pre-#343 → bypass" with the old fast path.
-    Comparing applicable sets to recorded rows closes that hole.
+    ``plan-result``. The gate verifies that evidence directly: compare
+    the applicable sets to the recorded rows. The most common cause of
+    a missing row is a runner image from before policy-as-code support
+    that doesn't fetch or POST anything (Helm rolling upgrade, node
+    image cache); any other path that leaves a runner from POSTing
+    for an applicable set lands here too.
 
     For every applicable set that has **no** recorded row AND is
     ``mandatory``, the gate writes a synthetic ``errored`` evaluation
@@ -206,10 +205,10 @@ async def evaluate_post_plan(db: AsyncSession, run: Run) -> str:
                 "result": {
                     "error": (
                         "Runner did not evaluate this mandatory policy set. "
-                        "If a Helm rolling upgrade is in progress, a pre-#343 "
-                        "runner image cached on this node may have skipped "
-                        "policy evaluation — roll the runner image forward "
-                        "and retry, or override to release this run."
+                        "Usually this means the runner image is older than the "
+                        "policy feature and skipped evaluation — roll the "
+                        "runner image forward and retry, or override to "
+                        "release this run."
                     )
                 },
                 "created_at": stamp,

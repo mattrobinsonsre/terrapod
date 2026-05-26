@@ -4,7 +4,7 @@ The runner uses two endpoints, both authenticated with a runner token
 scoped to a single run_id:
 
 - ``GET /api/terrapod/v1/runs/{run_id}/policy-bundle``  → applicable
-  sets + Terrapod context; stamps ``runs.policy_bundle_fetched_at``.
+  sets + Terrapod context.
 - ``POST /api/terrapod/v1/runs/{run_id}/policy-results`` → persists
   evaluation rows via Postgres ON CONFLICT DO NOTHING.
 
@@ -17,7 +17,6 @@ the FastAPI test client + a runner token) live under ``tests/api/``.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -47,7 +46,6 @@ def _run(**kw):
         "id": run_id,
         "workspace_id": uuid.uuid4(),
         "plan_only": False,
-        "policy_bundle_fetched_at": None,
         "message": "m",
         "source": "tfe-api",
         "is_destroy": False,
@@ -116,50 +114,6 @@ async def test_bundle_rejects_token_for_wrong_run() -> None:
         await router.get_policy_bundle(run_id=f"run-{run.id}", user=user, db=db)
     assert exc.value.status_code == 403
     assert "Token not scoped to this run" in exc.value.detail
-
-
-@pytest.mark.asyncio
-async def test_bundle_stamps_policy_bundle_fetched_at() -> None:
-    """Rolling-upgrade safety (B1): GET stamps the run so the post-plan
-    gate can distinguish a pre-#343 runner that never fetched from a
-    workspace with no applicable sets."""
-    run = _run()
-    ws = _ws()
-    run_id = f"run-{run.id}"
-    db = _mock_db_with_run(run, ws)
-    user = _user(method="runner_token", run_id=run_id)
-
-    with patch.object(
-        router.policy_set_service,
-        "applicable_policy_sets",
-        new=AsyncMock(return_value=[]),  # no policy sets in scope
-    ):
-        await router.get_policy_bundle(run_id=run_id, user=user, db=db)
-
-    assert run.policy_bundle_fetched_at is not None
-    db.commit.assert_awaited()
-
-
-@pytest.mark.asyncio
-async def test_bundle_does_not_re_stamp_already_set() -> None:
-    """Second GET (retry) is idempotent — doesn't overwrite the first
-    fetch timestamp."""
-    earlier = datetime(2026, 1, 1, tzinfo=__import__("datetime").timezone.utc)
-    run = _run(policy_bundle_fetched_at=earlier)
-    ws = _ws()
-    run_id = f"run-{run.id}"
-    db = _mock_db_with_run(run, ws)
-    user = _user(method="runner_token", run_id=run_id)
-
-    with patch.object(
-        router.policy_set_service,
-        "applicable_policy_sets",
-        new=AsyncMock(return_value=[]),
-    ):
-        await router.get_policy_bundle(run_id=run_id, user=user, db=db)
-
-    assert run.policy_bundle_fetched_at == earlier
-    db.commit.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -343,10 +297,10 @@ def _mk_db_with_recorded_set_ids(run, ws, recorded_ids):
 @pytest.mark.asyncio
 async def test_gate_missing_mandatory_writes_synthetic_errored() -> None:
     """When an applicable mandatory set has no recorded evaluation row,
-    the gate synthesises an errored row and blocks. Covers both the
-    pre-#343 rolling-upgrade case and the SHF-1 "new runner stamped
-    but didn't POST" case — the safety net is row-count-vs-set-count,
-    not stamp-based."""
+    the gate synthesises an errored row and blocks. Safety net is
+    row-count-vs-set-count — covers the rolling-upgrade case (an old
+    runner image that doesn't know about policy-as-code) and any other
+    path that leaves the runner from POSTing for an applicable set."""
     from terrapod.services import policy_set_service
 
     run = _run()
@@ -419,15 +373,19 @@ async def test_gate_no_applicable_sets_passes() -> None:
     db = _mock_db_with_run(run, ws)
 
     insert_mock = AsyncMock()
+    gate_mock = AsyncMock(return_value=False)
     with patch.multiple(
         policy_set_service,
         applicable_policy_sets=AsyncMock(return_value=[]),
         _insert_evaluations=insert_mock,
+        run_is_policy_blocked=gate_mock,
     ):
         result = await policy_set_service.evaluate_post_plan(db, run)
 
     assert result == policy_set_service.GATE_PASSED
     insert_mock.assert_not_called()
+    # Early-return on empty applicable_sets: no need to consult the gate query.
+    gate_mock.assert_not_called()
 
 
 @pytest.mark.asyncio

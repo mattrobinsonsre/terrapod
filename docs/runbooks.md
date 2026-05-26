@@ -703,7 +703,7 @@ Pick the least-disruptive option that fits:
 
 **Why**: OPA evaluation runs on the runner (since #343). For every applicable policy set, the runner is expected to POST a row to `/policy-results` before posting `plan-result`. The post-plan gate compares applicable sets to recorded rows and synthesises an `errored` row for any mandatory set that's missing one — fail-closed.
 
-This usually means **the runner image is from before #343 / does not know about policy-as-code**. Common during a Helm rolling upgrade when a node has a pre-#343 runner image cached and `imagePullPolicy: IfNotPresent` keeps using it until the cache is GC'd. Less commonly it can mean the runner crashed between fetching the bundle and posting results.
+This usually means **the runner image is from before policy-as-code support / does not know about OPA evaluation**. Common during a Helm rolling upgrade when a node has an older runner image cached and `imagePullPolicy: IfNotPresent` keeps using it until the cache is GC'd. It could also mean a newer runner reached the bundle endpoint but the POST to `/policy-results` failed all retry attempts before the run could be marked errored — rare, because the runner entrypoint will normally exit non-zero on POST failure and the reconciler will move the run to `errored` instead of leaving it for the gate.
 
 ### Diagnosis
 
