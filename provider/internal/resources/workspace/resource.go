@@ -273,11 +273,11 @@ func (r *workspaceResource) Create(ctx context.Context, req resource.CreateReque
 	// Apply the consumer set from plan (if managed here), then refresh
 	// the attribute from the server (#344, #348). Null in plan ⇒
 	// unmanaged ⇒ no PUT but we still read for state consistency.
-	if err := applyConsumersFromPlan(ctx, r.client, plan.ID.ValueString(), plan.RemoteStateConsumers); err != nil {
+	if err := applyConsumersFromPlan(ctx, r.tc, plan.ID.ValueString(), plan.RemoteStateConsumers); err != nil {
 		resp.Diagnostics.AddError("Failed to apply remote_state_consumers", err.Error())
 		return
 	}
-	consumers, dgs := readRemoteStateConsumers(ctx, r.client, plan.ID.ValueString())
+	consumers, dgs := readRemoteStateConsumers(ctx, r.tc, plan.ID.ValueString())
 	resp.Diagnostics.Append(dgs...)
 	plan.RemoteStateConsumers = consumers
 
@@ -308,7 +308,7 @@ func (r *workspaceResource) Read(ctx context.Context, req resource.ReadRequest, 
 	// even when the user manages this via standalone resources — the
 	// Optional+Computed schema means a null config value falls back
 	// to the state value during plan, so no spurious diff.
-	consumers, dgs := readRemoteStateConsumers(ctx, r.client, state.ID.ValueString())
+	consumers, dgs := readRemoteStateConsumers(ctx, r.tc, state.ID.ValueString())
 	resp.Diagnostics.Append(dgs...)
 	state.RemoteStateConsumers = consumers
 
@@ -344,11 +344,11 @@ func (r *workspaceResource) Update(ctx context.Context, req resource.UpdateReque
 
 	// Apply the consumer set from plan if managed here, then refresh.
 	// Same null = unmanaged convention as Create (#344, #348).
-	if err := applyConsumersFromPlan(ctx, r.client, plan.ID.ValueString(), plan.RemoteStateConsumers); err != nil {
+	if err := applyConsumersFromPlan(ctx, r.tc, plan.ID.ValueString(), plan.RemoteStateConsumers); err != nil {
 		resp.Diagnostics.AddError("Failed to apply remote_state_consumers", err.Error())
 		return
 	}
-	consumers, dgs := readRemoteStateConsumers(ctx, r.client, plan.ID.ValueString())
+	consumers, dgs := readRemoteStateConsumers(ctx, r.tc, plan.ID.ValueString())
 	resp.Diagnostics.Append(dgs...)
 	plan.RemoteStateConsumers = consumers
 
@@ -718,75 +718,75 @@ func buildWorkspaceRels(m *workspaceModel) map[string]any {
 }
 
 // readResourceIntoModel populates the Terraform model from a JSON:API resource.
-func readResourceIntoModel(ctx context.Context, res *client.Resource, m *workspaceModel) diag.Diagnostics {
+func readResourceIntoModel(ctx context.Context, res *terrapod.Resource, m *workspaceModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	m.ID = types.StringValue(res.ID)
-	m.Name = types.StringValue(client.GetStringAttr(res, "name"))
-	m.ExecutionMode = types.StringValue(client.GetStringAttr(res, "execution-mode"))
-	m.AutoApply = types.BoolValue(client.GetBoolAttr(res, "auto-apply"))
-	m.ExecutionBackend = types.StringValue(client.GetStringAttr(res, "execution-backend"))
-	m.WorkingDirectory = types.StringValue(client.GetStringAttr(res, "working-directory"))
-	m.ResourceCPU = types.StringValue(client.GetStringAttr(res, "resource-cpu"))
-	m.ResourceMemory = types.StringValue(client.GetStringAttr(res, "resource-memory"))
-	m.VCSWorkflow = types.StringValue(client.GetStringAttr(res, "vcs-workflow"))
-	m.AutoMerge = types.BoolValue(client.GetBoolAttr(res, "auto-merge"))
-	m.AutoMergeStrategy = types.StringValue(client.GetStringAttr(res, "auto-merge-strategy"))
-	m.OwnerEmail = types.StringValue(client.GetStringAttr(res, "owner-email"))
-	m.Locked = types.BoolValue(client.GetBoolAttr(res, "locked"))
-	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
+	m.Name = types.StringValue(terrapod.GetStringAttr(res, "name"))
+	m.ExecutionMode = types.StringValue(terrapod.GetStringAttr(res, "execution-mode"))
+	m.AutoApply = types.BoolValue(terrapod.GetBoolAttr(res, "auto-apply"))
+	m.ExecutionBackend = types.StringValue(terrapod.GetStringAttr(res, "execution-backend"))
+	m.WorkingDirectory = types.StringValue(terrapod.GetStringAttr(res, "working-directory"))
+	m.ResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "resource-cpu"))
+	m.ResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "resource-memory"))
+	m.VCSWorkflow = types.StringValue(terrapod.GetStringAttr(res, "vcs-workflow"))
+	m.AutoMerge = types.BoolValue(terrapod.GetBoolAttr(res, "auto-merge"))
+	m.AutoMergeStrategy = types.StringValue(terrapod.GetStringAttr(res, "auto-merge-strategy"))
+	m.OwnerEmail = types.StringValue(terrapod.GetStringAttr(res, "owner-email"))
+	m.Locked = types.BoolValue(terrapod.GetBoolAttr(res, "locked"))
+	m.CreatedAt = types.StringValue(terrapod.GetStringAttr(res, "created-at"))
+	m.UpdatedAt = types.StringValue(terrapod.GetStringAttr(res, "updated-at"))
 
 	// Nullable string fields
-	if v := client.GetStringAttr(res, "terraform-version"); v != "" {
+	if v := terrapod.GetStringAttr(res, "terraform-version"); v != "" {
 		m.TerraformVersion = types.StringValue(v)
 	} else {
 		m.TerraformVersion = types.StringNull()
 	}
 
-	if v := client.GetStringAttr(res, "vcs-repo-url"); v != "" {
+	if v := terrapod.GetStringAttr(res, "vcs-repo-url"); v != "" {
 		m.VCSRepoURL = types.StringValue(v)
 	} else {
 		m.VCSRepoURL = types.StringNull()
 	}
-	if v := client.GetStringAttr(res, "vcs-branch"); v != "" {
+	if v := terrapod.GetStringAttr(res, "vcs-branch"); v != "" {
 		m.VCSBranch = types.StringValue(v)
 	} else {
 		m.VCSBranch = types.StringNull()
 	}
-	if v := client.GetStringAttr(res, "agent-pool-id"); v != "" {
+	if v := terrapod.GetStringAttr(res, "agent-pool-id"); v != "" {
 		m.AgentPoolID = types.StringValue(v)
 	} else {
 		m.AgentPoolID = types.StringNull()
 	}
 
 	// VCS connection from relationship
-	if v := client.GetRelationshipID(res, "vcs-connection"); v != "" {
+	if v := terrapod.GetRelationshipID(res, "vcs-connection"); v != "" {
 		m.VCSConnectionID = types.StringValue(v)
 	} else {
 		m.VCSConnectionID = types.StringNull()
 	}
 
 	// Drift detection
-	m.DriftDetectionEnabled = types.BoolValue(client.GetBoolAttr(res, "drift-detection-enabled"))
-	if v := client.GetIntAttr(res, "drift-detection-interval-seconds"); v > 0 {
+	m.DriftDetectionEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "drift-detection-enabled"))
+	if v := terrapod.GetIntAttr(res, "drift-detection-interval-seconds"); v > 0 {
 		m.DriftDetectionIntervalSeconds = types.Int64Value(v)
 	} else {
 		m.DriftDetectionIntervalSeconds = types.Int64Null()
 	}
-	if v := client.GetStringAttr(res, "drift-status"); v != "" {
+	if v := terrapod.GetStringAttr(res, "drift-status"); v != "" {
 		m.DriftStatus = types.StringValue(v)
 	} else {
 		m.DriftStatus = types.StringNull()
 	}
-	if v := client.GetStringAttr(res, "drift-last-checked-at"); v != "" {
+	if v := terrapod.GetStringAttr(res, "drift-last-checked-at"); v != "" {
 		m.DriftLastCheckedAt = types.StringValue(v)
 	} else {
 		m.DriftLastCheckedAt = types.StringNull()
 	}
 
 	// Var files
-	if varFiles := client.GetListAttr(res, "var-files"); len(varFiles) > 0 {
+	if varFiles := terrapod.GetListAttr(res, "var-files"); len(varFiles) > 0 {
 		val, d := types.ListValueFrom(ctx, types.StringType, varFiles)
 		diags.Append(d...)
 		m.VarFiles = val
@@ -795,7 +795,7 @@ func readResourceIntoModel(ctx context.Context, res *client.Resource, m *workspa
 	}
 
 	// Labels
-	if labels := client.GetMapAttr(res, "labels"); len(labels) > 0 {
+	if labels := terrapod.GetMapAttr(res, "labels"); len(labels) > 0 {
 		val, d := types.MapValueFrom(ctx, types.StringType, labels)
 		diags.Append(d...)
 		m.Labels = val
@@ -809,7 +809,7 @@ func readResourceIntoModel(ctx context.Context, res *client.Resource, m *workspa
 // putRemoteStateConsumers declaratively replaces the producer's full
 // consumer set via the #344 PUT endpoint. Empty `ids` means "remove
 // all". Server-side enforces admin on the producer.
-func putRemoteStateConsumers(ctx context.Context, c *client.Client, workspaceID string, ids []string) error {
+func putRemoteStateConsumers(ctx context.Context, c *terrapod.Client, workspaceID string, ids []string) error {
 	items := make([]map[string]any, len(ids))
 	for i, id := range ids {
 		items[i] = map[string]any{"type": "workspaces", "id": id}
@@ -825,7 +825,7 @@ func putRemoteStateConsumers(ctx context.Context, c *client.Client, workspaceID 
 // readRemoteStateConsumers reads the producer's outbound consumer
 // workspace IDs and returns them as a terraform Set<string>. A null
 // Set is returned on error (caller decides whether to surface it).
-func readRemoteStateConsumers(ctx context.Context, c *client.Client, workspaceID string) (types.Set, diag.Diagnostics) {
+func readRemoteStateConsumers(ctx context.Context, c *terrapod.Client, workspaceID string) (types.Set, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	url := fmt.Sprintf("/api/terrapod/v1/workspaces/%s/remote-state-consumers?filter[remote-state-consumer][type]=outbound", workspaceID)
 	data, err := c.Get(ctx, url)
@@ -833,14 +833,14 @@ func readRemoteStateConsumers(ctx context.Context, c *client.Client, workspaceID
 		diags.AddError("Failed to read remote_state_consumers", err.Error())
 		return types.SetNull(types.StringType), diags
 	}
-	items, err := client.ParseResourceList(data)
+	items, err := terrapod.ParseResourceList(data)
 	if err != nil {
 		diags.AddError("Failed to parse remote_state_consumers response", err.Error())
 		return types.SetNull(types.StringType), diags
 	}
 	vals := make([]attr.Value, 0, len(items))
 	for i := range items {
-		if v := client.GetRelationshipID(&items[i], "consumer"); v != "" {
+		if v := terrapod.GetRelationshipID(&items[i], "consumer"); v != "" {
 			vals = append(vals, types.StringValue(v))
 		}
 	}
@@ -852,7 +852,7 @@ func readRemoteStateConsumers(ctx context.Context, c *client.Client, workspaceID
 // applyConsumersFromPlan PUTs the plan's remote_state_consumers to the
 // server iff the attribute is non-null. Null in plan ⇒ unmanaged here
 // (server side left intact). Empty set ⇒ explicit "remove all".
-func applyConsumersFromPlan(ctx context.Context, c *client.Client, workspaceID string, plan types.Set) error {
+func applyConsumersFromPlan(ctx context.Context, c *terrapod.Client, workspaceID string, plan types.Set) error {
 	if plan.IsNull() || plan.IsUnknown() {
 		return nil
 	}
