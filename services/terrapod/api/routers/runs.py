@@ -415,7 +415,13 @@ async def create_run(
     # run is created with configuration_version_id=NULL and the runner
     # 404s trying to download the archive (#358). If no upload has ever
     # succeeded, fail loudly rather than create an unrunnable run.
-    if cv_uuid is None and not ws.vcs_connection_id:
+    #
+    # The `or not ws.vcs_repo_url` arm catches a misconfigured workspace
+    # with a VCS connection but no repo URL: the VCS branch above
+    # requires BOTH to be truthy so would have skipped it, leaving a
+    # NULL CV. Treat it the same as a non-VCS workspace here — we can't
+    # fetch code from a URL that doesn't exist either way.
+    if cv_uuid is None and (not ws.vcs_connection_id or not ws.vcs_repo_url):
         latest_cv = await run_service.get_latest_uploaded_cv(db, ws.id)
         if latest_cv is None:
             raise HTTPException(

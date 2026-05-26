@@ -262,6 +262,54 @@ class TestCreateRun:
         assert resp.status_code == 422
         assert "uploaded configuration" in resp.json().get("detail", "").lower()
 
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.run_service.get_latest_uploaded_cv")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    async def test_vcs_workspace_with_empty_repo_url_falls_back_to_uploaded_cv(
+        self, mock_resolve, mock_get_cv, mock_create_run, mock_queue, *mocks
+    ):
+        """A misconfigured workspace — vcs_connection_id set but
+        vcs_repo_url empty — used to fall through both branches and
+        create a NULL-CV run. The fallback now covers this case so it
+        behaves the same as a non-VCS workspace (use the latest uploaded
+        CV or 422)."""
+        mock_resolve.return_value = "plan"
+        ws = _mock_workspace()
+        ws.vcs_connection_id = uuid.uuid4()  # connection set
+        ws.vcs_repo_url = ""  # but no repo — misconfigured
+        cv = MagicMock(id=uuid.uuid4())
+        mock_get_cv.return_value = cv
+        run = _mock_run(ws_id=ws.id, plan_only=True, status="queued")
+        mock_create_run.return_value = run
+        mock_queue.return_value = run
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"plan-only": True},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}", "type": "workspaces"}}
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201
+        mock_get_cv.assert_awaited_once()
+        assert mock_create_run.await_args.kwargs["configuration_version_id"] == cv.id
+
 
 # ── Show Run ───────────────────────────────────────────────────────────
 
