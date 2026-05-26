@@ -336,6 +336,20 @@ func (w *Writer) applyWorkspace(ctx context.Context, ws *ir.Workspace, connByRef
 
 	created, err := w.client.CreateWorkspace(ctx, req)
 	if err != nil {
+		// A conflict here means a Terrapod workspace already exists
+		// with the same name. That's a real collision the operator
+		// has to resolve — pre-existing workspace from a previous
+		// (non-migrator) deployment, an unrelated workspace named
+		// the same, or a half-completed prior migration where the
+		// state file got blown away. Surface clearly rather than
+		// hiding it as a generic error.
+		var conflict *terrapod.ConflictError
+		if errors.As(err, &conflict) {
+			out.State = "errored"
+			out.Error = fmt.Sprintf("Terrapod workspace named %q already exists; resolve the name collision (rename source or delete the existing workspace) then re-run apply", ws.Name)
+			w.recordWorkspace(ws, "errored", out.Error)
+			return out
+		}
 		out.State = "errored"
 		out.Error = err.Error()
 		w.recordWorkspace(ws, "errored", out.Error)
@@ -367,6 +381,14 @@ func (w *Writer) applyWorkspace(ctx context.Context, ws *ir.Workspace, connByRef
 // are recorded on the StateOutcome rather than rolling back the
 // workspace — the operator can re-attempt state migration without
 // re-creating the workspace by re-running apply.
+//
+// Idempotency: if the migration state file already records a
+// (lineage, serial) pair matching what the source returns, the
+// upload is skipped. This avoids re-uploading hundreds of MB of
+// unchanged state on each apply iteration. The check compares
+// against the state file's record — not against Terrapod — so the
+// migrator doesn't need to read state back from Terrapod just to
+// decide whether to write.
 func (w *Writer) applyState(ctx context.Context, terrapodID, sourceID string, reader StateReader) *StateOutcome {
 	out := &StateOutcome{State: "skipped"}
 	raw, lineage, serial, err := reader(ctx, sourceID)
@@ -385,11 +407,42 @@ func (w *Writer) applyState(ctx context.Context, terrapodID, sourceID string, re
 		return out
 	}
 
+	if rec := w.state.WorkspaceBySourceID(sourceID); rec != nil &&
+		rec.StateLineage == lineage && rec.StateSerial == serial && rec.StateSerial > 0 {
+		// State already migrated in a prior apply iteration —
+		// nothing to do. Operator can force re-upload by deleting
+		// the StateLineage/StateSerial fields from the state file
+		// or by deleting the workspace and starting over.
+		out.State = "unchanged"
+		out.Serial = serial
+		out.Lineage = lineage
+		out.SizeKB = int64(len(raw) / 1024)
+		return out
+	}
+
 	sv, err := w.client.CreateAndUploadState(ctx, terrapodID, raw, terrapod.CreateStateVersionRequest{
 		Serial:  serial,
 		Lineage: lineage,
 	})
 	if err != nil {
+		// 409 conflict from Terrapod = a state version with this
+		// exact serial already exists for this workspace. That's
+		// expected on resume after a partial apply where the
+		// migrator crashed between upload and state-file save.
+		// Treat as 'unchanged'; the next run sees the recorded
+		// serial/lineage and short-circuits.
+		var conflict *terrapod.ConflictError
+		if errors.As(err, &conflict) {
+			out.State = "unchanged"
+			out.Serial = serial
+			out.Lineage = lineage
+			out.SizeKB = int64(len(raw) / 1024)
+			if rec := w.state.WorkspaceBySourceID(sourceID); rec != nil {
+				rec.StateLineage = lineage
+				rec.StateSerial = serial
+			}
+			return out
+		}
 		out.State = "errored"
 		out.Error = err.Error()
 		return out

@@ -158,6 +158,9 @@ func readS3State(ctx context.Context, settings map[string]string, opts StateOpti
 	if bucket == "" || key == "" {
 		return nil, fmt.Errorf("s3 backend missing bucket/key (have %v)", settings)
 	}
+	if wkpfx := settings["workspace_key_prefix"]; wkpfx != "" {
+		return nil, fmt.Errorf("s3 backend declares workspace_key_prefix=%q — multi-workspace state migration not yet supported; flatten to one tofu workspace per project or open an issue", wkpfx)
+	}
 	region := opts.S3Region
 	if region == "" {
 		region = settings["region"]
@@ -214,10 +217,18 @@ func readGCSState(ctx context.Context, settings map[string]string) ([]byte, erro
 	if bucket == "" {
 		return nil, fmt.Errorf("gcs backend missing bucket (have %v)", settings)
 	}
-	// GCS terraform backend stores state at <prefix>/default.tfstate
-	// (with `default` being the terraform workspace; we don't yet
-	// support workspaces-other-than-default — those are rare in
-	// Atlantis flows and tracked as future work).
+	// GCS terraform backend stores state at <prefix>/<workspace>.tfstate
+	// — the migrator assumes the "default" tofu workspace because
+	// Atlantis usage almost universally maps one project → one
+	// implicit-default workspace. Operators using
+	// non-default tofu workspaces under one Atlantis project are a
+	// niche case we surface explicitly: any `workspace_key_prefix`
+	// setting in the backend HCL is a strong indicator the operator
+	// has more than one workspace per project. Refuse to guess and
+	// tell them.
+	if wkpfx := settings["workspace_key_prefix"]; wkpfx != "" {
+		return nil, fmt.Errorf("gcs backend declares workspace_key_prefix=%q — multi-workspace state migration not yet supported; export each workspace's state with `terraform state pull` and import via terrapod-migrate's local backend path, or open an issue", wkpfx)
+	}
 	objectName := "default.tfstate"
 	if prefix != "" {
 		objectName = strings.TrimSuffix(prefix, "/") + "/" + objectName
