@@ -21,7 +21,7 @@ import (
 var _ datasource.DataSource = &workspaceDataSource{}
 
 type workspaceDataSource struct {
-	client *client.Client
+	tc *terrapod.Client
 }
 
 type workspaceDataSourceModel struct {
@@ -103,7 +103,12 @@ func (d *workspaceDataSource) Configure(_ context.Context, req datasource.Config
 		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *client.Client, got %T", req.ProviderData))
 		return
 	}
-	d.client = c
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	d.tc = tc
 }
 
 func (d *workspaceDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -113,7 +118,7 @@ func (d *workspaceDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	data, err := d.client.Get(ctx, "/api/v2/organizations/default/workspaces/"+config.Name.ValueString())
+	data, err := d.tc.Get(ctx, "/api/v2/organizations/default/workspaces/"+config.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to read workspace", err.Error())
 		return
