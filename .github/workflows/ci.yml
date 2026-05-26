@@ -659,6 +659,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.gpg.outputs.fingerprint }}
 
+      # Build terrapod-migrate binaries and append them to the release
+      # created by the provider's GoReleaser run. Linux/Windows ship as
+      # per-arch zips; macOS ships as a single Universal 2 binary built
+      # by lipo-merging darwin/amd64 + darwin/arm64. See
+      # migrate/.goreleaser.yml — release.mode=append keeps this step
+      # from trying to create a duplicate GitHub Release for the same tag.
+      - name: Build migrate-tool binaries with GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+          workdir: migrate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_FINGERPRINT: ${{ steps.gpg.outputs.fingerprint }}
+
       - name: Generate release notes
         id: notes
         run: |

@@ -9,7 +9,17 @@ platforms are supported:
 - **Atlantis** — `atlantis.yaml` v3 schema; one or more repos map to
   Terrapod workspaces or autodiscovery rules.
 
-The CLI is a Go binary distributed alongside the Terrapod provider.
+The CLI is a Go binary distributed alongside the Terrapod provider on
+every Terrapod release. Each release publishes:
+
+- **macOS universal** — a single fat binary (lipo-merged darwin/amd64 +
+  darwin/arm64) that runs natively on both Intel and Apple Silicon.
+- **Linux** — amd64 + arm64.
+- **Windows** — amd64 + arm64.
+
+Each archive is accompanied by a SHA256 checksum file, and the checksum
+file is detached-GPG-signed with the same key that signs the provider.
+
 Releases pin to a Terrapod API version — the tool refuses to run against
 a deployment whose version doesn't match, to keep schema drift from
 producing half-migrated state.

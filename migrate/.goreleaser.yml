@@ -1,0 +1,72 @@
+# GoReleaser config for terrapod-migrate.
+#
+# Built and published alongside the Terraform provider on every Terrapod
+# release tag. The provider's own .goreleaser.yml creates the GitHub
+# Release; we append our archives + checksums to it with `release.mode:
+# append`, which avoids the second invocation trying (and failing) to
+# create a duplicate release.
+#
+# Distribution targets:
+#   - Linux  amd64  + arm64
+#   - Windows amd64  + arm64
+#   - macOS  universal (Apple "Universal 2" — a single fat binary that
+#                       runs natively on Intel and Apple-Silicon Macs)
+#
+# The macOS universal binary is produced by goreleaser's universal_binaries
+# step: it builds darwin/amd64 + darwin/arm64 separately and then runs
+# `lipo` to merge them into one. `replace: true` deletes the per-arch
+# darwin artifacts so operators only see the single universal one.
+version: 2
+
+project_name: terrapod-migrate
+
+builds:
+  - main: ./cmd/terrapod-migrate
+    env:
+      - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      # main.Version is stamped at link time so the build-time-pinned
+      # version (consumed by internal/version.Check) is the release semver.
+      - "-s -w -X main.Version={{ .Version }}"
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    binary: terrapod-migrate
+
+universal_binaries:
+  - replace: true
+
+archives:
+  - format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
+  algorithm: sha256
+
+signs:
+  - artifacts: checksum
+    args:
+      - "--batch"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+
+release:
+  # The provider release runs first and creates the GitHub Release for
+  # this tag. Append-mode tells goreleaser to upload our artifacts to
+  # that release instead of trying to create a fresh one.
+  mode: append
+
+changelog:
+  disable: true
