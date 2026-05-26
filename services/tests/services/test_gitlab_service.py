@@ -269,6 +269,62 @@ class TestGitlabRequestRetry:
         assert resp is ok
 
     @pytest.mark.asyncio
+    async def test_retries_exhausted_returns_last_response(self):
+        """After _MAX_RETRIES retryable responses, the loop returns the
+        last one rather than looping forever."""
+        from terrapod.services.gitlab_service import _gitlab_request
+
+        # 4 attempts max (1 initial + 3 retries), all 503 with retry_5xx=True
+        responses = [_fake_resp(503) for _ in range(4)]
+
+        with (
+            patch("terrapod.services.gitlab_service.asyncio.sleep", new=AsyncMock()) as mock_sleep,
+            patch("httpx.AsyncClient", return_value=_patched_client(responses)) as m_cls,
+        ):
+            resp = await _gitlab_request(
+                "POST", "https://gitlab.example/x", _mock_conn(), retry_5xx=True
+            )
+
+        assert resp.status_code == 503
+        assert m_cls.return_value.request.await_count == 4  # initial + 3 retries
+        assert mock_sleep.await_count == 3  # sleep between each retry, not after last
+
+    @pytest.mark.asyncio
+    async def test_4xx_other_than_429_does_not_retry(self):
+        """403 / 404 / 422 are caller bugs — no point retrying."""
+        from terrapod.services.gitlab_service import _gitlab_request
+
+        only = _fake_resp(404)
+
+        with (
+            patch("terrapod.services.gitlab_service.asyncio.sleep", new=AsyncMock()),
+            patch("httpx.AsyncClient", return_value=_patched_client([only])) as m_cls,
+        ):
+            resp = await _gitlab_request("GET", "https://gitlab.example/x", _mock_conn())
+
+        assert resp is only
+        assert m_cls.return_value.request.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_429_without_retry_after_falls_back_to_default_backoff(self):
+        """A 429 with no Retry-After header still retries — using the
+        default backoff so a misbehaving upstream can't tighten our loop."""
+        from terrapod.services.gitlab_service import _DEFAULT_BACKOFF_SECONDS, _gitlab_request
+
+        first = _fake_resp(429)  # no Retry-After header
+        second = _fake_resp(200)
+
+        with (
+            patch("terrapod.services.gitlab_service.asyncio.sleep", new=AsyncMock()) as mock_sleep,
+            patch("httpx.AsyncClient", return_value=_patched_client([first, second])),
+        ):
+            resp = await _gitlab_request("GET", "https://gitlab.example/x", _mock_conn())
+
+        assert resp is second
+        assert mock_sleep.await_count == 1
+        assert mock_sleep.await_args[0][0] == _DEFAULT_BACKOFF_SECONDS
+
+    @pytest.mark.asyncio
     async def test_create_commit_status_uses_retry_5xx(self):
         """End-to-end: create_commit_status now survives a transient 502."""
         from terrapod.services.gitlab_service import create_commit_status

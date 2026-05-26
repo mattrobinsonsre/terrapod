@@ -107,7 +107,7 @@ async def _gitlab_request(
                     )
                     raise
                 backoff = min(_DEFAULT_BACKOFF_SECONDS * (2**attempt), _MAX_RETRY_WAIT_SECONDS)
-                logger.info(
+                logger.warning(
                     "GitLab transport error, retrying",
                     method=method,
                     url=url,
@@ -125,7 +125,7 @@ async def _gitlab_request(
                 if resp.status_code == 429
                 else (min(_DEFAULT_BACKOFF_SECONDS * (2**attempt), _MAX_RETRY_WAIT_SECONDS))
             )
-            logger.info(
+            logger.warning(
                 "GitLab response retryable, backing off",
                 method=method,
                 url=url,
@@ -135,10 +135,11 @@ async def _gitlab_request(
             )
             await asyncio.sleep(wait)
 
-        # Loop exhausted without a returnable response. The transport-error
-        # branch raises, the success branch returns; the only way here is
-        # if every attempt was retryable but `attempt >= _MAX_RETRIES`
-        # never matched — defensive return of the last response.
+        # Unreachable. The early-return guard inside the loop fires on
+        # the final attempt (`attempt >= _MAX_RETRIES`) and returns the
+        # last response; transport errors on the final attempt re-raise.
+        # Kept as a typing/static-analysis lifeline matching the
+        # `_github_request` shape.
         assert resp is not None
         return resp
 
