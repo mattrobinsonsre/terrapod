@@ -8,6 +8,31 @@ The interactive API documentation is also available in the web UI under **API** 
 
 ---
 
+## Consumers
+
+The Terrapod API has four distinct consumer classes. Every API change must update every affected consumer — this is a hard contract:
+
+1. **Web UI** (`web/`) — Next.js BFF + React frontend. Server-side SSR + client-side `fetch()`. Frontend changes when JSON:API attribute names, endpoint paths, or response shapes change.
+2. **go-terrapod** (`go-terrapod/`) — the **canonical Go SDK**. Strongly-typed methods over the Terrapod JSON:API surface. Single source of truth for the Go view of the API: the provider and migration tool both import it; third-party Go automation can import it directly (`github.com/mattrobinsonsre/terrapod/go-terrapod`). Same shape and stability story as `hashicorp/go-tfe`.
+3. **terraform-provider-terrapod** (`provider/`) — a **thin wrapper around go-terrapod**. The provider holds only Terraform-plugin-framework code (schema, state translation, lifecycle hooks); every API call goes through go-terrapod. No JSON:API marshalling code lives inside `provider/internal/`.
+4. **terrapod-migrate** (`migrate/`) — the **migration tool** that moves TFE/HCP + Atlantis platforms onto Terrapod. Reads from the source via `go-tfe` (TFE migrations) or local-clone HCL parsing (Atlantis migrations). Writes to Terrapod via go-terrapod. Distributed as a universal-macOS + linux/windows amd64+arm64 GitHub Release artifact.
+
+### Workflow for extending the API
+
+1. Add the endpoint to the appropriate Python router (`services/terrapod/api/routers/*.py`).
+2. Add a typed method on go-terrapod (`go-terrapod/<resource>.go`) + tests.
+3. Update each consumer that needs it: the provider's resource file, the frontend page, or the migration tool's writer.
+
+### Endpoint coverage
+
+go-terrapod targets the full Terrapod API surface — both the TFE-V2-compatible (`/api/v2/`) and Terrapod-native (`/api/terrapod/v1/`) prefixes. The migration tool is a heavy consumer of the API-only routers (config-versions, state-management, registry endpoints) that the UI doesn't surface; the provider mostly consumes the frontend-also routers. Both can rely on the same typed surface in go-terrapod.
+
+### Version contract
+
+go-terrapod pins to a specific Terrapod API version at build time via the `SDKVersion` constant. Consuming tools call `Client.VersionCheck` at startup to fail-fast on a mismatch. The migration tool requires this match by default and exposes `--allow-api-version-mismatch` for advanced operators. Releases of Terrapod, go-terrapod, the provider, and the migration tool all happen at the same tag — they ship together.
+
+---
+
 ## Base URL and Authentication
 
 ### Base URL
