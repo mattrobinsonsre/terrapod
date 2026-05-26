@@ -1,32 +1,10 @@
 // Package gpg_key implements the terrapod_gpg_key resource.
-//
-// API Contract (Terrapod API ↔ Terraform Provider):
-//
-//	JSON:API type: "gpg-keys"
-//	ID: UUID (no prefix)
-//	Create:  POST   /api/terrapod/v1/gpg-keys
-//	Read:    GET    /api/terrapod/v1/gpg-keys/{id}
-//	Delete:  DELETE /api/terrapod/v1/gpg-keys/{id}
-//	No update — immutable resource.
-//
-// Attribute mapping:
-//
-//	"ascii-armor" → ascii_armor (string, required, write-only, forces new)
-//	"namespace"   → namespace   (string, optional, default "default")
-//	"source"      → source      (string, optional, default "terrapod")
-//	"source-url"  → source_url  (string, optional)
-//
-// Read-only:
-//
-//	"key-id"     → key_id     (string, computed — extracted from armor)
-//	"created-at" → created_at (string, computed)
-//	"updated-at" → updated_at (string, computed)
-//
-// Import: by GPG key ID.
+// Migrated to go-terrapod (#347).
 package gpg_key
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -37,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -58,11 +37,10 @@ var (
 
 type gpgKeyResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
-func NewResource() resource.Resource {
-	return &gpgKeyResource{}
-}
+func NewResource() resource.Resource { return &gpgKeyResource{} }
 
 func (r *gpgKeyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_gpg_key"
@@ -72,42 +50,14 @@ func (r *gpgKeyResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 	resp.Schema = schema.Schema{
 		Description: "Manages a GPG key for provider signing in the Terrapod registry.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Computed: true, Description: "GPG key ID.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"ascii_armor": schema.StringAttribute{
-				Required: true, Sensitive: true,
-				Description: "ASCII-armored PGP public key (write-only).",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"namespace": schema.StringAttribute{
-				Optional: true, Computed: true,
-				Default: stringdefault.StaticString("default"),
-				Description: "Namespace.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"source": schema.StringAttribute{
-				Optional: true, Computed: true,
-				Default: stringdefault.StaticString("terrapod"),
-				Description: "Key source.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"source_url": schema.StringAttribute{
-				Optional: true, Description: "Source URL.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"key_id": schema.StringAttribute{
-				Computed: true, Description: "PGP key ID (extracted from armor).",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"created_at": schema.StringAttribute{
-				Computed: true, Description: "Creation timestamp.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"updated_at": schema.StringAttribute{
-				Computed: true, Description: "Update timestamp.",
-			},
+			"id":         schema.StringAttribute{Computed: true, Description: "GPG key ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"ascii_armor": schema.StringAttribute{Required: true, Sensitive: true, Description: "ASCII-armored PGP public key (write-only).", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"namespace":  schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("default"), Description: "Namespace.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"source":     schema.StringAttribute{Optional: true, Computed: true, Default: stringdefault.StaticString("terrapod"), Description: "Key source.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"source_url": schema.StringAttribute{Optional: true, Description: "Source URL.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"key_id":     schema.StringAttribute{Computed: true, Description: "PGP key ID (extracted from armor).", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"created_at": schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"updated_at": schema.StringAttribute{Computed: true, Description: "Update timestamp."},
 		},
 	}
 }
@@ -122,6 +72,12 @@ func (r *gpgKeyResource) Configure(_ context.Context, req resource.ConfigureRequ
 		return
 	}
 	r.client = c
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *gpgKeyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -130,35 +86,20 @@ func (r *gpgKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	attrs := map[string]any{
-		"ascii-armor": plan.ASCIIArmor.ValueString(),
-		"namespace":   plan.Namespace.ValueString(),
-		"source":      plan.Source.ValueString(),
+	sdkReq := terrapod.CreateGPGKeyRequest{
+		ASCIIArmor: plan.ASCIIArmor.ValueString(),
+		Namespace:  plan.Namespace.ValueString(),
+		Source:     plan.Source.ValueString(),
 	}
 	if !plan.SourceURL.IsNull() {
-		attrs["source-url"] = plan.SourceURL.ValueString()
+		sdkReq.SourceURL = plan.SourceURL.ValueString()
 	}
-
-	body, err := client.MarshalResource("gpg-keys", attrs, nil)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
-	}
-
-	data, err := r.client.Post(ctx, "/api/terrapod/v1/gpg-keys", body)
+	k, err := r.tc.CreateGPGKey(ctx, sdkReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Create failed", err.Error())
 		return
 	}
-
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	readGPGKeyIntoModel(res, &plan)
+	readGPGKeyFromSDK(k, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -168,24 +109,17 @@ func (r *gpgKeyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	data, err := r.client.Get(ctx, "/api/terrapod/v1/gpg-keys/"+state.ID.ValueString())
+	k, err := r.tc.GetGPGKey(ctx, state.ID.ValueString())
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
 		resp.Diagnostics.AddError("Read failed", err.Error())
 		return
 	}
-
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	readGPGKeyIntoModel(res, &state)
+	readGPGKeyFromSDK(k, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -199,10 +133,12 @@ func (r *gpgKeyResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	err := r.client.Delete(ctx, "/api/terrapod/v1/gpg-keys/"+state.ID.ValueString())
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete failed", err.Error())
+	err := r.tc.DeleteGPGKey(ctx, state.ID.ValueString())
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Delete failed", err.Error())
+		}
 	}
 }
 
@@ -210,18 +146,17 @@ func (r *gpgKeyResource) ImportState(ctx context.Context, req resource.ImportSta
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func readGPGKeyIntoModel(res *client.Resource, m *gpgKeyModel) {
-	m.ID = types.StringValue(res.ID)
-	m.KeyID = types.StringValue(client.GetStringAttr(res, "key-id"))
-	m.Namespace = types.StringValue(client.GetStringAttr(res, "namespace"))
-	m.Source = types.StringValue(client.GetStringAttr(res, "source"))
-	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
-
-	if v := client.GetStringAttr(res, "source-url"); v != "" {
-		m.SourceURL = types.StringValue(v)
+func readGPGKeyFromSDK(k *terrapod.GPGKey, m *gpgKeyModel) {
+	m.ID = types.StringValue(k.ID)
+	m.KeyID = types.StringValue(k.KeyID)
+	m.Namespace = types.StringValue(k.Namespace)
+	m.Source = types.StringValue(k.Source)
+	m.CreatedAt = types.StringValue(k.CreatedAt)
+	m.UpdatedAt = types.StringValue(k.UpdatedAt)
+	if k.SourceURL != "" {
+		m.SourceURL = types.StringValue(k.SourceURL)
 	} else {
 		m.SourceURL = types.StringNull()
 	}
-	// ascii_armor is write-only — preserved from plan/config
+	// ascii_armor is write-only — preserved by Terraform from plan/config.
 }
