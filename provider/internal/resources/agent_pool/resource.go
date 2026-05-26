@@ -26,7 +26,7 @@ package agent_pool
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -38,6 +38,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -63,6 +64,7 @@ type agentPoolModel struct {
 
 type agentPoolResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
 // NewResource returns a new agent pool resource.
@@ -141,6 +143,13 @@ func (r *agentPoolResource) Configure(_ context.Context, req resource.ConfigureR
 		return
 	}
 	r.client = c
+
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *agentPoolResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -150,27 +159,13 @@ func (r *agentPoolResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	attrs := buildAgentPoolAttrs(&plan)
-
-	body, err := client.MarshalResource("agent-pools", attrs, nil)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal request", err.Error())
-		return
-	}
-
-	data, err := r.client.Post(ctx, "/api/terrapod/v1/agent-pools", body)
+	p, err := r.tc.CreateAgentPool(ctx, buildCreateAgentPoolRequest(&plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create agent pool", err.Error())
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(readAgentPoolIntoModel(ctx, res, &plan)...)
+	resp.Diagnostics.Append(readAgentPoolFromSDK(ctx, p, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -181,9 +176,10 @@ func (r *agentPoolResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/terrapod/v1/agent-pools/"+state.ID.ValueString())
+	p, err := r.tc.GetAgentPool(ctx, state.ID.ValueString())
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -191,13 +187,7 @@ func (r *agentPoolResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(readAgentPoolIntoModel(ctx, res, &state)...)
+	resp.Diagnostics.Append(readAgentPoolFromSDK(ctx, p, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -214,27 +204,13 @@ func (r *agentPoolResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	attrs := buildAgentPoolAttrs(&plan)
-
-	body, err := client.MarshalResourceWithID(state.ID.ValueString(), "agent-pools", attrs)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal request", err.Error())
-		return
-	}
-
-	data, err := r.client.Patch(ctx, "/api/terrapod/v1/agent-pools/"+state.ID.ValueString(), body)
+	p, err := r.tc.UpdateAgentPool(ctx, state.ID.ValueString(), buildUpdateAgentPoolRequest(&plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update agent pool", err.Error())
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(readAgentPoolIntoModel(ctx, res, &plan)...)
+	resp.Diagnostics.Append(readAgentPoolFromSDK(ctx, p, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -245,9 +221,12 @@ func (r *agentPoolResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/terrapod/v1/agent-pools/"+state.ID.ValueString())
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Failed to delete agent pool", err.Error())
+	err := r.tc.DeleteAgentPool(ctx, state.ID.ValueString())
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Failed to delete agent pool", err.Error())
+		}
 	}
 }
 
@@ -255,68 +234,88 @@ func (r *agentPoolResource) ImportState(ctx context.Context, req resource.Import
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// buildAgentPoolAttrs converts the Terraform model into JSON:API attributes.
-func buildAgentPoolAttrs(m *agentPoolModel) map[string]any {
-	attrs := map[string]any{
-		"name": m.Name.ValueString(),
+// buildCreateAgentPoolRequest projects the Terraform plan into the
+// SDK's typed create request. Optional fields are sent only when set.
+func buildCreateAgentPoolRequest(m *agentPoolModel) terrapod.CreateAgentPoolRequest {
+	req := terrapod.CreateAgentPoolRequest{
+		Name: m.Name.ValueString(),
 	}
-
 	if !m.Description.IsNull() && !m.Description.IsUnknown() {
-		attrs["description"] = m.Description.ValueString()
+		req.Description = m.Description.ValueString()
 	}
-
 	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
 		labels := map[string]string{}
 		for k, v := range m.Labels.Elements() {
 			labels[k] = v.(types.String).ValueString()
 		}
-		attrs["labels"] = labels
+		req.Labels = labels
 	}
-
 	if !m.OwnerEmail.IsNull() && !m.OwnerEmail.IsUnknown() {
-		attrs["owner-email"] = m.OwnerEmail.ValueString()
+		req.OwnerEmail = m.OwnerEmail.ValueString()
 	}
-
-	return attrs
+	return req
 }
 
-// readAgentPoolIntoModel populates the Terraform model from a JSON:API resource.
-func readAgentPoolIntoModel(ctx context.Context, res *client.Resource, m *agentPoolModel) diag.Diagnostics {
+// buildUpdateAgentPoolRequest mirrors the create build but uses the
+// SDK's pointer-typed partial-update shape. Terraform always supplies
+// every attribute on Update (plan vs state diff is the framework's
+// job), so we set every pointer — the SDK serialises only non-nil
+// values. The Labels map sets &{} explicitly (clear) when the model
+// has no labels, matching the old behaviour where omitting labels in
+// HCL cleared them.
+func buildUpdateAgentPoolRequest(m *agentPoolModel) terrapod.UpdateAgentPoolRequest {
+	req := terrapod.UpdateAgentPoolRequest{
+		Name: m.Name.ValueString(),
+	}
+	if !m.Description.IsNull() && !m.Description.IsUnknown() {
+		d := m.Description.ValueString()
+		req.Description = &d
+	}
+	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
+		labels := map[string]string{}
+		for k, v := range m.Labels.Elements() {
+			labels[k] = v.(types.String).ValueString()
+		}
+		req.Labels = &labels
+	}
+	if !m.OwnerEmail.IsNull() && !m.OwnerEmail.IsUnknown() {
+		o := m.OwnerEmail.ValueString()
+		req.OwnerEmail = &o
+	}
+	return req
+}
+
+// readAgentPoolFromSDK populates the Terraform model from the typed
+// SDK shape. Labels round-trip as a Map; empty/missing labels become
+// null on the model so a config with no `labels` block matches state.
+func readAgentPoolFromSDK(ctx context.Context, p *terrapod.AgentPool, m *agentPoolModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	m.ID = types.StringValue(res.ID)
-	m.Name = types.StringValue(client.GetStringAttr(res, "name"))
+	m.ID = types.StringValue(p.ID)
+	m.Name = types.StringValue(p.Name)
 
-	if v := client.GetStringAttr(res, "description"); v != "" {
-		m.Description = types.StringValue(v)
+	if p.Description != "" {
+		m.Description = types.StringValue(p.Description)
 	} else {
 		m.Description = types.StringNull()
 	}
 
-	// Labels — treat empty map {} as a valid value (not null) to avoid
-	// unnecessary Terraform diffs between config `labels = {}` and state `null`.
-	if raw, ok := res.Attributes["labels"]; ok && len(raw) > 0 {
-		var labels map[string]string
-		if err := json.Unmarshal(raw, &labels); err == nil {
-			val, d := types.MapValueFrom(ctx, types.StringType, labels)
-			diags.Append(d...)
-			m.Labels = val
-		} else {
-			m.Labels = types.MapNull(types.StringType)
-		}
+	if len(p.Labels) > 0 {
+		val, d := types.MapValueFrom(ctx, types.StringType, p.Labels)
+		diags.Append(d...)
+		m.Labels = val
 	} else {
 		m.Labels = types.MapNull(types.StringType)
 	}
 
-	// Owner email
-	if v := client.GetStringAttr(res, "owner-email"); v != "" {
-		m.OwnerEmail = types.StringValue(v)
+	if p.OwnerEmail != "" {
+		m.OwnerEmail = types.StringValue(p.OwnerEmail)
 	} else {
 		m.OwnerEmail = types.StringNull()
 	}
 
-	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
+	m.CreatedAt = types.StringValue(p.CreatedAt)
+	m.UpdatedAt = types.StringValue(p.UpdatedAt)
 
 	return diags
 }
