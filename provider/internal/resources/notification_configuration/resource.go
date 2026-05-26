@@ -1,7 +1,9 @@
+// Package notification_configuration — migrated to go-terrapod (#347).
 package notification_configuration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -13,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -23,11 +26,10 @@ var (
 
 type notificationConfigResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
-func NewResource() resource.Resource {
-	return &notificationConfigResource{}
-}
+func NewResource() resource.Resource { return &notificationConfigResource{} }
 
 func (r *notificationConfigResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_notification_configuration"
@@ -37,50 +39,18 @@ func (r *notificationConfigResource) Schema(_ context.Context, _ resource.Schema
 	resp.Schema = schema.Schema{
 		Description: "Manages a notification configuration for a Terrapod workspace.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Computed: true, Description: "Notification configuration ID.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"workspace_id": schema.StringAttribute{
-				Required: true, Description: "Workspace ID.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"name": schema.StringAttribute{
-				Required: true, Description: "Notification name.",
-			},
-			"destination_type": schema.StringAttribute{
-				Required: true, Description: "Type: generic, slack, or email.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"url": schema.StringAttribute{
-				Optional: true, Description: "Webhook URL (required for generic/slack).",
-			},
-			"token": schema.StringAttribute{
-				Optional: true, Sensitive: true,
-				Description: "HMAC or auth token (write-only).",
-			},
-			"enabled": schema.BoolAttribute{
-				Optional: true, Computed: true, Default: booldefault.StaticBool(false),
-				Description: "Whether the notification is enabled.",
-			},
-			"triggers": schema.ListAttribute{
-				Optional: true, ElementType: types.StringType,
-				Description: "Run event triggers.",
-			},
-			"email_addresses": schema.ListAttribute{
-				Optional: true, ElementType: types.StringType,
-				Description: "Email addresses (for email destination type).",
-			},
-			"has_token": schema.BoolAttribute{
-				Computed: true, Description: "Whether a token is configured.",
-			},
-			"created_at": schema.StringAttribute{
-				Computed: true, Description: "Creation timestamp.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"updated_at": schema.StringAttribute{
-				Computed: true, Description: "Update timestamp.",
-			},
+			"id": schema.StringAttribute{Computed: true, Description: "Notification configuration ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"workspace_id": schema.StringAttribute{Required: true, Description: "Workspace ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"name":            schema.StringAttribute{Required: true, Description: "Notification name."},
+			"destination_type": schema.StringAttribute{Required: true, Description: "Type: generic, slack, or email.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"url":             schema.StringAttribute{Optional: true, Description: "Webhook URL (required for generic/slack)."},
+			"token":           schema.StringAttribute{Optional: true, Sensitive: true, Description: "HMAC or auth token (write-only)."},
+			"enabled":         schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(false), Description: "Whether the notification is enabled."},
+			"triggers":        schema.ListAttribute{Optional: true, ElementType: types.StringType, Description: "Run event triggers."},
+			"email_addresses": schema.ListAttribute{Optional: true, ElementType: types.StringType, Description: "Email addresses (for email destination type)."},
+			"has_token":       schema.BoolAttribute{Computed: true, Description: "Whether a token is configured."},
+			"created_at":      schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"updated_at":      schema.StringAttribute{Computed: true, Description: "Update timestamp."},
 		},
 	}
 }
@@ -95,6 +65,12 @@ func (r *notificationConfigResource) Configure(_ context.Context, req resource.C
 		return
 	}
 	r.client = c
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *notificationConfigResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -103,27 +79,12 @@ func (r *notificationConfigResource) Create(ctx context.Context, req resource.Cr
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	attrs := buildAttrs(ctx, &plan)
-	body, err := client.MarshalResource("notification-configurations", attrs, nil)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
-	}
-
-	data, err := r.client.Post(ctx, fmt.Sprintf("/api/terrapod/v1/workspaces/%s/notification-configurations", plan.WorkspaceID.ValueString()), body)
+	nc, err := r.tc.CreateNotificationConfiguration(ctx, plan.WorkspaceID.ValueString(), buildCreateNCRequest(ctx, &plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Create failed", err.Error())
 		return
 	}
-
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(readIntoModel(ctx, res, &plan)...)
+	resp.Diagnostics.Append(readNCFromSDK(ctx, nc, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -133,24 +94,17 @@ func (r *notificationConfigResource) Read(ctx context.Context, req resource.Read
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	data, err := r.client.Get(ctx, "/api/terrapod/v1/notification-configurations/"+state.ID.ValueString())
+	nc, err := r.tc.GetNotificationConfiguration(ctx, state.ID.ValueString())
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
 		resp.Diagnostics.AddError("Read failed", err.Error())
 		return
 	}
-
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(readIntoModel(ctx, res, &state)...)
+	resp.Diagnostics.Append(readNCFromSDK(ctx, nc, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -160,33 +114,17 @@ func (r *notificationConfigResource) Update(ctx context.Context, req resource.Up
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 	var state notificationConfigModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	attrs := buildAttrs(ctx, &plan)
-	body, err := client.MarshalResourceWithID(state.ID.ValueString(), "notification-configurations", attrs)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
-	}
-
-	data, err := r.client.Patch(ctx, "/api/terrapod/v1/notification-configurations/"+state.ID.ValueString(), body)
+	nc, err := r.tc.UpdateNotificationConfiguration(ctx, state.ID.ValueString(), buildUpdateNCRequest(ctx, &plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Update failed", err.Error())
 		return
 	}
-
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(readIntoModel(ctx, res, &plan)...)
+	resp.Diagnostics.Append(readNCFromSDK(ctx, nc, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -196,10 +134,12 @@ func (r *notificationConfigResource) Delete(ctx context.Context, req resource.De
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	err := r.client.Delete(ctx, "/api/terrapod/v1/notification-configurations/"+state.ID.ValueString())
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete failed", err.Error())
+	err := r.tc.DeleteNotificationConfiguration(ctx, state.ID.ValueString())
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Delete failed", err.Error())
+		}
 	}
 }
 
@@ -207,61 +147,87 @@ func (r *notificationConfigResource) ImportState(ctx context.Context, req resour
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func buildAttrs(ctx context.Context, m *notificationConfigModel) map[string]any {
-	attrs := map[string]any{
-		"name":             m.Name.ValueString(),
-		"destination-type": m.DestinationType.ValueString(),
+func buildCreateNCRequest(ctx context.Context, m *notificationConfigModel) terrapod.CreateNotificationConfigurationRequest {
+	req := terrapod.CreateNotificationConfigurationRequest{
+		Name:            m.Name.ValueString(),
+		DestinationType: m.DestinationType.ValueString(),
 	}
 	if !m.URL.IsNull() {
-		attrs["url"] = m.URL.ValueString()
+		req.URL = m.URL.ValueString()
 	}
 	if !m.Token.IsNull() {
-		attrs["token"] = m.Token.ValueString()
+		req.Token = m.Token.ValueString()
 	}
 	if !m.Enabled.IsNull() && !m.Enabled.IsUnknown() {
-		attrs["enabled"] = m.Enabled.ValueBool()
+		req.Enabled = m.Enabled.ValueBool()
 	}
 	if !m.Triggers.IsNull() {
 		var triggers []string
 		m.Triggers.ElementsAs(ctx, &triggers, false)
-		attrs["triggers"] = triggers
+		req.Triggers = triggers
 	}
 	if !m.EmailAddresses.IsNull() {
 		var emails []string
 		m.EmailAddresses.ElementsAs(ctx, &emails, false)
-		attrs["email-addresses"] = emails
+		req.EmailAddresses = emails
 	}
-	return attrs
+	return req
 }
 
-func readIntoModel(ctx context.Context, res *client.Resource, m *notificationConfigModel) diag.Diagnostics {
+func buildUpdateNCRequest(ctx context.Context, m *notificationConfigModel) terrapod.UpdateNotificationConfigurationRequest {
+	req := terrapod.UpdateNotificationConfigurationRequest{
+		Name: m.Name.ValueString(),
+	}
+	if !m.URL.IsNull() && !m.URL.IsUnknown() {
+		u := m.URL.ValueString()
+		req.URL = &u
+	}
+	if !m.Token.IsNull() && !m.Token.IsUnknown() {
+		req.Token = m.Token.ValueString()
+	}
+	if !m.Enabled.IsNull() && !m.Enabled.IsUnknown() {
+		v := m.Enabled.ValueBool()
+		req.Enabled = &v
+	}
+	if !m.Triggers.IsNull() && !m.Triggers.IsUnknown() {
+		var triggers []string
+		m.Triggers.ElementsAs(ctx, &triggers, false)
+		req.Triggers = &triggers
+	}
+	if !m.EmailAddresses.IsNull() && !m.EmailAddresses.IsUnknown() {
+		var emails []string
+		m.EmailAddresses.ElementsAs(ctx, &emails, false)
+		req.EmailAddresses = &emails
+	}
+	return req
+}
+
+func readNCFromSDK(ctx context.Context, nc *terrapod.NotificationConfiguration, m *notificationConfigModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	m.ID = types.StringValue(res.ID)
-	m.Name = types.StringValue(client.GetStringAttr(res, "name"))
-	m.DestinationType = types.StringValue(client.GetStringAttr(res, "destination-type"))
-	m.Enabled = types.BoolValue(client.GetBoolAttr(res, "enabled"))
-	m.HasToken = types.BoolValue(client.GetBoolAttr(res, "has-token"))
-	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
+	m.ID = types.StringValue(nc.ID)
+	m.Name = types.StringValue(nc.Name)
+	m.DestinationType = types.StringValue(nc.DestinationType)
+	m.Enabled = types.BoolValue(nc.Enabled)
+	m.HasToken = types.BoolValue(nc.HasToken)
+	m.CreatedAt = types.StringValue(nc.CreatedAt)
+	m.UpdatedAt = types.StringValue(nc.UpdatedAt)
 
-	if v := client.GetStringAttr(res, "url"); v != "" {
-		m.URL = types.StringValue(v)
+	if nc.URL != "" {
+		m.URL = types.StringValue(nc.URL)
 	} else {
 		m.URL = types.StringNull()
 	}
 
-	// Token is write-only — preserve from config
-	if triggers := client.GetListAttr(res, "triggers"); len(triggers) > 0 {
-		val, d := types.ListValueFrom(ctx, types.StringType, triggers)
+	if len(nc.Triggers) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, nc.Triggers)
 		diags.Append(d...)
 		m.Triggers = val
 	} else {
 		m.Triggers = types.ListNull(types.StringType)
 	}
-
-	if emails := client.GetListAttr(res, "email-addresses"); len(emails) > 0 {
-		val, d := types.ListValueFrom(ctx, types.StringType, emails)
+	if len(nc.EmailAddresses) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, nc.EmailAddresses)
 		diags.Append(d...)
 		m.EmailAddresses = val
 	} else {
