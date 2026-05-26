@@ -12,6 +12,7 @@ import (
 	"github.com/mattrobinsonsre/terrapod/migrate/internal/framework"
 	"github.com/mattrobinsonsre/terrapod/migrate/internal/ir"
 	"github.com/mattrobinsonsre/terrapod/migrate/internal/sources/atlantis"
+	"github.com/mattrobinsonsre/terrapod/migrate/internal/sources/tfe"
 	"github.com/mattrobinsonsre/terrapod/migrate/internal/writer"
 )
 
@@ -28,6 +29,9 @@ func applyCmd(args []string) int {
 		source       = fs.String("source", "", "Source platform: 'atlantis' or 'tfe' (required)")
 		sourceDir    = fs.String("source-dir", "", "Local atlantis-repo clone (required when --source=atlantis)")
 		atlantisYAML = fs.String("atlantis-yaml-path", "", "Override path to atlantis.yaml (default: <source-dir>/atlantis.yaml)")
+		tfeAddress   = fs.String("tfe-address", os.Getenv("TFE_ADDRESS"), "TFE API address (or TFE_ADDRESS; default: https://app.terraform.io)")
+		tfeToken     = fs.String("tfe-token", os.Getenv("TFE_TOKEN"), "TFE API token (or TFE_TOKEN; org-owner preferred for sensitive-variable visibility)")
+		tfeOrg       = fs.String("tfe-org", os.Getenv("TFE_ORG"), "TFE organisation to migrate (or TFE_ORG)")
 		target       = fs.String("target", os.Getenv("TERRAPOD_HOSTNAME"), "Terrapod base URL (or TERRAPOD_HOSTNAME)")
 		token        = fs.String("token", os.Getenv("TERRAPOD_TOKEN"), "Terrapod API token (or TERRAPOD_TOKEN)")
 		statePath    = fs.String("state-file", framework.DefaultStateFile, "Path to the migration state JSON file")
@@ -68,8 +72,7 @@ func applyCmd(args []string) int {
 		}
 		plan, credsByConn, err = loadAtlantisPlan(*sourceDir, *atlantisYAML)
 	case "tfe":
-		fmt.Fprintln(os.Stderr, "apply: --source=tfe wiring is in a follow-up increment (issue #347)")
-		return 1
+		plan, credsByConn, err = loadTFEPlan(context.Background(), *tfeAddress, *tfeToken, *tfeOrg)
 	default:
 		fmt.Fprintf(os.Stderr, "apply: unknown --source %q (atlantis|tfe)\n", *source)
 		return 2
@@ -197,6 +200,62 @@ func loadAtlantisPlan(sourceDir, yamlPath string) (ir.Plan, map[string]writer.Cr
 
 	creds := map[string]writer.Creds{
 		connSourceID: credsFromEnv(providerFromRepoURL(src.RepoURL)),
+	}
+	return plan, creds, nil
+}
+
+// loadTFEPlan connects to a TFE/HCP instance and assembles the IR
+// Plan. Sensitive variable values are NOT inlined here — the writer
+// loads them lazily via the SensitiveValueForVariable callback only
+// in --apply mode, which keeps dry-run runs from making redundant
+// API calls and keeps sensitive payloads out of the dry-run report.
+//
+// Credentials for VCS connections are out of scope for this first
+// TFE wiring: TFE migrations carry over the workspace's
+// vcs_repo_url as metadata, but the operator wires up the matching
+// GitHub App / GitLab PAT separately (same env-var convention as
+// the atlantis flow). Future work: read TFE's oauth-client list and
+// surface them in the report so operators know which connections
+// to recreate.
+func loadTFEPlan(ctx context.Context, address, token, org string) (ir.Plan, map[string]writer.Creds, error) {
+	c, err := tfe.NewClient(ctx, tfe.Config{
+		Address: address,
+		Token:   token,
+		OrgName: org,
+	})
+	if err != nil {
+		return ir.Plan{}, nil, err
+	}
+
+	workspaces, conns, skipped, err := c.EmitWorkspaces(ctx)
+	if err != nil {
+		return ir.Plan{}, nil, err
+	}
+	varSkipped, err := c.AttachVariables(ctx, workspaces)
+	if err != nil {
+		return ir.Plan{}, nil, err
+	}
+	skipped = append(skipped, varSkipped...)
+
+	plan := ir.Plan{
+		Source: "tfe",
+		SourceMetadata: map[string]string{
+			"host":  hostFromRepoURL(c.Address),
+			"org":   c.OrgName,
+			"token": string(c.TokenTier),
+		},
+		VCSConnections: conns,
+		Workspaces:     workspaces,
+		Skipped:        skipped,
+	}
+
+	// Per-connection creds map: empty for now. Operators wire VCS
+	// credentials via the same env-var convention the atlantis flow
+	// uses (see credsFromEnv); the writer surfaces a clear error in
+	// --apply mode if the values are missing.
+	creds := map[string]writer.Creds{}
+	for _, conn := range conns {
+		creds[conn.SourceID] = credsFromEnv(conn.Provider)
 	}
 	return plan, creds, nil
 }
