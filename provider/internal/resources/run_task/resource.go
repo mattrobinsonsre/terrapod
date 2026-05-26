@@ -1,7 +1,9 @@
+// Package run_task — migrated to go-terrapod (#347).
 package run_task
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -12,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -22,11 +25,10 @@ var (
 
 type runTaskResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
-func NewResource() resource.Resource {
-	return &runTaskResource{}
-}
+func NewResource() resource.Resource { return &runTaskResource{} }
 
 func (r *runTaskResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_run_task"
@@ -36,44 +38,17 @@ func (r *runTaskResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 	resp.Schema = schema.Schema{
 		Description: "Manages a run task (pre/post-plan or pre-apply webhook) for a Terrapod workspace.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Computed: true, Description: "Run task ID.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"workspace_id": schema.StringAttribute{
-				Required: true, Description: "Workspace ID.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"name": schema.StringAttribute{
-				Required: true, Description: "Task name.",
-			},
-			"url": schema.StringAttribute{
-				Required: true, Description: "Webhook URL.",
-			},
-			"enabled": schema.BoolAttribute{
-				Optional: true, Computed: true, Default: booldefault.StaticBool(true),
-				Description: "Whether the task is enabled.",
-			},
-			"stage": schema.StringAttribute{
-				Required: true, Description: "Stage: pre_plan, post_plan, or pre_apply.",
-			},
-			"enforcement_level": schema.StringAttribute{
-				Required: true, Description: "Enforcement: mandatory or advisory.",
-			},
-			"hmac_key": schema.StringAttribute{
-				Optional: true, Sensitive: true,
-				Description: "HMAC signing key (write-only).",
-			},
-			"has_hmac_key": schema.BoolAttribute{
-				Computed: true, Description: "Whether an HMAC key is configured.",
-			},
-			"created_at": schema.StringAttribute{
-				Computed: true, Description: "Creation timestamp.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"updated_at": schema.StringAttribute{
-				Computed: true, Description: "Update timestamp.",
-			},
+			"id": schema.StringAttribute{Computed: true, Description: "Run task ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"workspace_id": schema.StringAttribute{Required: true, Description: "Workspace ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"name":             schema.StringAttribute{Required: true, Description: "Task name."},
+			"url":              schema.StringAttribute{Required: true, Description: "Webhook URL."},
+			"enabled":          schema.BoolAttribute{Optional: true, Computed: true, Default: booldefault.StaticBool(true), Description: "Whether the task is enabled."},
+			"stage":            schema.StringAttribute{Required: true, Description: "Stage: pre_plan, post_plan, or pre_apply."},
+			"enforcement_level": schema.StringAttribute{Required: true, Description: "Enforcement: mandatory or advisory."},
+			"hmac_key":         schema.StringAttribute{Optional: true, Sensitive: true, Description: "HMAC signing key (write-only)."},
+			"has_hmac_key":     schema.BoolAttribute{Computed: true, Description: "Whether an HMAC key is configured."},
+			"created_at":       schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"updated_at":       schema.StringAttribute{Computed: true, Description: "Update timestamp."},
 		},
 	}
 }
@@ -88,6 +63,12 @@ func (r *runTaskResource) Configure(_ context.Context, req resource.ConfigureReq
 		return
 	}
 	r.client = c
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *runTaskResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -96,27 +77,12 @@ func (r *runTaskResource) Create(ctx context.Context, req resource.CreateRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	attrs := buildAttrs(&plan)
-	body, err := client.MarshalResource("run-tasks", attrs, nil)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
-	}
-
-	data, err := r.client.Post(ctx, fmt.Sprintf("/api/terrapod/v1/workspaces/%s/run-tasks", plan.WorkspaceID.ValueString()), body)
+	rt, err := r.tc.CreateRunTask(ctx, plan.WorkspaceID.ValueString(), buildCreateRunTaskRequest(&plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Create failed", err.Error())
 		return
 	}
-
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	readIntoModel(res, &plan)
+	readRunTaskFromSDK(rt, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -126,24 +92,17 @@ func (r *runTaskResource) Read(ctx context.Context, req resource.ReadRequest, re
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	data, err := r.client.Get(ctx, "/api/terrapod/v1/run-tasks/"+state.ID.ValueString())
+	rt, err := r.tc.GetRunTask(ctx, state.ID.ValueString())
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
 		resp.Diagnostics.AddError("Read failed", err.Error())
 		return
 	}
-
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	readIntoModel(res, &state)
+	readRunTaskFromSDK(rt, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -153,33 +112,17 @@ func (r *runTaskResource) Update(ctx context.Context, req resource.UpdateRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 	var state runTaskModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	attrs := buildAttrs(&plan)
-	body, err := client.MarshalResourceWithID(state.ID.ValueString(), "run-tasks", attrs)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
-	}
-
-	data, err := r.client.Patch(ctx, "/api/terrapod/v1/run-tasks/"+state.ID.ValueString(), body)
+	rt, err := r.tc.UpdateRunTask(ctx, state.ID.ValueString(), buildUpdateRunTaskRequest(&plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Update failed", err.Error())
 		return
 	}
-
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	readIntoModel(res, &plan)
+	readRunTaskFromSDK(rt, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -189,10 +132,12 @@ func (r *runTaskResource) Delete(ctx context.Context, req resource.DeleteRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	err := r.client.Delete(ctx, "/api/terrapod/v1/run-tasks/"+state.ID.ValueString())
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete failed", err.Error())
+	err := r.tc.DeleteRunTask(ctx, state.ID.ValueString())
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Delete failed", err.Error())
+		}
 	}
 }
 
@@ -200,31 +145,49 @@ func (r *runTaskResource) ImportState(ctx context.Context, req resource.ImportSt
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func buildAttrs(m *runTaskModel) map[string]any {
-	attrs := map[string]any{
-		"name":              m.Name.ValueString(),
-		"url":               m.URL.ValueString(),
-		"stage":             m.Stage.ValueString(),
-		"enforcement-level": m.EnforcementLevel.ValueString(),
+func buildCreateRunTaskRequest(m *runTaskModel) terrapod.CreateRunTaskRequest {
+	req := terrapod.CreateRunTaskRequest{
+		Name:             m.Name.ValueString(),
+		URL:              m.URL.ValueString(),
+		Stage:            m.Stage.ValueString(),
+		EnforcementLevel: m.EnforcementLevel.ValueString(),
 	}
 	if !m.Enabled.IsNull() && !m.Enabled.IsUnknown() {
-		attrs["enabled"] = m.Enabled.ValueBool()
+		v := m.Enabled.ValueBool()
+		req.Enabled = &v
 	}
 	if !m.HMACKey.IsNull() {
-		attrs["hmac-key"] = m.HMACKey.ValueString()
+		req.HMACKey = m.HMACKey.ValueString()
 	}
-	return attrs
+	return req
 }
 
-func readIntoModel(res *client.Resource, m *runTaskModel) {
-	m.ID = types.StringValue(res.ID)
-	m.Name = types.StringValue(client.GetStringAttr(res, "name"))
-	m.URL = types.StringValue(client.GetStringAttr(res, "url"))
-	m.Enabled = types.BoolValue(client.GetBoolAttr(res, "enabled"))
-	m.Stage = types.StringValue(client.GetStringAttr(res, "stage"))
-	m.EnforcementLevel = types.StringValue(client.GetStringAttr(res, "enforcement-level"))
-	m.HasHMACKey = types.BoolValue(client.GetBoolAttr(res, "has-hmac-key"))
-	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
-	// hmac_key is write-only — preserved from plan/config
+func buildUpdateRunTaskRequest(m *runTaskModel) terrapod.UpdateRunTaskRequest {
+	req := terrapod.UpdateRunTaskRequest{
+		Name:             m.Name.ValueString(),
+		URL:              m.URL.ValueString(),
+		Stage:            m.Stage.ValueString(),
+		EnforcementLevel: m.EnforcementLevel.ValueString(),
+	}
+	if !m.Enabled.IsNull() && !m.Enabled.IsUnknown() {
+		v := m.Enabled.ValueBool()
+		req.Enabled = &v
+	}
+	if !m.HMACKey.IsNull() && !m.HMACKey.IsUnknown() {
+		req.HMACKey = m.HMACKey.ValueString()
+	}
+	return req
+}
+
+func readRunTaskFromSDK(rt *terrapod.RunTask, m *runTaskModel) {
+	m.ID = types.StringValue(rt.ID)
+	m.Name = types.StringValue(rt.Name)
+	m.URL = types.StringValue(rt.URL)
+	m.Enabled = types.BoolValue(rt.Enabled)
+	m.Stage = types.StringValue(rt.Stage)
+	m.EnforcementLevel = types.StringValue(rt.EnforcementLevel)
+	m.HasHMACKey = types.BoolValue(rt.HasHMACKey)
+	m.CreatedAt = types.StringValue(rt.CreatedAt)
+	m.UpdatedAt = types.StringValue(rt.UpdatedAt)
+	// hmac_key write-only — preserved from plan.
 }
