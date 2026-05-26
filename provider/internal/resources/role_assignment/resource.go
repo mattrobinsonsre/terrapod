@@ -1,38 +1,15 @@
 // Package role_assignment implements the terrapod_role_assignment resource.
 //
-// API Contract (Terrapod API ↔ Terraform Provider):
-//
-//	JSON:API type: "role-assignments"
-//	ID: composite — provider_name/email/role_name
-//
-//	Create: Read-modify-write via:
-//	  1. GET  /api/terrapod/v1/role-assignments                        — list all, filter by provider+email
-//	  2. PUT  /api/terrapod/v1/role-assignments                        — replace-all semantics for (provider, email)
-//	     Body: {"data": {"attributes": {"provider-name": "...", "email": "...", "roles": ["admin", "custom"]}}}
-//
-//	Read:   GET    /api/terrapod/v1/role-assignments                   — list all, find matching entry
-//	Delete: DELETE /api/terrapod/v1/role-assignments/{provider}/{email}/{role}
-//
-// Each Terraform resource instance represents ONE (provider, email, role)
-// triple. Create adds the role to the user's existing set; delete removes
-// only that single role.
-//
-// Attribute mapping (JSON:API attribute → Terraform schema attribute):
-//
-//	"provider-name" → provider_name (string, required, forces new)
-//	"email"         → email         (string, required, forces new)
-//	"role-name"     → role_name     (string, required, forces new)
-//
-// Read-only attributes:
-//
-//	"created-at" → created_at (string, computed)
-//
-// Import: provider_name/email/role_name
+// Migrated to go-terrapod (#347). Each Terraform resource instance
+// represents ONE (provider, email, role) triple — that's how the
+// HCL model has always exposed assignments. The underlying API
+// supports replace-all semantics for an identity, but per-role
+// idempotent add/remove is the Terraform-friendly shape.
 package role_assignment
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -43,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -51,24 +29,21 @@ var (
 	_ resource.ResourceWithImportState = &roleAssignmentResource{}
 )
 
-// roleAssignmentModel maps the Terraform schema to Go types.
 type roleAssignmentModel struct {
 	ID types.String `tfsdk:"id"`
 
-	// All three fields are immutable — changing any forces replacement.
 	ProviderName types.String `tfsdk:"provider_name"`
 	Email        types.String `tfsdk:"email"`
 	RoleName     types.String `tfsdk:"role_name"`
 
-	// Read-only
 	CreatedAt types.String `tfsdk:"created_at"`
 }
 
 type roleAssignmentResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
-// NewResource returns a new role assignment resource.
 func NewResource() resource.Resource {
 	return &roleAssignmentResource{}
 }
@@ -110,7 +85,6 @@ func (r *roleAssignmentResource) Schema(_ context.Context, _ resource.SchemaRequ
 				},
 			},
 
-			// Read-only
 			"created_at": schema.StringAttribute{
 				Description: "Creation timestamp.",
 				Computed:    true,
@@ -132,6 +106,13 @@ func (r *roleAssignmentResource) Configure(_ context.Context, req resource.Confi
 		return
 	}
 	r.client = c
+
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *roleAssignmentResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -141,48 +122,29 @@ func (r *roleAssignmentResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	providerName := plan.ProviderName.ValueString()
+	pn := plan.ProviderName.ValueString()
 	email := plan.Email.ValueString()
-	roleName := plan.RoleName.ValueString()
+	role := plan.RoleName.ValueString()
 
-	// Read the current roles for this (provider, email) pair.
-	currentRoles, err := r.listRolesForIdentity(ctx, providerName, email)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to read current roles", err.Error())
-		return
-	}
-
-	// Add the new role if not already present.
-	found := false
-	for _, rn := range currentRoles {
-		if rn == roleName {
-			found = true
-			break
-		}
-	}
-	if !found {
-		currentRoles = append(currentRoles, roleName)
-	}
-
-	// PUT the full role list.
-	if err := r.putRoles(ctx, providerName, email, currentRoles); err != nil {
+	if err := r.tc.AddRoleToIdentity(ctx, pn, email, role); err != nil {
 		resp.Diagnostics.AddError("Failed to create role assignment", err.Error())
 		return
 	}
 
-	// Read back to get created_at.
-	assignment, err := r.findAssignment(ctx, providerName, email, roleName)
+	// Round-trip to populate created_at.
+	a, err := r.tc.GetRoleAssignment(ctx, pn, email, role)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to read back assignment", err.Error())
 		return
 	}
-	if assignment == nil {
-		resp.Diagnostics.AddError("Assignment not found after create", fmt.Sprintf("Could not find assignment %s/%s/%s", providerName, email, roleName))
+	if a == nil {
+		resp.Diagnostics.AddError("Assignment not found after create",
+			fmt.Sprintf("Could not find assignment %s/%s/%s", pn, email, role))
 		return
 	}
 
-	plan.ID = types.StringValue(providerName + "/" + email + "/" + roleName)
-	plan.CreatedAt = types.StringValue(assignment.createdAt)
+	plan.ID = types.StringValue(pn + "/" + email + "/" + role)
+	plan.CreatedAt = types.StringValue(a.CreatedAt)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -193,31 +155,31 @@ func (r *roleAssignmentResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	providerName := state.ProviderName.ValueString()
+	pn := state.ProviderName.ValueString()
 	email := state.Email.ValueString()
-	roleName := state.RoleName.ValueString()
+	role := state.RoleName.ValueString()
 
-	assignment, err := r.findAssignment(ctx, providerName, email, roleName)
+	a, err := r.tc.GetRoleAssignment(ctx, pn, email, role)
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
 		resp.Diagnostics.AddError("Failed to read role assignment", err.Error())
 		return
 	}
-	if assignment == nil {
+	if a == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}
 
-	state.ID = types.StringValue(providerName + "/" + email + "/" + roleName)
-	state.CreatedAt = types.StringValue(assignment.createdAt)
+	state.ID = types.StringValue(pn + "/" + email + "/" + role)
+	state.CreatedAt = types.StringValue(a.CreatedAt)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *roleAssignmentResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// All attributes force replacement — Update should never be called.
 	resp.Diagnostics.AddError("Update not supported", "Role assignments are immutable. Delete and recreate instead.")
 }
 
@@ -228,20 +190,20 @@ func (r *roleAssignmentResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	deletePath := fmt.Sprintf("/api/terrapod/v1/role-assignments/%s/%s/%s",
+	err := r.tc.RemoveRoleFromIdentity(ctx,
 		state.ProviderName.ValueString(),
 		state.Email.ValueString(),
 		state.RoleName.ValueString(),
 	)
-
-	err := r.client.Delete(ctx, deletePath)
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Failed to delete role assignment", err.Error())
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Failed to delete role assignment", err.Error())
+		}
 	}
 }
 
 func (r *roleAssignmentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Import format: provider_name/email/role_name
 	parts := strings.SplitN(req.ID, "/", 3)
 	if len(parts) != 3 {
 		resp.Diagnostics.AddError("Invalid import ID", "Expected format: provider_name/email/role_name")
@@ -251,113 +213,4 @@ func (r *roleAssignmentResource) ImportState(ctx context.Context, req resource.I
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("provider_name"), parts[0])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("email"), parts[1])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("role_name"), parts[2])...)
-}
-
-// assignmentData holds the fields we extract from a role-assignments list entry.
-type assignmentData struct {
-	providerName string
-	email        string
-	roleName     string
-	createdAt    string
-}
-
-// listRolesForIdentity fetches all role assignments and returns the role names
-// for the given (provider, email) pair.
-func (r *roleAssignmentResource) listRolesForIdentity(ctx context.Context, providerName, email string) ([]string, error) {
-	data, err := r.client.Get(ctx, "/api/terrapod/v1/role-assignments")
-	if err != nil {
-		return nil, err
-	}
-
-	assignments, err := parseAssignmentList(data)
-	if err != nil {
-		return nil, err
-	}
-
-	var roles []string
-	for _, a := range assignments {
-		if a.providerName == providerName && a.email == email {
-			roles = append(roles, a.roleName)
-		}
-	}
-	return roles, nil
-}
-
-// findAssignment looks up a specific (provider, email, role) triple in the
-// assignment list.
-func (r *roleAssignmentResource) findAssignment(ctx context.Context, providerName, email, roleName string) (*assignmentData, error) {
-	data, err := r.client.Get(ctx, "/api/terrapod/v1/role-assignments")
-	if err != nil {
-		return nil, err
-	}
-
-	assignments, err := parseAssignmentList(data)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, a := range assignments {
-		if a.providerName == providerName && a.email == email && a.roleName == roleName {
-			return &a, nil
-		}
-	}
-	return nil, nil
-}
-
-// putRoles sends a PUT to replace all roles for a (provider, email) pair.
-func (r *roleAssignmentResource) putRoles(ctx context.Context, providerName, email string, roles []string) error {
-	body, err := json.Marshal(map[string]any{
-		"data": map[string]any{
-			"attributes": map[string]any{
-				"provider-name": providerName,
-				"email":         email,
-				"roles":         roles,
-			},
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("marshalling PUT body: %w", err)
-	}
-
-	_, err = r.client.Put(ctx, "/api/terrapod/v1/role-assignments", body)
-	return err
-}
-
-// parseAssignmentList parses the GET /api/terrapod/v1/role-assignments response.
-// The response has {"data": [{"type": "role-assignments", "attributes": {...}}, ...]}.
-func parseAssignmentList(data []byte) ([]assignmentData, error) {
-	var doc struct {
-		Data []struct {
-			Type       string         `json:"type"`
-			Attributes map[string]any `json:"attributes"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(data, &doc); err != nil {
-		return nil, err
-	}
-
-	assignments := make([]assignmentData, 0, len(doc.Data))
-	for _, item := range doc.Data {
-		a := assignmentData{
-			providerName: getStringFromMap(item.Attributes, "provider-name"),
-			email:        getStringFromMap(item.Attributes, "email"),
-			roleName:     getStringFromMap(item.Attributes, "role-name"),
-			createdAt:    getStringFromMap(item.Attributes, "created-at"),
-		}
-		assignments = append(assignments, a)
-	}
-	return assignments, nil
-}
-
-// getStringFromMap reads a string value from a map[string]any.
-func getStringFromMap(m map[string]any, key string) string {
-	v, ok := m[key]
-	if !ok || v == nil {
-		return ""
-	}
-	s, ok := v.(string)
-	if !ok {
-		return fmt.Sprintf("%v", v)
-	}
-	return s
 }
