@@ -96,7 +96,7 @@ projects:
 	defer srv.Close()
 
 	// ── Apply (the actual end-to-end exercise) ────────────────────
-	plan, creds, err := loadAtlantisPlan(cloneDir, "")
+	plan, creds, _, err := loadAtlantisPlan(cloneDir, "", atlantisStateOpts{})
 	if err != nil {
 		t.Fatalf("loadAtlantisPlan: %v", err)
 	}

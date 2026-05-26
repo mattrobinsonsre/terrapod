@@ -58,6 +58,13 @@ type Options struct {
 	// Not called in DryRun mode and not called for non-sensitive
 	// variables (those carry their value in the IR).
 	SensitiveValueForVariable func(workspaceSourceID, key string) (string, error)
+
+	// StateForWorkspace is invoked by Apply after a workspace has
+	// been created to upload the source-side state to Terrapod. nil
+	// disables state migration (the workspace is created but state
+	// is not — operators wire it up by hand). DryRun never invokes
+	// the callback.
+	StateForWorkspace StateReader
 }
 
 // Creds is the credential payload for a single VCS connection. Only
@@ -101,14 +108,26 @@ type ConnectionOutcome struct {
 // WorkspaceOutcome is the per-workspace result. VarOutcomes records
 // what happened to each variable; the workspace itself can succeed
 // while individual variables fail (the writer records the error and
-// keeps going so the operator sees the full picture).
+// keeps going so the operator sees the full picture). StateOutcome
+// is non-nil iff the writer attempted state migration for this
+// workspace (always in Apply when StateForWorkspace is set).
 type WorkspaceOutcome struct {
-	SourceID    string         `json:"source_id"`
-	Name        string         `json:"name"`
-	State       string         `json:"state"` // "planned" | "created" | "reused" | "errored"
-	TerrapodID  string         `json:"terrapod_id,omitempty"`
-	Error       string         `json:"error,omitempty"`
-	VarOutcomes []VarOutcome   `json:"var_outcomes,omitempty"`
+	SourceID     string        `json:"source_id"`
+	Name         string        `json:"name"`
+	State        string        `json:"state"` // "planned" | "created" | "reused" | "errored"
+	TerrapodID   string        `json:"terrapod_id,omitempty"`
+	Error        string        `json:"error,omitempty"`
+	VarOutcomes  []VarOutcome  `json:"var_outcomes,omitempty"`
+	StateOutcome *StateOutcome `json:"state_outcome,omitempty"`
+}
+
+// StateOutcome is the per-workspace state migration result.
+type StateOutcome struct {
+	State   string `json:"state"` // "uploaded" | "no_source_state" | "skipped" | "errored"
+	Serial  int64  `json:"serial,omitempty"`
+	Lineage string `json:"lineage,omitempty"`
+	SizeKB  int64  `json:"size_kb,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
 // VarOutcome is the per-variable result on a workspace.
@@ -345,6 +364,53 @@ func (w *Writer) applyWorkspace(ctx context.Context, ws *ir.Workspace, connByRef
 		out.VarOutcomes = append(out.VarOutcomes, vout)
 	}
 
+	if opts.StateForWorkspace != nil {
+		out.StateOutcome = w.applyState(ctx, created.ID, ws.SourceID, opts.StateForWorkspace)
+	}
+
+	return out
+}
+
+// applyState pulls state from the source via the StateReader and
+// uploads it to the just-created Terrapod workspace. Failures here
+// are recorded on the StateOutcome rather than rolling back the
+// workspace — the operator can re-attempt state migration without
+// re-creating the workspace by re-running apply.
+func (w *Writer) applyState(ctx context.Context, terrapodID, sourceID string, reader StateReader) *StateOutcome {
+	out := &StateOutcome{State: "skipped"}
+	raw, lineage, serial, err := reader(ctx, sourceID)
+	if err != nil {
+		var none *ErrNoStateForWorkspace
+		if errors.As(err, &none) {
+			out.State = "no_source_state"
+			return out
+		}
+		out.State = "errored"
+		out.Error = fmt.Sprintf("read source state: %v", err)
+		return out
+	}
+	if len(raw) == 0 {
+		out.State = "no_source_state"
+		return out
+	}
+
+	sv, err := w.client.CreateAndUploadState(ctx, terrapodID, raw, terrapod.CreateStateVersionRequest{
+		Serial:  serial,
+		Lineage: lineage,
+	})
+	if err != nil {
+		out.State = "errored"
+		out.Error = err.Error()
+		return out
+	}
+	out.State = "uploaded"
+	out.Serial = sv.Serial
+	out.Lineage = sv.Lineage
+	out.SizeKB = int64(len(raw) / 1024)
+	if rec := w.state.WorkspaceBySourceID(sourceID); rec != nil {
+		rec.StateLineage = sv.Lineage
+		rec.StateSerial = sv.Serial
+	}
 	return out
 }
 
@@ -459,6 +525,9 @@ func collectErrors(r *Report) []string {
 			if v.Error != "" {
 				errs = append(errs, fmt.Sprintf("workspace %q variable %q: %s", ws.Name, v.Key, v.Error))
 			}
+		}
+		if ws.StateOutcome != nil && ws.StateOutcome.Error != "" {
+			errs = append(errs, fmt.Sprintf("workspace %q state: %s", ws.Name, ws.StateOutcome.Error))
 		}
 	}
 	return errs

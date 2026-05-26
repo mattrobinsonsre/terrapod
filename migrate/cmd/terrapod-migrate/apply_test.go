@@ -53,7 +53,7 @@ projects:
 	runGit("remote", "add", "origin", "https://github.com/acme/infra")
 	runGit("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
 
-	plan, creds, err := loadAtlantisPlan(dir, "")
+	plan, creds, _, err := loadAtlantisPlan(dir, "", atlantisStateOpts{})
 	if err != nil {
 		t.Fatalf("loadAtlantisPlan: %v", err)
 	}

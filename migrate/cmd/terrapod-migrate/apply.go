@@ -32,6 +32,10 @@ func applyCmd(args []string) int {
 		tfeAddress   = fs.String("tfe-address", os.Getenv("TFE_ADDRESS"), "TFE API address (or TFE_ADDRESS; default: https://app.terraform.io)")
 		tfeToken     = fs.String("tfe-token", os.Getenv("TFE_TOKEN"), "TFE API token (or TFE_TOKEN; org-owner preferred for sensitive-variable visibility)")
 		tfeOrg       = fs.String("tfe-org", os.Getenv("TFE_ORG"), "TFE organisation to migrate (or TFE_ORG)")
+		skipState    = fs.Bool("skip-state", false, "Don't migrate state — workspaces are created but state is left for operator")
+		s3Endpoint   = fs.String("s3-endpoint-url", os.Getenv("AWS_ENDPOINT_URL_S3"), "S3 endpoint override (e.g. http://localhost:9000 for minio; or AWS_ENDPOINT_URL_S3)")
+		s3PathStyle  = fs.Bool("s3-force-path-style", os.Getenv("AWS_S3_FORCE_PATH_STYLE") == "true", "Use S3 path-style addressing (required for minio)")
+		s3Region     = fs.String("s3-region", os.Getenv("AWS_REGION"), "S3 region override (or AWS_REGION)")
 		target       = fs.String("target", os.Getenv("TERRAPOD_HOSTNAME"), "Terrapod base URL (or TERRAPOD_HOSTNAME)")
 		token        = fs.String("token", os.Getenv("TERRAPOD_TOKEN"), "Terrapod API token (or TERRAPOD_TOKEN)")
 		statePath    = fs.String("state-file", framework.DefaultStateFile, "Path to the migration state JSON file")
@@ -58,10 +62,13 @@ func applyCmd(args []string) int {
 		return 2
 	}
 
-	// Build the IR Plan from the source-specific loader.
+	// Build the IR Plan from the source-specific loader. We also
+	// capture the source-specific StateReader so the writer can pull
+	// state during --apply mode.
 	var (
 		plan        ir.Plan
 		credsByConn map[string]writer.Creds
+		stateReader writer.StateReader
 		err         error
 	)
 	switch *source {
@@ -70,9 +77,15 @@ func applyCmd(args []string) int {
 			fmt.Fprintln(os.Stderr, "apply: --source-dir is required for --source=atlantis")
 			return 2
 		}
-		plan, credsByConn, err = loadAtlantisPlan(*sourceDir, *atlantisYAML)
+		plan, credsByConn, stateReader, err = loadAtlantisPlan(*sourceDir, *atlantisYAML, atlantisStateOpts{
+			S3Endpoint:       *s3Endpoint,
+			S3ForcePathStyle: *s3PathStyle,
+			S3Region:         *s3Region,
+			S3AccessKey:      os.Getenv("AWS_ACCESS_KEY_ID"),
+			S3SecretKey:      os.Getenv("AWS_SECRET_ACCESS_KEY"),
+		})
 	case "tfe":
-		plan, credsByConn, err = loadTFEPlan(context.Background(), *tfeAddress, *tfeToken, *tfeOrg)
+		plan, credsByConn, stateReader, err = loadTFEPlan(context.Background(), *tfeAddress, *tfeToken, *tfeOrg)
 	default:
 		fmt.Fprintf(os.Stderr, "apply: unknown --source %q (atlantis|tfe)\n", *source)
 		return 2
@@ -80,6 +93,9 @@ func applyCmd(args []string) int {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "apply: load %s source: %v\n", *source, err)
 		return 1
+	}
+	if *skipState {
+		stateReader = nil
 	}
 
 	// Load or initialise the migration state file. Loading is best-
@@ -110,8 +126,9 @@ func applyCmd(args []string) int {
 
 	w := writer.New(c, state, *statePath)
 	opts := writer.Options{
-		DryRun:      !*apply,
-		ToolVersion: Version,
+		DryRun:            !*apply,
+		ToolVersion:       Version,
+		StateForWorkspace: stateReader,
 		CredsForVCSConnection: func(conn *ir.VCSConnection) (writer.Creds, error) {
 			if creds, ok := credsByConn[conn.SourceID]; ok {
 				return creds, nil
@@ -162,12 +179,23 @@ func applyCmd(args []string) int {
 // integration tests and pre-release smoke will exercise the env-var
 // path; today's CLI just emits a friendly error if --apply is set
 // without them.
-func loadAtlantisPlan(sourceDir, yamlPath string) (ir.Plan, map[string]writer.Creds, error) {
+// atlantisStateOpts mirrors atlantis.StateOptions so apply can plumb
+// CLI/env-derived S3/minio configuration through without importing
+// the package directly into the flag-parsing block.
+type atlantisStateOpts struct {
+	S3Endpoint       string
+	S3ForcePathStyle bool
+	S3Region         string
+	S3AccessKey      string
+	S3SecretKey      string
+}
+
+func loadAtlantisPlan(sourceDir, yamlPath string, stateOpts atlantisStateOpts) (ir.Plan, map[string]writer.Creds, writer.StateReader, error) {
 	src, err := atlantis.LoadDirectory(sourceDir, atlantis.LoadOptions{
 		AtlantisYAMLPath: yamlPath,
 	})
 	if err != nil {
-		return ir.Plan{}, nil, err
+		return ir.Plan{}, nil, nil, err
 	}
 
 	connSourceID := atlantisConnSourceID(src.RepoURL)
@@ -177,7 +205,7 @@ func loadAtlantisPlan(sourceDir, yamlPath string) (ir.Plan, map[string]writer.Cr
 		DefaultBranch:    src.DefaultBranch,
 	})
 	if err != nil {
-		return ir.Plan{}, nil, err
+		return ir.Plan{}, nil, nil, err
 	}
 
 	plan := ir.Plan{
@@ -201,7 +229,14 @@ func loadAtlantisPlan(sourceDir, yamlPath string) (ir.Plan, map[string]writer.Cr
 	creds := map[string]writer.Creds{
 		connSourceID: credsFromEnv(providerFromRepoURL(src.RepoURL)),
 	}
-	return plan, creds, nil
+	reader := src.StateReader(atlantis.StateOptions{
+		S3Endpoint:       stateOpts.S3Endpoint,
+		S3ForcePathStyle: stateOpts.S3ForcePathStyle,
+		S3Region:         stateOpts.S3Region,
+		S3AccessKey:      stateOpts.S3AccessKey,
+		S3SecretKey:      stateOpts.S3SecretKey,
+	})
+	return plan, creds, reader, nil
 }
 
 // loadTFEPlan connects to a TFE/HCP instance and assembles the IR
@@ -217,23 +252,23 @@ func loadAtlantisPlan(sourceDir, yamlPath string) (ir.Plan, map[string]writer.Cr
 // the atlantis flow). Future work: read TFE's oauth-client list and
 // surface them in the report so operators know which connections
 // to recreate.
-func loadTFEPlan(ctx context.Context, address, token, org string) (ir.Plan, map[string]writer.Creds, error) {
+func loadTFEPlan(ctx context.Context, address, token, org string) (ir.Plan, map[string]writer.Creds, writer.StateReader, error) {
 	c, err := tfe.NewClient(ctx, tfe.Config{
 		Address: address,
 		Token:   token,
 		OrgName: org,
 	})
 	if err != nil {
-		return ir.Plan{}, nil, err
+		return ir.Plan{}, nil, nil, err
 	}
 
 	workspaces, conns, skipped, err := c.EmitWorkspaces(ctx)
 	if err != nil {
-		return ir.Plan{}, nil, err
+		return ir.Plan{}, nil, nil, err
 	}
 	varSkipped, err := c.AttachVariables(ctx, workspaces)
 	if err != nil {
-		return ir.Plan{}, nil, err
+		return ir.Plan{}, nil, nil, err
 	}
 	skipped = append(skipped, varSkipped...)
 
@@ -257,7 +292,7 @@ func loadTFEPlan(ctx context.Context, address, token, org string) (ir.Plan, map[
 	for _, conn := range conns {
 		creds[conn.SourceID] = credsFromEnv(conn.Provider)
 	}
-	return plan, creds, nil
+	return plan, creds, c.StateReader(), nil
 }
 
 // printReportSummary prints a human-readable summary of the writer's
