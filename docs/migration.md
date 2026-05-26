@@ -188,9 +188,117 @@ substitutions aren't mechanical:
 - `provider "tfe" {}` declarations and `resource "tfe_*" {}` / `data
   "tfe_*" {}` blocks — different attribute shapes.
 
+Module source rewriting is **opt-in** via `--rewrite-modules` on the
+`rewrite` subcommand. Module pins are higher-blast-radius than backend
+blocks (a working `source = "github.com/acme/vpc?ref=v1.0.0"` line is
+easy to break with the wrong substitution) so the operator turns it on
+consciously. When `--rewrite-modules` is set, the rewriter walks every
+`module "..." { source = "..." }` block:
+
+- **TFE-registry form** (`"app.terraform.io/<org>/<name>/<provider>"`)
+  — looks up the matching Terrapod registry entry in the migration
+  state file. If found, rewrites to the Terrapod coord. If missing,
+  **hard error** by default (the operator just asked to rewrite and we
+  can't fulfil it). `--allow-missing-module-mapping` downgrades to a
+  warning.
+- **Git form** (`"git::https://..."`) — looks up the matching `module
+  register` record by git URL. Same hard-error-by-default behaviour.
+- **Public registry form** (`"hashicorp/aws"`) — ignored, never
+  rewritten.
+- **Local path** (`"./modules/vpc"`) — ignored, never rewritten.
+
+The Terrapod registry entries the rewriter looks up are created by
+`apply --source=tfe` (for tarball-based migration of TFE's private
+registry) and by the `module register` subcommand (for VCS-linked
+modules). See "Module migration" below.
+
 `rewrite` defaults to dry-run and prints a unified-diff report; pass
 `--apply` to write files in place. The tool does not run `git` — the
 operator inspects the diff, commits, and pushes via their normal flow.
+
+## Module migration
+
+Modules — like workspaces — are first-class migration targets. The
+tool supports two subtypes:
+
+### Tarball-based (TFE private registry → Terrapod private registry)
+
+Pulls every version of every module from the source TFE org's private
+registry, uploads to Terrapod's two-step module-version + tarball
+upload endpoints. Full version history preserved. Runs automatically
+as part of `apply --source=tfe` — no separate operator action.
+
+Each migrated module gets a record in `migration-state.json` mapping
+old source coordinate (`app.terraform.io/<org>/<name>/<provider>`) to
+new Terrapod coordinate (`<terrapod-host>/default/<name>/<provider>`).
+The `rewrite --rewrite-modules` step later consumes this record.
+
+Providers and GPG signing keys travel with the modules.
+
+### VCS-linked (`terrapod-migrate module register`)
+
+For modules whose sources live in git (rather than in a private TFE
+registry) the migration is a registration, not a tarball copy:
+Terrapod's registry is told to watch the git repo's tag stream and
+will publish versions over time as new tags appear. The operator
+brings their own git URL.
+
+Single module:
+
+```bash
+terrapod-migrate module register \
+   --source-vcs https://github.com/acme/modules-vpc \
+   --name vpc --provider aws --tag-prefix v \
+   --target https://terrapod.acme.com \
+   --apply
+```
+
+Batch via a config file (preferred for ≥10 modules — one source-
+controlled file the team can review):
+
+```bash
+terrapod-migrate module register \
+   --config-file modules.yaml \
+   --target https://terrapod.acme.com \
+   --apply
+```
+
+```yaml
+# modules.yaml
+modules:
+  - source_vcs: https://github.com/acme/modules-vpc
+    name: vpc
+    provider: aws
+    tag_prefix: v
+  - source_vcs: https://github.com/acme/modules-eks
+    name: eks
+    provider: aws
+    tag_prefix: v
+```
+
+Repeated single-shot invocations work too (idempotent thanks to the
+migration state file) — useful for shell loops over an external list
+of modules.
+
+Each registered module gets a record in `migration-state.json` mapping
+git URL → Terrapod coordinate, consumed by `rewrite --rewrite-modules`
+when the operator opts in to rewriting `module "x" { source =
+"git::..." }` references.
+
+### Ordering invariant
+
+Within `apply --source=tfe`, the call order is:
+
+1. VCS connections
+2. Workspaces (settings, vars, varsets)
+3. **Private registry: modules + providers + GPG keys**
+4. State (per workspace)
+5. Run triggers, notifications, agent pools
+
+Registry migration before state because the `rewrite` step (later)
+needs the registry mapping in `migration-state.json` to rewrite
+`source = "..."` lines. The operator runs `rewrite` after `apply`
+completes.
 
 ## Cutover
 
