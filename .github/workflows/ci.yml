@@ -6,6 +6,11 @@ on:
     tags: ['v[0-9]+.[0-9]+.[0-9]+']
   pull_request:
     branches: [main]
+    # Include `ready_for_review` so a PR opened in draft (which suppresses
+    # the default `opened`/`synchronize` events) starts CI when it's
+    # marked ready. Without this, draft-first PRs need a close+reopen to
+    # get any CI run at all — caught while bringing up #371.
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ci-${{ github.ref }}
