@@ -2,6 +2,7 @@ package module_workspace_link
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -22,6 +24,7 @@ var (
 
 type moduleWorkspaceLinkResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
 func NewResource() resource.Resource {
@@ -78,6 +81,13 @@ func (r *moduleWorkspaceLinkResource) Configure(_ context.Context, req resource.
 		return
 	}
 	r.client = c
+
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *moduleWorkspaceLinkResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -87,27 +97,17 @@ func (r *moduleWorkspaceLinkResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	body, err := client.MarshalResource("workspace-links", map[string]any{
-		"workspace_id": plan.WorkspaceID.ValueString(),
-	}, nil)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
-	}
-
-	data, err := r.client.Post(ctx, linksPath(plan.ModuleName.ValueString(), plan.ModuleProvider.ValueString()), body)
+	mwl, err := r.tc.CreateModuleWorkspaceLink(ctx, terrapod.CreateModuleWorkspaceLinkRequest{
+		ModuleName:     plan.ModuleName.ValueString(),
+		ModuleProvider: plan.ModuleProvider.ValueString(),
+		WorkspaceID:    plan.WorkspaceID.ValueString(),
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("Create failed", err.Error())
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	readIntoModel(res, &plan)
+	readMWLFromSDK(mwl, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -118,33 +118,27 @@ func (r *moduleWorkspaceLinkResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	// No individual GET endpoint — list all links and find ours by ID.
-	data, err := r.client.Get(ctx, linksPath(state.ModuleName.ValueString(), state.ModuleProvider.ValueString()))
+	mwl, err := r.tc.GetModuleWorkspaceLink(ctx,
+		state.ModuleName.ValueString(),
+		state.ModuleProvider.ValueString(),
+		state.ID.ValueString(),
+	)
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
 		resp.Diagnostics.AddError("Read failed", err.Error())
 		return
 	}
-
-	resources, err := client.ParseResourceList(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
+	if mwl == nil {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 
-	for i := range resources {
-		if resources[i].ID == state.ID.ValueString() {
-			readIntoModel(&resources[i], &state)
-			resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-			return
-		}
-	}
-
-	// Link no longer exists.
-	resp.State.RemoveResource(ctx)
+	readMWLFromSDK(mwl, &state)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *moduleWorkspaceLinkResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -158,34 +152,34 @@ func (r *moduleWorkspaceLinkResource) Delete(ctx context.Context, req resource.D
 		return
 	}
 
-	deletePath := fmt.Sprintf("%s/%s", linksPath(state.ModuleName.ValueString(), state.ModuleProvider.ValueString()), state.ID.ValueString())
-	err := r.client.Delete(ctx, deletePath)
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete failed", err.Error())
+	err := r.tc.DeleteModuleWorkspaceLink(ctx,
+		state.ModuleName.ValueString(),
+		state.ModuleProvider.ValueString(),
+		state.ID.ValueString(),
+	)
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Delete failed", err.Error())
+		}
 	}
 }
 
 func (r *moduleWorkspaceLinkResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Import ID format: "module_name/provider_name/link_id"
 	parts := strings.SplitN(req.ID, "/", 3)
 	if len(parts) != 3 {
 		resp.Diagnostics.AddError("Invalid import ID", "Expected format: module_name/provider_name/link_id")
 		return
 	}
-
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("module_name"), parts[0])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("module_provider"), parts[1])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[2])...)
 }
 
-func linksPath(name, provider string) string {
-	return fmt.Sprintf("/api/terrapod/v1/registry-modules/private/default/%s/%s/workspace-links", name, provider)
-}
-
-func readIntoModel(res *client.Resource, m *moduleWorkspaceLinkModel) {
-	m.ID = types.StringValue(res.ID)
-	m.WorkspaceID = types.StringValue(client.GetStringAttr(res, "workspace-id"))
-	m.WorkspaceName = types.StringValue(client.GetStringAttr(res, "workspace-name"))
-	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-	m.CreatedBy = types.StringValue(client.GetStringAttr(res, "created-by"))
+func readMWLFromSDK(mwl *terrapod.ModuleWorkspaceLink, m *moduleWorkspaceLinkModel) {
+	m.ID = types.StringValue(mwl.ID)
+	m.WorkspaceID = types.StringValue(mwl.WorkspaceID)
+	m.WorkspaceName = types.StringValue(mwl.WorkspaceName)
+	m.CreatedAt = types.StringValue(mwl.CreatedAt)
+	m.CreatedBy = types.StringValue(mwl.CreatedBy)
 }
