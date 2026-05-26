@@ -11,8 +11,10 @@
 terraform {
   required_providers {
     terrapod = {
-      source  = "mattrobinsonsre/terrapod"
-      version = "~> 0.0"
+      source = "mattrobinsonsre/terrapod"
+      # No version constraint: the smoke runs against a locally-
+      # built binary wired via dev_overrides; the registry version
+      # is irrelevant.
     }
   }
 }
@@ -81,6 +83,7 @@ resource "terrapod_variable_set_workspace" "shared_to_main" {
 resource "terrapod_agent_pool" "main" {
   name        = "provider-${var.smoke_id}"
   description = "Provider smoke pool"
+  owner_email = var.smoke_email
   labels = {
     smoke = var.smoke_id
   }
