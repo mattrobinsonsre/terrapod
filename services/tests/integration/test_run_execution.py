@@ -80,7 +80,12 @@ async def _join_listener(client, pool_id: str, join_token: str, name="test-liste
 async def _create_remote_workspace(
     client, pool_id: str, name: str, auto_apply: bool = False
 ) -> str:
-    """Create an agent-execution workspace tied to a pool, return ws_id."""
+    """Create an agent-execution workspace tied to a pool, return ws_id.
+
+    Also seeds an uploaded CV — non-VCS workspaces need one before runs
+    can be queued (#358), and none of the tests in this file exercise
+    the no-CV 422 path.
+    """
     resp = await client.post(
         WS_ENDPOINT,
         json={
@@ -97,7 +102,27 @@ async def _create_remote_workspace(
         headers=AUTH,
     )
     assert resp.status_code == 201, resp.text
-    return resp.json()["data"]["id"]
+    ws_id = resp.json()["data"]["id"]
+    await _seed_uploaded_cv(client, ws_id)
+    return ws_id
+
+
+async def _seed_uploaded_cv(client, ws_id: str) -> str:
+    """Create + mark-uploaded an empty CV; returns cv_id."""
+    resp = await client.post(
+        f"/api/v2/workspaces/{ws_id}/configuration-versions",
+        json={"data": {"type": "configuration-versions", "attributes": {"auto-queue-runs": False}}},
+        headers=AUTH,
+    )
+    assert resp.status_code == 201, resp.text
+    cv_id = resp.json()["data"]["id"]
+    resp = await client.put(
+        f"/api/v2/configuration-versions/{cv_id}/upload",
+        content=b"placeholder-tarball-for-tests",
+        headers={"Content-Type": "application/x-tar"},
+    )
+    assert resp.status_code in (200, 204), resp.text
+    return cv_id
 
 
 async def _create_run(client, ws_id: str, **attrs) -> dict:

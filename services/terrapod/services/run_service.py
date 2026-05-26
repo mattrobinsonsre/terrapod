@@ -932,6 +932,31 @@ async def mark_configuration_uploaded(
     return cv
 
 
+async def get_latest_uploaded_cv(
+    db: AsyncSession, workspace_id: uuid.UUID
+) -> ConfigurationVersion | None:
+    """Return the most recent fully-uploaded, non-speculative CV for a
+    workspace, or None.
+
+    Used by UI-queued runs on non-VCS workspaces (#358): there's no VCS
+    to auto-fetch from and the CLI is the only producer of CVs, so the
+    last successful CLI upload is the right default for "Queue Plan".
+    Speculative CVs are excluded — they belong to PR/MR speculative runs
+    and don't reflect the workspace's apply-able state.
+    """
+    result = await db.execute(
+        select(ConfigurationVersion)
+        .where(
+            ConfigurationVersion.workspace_id == workspace_id,
+            ConfigurationVersion.status == "uploaded",
+            ConfigurationVersion.speculative.is_(False),
+        )
+        .order_by(ConfigurationVersion.created_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
 async def find_orphaned_runs(
     db: AsyncSession,
     listener_ids: list[uuid.UUID],

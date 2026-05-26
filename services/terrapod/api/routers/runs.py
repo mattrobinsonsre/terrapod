@@ -410,6 +410,22 @@ async def create_run(
     if cv_uuid is None and ws.vcs_connection_id and ws.vcs_repo_url:
         cv_uuid, vcs_sha, vcs_branch = await _fetch_vcs_config(db, ws, ref_override=vcs_ref)
 
+    # Non-VCS workspace, no CV in the request body (e.g. "Queue Plan" from
+    # the UI) — fall back to the latest CLI-uploaded CV. Without this the
+    # run is created with configuration_version_id=NULL and the runner
+    # 404s trying to download the archive (#358). If no upload has ever
+    # succeeded, fail loudly rather than create an unrunnable run.
+    if cv_uuid is None and not ws.vcs_connection_id:
+        latest_cv = await run_service.get_latest_uploaded_cv(db, ws.id)
+        if latest_cv is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Workspace has no uploaded configuration. "
+                "Upload one via 'tofu plan' / 'tofu apply' (CLI), or POST a "
+                "configuration version + tarball before queueing a run.",
+            )
+        cv_uuid = latest_cv.id
+
     run = await run_service.create_run(
         db,
         workspace=ws,

@@ -180,6 +180,88 @@ class TestCreateRun:
             )
         assert resp.status_code == 422
 
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.run_service.get_latest_uploaded_cv")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    async def test_non_vcs_no_cv_uses_latest_uploaded_cv(
+        self, mock_resolve, mock_get_cv, mock_create_run, mock_queue, *mocks
+    ):
+        """#358: UI "Queue Plan" on a non-VCS workspace must default
+        configuration-version to the last successful CLI upload so the
+        runner has something to download. Without this the run is
+        created with cv_id=NULL and the runner 404s on archive fetch."""
+        mock_resolve.return_value = "plan"
+        ws = _mock_workspace()  # vcs_connection_id is None by default
+        cv = MagicMock(id=uuid.uuid4())
+        mock_get_cv.return_value = cv
+        run = _mock_run(ws_id=ws.id, plan_only=True, status="queued")
+        mock_create_run.return_value = run
+        mock_queue.return_value = run
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"plan-only": True},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}", "type": "workspaces"}}
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201
+        mock_get_cv.assert_awaited_once()
+        # create_run was called with the fallback CV id
+        assert mock_create_run.await_args.kwargs["configuration_version_id"] == cv.id
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.get_latest_uploaded_cv")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    async def test_non_vcs_no_cv_no_uploaded_cv_returns_422(
+        self, mock_resolve, mock_get_cv, *mocks
+    ):
+        """#358 counterpart: when no CLI upload has ever succeeded for a
+        non-VCS workspace, queueing a plan must fail loudly with an
+        actionable 422 rather than create an unrunnable run."""
+        mock_resolve.return_value = "plan"
+        ws = _mock_workspace()
+        mock_get_cv.return_value = None
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"plan-only": True},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}", "type": "workspaces"}}
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+        assert "uploaded configuration" in resp.json().get("detail", "").lower()
+
 
 # ── Show Run ───────────────────────────────────────────────────────────
 
