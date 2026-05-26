@@ -1,8 +1,11 @@
 module github.com/mattrobinsonsre/terrapod/provider
 
-go 1.24.0
+go 1.26
 
-require github.com/hashicorp/terraform-plugin-framework v1.13.0
+require (
+	github.com/hashicorp/terraform-plugin-framework v1.13.0
+	github.com/mattrobinsonsre/terrapod/go-terrapod v0.0.0-00010101000000-000000000000
+)
 
 require (
 	github.com/fatih/color v1.18.0 // indirect
@@ -28,3 +31,5 @@ require (
 	google.golang.org/grpc v1.79.3 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 )
+
+replace github.com/mattrobinsonsre/terrapod/go-terrapod => ../go-terrapod

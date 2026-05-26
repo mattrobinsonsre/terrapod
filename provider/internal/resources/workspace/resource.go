@@ -3,6 +3,7 @@ package workspace
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -19,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -27,8 +29,15 @@ var (
 	_ resource.ResourceWithImportState = &workspaceResource{}
 )
 
+// workspaceResource holds two clients during the provider's migration to
+// go-terrapod (#347). Workspace CRUD uses the new typed methods on `tc`;
+// the remote-state-consumers helpers below still use `client` because
+// they live outside the workspaces resource and migrate in a later pass
+// alongside the standalone terrapod_remote_state_consumer resource. Once
+// both have migrated, the `client` field disappears.
 type workspaceResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
 // NewResource returns a new workspace resource.
@@ -222,6 +231,22 @@ func (r *workspaceResource) Configure(_ context.Context, req resource.ConfigureR
 		return
 	}
 	r.client = c
+
+	// Build the go-terrapod client from the same BaseURL+Token. Both
+	// clients share the operator's auth + endpoint configuration; only
+	// the call shapes differ. SkipTLSVerify is captured indirectly via
+	// the shared HTTPClient when the provider was configured with it
+	// — we re-derive here so go-terrapod's defaults (TLS 1.3 minimum)
+	// apply consistently with the rest of the SDK consumers.
+	tc, err := terrapod.NewClient(terrapod.Options{
+		BaseURL: c.BaseURL,
+		Token:   c.Token,
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *workspaceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -231,28 +256,19 @@ func (r *workspaceResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	attrs := buildWorkspaceAttrs(&plan)
-	rels := buildWorkspaceRels(&plan)
-
-	body, err := client.MarshalResource("workspaces", attrs, rels)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal request", err.Error())
+	createReq, dgs := buildCreateWorkspaceRequest(ctx, &plan)
+	resp.Diagnostics.Append(dgs...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	data, err := r.client.Post(ctx, "/api/v2/organizations/default/workspaces", body)
+	ws, err := r.tc.CreateWorkspace(ctx, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create workspace", err.Error())
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(readResourceIntoModel(ctx, res, &plan)...)
+	resp.Diagnostics.Append(readWorkspaceIntoModel(ctx, ws, &plan)...)
 
 	// Apply the consumer set from plan (if managed here), then refresh
 	// the attribute from the server (#344, #348). Null in plan ⇒
@@ -275,9 +291,10 @@ func (r *workspaceResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/v2/workspaces/"+state.ID.ValueString())
+	ws, err := r.tc.GetWorkspace(ctx, state.ID.ValueString())
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -285,13 +302,7 @@ func (r *workspaceResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(readResourceIntoModel(ctx, res, &state)...)
+	resp.Diagnostics.Append(readWorkspaceIntoModel(ctx, ws, &state)...)
 
 	// Refresh the consumer set from server (#344, #348). Always read,
 	// even when the user manages this via standalone resources — the
@@ -317,27 +328,19 @@ func (r *workspaceResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	attrs := buildWorkspaceAttrs(&plan)
-	rels := buildWorkspaceRels(&plan)
-	body, err := client.MarshalResourceWithIDAndRels(state.ID.ValueString(), "workspaces", attrs, rels)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal request", err.Error())
+	updateReq, dgs := buildUpdateWorkspaceRequest(ctx, &plan)
+	resp.Diagnostics.Append(dgs...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	data, err := r.client.Patch(ctx, "/api/v2/workspaces/"+state.ID.ValueString(), body)
+	ws, err := r.tc.UpdateWorkspace(ctx, state.ID.ValueString(), updateReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update workspace", err.Error())
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(readResourceIntoModel(ctx, res, &plan)...)
+	resp.Diagnostics.Append(readWorkspaceIntoModel(ctx, ws, &plan)...)
 
 	// Apply the consumer set from plan if managed here, then refresh.
 	// Same null = unmanaged convention as Create (#344, #348).
@@ -359,35 +362,278 @@ func (r *workspaceResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	// Workspace delete lives on the Terrapod-native prefix (it isn't a
-	// CLI-consumed surface; the v2 alias was removed in #278). Calling
-	// /api/v2/workspaces/{id} returns 405 — see #353.
-	err := r.client.Delete(ctx, "/api/terrapod/v1/workspaces/"+state.ID.ValueString())
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Failed to delete workspace", err.Error())
+	// go-terrapod handles the Terrapod-native path (/api/terrapod/v1/
+	// rather than /api/v2/, which returns 405 — see #353). The 404-on-
+	// idempotent-delete is unwrapped to match the original behaviour.
+	err := r.tc.DeleteWorkspace(ctx, state.ID.ValueString())
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Failed to delete workspace", err.Error())
+		}
 	}
 }
 
 func (r *workspaceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Import by workspace name — resolve to ID via the by-name endpoint.
-	name := req.ID
-
-	data, err := r.client.Get(ctx, "/api/v2/organizations/default/workspaces/"+name)
+	// Import by workspace name — resolve to ID via go-terrapod's
+	// GetWorkspaceByName. Terraform then calls Read with the resolved
+	// id to populate the rest of the state.
+	ws, err := r.tc.GetWorkspaceByName(ctx, req.ID)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to import workspace", fmt.Sprintf("Could not find workspace %q: %s", name, err))
+		resp.Diagnostics.AddError("Failed to import workspace", fmt.Sprintf("Could not find workspace %q: %s", req.ID, err))
 		return
 	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), ws.ID)...)
+}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
+// buildCreateWorkspaceRequest translates a Terraform plan into the
+// go-terrapod CreateWorkspaceRequest. Optional fields the operator
+// didn't set (IsNull / IsUnknown) stay zero-valued in the struct so
+// the SDK omits them from the JSON:API attributes — matching the
+// previous map-based behaviour where only set keys were sent.
+func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrapod.CreateWorkspaceRequest, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	req := terrapod.CreateWorkspaceRequest{Name: m.Name.ValueString()}
+
+	if !m.ExecutionMode.IsNull() && !m.ExecutionMode.IsUnknown() {
+		req.ExecutionMode = m.ExecutionMode.ValueString()
+	}
+	if !m.AutoApply.IsNull() && !m.AutoApply.IsUnknown() {
+		v := m.AutoApply.ValueBool()
+		req.AutoApply = &v
+	}
+	if !m.ExecutionBackend.IsNull() && !m.ExecutionBackend.IsUnknown() {
+		req.ExecutionBackend = m.ExecutionBackend.ValueString()
+	}
+	if !m.TerraformVersion.IsNull() && !m.TerraformVersion.IsUnknown() {
+		req.TerraformVersion = m.TerraformVersion.ValueString()
+	}
+	if !m.WorkingDirectory.IsNull() && !m.WorkingDirectory.IsUnknown() {
+		req.WorkingDirectory = m.WorkingDirectory.ValueString()
+	}
+	if !m.ResourceCPU.IsNull() && !m.ResourceCPU.IsUnknown() {
+		req.ResourceCPU = m.ResourceCPU.ValueString()
+	}
+	if !m.ResourceMemory.IsNull() && !m.ResourceMemory.IsUnknown() {
+		req.ResourceMemory = m.ResourceMemory.ValueString()
+	}
+	if !m.VCSRepoURL.IsNull() {
+		req.VCSRepoURL = m.VCSRepoURL.ValueString()
+	}
+	if !m.VCSBranch.IsNull() {
+		req.VCSBranch = m.VCSBranch.ValueString()
+	}
+	if !m.VCSWorkflow.IsNull() && !m.VCSWorkflow.IsUnknown() {
+		req.VCSWorkflow = m.VCSWorkflow.ValueString()
+	}
+	if !m.AutoMerge.IsNull() && !m.AutoMerge.IsUnknown() {
+		v := m.AutoMerge.ValueBool()
+		req.AutoMerge = &v
+	}
+	if !m.AutoMergeStrategy.IsNull() && !m.AutoMergeStrategy.IsUnknown() {
+		req.AutoMergeStrategy = m.AutoMergeStrategy.ValueString()
+	}
+	if !m.VCSConnectionID.IsNull() && !m.VCSConnectionID.IsUnknown() {
+		req.VCSConnectionID = m.VCSConnectionID.ValueString()
+	}
+	if !m.AgentPoolID.IsNull() {
+		req.AgentPoolID = m.AgentPoolID.ValueString()
+	}
+	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
+		labels := map[string]string{}
+		for k, v := range m.Labels.Elements() {
+			labels[k] = v.(types.String).ValueString()
+		}
+		req.Labels = labels
+	}
+	if !m.VarFiles.IsNull() && !m.VarFiles.IsUnknown() {
+		varFiles := []string{}
+		for _, v := range m.VarFiles.Elements() {
+			varFiles = append(varFiles, v.(types.String).ValueString())
+		}
+		req.VarFiles = varFiles
+	}
+	if !m.DriftDetectionEnabled.IsNull() && !m.DriftDetectionEnabled.IsUnknown() {
+		v := m.DriftDetectionEnabled.ValueBool()
+		req.DriftDetectionEnabled = &v
+	}
+	if !m.DriftDetectionIntervalSeconds.IsNull() && !m.DriftDetectionIntervalSeconds.IsUnknown() {
+		v := m.DriftDetectionIntervalSeconds.ValueInt64()
+		req.DriftDetectionIntervalSeconds = &v
+	}
+	return req, diags
+}
+
+// buildUpdateWorkspaceRequest is the partial-update counterpart to
+// buildCreateWorkspaceRequest. Same translation logic minus the Name
+// field (immutable post-create).
+func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrapod.UpdateWorkspaceRequest, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	req := terrapod.UpdateWorkspaceRequest{}
+
+	if !m.ExecutionMode.IsNull() && !m.ExecutionMode.IsUnknown() {
+		req.ExecutionMode = m.ExecutionMode.ValueString()
+	}
+	if !m.AutoApply.IsNull() && !m.AutoApply.IsUnknown() {
+		v := m.AutoApply.ValueBool()
+		req.AutoApply = &v
+	}
+	if !m.ExecutionBackend.IsNull() && !m.ExecutionBackend.IsUnknown() {
+		req.ExecutionBackend = m.ExecutionBackend.ValueString()
+	}
+	if !m.TerraformVersion.IsNull() && !m.TerraformVersion.IsUnknown() {
+		req.TerraformVersion = m.TerraformVersion.ValueString()
+	}
+	if !m.WorkingDirectory.IsNull() && !m.WorkingDirectory.IsUnknown() {
+		req.WorkingDirectory = m.WorkingDirectory.ValueString()
+	}
+	if !m.ResourceCPU.IsNull() && !m.ResourceCPU.IsUnknown() {
+		req.ResourceCPU = m.ResourceCPU.ValueString()
+	}
+	if !m.ResourceMemory.IsNull() && !m.ResourceMemory.IsUnknown() {
+		req.ResourceMemory = m.ResourceMemory.ValueString()
+	}
+	if !m.VCSRepoURL.IsNull() {
+		req.VCSRepoURL = m.VCSRepoURL.ValueString()
+	}
+	if !m.VCSBranch.IsNull() {
+		req.VCSBranch = m.VCSBranch.ValueString()
+	}
+	if !m.VCSWorkflow.IsNull() && !m.VCSWorkflow.IsUnknown() {
+		req.VCSWorkflow = m.VCSWorkflow.ValueString()
+	}
+	if !m.AutoMerge.IsNull() && !m.AutoMerge.IsUnknown() {
+		v := m.AutoMerge.ValueBool()
+		req.AutoMerge = &v
+	}
+	if !m.AutoMergeStrategy.IsNull() && !m.AutoMergeStrategy.IsUnknown() {
+		req.AutoMergeStrategy = m.AutoMergeStrategy.ValueString()
+	}
+	if !m.VCSConnectionID.IsNull() && !m.VCSConnectionID.IsUnknown() {
+		req.VCSConnectionID = m.VCSConnectionID.ValueString()
+	}
+	if !m.AgentPoolID.IsNull() {
+		req.AgentPoolID = m.AgentPoolID.ValueString()
+	}
+	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
+		labels := map[string]string{}
+		for k, v := range m.Labels.Elements() {
+			labels[k] = v.(types.String).ValueString()
+		}
+		req.Labels = labels
+	}
+	if !m.VarFiles.IsNull() && !m.VarFiles.IsUnknown() {
+		varFiles := []string{}
+		for _, v := range m.VarFiles.Elements() {
+			varFiles = append(varFiles, v.(types.String).ValueString())
+		}
+		req.VarFiles = varFiles
+	}
+	if !m.DriftDetectionEnabled.IsNull() && !m.DriftDetectionEnabled.IsUnknown() {
+		v := m.DriftDetectionEnabled.ValueBool()
+		req.DriftDetectionEnabled = &v
+	}
+	if !m.DriftDetectionIntervalSeconds.IsNull() && !m.DriftDetectionIntervalSeconds.IsUnknown() {
+		v := m.DriftDetectionIntervalSeconds.ValueInt64()
+		req.DriftDetectionIntervalSeconds = &v
+	}
+	return req, diags
+}
+
+// readWorkspaceIntoModel populates the Terraform model from a typed
+// go-terrapod Workspace. Replaces the previous Resource/Attribute-map
+// based readResourceIntoModel — the SDK does the JSON:API parsing now.
+func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *workspaceModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	m.ID = types.StringValue(ws.ID)
+	m.Name = types.StringValue(ws.Name)
+	m.ExecutionMode = types.StringValue(ws.ExecutionMode)
+	m.AutoApply = types.BoolValue(ws.AutoApply)
+	m.ExecutionBackend = types.StringValue(ws.ExecutionBackend)
+	m.WorkingDirectory = types.StringValue(ws.WorkingDirectory)
+	m.ResourceCPU = types.StringValue(ws.ResourceCPU)
+	m.ResourceMemory = types.StringValue(ws.ResourceMemory)
+	m.VCSWorkflow = types.StringValue(ws.VCSWorkflow)
+	m.AutoMerge = types.BoolValue(ws.AutoMerge)
+	m.AutoMergeStrategy = types.StringValue(ws.AutoMergeStrategy)
+	m.OwnerEmail = types.StringValue(ws.OwnerEmail)
+	m.Locked = types.BoolValue(ws.Locked)
+	m.CreatedAt = types.StringValue(ws.CreatedAt)
+	m.UpdatedAt = types.StringValue(ws.UpdatedAt)
+
+	// Nullable string fields — empty string from the SDK means absent
+	// on the server; Terraform null preserves "computed-default" UX.
+	if ws.TerraformVersion != "" {
+		m.TerraformVersion = types.StringValue(ws.TerraformVersion)
+	} else {
+		m.TerraformVersion = types.StringNull()
+	}
+	if ws.VCSRepoURL != "" {
+		m.VCSRepoURL = types.StringValue(ws.VCSRepoURL)
+	} else {
+		m.VCSRepoURL = types.StringNull()
+	}
+	if ws.VCSBranch != "" {
+		m.VCSBranch = types.StringValue(ws.VCSBranch)
+	} else {
+		m.VCSBranch = types.StringNull()
+	}
+	if ws.AgentPoolID != "" {
+		m.AgentPoolID = types.StringValue(ws.AgentPoolID)
+	} else {
+		m.AgentPoolID = types.StringNull()
+	}
+	if ws.VCSConnectionID != "" {
+		m.VCSConnectionID = types.StringValue(ws.VCSConnectionID)
+	} else {
+		m.VCSConnectionID = types.StringNull()
 	}
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), res.ID)...)
+	// Drift detection
+	m.DriftDetectionEnabled = types.BoolValue(ws.DriftDetectionEnabled)
+	if ws.DriftDetectionIntervalSeconds != nil && *ws.DriftDetectionIntervalSeconds > 0 {
+		m.DriftDetectionIntervalSeconds = types.Int64Value(*ws.DriftDetectionIntervalSeconds)
+	} else {
+		m.DriftDetectionIntervalSeconds = types.Int64Null()
+	}
+	if ws.DriftStatus != "" {
+		m.DriftStatus = types.StringValue(ws.DriftStatus)
+	} else {
+		m.DriftStatus = types.StringNull()
+	}
+	if ws.DriftLastCheckedAt != "" {
+		m.DriftLastCheckedAt = types.StringValue(ws.DriftLastCheckedAt)
+	} else {
+		m.DriftLastCheckedAt = types.StringNull()
+	}
+
+	// Var files
+	if len(ws.VarFiles) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, ws.VarFiles)
+		diags.Append(d...)
+		m.VarFiles = val
+	} else {
+		m.VarFiles = types.ListNull(types.StringType)
+	}
+
+	// Labels
+	if len(ws.Labels) > 0 {
+		val, d := types.MapValueFrom(ctx, types.StringType, ws.Labels)
+		diags.Append(d...)
+		m.Labels = val
+	} else {
+		m.Labels = types.MapNull(types.StringType)
+	}
+	return diags
 }
 
 // buildWorkspaceAttrs converts the Terraform model into JSON:API attributes.
+//
+// DEPRECATED — kept for the ImportState path which still uses the raw
+// client until the read-by-name path lands on go-terrapod. Will be
+// deleted alongside the rest of provider/internal/client/ once every
+// resource has migrated.
 func buildWorkspaceAttrs(m *workspaceModel) map[string]any {
 	attrs := map[string]any{
 		"name": m.Name.ValueString(),
