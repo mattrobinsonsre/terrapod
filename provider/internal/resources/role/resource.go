@@ -8,35 +8,15 @@
 //	Read:    GET    /api/terrapod/v1/roles/{name}
 //	Update:  PATCH  /api/terrapod/v1/roles/{name}
 //	Delete:  DELETE /api/terrapod/v1/roles/{name}
-//	List:    GET    /api/terrapod/v1/roles
 //
-// The API uses the role name as the resource identifier — there is no
-// UUID or prefixed ID. The "name" field in the JSON:API response sits
-// at the top level alongside "type", not inside "attributes".
-//
-// Attribute mapping (JSON:API attribute → Terraform schema attribute):
-//
-//	(top-level "name")              → name                 (string, required, forces new — used as ID)
-//	"description"                   → description          (string, optional)
-//	"allow-labels"                  → allow_labels         (map[string]string, optional)
-//	"allow-names"                   → allow_names          (list of strings, optional)
-//	"deny-labels"                   → deny_labels          (map[string]string, optional)
-//	"deny-names"                    → deny_names           (list of strings, optional)
-//	"workspace-permission"          → workspace_permission (string, required: read/plan/write/admin)
-//	"pool-permission"               → pool_permission      (string, optional: read/write/admin, default "read")
-//
-// Read-only attributes:
-//
-//	"built-in"   → built_in    (bool,   computed)
-//	"created-at" → created_at  (string, computed)
-//	"updated-at" → updated_at  (string, computed)
-//
-// Import: by role name.
+// Migrated to go-terrapod (#347). Roles use "name" at the data
+// envelope level instead of "id" — the SDK absorbs that quirk so the
+// provider doesn't need a custom marshaller.
 package role
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -48,6 +28,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -56,11 +37,9 @@ var (
 	_ resource.ResourceWithImportState = &roleResource{}
 )
 
-// roleModel maps the Terraform schema to Go types.
 type roleModel struct {
 	ID types.String `tfsdk:"id"`
 
-	// Writable attributes
 	Name                types.String `tfsdk:"name"`
 	Description         types.String `tfsdk:"description"`
 	AllowLabels         types.Map    `tfsdk:"allow_labels"`
@@ -70,7 +49,6 @@ type roleModel struct {
 	WorkspacePermission types.String `tfsdk:"workspace_permission"`
 	PoolPermission      types.String `tfsdk:"pool_permission"`
 
-	// Read-only attributes
 	BuiltIn   types.Bool   `tfsdk:"built_in"`
 	CreatedAt types.String `tfsdk:"created_at"`
 	UpdatedAt types.String `tfsdk:"updated_at"`
@@ -78,9 +56,9 @@ type roleModel struct {
 
 type roleResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
-// NewResource returns a new role resource.
 func NewResource() resource.Resource {
 	return &roleResource{}
 }
@@ -144,7 +122,6 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 
-			// Read-only
 			"built_in": schema.BoolAttribute{
 				Description: "Whether this is a built-in role.",
 				Computed:    true,
@@ -177,6 +154,13 @@ func (r *roleResource) Configure(_ context.Context, req resource.ConfigureReques
 		return
 	}
 	r.client = c
+
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -186,28 +170,13 @@ func (r *roleResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	attrs := buildRoleAttrs(&plan)
-
-	// The roles API expects "name" at the data level, not inside attributes.
-	body, err := marshalRoleRequest(plan.Name.ValueString(), attrs)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
-	}
-
-	data, err := r.client.Post(ctx, "/api/terrapod/v1/roles", body)
+	role, err := r.tc.CreateRole(ctx, buildCreateRoleRequest(&plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create role", err.Error())
 		return
 	}
 
-	res, err := parseRoleResponse(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(readRoleIntoModel(ctx, res, &plan)...)
+	resp.Diagnostics.Append(readRoleFromSDK(ctx, role, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -218,9 +187,10 @@ func (r *roleResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/terrapod/v1/roles/"+state.ID.ValueString())
+	role, err := r.tc.GetRole(ctx, state.ID.ValueString())
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -228,13 +198,7 @@ func (r *roleResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	res, err := parseRoleResponse(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(readRoleIntoModel(ctx, res, &state)...)
+	resp.Diagnostics.Append(readRoleFromSDK(ctx, role, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -251,26 +215,13 @@ func (r *roleResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	attrs := buildRoleAttrs(&plan)
-	body, err := marshalRoleRequest(state.ID.ValueString(), attrs)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
-	}
-
-	data, err := r.client.Patch(ctx, "/api/terrapod/v1/roles/"+state.ID.ValueString(), body)
+	role, err := r.tc.UpdateRole(ctx, state.ID.ValueString(), buildUpdateRoleRequest(&plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update role", err.Error())
 		return
 	}
 
-	res, err := parseRoleResponse(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(readRoleIntoModel(ctx, res, &plan)...)
+	resp.Diagnostics.Append(readRoleFromSDK(ctx, role, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -281,200 +232,123 @@ func (r *roleResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/terrapod/v1/roles/"+state.ID.ValueString())
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Failed to delete role", err.Error())
+	err := r.tc.DeleteRole(ctx, state.ID.ValueString())
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Failed to delete role", err.Error())
+		}
 	}
 }
 
 func (r *roleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Import by role name — the name IS the ID.
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 }
 
-// buildRoleAttrs converts the Terraform model into JSON:API attributes.
-func buildRoleAttrs(m *roleModel) map[string]any {
-	attrs := map[string]any{
-		"workspace-permission": m.WorkspacePermission.ValueString(),
+func buildCreateRoleRequest(m *roleModel) terrapod.CreateRoleRequest {
+	req := terrapod.CreateRoleRequest{
+		Name:                m.Name.ValueString(),
+		WorkspacePermission: m.WorkspacePermission.ValueString(),
 	}
-
 	if !m.PoolPermission.IsNull() && !m.PoolPermission.IsUnknown() {
-		attrs["pool-permission"] = m.PoolPermission.ValueString()
+		req.PoolPermission = m.PoolPermission.ValueString()
 	}
-
 	if !m.Description.IsNull() {
-		attrs["description"] = m.Description.ValueString()
+		req.Description = m.Description.ValueString()
 	}
-
 	if !m.AllowLabels.IsNull() && !m.AllowLabels.IsUnknown() {
-		labels := map[string]string{}
-		for k, v := range m.AllowLabels.Elements() {
-			labels[k] = v.(types.String).ValueString()
-		}
-		attrs["allow-labels"] = labels
-	} else {
-		attrs["allow-labels"] = map[string]string{}
+		req.AllowLabels = mapFromTFMap(m.AllowLabels)
 	}
-
 	if !m.AllowNames.IsNull() && !m.AllowNames.IsUnknown() {
-		names := make([]string, 0, len(m.AllowNames.Elements()))
-		for _, v := range m.AllowNames.Elements() {
-			names = append(names, v.(types.String).ValueString())
-		}
-		attrs["allow-names"] = names
-	} else {
-		attrs["allow-names"] = []string{}
+		req.AllowNames = sliceFromTFList(m.AllowNames)
 	}
-
 	if !m.DenyLabels.IsNull() && !m.DenyLabels.IsUnknown() {
-		labels := map[string]string{}
-		for k, v := range m.DenyLabels.Elements() {
-			labels[k] = v.(types.String).ValueString()
-		}
-		attrs["deny-labels"] = labels
-	} else {
-		attrs["deny-labels"] = map[string]string{}
+		req.DenyLabels = mapFromTFMap(m.DenyLabels)
 	}
-
 	if !m.DenyNames.IsNull() && !m.DenyNames.IsUnknown() {
-		names := make([]string, 0, len(m.DenyNames.Elements()))
-		for _, v := range m.DenyNames.Elements() {
-			names = append(names, v.(types.String).ValueString())
-		}
-		attrs["deny-names"] = names
-	} else {
-		attrs["deny-names"] = []string{}
+		req.DenyNames = sliceFromTFList(m.DenyNames)
 	}
-
-	return attrs
+	return req
 }
 
-// marshalRoleRequest builds the JSON body for role create/update.
-// The roles API expects "name" at the data level (not "id").
-func marshalRoleRequest(name string, attributes map[string]any) ([]byte, error) {
-	body := map[string]any{
-		"data": map[string]any{
-			"name":       name,
-			"type":       "roles",
-			"attributes": attributes,
-		},
+// buildUpdateRoleRequest — Terraform always passes every attribute on
+// Update (plan diff is the framework's job), so every present field
+// becomes a pointer. Null/unknown attributes leave the underlying
+// pointer nil so the SDK omits them from the PATCH body.
+func buildUpdateRoleRequest(m *roleModel) terrapod.UpdateRoleRequest {
+	req := terrapod.UpdateRoleRequest{
+		WorkspacePermission: m.WorkspacePermission.ValueString(),
 	}
-	return json.Marshal(body)
+	if !m.PoolPermission.IsNull() && !m.PoolPermission.IsUnknown() {
+		req.PoolPermission = m.PoolPermission.ValueString()
+	}
+	if !m.Description.IsNull() && !m.Description.IsUnknown() {
+		d := m.Description.ValueString()
+		req.Description = &d
+	}
+	// Allow/deny — null on the model ⇒ empty pointer (clear); set ⇒
+	// pointer to the materialised value. This matches the old
+	// behaviour where the resource always wrote allow/deny to the API
+	// (omitting allow_labels in HCL cleared them on the server).
+	allowLabels := mapFromTFMapOrEmpty(m.AllowLabels)
+	req.AllowLabels = &allowLabels
+	allowNames := sliceFromTFListOrEmpty(m.AllowNames)
+	req.AllowNames = &allowNames
+	denyLabels := mapFromTFMapOrEmpty(m.DenyLabels)
+	req.DenyLabels = &denyLabels
+	denyNames := sliceFromTFListOrEmpty(m.DenyNames)
+	req.DenyNames = &denyNames
+	return req
 }
 
-// roleResponseData holds the parsed role response. The roles API returns
-// "name" at the top level of the data object instead of "id".
-type roleResponseData struct {
-	Name       string
-	Attributes map[string]any
-}
-
-// parseRoleResponse extracts a role from a JSON:API response.
-// The roles API uses "name" as the identifier, not "id".
-func parseRoleResponse(data []byte) (*roleResponseData, error) {
-	var doc struct {
-		Data struct {
-			Name       string         `json:"name"`
-			Type       string         `json:"type"`
-			Attributes map[string]any `json:"attributes"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(data, &doc); err != nil {
-		return nil, err
-	}
-	return &roleResponseData{
-		Name:       doc.Data.Name,
-		Attributes: doc.Data.Attributes,
-	}, nil
-}
-
-// readRoleIntoModel populates the Terraform model from a parsed role response.
-func readRoleIntoModel(ctx context.Context, res *roleResponseData, m *roleModel) diag.Diagnostics {
+func readRoleFromSDK(ctx context.Context, role *terrapod.Role, m *roleModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	m.ID = types.StringValue(res.Name)
-	m.Name = types.StringValue(res.Name)
+	m.ID = types.StringValue(role.Name)
+	m.Name = types.StringValue(role.Name)
 
-	m.WorkspacePermission = types.StringValue(getStringFromMap(res.Attributes, "workspace-permission"))
-	if v := getStringFromMap(res.Attributes, "pool-permission"); v != "" {
-		m.PoolPermission = types.StringValue(v)
+	m.WorkspacePermission = types.StringValue(role.WorkspacePermission)
+	if role.PoolPermission != "" {
+		m.PoolPermission = types.StringValue(role.PoolPermission)
 	} else {
 		m.PoolPermission = types.StringValue("read")
 	}
-	m.BuiltIn = types.BoolValue(getBoolFromMap(res.Attributes, "built-in"))
-	m.CreatedAt = types.StringValue(getStringFromMap(res.Attributes, "created-at"))
-	m.UpdatedAt = types.StringValue(getStringFromMap(res.Attributes, "updated-at"))
 
-	if v := getStringFromMap(res.Attributes, "description"); v != "" {
-		m.Description = types.StringValue(v)
+	m.BuiltIn = types.BoolValue(role.BuiltIn)
+	m.CreatedAt = types.StringValue(role.CreatedAt)
+	m.UpdatedAt = types.StringValue(role.UpdatedAt)
+
+	if role.Description != "" {
+		m.Description = types.StringValue(role.Description)
 	} else {
 		m.Description = types.StringNull()
 	}
 
-	// Allow labels
-	if raw, ok := res.Attributes["allow-labels"]; ok && raw != nil {
-		if labels, ok := raw.(map[string]any); ok && len(labels) > 0 {
-			strLabels := make(map[string]string, len(labels))
-			for k, v := range labels {
-				strLabels[k] = fmt.Sprintf("%v", v)
-			}
-			val, d := types.MapValueFrom(ctx, types.StringType, strLabels)
-			diags.Append(d...)
-			m.AllowLabels = val
-		} else {
-			m.AllowLabels = types.MapNull(types.StringType)
-		}
+	if len(role.AllowLabels) > 0 {
+		val, d := types.MapValueFrom(ctx, types.StringType, role.AllowLabels)
+		diags.Append(d...)
+		m.AllowLabels = val
 	} else {
 		m.AllowLabels = types.MapNull(types.StringType)
 	}
-
-	// Allow names
-	if raw, ok := res.Attributes["allow-names"]; ok && raw != nil {
-		if names, ok := raw.([]any); ok && len(names) > 0 {
-			strNames := make([]string, 0, len(names))
-			for _, v := range names {
-				strNames = append(strNames, fmt.Sprintf("%v", v))
-			}
-			val, d := types.ListValueFrom(ctx, types.StringType, strNames)
-			diags.Append(d...)
-			m.AllowNames = val
-		} else {
-			m.AllowNames = types.ListNull(types.StringType)
-		}
+	if len(role.AllowNames) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, role.AllowNames)
+		diags.Append(d...)
+		m.AllowNames = val
 	} else {
 		m.AllowNames = types.ListNull(types.StringType)
 	}
-
-	// Deny labels
-	if raw, ok := res.Attributes["deny-labels"]; ok && raw != nil {
-		if labels, ok := raw.(map[string]any); ok && len(labels) > 0 {
-			strLabels := make(map[string]string, len(labels))
-			for k, v := range labels {
-				strLabels[k] = fmt.Sprintf("%v", v)
-			}
-			val, d := types.MapValueFrom(ctx, types.StringType, strLabels)
-			diags.Append(d...)
-			m.DenyLabels = val
-		} else {
-			m.DenyLabels = types.MapNull(types.StringType)
-		}
+	if len(role.DenyLabels) > 0 {
+		val, d := types.MapValueFrom(ctx, types.StringType, role.DenyLabels)
+		diags.Append(d...)
+		m.DenyLabels = val
 	} else {
 		m.DenyLabels = types.MapNull(types.StringType)
 	}
-
-	// Deny names
-	if raw, ok := res.Attributes["deny-names"]; ok && raw != nil {
-		if names, ok := raw.([]any); ok && len(names) > 0 {
-			strNames := make([]string, 0, len(names))
-			for _, v := range names {
-				strNames = append(strNames, fmt.Sprintf("%v", v))
-			}
-			val, d := types.ListValueFrom(ctx, types.StringType, strNames)
-			diags.Append(d...)
-			m.DenyNames = val
-		} else {
-			m.DenyNames = types.ListNull(types.StringType)
-		}
+	if len(role.DenyNames) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, role.DenyNames)
+		diags.Append(d...)
+		m.DenyNames = val
 	} else {
 		m.DenyNames = types.ListNull(types.StringType)
 	}
@@ -482,28 +356,37 @@ func readRoleIntoModel(ctx context.Context, res *roleResponseData, m *roleModel)
 	return diags
 }
 
-// getStringFromMap reads a string value from a map[string]any.
-func getStringFromMap(m map[string]any, key string) string {
-	v, ok := m[key]
-	if !ok || v == nil {
-		return ""
+// mapFromTFMap projects a Terraform Map into a Go map[string]string.
+// Caller is responsible for guarding against IsNull/IsUnknown.
+func mapFromTFMap(m types.Map) map[string]string {
+	out := map[string]string{}
+	for k, v := range m.Elements() {
+		out[k] = v.(types.String).ValueString()
 	}
-	s, ok := v.(string)
-	if !ok {
-		return fmt.Sprintf("%v", v)
-	}
-	return s
+	return out
 }
 
-// getBoolFromMap reads a bool value from a map[string]any.
-func getBoolFromMap(m map[string]any, key string) bool {
-	v, ok := m[key]
-	if !ok || v == nil {
-		return false
+// mapFromTFMapOrEmpty returns the projected map or an empty map when
+// the Terraform Map is null/unknown. Used by Update where "no labels
+// in HCL" means "clear labels on the server".
+func mapFromTFMapOrEmpty(m types.Map) map[string]string {
+	if m.IsNull() || m.IsUnknown() {
+		return map[string]string{}
 	}
-	b, ok := v.(bool)
-	if !ok {
-		return false
+	return mapFromTFMap(m)
+}
+
+func sliceFromTFList(l types.List) []string {
+	out := make([]string, 0, len(l.Elements()))
+	for _, v := range l.Elements() {
+		out = append(out, v.(types.String).ValueString())
 	}
-	return b
+	return out
+}
+
+func sliceFromTFListOrEmpty(l types.List) []string {
+	if l.IsNull() || l.IsUnknown() {
+		return []string{}
+	}
+	return sliceFromTFList(l)
 }
