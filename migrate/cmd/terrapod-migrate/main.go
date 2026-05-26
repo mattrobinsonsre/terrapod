@@ -33,8 +33,13 @@ func main() {
 		printUsage()
 		os.Exit(2)
 	}
+	rest := os.Args[2:]
 	switch os.Args[1] {
-	case "apply", "rewrite", "verify", "status":
+	case "apply":
+		os.Exit(applyCmd(rest))
+	case "status":
+		os.Exit(statusCmd(rest))
+	case "rewrite", "verify":
 		fmt.Fprintf(os.Stderr, "%s: subcommand not yet implemented (placeholder; coming in subsequent increments)\n", os.Args[1])
 		os.Exit(1)
 	case "version", "-v", "--version":
