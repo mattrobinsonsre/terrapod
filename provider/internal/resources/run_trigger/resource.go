@@ -2,6 +2,7 @@ package run_trigger
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -10,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -17,6 +19,7 @@ var _ resource.Resource = &runTriggerResource{}
 
 type runTriggerResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
 func NewResource() resource.Resource {
@@ -69,6 +72,13 @@ func (r *runTriggerResource) Configure(_ context.Context, req resource.Configure
 		return
 	}
 	r.client = c
+
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *runTriggerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -78,34 +88,16 @@ func (r *runTriggerResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	rels := map[string]any{
-		"sourceable": map[string]any{
-			"data": map[string]any{
-				"id":   plan.SourceWorkspaceID.ValueString(),
-				"type": "workspaces",
-			},
-		},
-	}
-
-	body, err := client.MarshalResource("run-triggers", map[string]any{}, rels)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
-	}
-
-	data, err := r.client.Post(ctx, fmt.Sprintf("/api/terrapod/v1/workspaces/%s/run-triggers", plan.WorkspaceID.ValueString()), body)
+	rt, err := r.tc.CreateRunTrigger(ctx, terrapod.CreateRunTriggerRequest{
+		DestinationWorkspaceID: plan.WorkspaceID.ValueString(),
+		SourceWorkspaceID:      plan.SourceWorkspaceID.ValueString(),
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("Create failed", err.Error())
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	readIntoModel(res, &plan)
+	readRunTriggerFromSDK(rt, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -116,9 +108,10 @@ func (r *runTriggerResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/terrapod/v1/run-triggers/"+state.ID.ValueString())
+	rt, err := r.tc.GetRunTrigger(ctx, state.ID.ValueString())
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -126,13 +119,7 @@ func (r *runTriggerResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	readIntoModel(res, &state)
+	readRunTriggerFromSDK(rt, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -147,23 +134,24 @@ func (r *runTriggerResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/terrapod/v1/run-triggers/"+state.ID.ValueString())
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete failed", err.Error())
+	err := r.tc.DeleteRunTrigger(ctx, state.ID.ValueString())
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Delete failed", err.Error())
+		}
 	}
 }
 
-func readIntoModel(res *client.Resource, m *runTriggerModel) {
-	m.ID = types.StringValue(res.ID)
-	m.WorkspaceName = types.StringValue(client.GetStringAttr(res, "workspace-name"))
-	m.SourceableName = types.StringValue(client.GetStringAttr(res, "sourceable-name"))
-	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-
-	// Relationships
-	if v := client.GetRelationshipID(res, "workspace"); v != "" {
-		m.WorkspaceID = types.StringValue(v)
+func readRunTriggerFromSDK(rt *terrapod.RunTrigger, m *runTriggerModel) {
+	m.ID = types.StringValue(rt.ID)
+	m.WorkspaceName = types.StringValue(rt.WorkspaceName)
+	m.SourceableName = types.StringValue(rt.SourceableName)
+	m.CreatedAt = types.StringValue(rt.CreatedAt)
+	if rt.WorkspaceID != "" {
+		m.WorkspaceID = types.StringValue(rt.WorkspaceID)
 	}
-	if v := client.GetRelationshipID(res, "sourceable"); v != "" {
-		m.SourceWorkspaceID = types.StringValue(v)
+	if rt.SourceID != "" {
+		m.SourceWorkspaceID = types.StringValue(rt.SourceID)
 	}
 }
