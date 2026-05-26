@@ -102,9 +102,10 @@ func (c *Client) RemoveRoleFromIdentity(ctx context.Context, providerName, email
 	return c.Delete(ctx, path)
 }
 
-// GetRoleAssignment looks up the (provider, email, role) triple. Returns
-// (nil, nil) when no such binding exists — distinct from the NotFoundError
-// the server doesn't actually return for this composite shape.
+// GetRoleAssignment looks up the (provider, email, role) triple.
+// Returns nil + *NotFoundError when no such binding exists (consistent
+// with every other Get* in this SDK — callers should test with
+// errors.As / IsNotFound).
 func (c *Client) GetRoleAssignment(ctx context.Context, providerName, email, roleName string) (*RoleAssignment, error) {
 	all, err := c.ListRoleAssignmentsForIdentity(ctx, providerName, email)
 	if err != nil {
@@ -115,7 +116,7 @@ func (c *Client) GetRoleAssignment(ctx context.Context, providerName, email, rol
 			return &all[i], nil
 		}
 	}
-	return nil, nil
+	return nil, &NotFoundError{Resource: "role-assignment", ID: providerName + "/" + email + "/" + roleName}
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────

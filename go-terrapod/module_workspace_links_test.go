@@ -76,7 +76,10 @@ func TestGetModuleWorkspaceLink(t *testing.T) {
 	if mwl.WorkspaceID != "ws-api" {
 		t.Errorf("mwl: %+v", mwl)
 	}
-	missing, _ := c.GetModuleWorkspaceLink(t.Context(), "vpc", "aws", "nope")
+	missing, err := c.GetModuleWorkspaceLink(t.Context(), "vpc", "aws", "nope")
+	if err == nil || !IsNotFound(err) {
+		t.Errorf("expected NotFoundError for missing link, got %v", err)
+	}
 	if missing != nil {
 		t.Errorf("expected nil for missing link")
 	}

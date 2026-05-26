@@ -430,17 +430,47 @@ func (w *Writer) applyState(ctx context.Context, terrapodID, sourceID string, re
 		return out
 	}
 
+	// Local-state-file idempotency: short-circuit when the recorded
+	// (lineage, serial) pair matches the source. Lineage is non-empty
+	// for any valid terraform state, so we gate on lineage rather
+	// than serial > 0 (legitimate states can sit at serial 0).
 	if rec := w.state.WorkspaceBySourceID(sourceID); rec != nil &&
-		rec.StateLineage == lineage && rec.StateSerial == serial && rec.StateSerial > 0 {
-		// State already migrated in a prior apply iteration —
-		// nothing to do. Operator can force re-upload by deleting
-		// the StateLineage/StateSerial fields from the state file
-		// or by deleting the workspace and starting over.
+		rec.StateLineage != "" &&
+		rec.StateLineage == lineage && rec.StateSerial == serial {
 		out.State = "unchanged"
 		out.Serial = serial
 		out.Lineage = lineage
-		out.SizeKB = int64(len(raw) / 1024)
+		out.SizeKB = stateSizeKB(len(raw))
 		return out
+	}
+
+	// Destination-side safety net: before uploading, look at what's
+	// currently on Terrapod for this workspace. Two cases force a
+	// hard error rather than upload:
+	//   1. Destination's lineage differs from source's → these are
+	//      unrelated terraform states; uploading would silently
+	//      displace the unrelated state.
+	//   2. Destination's serial is HIGHER than source's → the
+	//      destination has advanced past what we're migrating;
+	//      uploading would roll back operator work that happened
+	//      between iterations.
+	// Both cases need operator decision — the migrator must never
+	// auto-resolve.
+	if dest, err := w.client.GetCurrentStateVersion(ctx, terrapodID); err == nil && dest != nil {
+		if dest.Lineage != "" && dest.Lineage != lineage {
+			out.State = "errored"
+			out.Error = fmt.Sprintf(
+				"destination state lineage %q differs from source %q — refusing to overwrite an unrelated state; resolve manually (delete the destination workspace, or migrate to a fresh workspace name)",
+				dest.Lineage, lineage)
+			return out
+		}
+		if dest.Serial > serial {
+			out.State = "errored"
+			out.Error = fmt.Sprintf(
+				"destination has advanced to serial %d; source serial is %d — refusing to roll back; investigate before re-running",
+				dest.Serial, serial)
+			return out
+		}
 	}
 
 	sv, err := w.client.CreateAndUploadState(ctx, terrapodID, raw, terrapod.CreateStateVersionRequest{
@@ -448,18 +478,30 @@ func (w *Writer) applyState(ctx context.Context, terrapodID, sourceID string, re
 		Lineage: lineage,
 	})
 	if err != nil {
-		// 409 conflict from Terrapod = a state version with this
-		// exact serial already exists for this workspace. That's
-		// expected on resume after a partial apply where the
-		// migrator crashed between upload and state-file save.
-		// Treat as 'unchanged'; the next run sees the recorded
-		// serial/lineage and short-circuits.
+		// 409 conflict means a state version with this exact serial
+		// already exists for the workspace. Treat as `unchanged`
+		// ONLY when the destination's current state matches our
+		// source's lineage — otherwise it's a different state
+		// already at this serial, which is a fatal collision.
 		var conflict *terrapod.ConflictError
 		if errors.As(err, &conflict) {
+			dest, gerr := w.client.GetCurrentStateVersion(ctx, terrapodID)
+			if gerr != nil || dest == nil {
+				out.State = "errored"
+				out.Error = fmt.Sprintf("conflict on state upload but cannot read destination to verify: %v", err)
+				return out
+			}
+			if dest.Lineage != lineage {
+				out.State = "errored"
+				out.Error = fmt.Sprintf(
+					"conflict on state upload: destination has serial %d with lineage %q, source has lineage %q — resolve manually",
+					dest.Serial, dest.Lineage, lineage)
+				return out
+			}
 			out.State = "unchanged"
 			out.Serial = serial
 			out.Lineage = lineage
-			out.SizeKB = int64(len(raw) / 1024)
+			out.SizeKB = stateSizeKB(len(raw))
 			if rec := w.state.WorkspaceBySourceID(sourceID); rec != nil {
 				rec.StateLineage = lineage
 				rec.StateSerial = serial
@@ -473,7 +515,7 @@ func (w *Writer) applyState(ctx context.Context, terrapodID, sourceID string, re
 	out.State = "uploaded"
 	out.Serial = sv.Serial
 	out.Lineage = sv.Lineage
-	out.SizeKB = int64(len(raw) / 1024)
+	out.SizeKB = stateSizeKB(len(raw))
 	if rec := w.state.WorkspaceBySourceID(sourceID); rec != nil {
 		rec.StateLineage = sv.Lineage
 		rec.StateSerial = sv.Serial
@@ -481,23 +523,39 @@ func (w *Writer) applyState(ctx context.Context, terrapodID, sourceID string, re
 	return out
 }
 
+// stateSizeKB rounds up to the nearest KB so a 200-byte state
+// reports as 1 KB rather than 0 KB. Cosmetic — the report uses this
+// for operator-facing size labels only.
+func stateSizeKB(n int) int64 {
+	if n == 0 {
+		return 0
+	}
+	return int64((n + 1023) / 1024)
+}
+
 func (w *Writer) applyVariable(ctx context.Context, workspaceID, workspaceSourceID string, v *ir.Variable, opts Options) VarOutcome {
 	out := VarOutcome{Key: v.Key, State: "planned"}
 
 	value := v.Value
 	if v.Sensitive {
-		if opts.SensitiveValueForVariable == nil {
-			out.State = "errored"
-			out.Error = "no sensitive-value callback for apply mode"
-			return out
+		// Sensitive variable values cannot be read back from source
+		// platforms (TFE returns null; Atlantis has none). The
+		// migrator deliberately does NOT prompt for or store values
+		// — instead the variable is created on Terrapod with an
+		// empty value + sensitive=true, so the operator sees the row
+		// in the workspace UI and can fill it in post-cutover. The
+		// per-workspace SkippedItem emitted by the source flags
+		// which keys need attention. The SensitiveValueForVariable
+		// callback is an opt-in escape hatch for future value-loader
+		// plugins; when set + non-error, its return value is used.
+		value = ""
+		out.State = "needs_value"
+		if opts.SensitiveValueForVariable != nil {
+			if s, err := opts.SensitiveValueForVariable(workspaceSourceID, v.Key); err == nil {
+				value = s
+				out.State = "planned"
+			}
 		}
-		s, err := opts.SensitiveValueForVariable(workspaceSourceID, v.Key)
-		if err != nil {
-			out.State = "errored"
-			out.Error = fmt.Sprintf("load sensitive value: %v", err)
-			return out
-		}
-		value = s
 	}
 
 	req := terrapod.CreateVariableRequest{
@@ -509,21 +567,62 @@ func (w *Writer) applyVariable(ctx context.Context, workspaceID, workspaceSource
 		Description: v.Description,
 	}
 	if _, err := w.client.CreateVariable(ctx, workspaceID, req); err != nil {
-		out.State = "errored"
-		out.Error = err.Error()
-		// 409 conflict from the server (Terrapod already has the key
-		// from a prior partial run) is treated as success — variable
-		// re-creation is idempotent from the operator's perspective.
+		// 409 conflict from the server (Terrapod already has the
+		// key) means an earlier apply already wrote it. For
+		// non-sensitive vars: PATCH to reconcile the value so the
+		// destination reflects the current source. For sensitive
+		// vars: leave the existing value alone — the operator
+		// hand-entered it post-cutover; the migrator must never
+		// clobber operator-entered secrets.
 		var conflict *terrapod.ConflictError
 		if errors.As(err, &conflict) {
-			out.State = "reused"
-			out.Error = ""
+			if v.Sensitive {
+				out.State = "needs_value"
+				return out
+			}
+			if rerr := w.reconcileVariable(ctx, workspaceID, req); rerr != nil {
+				out.State = "errored"
+				out.Error = fmt.Sprintf("reconcile existing variable: %v", rerr)
+				return out
+			}
+			out.State = "reconciled"
+			return out
 		}
+		out.State = "errored"
+		out.Error = err.Error()
 		return out
 	}
 
+	if v.Sensitive {
+		// Row created with empty value; operator must fill it in.
+		// Leave State="needs_value" — set above.
+		return out
+	}
 	out.State = "created"
 	return out
+}
+
+// reconcileVariable PATCHes an existing variable to align its value,
+// category, HCL and description with the source. Used on Apply-mode
+// 409 to recover from a partial prior run rather than leaving the
+// destination at a stale value. Sensitive variables are NEVER
+// reconciled — operator-entered secrets must not be clobbered.
+func (w *Writer) reconcileVariable(ctx context.Context, workspaceID string, req terrapod.CreateVariableRequest) error {
+	existing, err := w.client.GetVariable(ctx, workspaceID, req.Key)
+	if err != nil {
+		return fmt.Errorf("get existing %q: %w", req.Key, err)
+	}
+	hcl := req.HCL
+	updReq := terrapod.UpdateVariableRequest{
+		Value:       &req.Value,
+		Category:    req.Category,
+		HCL:         &hcl,
+		Description: &req.Description,
+	}
+	if _, err := w.client.UpdateVariable(ctx, workspaceID, existing.ID, updReq); err != nil {
+		return fmt.Errorf("patch %q: %w", req.Key, err)
+	}
+	return nil
 }
 
 // ── State plumbing ───────────────────────────────────────────────────

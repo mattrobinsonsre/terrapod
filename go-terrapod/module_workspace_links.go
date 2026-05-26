@@ -64,7 +64,7 @@ func (c *Client) ListModuleWorkspaceLinks(ctx context.Context, moduleName, modul
 // GetModuleWorkspaceLink looks up a single link by id. Filters
 // client-side from ListModuleWorkspaceLinks because the server
 // doesn't expose a single-link GET (the link id is composite per-
-// module). Returns nil + nil when not found.
+// module). Returns nil + *NotFoundError when no link matches.
 func (c *Client) GetModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) (*ModuleWorkspaceLink, error) {
 	links, err := c.ListModuleWorkspaceLinks(ctx, moduleName, moduleProvider)
 	if err != nil {
@@ -75,7 +75,7 @@ func (c *Client) GetModuleWorkspaceLink(ctx context.Context, moduleName, moduleP
 			return &links[i], nil
 		}
 	}
-	return nil, nil
+	return nil, &NotFoundError{Resource: "module-workspace-link", ID: linkID}
 }
 
 // DeleteModuleWorkspaceLink removes the link by id.

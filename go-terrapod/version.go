@@ -35,12 +35,9 @@ var ErrVersionMismatch = errors.New("SDK version does not match Terrapod API ver
 // is distinct from a version-mismatch.
 var ErrVersionUnreported = errors.New("Terrapod did not report a version in .well-known/terraform.json")
 
-// versionHTTPClient is a dedicated client for the version probe. We
-// use a 10-second timeout (generous for one GET against a healthy API
-// and short enough that a misconfigured target fails fast) and don't
-// touch Client.HTTPClient because the probe needs to work even for
-// callers that haven't fully constructed a Client yet.
-var versionHTTPClient = &http.Client{Timeout: 10 * time.Second}
+// versionProbeTimeout caps the discovery GET: generous enough for a
+// healthy API, short enough that a misconfigured target fails fast.
+const versionProbeTimeout = 10 * time.Second
 
 // VersionCheck probes the target Terrapod deployment's reported
 // version and compares it against the SDK's build-time-pinned
@@ -64,8 +61,8 @@ var versionHTTPClient = &http.Client{Timeout: 10 * time.Second}
 //	    return err
 //	}
 //
-// Tests can substitute the inner HTTP client by setting
-// terrapod.VersionHTTPClient before calling.
+// Tests substitute the HTTP client by passing a custom HTTPClient in
+// terrapod.Options when constructing the Client.
 func (c *Client) VersionCheck(ctx context.Context) error {
 	if SDKVersion == "" || SDKVersion == "dev" {
 		// Dev builds have no meaningful version to compare against.
@@ -81,7 +78,19 @@ func (c *Client) VersionCheck(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("build discovery request: %w", err)
 	}
-	resp, err := versionHTTPClient.Do(req)
+	// Wrap the Client's HTTPClient with a short per-request timeout so
+	// the probe fails fast even when the caller's HTTPClient has no
+	// timeout configured. Callers can override by constructing the
+	// Client with a custom HTTPClient.
+	httpClient := c.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: versionProbeTimeout}
+	} else if httpClient.Timeout == 0 || httpClient.Timeout > versionProbeTimeout {
+		clone := *httpClient
+		clone.Timeout = versionProbeTimeout
+		httpClient = &clone
+	}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("fetch %s: %w", url, err)
 	}
@@ -110,6 +119,3 @@ func (c *Client) VersionCheck(ctx context.Context) error {
 	return nil
 }
 
-// VersionHTTPClient is exposed for tests. Callers in production
-// shouldn't touch it.
-var VersionHTTPClient = versionHTTPClient

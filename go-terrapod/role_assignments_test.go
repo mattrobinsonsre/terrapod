@@ -184,8 +184,8 @@ func TestGetRoleAssignment(t *testing.T) {
 		t.Fatalf("expected assignment, got %v / err %v", a, err)
 	}
 	missing, err := c.GetRoleAssignment(t.Context(), "local", "alice@example.com", "nope")
-	if err != nil {
-		t.Fatal(err)
+	if err == nil || !IsNotFound(err) {
+		t.Fatalf("expected NotFoundError, got %v (missing=%+v)", err, missing)
 	}
 	if missing != nil {
 		t.Errorf("expected nil for missing assignment, got %+v", missing)

@@ -74,12 +74,17 @@ async def delete_state_version(
     sv = await _get_state_version(state_version_id, db)
     ws = await _require_sv_workspace_permission(sv, "admin", user, db)
 
-    # Prevent deleting the current (latest) state version
+    # Prevent deleting the current (latest) state version, UNLESS the
+    # record is an empty placeholder (state_size == 0). An empty
+    # current state version is the orphan left behind when the
+    # create-then-PUT flow's PUT failed; the migrator's
+    # CreateAndUploadState rollback needs to clean these up so a
+    # retry at the same serial doesn't 409-collide.
     max_serial_result = await db.execute(
         select(func.max(StateVersion.serial)).where(StateVersion.workspace_id == sv.workspace_id)
     )
     max_serial = max_serial_result.scalar_one_or_none()
-    if max_serial is not None and sv.serial == max_serial:
+    if max_serial is not None and sv.serial == max_serial and (sv.state_size or 0) > 0:
         raise HTTPException(
             status_code=409,
             detail="Cannot delete the current state version",

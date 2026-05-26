@@ -179,9 +179,23 @@ func (c *Client) Patch(ctx context.Context, path string, payload []byte) ([]byte
 	return body, nil
 }
 
-// Put performs a PUT.
+// Put performs a PUT with the standard JSON:API Content-Type.
 func (c *Client) Put(ctx context.Context, path string, payload []byte) ([]byte, error) {
 	body, status, err := c.do(ctx, http.MethodPut, path, payload)
+	if err != nil {
+		return nil, err
+	}
+	if status < 200 || status >= 300 {
+		return nil, classifyError(status, body)
+	}
+	return body, nil
+}
+
+// PutRaw performs a PUT with a caller-supplied Content-Type, used for
+// non-JSON:API uploads such as state version content. Error responses
+// are still expected to be JSON:API envelopes.
+func (c *Client) PutRaw(ctx context.Context, path, contentType string, payload []byte) ([]byte, error) {
+	body, status, err := c.doWithContentType(ctx, http.MethodPut, path, payload, contentType)
 	if err != nil {
 		return nil, err
 	}
@@ -228,6 +242,15 @@ func (c *Client) DeleteWithBody(ctx context.Context, path string, payload []byte
 // Body is always populated when err is nil regardless of status, so
 // callers can produce typed errors from non-2xx bodies.
 func (c *Client) do(ctx context.Context, method, path string, body []byte) ([]byte, int, error) {
+	return c.doWithContentType(ctx, method, path, body, "application/vnd.api+json")
+}
+
+// doWithContentType is the same as do but allows the caller to
+// override the request Content-Type. Used by raw uploads (e.g. state
+// version content) that send non-JSON:API payloads. The Accept header
+// stays application/vnd.api+json because error responses are still
+// JSON:API envelopes.
+func (c *Client) doWithContentType(ctx context.Context, method, path string, body []byte, contentType string) ([]byte, int, error) {
 	var lastErr error
 	for attempt := 0; attempt <= c.MaxRetries; attempt++ {
 		if attempt > 0 {
@@ -250,7 +273,7 @@ func (c *Client) do(ctx context.Context, method, path string, body []byte) ([]by
 			return nil, 0, fmt.Errorf("build request: %w", err)
 		}
 		req.Header.Set("Authorization", "Bearer "+c.Token)
-		req.Header.Set("Content-Type", "application/vnd.api+json")
+		req.Header.Set("Content-Type", contentType)
 		req.Header.Set("Accept", "application/vnd.api+json")
 		req.Header.Set("User-Agent", c.UserAgent)
 

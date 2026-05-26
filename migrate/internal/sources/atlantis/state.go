@@ -104,11 +104,7 @@ func (s *Source) projectDirForSourceID(sourceID string) (string, error) {
 	if s.AtlantisYAML != nil {
 		for _, p := range s.AtlantisYAML.Projects {
 			if ProjectIdentifier(p) == sourceID {
-				dir := strings.TrimSpace(p.Dir)
-				if dir == "" || dir == "." {
-					return s.SourcePath, nil
-				}
-				return filepath.Join(s.SourcePath, dir), nil
+				return resolveProjectDir(s.SourcePath, p.Dir)
 			}
 		}
 	}
@@ -116,13 +112,32 @@ func (s *Source) projectDirForSourceID(sourceID string) (string, error) {
 	// treat the suffix after the last `:` as a directory relative
 	// to SourcePath.
 	if idx := strings.LastIndex(sourceID, ":"); idx >= 0 {
-		rel := sourceID[idx+1:]
-		if rel == "" || rel == "." {
-			return s.SourcePath, nil
-		}
-		return filepath.Join(s.SourcePath, rel), nil
+		return resolveProjectDir(s.SourcePath, sourceID[idx+1:])
 	}
 	return "", fmt.Errorf("atlantis source id %q does not match any project in atlantis.yaml", sourceID)
+}
+
+// resolveProjectDir joins a project's relative `dir` to SourcePath
+// and rejects any result that escapes SourcePath (path traversal).
+// A malicious or buggy atlantis.yaml with `dir: ../../etc` would
+// otherwise let the migrator read arbitrary local files and upload
+// them as terraform state, where anyone with workspace read access
+// could retrieve them.
+func resolveProjectDir(sourcePath, dir string) (string, error) {
+	dir = strings.TrimSpace(dir)
+	if dir == "" || dir == "." {
+		return sourcePath, nil
+	}
+	if filepath.IsAbs(dir) {
+		return "", fmt.Errorf("atlantis project dir %q must be relative to the repo root", dir)
+	}
+	joined := filepath.Join(sourcePath, dir)
+	cleaned := filepath.Clean(joined)
+	rel, err := filepath.Rel(sourcePath, cleaned)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("atlantis project dir %q escapes the repo root", dir)
+	}
+	return cleaned, nil
 }
 
 func fetchStateForBackend(ctx context.Context, backend *hcl.Backend, projectDir string, opts StateOptions) ([]byte, error) {
@@ -154,9 +169,15 @@ func readLocalState(projectDir, configuredPath string) ([]byte, error) {
 	if path == "" {
 		path = "terraform.tfstate"
 	}
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(projectDir, path)
+	if filepath.IsAbs(path) {
+		return nil, fmt.Errorf("local backend path %q must be relative to the project directory", configuredPath)
 	}
+	joined := filepath.Clean(filepath.Join(projectDir, path))
+	rel, err := filepath.Rel(projectDir, joined)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return nil, fmt.Errorf("local backend path %q escapes the project directory", configuredPath)
+	}
+	path = joined
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

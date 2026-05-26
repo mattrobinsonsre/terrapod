@@ -147,9 +147,12 @@ func applyCmd(args []string) int {
 		StateForWorkspace:    stateReader,
 		VCSConnectionIDByRef: connByRef,
 		DestHost:             hostFromRepoURL(*target),
-		SensitiveValueForVariable: func(workspaceSourceID, key string) (string, error) {
-			return "", fmt.Errorf("sensitive variable %q on workspace %q: source did not provide a value-loader (atlantis has no sensitive vars; tfe support pending)", key, workspaceSourceID)
-		},
+		// SensitiveValueForVariable left nil — the writer creates
+		// sensitive variables with empty values + sensitive=true,
+		// so they appear in the destination workspace UI for the
+		// operator to fill in post-cutover. The callback is reserved
+		// for future value-loader plugins (Vault, sops, etc.).
+		SensitiveValueForVariable: nil,
 	}
 
 	report, err := w.Run(context.Background(), plan, opts)

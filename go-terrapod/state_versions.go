@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/url"
+	"time"
 )
 
 // StateVersion is the Terrapod-side record of a Terraform state
@@ -62,8 +63,9 @@ func (c *Client) CreateStateVersion(ctx context.Context, workspaceID string, req
 // state version ID is the capability. This matches the TFE V2
 // behaviour that go-tfe expects.
 func (c *Client) UploadStateContent(ctx context.Context, stateVersionID string, raw []byte) error {
-	_, err := c.Put(ctx,
+	_, err := c.PutRaw(ctx,
 		fmt.Sprintf("/api/v2/state-versions/%s/content", url.PathEscape(stateVersionID)),
+		"application/octet-stream",
 		raw)
 	return err
 }
@@ -72,6 +74,11 @@ func (c *Client) UploadStateContent(ctx context.Context, stateVersionID string, 
 // into a single call. Computes the MD5 from the raw bytes when MD5
 // is empty in the request; otherwise uses the caller's value (useful
 // when a source-side checksum is already known).
+//
+// On upload failure, the partially-created state version record is
+// best-effort deleted so a subsequent retry can re-create at the
+// same serial without colliding. A failed rollback is reported in
+// the wrapped error so the operator can clean up manually.
 func (c *Client) CreateAndUploadState(ctx context.Context, workspaceID string, raw []byte, req CreateStateVersionRequest) (*StateVersion, error) {
 	if req.MD5 == "" {
 		sum := md5.Sum(raw) //nolint:gosec
@@ -82,9 +89,29 @@ func (c *Client) CreateAndUploadState(ctx context.Context, workspaceID string, r
 		return nil, fmt.Errorf("create state version: %w", err)
 	}
 	if err := c.UploadStateContent(ctx, sv.ID, raw); err != nil {
+		// Best-effort rollback. We use a fresh background context with
+		// a short timeout because the caller's ctx may itself be the
+		// cause of the upload failure (cancel / deadline) and we still
+		// want to clean up the orphan record. Failures are surfaced
+		// via the wrapped error message so operators see what's left
+		// behind on Terrapod.
+		rbCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if rbErr := c.DeleteStateVersion(rbCtx, sv.ID); rbErr != nil {
+			return nil, fmt.Errorf("upload state content (sv=%s): %w; rollback of orphan record also failed: %v", sv.ID, err, rbErr)
+		}
 		return nil, fmt.Errorf("upload state content (sv=%s): %w", sv.ID, err)
 	}
 	return sv, nil
+}
+
+// DeleteStateVersion removes a non-current state version record.
+// Used by CreateAndUploadState to roll back an orphaned record when
+// the /content PUT fails after the metadata row was created. Path
+// is the Terrapod-native management endpoint, not the TFE V2 surface.
+func (c *Client) DeleteStateVersion(ctx context.Context, stateVersionID string) error {
+	return c.Delete(ctx,
+		fmt.Sprintf("/api/terrapod/v1/state-versions/%s/manage", url.PathEscape(stateVersionID)))
 }
 
 // GetCurrentStateVersion reads the current state version for a

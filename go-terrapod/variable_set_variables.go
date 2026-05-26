@@ -61,7 +61,8 @@ func (c *Client) CreateVarsetVariable(ctx context.Context, varsetID string, req 
 
 // GetVarsetVariable fetches one variable from a varset. The TFE V2
 // shape doesn't expose a per-id GET — we list and filter client-side.
-// Returns nil + nil when not found.
+// Returns nil + *NotFoundError when no variable matches (consistent
+// with every other Get* in this SDK).
 func (c *Client) GetVarsetVariable(ctx context.Context, varsetID, varID string) (*VariableSetVariable, error) {
 	vars, err := c.ListVarsetVariables(ctx, varsetID)
 	if err != nil {
@@ -72,7 +73,7 @@ func (c *Client) GetVarsetVariable(ctx context.Context, varsetID, varID string) 
 			return &vars[i], nil
 		}
 	}
-	return nil, nil
+	return nil, &NotFoundError{Resource: "varset-variable", ID: varID}
 }
 
 // ListVarsetVariables returns every variable in the varset.

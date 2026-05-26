@@ -77,8 +77,9 @@ func (c *Client) ListAgentPoolTokens(ctx context.Context, poolID string) ([]Agen
 }
 
 // GetAgentPoolToken fetches one token's metadata. The API doesn't
-// expose a per-id GET — the SDK lists and filters. Returns nil + nil
-// when not found.
+// expose a per-id GET — the SDK lists and filters. Returns
+// nil + *NotFoundError when no token matches (consistent with
+// every other Get* in this SDK).
 func (c *Client) GetAgentPoolToken(ctx context.Context, poolID, tokenID string) (*AgentPoolToken, error) {
 	tokens, err := c.ListAgentPoolTokens(ctx, poolID)
 	if err != nil {
@@ -89,7 +90,7 @@ func (c *Client) GetAgentPoolToken(ctx context.Context, poolID, tokenID string) 
 			return &tokens[i], nil
 		}
 	}
-	return nil, nil
+	return nil, &NotFoundError{Resource: "agent-pool-token", ID: tokenID}
 }
 
 // DeleteAgentPoolToken revokes a token by id.
