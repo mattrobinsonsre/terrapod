@@ -131,18 +131,40 @@ for ad-hoc rewriting without a migration record.
   and listed in the skipped-items report.
 - **PR comment history** — out of scope.
 
-### State strategy
+### State migration
 
-Atlantis doesn't manage state — the operator already has `terraform {
-backend "s3"/"gcs"/"azurerm" {} }` blocks declared. Two options:
+Atlantis itself doesn't store state — the operator's HCL declares a
+`terraform { backend "s3"/"gcs"/"azurerm"/"local" {} }` block, and the
+state file lives in whichever bucket / blob container / disk path that
+points at. Terrapod is single-backend on purpose — every workspace's
+state lives in Terrapod's own storage; foreign backends aren't a
+supported execution model.
 
-- **Default — leave state in place.** The migrated Terrapod workspace
-  runs in `agent` mode against the existing backend. The runner's
-  backend-override file is *not* injected for these workspaces; they
-  continue to use the operator's HCL-declared backend.
-- **Opt-in — `--migrate-state`.** Rewrites the workspace's backend to
-  `cloud { }`, runs `tofu init -migrate-state` once, and Terrapod owns
-  the state afterwards. More invasive cutover but cleaner long-term.
+Migration therefore reads each project's state from its declared
+source-side location, pushes it into Terrapod, and rewrites the HCL to
+replace the foreign `backend "..." {}` with `terraform { cloud { ... }
+}` pointing at Terrapod. There is no "leave state in place" option.
+
+Supported source-side backends (more can be added; these cover the
+common cases):
+
+- `s3` — AWS S3, reads via `aws-sdk-go-v2`, credentials via the SDK's
+  default chain (env vars, `AWS_PROFILE`, IRSA, etc.). Lock-table
+  configuration is read but not respected — the operator must pause
+  Atlantis before running migration.
+- `gcs` — Google Cloud Storage via `cloud.google.com/go/storage`,
+  credentials via `GOOGLE_APPLICATION_CREDENTIALS` or `gcloud auth`.
+- `azurerm` — Azure Blob Storage via `azure-sdk-for-go/sdk/storage/azblob`,
+  credentials via `az login` / managed identity / `AZURE_*` env vars.
+- `local` — file on disk inside the local clone (small dev setups only).
+
+Workspaces using `backend "remote" { ... }` that points at TFE / HCP
+are detected and rejected with a clear message — the operator should
+run the migration with `--source=tfe` against the actual state holder.
+
+State migration preserves serial + lineage so a re-run of
+`terraform plan` against the migrated state matches what the source
+produced.
 
 ## HCL rewriting
 
