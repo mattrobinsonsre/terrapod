@@ -1,0 +1,434 @@
+package terrapod
+
+import (
+	"context"
+	"fmt"
+	"net/url"
+	"strconv"
+)
+
+// Workspace is the decoded form of one Terrapod workspace resource.
+// Field tags mirror the JSON:API attribute names so callers can also
+// (de)serialise directly when convenient.
+//
+// Nullable string fields (TerraformVersion, VCSRepoURL, VCSBranch,
+// AgentPoolID, etc.) are returned as empty strings rather than nil
+// pointers — Terrapod treats empty and null equivalently here, and the
+// pointer-vs-empty distinction adds friction without information.
+//
+// DriftDetectionIntervalSeconds uses *int64 because zero is a
+// meaningful value the server may return (disabled-by-explicit-zero
+// vs. unset). Same logic for any future field where 0 is a legal
+// non-default value.
+type Workspace struct {
+	ID                            string            `json:"id"`
+	Name                          string            `json:"name"`
+	ExecutionMode                 string            `json:"execution-mode"`
+	ExecutionBackend              string            `json:"execution-backend,omitempty"`
+	AutoApply                     bool              `json:"auto-apply"`
+	TerraformVersion              string            `json:"terraform-version,omitempty"`
+	WorkingDirectory              string            `json:"working-directory,omitempty"`
+	ResourceCPU                   string            `json:"resource-cpu,omitempty"`
+	ResourceMemory                string            `json:"resource-memory,omitempty"`
+	VCSRepoURL                    string            `json:"vcs-repo-url,omitempty"`
+	VCSBranch                     string            `json:"vcs-branch,omitempty"`
+	VCSWorkflow                   string            `json:"vcs-workflow,omitempty"`
+	VCSConnectionID               string            `json:"vcs-connection-id,omitempty"` // resolved from `vcs-connection` relationship
+	AgentPoolID                   string            `json:"agent-pool-id,omitempty"`
+	AutoMerge                     bool              `json:"auto-merge"`
+	AutoMergeStrategy             string            `json:"auto-merge-strategy,omitempty"`
+	OwnerEmail                    string            `json:"owner-email,omitempty"`
+	Locked                        bool              `json:"locked"`
+	Labels                        map[string]string `json:"labels,omitempty"`
+	VarFiles                      []string          `json:"var-files,omitempty"`
+	DriftDetectionEnabled         bool              `json:"drift-detection-enabled"`
+	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
+	DriftStatus                   string            `json:"drift-status,omitempty"`
+	DriftLastCheckedAt            string            `json:"drift-last-checked-at,omitempty"`
+	CreatedAt                     string            `json:"created-at,omitempty"`
+	UpdatedAt                     string            `json:"updated-at,omitempty"`
+}
+
+// CreateWorkspaceRequest is the input shape for Client.CreateWorkspace.
+// Only Name is required by Terrapod; every other field is optional and
+// either takes a server-side default or is updateable later.
+//
+// To produce a JSON:API body the SDK marshals from this struct rather
+// than a free-form map so callers get type safety and the Terrapod
+// schema stays singular-sourced in this file.
+type CreateWorkspaceRequest struct {
+	Name                          string             `json:"name"`
+	ExecutionMode                 string             `json:"execution-mode,omitempty"`
+	ExecutionBackend              string             `json:"execution-backend,omitempty"`
+	AutoApply                     *bool              `json:"auto-apply,omitempty"`
+	TerraformVersion              string             `json:"terraform-version,omitempty"`
+	WorkingDirectory              string             `json:"working-directory,omitempty"`
+	ResourceCPU                   string             `json:"resource-cpu,omitempty"`
+	ResourceMemory                string             `json:"resource-memory,omitempty"`
+	VCSRepoURL                    string             `json:"vcs-repo-url,omitempty"`
+	VCSBranch                     string             `json:"vcs-branch,omitempty"`
+	VCSWorkflow                   string             `json:"vcs-workflow,omitempty"`
+	VCSConnectionID               string             `json:"-"` // → relationship, not attribute
+	AgentPoolID                   string             `json:"agent-pool-id,omitempty"`
+	AutoMerge                     *bool              `json:"auto-merge,omitempty"`
+	AutoMergeStrategy             string             `json:"auto-merge-strategy,omitempty"`
+	OwnerEmail                    string             `json:"owner-email,omitempty"`
+	Labels                        map[string]string  `json:"labels,omitempty"`
+	VarFiles                      []string           `json:"var-files,omitempty"`
+	DriftDetectionEnabled         *bool              `json:"drift-detection-enabled,omitempty"`
+	DriftDetectionIntervalSeconds *int64             `json:"drift-detection-interval-seconds,omitempty"`
+}
+
+// UpdateWorkspaceRequest is the input shape for Client.UpdateWorkspace.
+// Same fields as CreateWorkspaceRequest minus Name (which is set at
+// create time and not updateable via the standard PATCH endpoint).
+//
+// Pointer-typed bool fields let callers distinguish "leave alone"
+// (nil) from "set to false" (&false). Without that distinction we'd
+// flip a workspace's auto-apply to false on every PATCH that didn't
+// explicitly set it.
+type UpdateWorkspaceRequest struct {
+	ExecutionMode                 string            `json:"execution-mode,omitempty"`
+	ExecutionBackend              string            `json:"execution-backend,omitempty"`
+	AutoApply                     *bool             `json:"auto-apply,omitempty"`
+	TerraformVersion              string            `json:"terraform-version,omitempty"`
+	WorkingDirectory              string            `json:"working-directory,omitempty"`
+	ResourceCPU                   string            `json:"resource-cpu,omitempty"`
+	ResourceMemory                string            `json:"resource-memory,omitempty"`
+	VCSRepoURL                    string            `json:"vcs-repo-url,omitempty"`
+	VCSBranch                     string            `json:"vcs-branch,omitempty"`
+	VCSWorkflow                   string            `json:"vcs-workflow,omitempty"`
+	VCSConnectionID               string            `json:"-"`
+	AgentPoolID                   string            `json:"agent-pool-id,omitempty"`
+	AutoMerge                     *bool             `json:"auto-merge,omitempty"`
+	AutoMergeStrategy             string            `json:"auto-merge-strategy,omitempty"`
+	Labels                        map[string]string `json:"labels,omitempty"`
+	VarFiles                      []string          `json:"var-files,omitempty"`
+	DriftDetectionEnabled         *bool             `json:"drift-detection-enabled,omitempty"`
+	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
+}
+
+// WorkspaceListOptions filters and paginates ListWorkspaces. Zero
+// values produce a default-paged unfiltered list.
+type WorkspaceListOptions struct {
+	// PageNumber is 1-indexed (matches the server). 0 means "page 1".
+	PageNumber int
+	// PageSize defaults to the server's default (20) when 0.
+	PageSize int
+	// Search matches workspace names with prefix/substring semantics
+	// (server-controlled). Empty means no name filter.
+	Search string
+}
+
+// WorkspaceList is the paginated result of ListWorkspaces.
+type WorkspaceList struct {
+	Items       []Workspace
+	CurrentPage int
+	TotalPages  int
+	TotalCount  int
+}
+
+// CreateWorkspace creates a new workspace in the default organisation
+// (Terrapod is single-org by design). Returns the created Workspace
+// with server-populated fields filled in (id, created_at, etc.).
+//
+// Common errors:
+//   - *ConflictError when the name is already taken
+//   - *ValidationError on invalid attribute values
+//   - *AuthorizationError when the token lacks `admin` on the workspace
+func (c *Client) CreateWorkspace(ctx context.Context, req CreateWorkspaceRequest) (*Workspace, error) {
+	attrs := workspaceCreateAttrs(req)
+	rels := workspaceRels(req.VCSConnectionID)
+	body, err := MarshalResource("workspaces", attrs, rels)
+	if err != nil {
+		return nil, fmt.Errorf("marshal create workspace: %w", err)
+	}
+	data, err := c.Post(ctx, "/api/v2/organizations/default/workspaces", body)
+	if err != nil {
+		return nil, err
+	}
+	return parseWorkspace(data)
+}
+
+// GetWorkspace reads a workspace by id ("ws-..."). Returns
+// *NotFoundError when the id is unknown.
+func (c *Client) GetWorkspace(ctx context.Context, id string) (*Workspace, error) {
+	data, err := c.Get(ctx, "/api/v2/workspaces/"+url.PathEscape(id))
+	if err != nil {
+		return nil, err
+	}
+	return parseWorkspace(data)
+}
+
+// GetWorkspaceByName reads a workspace by its name (the human-
+// recognisable identifier operators use). Useful for import flows
+// where the operator types the name they see in the UI rather than
+// the typed-id form.
+func (c *Client) GetWorkspaceByName(ctx context.Context, name string) (*Workspace, error) {
+	data, err := c.Get(ctx, "/api/v2/organizations/default/workspaces/"+url.PathEscape(name))
+	if err != nil {
+		return nil, err
+	}
+	return parseWorkspace(data)
+}
+
+// UpdateWorkspace partially updates the workspace identified by id.
+// Fields whose zero value should be a no-op (don't set this field on
+// the server) use pointer types; setting a nil pointer leaves the
+// server-side value unchanged.
+//
+// Returns the updated Workspace.
+func (c *Client) UpdateWorkspace(ctx context.Context, id string, req UpdateWorkspaceRequest) (*Workspace, error) {
+	attrs := workspaceUpdateAttrs(req)
+	rels := workspaceRels(req.VCSConnectionID)
+	body, err := MarshalResourceWithIDAndRels(id, "workspaces", attrs, rels)
+	if err != nil {
+		return nil, fmt.Errorf("marshal update workspace: %w", err)
+	}
+	data, err := c.Patch(ctx, "/api/v2/workspaces/"+url.PathEscape(id), body)
+	if err != nil {
+		return nil, err
+	}
+	return parseWorkspace(data)
+}
+
+// DeleteWorkspace removes the workspace identified by id. The endpoint
+// lives on the Terrapod-native prefix (not /api/v2/) — workspace
+// deletion isn't a CLI-consumed surface and the v2 alias was removed
+// in #278.
+//
+// Returns nil on success, *NotFoundError if the workspace doesn't
+// exist (treated as success by most callers — idempotent delete).
+func (c *Client) DeleteWorkspace(ctx context.Context, id string) error {
+	return c.Delete(ctx, "/api/terrapod/v1/workspaces/"+url.PathEscape(id))
+}
+
+// ListWorkspaces returns one page of workspaces. The caller drives
+// pagination explicitly via opts.PageNumber so a large org with
+// thousands of workspaces still finishes (the alternative —
+// auto-pagination inside this method — would block for minutes).
+func (c *Client) ListWorkspaces(ctx context.Context, opts WorkspaceListOptions) (*WorkspaceList, error) {
+	q := url.Values{}
+	if opts.PageNumber > 0 {
+		q.Set("page[number]", strconv.Itoa(opts.PageNumber))
+	}
+	if opts.PageSize > 0 {
+		q.Set("page[size]", strconv.Itoa(opts.PageSize))
+	}
+	if opts.Search != "" {
+		q.Set("search[name]", opts.Search)
+	}
+	path := "/api/v2/organizations/default/workspaces"
+	if encoded := q.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
+	data, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	resources, err := ParseResourceList(data)
+	if err != nil {
+		return nil, err
+	}
+	list := &WorkspaceList{Items: make([]Workspace, 0, len(resources))}
+	for i := range resources {
+		ws := workspaceFromResource(&resources[i])
+		list.Items = append(list.Items, *ws)
+	}
+	// Pagination meta is in the `meta` block of the document, decoded
+	// separately so the resource-list parse stays clean.
+	if meta, err := parseListMeta(data); err == nil {
+		list.CurrentPage = meta.CurrentPage
+		list.TotalPages = meta.TotalPages
+		list.TotalCount = meta.TotalCount
+	}
+	return list, nil
+}
+
+// ── Internal helpers ─────────────────────────────────────────────────
+
+// workspaceCreateAttrs turns a CreateWorkspaceRequest into the JSON:API
+// attributes map. Only set keys go in — Terrapod doesn't tolerate
+// `null` for fields it expects to omit, and `omitempty` on struct
+// tags doesn't help with nested map marshaling.
+func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
+	attrs := map[string]any{"name": req.Name}
+	if req.ExecutionMode != "" {
+		attrs["execution-mode"] = req.ExecutionMode
+	}
+	if req.ExecutionBackend != "" {
+		attrs["execution-backend"] = req.ExecutionBackend
+	}
+	if req.AutoApply != nil {
+		attrs["auto-apply"] = *req.AutoApply
+	}
+	if req.TerraformVersion != "" {
+		attrs["terraform-version"] = req.TerraformVersion
+	}
+	if req.WorkingDirectory != "" {
+		attrs["working-directory"] = req.WorkingDirectory
+	}
+	if req.ResourceCPU != "" {
+		attrs["resource-cpu"] = req.ResourceCPU
+	}
+	if req.ResourceMemory != "" {
+		attrs["resource-memory"] = req.ResourceMemory
+	}
+	if req.VCSRepoURL != "" {
+		attrs["vcs-repo-url"] = req.VCSRepoURL
+	}
+	if req.VCSBranch != "" {
+		attrs["vcs-branch"] = req.VCSBranch
+	}
+	if req.VCSWorkflow != "" {
+		attrs["vcs-workflow"] = req.VCSWorkflow
+	}
+	if req.AgentPoolID != "" {
+		attrs["agent-pool-id"] = req.AgentPoolID
+	}
+	if req.AutoMerge != nil {
+		attrs["auto-merge"] = *req.AutoMerge
+	}
+	if req.AutoMergeStrategy != "" {
+		attrs["auto-merge-strategy"] = req.AutoMergeStrategy
+	}
+	if req.OwnerEmail != "" {
+		attrs["owner-email"] = req.OwnerEmail
+	}
+	if req.Labels != nil {
+		attrs["labels"] = req.Labels
+	}
+	if req.VarFiles != nil {
+		attrs["var-files"] = req.VarFiles
+	}
+	if req.DriftDetectionEnabled != nil {
+		attrs["drift-detection-enabled"] = *req.DriftDetectionEnabled
+	}
+	if req.DriftDetectionIntervalSeconds != nil {
+		attrs["drift-detection-interval-seconds"] = *req.DriftDetectionIntervalSeconds
+	}
+	return attrs
+}
+
+// workspaceUpdateAttrs is workspaceCreateAttrs minus Name + OwnerEmail.
+// Sharing code via a helper that strips fields would be fragile; the
+// duplication is shallow and the trade-off favours explicit type
+// boundaries.
+func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
+	attrs := map[string]any{}
+	if req.ExecutionMode != "" {
+		attrs["execution-mode"] = req.ExecutionMode
+	}
+	if req.ExecutionBackend != "" {
+		attrs["execution-backend"] = req.ExecutionBackend
+	}
+	if req.AutoApply != nil {
+		attrs["auto-apply"] = *req.AutoApply
+	}
+	if req.TerraformVersion != "" {
+		attrs["terraform-version"] = req.TerraformVersion
+	}
+	if req.WorkingDirectory != "" {
+		attrs["working-directory"] = req.WorkingDirectory
+	}
+	if req.ResourceCPU != "" {
+		attrs["resource-cpu"] = req.ResourceCPU
+	}
+	if req.ResourceMemory != "" {
+		attrs["resource-memory"] = req.ResourceMemory
+	}
+	if req.VCSRepoURL != "" {
+		attrs["vcs-repo-url"] = req.VCSRepoURL
+	}
+	if req.VCSBranch != "" {
+		attrs["vcs-branch"] = req.VCSBranch
+	}
+	if req.VCSWorkflow != "" {
+		attrs["vcs-workflow"] = req.VCSWorkflow
+	}
+	if req.AgentPoolID != "" {
+		attrs["agent-pool-id"] = req.AgentPoolID
+	}
+	if req.AutoMerge != nil {
+		attrs["auto-merge"] = *req.AutoMerge
+	}
+	if req.AutoMergeStrategy != "" {
+		attrs["auto-merge-strategy"] = req.AutoMergeStrategy
+	}
+	if req.Labels != nil {
+		attrs["labels"] = req.Labels
+	}
+	if req.VarFiles != nil {
+		attrs["var-files"] = req.VarFiles
+	}
+	if req.DriftDetectionEnabled != nil {
+		attrs["drift-detection-enabled"] = *req.DriftDetectionEnabled
+	}
+	if req.DriftDetectionIntervalSeconds != nil {
+		attrs["drift-detection-interval-seconds"] = *req.DriftDetectionIntervalSeconds
+	}
+	return attrs
+}
+
+// workspaceRels builds the relationships block for create + update.
+// Empty vcsConnectionID returns nil — caller's MarshalResource handles
+// that by omitting the `relationships` key entirely.
+func workspaceRels(vcsConnectionID string) map[string]any {
+	if vcsConnectionID == "" {
+		return nil
+	}
+	return map[string]any{
+		"vcs-connection": map[string]any{
+			"data": map[string]any{
+				"id":   vcsConnectionID,
+				"type": "vcs-connections",
+			},
+		},
+	}
+}
+
+// parseWorkspace decodes a JSON:API single-workspace response.
+func parseWorkspace(body []byte) (*Workspace, error) {
+	res, err := ParseResource(body)
+	if err != nil {
+		return nil, fmt.Errorf("parse workspace response: %w", err)
+	}
+	return workspaceFromResource(res), nil
+}
+
+// workspaceFromResource projects the raw Resource into a typed Workspace.
+// Centralised so the list-decoding path uses the same projection as
+// the single-resource path.
+func workspaceFromResource(res *Resource) *Workspace {
+	ws := &Workspace{
+		ID:                    res.ID,
+		Name:                  GetStringAttr(res, "name"),
+		ExecutionMode:         GetStringAttr(res, "execution-mode"),
+		ExecutionBackend:      GetStringAttr(res, "execution-backend"),
+		AutoApply:             GetBoolAttr(res, "auto-apply"),
+		TerraformVersion:      GetStringAttr(res, "terraform-version"),
+		WorkingDirectory:      GetStringAttr(res, "working-directory"),
+		ResourceCPU:           GetStringAttr(res, "resource-cpu"),
+		ResourceMemory:        GetStringAttr(res, "resource-memory"),
+		VCSRepoURL:            GetStringAttr(res, "vcs-repo-url"),
+		VCSBranch:             GetStringAttr(res, "vcs-branch"),
+		VCSWorkflow:           GetStringAttr(res, "vcs-workflow"),
+		VCSConnectionID:       GetRelationshipID(res, "vcs-connection"),
+		AgentPoolID:           GetStringAttr(res, "agent-pool-id"),
+		AutoMerge:             GetBoolAttr(res, "auto-merge"),
+		AutoMergeStrategy:     GetStringAttr(res, "auto-merge-strategy"),
+		OwnerEmail:            GetStringAttr(res, "owner-email"),
+		Locked:                GetBoolAttr(res, "locked"),
+		Labels:                GetMapAttr(res, "labels"),
+		VarFiles:              GetListAttr(res, "var-files"),
+		DriftDetectionEnabled: GetBoolAttr(res, "drift-detection-enabled"),
+		DriftStatus:           GetStringAttr(res, "drift-status"),
+		DriftLastCheckedAt:    GetStringAttr(res, "drift-last-checked-at"),
+		CreatedAt:             GetStringAttr(res, "created-at"),
+		UpdatedAt:             GetStringAttr(res, "updated-at"),
+	}
+	if v := GetIntAttr(res, "drift-detection-interval-seconds"); v > 0 {
+		ws.DriftDetectionIntervalSeconds = &v
+	}
+	return ws
+}

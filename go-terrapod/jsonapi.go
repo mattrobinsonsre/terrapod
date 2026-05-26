@@ -225,6 +225,33 @@ func GetRelationshipID(r *Resource, name string) string {
 	return rr.ID
 }
 
+// ListMeta is the pagination shape Terrapod returns in the `meta`
+// block of a JSON:API list response. Every list endpoint emits this
+// shape; SDK list methods decode it via parseListMeta and surface the
+// useful fields on their typed list-result struct (Workspaces.List
+// returns WorkspaceList with CurrentPage/TotalPages/TotalCount).
+type ListMeta struct {
+	CurrentPage int `json:"current-page"`
+	TotalPages  int `json:"total-pages"`
+	TotalCount  int `json:"total-count"`
+}
+
+// parseListMeta extracts pagination info from a JSON:API list
+// response. Missing or unparsable meta returns zero-valued ListMeta
+// with no error — callers proceed without pagination info rather than
+// fail the whole list.
+func parseListMeta(body []byte) (ListMeta, error) {
+	var doc struct {
+		Meta struct {
+			Pagination ListMeta `json:"pagination"`
+		} `json:"meta"`
+	}
+	if err := json.Unmarshal(body, &doc); err != nil {
+		return ListMeta{}, err
+	}
+	return doc.Meta.Pagination, nil
+}
+
 // StripPrefix removes a typed-id prefix (e.g. "ws-abc123" → "abc123").
 // Inverse of AddPrefix. Safe to call when the prefix is already absent.
 func StripPrefix(id, prefix string) string {
