@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -118,7 +119,7 @@ func (d *workspaceDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	res, err := client.ParseResource(data)
+	res, err := terrapod.ParseResource(data)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to parse response", err.Error())
 		return
@@ -128,45 +129,45 @@ func (d *workspaceDataSource) Read(ctx context.Context, req datasource.ReadReque
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
 }
 
-func readDataSourceModel(ctx context.Context, res *client.Resource, m *workspaceDataSourceModel) diag.Diagnostics {
+func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspaceDataSourceModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	m.ID = types.StringValue(res.ID)
-	m.Name = types.StringValue(client.GetStringAttr(res, "name"))
-	m.ExecutionMode = types.StringValue(client.GetStringAttr(res, "execution-mode"))
-	m.AutoApply = types.BoolValue(client.GetBoolAttr(res, "auto-apply"))
-	m.ExecutionBackend = types.StringValue(client.GetStringAttr(res, "execution-backend"))
-	m.WorkingDirectory = types.StringValue(client.GetStringAttr(res, "working-directory"))
-	m.ResourceCPU = types.StringValue(client.GetStringAttr(res, "resource-cpu"))
-	m.ResourceMemory = types.StringValue(client.GetStringAttr(res, "resource-memory"))
-	m.OwnerEmail = types.StringValue(client.GetStringAttr(res, "owner-email"))
-	m.Locked = types.BoolValue(client.GetBoolAttr(res, "locked"))
-	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
-	m.DriftDetectionEnabled = types.BoolValue(client.GetBoolAttr(res, "drift-detection-enabled"))
+	m.Name = types.StringValue(terrapod.GetStringAttr(res, "name"))
+	m.ExecutionMode = types.StringValue(terrapod.GetStringAttr(res, "execution-mode"))
+	m.AutoApply = types.BoolValue(terrapod.GetBoolAttr(res, "auto-apply"))
+	m.ExecutionBackend = types.StringValue(terrapod.GetStringAttr(res, "execution-backend"))
+	m.WorkingDirectory = types.StringValue(terrapod.GetStringAttr(res, "working-directory"))
+	m.ResourceCPU = types.StringValue(terrapod.GetStringAttr(res, "resource-cpu"))
+	m.ResourceMemory = types.StringValue(terrapod.GetStringAttr(res, "resource-memory"))
+	m.OwnerEmail = types.StringValue(terrapod.GetStringAttr(res, "owner-email"))
+	m.Locked = types.BoolValue(terrapod.GetBoolAttr(res, "locked"))
+	m.CreatedAt = types.StringValue(terrapod.GetStringAttr(res, "created-at"))
+	m.UpdatedAt = types.StringValue(terrapod.GetStringAttr(res, "updated-at"))
+	m.DriftDetectionEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "drift-detection-enabled"))
 
-	setOptionalString(&m.TerraformVersion, client.GetStringAttr(res, "terraform-version"))
-	setOptionalString(&m.VCSRepoURL, client.GetStringAttr(res, "vcs-repo-url"))
-	setOptionalString(&m.VCSBranch, client.GetStringAttr(res, "vcs-branch"))
-	setOptionalString(&m.AgentPoolID, client.GetStringAttr(res, "agent-pool-id"))
-	setOptionalString(&m.DriftStatus, client.GetStringAttr(res, "drift-status"))
-	setOptionalString(&m.DriftLastCheckedAt, client.GetStringAttr(res, "drift-last-checked-at"))
-	setOptionalString(&m.LifecycleState, client.GetStringAttr(res, "lifecycle-state"))
-	setOptionalString(&m.LifecycleReason, client.GetStringAttr(res, "lifecycle-reason"))
+	setOptionalString(&m.TerraformVersion, terrapod.GetStringAttr(res, "terraform-version"))
+	setOptionalString(&m.VCSRepoURL, terrapod.GetStringAttr(res, "vcs-repo-url"))
+	setOptionalString(&m.VCSBranch, terrapod.GetStringAttr(res, "vcs-branch"))
+	setOptionalString(&m.AgentPoolID, terrapod.GetStringAttr(res, "agent-pool-id"))
+	setOptionalString(&m.DriftStatus, terrapod.GetStringAttr(res, "drift-status"))
+	setOptionalString(&m.DriftLastCheckedAt, terrapod.GetStringAttr(res, "drift-last-checked-at"))
+	setOptionalString(&m.LifecycleState, terrapod.GetStringAttr(res, "lifecycle-state"))
+	setOptionalString(&m.LifecycleReason, terrapod.GetStringAttr(res, "lifecycle-reason"))
 
-	if v := client.GetRelationshipID(res, "vcs-connection"); v != "" {
+	if v := terrapod.GetRelationshipID(res, "vcs-connection"); v != "" {
 		m.VCSConnectionID = types.StringValue(v)
 	} else {
 		m.VCSConnectionID = types.StringNull()
 	}
 
-	if v := client.GetIntAttr(res, "drift-detection-interval-seconds"); v > 0 {
+	if v := terrapod.GetIntAttr(res, "drift-detection-interval-seconds"); v > 0 {
 		m.DriftDetectionIntervalSeconds = types.Int64Value(v)
 	} else {
 		m.DriftDetectionIntervalSeconds = types.Int64Null()
 	}
 
-	if varFiles := client.GetListAttr(res, "var-files"); len(varFiles) > 0 {
+	if varFiles := terrapod.GetListAttr(res, "var-files"); len(varFiles) > 0 {
 		val, d := types.ListValueFrom(ctx, types.StringType, varFiles)
 		diags.Append(d...)
 		m.VarFiles = val
@@ -174,7 +175,7 @@ func readDataSourceModel(ctx context.Context, res *client.Resource, m *workspace
 		m.VarFiles = types.ListNull(types.StringType)
 	}
 
-	if labels := client.GetMapAttr(res, "labels"); len(labels) > 0 {
+	if labels := terrapod.GetMapAttr(res, "labels"); len(labels) > 0 {
 		val, d := types.MapValueFrom(ctx, types.StringType, labels)
 		diags.Append(d...)
 		m.Labels = val

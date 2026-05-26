@@ -1,25 +1,23 @@
 // Package role implements the terrapod_role data source.
-//
-// API Contract: GET /api/terrapod/v1/roles/{name}
-// Looks up a single role by name.
+// Migrated to go-terrapod (#347).
 package role
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
 var _ datasource.DataSource = &roleDataSource{}
 
 type roleDataSource struct {
-	client *client.Client
+	tc *terrapod.Client
 }
 
 type roleDataSourceModel struct {
@@ -48,15 +46,15 @@ func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 		Description: "Look up a Terrapod role by name.",
 		Attributes: map[string]schema.Attribute{
 			"name":                 schema.StringAttribute{Required: true, Description: "Role name."},
-			"description":         schema.StringAttribute{Computed: true, Description: "Description."},
-			"allow_labels":        schema.MapAttribute{Computed: true, ElementType: types.StringType, Description: "Allow labels."},
-			"allow_names":         schema.ListAttribute{Computed: true, ElementType: types.StringType, Description: "Allow name patterns."},
-			"deny_labels":         schema.MapAttribute{Computed: true, ElementType: types.StringType, Description: "Deny labels."},
-			"deny_names":          schema.ListAttribute{Computed: true, ElementType: types.StringType, Description: "Deny name patterns."},
+			"description":          schema.StringAttribute{Computed: true, Description: "Description."},
+			"allow_labels":         schema.MapAttribute{Computed: true, ElementType: types.StringType, Description: "Allow labels."},
+			"allow_names":          schema.ListAttribute{Computed: true, ElementType: types.StringType, Description: "Allow name patterns."},
+			"deny_labels":          schema.MapAttribute{Computed: true, ElementType: types.StringType, Description: "Deny labels."},
+			"deny_names":           schema.ListAttribute{Computed: true, ElementType: types.StringType, Description: "Deny name patterns."},
 			"workspace_permission": schema.StringAttribute{Computed: true, Description: "Permission level."},
-			"built_in":            schema.BoolAttribute{Computed: true, Description: "Whether the role is built-in."},
-			"created_at":          schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
-			"updated_at":          schema.StringAttribute{Computed: true, Description: "Update timestamp."},
+			"built_in":             schema.BoolAttribute{Computed: true, Description: "Whether the role is built-in."},
+			"created_at":           schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
+			"updated_at":           schema.StringAttribute{Computed: true, Description: "Update timestamp."},
 		},
 	}
 }
@@ -70,7 +68,12 @@ func (d *roleDataSource) Configure(_ context.Context, req datasource.ConfigureRe
 		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *client.Client, got %T", req.ProviderData))
 		return
 	}
-	d.client = c
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	d.tc = tc
 }
 
 func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -80,147 +83,51 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 
-	data, err := d.client.Get(ctx, "/api/terrapod/v1/roles/"+config.Name.ValueString())
+	role, err := d.tc.GetRole(ctx, config.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to read role", err.Error())
 		return
 	}
 
-	// The roles API uses "name" at the data level instead of "id",
-	// so we can't use client.ParseResource which expects standard JSON:API.
-	res, err := parseRoleResponse(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
+	config.Name = types.StringValue(role.Name)
+	if role.Description != "" {
+		config.Description = types.StringValue(role.Description)
+	} else {
+		config.Description = types.StringNull()
 	}
+	config.WorkspacePermission = types.StringValue(role.WorkspacePermission)
+	config.BuiltIn = types.BoolValue(role.BuiltIn)
+	config.CreatedAt = types.StringValue(role.CreatedAt)
+	config.UpdatedAt = types.StringValue(role.UpdatedAt)
 
-	config.Name = types.StringValue(res.Name)
-
-	config.Description = stringOrNull(getStringFromMap(res.Attributes, "description"))
-	config.WorkspacePermission = types.StringValue(getStringFromMap(res.Attributes, "workspace-permission"))
-	config.BuiltIn = types.BoolValue(getBoolFromMap(res.Attributes, "built-in"))
-	config.CreatedAt = types.StringValue(getStringFromMap(res.Attributes, "created-at"))
-	config.UpdatedAt = types.StringValue(getStringFromMap(res.Attributes, "updated-at"))
-
-	if raw, ok := res.Attributes["allow-labels"]; ok && raw != nil {
-		if labels, ok := raw.(map[string]any); ok && len(labels) > 0 {
-			strLabels := make(map[string]string, len(labels))
-			for k, v := range labels {
-				strLabels[k] = fmt.Sprintf("%v", v)
-			}
-			val, diags := types.MapValueFrom(ctx, types.StringType, strLabels)
-			resp.Diagnostics.Append(diags...)
-			config.AllowLabels = val
-		} else {
-			config.AllowLabels = types.MapNull(types.StringType)
-		}
+	if len(role.AllowLabels) > 0 {
+		val, dl := types.MapValueFrom(ctx, types.StringType, role.AllowLabels)
+		resp.Diagnostics.Append(dl...)
+		config.AllowLabels = val
 	} else {
 		config.AllowLabels = types.MapNull(types.StringType)
 	}
-
-	if raw, ok := res.Attributes["deny-labels"]; ok && raw != nil {
-		if labels, ok := raw.(map[string]any); ok && len(labels) > 0 {
-			strLabels := make(map[string]string, len(labels))
-			for k, v := range labels {
-				strLabels[k] = fmt.Sprintf("%v", v)
-			}
-			val, diags := types.MapValueFrom(ctx, types.StringType, strLabels)
-			resp.Diagnostics.Append(diags...)
-			config.DenyLabels = val
-		} else {
-			config.DenyLabels = types.MapNull(types.StringType)
-		}
+	if len(role.DenyLabels) > 0 {
+		val, dl := types.MapValueFrom(ctx, types.StringType, role.DenyLabels)
+		resp.Diagnostics.Append(dl...)
+		config.DenyLabels = val
 	} else {
 		config.DenyLabels = types.MapNull(types.StringType)
 	}
-
-	if raw, ok := res.Attributes["allow-names"]; ok && raw != nil {
-		if names, ok := raw.([]any); ok && len(names) > 0 {
-			strNames := make([]string, 0, len(names))
-			for _, v := range names {
-				strNames = append(strNames, fmt.Sprintf("%v", v))
-			}
-			val, diags := types.ListValueFrom(ctx, types.StringType, strNames)
-			resp.Diagnostics.Append(diags...)
-			config.AllowNames = val
-		} else {
-			config.AllowNames = types.ListNull(types.StringType)
-		}
+	if len(role.AllowNames) > 0 {
+		val, dl := types.ListValueFrom(ctx, types.StringType, role.AllowNames)
+		resp.Diagnostics.Append(dl...)
+		config.AllowNames = val
 	} else {
 		config.AllowNames = types.ListNull(types.StringType)
 	}
-
-	if raw, ok := res.Attributes["deny-names"]; ok && raw != nil {
-		if names, ok := raw.([]any); ok && len(names) > 0 {
-			strNames := make([]string, 0, len(names))
-			for _, v := range names {
-				strNames = append(strNames, fmt.Sprintf("%v", v))
-			}
-			val, diags := types.ListValueFrom(ctx, types.StringType, strNames)
-			resp.Diagnostics.Append(diags...)
-			config.DenyNames = val
-		} else {
-			config.DenyNames = types.ListNull(types.StringType)
-		}
+	if len(role.DenyNames) > 0 {
+		val, dl := types.ListValueFrom(ctx, types.StringType, role.DenyNames)
+		resp.Diagnostics.Append(dl...)
+		config.DenyNames = val
 	} else {
 		config.DenyNames = types.ListNull(types.StringType)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
-}
-
-// roleResponseData holds the parsed role response.
-type roleResponseData struct {
-	Name       string
-	Attributes map[string]any
-}
-
-// parseRoleResponse extracts a role from a JSON:API response.
-// The roles API uses "name" as the identifier, not "id".
-func parseRoleResponse(data []byte) (*roleResponseData, error) {
-	var doc struct {
-		Data struct {
-			Name       string         `json:"name"`
-			Type       string         `json:"type"`
-			Attributes map[string]any `json:"attributes"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(data, &doc); err != nil {
-		return nil, err
-	}
-	return &roleResponseData{
-		Name:       doc.Data.Name,
-		Attributes: doc.Data.Attributes,
-	}, nil
-}
-
-func getStringFromMap(m map[string]any, key string) string {
-	v, ok := m[key]
-	if !ok || v == nil {
-		return ""
-	}
-	s, ok := v.(string)
-	if !ok {
-		return fmt.Sprintf("%v", v)
-	}
-	return s
-}
-
-func getBoolFromMap(m map[string]any, key string) bool {
-	v, ok := m[key]
-	if !ok || v == nil {
-		return false
-	}
-	b, ok := v.(bool)
-	if !ok {
-		return false
-	}
-	return b
-}
-
-func stringOrNull(s string) types.String {
-	if s == "" {
-		return types.StringNull()
-	}
-	return types.StringValue(s)
 }

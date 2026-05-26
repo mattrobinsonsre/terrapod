@@ -1,30 +1,28 @@
 // Package workspaces implements the terrapod_workspaces data source (list).
-//
-// API Contract: GET /api/v2/organizations/default/workspaces?search[name]={search}
-// Returns a filtered list of workspaces. Supports name substring search.
+// Migrated to go-terrapod (#347).
 package workspaces
 
 import (
 	"context"
 	"fmt"
-	"net/url"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
 var _ datasource.DataSource = &workspacesDataSource{}
 
 type workspacesDataSource struct {
-	client *client.Client
+	tc *terrapod.Client
 }
 
 type workspacesDataSourceModel struct {
-	Search     types.String             `tfsdk:"search"`
-	Workspaces []workspaceSummaryModel  `tfsdk:"workspaces"`
+	Search     types.String            `tfsdk:"search"`
+	Workspaces []workspaceSummaryModel `tfsdk:"workspaces"`
 }
 
 type workspaceSummaryModel struct {
@@ -34,7 +32,6 @@ type workspaceSummaryModel struct {
 	Locked        types.Bool   `tfsdk:"locked"`
 }
 
-// NewDataSource returns a new workspaces list data source.
 func NewDataSource() datasource.DataSource {
 	return &workspacesDataSource{}
 }
@@ -76,7 +73,12 @@ func (d *workspacesDataSource) Configure(_ context.Context, req datasource.Confi
 		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *client.Client, got %T", req.ProviderData))
 		return
 	}
-	d.client = c
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	d.tc = tc
 }
 
 func (d *workspacesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -86,31 +88,39 @@ func (d *workspacesDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	path := "/api/v2/organizations/default/workspaces"
-	if !config.Search.IsNull() && config.Search.ValueString() != "" {
-		path += "?search[name]=" + url.QueryEscape(config.Search.ValueString())
+	opts := terrapod.WorkspaceListOptions{}
+	if !config.Search.IsNull() {
+		opts.Search = config.Search.ValueString()
 	}
 
-	data, err := d.client.Get(ctx, path)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to list workspaces", err.Error())
-		return
+	// The data source historically returned everything matching the
+	// filter in one go (no pagination knobs in the HCL shape). Drive
+	// pagination explicitly so a large org doesn't truncate at the
+	// server-default page size.
+	workspaces := make([]workspaceSummaryModel, 0)
+	opts.PageNumber = 1
+	if opts.PageSize == 0 {
+		opts.PageSize = 100
 	}
-
-	resources, err := client.ParseResourceList(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
-	workspaces := make([]workspaceSummaryModel, 0, len(resources))
-	for _, r := range resources {
-		workspaces = append(workspaces, workspaceSummaryModel{
-			ID:            types.StringValue(r.ID),
-			Name:          types.StringValue(client.GetStringAttr(&r, "name")),
-			ExecutionMode: types.StringValue(client.GetStringAttr(&r, "execution-mode")),
-			Locked:        types.BoolValue(client.GetBoolAttr(&r, "locked")),
-		})
+	for {
+		list, err := d.tc.ListWorkspaces(ctx, opts)
+		if err != nil {
+			resp.Diagnostics.AddError("Failed to list workspaces", err.Error())
+			return
+		}
+		for i := range list.Items {
+			ws := &list.Items[i]
+			workspaces = append(workspaces, workspaceSummaryModel{
+				ID:            types.StringValue(ws.ID),
+				Name:          types.StringValue(ws.Name),
+				ExecutionMode: types.StringValue(ws.ExecutionMode),
+				Locked:        types.BoolValue(ws.Locked),
+			})
+		}
+		if list.TotalPages == 0 || opts.PageNumber >= list.TotalPages {
+			break
+		}
+		opts.PageNumber++
 	}
 
 	config.Workspaces = workspaces
