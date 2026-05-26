@@ -1,6 +1,7 @@
 package writer
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -256,5 +257,233 @@ func TestWriter_Apply_RecordsErrors(t *testing.T) {
 	}
 	if report.Workspaces[0].State != "errored" {
 		t.Errorf("workspace state: %q", report.Workspaces[0].State)
+	}
+}
+
+// fakeStateReader builds a StateReader that always returns the same
+// (raw, lineage, serial) triple. Used by the safety-path tests
+// below.
+func fakeStateReader(raw []byte, lineage string, serial int64) StateReader {
+	return func(_ context.Context, _ string) ([]byte, string, int64, error) {
+		return raw, lineage, serial, nil
+	}
+}
+
+// stateScenarioServer is a fake Terrapod that supports the
+// state-version create/upload/get flow with configurable behaviour:
+//   - createStatus / createBody : what to return on POST /state-versions
+//   - putStatus              : what to return on PUT /state-versions/{id}/content
+//   - currentSV              : what GetCurrentStateVersion returns (nil → 404)
+//   - rollbackOK             : if false, the DELETE returns 500
+//
+// Tests use it to drive each safety branch without standing up a
+// full Terrapod.
+type stateScenarioServer struct {
+	createStatus  int
+	createBody    string
+	putStatus     int
+	currentSV     *terrapod.StateVersion
+	rollbackOK    bool
+	createCalled  int
+	putCalled     int
+	deleteCalled  int
+	currentCalled int
+}
+
+func newStateScenarioClient(t *testing.T, s *stateScenarioServer) *terrapod.Client {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/state-versions"):
+			s.createCalled++
+			body := s.createBody
+			if body == "" {
+				body = `{"data":{"id":"sv-new","type":"state-versions","attributes":{"serial":1,"lineage":"L1","md5":""}}}`
+			}
+			w.WriteHeader(s.createStatus)
+			_, _ = w.Write([]byte(body))
+		case r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/content"):
+			s.putCalled++
+			w.WriteHeader(s.putStatus)
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/current-state-version"):
+			s.currentCalled++
+			if s.currentSV == nil {
+				http.Error(w, `{"errors":[{"status":"404","detail":"none"}]}`, http.StatusNotFound)
+				return
+			}
+			_, _ = w.Write([]byte(stateVersionJSON(s.currentSV)))
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/state-versions/") && strings.HasSuffix(r.URL.Path, "/manage"):
+			s.deleteCalled++
+			if !s.rollbackOK {
+				http.Error(w, `{"errors":[{"status":"500","detail":"rollback boom"}]}`, http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.Error(w, "unhandled "+r.Method+" "+r.URL.Path, http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	c, err := terrapod.NewClient(terrapod.Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
+func stateVersionJSON(sv *terrapod.StateVersion) string {
+	return `{"data":{"id":"` + sv.ID + `","type":"state-versions","attributes":{"serial":` +
+		fmtInt(sv.Serial) + `,"lineage":"` + sv.Lineage + `","md5":"` + sv.MD5 + `","state-size":` + fmtInt(sv.StateSize) + `}}}`
+}
+
+func fmtInt(n int64) string {
+	if n == 0 {
+		return "0"
+	}
+	var b []byte
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	for n > 0 {
+		b = append([]byte{byte('0' + n%10)}, b...)
+		n /= 10
+	}
+	if neg {
+		b = append([]byte{'-'}, b...)
+	}
+	return string(b)
+}
+
+// TestApplyState_LineageMismatch_RefusesUpload exercises the round-1
+// pre-check that prevents an unrelated state lineage from being
+// overwritten silently.
+func TestApplyState_LineageMismatch_RefusesUpload(t *testing.T) {
+	scenario := &stateScenarioServer{
+		currentSV: &terrapod.StateVersion{ID: "sv-existing", Serial: 5, Lineage: "L_OTHER", StateSize: 1234, MD5: "abc"},
+	}
+	c := newStateScenarioClient(t, scenario)
+	w := New(c, &framework.State{}, "")
+
+	out := w.applyState(t.Context(), "ws-1", "src-1", fakeStateReader([]byte("state-body"), "L_SOURCE", 7))
+	if out.State != "errored" {
+		t.Fatalf("expected errored, got %q (err=%q)", out.State, out.Error)
+	}
+	if !strings.Contains(out.Error, "lineage") {
+		t.Errorf("error should mention lineage: %q", out.Error)
+	}
+	if scenario.createCalled != 0 {
+		t.Errorf("must not have called CreateStateVersion on lineage mismatch")
+	}
+}
+
+// TestApplyState_DestSerialAhead_RefusesUpload exercises the
+// "destination has advanced" guard. Even with matching lineage we
+// refuse rather than roll back operator work.
+func TestApplyState_DestSerialAhead_RefusesUpload(t *testing.T) {
+	scenario := &stateScenarioServer{
+		currentSV: &terrapod.StateVersion{ID: "sv-existing", Serial: 10, Lineage: "L_SOURCE", StateSize: 1234, MD5: "abc"},
+	}
+	c := newStateScenarioClient(t, scenario)
+	w := New(c, &framework.State{}, "")
+
+	out := w.applyState(t.Context(), "ws-1", "src-1", fakeStateReader([]byte("state-body"), "L_SOURCE", 7))
+	if out.State != "errored" || !strings.Contains(out.Error, "serial") {
+		t.Fatalf("expected serial-advanced error, got %q / %q", out.State, out.Error)
+	}
+	if scenario.createCalled != 0 {
+		t.Errorf("must not upload when destination is ahead")
+	}
+}
+
+// TestApplyState_PreCheckTransientError_HardFails verifies that a
+// network/5xx failure on the pre-check (NOT a 404) is treated as a
+// hard error rather than "no state, proceed".
+func TestApplyState_PreCheckTransientError_HardFails(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Every request 500s — including the pre-check GET.
+		http.Error(w, `{"errors":[{"status":"500","detail":"flake"}]}`, http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	c, _ := terrapod.NewClient(terrapod.Options{BaseURL: srv.URL, Token: "t", MaxRetries: 0})
+	w := New(c, &framework.State{}, "")
+
+	out := w.applyState(t.Context(), "ws-1", "src-1", fakeStateReader([]byte("state-body"), "L_SOURCE", 7))
+	if out.State != "errored" {
+		t.Fatalf("expected errored on transient pre-check failure, got %q", out.State)
+	}
+	if !strings.Contains(out.Error, "pre-check") {
+		t.Errorf("error should mention pre-check: %q", out.Error)
+	}
+}
+
+// TestApplyState_EmptyPlaceholder_409_RefusesAsUnchanged is the
+// round-2 P0 regression test. A prior run's orphan rollback failed,
+// leaving a state-size=0 row at the source's serial. The 409 path
+// MUST NOT mark this as `unchanged` — that would claim success
+// while the workspace points at zero-byte state.
+func TestApplyState_EmptyPlaceholder_409_RefusesAsUnchanged(t *testing.T) {
+	scenario := &stateScenarioServer{
+		createStatus: http.StatusConflict,
+		createBody:   `{"errors":[{"status":"409","detail":"serial exists"}]}`,
+		currentSV: &terrapod.StateVersion{
+			ID: "sv-orphan", Serial: 7, Lineage: "L_SOURCE", StateSize: 0, MD5: "",
+		},
+	}
+	c := newStateScenarioClient(t, scenario)
+	w := New(c, &framework.State{}, "")
+
+	out := w.applyState(t.Context(), "ws-1", "src-1", fakeStateReader([]byte("state-body"), "L_SOURCE", 7))
+	if out.State != "errored" {
+		t.Fatalf("expected errored on empty-placeholder 409, got %q (err=%q)", out.State, out.Error)
+	}
+	if !strings.Contains(out.Error, "orphan") {
+		t.Errorf("error should mention orphan placeholder: %q", out.Error)
+	}
+}
+
+// TestApplyState_FreshWorkspace_NotFound_Proceeds verifies the
+// pre-check correctly treats a 404 from GetCurrentStateVersion as
+// "fresh workspace, OK to proceed" rather than a hard fail.
+func TestApplyState_FreshWorkspace_NotFound_Proceeds(t *testing.T) {
+	scenario := &stateScenarioServer{
+		createStatus: http.StatusCreated,
+		createBody:   `{"data":{"id":"sv-new","type":"state-versions","attributes":{"serial":1,"lineage":"L_SOURCE","state-size":11}}}`,
+		putStatus:    http.StatusOK,
+		currentSV:    nil, // → 404
+	}
+	c := newStateScenarioClient(t, scenario)
+	w := New(c, &framework.State{}, "")
+
+	out := w.applyState(t.Context(), "ws-1", "src-1", fakeStateReader([]byte("state-body"), "L_SOURCE", 1))
+	if out.State != "uploaded" {
+		t.Fatalf("expected uploaded on fresh workspace, got %q (err=%q)", out.State, out.Error)
+	}
+	if scenario.putCalled != 1 {
+		t.Errorf("expected one PUT, got %d", scenario.putCalled)
+	}
+}
+
+// TestApplyState_UploadFails_OrphanRollback verifies that when the
+// /content PUT fails, CreateAndUploadState's rollback fires and
+// the orphan record is DELETEd.
+func TestApplyState_UploadFails_OrphanRollback(t *testing.T) {
+	scenario := &stateScenarioServer{
+		createStatus: http.StatusCreated,
+		createBody:   `{"data":{"id":"sv-new","type":"state-versions","attributes":{"serial":1,"lineage":"L_SOURCE","state-size":0}}}`,
+		putStatus:    http.StatusInternalServerError,
+		currentSV:    nil,
+		rollbackOK:   true,
+	}
+	c := newStateScenarioClient(t, scenario)
+	w := New(c, &framework.State{}, "")
+
+	out := w.applyState(t.Context(), "ws-1", "src-1", fakeStateReader([]byte("state-body"), "L_SOURCE", 1))
+	if out.State != "errored" {
+		t.Fatalf("expected errored on upload failure, got %q", out.State)
+	}
+	if scenario.deleteCalled != 1 {
+		t.Errorf("expected rollback DELETE, got %d calls", scenario.deleteCalled)
 	}
 }

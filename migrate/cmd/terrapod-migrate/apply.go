@@ -336,6 +336,28 @@ func printReportSummary(r *writer.Report, dryRun bool) {
 			fmt.Printf("    - %s %q: %s\n", s.Kind, s.Name, s.Reason)
 		}
 	}
+
+	// Sensitive variables that landed on the destination as empty
+	// rows need explicit operator action post-cutover. Surface them
+	// distinctly from generic Skipped items so they don't get lost
+	// in a wall of "skipped" output. The handover doc renders the
+	// same set under "Manual Action Required".
+	var needsValue []string
+	for _, ws := range r.Workspaces {
+		for _, v := range ws.VarOutcomes {
+			if v.State == "needs_value" {
+				needsValue = append(needsValue, fmt.Sprintf("%s / %s", ws.Name, v.Key))
+			}
+		}
+	}
+	if len(needsValue) > 0 {
+		fmt.Printf("\n  sensitive variables needing operator action (%d):\n", len(needsValue))
+		fmt.Println("    These were created as empty rows with sensitive=true. Open each")
+		fmt.Println("    workspace in Terrapod and fill in the value before the next plan.")
+		for _, n := range needsValue {
+			fmt.Printf("    - %s\n", n)
+		}
+	}
 }
 
 // statusCmd prints the contents of the migration state file. Used by

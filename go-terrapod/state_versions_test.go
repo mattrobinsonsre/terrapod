@@ -113,3 +113,92 @@ func TestGetCurrentStateVersion(t *testing.T) {
 		t.Errorf("state-version: %+v", sv)
 	}
 }
+
+// TestUploadStateContent_ContentType pins the wire format for the
+// content endpoint: raw state bytes, Content-Type
+// application/octet-stream (NOT application/vnd.api+json). A
+// regression here would silently break a future stricter server.
+func TestUploadStateContent_ContentType(t *testing.T) {
+	var gotContentType string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/content") {
+			gotContentType = r.Header.Get("Content-Type")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		http.Error(w, "unhandled", http.StatusNotFound)
+	}))
+	defer srv.Close()
+	c, _ := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err := c.UploadStateContent(t.Context(), "sv-x", []byte("raw")); err != nil {
+		t.Fatal(err)
+	}
+	if gotContentType != "application/octet-stream" {
+		t.Errorf("Content-Type = %q, want application/octet-stream", gotContentType)
+	}
+}
+
+// TestCreateAndUploadState_RollbackOnUploadFail verifies the round-1
+// orphan-rollback behaviour: when the /content PUT fails, the SDK
+// must DELETE the just-created state-version record so a retry at
+// the same serial doesn't 409-collide.
+func TestCreateAndUploadState_RollbackOnUploadFail(t *testing.T) {
+	var sawDelete bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/state-versions"):
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"data":{"id":"sv-xxx","type":"state-versions","attributes":{"serial":1,"lineage":"L"}}}`))
+		case r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/content"):
+			http.Error(w, `{"errors":[{"status":"500","detail":"boom"}]}`, http.StatusInternalServerError)
+		case r.Method == http.MethodDelete &&
+			strings.HasPrefix(r.URL.Path, "/api/terrapod/v1/state-versions/") &&
+			strings.HasSuffix(r.URL.Path, "/manage"):
+			sawDelete = true
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.Error(w, "unhandled "+r.URL.Path, http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+	c, _ := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+
+	_, err := c.CreateAndUploadState(t.Context(), "ws-a", []byte("state"), CreateStateVersionRequest{Serial: 1, Lineage: "L"})
+	if err == nil {
+		t.Fatal("expected upload error")
+	}
+	if !sawDelete {
+		t.Errorf("expected orphan rollback DELETE, never fired")
+	}
+}
+
+// TestGetAgentPoolToken_NotFound pins the round-1 contract change —
+// the lookup used to return (nil, nil) on missing-id; it must now
+// return *NotFoundError to match every other Get* in this SDK.
+func TestGetAgentPoolToken_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":[],"meta":{"pagination":{"current-page":1,"total-pages":1,"total-count":0,"page-size":20}}}`))
+	}))
+	defer srv.Close()
+	c, _ := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	tok, err := c.GetAgentPoolToken(t.Context(), "ap-x", "nope")
+	if !IsNotFound(err) {
+		t.Errorf("expected NotFoundError, got err=%v tok=%+v", err, tok)
+	}
+}
+
+// TestGetVarsetVariable_NotFound — same contract test for varset
+// variables.
+func TestGetVarsetVariable_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	}))
+	defer srv.Close()
+	c, _ := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	v, err := c.GetVarsetVariable(t.Context(), "vs-x", "nope")
+	if !IsNotFound(err) {
+		t.Errorf("expected NotFoundError, got err=%v v=%+v", err, v)
+	}
+}

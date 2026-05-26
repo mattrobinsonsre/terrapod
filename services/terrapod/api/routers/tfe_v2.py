@@ -1699,7 +1699,30 @@ async def upload_state_content(
     if sv is None:
         raise HTTPException(status_code=404, detail="State version not found")
 
+    # Cap state body size to prevent OOM. Real-world terraform states
+    # rarely exceed ~50 MB; 256 MB is a generous upper bound that
+    # still leaves headroom for the rest of the worker. Bigger states
+    # should be split — terraform itself struggles with multi-GB
+    # state files. Cap is enforced both via Content-Length pre-check
+    # (cheap reject before allocating) and via the read length after
+    # the fact (guards against missing/lying headers).
+    state_max_bytes = 256 * 1024 * 1024
+    cl_raw = request.headers.get("content-length")
+    if cl_raw is not None:
+        try:
+            if int(cl_raw) > state_max_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"State exceeds {state_max_bytes} bytes; split the workspace or contact your operator",
+                )
+        except ValueError:
+            pass  # malformed header — let body read enforce the cap
     state_data = await request.body()
+    if len(state_data) > state_max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"State exceeds {state_max_bytes} bytes; split the workspace or contact your operator",
+        )
     if not state_data:
         raise HTTPException(status_code=422, detail="State data is required")
 

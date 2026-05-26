@@ -445,18 +445,19 @@ func (w *Writer) applyState(ctx context.Context, terrapodID, sourceID string, re
 	}
 
 	// Destination-side safety net: before uploading, look at what's
-	// currently on Terrapod for this workspace. Two cases force a
-	// hard error rather than upload:
-	//   1. Destination's lineage differs from source's → these are
-	//      unrelated terraform states; uploading would silently
-	//      displace the unrelated state.
-	//   2. Destination's serial is HIGHER than source's → the
-	//      destination has advanced past what we're migrating;
-	//      uploading would roll back operator work that happened
-	//      between iterations.
-	// Both cases need operator decision — the migrator must never
-	// auto-resolve.
-	if dest, err := w.client.GetCurrentStateVersion(ctx, terrapodID); err == nil && dest != nil {
+	// currently on Terrapod for this workspace. Three outcomes:
+	//   - NotFound (fresh workspace, no state) → proceed
+	//   - dest lineage differs from source → hard error (would
+	//     silently displace an unrelated state)
+	//   - dest serial > source serial → hard error (would roll
+	//     back operator work between iterations)
+	//   - other error (transient network, 5xx) → hard error (do
+	//     NOT proceed; the safety net is the only guard against
+	//     silent overwrite, so treating a flake as "no state" is
+	//     unsafe)
+	dest, err := w.client.GetCurrentStateVersion(ctx, terrapodID)
+	switch {
+	case err == nil && dest != nil:
 		if dest.Lineage != "" && dest.Lineage != lineage {
 			out.State = "errored"
 			out.Error = fmt.Sprintf(
@@ -471,6 +472,12 @@ func (w *Writer) applyState(ctx context.Context, terrapodID, sourceID string, re
 				dest.Serial, serial)
 			return out
 		}
+	case terrapod.IsNotFound(err):
+		// Fresh workspace, no state yet — fine.
+	case err != nil:
+		out.State = "errored"
+		out.Error = fmt.Sprintf("destination state pre-check failed: %v — refusing to upload blind", err)
+		return out
 	}
 
 	sv, err := w.client.CreateAndUploadState(ctx, terrapodID, raw, terrapod.CreateStateVersionRequest{
@@ -481,8 +488,13 @@ func (w *Writer) applyState(ctx context.Context, terrapodID, sourceID string, re
 		// 409 conflict means a state version with this exact serial
 		// already exists for the workspace. Treat as `unchanged`
 		// ONLY when the destination's current state matches our
-		// source's lineage — otherwise it's a different state
-		// already at this serial, which is a fatal collision.
+		// source's lineage AND has real content uploaded. An empty
+		// placeholder (state_size == 0) means a prior run's orphan
+		// rollback failed; declaring success here would leave the
+		// workspace pointing at zero-byte state. Surface as an
+		// error so the operator can manually delete the placeholder
+		// (the API's manage endpoint allows deleting empty
+		// current-version rows).
 		var conflict *terrapod.ConflictError
 		if errors.As(err, &conflict) {
 			dest, gerr := w.client.GetCurrentStateVersion(ctx, terrapodID)
@@ -496,6 +508,13 @@ func (w *Writer) applyState(ctx context.Context, terrapodID, sourceID string, re
 				out.Error = fmt.Sprintf(
 					"conflict on state upload: destination has serial %d with lineage %q, source has lineage %q — resolve manually",
 					dest.Serial, dest.Lineage, lineage)
+				return out
+			}
+			if dest.StateSize == 0 {
+				out.State = "errored"
+				out.Error = fmt.Sprintf(
+					"conflict on state upload: destination state-version %s exists at serial %d but has size 0 (orphan from a prior failed upload). Delete it via `DELETE /api/terrapod/v1/state-versions/%s/manage` and re-run apply.",
+					dest.ID, dest.Serial, dest.ID)
 				return out
 			}
 			out.State = "unchanged"
@@ -605,12 +624,26 @@ func (w *Writer) applyVariable(ctx context.Context, workspaceID, workspaceSource
 // reconcileVariable PATCHes an existing variable to align its value,
 // category, HCL and description with the source. Used on Apply-mode
 // 409 to recover from a partial prior run rather than leaving the
-// destination at a stale value. Sensitive variables are NEVER
-// reconciled — operator-entered secrets must not be clobbered.
+// destination at a stale value.
+//
+// Safety:
+//   - Sensitive source variables are filtered out by the caller —
+//     reconcile is never invoked for them, so operator-entered
+//     secrets are not clobbered.
+//   - If the DESTINATION row is sensitive (operator hand-flagged it
+//     post-cutover), reconcile refuses the PATCH — the source's
+//     non-sensitive value would silently overwrite the operator's
+//     secret. Surfaced as a clear error so the operator can decide.
 func (w *Writer) reconcileVariable(ctx context.Context, workspaceID string, req terrapod.CreateVariableRequest) error {
-	existing, err := w.client.GetVariable(ctx, workspaceID, req.Key)
+	// GetVariable filters by id, not key — the SDK has no per-key
+	// lookup, so we list and match. The list is small (one workspace's
+	// vars) so the per-409 cost is bounded.
+	existing, err := w.findVariableByKey(ctx, workspaceID, req.Key)
 	if err != nil {
-		return fmt.Errorf("get existing %q: %w", req.Key, err)
+		return fmt.Errorf("locate existing %q: %w", req.Key, err)
+	}
+	if existing.Sensitive {
+		return fmt.Errorf("destination variable %q is flagged sensitive — refusing to overwrite an operator-entered value with the source's non-sensitive value", req.Key)
 	}
 	hcl := req.HCL
 	updReq := terrapod.UpdateVariableRequest{
@@ -623,6 +656,22 @@ func (w *Writer) reconcileVariable(ctx context.Context, workspaceID string, req 
 		return fmt.Errorf("patch %q: %w", req.Key, err)
 	}
 	return nil
+}
+
+// findVariableByKey lists workspace variables and returns the one
+// matching the given key. Returns *NotFoundError when absent so
+// callers can react with the standard IsNotFound predicate.
+func (w *Writer) findVariableByKey(ctx context.Context, workspaceID, key string) (*terrapod.Variable, error) {
+	vars, err := w.client.ListVariables(ctx, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range vars {
+		if vars[i].Key == key {
+			return &vars[i], nil
+		}
+	}
+	return nil, &terrapod.NotFoundError{Resource: "variable", ID: key}
 }
 
 // ── State plumbing ───────────────────────────────────────────────────
