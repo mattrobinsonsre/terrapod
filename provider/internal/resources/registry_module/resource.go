@@ -1,38 +1,9 @@
-// Package registry_module implements the terrapod_registry_module resource.
-//
-// API Contract (Terrapod API ↔ Terraform Provider):
-//
-//	JSON:API type: "registry-modules"
-//	ID: UUID (no prefix)
-//	Create:  POST   /api/terrapod/v1/registry-modules
-//	Read:    GET    /api/terrapod/v1/registry-modules/private/default/{name}/{provider}
-//	Update:  PATCH  /api/terrapod/v1/registry-modules/private/default/{name}/{provider}
-//	Delete:  DELETE /api/terrapod/v1/registry-modules/private/default/{name}/{provider}
-//
-// Attribute mapping:
-//
-//	"name"               → name               (string, required, forces new)
-//	"provider"           → provider_name      (string, required, forces new)
-//	"labels"             → labels             (map, optional)
-//	"vcs-connection-id"  → vcs_connection_id  (string, optional)
-//	"vcs-repo-url"       → vcs_repo_url       (string, optional)
-//	"vcs-branch"         → vcs_branch         (string, optional)
-//	"vcs-tag-pattern"    → vcs_tag_pattern    (string, optional)
-//
-// Read-only:
-//
-//	"namespace"    → namespace    (string, always "default")
-//	"status"       → status       (string)
-//	"owner-email"  → owner_email  (string)
-//	"source"       → source       (string)
-//	"created-at"   → created_at   (string)
-//	"updated-at"   → updated_at   (string)
-//
-// Import: name/provider (e.g. "my-module/aws")
+// Package registry_module — migrated to go-terrapod (#347).
 package registry_module
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -44,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -71,11 +43,10 @@ var (
 
 type registryModuleResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
-func NewResource() resource.Resource {
-	return &registryModuleResource{}
-}
+func NewResource() resource.Resource { return &registryModuleResource{} }
 
 func (r *registryModuleResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_registry_module"
@@ -85,48 +56,20 @@ func (r *registryModuleResource) Schema(_ context.Context, _ resource.SchemaRequ
 	resp.Schema = schema.Schema{
 		Description: "Manages a private module in the Terrapod registry.",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				Computed: true, Description: "Module ID.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"name": schema.StringAttribute{
-				Required: true, Description: "Module name.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"provider_name": schema.StringAttribute{
-				Required: true, Description: "Provider name (e.g. aws, gcp).",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"labels": schema.MapAttribute{
-				Optional: true, ElementType: types.StringType,
-				Description: "Labels for RBAC evaluation.",
-			},
+			"id":   schema.StringAttribute{Computed: true, Description: "Module ID.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"name": schema.StringAttribute{Required: true, Description: "Module name.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"provider_name": schema.StringAttribute{Required: true, Description: "Provider name (e.g. aws, gcp).", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"labels":            schema.MapAttribute{Optional: true, ElementType: types.StringType, Description: "Labels for RBAC evaluation."},
 			"vcs_connection_id": schema.StringAttribute{Optional: true, Description: "VCS connection ID."},
 			"vcs_repo_url":      schema.StringAttribute{Optional: true, Description: "VCS repo URL."},
 			"vcs_branch":        schema.StringAttribute{Optional: true, Description: "VCS branch."},
 			"vcs_tag_pattern":   schema.StringAttribute{Optional: true, Description: "VCS tag pattern (e.g. v*)."},
-			"namespace": schema.StringAttribute{
-				Computed: true, Description: "Namespace (always default).",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"status": schema.StringAttribute{
-				Computed: true, Description: "Module status.",
-			},
-			"owner_email": schema.StringAttribute{
-				Computed: true, Description: "Owner email.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"source": schema.StringAttribute{
-				Computed: true, Description: "Source (upload or vcs).",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"created_at": schema.StringAttribute{
-				Computed: true, Description: "Creation timestamp.",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"updated_at": schema.StringAttribute{
-				Computed: true, Description: "Update timestamp.",
-			},
+			"namespace":         schema.StringAttribute{Computed: true, Description: "Namespace (always default).", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"status":            schema.StringAttribute{Computed: true, Description: "Module status."},
+			"owner_email":       schema.StringAttribute{Computed: true, Description: "Owner email.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"source":            schema.StringAttribute{Computed: true, Description: "Source (upload or vcs).", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"created_at":        schema.StringAttribute{Computed: true, Description: "Creation timestamp.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"updated_at":        schema.StringAttribute{Computed: true, Description: "Update timestamp."},
 		},
 	}
 }
@@ -141,11 +84,12 @@ func (r *registryModuleResource) Configure(_ context.Context, req resource.Confi
 		return
 	}
 	r.client = c
-}
-
-func (r *registryModuleResource) modulePath(m *registryModuleModel) string {
-	return fmt.Sprintf("/api/terrapod/v1/registry-modules/private/default/%s/%s",
-		m.Name.ValueString(), m.ProviderName.ValueString())
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *registryModuleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -154,27 +98,36 @@ func (r *registryModuleResource) Create(ctx context.Context, req resource.Create
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	attrs := buildModuleAttrs(&plan)
-	body, err := client.MarshalResource("registry-modules", attrs, nil)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
+	sdkReq := terrapod.CreateRegistryModuleRequest{
+		Name:         plan.Name.ValueString(),
+		ProviderName: plan.ProviderName.ValueString(),
+	}
+	if !plan.Labels.IsNull() && !plan.Labels.IsUnknown() {
+		labels := map[string]string{}
+		for k, v := range plan.Labels.Elements() {
+			labels[k] = v.(types.String).ValueString()
+		}
+		sdkReq.Labels = labels
+	}
+	if !plan.VCSConnectionID.IsNull() {
+		sdkReq.VCSConnectionID = plan.VCSConnectionID.ValueString()
+	}
+	if !plan.VCSRepoURL.IsNull() {
+		sdkReq.VCSRepoURL = plan.VCSRepoURL.ValueString()
+	}
+	if !plan.VCSBranch.IsNull() {
+		sdkReq.VCSBranch = plan.VCSBranch.ValueString()
+	}
+	if !plan.VCSTagPattern.IsNull() {
+		sdkReq.VCSTagPattern = plan.VCSTagPattern.ValueString()
 	}
 
-	data, err := r.client.Post(ctx, "/api/terrapod/v1/registry-modules", body)
+	m, err := r.tc.CreateRegistryModule(ctx, sdkReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Create failed", err.Error())
 		return
 	}
-
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(readModuleIntoModel(ctx, res, &plan)...)
+	resp.Diagnostics.Append(readModuleFromSDK(ctx, m, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -184,24 +137,17 @@ func (r *registryModuleResource) Read(ctx context.Context, req resource.ReadRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	data, err := r.client.Get(ctx, r.modulePath(&state))
+	m, err := r.tc.GetRegistryModule(ctx, state.Name.ValueString(), state.ProviderName.ValueString())
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
 		resp.Diagnostics.AddError("Read failed", err.Error())
 		return
 	}
-
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(readModuleIntoModel(ctx, res, &state)...)
+	resp.Diagnostics.Append(readModuleFromSDK(ctx, m, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -211,27 +157,37 @@ func (r *registryModuleResource) Update(ctx context.Context, req resource.Update
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	attrs := buildModuleAttrs(&plan)
-	body, err := client.MarshalResourceWithID(plan.ID.ValueString(), "registry-modules", attrs)
-	if err != nil {
-		resp.Diagnostics.AddError("Marshal error", err.Error())
-		return
+	sdkReq := terrapod.UpdateRegistryModuleRequest{}
+	if !plan.Labels.IsNull() && !plan.Labels.IsUnknown() {
+		labels := map[string]string{}
+		for k, v := range plan.Labels.Elements() {
+			labels[k] = v.(types.String).ValueString()
+		}
+		sdkReq.Labels = &labels
+	}
+	if !plan.VCSConnectionID.IsNull() && !plan.VCSConnectionID.IsUnknown() {
+		s := plan.VCSConnectionID.ValueString()
+		sdkReq.VCSConnectionID = &s
+	}
+	if !plan.VCSRepoURL.IsNull() && !plan.VCSRepoURL.IsUnknown() {
+		s := plan.VCSRepoURL.ValueString()
+		sdkReq.VCSRepoURL = &s
+	}
+	if !plan.VCSBranch.IsNull() && !plan.VCSBranch.IsUnknown() {
+		s := plan.VCSBranch.ValueString()
+		sdkReq.VCSBranch = &s
+	}
+	if !plan.VCSTagPattern.IsNull() && !plan.VCSTagPattern.IsUnknown() {
+		s := plan.VCSTagPattern.ValueString()
+		sdkReq.VCSTagPattern = &s
 	}
 
-	data, err := r.client.Patch(ctx, r.modulePath(&plan), body)
+	m, err := r.tc.UpdateRegistryModule(ctx, plan.Name.ValueString(), plan.ProviderName.ValueString(), sdkReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Update failed", err.Error())
 		return
 	}
-
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Parse error", err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(readModuleIntoModel(ctx, res, &plan)...)
+	resp.Diagnostics.Append(readModuleFromSDK(ctx, m, &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -241,10 +197,12 @@ func (r *registryModuleResource) Delete(ctx context.Context, req resource.Delete
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	err := r.client.Delete(ctx, r.modulePath(&state))
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Delete failed", err.Error())
+	err := r.tc.DeleteRegistryModule(ctx, state.Name.ValueString(), state.ProviderName.ValueString())
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Delete failed", err.Error())
+		}
 	}
 }
 
@@ -258,59 +216,28 @@ func (r *registryModuleResource) ImportState(ctx context.Context, req resource.I
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("provider_name"), parts[1])...)
 }
 
-func buildModuleAttrs(m *registryModuleModel) map[string]any {
-	attrs := map[string]any{
-		"name":     m.Name.ValueString(),
-		"provider": m.ProviderName.ValueString(),
-	}
-	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
-		labels := map[string]string{}
-		for k, v := range m.Labels.Elements() {
-			labels[k] = v.(types.String).ValueString()
-		}
-		attrs["labels"] = labels
-	}
-	if !m.VCSConnectionID.IsNull() {
-		attrs["vcs-connection-id"] = m.VCSConnectionID.ValueString()
-	}
-	if !m.VCSRepoURL.IsNull() {
-		attrs["vcs-repo-url"] = m.VCSRepoURL.ValueString()
-	}
-	if !m.VCSBranch.IsNull() {
-		attrs["vcs-branch"] = m.VCSBranch.ValueString()
-	}
-	if !m.VCSTagPattern.IsNull() {
-		attrs["vcs-tag-pattern"] = m.VCSTagPattern.ValueString()
-	}
-	return attrs
-}
-
-func readModuleIntoModel(ctx context.Context, res *client.Resource, m *registryModuleModel) diag.Diagnostics {
+func readModuleFromSDK(ctx context.Context, m *terrapod.RegistryModule, mod *registryModuleModel) diag.Diagnostics {
 	var diags diag.Diagnostics
-
-	m.ID = types.StringValue(res.ID)
-	m.Name = types.StringValue(client.GetStringAttr(res, "name"))
-	m.ProviderName = types.StringValue(client.GetStringAttr(res, "provider"))
-	m.Namespace = types.StringValue(client.GetStringAttr(res, "namespace"))
-	m.Status = types.StringValue(client.GetStringAttr(res, "status"))
-	m.OwnerEmail = types.StringValue(client.GetStringAttr(res, "owner-email"))
-	m.Source = types.StringValue(client.GetStringAttr(res, "source"))
-	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
-
-	setOptStr(&m.VCSConnectionID, client.GetStringAttr(res, "vcs-connection-id"))
-	setOptStr(&m.VCSRepoURL, client.GetStringAttr(res, "vcs-repo-url"))
-	setOptStr(&m.VCSBranch, client.GetStringAttr(res, "vcs-branch"))
-	setOptStr(&m.VCSTagPattern, client.GetStringAttr(res, "vcs-tag-pattern"))
-
-	if labels := client.GetMapAttr(res, "labels"); len(labels) > 0 {
-		val, d := types.MapValueFrom(ctx, types.StringType, labels)
+	mod.ID = types.StringValue(m.ID)
+	mod.Name = types.StringValue(m.Name)
+	mod.ProviderName = types.StringValue(m.ProviderName)
+	mod.Namespace = types.StringValue(m.Namespace)
+	mod.Status = types.StringValue(m.Status)
+	mod.OwnerEmail = types.StringValue(m.OwnerEmail)
+	mod.Source = types.StringValue(m.Source)
+	mod.CreatedAt = types.StringValue(m.CreatedAt)
+	mod.UpdatedAt = types.StringValue(m.UpdatedAt)
+	setOptStr(&mod.VCSConnectionID, m.VCSConnectionID)
+	setOptStr(&mod.VCSRepoURL, m.VCSRepoURL)
+	setOptStr(&mod.VCSBranch, m.VCSBranch)
+	setOptStr(&mod.VCSTagPattern, m.VCSTagPattern)
+	if len(m.Labels) > 0 {
+		val, d := types.MapValueFrom(ctx, types.StringType, m.Labels)
 		diags.Append(d...)
-		m.Labels = val
+		mod.Labels = val
 	} else {
-		m.Labels = types.MapNull(types.StringType)
+		mod.Labels = types.MapNull(types.StringType)
 	}
-
 	return diags
 }
 
