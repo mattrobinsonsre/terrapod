@@ -43,6 +43,8 @@ func main() {
 		os.Exit(rewriteCmd(rest))
 	case "verify":
 		os.Exit(verifyCmd(rest))
+	case "cutover":
+		os.Exit(cutoverCmd(rest))
 	case "version", "-v", "--version":
 		fmt.Println(Version)
 	case "help", "-h", "--help":
@@ -62,10 +64,14 @@ USAGE:
 
 SUBCOMMANDS:
   apply     Read from --source (tfe|atlantis), write to --target Terrapod.
-            Default is dry-run; pass --apply to write.
+            Default is dry-run; pass --apply to write. Migrates workspaces,
+            variables, VCS connections, and state.
   rewrite   Mechanically rewrite HCL cloud{}/backend"remote"{}/private
             module sources in a local directory. No VCS interaction.
-  verify    Re-run plans on migrated workspaces to confirm parity.
+  verify    Read back the migrated workspaces from Terrapod and confirm
+            they match the migration state file.
+  cutover   Generate the handover Markdown doc; optionally --lock or
+            --unlock source workspaces (TFE only) during the cutover.
   status    Print the contents of the migration state file.
 
   version   Print the tool version.

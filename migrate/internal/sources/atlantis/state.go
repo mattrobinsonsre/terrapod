@@ -24,7 +24,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	gcs "cloud.google.com/go/storage"
 
@@ -32,15 +31,23 @@ import (
 	"github.com/mattrobinsonsre/terrapod/migrate/internal/writer"
 )
 
-// StateOptions controls Atlantis-side state fetching. Most fields
-// are optional — the SDK clients default to the operator's ambient
-// credentials (env vars, IRSA, gcloud, Azure CLI login) — but the
-// fields exist as explicit overrides for testing (minio in
-// particular needs S3Endpoint + ForcePathStyle).
+// StateOptions controls Atlantis-side state fetching. Credentials
+// are NEVER provided here — every cloud SDK we use (aws-sdk-go-v2,
+// cloud.google.com/go/storage, azure-sdk-for-go) has a credential
+// chain that already covers env vars, profile files, SSO sessions,
+// instance roles, IRSA, ADC, and CLI logins. Reinventing any of that
+// inside this tool would just produce a worse version.
+//
+// The fields below are the *non-credential* overrides the chains
+// can't infer: a custom endpoint URL (minio / LocalStack / VPC
+// endpoint) and S3 path-style addressing (mandatory for minio).
+// For minio smoke tests, operators point AWS_ACCESS_KEY_ID /
+// AWS_SECRET_ACCESS_KEY (or an AWS_PROFILE) at the minio creds —
+// the SDK picks them up the same way it would for real S3.
 type StateOptions struct {
-	// S3Endpoint, if set, overrides the AWS S3 endpoint URL. Set this
-	// to the minio endpoint URL (e.g. "http://localhost:9000") for
-	// smoke tests against minio.
+	// S3Endpoint, if set, overrides the AWS S3 endpoint URL. Set
+	// this to the minio endpoint URL (e.g. "http://localhost:9000")
+	// for smoke tests against minio.
 	S3Endpoint string
 
 	// S3ForcePathStyle uses path-style addressing (bucket in path
@@ -48,15 +55,10 @@ type StateOptions struct {
 	// works either way.
 	S3ForcePathStyle bool
 
-	// S3Region overrides the resolved region. Used in conjunction
-	// with S3Endpoint for minio (whose region is arbitrary).
+	// S3Region overrides the resolved region. Useful for minio
+	// (whose region is arbitrary) and for explicit pinning when the
+	// backend HCL omits a region.
 	S3Region string
-
-	// S3AccessKey / S3SecretKey override the credential chain — set
-	// these for minio smoke testing. Production migrations should
-	// leave these empty and rely on the operator's ambient creds.
-	S3AccessKey string
-	S3SecretKey string
 }
 
 // StateReader returns a writer.StateReader that resolves
@@ -164,15 +166,7 @@ func readS3State(ctx context.Context, settings map[string]string, opts StateOpti
 		region = "us-east-1"
 	}
 
-	loadOpts := []func(*awsconfig.LoadOptions) error{
-		awsconfig.WithRegion(region),
-	}
-	if opts.S3AccessKey != "" && opts.S3SecretKey != "" {
-		loadOpts = append(loadOpts, awsconfig.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider(opts.S3AccessKey, opts.S3SecretKey, ""),
-		))
-	}
-	cfg, err := awsconfig.LoadDefaultConfig(ctx, loadOpts...)
+	cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(region))
 	if err != nil {
 		return nil, fmt.Errorf("s3: load aws config: %w", err)
 	}

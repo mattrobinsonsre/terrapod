@@ -39,16 +39,19 @@ type Options struct {
 	// build-time version of the calling binary.
 	ToolVersion string
 
-	// CredsForVCSConnection is invoked by Apply when creating a VCS
-	// connection. Returns the credential payload (PrivateKey or Token)
-	// the source plugin holds in memory. Sources hand the writer this
-	// callback at construction; the IR never carries credentials.
+	// VCSConnectionIDByRef maps an IR VCSConnection.SourceID to a
+	// Terrapod-side connection_id the operator has ALREADY created
+	// on Terrapod (via the UI or terraform-provider-terrapod). The
+	// migrator does not create VCS connections on the operator's
+	// behalf — that would require it to authenticate against GitHub /
+	// GitLab on top of everything else, which we deliberately scope
+	// out.
 	//
-	// Implementations MUST return a fresh struct per call — the writer
-	// doesn't cache the result. Called once per VCS connection in the
-	// Plan; in DryRun mode it is NOT called (we describe the planned
-	// write without ever needing the credentials).
-	CredsForVCSConnection func(conn *ir.VCSConnection) (Creds, error)
+	// When a workspace references a connection that isn't in the map,
+	// the writer leaves vcs_connection_id empty on the create call
+	// and records a SkippedItem in the report telling the operator
+	// which connection they need to wire up post-migration.
+	VCSConnectionIDByRef map[string]string
 
 	// SensitiveValueForVariable is invoked by Apply when creating a
 	// sensitive variable. The IR carries the metadata (key, sensitive
@@ -65,17 +68,6 @@ type Options struct {
 	// is not — operators wire it up by hand). DryRun never invokes
 	// the callback.
 	StateForWorkspace StateReader
-}
-
-// Creds is the credential payload for a single VCS connection. Only
-// one of (PrivateKey, GitHub App ID, GitHub Installation ID) or Token
-// is populated, depending on the provider.
-type Creds struct {
-	GithubAppID          int64
-	GithubInstallationID int64
-	PrivateKey           string
-
-	Token string
 }
 
 // Report is the structured summary of an Apply or DryRun. It's
@@ -186,8 +178,13 @@ func (w *Writer) Run(ctx context.Context, plan ir.Plan, opts Options) (*Report, 
 	// --target flag at apply time; the writer leaves the field alone
 	// when not pre-set (tests don't need it).
 
-	// VCS connections first: workspaces reference them. The map keeps
+	// VCS connections first: look up existing Terrapod connections
+	// that match each source connection's repo URL. The map keeps
 	// SourceID → TerrapodID lookups O(1) when wiring workspaces.
+	// Connections without a match get recorded as "missing" but
+	// don't block the migration — workspaces referencing them are
+	// created without vcs_connection_id and the report tells the
+	// operator what to wire up.
 	connByRef := map[string]string{}
 	for i := range plan.VCSConnections {
 		c := &plan.VCSConnections[i]
@@ -195,6 +192,15 @@ func (w *Writer) Run(ctx context.Context, plan ir.Plan, opts Options) (*Report, 
 		report.Connections = append(report.Connections, outcome)
 		if outcome.TerrapodID != "" {
 			connByRef[c.SourceID] = outcome.TerrapodID
+		}
+		if outcome.State == "missing" {
+			// Surface as a Skipped item so the cutover handover doc
+			// renders it under "Manual Action Required".
+			report.Skipped = append(report.Skipped, ir.SkippedItem{
+				Kind:   "vcs-connection",
+				Name:   c.Name,
+				Reason: fmt.Sprintf("Create a Terrapod VCS connection for %s (%s), then re-run apply to wire it to the migrated workspaces.", c.ServerURL, c.Provider),
+			})
 		}
 		if err := w.saveState(); err != nil {
 			return report, fmt.Errorf("save state after connection %q: %w", c.SourceID, err)
@@ -229,7 +235,20 @@ func (w *Writer) Run(ctx context.Context, plan ir.Plan, opts Options) (*Report, 
 
 // ── Connection handling ───────────────────────────────────────────────
 
-func (w *Writer) applyConnection(ctx context.Context, c *ir.VCSConnection, opts Options) ConnectionOutcome {
+// applyConnection looks up a Terrapod-side VCS connection that
+// already exists for the given source connection's URL/provider.
+// The migrator deliberately does NOT create connections — that
+// would require it to authenticate against the upstream VCS
+// provider (GitHub App keys / GitLab PATs) which is outside the
+// migration's scope. Operators create the Terrapod VCS connection
+// once via UI or terraform-provider-terrapod; the migrator
+// discovers it and references it by ID.
+//
+// When no matching Terrapod connection exists, the connection is
+// recorded as "missing" — workspaces that referenced it will be
+// created without a vcs_connection_id and a SkippedItem points the
+// operator at the manual follow-up.
+func (w *Writer) applyConnection(_ context.Context, c *ir.VCSConnection, opts Options) ConnectionOutcome {
 	out := ConnectionOutcome{
 		SourceID: c.SourceID,
 		Name:     c.Name,
@@ -237,56 +256,24 @@ func (w *Writer) applyConnection(ctx context.Context, c *ir.VCSConnection, opts 
 		State:    "planned",
 	}
 
-	// Idempotency: if a prior run already created this connection,
-	// reuse the recorded TerrapodID without touching the API.
-	if prior := findConnectionRecord(w.state, c.SourceID); prior != nil && prior.TerrapodID != "" {
-		out.State = "reused"
-		out.TerrapodID = prior.TerrapodID
+	if id, ok := opts.VCSConnectionIDByRef[c.SourceID]; ok && id != "" {
+		out.State = "matched"
+		out.TerrapodID = id
+		w.recordConnection(c, "matched", "")
+		if rec := findConnectionRecord(w.state, c.SourceID); rec != nil {
+			rec.TerrapodID = id
+		}
 		return out
 	}
 
 	if opts.DryRun {
-		w.recordConnection(c, "planned", "")
+		w.recordConnection(c, "missing", "")
 		return out
 	}
 
-	if opts.CredsForVCSConnection == nil {
-		out.State = "errored"
-		out.Error = "no credentials callback configured for apply mode"
-		w.recordConnection(c, "errored", out.Error)
-		return out
-	}
-	creds, err := opts.CredsForVCSConnection(c)
-	if err != nil {
-		out.State = "errored"
-		out.Error = fmt.Sprintf("load credentials: %v", err)
-		w.recordConnection(c, "errored", out.Error)
-		return out
-	}
-
-	req := terrapod.CreateVCSConnectionRequest{
-		Name:                 c.Name,
-		Provider:             c.Provider,
-		ServerURL:            c.ServerURL,
-		GithubAppID:          creds.GithubAppID,
-		GithubInstallationID: creds.GithubInstallationID,
-		PrivateKey:           creds.PrivateKey,
-		Token:                creds.Token,
-	}
-	v, err := w.client.CreateVCSConnection(ctx, req)
-	if err != nil {
-		out.State = "errored"
-		out.Error = err.Error()
-		w.recordConnection(c, "errored", out.Error)
-		return out
-	}
-
-	out.State = "created"
-	out.TerrapodID = v.ID
-	w.recordConnection(c, "created", "")
-	if rec := findConnectionRecord(w.state, c.SourceID); rec != nil {
-		rec.TerrapodID = v.ID
-	}
+	out.State = "missing"
+	out.Error = fmt.Sprintf("no Terrapod VCS connection matches source %q (%s, %s) — create one in Terrapod first, then re-run migrate", c.Name, c.Provider, c.ServerURL)
+	w.recordConnection(c, "missing", out.Error)
 	return out
 }
 
@@ -331,15 +318,19 @@ func (w *Writer) applyWorkspace(ctx context.Context, ws *ir.Workspace, connByRef
 		VCSBranch:        ws.VCSBranch,
 	}
 	if ws.VCSConnectionRef != "" {
-		if id, ok := connByRef[ws.VCSConnectionRef]; ok {
-			req.VCSConnectionID = id
-		} else if rec := findConnectionRecord(w.state, ws.VCSConnectionRef); rec != nil {
-			req.VCSConnectionID = rec.TerrapodID
-		} else {
-			out.State = "errored"
-			out.Error = fmt.Sprintf("vcs_connection_ref %q not found in plan or state", ws.VCSConnectionRef)
-			w.recordWorkspace(ws, "errored", out.Error)
-			return out
+		switch {
+		case connByRef[ws.VCSConnectionRef] != "":
+			req.VCSConnectionID = connByRef[ws.VCSConnectionRef]
+		default:
+			if rec := findConnectionRecord(w.state, ws.VCSConnectionRef); rec != nil && rec.TerrapodID != "" {
+				req.VCSConnectionID = rec.TerrapodID
+			}
+			// If neither path resolved the connection, we still
+			// create the workspace — just without a VCS link. The
+			// connection-level outcome ("missing") already tells
+			// the operator what to wire up; failing the workspace
+			// would block migrations behind operator-side VCS
+			// connection wiring, which goes against the design.
 		}
 	}
 
@@ -513,7 +504,11 @@ func findConnectionRecord(s *framework.State, sourceID string) *framework.VCSCon
 func collectErrors(r *Report) []string {
 	var errs []string
 	for _, c := range r.Connections {
-		if c.Error != "" {
+		// "missing" is operator-actionable but not a writer failure —
+		// the workspace is still created without a VCS connection
+		// and the report's Skipped section tells the operator how
+		// to wire it up. Only true errors land here.
+		if c.Error != "" && c.State != "missing" {
 			errs = append(errs, fmt.Sprintf("vcs-connection %q: %s", c.Name, c.Error))
 		}
 	}

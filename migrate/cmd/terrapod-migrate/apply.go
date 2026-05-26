@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/migrate/internal/framework"
@@ -19,10 +20,15 @@ import (
 // applyCmd is the apply subcommand: read from a source platform,
 // write to Terrapod. Default is dry-run; pass --apply to write.
 //
-// The flag surface is deliberately narrow on the first cut. Sources
-// that need richer config (TFE org + token, Atlantis multi-repo
-// scanning) layer their own flags inside this function rather than
-// inflating the shared surface.
+// Authentication scope is intentionally narrow:
+//   - Source-side reads use go-tfe (TFE/HCP) or local git clones
+//     (Atlantis). The migrator NEVER authenticates against GitHub or
+//     GitLab — operators create Terrapod-side VCS connections via UI
+//     or terraform-provider-terrapod, and the migrator discovers
+//     existing connections to wire to migrated workspaces.
+//   - State reads use the AWS / GCP / Azure SDKs' default credential
+//     chains (env, profiles, IAM roles, IRSA, ADC, AZ login).
+//   - Terrapod writes use the supplied --token.
 func applyCmd(args []string) int {
 	fs := flag.NewFlagSet("apply", flag.ContinueOnError)
 	var (
@@ -33,18 +39,22 @@ func applyCmd(args []string) int {
 		tfeToken     = fs.String("tfe-token", os.Getenv("TFE_TOKEN"), "TFE API token (or TFE_TOKEN; org-owner preferred for sensitive-variable visibility)")
 		tfeOrg       = fs.String("tfe-org", os.Getenv("TFE_ORG"), "TFE organisation to migrate (or TFE_ORG)")
 		skipState    = fs.Bool("skip-state", false, "Don't migrate state — workspaces are created but state is left for operator")
-		s3Endpoint   = fs.String("s3-endpoint-url", os.Getenv("AWS_ENDPOINT_URL_S3"), "S3 endpoint override (e.g. http://localhost:9000 for minio; or AWS_ENDPOINT_URL_S3)")
-		s3PathStyle  = fs.Bool("s3-force-path-style", os.Getenv("AWS_S3_FORCE_PATH_STYLE") == "true", "Use S3 path-style addressing (required for minio)")
-		s3Region     = fs.String("s3-region", os.Getenv("AWS_REGION"), "S3 region override (or AWS_REGION)")
-		target       = fs.String("target", os.Getenv("TERRAPOD_HOSTNAME"), "Terrapod base URL (or TERRAPOD_HOSTNAME)")
-		token        = fs.String("token", os.Getenv("TERRAPOD_TOKEN"), "Terrapod API token (or TERRAPOD_TOKEN)")
-		statePath    = fs.String("state-file", framework.DefaultStateFile, "Path to the migration state JSON file")
-		apply        = fs.Bool("apply", false, "Actually write to Terrapod (default is dry-run)")
-		jsonReport   = fs.Bool("json", false, "Emit the final Report as JSON instead of a text summary")
-		skipTLS      = fs.Bool("skip-tls-verify", false, "Skip TLS certificate verification (dev only)")
+		// S3 client configuration. Auth comes entirely from
+		// aws-sdk-go-v2's default credential chain (env vars,
+		// ~/.aws/credentials with AWS_PROFILE, AWS SSO, IAM roles,
+		// IRSA, EC2/ECS instance metadata) — same chain every other
+		// AWS-aware tool uses. We do not reinvent it.
+		s3Endpoint  = fs.String("s3-endpoint-url", os.Getenv("AWS_ENDPOINT_URL_S3"), "S3 endpoint override (e.g. http://localhost:9000 for minio; or AWS_ENDPOINT_URL_S3)")
+		s3PathStyle = fs.Bool("s3-force-path-style", os.Getenv("AWS_S3_FORCE_PATH_STYLE") == "true", "Use S3 path-style addressing (required for minio)")
+		s3Region    = fs.String("s3-region", "", "S3 region override (default: AWS_REGION env, or read from backend HCL)")
+		target      = fs.String("target", os.Getenv("TERRAPOD_HOSTNAME"), "Terrapod base URL (or TERRAPOD_HOSTNAME)")
+		token       = fs.String("token", os.Getenv("TERRAPOD_TOKEN"), "Terrapod API token (or TERRAPOD_TOKEN)")
+		statePath   = fs.String("state-file", framework.DefaultStateFile, "Path to the migration state JSON file")
+		apply       = fs.Bool("apply", false, "Actually write to Terrapod (default is dry-run)")
+		jsonReport  = fs.Bool("json", false, "Emit the final Report as JSON instead of a text summary")
+		skipTLS     = fs.Bool("skip-tls-verify", false, "Skip TLS certificate verification (dev only)")
 	)
 	if err := fs.Parse(args); err != nil {
-		// flag.ContinueOnError already printed the usage; bail.
 		return 2
 	}
 
@@ -62,12 +72,9 @@ func applyCmd(args []string) int {
 		return 2
 	}
 
-	// Build the IR Plan from the source-specific loader. We also
-	// capture the source-specific StateReader so the writer can pull
-	// state during --apply mode.
+	// Build the IR Plan + a source-specific StateReader.
 	var (
 		plan        ir.Plan
-		credsByConn map[string]writer.Creds
 		stateReader writer.StateReader
 		err         error
 	)
@@ -77,15 +84,13 @@ func applyCmd(args []string) int {
 			fmt.Fprintln(os.Stderr, "apply: --source-dir is required for --source=atlantis")
 			return 2
 		}
-		plan, credsByConn, stateReader, err = loadAtlantisPlan(*sourceDir, *atlantisYAML, atlantisStateOpts{
+		plan, stateReader, err = loadAtlantisPlan(*sourceDir, *atlantisYAML, atlantis.StateOptions{
 			S3Endpoint:       *s3Endpoint,
 			S3ForcePathStyle: *s3PathStyle,
 			S3Region:         *s3Region,
-			S3AccessKey:      os.Getenv("AWS_ACCESS_KEY_ID"),
-			S3SecretKey:      os.Getenv("AWS_SECRET_ACCESS_KEY"),
 		})
 	case "tfe":
-		plan, credsByConn, stateReader, err = loadTFEPlan(context.Background(), *tfeAddress, *tfeToken, *tfeOrg)
+		plan, stateReader, err = loadTFEPlan(context.Background(), *tfeAddress, *tfeToken, *tfeOrg)
 	default:
 		fmt.Fprintf(os.Stderr, "apply: unknown --source %q (atlantis|tfe)\n", *source)
 		return 2
@@ -98,8 +103,6 @@ func applyCmd(args []string) int {
 		stateReader = nil
 	}
 
-	// Load or initialise the migration state file. Loading is best-
-	// effort — a non-existent file is the normal first-run case.
 	state, err := framework.Load(*statePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "apply: load state file %s: %v\n", *statePath, err)
@@ -109,10 +112,6 @@ func applyCmd(args []string) int {
 		state = &framework.State{}
 	}
 
-	// Build the SDK client. Note: in dry-run mode the writer never
-	// actually calls the client (its DryRun branch short-circuits
-	// before any HTTP), so an unreachable --target is fine for
-	// dry-run inspection of the Plan.
 	c, err := terrapod.NewClient(terrapod.Options{
 		BaseURL:       *target,
 		Token:         *token,
@@ -124,17 +123,29 @@ func applyCmd(args []string) int {
 		return 1
 	}
 
+	// Resolve plan VCS connections to Terrapod-side connection IDs by
+	// listing existing connections and matching on server URL +
+	// provider. The migrator never creates connections — operators
+	// wire them up once via UI/provider, and we discover them here.
+	// In dry-run mode we still attempt the lookup so the report
+	// shows exactly which connections are wired and which need
+	// operator follow-up.
+	connByRef, err := resolveVCSConnections(context.Background(), c, plan.VCSConnections)
+	if err != nil && *apply {
+		// In --apply mode a Terrapod-side lookup failure is fatal —
+		// we'd otherwise wire every workspace without a VCS link.
+		// In dry-run we proceed with an empty map so the operator
+		// sees the planned "missing connection" surface.
+		fmt.Fprintf(os.Stderr, "apply: list Terrapod VCS connections: %v\n", err)
+		return 1
+	}
+
 	w := writer.New(c, state, *statePath)
 	opts := writer.Options{
-		DryRun:            !*apply,
-		ToolVersion:       Version,
-		StateForWorkspace: stateReader,
-		CredsForVCSConnection: func(conn *ir.VCSConnection) (writer.Creds, error) {
-			if creds, ok := credsByConn[conn.SourceID]; ok {
-				return creds, nil
-			}
-			return writer.Creds{}, fmt.Errorf("no credentials available for vcs-connection %q (provide via the source plugin)", conn.SourceID)
-		},
+		DryRun:               !*apply,
+		ToolVersion:          Version,
+		StateForWorkspace:    stateReader,
+		VCSConnectionIDByRef: connByRef,
 		SensitiveValueForVariable: func(workspaceSourceID, key string) (string, error) {
 			return "", fmt.Errorf("sensitive variable %q on workspace %q: source did not provide a value-loader (atlantis has no sensitive vars; tfe support pending)", key, workspaceSourceID)
 		},
@@ -160,42 +171,56 @@ func applyCmd(args []string) int {
 	return 0
 }
 
-// loadAtlantisPlan reads a local atlantis clone, parses its
-// atlantis.yaml, and assembles the IR Plan plus the per-connection
-// credentials map (Atlantis migrations get one VCS connection per
-// repo URL, and the credential payload is configured by the
-// operator's VCS provider — for the first cut we use a stub since
-// Atlantis itself doesn't carry GitHub-App credentials we could
-// inherit).
+// resolveVCSConnections lists the Terrapod-side VCS connections and
+// builds a SourceID → TerrapodID map by matching each plan
+// connection against existing Terrapod connections. Match rules:
 //
-// Credentials note: Atlantis has no notion of API-level repo
-// credentials embedded in atlantis.yaml. The operator brings their
-// own GitHub App / GitLab PAT, set via environment variables matched
-// to the VCSConnection.SourceID. This is a minimal pass-through so
-// dry-run reporting works; --apply on atlantis migrations requires
-// operators to set TERRAPOD_MIGRATE_GITHUB_APP_ID,
-// TERRAPOD_MIGRATE_GITHUB_INSTALLATION_ID, and
-// TERRAPOD_MIGRATE_GITHUB_PRIVATE_KEY before running. The
-// integration tests and pre-release smoke will exercise the env-var
-// path; today's CLI just emits a friendly error if --apply is set
-// without them.
-// atlantisStateOpts mirrors atlantis.StateOptions so apply can plumb
-// CLI/env-derived S3/minio configuration through without importing
-// the package directly into the flag-parsing block.
-type atlantisStateOpts struct {
-	S3Endpoint       string
-	S3ForcePathStyle bool
-	S3Region         string
-	S3AccessKey      string
-	S3SecretKey      string
+//   - exact server URL match wins (case-insensitive)
+//   - falling back to host equality (strip scheme + port + path)
+//   - provider must match (github / gitlab)
+//
+// A nil/empty return is valid — the writer treats unmatched
+// connections as Skipped items in the report.
+func resolveVCSConnections(ctx context.Context, c *terrapod.Client, planConns []ir.VCSConnection) (map[string]string, error) {
+	out := map[string]string{}
+	if len(planConns) == 0 {
+		return out, nil
+	}
+	existing, err := c.ListVCSConnections(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, planConn := range planConns {
+		want := canonicaliseURL(planConn.ServerURL)
+		wantHost := hostFromRepoURL(planConn.ServerURL)
+		for i := range existing {
+			ex := &existing[i]
+			if !strings.EqualFold(ex.Provider, planConn.Provider) {
+				continue
+			}
+			if canonicaliseURL(ex.ServerURL) == want ||
+				(want == "" && ex.ServerURL == "") || // default-host on both sides
+				hostFromRepoURL(ex.ServerURL) == wantHost {
+				out[planConn.SourceID] = ex.ID
+				break
+			}
+		}
+	}
+	return out, nil
 }
 
-func loadAtlantisPlan(sourceDir, yamlPath string, stateOpts atlantisStateOpts) (ir.Plan, map[string]writer.Creds, writer.StateReader, error) {
+func canonicaliseURL(u string) string {
+	u = strings.ToLower(strings.TrimSpace(u))
+	u = strings.TrimSuffix(u, "/")
+	return u
+}
+
+func loadAtlantisPlan(sourceDir, yamlPath string, stateOpts atlantis.StateOptions) (ir.Plan, writer.StateReader, error) {
 	src, err := atlantis.LoadDirectory(sourceDir, atlantis.LoadOptions{
 		AtlantisYAMLPath: yamlPath,
 	})
 	if err != nil {
-		return ir.Plan{}, nil, nil, err
+		return ir.Plan{}, nil, err
 	}
 
 	connSourceID := atlantisConnSourceID(src.RepoURL)
@@ -205,7 +230,7 @@ func loadAtlantisPlan(sourceDir, yamlPath string, stateOpts atlantisStateOpts) (
 		DefaultBranch:    src.DefaultBranch,
 	})
 	if err != nil {
-		return ir.Plan{}, nil, nil, err
+		return ir.Plan{}, nil, err
 	}
 
 	plan := ir.Plan{
@@ -217,58 +242,35 @@ func loadAtlantisPlan(sourceDir, yamlPath string, stateOpts atlantisStateOpts) (
 		},
 		VCSConnections: []ir.VCSConnection{
 			{
-				SourceID: connSourceID,
-				Name:     "atlantis-" + hostFromRepoURL(src.RepoURL),
-				Provider: providerFromRepoURL(src.RepoURL),
+				SourceID:  connSourceID,
+				Name:      "atlantis-" + hostFromRepoURL(src.RepoURL),
+				Provider:  providerFromRepoURL(src.RepoURL),
+				ServerURL: "https://" + hostFromRepoURL(src.RepoURL),
 			},
 		},
 		Workspaces: workspaces,
 		Skipped:    skipped,
 	}
-
-	creds := map[string]writer.Creds{
-		connSourceID: credsFromEnv(providerFromRepoURL(src.RepoURL)),
-	}
-	reader := src.StateReader(atlantis.StateOptions{
-		S3Endpoint:       stateOpts.S3Endpoint,
-		S3ForcePathStyle: stateOpts.S3ForcePathStyle,
-		S3Region:         stateOpts.S3Region,
-		S3AccessKey:      stateOpts.S3AccessKey,
-		S3SecretKey:      stateOpts.S3SecretKey,
-	})
-	return plan, creds, reader, nil
+	return plan, src.StateReader(stateOpts), nil
 }
 
-// loadTFEPlan connects to a TFE/HCP instance and assembles the IR
-// Plan. Sensitive variable values are NOT inlined here — the writer
-// loads them lazily via the SensitiveValueForVariable callback only
-// in --apply mode, which keeps dry-run runs from making redundant
-// API calls and keeps sensitive payloads out of the dry-run report.
-//
-// Credentials for VCS connections are out of scope for this first
-// TFE wiring: TFE migrations carry over the workspace's
-// vcs_repo_url as metadata, but the operator wires up the matching
-// GitHub App / GitLab PAT separately (same env-var convention as
-// the atlantis flow). Future work: read TFE's oauth-client list and
-// surface them in the report so operators know which connections
-// to recreate.
-func loadTFEPlan(ctx context.Context, address, token, org string) (ir.Plan, map[string]writer.Creds, writer.StateReader, error) {
+func loadTFEPlan(ctx context.Context, address, token, org string) (ir.Plan, writer.StateReader, error) {
 	c, err := tfe.NewClient(ctx, tfe.Config{
 		Address: address,
 		Token:   token,
 		OrgName: org,
 	})
 	if err != nil {
-		return ir.Plan{}, nil, nil, err
+		return ir.Plan{}, nil, err
 	}
 
 	workspaces, conns, skipped, err := c.EmitWorkspaces(ctx)
 	if err != nil {
-		return ir.Plan{}, nil, nil, err
+		return ir.Plan{}, nil, err
 	}
 	varSkipped, err := c.AttachVariables(ctx, workspaces)
 	if err != nil {
-		return ir.Plan{}, nil, nil, err
+		return ir.Plan{}, nil, err
 	}
 	skipped = append(skipped, varSkipped...)
 
@@ -283,16 +285,7 @@ func loadTFEPlan(ctx context.Context, address, token, org string) (ir.Plan, map[
 		Workspaces:     workspaces,
 		Skipped:        skipped,
 	}
-
-	// Per-connection creds map: empty for now. Operators wire VCS
-	// credentials via the same env-var convention the atlantis flow
-	// uses (see credsFromEnv); the writer surfaces a clear error in
-	// --apply mode if the values are missing.
-	creds := map[string]writer.Creds{}
-	for _, conn := range conns {
-		creds[conn.SourceID] = credsFromEnv(conn.Provider)
-	}
-	return plan, creds, c.StateReader(), nil
+	return plan, c.StateReader(), nil
 }
 
 // printReportSummary prints a human-readable summary of the writer's
@@ -359,8 +352,6 @@ func statusCmd(args []string) int {
 // ── Helpers ──────────────────────────────────────────────────────────
 
 func atlantisConnSourceID(repoURL string) string {
-	// Stable per-repo id so re-running apply against the same clone
-	// resolves to the same VCS connection record.
 	return "atlantis-vcs:" + repoURL
 }
 
@@ -385,46 +376,12 @@ func providerFromRepoURL(repoURL string) string {
 		return "github"
 	case host == "gitlab.com":
 		return "gitlab"
-	case len(host) >= 7 && host[len(host)-7:] == "gitlab.": // self-hosted-ish
+	case strings.HasPrefix(host, "gitlab."):
 		return "gitlab"
 	default:
-		// Self-hosted: best-guess from the host hint. Operators
-		// override by setting TERRAPOD_MIGRATE_VCS_PROVIDER.
 		if env := os.Getenv("TERRAPOD_MIGRATE_VCS_PROVIDER"); env != "" {
 			return env
 		}
 		return "github"
 	}
-}
-
-func credsFromEnv(provider string) writer.Creds {
-	switch provider {
-	case "github":
-		// Atlantis-side migrations don't carry GitHub-App credentials
-		// in atlantis.yaml; operators wire them through environment.
-		// We don't validate here — Apply will surface a clear error
-		// from the API if the credentials are wrong.
-		return writer.Creds{
-			PrivateKey: os.Getenv("TERRAPOD_MIGRATE_GITHUB_PRIVATE_KEY"),
-			// IDs come back as zero from atoi-failures, which lets
-			// dry-run pass without env wiring while --apply surfaces
-			// a 422 from the API.
-			GithubAppID:          atoiSafe(os.Getenv("TERRAPOD_MIGRATE_GITHUB_APP_ID")),
-			GithubInstallationID: atoiSafe(os.Getenv("TERRAPOD_MIGRATE_GITHUB_INSTALLATION_ID")),
-		}
-	case "gitlab":
-		return writer.Creds{Token: os.Getenv("TERRAPOD_MIGRATE_GITLAB_TOKEN")}
-	}
-	return writer.Creds{}
-}
-
-func atoiSafe(s string) int64 {
-	var n int64
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return 0
-		}
-		n = n*10 + int64(c-'0')
-	}
-	return n
 }

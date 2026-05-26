@@ -15,7 +15,7 @@ import (
 
 	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/migrate/internal/framework"
-	"github.com/mattrobinsonsre/terrapod/migrate/internal/ir"
+	"github.com/mattrobinsonsre/terrapod/migrate/internal/sources/atlantis"
 	"github.com/mattrobinsonsre/terrapod/migrate/internal/writer"
 )
 
@@ -67,9 +67,8 @@ projects:
 
 	// ── Fake Terrapod ─────────────────────────────────────────────
 	var (
-		mu                 sync.Mutex
-		connectionsCreated int
-		workspacesCreated  int
+		mu                sync.Mutex
+		workspacesCreated int
 	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
@@ -80,10 +79,10 @@ projects:
 		}
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/terrapod/v1/vcs-connections":
-			connectionsCreated++
-			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"data":{"id":"vcs-fixt","type":"vcs-connections","attributes":{"name":"atlantis-github.com","provider":"github","has-token":true}}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/terrapod/v1/vcs-connections":
+			// Pretend the operator pre-wired one Terrapod-side
+			// connection that matches the atlantis-derived host.
+			_, _ = w.Write([]byte(`{"data":[{"id":"vcs-fixt","type":"vcs-connections","attributes":{"name":"github-prod","provider":"github","server-url":"https://github.com","has-token":true}}]}`))
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/workspaces"):
 			workspacesCreated++
 			id := "ws-" + intToStr(workspacesCreated)
@@ -96,7 +95,7 @@ projects:
 	defer srv.Close()
 
 	// ── Apply (the actual end-to-end exercise) ────────────────────
-	plan, creds, _, err := loadAtlantisPlan(cloneDir, "", atlantisStateOpts{})
+	plan, _, err := loadAtlantisPlan(cloneDir, "", atlantis.StateOptions{})
 	if err != nil {
 		t.Fatalf("loadAtlantisPlan: %v", err)
 	}
@@ -112,17 +111,15 @@ projects:
 
 	state := &framework.State{}
 	w := writer.New(c, state, stateFile)
+	// The fake server returns a single existing VCS connection that
+	// matches the atlantis-derived github.com host; pretend the
+	// operator has already wired it up in Terrapod.
+	connByRef := map[string]string{
+		plan.VCSConnections[0].SourceID: "vcs-fixt",
+	}
 	report, err := w.Run(context.Background(), plan, writer.Options{
-		DryRun: false,
-		CredsForVCSConnection: func(conn *ir.VCSConnection) (writer.Creds, error) {
-			// The atlantis flow's normal cred-sourcing path runs
-			// against env vars; the test bypasses that by supplying
-			// canned creds directly here.
-			if c, ok := creds[conn.SourceID]; ok {
-				return c, nil
-			}
-			return writer.Creds{Token: "fake"}, nil
-		},
+		DryRun:               false,
+		VCSConnectionIDByRef: connByRef,
 	})
 	if err != nil {
 		t.Fatalf("writer.Run: %v", err)
@@ -132,11 +129,13 @@ projects:
 	if len(report.Errors) != 0 {
 		t.Errorf("expected no errors, got: %v", report.Errors)
 	}
-	if connectionsCreated != 1 {
-		t.Errorf("expected 1 vcs connection created, got %d", connectionsCreated)
-	}
 	if workspacesCreated != 2 {
 		t.Errorf("expected 2 workspaces created, got %d", workspacesCreated)
+	}
+	// Connection lookup should have matched the pre-existing
+	// Terrapod connection — surfacing as "matched", not "missing".
+	if len(report.Connections) != 1 || report.Connections[0].State != "matched" {
+		t.Errorf("expected one matched connection, got: %+v", report.Connections)
 	}
 
 	// State file should now exist and list both workspaces.

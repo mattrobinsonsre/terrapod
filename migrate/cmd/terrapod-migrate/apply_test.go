@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/mattrobinsonsre/terrapod/migrate/internal/sources/atlantis"
 )
 
 // TestLoadAtlantisPlan_FromFakeClone exercises the apply-subcommand's
@@ -53,7 +55,7 @@ projects:
 	runGit("remote", "add", "origin", "https://github.com/acme/infra")
 	runGit("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
 
-	plan, creds, _, err := loadAtlantisPlan(dir, "", atlantisStateOpts{})
+	plan, _, err := loadAtlantisPlan(dir, "", atlantis.StateOptions{})
 	if err != nil {
 		t.Fatalf("loadAtlantisPlan: %v", err)
 	}
@@ -70,15 +72,13 @@ projects:
 		t.Errorf("expected ≥1 workspace, got %d", len(plan.Workspaces))
 	}
 	// All workspaces should carry the connection ref so the writer
-	// can wire vcs_connection_id without ambiguity.
+	// can resolve vcs_connection_id against the existing Terrapod
+	// connections at apply time.
 	connSourceID := plan.VCSConnections[0].SourceID
 	for _, ws := range plan.Workspaces {
 		if ws.VCSConnectionRef != connSourceID {
 			t.Errorf("workspace %q vcs ref = %q, want %q", ws.Name, ws.VCSConnectionRef, connSourceID)
 		}
-	}
-	if _, ok := creds[connSourceID]; !ok {
-		t.Errorf("creds map missing entry for %q", connSourceID)
 	}
 }
 
@@ -104,7 +104,7 @@ func TestProviderFromRepoURL(t *testing.T) {
 	cases := map[string]string{
 		"https://github.com/o/r":    "github",
 		"https://gitlab.com/g/r":    "gitlab",
-		"https://gitlab.acme.com/r": "github", // self-hosted-gitlab heuristic only matches "gitlab." prefix; "gitlab.acme.com" lacks it
+		"https://gitlab.acme.com/r": "gitlab", // self-hosted gitlab detected via "gitlab." prefix
 	}
 	for in, want := range cases {
 		if got := providerFromRepoURL(in); got != want {

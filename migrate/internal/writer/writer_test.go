@@ -129,15 +129,18 @@ func TestWriter_Apply_CreatesEverything(t *testing.T) {
 	}
 
 	opts := Options{
-		CredsForVCSConnection: func(_ *ir.VCSConnection) (Creds, error) {
-			return Creds{GithubAppID: 1, GithubInstallationID: 2, PrivateKey: "pk"}, nil
-		},
+		// Pretend the operator already wired a Terrapod-side VCS
+		// connection that matches the plan's src-1 reference.
+		VCSConnectionIDByRef: map[string]string{"src-1": "vcs-existing"},
 	}
 	report, err := w.Run(t.Context(), plan, opts)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if fs.connectionsCreated != 1 || fs.workspacesCreated != 1 || fs.variablesCreated != 1 {
+	// The migrator no longer creates VCS connections — only matches
+	// existing ones. Expect zero connection POSTs and exactly one
+	// workspace + one variable.
+	if fs.connectionsCreated != 0 || fs.workspacesCreated != 1 || fs.variablesCreated != 1 {
 		t.Errorf("API calls: conns=%d ws=%d vars=%d", fs.connectionsCreated, fs.workspacesCreated, fs.variablesCreated)
 	}
 	if len(report.Errors) != 0 {
@@ -168,9 +171,7 @@ func TestWriter_Apply_VCSConnectionRefResolution(t *testing.T) {
 		},
 	}
 	opts := Options{
-		CredsForVCSConnection: func(_ *ir.VCSConnection) (Creds, error) {
-			return Creds{Token: "t"}, nil
-		},
+		VCSConnectionIDByRef: map[string]string{"src-1": "vcs-existing"},
 	}
 	_, err := w.Run(t.Context(), plan, opts)
 	if err != nil {
@@ -188,7 +189,7 @@ func TestWriter_Apply_VCSConnectionRefResolution(t *testing.T) {
 		t.Fatalf("vcs-connection relationship missing: %+v", doc.Data.Relationships)
 	}
 	data, ok := rel["data"].(map[string]any)
-	if !ok || data["id"] != "vcs-fixt" {
+	if !ok || data["id"] != "vcs-existing" {
 		t.Errorf("vcs-connection id not wired through: %+v", rel)
 	}
 }
