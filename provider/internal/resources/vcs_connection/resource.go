@@ -8,34 +8,21 @@
 //	Read:    GET    /api/terrapod/v1/vcs-connections/{id}
 //	Delete:  DELETE /api/terrapod/v1/vcs-connections/{id}
 //
-// This resource is immutable — there is no update (PATCH) endpoint.
-// Any attribute change forces replacement.
+// This resource is immutable from the Terraform side — any attribute
+// change forces replacement. The Terrapod API does support PATCH
+// (#315) but the provider has historically modelled VCS connections
+// as RequiresReplace because rotating a private key cleanly via
+// Terraform plans is messy. The go-terrapod SDK exposes the PATCH
+// path for direct callers (CLI tooling, migration tool).
 //
-// Attribute mapping (JSON:API attribute -> Terraform schema attribute):
-//
-//	"name"                     -> name                     (string, required, forces new)
-//	"provider"                 -> provider                 (string, required, forces new: "github" or "gitlab")
-//	"server-url"               -> server_url               (string, optional, forces new)
-//	"github-app-id"            -> github_app_id            (int,    optional, forces new)
-//	"github-installation-id"   -> github_installation_id   (int,    optional, forces new)
-//	"private-key"              -> private_key              (string, optional, sensitive, write-only, forces new)
-//	"token"                    -> token                    (string, optional, sensitive, write-only, forces new)
-//
-// Read-only attributes:
-//
-//	"status"                   -> status                   (string, computed)
-//	"has-token"                -> has_token                (bool,   computed)
-//	"github-account-login"     -> github_account_login     (string, computed)
-//	"github-account-type"      -> github_account_type      (string, computed)
-//	"created-at"               -> created_at               (string, computed)
-//	"updated-at"               -> updated_at               (string, computed)
-//
-// Import: by VCS connection ID (e.g. "vcs-abc123").
-// Note: private_key and token values will not be available after import.
+// Migrated to go-terrapod (#347): CRUD goes through the typed SDK;
+// the legacy *client.Client is kept only because the provider's
+// Configure callback hands it to us.
 package vcs_connection
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -46,6 +33,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 )
 
@@ -54,11 +42,9 @@ var (
 	_ resource.ResourceWithImportState = &vcsConnectionResource{}
 )
 
-// vcsConnectionModel maps the Terraform schema to Go types.
 type vcsConnectionModel struct {
 	ID types.String `tfsdk:"id"`
 
-	// Writable attributes (all force replacement — resource is immutable)
 	Name                 types.String `tfsdk:"name"`
 	Provider             types.String `tfsdk:"vcs_provider"`
 	ServerURL            types.String `tfsdk:"server_url"`
@@ -67,7 +53,6 @@ type vcsConnectionModel struct {
 	PrivateKey           types.String `tfsdk:"private_key"`
 	Token                types.String `tfsdk:"token"`
 
-	// Read-only attributes
 	Status             types.String `tfsdk:"status"`
 	HasToken           types.Bool   `tfsdk:"has_token"`
 	GithubAccountLogin types.String `tfsdk:"github_account_login"`
@@ -78,9 +63,9 @@ type vcsConnectionModel struct {
 
 type vcsConnectionResource struct {
 	client *client.Client
+	tc     *terrapod.Client
 }
 
-// NewResource returns a new VCS connection resource.
 func NewResource() resource.Resource {
 	return &vcsConnectionResource{}
 }
@@ -154,7 +139,6 @@ func (r *vcsConnectionResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 
-			// Read-only
 			"status": schema.StringAttribute{
 				Description: "The connection status.",
 				Computed:    true,
@@ -202,6 +186,13 @@ func (r *vcsConnectionResource) Configure(_ context.Context, req resource.Config
 		return
 	}
 	r.client = c
+
+	tc, err := terrapod.NewClient(terrapod.Options{BaseURL: c.BaseURL, Token: c.Token})
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to build go-terrapod client", err.Error())
+		return
+	}
+	r.tc = tc
 }
 
 func (r *vcsConnectionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -211,27 +202,13 @@ func (r *vcsConnectionResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	attrs := buildVCSConnectionAttrs(&plan)
-
-	body, err := client.MarshalResource("vcs-connections", attrs, nil)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal request", err.Error())
-		return
-	}
-
-	data, err := r.client.Post(ctx, "/api/terrapod/v1/vcs-connections", body)
+	v, err := r.tc.CreateVCSConnection(ctx, buildCreateVCSConnectionRequest(&plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create VCS connection", err.Error())
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
-	readVCSConnectionIntoModel(res, &plan)
+	readVCSConnectionFromSDK(v, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -242,9 +219,10 @@ func (r *vcsConnectionResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	data, err := r.client.Get(ctx, "/api/terrapod/v1/vcs-connections/"+state.ID.ValueString())
+	v, err := r.tc.GetVCSConnection(ctx, state.ID.ValueString())
 	if err != nil {
-		if client.IsNotFound(err) {
+		var nf *terrapod.NotFoundError
+		if errors.As(err, &nf) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -252,28 +230,22 @@ func (r *vcsConnectionResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	res, err := client.ParseResource(data)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to parse response", err.Error())
-		return
-	}
-
-	// Preserve write-only fields from state (API never returns them).
+	// Preserve write-only fields from state — the API never echoes them back.
 	privateKey := state.PrivateKey
 	token := state.Token
 
-	readVCSConnectionIntoModel(res, &state)
+	readVCSConnectionFromSDK(v, &state)
 	state.PrivateKey = privateKey
 	state.Token = token
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-// Update is not supported — all attributes force replacement.
-// This method is required by the Resource interface but should never be called.
+// Update is not supported — all schema attributes force replacement.
+// Required by the framework interface but never reached at runtime.
 func (r *vcsConnectionResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
 	resp.Diagnostics.AddError(
 		"Update not supported",
-		"VCS connections are immutable. All changes force replacement.",
+		"VCS connections are immutable on the Terraform provider — all attributes force replacement. Use the Terrapod CLI / API directly to rotate credentials in-place.",
 	)
 }
 
@@ -284,9 +256,12 @@ func (r *vcsConnectionResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	err := r.client.Delete(ctx, "/api/terrapod/v1/vcs-connections/"+state.ID.ValueString())
-	if err != nil && !client.IsNotFound(err) {
-		resp.Diagnostics.AddError("Failed to delete VCS connection", err.Error())
+	err := r.tc.DeleteVCSConnection(ctx, state.ID.ValueString())
+	if err != nil {
+		var nf *terrapod.NotFoundError
+		if !errors.As(err, &nf) {
+			resp.Diagnostics.AddError("Failed to delete VCS connection", err.Error())
+		}
 	}
 }
 
@@ -294,71 +269,70 @@ func (r *vcsConnectionResource) ImportState(ctx context.Context, req resource.Im
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// buildVCSConnectionAttrs converts the Terraform model into JSON:API attributes.
-func buildVCSConnectionAttrs(m *vcsConnectionModel) map[string]any {
-	attrs := map[string]any{
-		"name":     m.Name.ValueString(),
-		"provider": m.Provider.ValueString(),
+// buildCreateVCSConnectionRequest projects the Terraform model into
+// the SDK's typed request shape. Optional fields are passed through
+// only when set; the SDK drops zero values from the wire body.
+func buildCreateVCSConnectionRequest(m *vcsConnectionModel) terrapod.CreateVCSConnectionRequest {
+	req := terrapod.CreateVCSConnectionRequest{
+		Name:     m.Name.ValueString(),
+		Provider: m.Provider.ValueString(),
 	}
-
 	if !m.ServerURL.IsNull() && !m.ServerURL.IsUnknown() {
-		attrs["server-url"] = m.ServerURL.ValueString()
+		req.ServerURL = m.ServerURL.ValueString()
 	}
 	if !m.GithubAppID.IsNull() && !m.GithubAppID.IsUnknown() {
-		attrs["github-app-id"] = m.GithubAppID.ValueInt64()
+		req.GithubAppID = m.GithubAppID.ValueInt64()
 	}
 	if !m.GithubInstallationID.IsNull() && !m.GithubInstallationID.IsUnknown() {
-		attrs["github-installation-id"] = m.GithubInstallationID.ValueInt64()
+		req.GithubInstallationID = m.GithubInstallationID.ValueInt64()
 	}
 	if !m.PrivateKey.IsNull() && !m.PrivateKey.IsUnknown() {
-		attrs["private-key"] = m.PrivateKey.ValueString()
+		req.PrivateKey = m.PrivateKey.ValueString()
 	}
 	if !m.Token.IsNull() && !m.Token.IsUnknown() {
-		attrs["token"] = m.Token.ValueString()
+		req.Token = m.Token.ValueString()
 	}
-
-	return attrs
+	return req
 }
 
-// readVCSConnectionIntoModel populates the Terraform model from a JSON:API resource.
-func readVCSConnectionIntoModel(res *client.Resource, m *vcsConnectionModel) {
-	m.ID = types.StringValue(res.ID)
-	m.Name = types.StringValue(client.GetStringAttr(res, "name"))
-	m.Provider = types.StringValue(client.GetStringAttr(res, "provider"))
+// readVCSConnectionFromSDK populates the Terraform model from the SDK
+// type. PrivateKey and Token are write-only — the caller preserves
+// them from prior state.
+func readVCSConnectionFromSDK(v *terrapod.VCSConnection, m *vcsConnectionModel) {
+	m.ID = types.StringValue(v.ID)
+	m.Name = types.StringValue(v.Name)
+	m.Provider = types.StringValue(v.Provider)
 
-	if v := client.GetStringAttr(res, "server-url"); v != "" {
-		m.ServerURL = types.StringValue(v)
+	if v.ServerURL != "" {
+		m.ServerURL = types.StringValue(v.ServerURL)
 	} else {
 		m.ServerURL = types.StringNull()
 	}
-
-	if v := client.GetIntAttr(res, "github-app-id"); v != 0 {
-		m.GithubAppID = types.Int64Value(v)
+	if v.GithubAppID != 0 {
+		m.GithubAppID = types.Int64Value(v.GithubAppID)
 	} else {
 		m.GithubAppID = types.Int64Null()
 	}
-	if v := client.GetIntAttr(res, "github-installation-id"); v != 0 {
-		m.GithubInstallationID = types.Int64Value(v)
+	if v.GithubInstallationID != 0 {
+		m.GithubInstallationID = types.Int64Value(v.GithubInstallationID)
 	} else {
 		m.GithubInstallationID = types.Int64Null()
 	}
 
-	// private_key and token are write-only — caller preserves them from state.
+	m.Status = types.StringValue(v.Status)
+	m.HasToken = types.BoolValue(v.HasToken)
 
-	m.Status = types.StringValue(client.GetStringAttr(res, "status"))
-	m.HasToken = types.BoolValue(client.GetBoolAttr(res, "has-token"))
-
-	if v := client.GetStringAttr(res, "github-account-login"); v != "" {
-		m.GithubAccountLogin = types.StringValue(v)
+	if v.GithubAccountLogin != "" {
+		m.GithubAccountLogin = types.StringValue(v.GithubAccountLogin)
 	} else {
 		m.GithubAccountLogin = types.StringNull()
 	}
-	if v := client.GetStringAttr(res, "github-account-type"); v != "" {
-		m.GithubAccountType = types.StringValue(v)
+	if v.GithubAccountType != "" {
+		m.GithubAccountType = types.StringValue(v.GithubAccountType)
 	} else {
 		m.GithubAccountType = types.StringNull()
 	}
 
-	m.CreatedAt = types.StringValue(client.GetStringAttr(res, "created-at"))
-	m.UpdatedAt = types.StringValue(client.GetStringAttr(res, "updated-at"))
+	m.CreatedAt = types.StringValue(v.CreatedAt)
+	m.UpdatedAt = types.StringValue(v.UpdatedAt)
 }
