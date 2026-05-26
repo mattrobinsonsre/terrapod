@@ -1,0 +1,132 @@
+// Package ir defines the intermediate representation that source plugins
+// produce and the Terrapod writer consumes.
+//
+// The IR is the single contract that keeps sources and writer decoupled:
+// a source plugin (atlantis, tfe) only knows how to produce Plan and the
+// items inside it; the writer only knows how to translate Plan items
+// into Terrapod API calls. Adding a third source later (Digger,
+// Terrateam) is one new directory under internal/sources/ — no writer
+// changes required.
+//
+// Every item carries SourceID (an opaque string the source uses to
+// identify the upstream object — the TFE workspace UUID, or the
+// "<repo>/<dir>" path for an atlantis.yaml project) so the migration
+// state file can map SourceID → TerrapodID for idempotency. SourceID is
+// guaranteed unique within a single Plan from a single source.
+//
+// Fields are intentionally a superset of what any one source emits:
+// missing fields on the source side stay zero, the writer ignores
+// zero-valued fields, and we don't have to thread a feature matrix
+// through the writer per source. Adding a new field is back-compatible.
+//
+// JSON tags on every field — the IR is dumped to stdout in dry-run mode
+// and serialised to disk in the migration state file. Deterministic
+// representation (sorted keys, no embedded time-of-day where avoidable)
+// keeps diffs stable across runs.
+package ir
+
+// Plan is the top-level IR document. Every source plugin produces one
+// per migration; the writer consumes it once.
+type Plan struct {
+	// Source names the producing plugin: "tfe" | "atlantis". The writer
+	// uses this only to populate the `terrapod-migrated-from:{source}`
+	// label on every created resource — never to branch on behaviour.
+	Source string `json:"source"`
+
+	// SourceMetadata is free-form context the source attaches for
+	// operator-facing reports: org name, host URL, repo list, fetch
+	// timestamp, source-side version. Never read by the writer.
+	SourceMetadata map[string]string `json:"source_metadata,omitempty"`
+
+	// Workspaces is the headline collection. Order is unspecified; the
+	// writer may parallelise or sequence as it likes (sequential is the
+	// first-release default).
+	Workspaces []Workspace `json:"workspaces,omitempty"`
+
+	// VCSConnections to create on the Terrapod side before workspaces
+	// that reference them. The writer resolves the dependency.
+	VCSConnections []VCSConnection `json:"vcs_connections,omitempty"`
+
+	// Skipped collects items the source decided not to migrate, with a
+	// per-item reason. Surfaced in the dry-run report and the handover
+	// document; never written to Terrapod.
+	Skipped []SkippedItem `json:"skipped,omitempty"`
+
+	// Subsequent increments add: VariableSets, RunTriggers,
+	// Notifications, AgentPools, RegistryModules, RegistryProviders,
+	// GPGKeys, RoleProposals, Cutover (lock-source + handover) etc.
+	// Keeping the Plan struct narrow on first cut so we don't fix shape
+	// before the sources can speak.
+}
+
+// Workspace is the migrated form of a TFE workspace or an Atlantis
+// project. Field names match Terrapod's create-workspace JSON:API
+// attributes where possible to keep the writer's mapping mechanical.
+type Workspace struct {
+	SourceID         string            `json:"source_id"`
+	Name             string            `json:"name"`
+	ExecutionMode    string            `json:"execution_mode,omitempty"`     // "local" | "agent"
+	TerraformVersion string            `json:"terraform_version,omitempty"`  // "1.12", "1.12.3", etc — Terrapod accepts partials
+	WorkingDirectory string            `json:"working_directory,omitempty"`  // relative path within the repo
+	Labels           map[string]string `json:"labels,omitempty"`             // TFE tags translate here: "k:v" → {k: "v"}, "k" → {k: ""}
+	AutoApply        bool              `json:"auto_apply,omitempty"`
+	OwnerEmail       string            `json:"owner_email,omitempty"`        // set on creation; defaults to migrating user
+	VCSConnectionRef string            `json:"vcs_connection_ref,omitempty"` // references VCSConnection.SourceID
+	VCSRepoURL       string            `json:"vcs_repo_url,omitempty"`
+	VCSBranch        string            `json:"vcs_branch,omitempty"`
+	Variables        []Variable        `json:"variables,omitempty"`
+	// State and ConfigurationVersion stay external to the Workspace struct
+	// because (a) they're large blobs we don't want serialised into the
+	// state file and (b) they may need their own retry/streaming policy.
+	// The writer pulls them via dedicated source-plugin calls keyed by
+	// SourceID.
+}
+
+// Variable mirrors a TFE workspace or varset variable. `Value` is
+// omitted from JSON when sensitive — sensitive values are read from the
+// source by the writer at apply time, never serialised into the state
+// file or dry-run report.
+type Variable struct {
+	Key         string `json:"key"`
+	Value       string `json:"value,omitempty"`
+	Category    string `json:"category"`           // "terraform" | "env"
+	HCL         bool   `json:"hcl,omitempty"`      // only meaningful for category=terraform
+	Sensitive   bool   `json:"sensitive,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+// VCSConnection is a Terrapod-side VCS connection (one per source
+// OAuth/PAT). On Atlantis migrations there's typically one shared
+// connection; on TFE migrations there's one per TFE oauth-client.
+type VCSConnection struct {
+	SourceID  string `json:"source_id"`
+	Name      string `json:"name"`
+	Provider  string `json:"provider"`             // "github" | "gitlab"
+	ServerURL string `json:"server_url,omitempty"` // empty = provider default (github.com / gitlab.com)
+	// Credentials NEVER appear in the IR. The source plugin holds them
+	// in memory only and hands them to the writer's CreateVCSConnection
+	// call directly. Even the migration state file omits them — only
+	// the resulting Terrapod connection id is recorded.
+}
+
+// SkippedItem records something the source decided not to migrate. The
+// surface is intentionally simple — operators read this list to know
+// what they have to do by hand.
+type SkippedItem struct {
+	// Kind names the resource type as the operator would search for it:
+	// "sentinel-policy", "tfe-stack", "bitbucket-vcs-connection",
+	// "atlantis-workflow", "atlantis-pre-workflow-hook" etc. Kept as a
+	// string (not a typed enum) because the set grows per source.
+	Kind string `json:"kind"`
+
+	// Name is the human-recognisable identifier at the source. For a
+	// Sentinel policy that's its name; for a VCS connection it's
+	// the repo URL or oauth-client name.
+	Name string `json:"name"`
+
+	// Reason is operator-readable. Phrase as "<this kind> <name> <why
+	// it was skipped>" so the report reads cleanly: "Sentinel policy
+	// 'prod-only-no-public-buckets' skipped: not supported by Terrapod
+	// (see docs/migration.md#sentinel)".
+	Reason string `json:"reason"`
+}

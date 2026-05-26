@@ -141,6 +141,44 @@ jobs:
         run: go test ./... -v -count=1 -timeout 120s
         working-directory: provider
 
+  # ── Migrate Lint ──────────────────────────────────────
+  # The terrapod-migrate binary lives in migrate/ with its own go.mod
+  # (the provider doesn't carry go-tfe or the HCL libs). Mirrors the
+  # provider-lint shape so failures look the same to operators.
+  migrate-lint:
+    name: Migrate Lint
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: migrate/go.mod
+          cache-dependency-path: migrate/go.sum
+      - name: Vet
+        run: go vet ./...
+        working-directory: migrate
+      - name: Build
+        run: go build ./...
+        working-directory: migrate
+
+  # ── Migrate Test ──────────────────────────────────────
+  migrate-test:
+    name: Migrate Test
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: migrate/go.mod
+          cache-dependency-path: migrate/go.sum
+      - name: Test
+        run: go test ./... -v -count=1 -timeout 120s
+        working-directory: migrate
+
   # ── Python Test ────────────────────────────────────────
   python-test:
     name: Python Test
@@ -738,6 +776,8 @@ jobs:
       - frontend-lint
       - provider-lint
       - provider-test
+      - migrate-lint
+      - migrate-test
       - python-test
       - python-audit
       - npm-audit
@@ -761,6 +801,8 @@ jobs:
             "${{ needs.frontend-lint.result }}"
             "${{ needs.provider-lint.result }}"
             "${{ needs.provider-test.result }}"
+            "${{ needs.migrate-lint.result }}"
+            "${{ needs.migrate-test.result }}"
             "${{ needs.python-test.result }}"
             "${{ needs.python-audit.result }}"
             "${{ needs.npm-audit.result }}"

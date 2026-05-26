@@ -73,6 +73,9 @@ reports/
 # Provider build artifacts
 provider/terraform-provider-terrapod
 
+# Migration tool build artifacts
+migrate/terrapod-migrate
+
 # Terraform (local dev testing)
 .terraform/
 *.tfstate
