@@ -459,6 +459,16 @@ jobs:
     # install + test suite) with headroom; anything past that is
     # genuinely broken, not slow.
     timeout-minutes: 25
+    env:
+      # Pin Playwright's browser install location to /tmp so both the
+      # downloaded zip (which lands in /tmp/playwright-download-*)
+      # and the extracted browser tree end up on the same directory
+      # path. Default would extract to ~/.cache/ms-playwright/, which
+      # we've seen wedge silently mid-extract — likely because the
+      # final post-extract rename/move spans directories and triggers
+      # extra I/O on the Azure-backed runner disk. Job-scoped so both
+      # the install step and the test run step see the same path.
+      PLAYWRIGHT_BROWSERS_PATH: /tmp/ms-playwright
     permissions:
       contents: read
       packages: read
