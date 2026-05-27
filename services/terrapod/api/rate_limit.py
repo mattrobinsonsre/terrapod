@@ -104,13 +104,16 @@ class RateLimitMiddleware:
             is_runner = verify_runner_token(token) is not None
 
         is_auth_endpoint = _is_auth_path(path)
-        # Any Authorization header bumps the tier. We don't verify the
-        # credential here — the downstream auth dependency will 401 bogus
-        # tokens — but presence is enough to separate interactive /
-        # machine-integration traffic from unauthenticated traffic.
-        # (The web UI also sends Bearer tokens from localStorage; there
-        # is no session cookie in Terrapod.)
-        is_authenticated = bool(auth_header)
+        # Any Authorization header OR an X-Terrapod-Client-Cert header
+        # bumps the tier. We don't verify the credential here — the
+        # downstream auth dependency will 401 bogus tokens / certs — but
+        # presence is enough to separate interactive / machine-
+        # integration traffic from unauthenticated traffic. (The web UI
+        # sends Bearer tokens from localStorage; listener pods send
+        # X-Terrapod-Client-Cert with their X.509 cert; there is no
+        # session cookie in Terrapod.)
+        listener_cert = request.headers.get("x-terrapod-client-cert", "")
+        is_authenticated = bool(auth_header) or bool(listener_cert)
 
         if is_auth_endpoint:
             limit = self.auth_requests_per_minute

@@ -227,6 +227,27 @@ class TestRateLimitMiddleware:
         assert "api_authn" not in key
         assert response.headers["X-Ratelimit-Limit"] == "5"
 
+    def test_listener_cert_uses_authenticated_tier(self):
+        """X-Terrapod-Client-Cert (listener auth) maps to authenticated tier.
+
+        Listener pods don't send Authorization; they auth with their X.509
+        cert via X-Terrapod-Client-Cert. Without recognising this header,
+        listener traffic falls into the unauthenticated 100/min bucket and
+        all listeners across the fleet sharing a NAT-source IP DoS each
+        other on rollout.
+        """
+        mock_redis = _make_redis_mock(count=1)
+        app = _make_app(get_redis=lambda: mock_redis, rpm=5, authenticated_rpm=500)
+        client = TestClient(app)
+        response = client.get(
+            "/api/terrapod/v1/workspaces",
+            headers={"X-Terrapod-Client-Cert": "base64-cert-bytes-here"},
+        )
+        assert response.status_code == 200
+        incr_call = mock_redis.pipeline.return_value.incr.call_args
+        assert "api_authn" in incr_call[0][0]
+        assert response.headers["X-Ratelimit-Limit"] == "500"
+
     def test_zero_limit_means_unlimited(self):
         """rpm=0 should bypass the Redis bucket entirely."""
         mock_redis = _make_redis_mock(count=9999)
