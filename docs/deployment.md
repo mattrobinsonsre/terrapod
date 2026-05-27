@@ -484,6 +484,7 @@ listener:
 | `ingress.annotations` | `{}` | Ingress annotations |
 | `ingress.extraPaths` | `[]` | Extra paths prepended before the default catch-all |
 | `tls.existingSecret` | `""` | Existing TLS secret name |
+| `web.hsts.value` | `"max-age=63072000"` | `Strict-Transport-Security` header sent on every BFF response. Set to `""` to disable. Default is 2 years, no `includeSubDomains` (operator's call), no `preload`. |
 
 The chart supports up to three Ingresses. See [Split-networking deployments](deployment-network-isolation.md) for the `internalIngress` block (private path for listener + runner traffic) and [Optional split webhook ingress](deployment-webhook-ingress.md) for the `webhookIngress` block (public-must-reach surface).
 

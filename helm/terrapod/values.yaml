@@ -445,6 +445,28 @@ web:
     tag: ""  # Defaults to appVersion
     pullPolicy: IfNotPresent
 
+  # HSTS (Strict-Transport-Security) header sent on every BFF response.
+  # On by default — Terrapod's deployed model is HTTPS-only and many
+  # ingress controllers (notably Tailscale) don't listen on port 80, so
+  # a typo like `http://<hostname>` would otherwise just fail. The
+  # header tells browsers to upgrade `http://<hostname>` to
+  # `https://<hostname>` for `max-age` seconds after the first HTTPS
+  # visit.
+  #
+  # Default `max-age=63072000` is 2 years. No `includeSubDomains`:
+  # Terrapod's hostname's parent zone (e.g. `ts.net`, a corporate
+  # internal zone) is almost always shared with sibling services that
+  # have their own HTTP policies — asserting the directive would force
+  # HTTPS on all of them, which is the deploying operator's call.
+  # No `preload`: that's a one-way commitment to the hsts-preload list.
+  #
+  # Set `value: ""` to disable the header entirely (e.g. dev or mixed
+  # http/https deployments). Operators who DO own the entire parent
+  # zone and want the broader assertion can add `; includeSubDomains`
+  # (and optionally `; preload`) explicitly.
+  hsts:
+    value: "max-age=63072000"
+
   # Service configuration
   service:
     type: ClusterIP

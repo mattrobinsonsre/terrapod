@@ -65,6 +65,13 @@ spec:
           env:
             - name: API_URL
               value: "http://{{ include "terrapod.fullname" . }}-api:8000"
+            # HSTS (Strict-Transport-Security). When non-empty, the
+            # web container sends this value on every response. Default
+            # is `max-age=63072000` (2 years, no includeSubDomains, no
+            # preload) — see values.yaml `web.hsts` for the rationale.
+            # Set to "" to disable.
+            - name: HSTS
+              value: {{ .Values.web.hsts.value | quote }}
             {{- with .Values.web.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
