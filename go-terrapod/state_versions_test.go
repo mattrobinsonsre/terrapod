@@ -202,3 +202,53 @@ func TestGetVarsetVariable_NotFound(t *testing.T) {
 		t.Errorf("expected NotFoundError, got err=%v v=%+v", err, v)
 	}
 }
+
+// TestCreateStateVersion_Conflict pins the 409 → *ConflictError
+// classification path. The migrator's writer relies on
+// errors.As(err, &ConflictError{}) to distinguish "serial already
+// exists" from other failures; a regression in parseStateVersion
+// swallowing typed errors would silently break that branch.
+func TestCreateStateVersion_Conflict(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		http.Error(w, `{"errors":[{"status":"409","detail":"serial 7 already exists"}]}`, http.StatusConflict)
+	}))
+	defer srv.Close()
+	c, _ := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+
+	_, err := c.CreateStateVersion(t.Context(), "ws-a", CreateStateVersionRequest{Serial: 7, Lineage: "L"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !IsConflict(err) {
+		t.Errorf("expected *ConflictError, got %T: %v", err, err)
+	}
+}
+
+// TestGetVariableByKey pins the new per-key lookup helper added in
+// round 3. Verifies both the happy path and the NotFoundError
+// contract.
+func TestGetVariableByKey(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_, _ = w.Write([]byte(`{"data":[
+            {"id":"var-1","type":"vars","attributes":{"key":"AWS_REGION","value":"eu-west-1","category":"env","sensitive":false}},
+            {"id":"var-2","type":"vars","attributes":{"key":"AWS_PROFILE","value":"dev","category":"env","sensitive":false}}
+        ]}`))
+	}))
+	defer srv.Close()
+	c, _ := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+
+	got, err := c.GetVariableByKey(t.Context(), "ws-a", "AWS_REGION")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != "var-1" || got.Value != "eu-west-1" {
+		t.Errorf("variable: %+v", got)
+	}
+
+	missing, err := c.GetVariableByKey(t.Context(), "ws-a", "NOPE")
+	if !IsNotFound(err) {
+		t.Errorf("expected NotFoundError, got %v (missing=%+v)", err, missing)
+	}
+}

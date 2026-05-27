@@ -97,6 +97,26 @@ func (c *Client) GetVariable(ctx context.Context, workspaceID, id string) (*Vari
 	return nil, &NotFoundError{Resource: "variable", ID: id}
 }
 
+// GetVariableByKey looks up a variable by workspace + key (the
+// human-typed name, e.g. "AWS_REGION"). Most operator-facing tools
+// reason in keys rather than UUIDs; this is the lookup they want.
+// Same per-workspace list cost as GetVariable.
+//
+// Returns *NotFoundError when no variable with the given key exists
+// on the workspace.
+func (c *Client) GetVariableByKey(ctx context.Context, workspaceID, key string) (*Variable, error) {
+	list, err := c.ListVariables(ctx, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range list {
+		if list[i].Key == key {
+			return &list[i], nil
+		}
+	}
+	return nil, &NotFoundError{Resource: "variable", ID: key}
+}
+
 // ListVariables returns every variable on a workspace. Terrapod
 // doesn't paginate this endpoint (variable counts per workspace are
 // small); the SDK returns the full set in one call.

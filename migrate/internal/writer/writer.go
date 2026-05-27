@@ -478,6 +478,14 @@ func (w *Writer) applyState(ctx context.Context, terrapodID, sourceID string, re
 		out.State = "errored"
 		out.Error = fmt.Sprintf("destination state pre-check failed: %v — refusing to upload blind", err)
 		return out
+	default:
+		// err == nil && dest == nil — should be unreachable since the
+		// SDK contract is (value | nil-with-NotFoundError). Treat as
+		// hard failure: the safety net only works when we can read
+		// the destination, and a silent (nil,nil) means we can't.
+		out.State = "errored"
+		out.Error = "destination state pre-check returned (nil, nil) — SDK contract violation; refusing to upload blind"
+		return out
 	}
 
 	sv, err := w.client.CreateAndUploadState(ctx, terrapodID, raw, terrapod.CreateStateVersionRequest{
@@ -635,10 +643,7 @@ func (w *Writer) applyVariable(ctx context.Context, workspaceID, workspaceSource
 //     non-sensitive value would silently overwrite the operator's
 //     secret. Surfaced as a clear error so the operator can decide.
 func (w *Writer) reconcileVariable(ctx context.Context, workspaceID string, req terrapod.CreateVariableRequest) error {
-	// GetVariable filters by id, not key — the SDK has no per-key
-	// lookup, so we list and match. The list is small (one workspace's
-	// vars) so the per-409 cost is bounded.
-	existing, err := w.findVariableByKey(ctx, workspaceID, req.Key)
+	existing, err := w.client.GetVariableByKey(ctx, workspaceID, req.Key)
 	if err != nil {
 		return fmt.Errorf("locate existing %q: %w", req.Key, err)
 	}
@@ -658,21 +663,6 @@ func (w *Writer) reconcileVariable(ctx context.Context, workspaceID string, req 
 	return nil
 }
 
-// findVariableByKey lists workspace variables and returns the one
-// matching the given key. Returns *NotFoundError when absent so
-// callers can react with the standard IsNotFound predicate.
-func (w *Writer) findVariableByKey(ctx context.Context, workspaceID, key string) (*terrapod.Variable, error) {
-	vars, err := w.client.ListVariables(ctx, workspaceID)
-	if err != nil {
-		return nil, err
-	}
-	for i := range vars {
-		if vars[i].Key == key {
-			return &vars[i], nil
-		}
-	}
-	return nil, &terrapod.NotFoundError{Resource: "variable", ID: key}
-}
 
 // ── State plumbing ───────────────────────────────────────────────────
 
