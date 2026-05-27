@@ -40,6 +40,12 @@ export default function PolicySetsPage() {
   const [description, setDescription] = useState('')
   const [enforcement, setEnforcement] = useState('advisory')
   const [globalScope, setGlobalScope] = useState(false)
+  const [source, setSource] = useState<'inline' | 'vcs'>('inline')
+  const [vcsConnectionId, setVcsConnectionId] = useState('')
+  const [vcsRepoUrl, setVcsRepoUrl] = useState('')
+  const [vcsBranch, setVcsBranch] = useState('')
+  const [policyPath, setPolicyPath] = useState('')
+  const [vcsConnections, setVcsConnections] = useState<{id: string; attributes: {name: string}}[]>([])
   const [creating, setCreating] = useState(false)
 
   const accessor = useCallback((item: PolicySet, key: PsSortKey): string | number | null | undefined => {
@@ -79,23 +85,39 @@ export default function PolicySetsPage() {
     }
   }
 
+  useEffect(() => {
+    if (showCreate && source === 'vcs' && vcsConnections.length === 0) {
+      apiFetch('/api/terrapod/v1/vcs-connections').then(r => r.ok ? r.json() : { data: [] }).then(d => {
+        setVcsConnections(d.data || [])
+      }).catch(() => {})
+    }
+  }, [showCreate, source, vcsConnections.length])
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setCreating(true)
     setError('')
     try {
+      const attrs: Record<string, unknown> = {
+        name,
+        description,
+        'enforcement-level': enforcement,
+        'global-scope': globalScope,
+        source,
+      }
+      if (source === 'vcs') {
+        attrs['vcs-connection-id'] = vcsConnectionId
+        attrs['vcs-repo-url'] = vcsRepoUrl
+        attrs['vcs-branch'] = vcsBranch
+        attrs['policy-path'] = policyPath
+      }
       const res = await apiFetch('/api/terrapod/v1/policy-sets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
           data: {
             type: 'policy-sets',
-            attributes: {
-              name,
-              description,
-              'enforcement-level': enforcement,
-              'global-scope': globalScope,
-            },
+            attributes: attrs,
           },
         }),
       })
@@ -166,8 +188,52 @@ export default function PolicySetsPage() {
                 <span className="text-sm text-slate-300">Global (apply to every workspace)</span>
               </label>
             </div>
+            <div className="flex gap-4 items-center">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="source" value="inline" checked={source === 'inline'} onChange={() => setSource('inline')}
+                  className="text-brand-600 focus:ring-brand-500" />
+                <span className="text-sm text-slate-300">Inline (manage policies in UI)</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="source" value="vcs" checked={source === 'vcs'} onChange={() => setSource('vcs')}
+                  className="text-brand-600 focus:ring-brand-500" />
+                <span className="text-sm text-slate-300">From VCS Repository</span>
+              </label>
+            </div>
+            {source === 'vcs' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-900/50 rounded-lg border border-slate-700/50">
+                <div>
+                  <label htmlFor="ps-vcs-conn" className="block text-sm font-medium text-slate-300 mb-1">VCS Connection</label>
+                  <select id="ps-vcs-conn" value={vcsConnectionId} onChange={(e) => setVcsConnectionId(e.target.value)} required
+                    className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    <option value="">Select connection...</option>
+                    {vcsConnections.map(c => (
+                      <option key={c.id} value={c.id}>{c.attributes.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="ps-vcs-repo" className="block text-sm font-medium text-slate-300 mb-1">Repository URL</label>
+                  <input id="ps-vcs-repo" type="text" value={vcsRepoUrl} onChange={(e) => setVcsRepoUrl(e.target.value)} required
+                    placeholder="https://github.com/org/infra-policies"
+                    className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                </div>
+                <div>
+                  <label htmlFor="ps-vcs-branch" className="block text-sm font-medium text-slate-300 mb-1">Branch</label>
+                  <input id="ps-vcs-branch" type="text" value={vcsBranch} onChange={(e) => setVcsBranch(e.target.value)}
+                    placeholder="main (default)"
+                    className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                </div>
+                <div>
+                  <label htmlFor="ps-vcs-path" className="block text-sm font-medium text-slate-300 mb-1">Policy Path</label>
+                  <input id="ps-vcs-path" type="text" value={policyPath} onChange={(e) => setPolicyPath(e.target.value)}
+                    placeholder="policies/ (directory containing .rego files)"
+                    className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                </div>
+              </div>
+            )}
             <p className="text-xs text-slate-500">
-              Add policies and refine label scoping after creating the set.
+              {source === 'vcs' ? 'Policies will be synced from the repository automatically.' : 'Add policies and refine label scoping after creating the set.'}
             </p>
             <button type="submit" disabled={creating}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">

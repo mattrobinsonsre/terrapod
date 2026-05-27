@@ -114,6 +114,14 @@ def _policy_set_json(ps: PolicySet, *, embed_policies: bool = False) -> dict:
         "allow-names": ps.allow_names or [],
         "deny-labels": ps.deny_labels or {},
         "deny-names": ps.deny_names or [],
+        "source": ps.source,
+        "vcs-connection-id": f"vcs-{ps.vcs_connection_id}" if ps.vcs_connection_id else None,
+        "vcs-repo-url": ps.vcs_repo_url or None,
+        "vcs-branch": ps.vcs_branch or None,
+        "policy-path": ps.policy_path or None,
+        "vcs-last-commit-sha": ps.vcs_last_commit_sha or None,
+        "vcs-last-synced-at": _rfc3339(ps.vcs_last_synced_at) if ps.vcs_last_synced_at else None,
+        "vcs-last-error": ps.vcs_last_error,
         "policy-count": len(ps.policies),
         "created-by": ps.created_by or "",
         "created-at": _rfc3339(ps.created_at),
@@ -211,6 +219,22 @@ async def create_policy_set(
     if not name:
         raise HTTPException(status_code=422, detail="name is required")
 
+    source = attrs.get("source", "inline")
+    if source not in ("inline", "vcs"):
+        raise HTTPException(status_code=422, detail="source must be 'inline' or 'vcs'")
+
+    vcs_connection_id = None
+    if source == "vcs":
+        vcs_conn_id_raw = attrs.get("vcs-connection-id", "")
+        if not vcs_conn_id_raw:
+            raise HTTPException(status_code=422, detail="vcs-connection-id is required for VCS policy sets")
+        try:
+            vcs_connection_id = uuid.UUID(vcs_conn_id_raw.removeprefix("vcs-"))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Invalid vcs-connection-id") from exc
+        if not attrs.get("vcs-repo-url"):
+            raise HTTPException(status_code=422, detail="vcs-repo-url is required for VCS policy sets")
+
     ps = PolicySet(
         name=name,
         description=attrs.get("description", "") or "",
@@ -221,6 +245,11 @@ async def create_policy_set(
         allow_names=attrs.get("allow-names", []) or [],
         deny_labels=attrs.get("deny-labels", {}) or {},
         deny_names=attrs.get("deny-names", []) or [],
+        source=source,
+        vcs_connection_id=vcs_connection_id,
+        vcs_repo_url=attrs.get("vcs-repo-url", "") if source == "vcs" else "",
+        vcs_branch=attrs.get("vcs-branch", "") if source == "vcs" else "",
+        policy_path=attrs.get("policy-path", "") if source == "vcs" else "",
         created_by=user.email,
     )
     db.add(ps)
@@ -306,6 +335,28 @@ async def delete_policy_set(
     return JSONResponse(content=None, status_code=204)
 
 
+# ── VCS Sync Action ──────────────────────────────────────────────────
+
+
+@router.post("/policy-sets/{ps_id}/actions/sync")
+async def sync_policy_set(
+    ps_id: str = Path(...),
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Trigger an immediate sync of a VCS-sourced policy set."""
+    ps = await _get_policy_set(db, ps_id)
+    if ps.source != "vcs":
+        raise HTTPException(status_code=409, detail="Only VCS-sourced policy sets can be synced")
+
+    from terrapod.services.policy_vcs_poller import _sync_policy_set
+
+    await _sync_policy_set(db, ps)
+    await db.commit()
+    ps = await _get_policy_set(db, ps_id)
+    return JSONResponse(content={"data": _policy_set_json(ps, embed_policies=True)})
+
+
 # ── Policy CRUD ───────────────────────────────────────────────────────
 
 
@@ -351,6 +402,11 @@ async def add_policy(
 ) -> JSONResponse:
     """Add a policy to a set. The Rego is validated with `opa check`."""
     ps = await _get_policy_set(db, ps_id)
+    if ps.source == "vcs":
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot add inline policies to a VCS-sourced policy set — policies are managed by the linked repository",
+        )
     attrs = body.get("data", {}).get("attributes", {})
     name = (attrs.get("name") or "").strip()
     if not name:
@@ -397,6 +453,12 @@ async def update_policy(
 ) -> JSONResponse:
     """Partial update of a policy. A changed Rego is re-validated."""
     policy = await _get_policy(db, policy_id)
+    ps = await _get_policy_set(db, f"polset-{policy.policy_set_id}")
+    if ps.source == "vcs":
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot edit policies on a VCS-sourced policy set — push changes to the repository",
+        )
     attrs = body.get("data", {}).get("attributes", {})
 
     if "name" in attrs:
@@ -430,6 +492,12 @@ async def delete_policy(
 ) -> JSONResponse:
     """Delete a single policy."""
     policy = await _get_policy(db, policy_id)
+    ps = await _get_policy_set(db, f"polset-{policy.policy_set_id}")
+    if ps.source == "vcs":
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot delete policies from a VCS-sourced policy set — remove the file from the repository",
+        )
     await db.delete(policy)
     await db.commit()
     return JSONResponse(content=None, status_code=204)

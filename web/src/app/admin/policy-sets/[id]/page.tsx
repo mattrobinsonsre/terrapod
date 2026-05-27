@@ -27,6 +27,13 @@ interface PolicySet {
     'allow-names': string[]
     'deny-labels': Record<string, string | string[]>
     'deny-names': string[]
+    source: 'inline' | 'vcs'
+    'vcs-repo-url': string | null
+    'vcs-branch': string | null
+    'policy-path': string | null
+    'vcs-last-commit-sha': string | null
+    'vcs-last-synced-at': string | null
+    'vcs-last-error': string | null
     'created-by': string
   }
   relationships?: { policies?: { data: Policy[] } }
@@ -267,12 +274,51 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
           </button>
         </form>
 
+        {ps.attributes.source === 'vcs' && (
+          <div className="rounded-md bg-blue-900/30 border border-blue-700/50 p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-blue-200">
+                  Policies synced from <span className="font-mono text-blue-300">{ps.attributes['vcs-repo-url']}</span>
+                  {ps.attributes['vcs-branch'] && <> ({ps.attributes['vcs-branch']})</>}
+                  {ps.attributes['policy-path'] && <> at <span className="font-mono">{ps.attributes['policy-path']}/</span></>}
+                </p>
+                {ps.attributes['vcs-last-synced-at'] && (
+                  <p className="text-xs text-blue-400 mt-1">
+                    Last synced {new Date(ps.attributes['vcs-last-synced-at']).toLocaleString()}
+                    {ps.attributes['vcs-last-commit-sha'] && <> (commit {ps.attributes['vcs-last-commit-sha'].slice(0, 8)})</>}
+                  </p>
+                )}
+                {ps.attributes['vcs-last-error'] && (
+                  <p className="text-xs text-red-400 mt-1">Sync error: {ps.attributes['vcs-last-error']}</p>
+                )}
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await apiFetch(`/api/terrapod/v1/policy-sets/${ps.id}/actions/sync`, { method: 'POST' })
+                    if (res.ok) load()
+                  } catch {}
+                }}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-700 hover:bg-blue-600 text-white transition-colors"
+              >
+                Sync Now
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-slate-200">Policies ({policies.length})</h2>
-          <button onClick={() => setShowAddPolicy(!showAddPolicy)}
-            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors">
-            {showAddPolicy ? 'Cancel' : 'Add Policy'}
-          </button>
+          {ps.attributes.source !== 'vcs' && (
+            <button onClick={() => setShowAddPolicy(!showAddPolicy)}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors">
+              {showAddPolicy ? 'Cancel' : 'Add Policy'}
+            </button>
+          )}
+          {ps.attributes.source === 'vcs' && (
+            <span className="text-xs text-slate-500">Managed by repository — push changes via PR</span>
+          )}
         </div>
 
         {showAddPolicy && (
