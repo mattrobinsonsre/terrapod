@@ -1,4 +1,5 @@
 {{- include "terrapod.validateWebhookIngress" . -}}
+{{- include "terrapod.validateInternalIngress" . -}}
 {{- if .Values.ingress.enabled }}
 {{- include "terrapod.validateIngressWeb" . -}}
 apiVersion: networking.k8s.io/v1
@@ -78,6 +79,52 @@ spec:
           {{- range .Values.webhookIngress.paths }}
           - path: {{ . }}
             pathType: {{ $.Values.webhookIngress.pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ include "terrapod.fullname" $ }}-web
+                port:
+                  name: http
+          {{- end }}
+{{- end }}
+{{- if .Values.internalIngress.enabled }}
+---
+# Internal Ingress — the network-isolated route used by listener pods +
+# runner Jobs from other clusters. Routes to the same web Service (BFF
+# rule still holds) so listener auth (bearer cert), runner-token auth,
+# and TFE-V2 session auth all work uniformly regardless of which Ingress
+# the request entered through.
+#
+# Default `paths: ["/"]` because this Ingress is internal-trusted —
+# there's no security reason to allow-list paths. Operators can narrow
+# if their controller requires explicit declarations.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "terrapod.fullname" . }}-internal
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: internal
+  {{- with .Values.internalIngress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.internalIngress.className }}
+  ingressClassName: {{ .Values.internalIngress.className }}
+  {{- end }}
+  {{- if .Values.internalIngress.tls }}
+  tls:
+    - hosts:
+        - {{ .Values.internalIngress.hostname }}
+      secretName: {{ printf "%s-internal-tls" (include "terrapod.fullname" .) }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.internalIngress.hostname }}
+      http:
+        paths:
+          {{- range .Values.internalIngress.paths }}
+          - path: {{ . }}
+            pathType: {{ $.Values.internalIngress.pathType | default "Prefix" }}
             backend:
               service:
                 name: {{ include "terrapod.fullname" $ }}-web

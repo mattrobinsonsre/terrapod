@@ -101,6 +101,16 @@ def build_job_spec(
         },
     ]
 
+    # Public/canonical API URL — only forwarded to the runner when it
+    # differs from TP_API_URL. The entrypoint uses it to add a terraform
+    # CLI host{} block redirecting the canonical hostname (the one users
+    # type in `source = "..."` URLs and SSO callbacks) to TP_API_URL (the
+    # internal URL the runner actually traverses). Skipped when same so
+    # there's no needless self-redirect.
+    public_api_url = os.environ.get("TERRAPOD_PUBLIC_API_URL", "").strip()
+    if public_api_url and public_api_url != container_env[2]["value"]:
+        container_env.append({"name": "TP_PUBLIC_API_URL", "value": public_api_url})
+
     # Terraform version + backend
     version = terraform_version or runner_config.default_terraform_version
     backend = execution_backend or runner_config.default_execution_backend

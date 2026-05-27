@@ -172,3 +172,65 @@ class TestAuthTokenInjection:
         assert "valueFrom" in auth_env
         assert auth_env["valueFrom"]["secretKeyRef"]["name"] == "tprun-abc12345-auth"
         assert auth_env["valueFrom"]["secretKeyRef"]["key"] == "token"
+
+
+class TestPublicApiUrl:
+    """Split-networking: TP_PUBLIC_API_URL only emitted when distinct from TP_API_URL."""
+
+    def _build(self, monkeypatch, api_url, public_api_url):
+        from terrapod.runner.job_template import build_job_spec
+
+        monkeypatch.setenv("TERRAPOD_API_URL", api_url)
+        if public_api_url is None:
+            monkeypatch.delenv("TERRAPOD_PUBLIC_API_URL", raising=False)
+        else:
+            monkeypatch.setenv("TERRAPOD_PUBLIC_API_URL", public_api_url)
+        spec = build_job_spec(
+            run_id="abc123",
+            phase="plan",
+            runner_config=_runner_config(),
+            auth_secret_name="tprun-abc12345-auth",
+            env_vars=[],
+            terraform_vars=[],
+        )
+        return spec["spec"]["template"]["spec"]["containers"][0]["env"]
+
+    def test_public_api_url_emitted_when_different(self, monkeypatch):
+        env = self._build(
+            monkeypatch,
+            api_url="https://terrapod-internal.example.com",
+            public_api_url="https://terrapod.example.com",
+        )
+        env_dict = {e["name"]: e.get("value") for e in env if "value" in e}
+        assert env_dict["TP_API_URL"] == "https://terrapod-internal.example.com"
+        assert env_dict["TP_PUBLIC_API_URL"] == "https://terrapod.example.com"
+
+    def test_public_api_url_omitted_when_same(self, monkeypatch):
+        env = self._build(
+            monkeypatch,
+            api_url="https://terrapod.example.com",
+            public_api_url="https://terrapod.example.com",
+        )
+        env_names = {e["name"] for e in env}
+        assert "TP_API_URL" in env_names
+        assert "TP_PUBLIC_API_URL" not in env_names
+
+    def test_public_api_url_omitted_when_unset(self, monkeypatch):
+        env = self._build(
+            monkeypatch,
+            api_url="https://terrapod.example.com",
+            public_api_url=None,
+        )
+        env_names = {e["name"] for e in env}
+        assert "TP_PUBLIC_API_URL" not in env_names
+
+    def test_public_api_url_omitted_when_empty_string(self, monkeypatch):
+        # The Helm template renders "" when neither listener.publicApiUrl
+        # nor api.config.external_url is set — must be treated as "unset".
+        env = self._build(
+            monkeypatch,
+            api_url="https://terrapod.example.com",
+            public_api_url="",
+        )
+        env_names = {e["name"] for e in env}
+        assert "TP_PUBLIC_API_URL" not in env_names

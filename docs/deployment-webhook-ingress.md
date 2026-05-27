@@ -118,6 +118,7 @@ That's the default. All traffic, including webhooks, goes through `ingress`. If 
 
 ## See also
 
+- [Split-networking deployments](deployment-network-isolation.md) — the complementary `internalIngress` block + listener/runner `publicApiUrl` pattern for the private side of the same split.
 - `helm/terrapod/values.yaml` — full `webhookIngress:` block schema.
 - `services/terrapod/api/routers/vcs_events.py` — GitHub webhook receiver (HMAC validated).
 - `services/terrapod/api/routers/run_tasks.py` — run-task callback receiver (token validated).

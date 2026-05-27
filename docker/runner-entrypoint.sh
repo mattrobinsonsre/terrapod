@@ -556,6 +556,37 @@ TFEOF
     esac
 fi
 
+# --- Public hostname redirect (split-networking deployments) ---
+# When the deployment uses a separate internal API URL for runners (see
+# the internalIngress + listener.publicApiUrl pattern in the Terrapod
+# Helm chart), the runner's TP_API_URL points at the internal hostname
+# while user code under `source = "..."` references the public/canonical
+# hostname. Add a terraform CLI `host{}` block redirecting public→
+# internal so module + provider registry discovery for the canonical
+# hostname resolves via the internal route.
+#
+# Credentials are also written for the public host because terraform
+# matches credentials by the source-URL hostname, not the discovery
+# target. Without this the host{} redirect would resolve services but
+# terraform would still fail auth ("no credentials block for host X").
+if [ -n "$TP_PUBLIC_API_URL" ] && [ -n "$TF_CLI_CONFIG_FILE" ]; then
+    PUBLIC_HOST=$(echo "$TP_PUBLIC_API_URL" | sed -n 's|^https\{0,1\}://\([^/:]*\).*|\1|p')
+    if [ -n "$PUBLIC_HOST" ] && [ "$PUBLIC_HOST" != "$MIRROR_HOST" ]; then
+        cat >> "$TF_CLI_CONFIG_FILE" <<TFEOF
+credentials "$PUBLIC_HOST" {
+  token = "$TP_AUTH_TOKEN"
+}
+host "$PUBLIC_HOST" {
+  services = {
+    "modules.v1"   = "${TP_API_URL}/api/v2/registry/modules/"
+    "providers.v1" = "${TP_API_URL}/v1/providers/"
+  }
+}
+TFEOF
+        log "[entrypoint] Configured host{} redirect: $PUBLIC_HOST → $TP_API_URL"
+    fi
+fi
+
 # --- Provider download timeouts ---
 # Increase registry client timeout (default 10s) and enable retries for
 # provider binary downloads. Covers first-request latency when the provider

@@ -485,6 +485,8 @@ listener:
 | `ingress.extraPaths` | `[]` | Extra paths prepended before the default catch-all |
 | `tls.existingSecret` | `""` | Existing TLS secret name |
 
+The chart supports up to three Ingresses. See [Split-networking deployments](deployment-network-isolation.md) for the `internalIngress` block (private path for listener + runner traffic) and [Optional split webhook ingress](deployment-webhook-ingress.md) for the `webhookIngress` block (public-must-reach surface).
+
 ### Database
 
 | Value | Default | Description |

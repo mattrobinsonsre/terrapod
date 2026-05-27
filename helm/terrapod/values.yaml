@@ -646,6 +646,21 @@ listener:
   # Also used as the default for runners.serverUrl when that value is empty.
   apiUrl: ""
 
+  # Public/canonical API URL — the hostname users see in their browsers,
+  # the CLI cloud block, and in module/provider `source = "..."` URLs.
+  # Distinct from `apiUrl` (the URL the listener and runner pods actually
+  # call). When set AND different from `apiUrl`, the runner auto-generates
+  # a terraform CLI `host{}` block redirecting the public hostname to the
+  # internal one, so user code can keep referring to the canonical
+  # hostname while runners traverse the internal route.
+  #
+  # Defaults to `api.config.external_url` (the chart-wide public URL) when
+  # unset. Leave empty in single-network deployments where the listener
+  # reaches the same hostname users do.
+  #
+  # See docs/deployment-network-isolation.md for the full pattern.
+  publicApiUrl: ""
+
   # Join token for pool registration.
   # Either set joinToken directly or reference an existing K8s Secret (recommended).
   # The token is obtained by creating an agent pool + join token via the API.
@@ -801,6 +816,49 @@ webhookIngress:
   paths:
     - /api/terrapod/v1/vcs-events       # GitHub / GitLab webhook receivers
     - /api/terrapod/v1/task-stage-results # external run-task callback receiver
+
+# ── Internal Ingress (optional) ─────────────────────────────────────────────
+# Optional THIRD Ingress for the internal-only surface: listener pods
+# joining + heartbeating, runner Jobs uploading artifacts and pulling the
+# binary/provider/module caches. Use this when listener and runner pods
+# live in clusters that cannot reach the primary `ingress` hostname (e.g.
+# the management plane is on a Tailscale/VPN ingress that pod networks
+# don't traverse, but a private LB or internal LB shared across the VPC
+# fabric is reachable).
+#
+# Mechanism-agnostic — same as `webhookIngress`. Set `className` to your
+# internal Ingress controller (`traefik-internal`, internal-only nginx,
+# `alb` with `scheme: internal`, etc.) and pass operator-specific options
+# via `annotations`.
+#
+# Three audiences, three Ingresses, one BFF:
+#
+#   ingress         → humans (UI), CLI cloud block, SSO redirect
+#   webhookIngress  → public-must-reach (VCS webhooks, run-task callbacks)
+#   internalIngress → listener + runner traffic from other clusters
+#
+# All three terminate at `<fullname>-web` (the BFF). The difference is
+# WHERE the request landed, not what it does. Listener auth (bearer cert)
+# and runner-token auth still apply on every endpoint.
+#
+# When this block is enabled, set `listener.publicApiUrl` (or leave it
+# unset to default to `api.config.external_url`) so the runner knows that
+# the public hostname in user `.tf` code (e.g. `source = "..."` registry
+# URLs) differs from `listener.apiUrl` — the runner auto-generates a
+# terraform `host{}` block redirecting the public hostname to the
+# internal URL it actually calls. See docs/deployment-network-isolation.md.
+internalIngress:
+  enabled: false
+  className: ""
+  hostname: ""  # Required when enabled: e.g., terrapod-internal.example.com
+  tls: true
+  pathType: Prefix
+  annotations: {}
+  # Path allow-list. Defaults to all paths — this Ingress is the internal-
+  # trusted route, so there's no security reason to restrict it. Operators
+  # can narrow if their controller requires explicit path declarations.
+  paths:
+    - /
 
 # ── TLS ───────────────────────────────────────────────────────────────────────
 tls:

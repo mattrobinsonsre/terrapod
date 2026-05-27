@@ -73,6 +73,15 @@ spec:
                   fieldPath: metadata.name
             - name: TERRAPOD_API_URL
               value: {{ .Values.listener.apiUrl | default (printf "http://%s-api:8000" (include "terrapod.fullname" .)) | quote }}
+            # Public/canonical API URL — what users see in their browsers,
+            # the CLI cloud block, and module/provider source URLs. When
+            # different from TERRAPOD_API_URL, the listener forwards it to
+            # runner Jobs as TP_PUBLIC_API_URL so the runner entrypoint can
+            # add a terraform host{} redirect (canonical → internal).
+            # Defaults to api.config.external_url; empty in single-network
+            # deployments where listener.apiUrl == the canonical URL.
+            - name: TERRAPOD_PUBLIC_API_URL
+              value: {{ .Values.listener.publicApiUrl | default .Values.api.config.external_url | default "" | quote }}
             # Cert TTL drives the renewal threshold (renew at 50% + splay).
             # Must match `api.config.agent_pools.listener_cert_ttl_seconds` so
             # pods anticipate renewal correctly. Values-local.yaml lowers
