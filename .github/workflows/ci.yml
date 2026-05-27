@@ -512,8 +512,13 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
         working-directory: e2e
-        # Known-flaky step — apt-get for system deps + browser archive
-        # download from playwright.dev have both wedged in the past.
+        env:
+          # Diagnostic: this step has wedged at ~100% download with no
+          # further output, leaving us to guess which post-download
+          # phase (extract / chmod / metadata-write) is stuck. pw:install
+          # logs each phase, so the next failure shows the actual
+          # wedge site instead of a silent timeout.
+          DEBUG: pw:install
         # Normal install is 60-90s; 5 min lets a cold runner finish
         # but kills a wedge fast enough to recover the job.
         timeout-minutes: 5
