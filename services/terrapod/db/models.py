@@ -1594,6 +1594,30 @@ class PolicySet(Base):
     deny_labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     deny_names: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
 
+    # Source discriminator. "inline" = policies managed via API/UI CRUD (default).
+    # "vcs" = policies synced from a git repo; inline CRUD is rejected.
+    source: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="inline", default="inline"
+    )  # inline, vcs
+
+    # VCS configuration (populated when source=vcs)
+    vcs_connection_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("vcs_connections.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    vcs_connection: Mapped["VCSConnection | None"] = relationship(
+        "VCSConnection", foreign_keys=[vcs_connection_id], lazy="joined"
+    )
+    vcs_repo_url: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    vcs_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    policy_path: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    vcs_last_commit_sha: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    vcs_last_synced_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    vcs_last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     created_by: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
