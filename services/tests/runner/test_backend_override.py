@@ -51,6 +51,7 @@ def _find_entrypoint() -> Path:
         if path.is_file():
             return path
     pytest.skip("runner-entrypoint.sh not reachable from the test environment")
+    raise AssertionError("unreachable: pytest.skip() raises Skipped")  # pragma: no cover
 
 
 def _extract_override_fragment() -> str:

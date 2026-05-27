@@ -35,6 +35,7 @@ def _entrypoint_path() -> Path:
         if path.is_file():
             return path
     pytest.skip("runner-entrypoint.sh not reachable from the test environment")
+    raise AssertionError("unreachable: pytest.skip() raises Skipped")  # pragma: no cover
 
 
 def _extract_deny_jq() -> str:
