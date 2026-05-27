@@ -1,3 +1,4 @@
+{{- include "terrapod.validateWebhookIngress" . -}}
 {{- if .Values.ingress.enabled }}
 {{- include "terrapod.validateIngressWeb" . -}}
 apiVersion: networking.k8s.io/v1
@@ -37,4 +38,50 @@ spec:
                 name: {{ include "terrapod.fullname" . }}-web
                 port:
                   name: http
+{{- end }}
+{{- if .Values.webhookIngress.enabled }}
+---
+# Public webhook Ingress — restricted to the inbound-from-public-internet
+# allow-list (VCS webhooks, run-task callbacks). The management surface
+# (UI, admin API, CLI, SSO callback, state uploads) stays on the primary
+# `ingress` block above, which the operator can keep private/restricted.
+#
+# Routes to the same web Service (BFF rule still holds) — Next.js
+# rewrites the matched paths to the API service internally. Auth on
+# these routes is HMAC- or token-based per endpoint, not session-based,
+# so they're safe to receive directly from off-tailnet callers.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "terrapod.fullname" . }}-webhooks
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: webhooks
+  {{- with .Values.webhookIngress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.webhookIngress.className }}
+  ingressClassName: {{ .Values.webhookIngress.className }}
+  {{- end }}
+  {{- if .Values.webhookIngress.tls }}
+  tls:
+    - hosts:
+        - {{ .Values.webhookIngress.hostname }}
+      secretName: {{ printf "%s-webhooks-tls" (include "terrapod.fullname" .) }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.webhookIngress.hostname }}
+      http:
+        paths:
+          {{- range .Values.webhookIngress.paths }}
+          - path: {{ . }}
+            pathType: {{ $.Values.webhookIngress.pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ include "terrapod.fullname" $ }}-web
+                port:
+                  name: http
+          {{- end }}
 {{- end }}

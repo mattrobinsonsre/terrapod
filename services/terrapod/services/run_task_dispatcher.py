@@ -115,8 +115,19 @@ async def handle_run_task_call(payload: dict) -> None:
         tsr.started_at = _utc_now()
         await db.flush()
 
-        # Build callback URL
-        base = settings.auth.callback_base_url.rstrip("/")
+        # Build callback URL. Priority chain:
+        #   1. public_webhook_url — set when the deployment uses a split
+        #      webhook ingress (the URL external services can reach from
+        #      the public internet)
+        #   2. external_url — set when the management plane is itself
+        #      public-reachable (no split)
+        #   3. callback_base_url — last-resort fallback (also the SSO
+        #      callback host; legacy path)
+        # External run-task services call back from off-network, so they
+        # need a base they can actually resolve and connect to.
+        base = (
+            settings.public_webhook_url or settings.external_url or settings.auth.callback_base_url
+        ).rstrip("/")
         callback_url = f"{base}/api/terrapod/v1/task-stage-results/tsr-{tsr.id}/callback"
 
         # Build payload

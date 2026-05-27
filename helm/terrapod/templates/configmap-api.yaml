@@ -13,6 +13,20 @@ data:
     {{- if .Values.api.config.external_url }}
     external_url: {{ .Values.api.config.external_url | quote }}
     {{- end }}
+    {{- /*
+      public_webhook_url priority:
+        1. explicit api.config.public_webhook_url (operator override wins)
+        2. webhookIngress.hostname when webhookIngress.enabled
+           (auto-derived from the split-surface ingress)
+        3. omit (server-side falls back to external_url for webhook URLs)
+    */}}
+    {{- $publicWebhookURL := .Values.api.config.public_webhook_url }}
+    {{- if not $publicWebhookURL }}
+    {{- $publicWebhookURL = include "terrapod.publicWebhookURL" . }}
+    {{- end }}
+    {{- if $publicWebhookURL }}
+    public_webhook_url: {{ $publicWebhookURL | quote }}
+    {{- end }}
     {{- if .Values.api.config.database }}
     database:
       pool_size: {{ .Values.api.config.database.pool_size | default 10 }}

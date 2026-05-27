@@ -680,6 +680,17 @@ class Settings(BaseSettings):
         description="Public-facing Terrapod URL (e.g. https://terrapod.example.com). "
         "Used for commit status links, notification URLs, and any outbound links back to the UI.",
     )
+    public_webhook_url: str = Field(
+        default="",
+        description=(
+            "Base URL Terrapod hands to EXTERNAL services that call back into us "
+            "from the public internet (VCS webhook URL displayed in the connection "
+            "edit screen; run-task callback URL in the dispatched webhook payload). "
+            "Independent of `external_url` so deployments can put the management "
+            "plane on a private/restricted ingress while exposing only the webhook "
+            "surface publicly. When empty, callers fall back to `external_url`."
+        ),
+    )
 
     # Database
     database_url: PostgresDsn = Field(

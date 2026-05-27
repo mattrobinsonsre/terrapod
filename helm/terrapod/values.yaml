@@ -86,6 +86,20 @@ api:
     # outbound references back to the UI. Example: https://terrapod.example.com
     external_url: ""
 
+    # Public webhook URL — the base URL Terrapod hands to EXTERNAL
+    # services that call back into us from the public internet (VCS
+    # webhook URL displayed in the connection edit screen; run-task
+    # callback URL in the dispatched webhook payload). Independent
+    # of `external_url` so deployments can put the management plane
+    # on a private/restricted ingress while exposing only the webhook
+    # surface publicly. When left empty, falls back to `external_url`
+    # (acceptable when the management plane is itself public).
+    #
+    # Auto-derived by the chart when `webhookIngress.enabled` is true
+    # (uses `webhookIngress.hostname`); operators can override
+    # explicitly here.
+    public_webhook_url: ""
+
     # SQLAlchemy connection pool settings for RDS Proxy / pgBouncer compatibility.
     # Tune these if using a connection pooler or high-availability PostgreSQL.
     database:
@@ -749,6 +763,44 @@ ingress:
   #       name: my-health-service
   #       port:
   #         name: http
+
+# ── Webhook Ingress (optional) ────────────────────────────────────────────────
+# Optional SECOND Ingress for the public-internet-inbound surface only:
+# VCS webhooks and run-task callbacks. Lets operators keep the management
+# plane (UI, admin API, CLI, SSO callback, state uploads, the whole BFF)
+# on a private/restricted ingress while exposing only the must-be-public
+# webhook receivers separately.
+#
+# Mechanism-agnostic: set `className` to whatever Ingress controller
+# handles the public surface — `nginx`, `alb`, `tailscale`, `cloudflare`,
+# etc. — and pass any mechanism-specific options via `annotations`. The
+# chart wires the path allow-list; the operator wires the reachability.
+#
+# Without this block (default), all traffic — including webhooks — has to
+# go through `ingress` above. That's fine for deployments where the
+# management plane is itself public; the split exists for the case where
+# it isn't.
+#
+# Server-side, `api.config.public_webhook_url` is auto-derived from this
+# block's hostname so the URLs Terrapod hands out to external services
+# (VCS webhook URL in the connection edit screen, run-task callback URL
+# in the dispatched webhook payload) point at the public hostname rather
+# than the private management one. Operators can override explicitly via
+# `api.config.public_webhook_url`.
+webhookIngress:
+  enabled: false
+  className: ""
+  hostname: ""  # Required when enabled: e.g., terrapod-webhooks.example.com
+  tls: true
+  pathType: Prefix
+  annotations: {}
+  # Path allow-list. Each entry is rendered as a separate `path:` rule
+  # routing to the web Service (the BFF). Defaults to the full set of
+  # inbound-from-public-internet endpoints Terrapod exposes; operators
+  # who don't use external run tasks can trim that out.
+  paths:
+    - /api/terrapod/v1/vcs-events       # GitHub / GitLab webhook receivers
+    - /api/terrapod/v1/task-stage-results # external run-task callback receiver
 
 # ── TLS ───────────────────────────────────────────────────────────────────────
 tls:

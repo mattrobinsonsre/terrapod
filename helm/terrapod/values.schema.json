@@ -179,6 +179,20 @@
       }
     },
 
+    "webhookIngress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "hostname": { "type": "string" },
+        "tls": { "type": "boolean" },
+        "pathType": { "type": "string", "enum": ["Prefix", "Exact", "ImplementationSpecific"] },
+        "annotations": { "type": "object" },
+        "paths": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
     "tls": {
       "type": "object",
       "additionalProperties": false,
@@ -387,6 +401,7 @@
           "enum": ["debug", "info", "warning", "error", "critical"]
         },
         "external_url": { "type": "string" },
+        "public_webhook_url": { "type": "string" },
         "database": {
           "type": "object",
           "additionalProperties": false,
