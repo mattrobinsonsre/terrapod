@@ -523,6 +523,27 @@ if [ -n "$TP_API_URL" ]; then
     # Extract hostname from API URL for credentials block
     MIRROR_HOST=$(echo "$TP_API_URL" | sed -n 's|^https\{0,1\}://\([^/:]*\).*|\1|p')
 
+    # Build the Terrapod-native-hosts glob pattern list. These hostnames
+    # serve providers via the REGISTRY protocol
+    # (/api/v2/registry/providers/) — Terrapod's own registry — and must
+    # NOT be routed through the network mirror, whose purpose is caching
+    # THIRD-PARTY providers (registry.terraform.io et al.) at
+    # /v1/providers/. The mirror returns empty for native hosts because
+    # those providers don't have an upstream to cache.
+    #
+    # When listener.publicApiUrl is set on a split-networking deployment,
+    # the public hostname (what users type in `source = "..."`) is also a
+    # Terrapod-native host and needs the same routing — otherwise tofu
+    # picks the mirror for the public-host source and finds nothing.
+    TP_NATIVE_PATTERNS="\"${MIRROR_HOST}/*/*\""
+    TP_PUBLIC_HOST=""
+    if [ -n "$TP_PUBLIC_API_URL" ]; then
+        TP_PUBLIC_HOST=$(echo "$TP_PUBLIC_API_URL" | sed -n 's|^https\{0,1\}://\([^/:]*\).*|\1|p')
+        if [ -n "$TP_PUBLIC_HOST" ] && [ "$TP_PUBLIC_HOST" != "$MIRROR_HOST" ]; then
+            TP_NATIVE_PATTERNS="${TP_NATIVE_PATTERNS}, \"${TP_PUBLIC_HOST}/*/*\""
+        fi
+    fi
+
     case "$TP_API_URL" in
         https://*)
             cat > /tmp/terraform.rc <<TFEOF
@@ -532,15 +553,15 @@ credentials "$MIRROR_HOST" {
 provider_installation {
   network_mirror {
     url = "${TP_API_URL}/v1/providers/"
-    exclude = ["${MIRROR_HOST}/*/*"]
+    exclude = [${TP_NATIVE_PATTERNS}]
   }
   direct {
-    include = ["${MIRROR_HOST}/*/*"]
+    include = [${TP_NATIVE_PATTERNS}]
   }
 }
 TFEOF
             export TF_CLI_CONFIG_FILE="/tmp/terraform.rc"
-            log "[entrypoint] Provider mirror + credentials configured: ${TP_API_URL}/v1/providers/"
+            log "[entrypoint] Provider mirror + credentials configured: ${TP_API_URL}/v1/providers/ (direct for: ${TP_NATIVE_PATTERNS})"
             ;;
         *)
             # HTTP — skip network mirror (terraform requires HTTPS) but still
@@ -585,23 +606,19 @@ fi
 # affects service discovery. Provider DOWNLOAD via terraform's default
 # direct mode requires HTTPS, so an HTTP-only deployment can't serve
 # providers via this redirect; that's a pre-existing limitation.
-INTERNAL_HOST=$(echo "${TP_API_URL:-}" | sed -n 's|^https\{0,1\}://\([^/:]*\).*|\1|p')
-if [ -n "$TP_PUBLIC_API_URL" ] && [ -n "$TF_CLI_CONFIG_FILE" ] && [ -n "$INTERNAL_HOST" ]; then
-    PUBLIC_HOST=$(echo "$TP_PUBLIC_API_URL" | sed -n 's|^https\{0,1\}://\([^/:]*\).*|\1|p')
-    if [ -n "$PUBLIC_HOST" ] && [ "$PUBLIC_HOST" != "$INTERNAL_HOST" ]; then
-        cat >> "$TF_CLI_CONFIG_FILE" <<TFEOF
-credentials "$PUBLIC_HOST" {
+if [ -n "$TP_PUBLIC_HOST" ] && [ -n "$TF_CLI_CONFIG_FILE" ] && [ "$TP_PUBLIC_HOST" != "$MIRROR_HOST" ]; then
+    cat >> "$TF_CLI_CONFIG_FILE" <<TFEOF
+credentials "$TP_PUBLIC_HOST" {
   token = "$TP_AUTH_TOKEN"
 }
-host "$PUBLIC_HOST" {
+host "$TP_PUBLIC_HOST" {
   services = {
     "modules.v1"   = "${TP_API_URL}/api/v2/registry/modules/"
     "providers.v1" = "${TP_API_URL}/api/v2/registry/providers/"
   }
 }
 TFEOF
-        log "[entrypoint] Configured host{} redirect: $PUBLIC_HOST → $TP_API_URL"
-    fi
+    log "[entrypoint] Configured host{} redirect: $TP_PUBLIC_HOST → $TP_API_URL"
 fi
 
 # --- Provider download timeouts ---
