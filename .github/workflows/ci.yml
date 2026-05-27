@@ -453,22 +453,10 @@ jobs:
       && needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     # Whole-job upper bound. Default is GitHub's 360 min, which lets a
-    # wedged step (most commonly Playwright browser install) run for
-    # six hours before anyone notices. 25 min covers a cold-runner
-    # worst-case (image pull + stack boot + node setup + browser
-    # install + test suite) with headroom; anything past that is
-    # genuinely broken, not slow.
-    timeout-minutes: 25
-    env:
-      # Pin Playwright's browser install location to /tmp so both the
-      # downloaded zip (which lands in /tmp/playwright-download-*)
-      # and the extracted browser tree end up on the same directory
-      # path. Default would extract to ~/.cache/ms-playwright/, which
-      # we've seen wedge silently mid-extract — likely because the
-      # final post-extract rename/move spans directories and triggers
-      # extra I/O on the Azure-backed runner disk. Job-scoped so both
-      # the install step and the test run step see the same path.
-      PLAYWRIGHT_BROWSERS_PATH: /tmp/ms-playwright
+    # wedged step run for six hours before anyone notices. 15 min covers
+    # a cold-runner worst-case (image pull + stack boot + test suite)
+    # with headroom; anything past that is genuinely broken, not slow.
+    timeout-minutes: 15
     permissions:
       contents: read
       packages: read
@@ -507,39 +495,32 @@ jobs:
           done
           echo "Stack healthy (${elapsed}s)"
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: e2e/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-        working-directory: e2e
-        # Cold npm caches rarely take more than a minute; 5 fails fast.
-        timeout-minutes: 5
-
-      - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
-        working-directory: e2e
-        env:
-          # Diagnostic: this step has wedged at ~100% download with no
-          # further output, leaving us to guess which post-download
-          # phase (extract / chmod / metadata-write) is stuck. pw:install
-          # logs each phase, so the next failure shows the actual
-          # wedge site instead of a silent timeout.
-          DEBUG: pw:install
-        # Normal install is 60-90s; 5 min lets a cold runner finish
-        # but kills a wedge fast enough to recover the job.
-        timeout-minutes: 5
-
+      # Run npm ci + tests inside the official Playwright image. The
+      # image bundles Node + Chromium + all OS deps, eliminating the
+      # `playwright install` step that has repeatedly wedged at the
+      # extract phase on the Azure-backed runner disk (167 MiB → ~600
+      # MiB unpack across many small files takes >5 min consistently).
+      #
+      # `--network host` lets the container reach the docker-compose
+      # stack on localhost. `--ipc=host` is the Playwright-recommended
+      # setting to avoid Chromium running out of memory in shared /dev/shm.
+      # Image tag MUST track the pinned `@playwright/test` version in
+      # e2e/package-lock.json — version skew between client and bundled
+      # browsers causes runtime failures.
       - name: Run Playwright tests
-        run: npx playwright test
-        working-directory: e2e
-        env:
-          CI: true
-        # Playwright has per-test timeouts of its own, but a hung
-        # worker can outlast them; this is the outer safety net.
+        run: |
+          docker run --rm \
+            --network=host \
+            --ipc=host \
+            -v "${{ github.workspace }}/e2e:/work" \
+            -w /work \
+            -e CI=true \
+            -e HOME=/tmp \
+            mcr.microsoft.com/playwright:v1.58.2-noble \
+            sh -c "npm ci --ignore-scripts && npx playwright test"
+        # Playwright has per-test timeouts of its own; this is the
+        # outer safety net. npm ci inside the container is ~10 s for
+        # this tree (only @playwright/test + typescript).
         timeout-minutes: 10
 
       - name: Upload test report
