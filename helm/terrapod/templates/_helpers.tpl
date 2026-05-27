@@ -315,7 +315,7 @@ Validate the optional internal Ingress:
 {{- define "terrapod.validateInternalIngress" -}}
 {{- if .Values.internalIngress.enabled -}}
 {{- if not .Values.internalIngress.hostname -}}
-{{- fail "internalIngress.enabled is true but internalIngress.hostname is empty. Set the internal hostname listener pods and runner Jobs will reach Terrapod at." -}}
+{{- fail "internalIngress.enabled is true but internalIngress.hostname is empty. Set the internal hostname that listener pods and runner Jobs will use to reach Terrapod." -}}
 {{- end -}}
 {{- if not .Values.web.enabled -}}
 {{- fail "internalIngress.enabled is true but web.enabled is false. The internal Ingress routes to the web frontend — set web.enabled=true." -}}

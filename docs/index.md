@@ -101,7 +101,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Monitoring](monitoring.md) | Prometheus metrics, scraping, recommended alerts |
 | [Deployment](deployment.md) | Production Helm deployment, storage backends, scaling |
 | [Split-networking deployments](deployment-network-isolation.md) | Three-Ingress model: management / webhook / internal agent path, with split-hostname runner config |
-| [Webhook ingress (split)](deployment-webhook-ingress.md) | Optional second Ingress for the public-must-reach surface (VCS webhooks, run-task callbacks) |
+| [Optional split webhook ingress](deployment-webhook-ingress.md) | Optional second Ingress for the public-must-reach surface (VCS webhooks, run-task callbacks) |
 | [Security Hardening](security-hardening.md) | TLS, secrets management, network policies, rate limiting |
 | [Production Checklist](production-checklist.md) | Step-by-step checklist for go-live readiness |
 | [Disaster Recovery](disaster-recovery.md) | Break-glass state recovery from object storage |

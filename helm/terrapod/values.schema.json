@@ -202,9 +202,11 @@
         "className": { "type": "string" },
         "hostname": { "type": "string" },
         "tls": { "type": "boolean" },
+        "existingSecret": { "type": "string" },
         "pathType": { "type": "string", "enum": ["Prefix", "Exact", "ImplementationSpecific"] },
         "annotations": { "type": "object" },
-        "paths": { "type": "array", "items": { "type": "string" } }
+        "paths": { "type": "array", "items": { "type": "string" } },
+        "extraPaths": { "type": "array", "items": { "type": "object" } }
       }
     },
 

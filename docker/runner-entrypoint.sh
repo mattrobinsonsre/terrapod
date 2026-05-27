@@ -569,9 +569,26 @@ fi
 # matches credentials by the source-URL hostname, not the discovery
 # target. Without this the host{} redirect would resolve services but
 # terraform would still fail auth ("no credentials block for host X").
-if [ -n "$TP_PUBLIC_API_URL" ] && [ -n "$TF_CLI_CONFIG_FILE" ]; then
+#
+# Service URLs match what /.well-known/terraform.json advertises in
+# api/routers/oauth.py — modules.v1 = /api/v2/registry/modules/,
+# providers.v1 = /api/v2/registry/providers/ (the *registry* protocol;
+# /v1/providers/ is the separate network-mirror protocol).
+#
+# Port suffixes (e.g. host:8443) are stripped by the host extraction
+# regex below, so a public URL and internal URL that differ only by
+# port are treated as the same host — no redirect emitted. Acceptable:
+# terraform's host discovery is hostname-keyed, not host+port keyed.
+#
+# HTTP fallback note: when TP_API_URL is HTTP (no provider mirror in
+# the existing terraform.rc), the redirect still works — host{} only
+# affects service discovery. Provider DOWNLOAD via terraform's default
+# direct mode requires HTTPS, so an HTTP-only deployment can't serve
+# providers via this redirect; that's a pre-existing limitation.
+INTERNAL_HOST=$(echo "${TP_API_URL:-}" | sed -n 's|^https\{0,1\}://\([^/:]*\).*|\1|p')
+if [ -n "$TP_PUBLIC_API_URL" ] && [ -n "$TF_CLI_CONFIG_FILE" ] && [ -n "$INTERNAL_HOST" ]; then
     PUBLIC_HOST=$(echo "$TP_PUBLIC_API_URL" | sed -n 's|^https\{0,1\}://\([^/:]*\).*|\1|p')
-    if [ -n "$PUBLIC_HOST" ] && [ "$PUBLIC_HOST" != "$MIRROR_HOST" ]; then
+    if [ -n "$PUBLIC_HOST" ] && [ "$PUBLIC_HOST" != "$INTERNAL_HOST" ]; then
         cat >> "$TF_CLI_CONFIG_FILE" <<TFEOF
 credentials "$PUBLIC_HOST" {
   token = "$TP_AUTH_TOKEN"
@@ -579,7 +596,7 @@ credentials "$PUBLIC_HOST" {
 host "$PUBLIC_HOST" {
   services = {
     "modules.v1"   = "${TP_API_URL}/api/v2/registry/modules/"
-    "providers.v1" = "${TP_API_URL}/v1/providers/"
+    "providers.v1" = "${TP_API_URL}/api/v2/registry/providers/"
   }
 }
 TFEOF

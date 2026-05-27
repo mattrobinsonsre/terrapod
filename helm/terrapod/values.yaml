@@ -852,6 +852,11 @@ internalIngress:
   className: ""
   hostname: ""  # Required when enabled: e.g., terrapod-internal.example.com
   tls: true
+  # Name of an existing TLS Secret to reuse (e.g. a wildcard cert
+  # covering both the public and internal hostnames). If empty, the
+  # chart uses `<fullname>-internal-tls` (typically issued by
+  # cert-manager via the annotations below).
+  existingSecret: ""
   pathType: Prefix
   annotations: {}
   # Path allow-list. Defaults to all paths — this Ingress is the internal-
@@ -859,6 +864,10 @@ internalIngress:
   # can narrow if their controller requires explicit path declarations.
   paths:
     - /
+  # Extra paths prepended before the path allow-list above. Same shape
+  # and use as `ingress.extraPaths` (e.g. a controller-specific health-
+  # check path that needs an explicit backend).
+  extraPaths: []
 
 # ── TLS ───────────────────────────────────────────────────────────────────────
 tls:

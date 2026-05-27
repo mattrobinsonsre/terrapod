@@ -234,3 +234,16 @@ class TestPublicApiUrl:
         )
         env_names = {e["name"] for e in env}
         assert "TP_PUBLIC_API_URL" not in env_names
+
+    def test_public_api_url_omitted_when_trailing_slash_only_difference(self, monkeypatch):
+        # Operators may set publicApiUrl with a trailing slash while
+        # apiUrl has none (or vice versa). That's not a real difference;
+        # the runner entrypoint's host extraction would discard them too.
+        # Verifies the .rstrip("/") guard in build_job_spec.
+        env = self._build(
+            monkeypatch,
+            api_url="https://terrapod.example.com",
+            public_api_url="https://terrapod.example.com/",
+        )
+        env_names = {e["name"] for e in env}
+        assert "TP_PUBLIC_API_URL" not in env_names

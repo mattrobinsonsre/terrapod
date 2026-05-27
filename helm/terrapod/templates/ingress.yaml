@@ -116,12 +116,15 @@ spec:
   tls:
     - hosts:
         - {{ .Values.internalIngress.hostname }}
-      secretName: {{ printf "%s-internal-tls" (include "terrapod.fullname" .) }}
+      secretName: {{ .Values.internalIngress.existingSecret | default (printf "%s-internal-tls" (include "terrapod.fullname" .)) }}
   {{- end }}
   rules:
     - host: {{ .Values.internalIngress.hostname }}
       http:
         paths:
+          {{- with .Values.internalIngress.extraPaths }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
           {{- range .Values.internalIngress.paths }}
           - path: {{ . }}
             pathType: {{ $.Values.internalIngress.pathType | default "Prefix" }}

@@ -58,7 +58,7 @@ The listener Deployment carries two URL env vars:
 | Env var | Helm value | Meaning |
 |---|---|---|
 | `TERRAPOD_API_URL` | `listener.apiUrl` | The URL the listener (and the runners it spawns) **actually calls**. In a split-networking deployment, this is the `internalIngress` hostname. |
-| `TERRAPOD_PUBLIC_API_URL` | `listener.publicApiUrl` (default: `api.config.external_url`) | The **public/canonical** hostname users see in their browsers, in the CLI cloud block, and in `source = "..."` registry URLs in user `.tf` code. |
+| `TERRAPOD_PUBLIC_API_URL` | `listener.publicApiUrl` (default: `api.config.external_url`, or empty if both are unset) | The **public/canonical** hostname users see in their browsers, in the CLI cloud block, and in `source = "..."` registry URLs in user `.tf` code. Empty means "no redirect needed" — the listener still works, runner Jobs just don't get a `host{}` block. |
 
 When the two values differ, the listener forwards `TP_PUBLIC_API_URL` to each runner Job pod's env. The runner entrypoint detects the mismatch and appends a terraform CLI `host{}` block to `TF_CLI_CONFIG_FILE`:
 
@@ -74,7 +74,7 @@ host "terrapod.example.com" {
 }
 ```
 
-That's terraform's [service-discovery override](https://developer.hashicorp.com/terraform/cli/config/config-file#provider-discovery) mechanism. It means:
+That's terraform's [remote service discovery](https://developer.hashicorp.com/terraform/internals/remote-service-discovery) mechanism, overridden via a CLI `host{}` block. It means:
 
 - User code can refer to `source = "terrapod.example.com/myorg/aws-vpc/aws"` — the **canonical** hostname they'd use from their laptop.
 - Humans on the network that can reach `terrapod.example.com` natively (e.g. on tailnet) hit it directly. No CLI config tweaks required.
@@ -106,7 +106,10 @@ webhookIngress:
   enabled: true
   className: tailscale                   # Tailscale Funnel
   hostname: terrapod-webhooks.example.com
-  tls: true
+  tls: true                              # Tailscale Funnel terminates TLS at the edge;
+                                          # `tls: true` here just lets the chart render
+                                          # the spec's TLS block — the operator-managed
+                                          # Tailscale layer handles the cert.
   annotations:
     tailscale.com/funnel: "true"
 
@@ -168,7 +171,7 @@ After enabling `internalIngress`:
 1. **Resource provisioned**: `kubectl get ingress -n terrapod` shows three Ingress objects (or two, if webhookIngress is off).
 2. **TLS cert issued**: if using cert-manager, `kubectl get certificate -n terrapod terrapod-internal-tls` shows `Ready=True` within ~30 s of the Ingress being created.
 3. **DNS record published**: if using external-dns, the configured private zone should have an A/AAAA record matching `internalIngress.hostname`.
-4. **Reachable from agent clusters**: `kubectl run -n default --rm -it --restart=Never --image=curlimages/curl debug -- curl -sSv https://terrapod-internal.example.com/api/terrapod/v1/health` from an agent cluster should return `{"status":"ok"}`.
+4. **Reachable from agent clusters**: `kubectl run -n default --rm -it --restart=Never --image=curlimages/curl debug -- curl -sS https://terrapod-internal.example.com/.well-known/terraform.json` from an agent cluster should return the service-discovery JSON document. This endpoint is unauthenticated and goes through the BFF the same way listener and runner traffic does, so a 200 here proves both the Ingress routing and BFF→API proxy work.
 5. **Listener pods using the internal URL**: `kubectl get deploy -n terrapod -l app.kubernetes.io/component=listener -o jsonpath='{.items[0].spec.template.spec.containers[0].env[?(@.name=="TERRAPOD_API_URL")].value}'` matches the internal hostname.
 6. **Runner Job spec carries `TP_PUBLIC_API_URL`**: trigger a plan, then `kubectl get job -n terrapod-runners <job> -o yaml | grep TP_PUBLIC_API_URL` should show the canonical URL.
 7. **Runner `terraform.rc` includes the host block**: `kubectl logs -n terrapod-runners <pod> | grep "Configured host{} redirect"` confirms the entrypoint wrote it.

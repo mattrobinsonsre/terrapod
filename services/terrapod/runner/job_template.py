@@ -83,13 +83,11 @@ def build_job_spec(
     job_name = f"tprun-{run_short}-{phase}"
 
     # Build container env vars
+    api_url = os.environ.get("TERRAPOD_API_URL", "http://terrapod-api:8000")
     container_env = [
         {"name": "TP_RUN_ID", "value": run_id},
         {"name": "TP_PHASE", "value": phase},
-        {
-            "name": "TP_API_URL",
-            "value": os.environ.get("TERRAPOD_API_URL", "http://terrapod-api:8000"),
-        },
+        {"name": "TP_API_URL", "value": api_url},
         {
             "name": "TP_AUTH_TOKEN",
             "valueFrom": {
@@ -107,8 +105,13 @@ def build_job_spec(
     # type in `source = "..."` URLs and SSO callbacks) to TP_API_URL (the
     # internal URL the runner actually traverses). Skipped when same so
     # there's no needless self-redirect.
+    #
+    # Trailing slashes are normalised here so values that only differ by
+    # a trailing `/` ("https://x.example/" vs "https://x.example") don't
+    # trigger a no-op redirect — the entrypoint's host-extraction re-
+    # checks at hostname level either way, this is just a tighter guard.
     public_api_url = os.environ.get("TERRAPOD_PUBLIC_API_URL", "").strip()
-    if public_api_url and public_api_url != container_env[2]["value"]:
+    if public_api_url and public_api_url.rstrip("/") != api_url.rstrip("/"):
         container_env.append({"name": "TP_PUBLIC_API_URL", "value": public_api_url})
 
     # Terraform version + backend
