@@ -677,10 +677,53 @@ if [ "$TP_PHASE" = "apply" ] && [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; the
     fi
 fi
 
+# --- Build -var-file args BEFORE init ---
+# Var-files must be available at init time for "early evaluation"
+# configs — OpenTofu >= 1.12 and Terraform >= 1.10 resolve variables
+# in `backend` blocks, `required_providers` version constraints, and
+# (in OpenTofu) module source paths during init. Without -var-file
+# at init, those configs crash on the first variable reference.
+#
+# Older versions don't accept -var-file on init and would error
+# `flag provided but not defined`. We detect support dynamically by
+# grepping the binary's own `init -help` output rather than parsing
+# a version string — covers both terraform and tofu, future-proof
+# against new versions adding the flag, never wrong about the
+# specific binary we just downloaded.
+#
+# Uses a temp file + line-by-line read to safely handle paths with
+# spaces. The API validates paths at ingestion (no traversal, no
+# shell metacharacters), but we still quote properly here for
+# defense in depth.
+set --
+if [ -n "$TP_VAR_FILES" ] && [ "$TP_VAR_FILES" != "[]" ]; then
+    echo "$TP_VAR_FILES" | jq -r '.[]' > /tmp/var_files.txt
+    while IFS= read -r vf; do
+        set -- "$@" "-var-file=$vf"
+    done < /tmp/var_files.txt
+    rm -f /tmp/var_files.txt
+    log "[entrypoint] Using var files: $TP_VAR_FILES"
+fi
+
+# Detect whether init accepts -var-file. `init -help` exits 0 and
+# prints the flag list to stderr (terraform) or stdout (tofu); 2>&1
+# captures both.
+INIT_SUPPORTS_VAR_FILE=0
+if [ "$#" -gt 0 ] && "$TP_BIN" init -help 2>&1 | grep -q -- '-var-file'; then
+    INIT_SUPPORTS_VAR_FILE=1
+fi
+
 # --- Initialize ---
 log "[entrypoint] Running $TP_BACKEND init..."
 INIT_EXIT=0
-"$TP_BIN" init -input=false > /tmp/init.log 2>&1 || INIT_EXIT=$?
+if [ "$INIT_SUPPORTS_VAR_FILE" = "1" ]; then
+    "$TP_BIN" init -input=false "$@" > /tmp/init.log 2>&1 || INIT_EXIT=$?
+else
+    if [ "$#" -gt 0 ]; then
+        log "[entrypoint] $TP_BACKEND $TP_VERSION init does not accept -var-file (need tofu>=1.12 / terraform>=1.10 for early-eval); init will run without var-files. Configs using variables in backend/required_providers/module-source will fail."
+    fi
+    "$TP_BIN" init -input=false > /tmp/init.log 2>&1 || INIT_EXIT=$?
+fi
 cat /tmp/init.log
 cat /tmp/init.log >> "$COMBINED_LOG"
 if [ "$INIT_EXIT" != "0" ]; then
@@ -725,19 +768,9 @@ if [ "$TP_PHASE" = "plan" ] && [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ] && [ 
     fi
 fi
 
-# --- Build -var-file arguments from TP_VAR_FILES JSON ---
-# Uses a temp file + line-by-line read to safely handle paths with spaces.
-# The API validates paths at ingestion (no traversal, no shell metacharacters),
-# but we still quote properly here for defense in depth.
-set --
-if [ -n "$TP_VAR_FILES" ] && [ "$TP_VAR_FILES" != "[]" ]; then
-    echo "$TP_VAR_FILES" | jq -r '.[]' > /tmp/var_files.txt
-    while IFS= read -r vf; do
-        set -- "$@" "-var-file=$vf"
-    done < /tmp/var_files.txt
-    rm -f /tmp/var_files.txt
-    log "[entrypoint] Using var files: $TP_VAR_FILES"
-fi
+# --- Extend positional args with -target / -replace for plan/apply ---
+# init doesn't accept these flags, so we add them only after init has run.
+# $@ already contains the -var-file args built above.
 
 # --- Build -target arguments from TP_TARGET_ADDRS JSON ---
 if [ -n "$TP_TARGET_ADDRS" ] && [ "$TP_TARGET_ADDRS" != "[]" ]; then
