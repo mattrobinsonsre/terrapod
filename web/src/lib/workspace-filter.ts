@@ -108,6 +108,26 @@ export function toggleStatusTerm(parsed: ParsedFilter, value: string): ParsedFil
   return { terms: [...parsed.terms, { kind: 'status', value }] }
 }
 
+/** True if the parsed filter already contains a `key:value` label term. */
+export function hasLabelTerm(parsed: ParsedFilter, key: string, value: string): boolean {
+  return parsed.terms.some(t => t.kind === 'label' && t.key === key && t.value === value)
+}
+
+/** Toggle a `key:value` label term: remove it if present, append otherwise.
+ *
+ * Used by the inline label chips on each workspace row and by the
+ * "+ Label" picker — click an existing filter chip → removes it, click
+ * a new label → adds it. Symmetric with toggleStatusTerm.
+ */
+export function toggleLabelTerm(parsed: ParsedFilter, key: string, value: string): ParsedFilter {
+  if (hasLabelTerm(parsed, key, value)) {
+    return {
+      terms: parsed.terms.filter(t => !(t.kind === 'label' && t.key === key && t.value === value)),
+    }
+  }
+  return { terms: [...parsed.terms, { kind: 'label', key, value }] }
+}
+
 export interface MatchableWorkspace {
   attributes: {
     name: string

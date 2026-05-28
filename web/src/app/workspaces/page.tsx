@@ -14,11 +14,13 @@ import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { useWorkspaceListEvents } from '@/lib/use-workspace-list-events'
 import {
+  hasLabelTerm,
   hasStatusTerm,
   matchWorkspace,
   parseFilterQuery,
   removeTerm,
   serializeFilter,
+  toggleLabelTerm,
   toggleStatusTerm,
 } from '@/lib/workspace-filter'
 import { WORKSPACE_STATUSES, resolveStatus } from '@/lib/workspace-status'
@@ -99,18 +101,48 @@ function WorkspacesPageInner() {
     }
   }, [statusMenuOpen])
 
-  // Sync the input to the URL whenever the parsed filter changes.
+  // Label dropdown — same outside-click + Escape pattern as Status. The
+  // dropdown is a two-level picker: first pick a label key, then a value.
+  const [labelMenuOpen, setLabelMenuOpen] = useState(false)
+  const [labelMenuKey, setLabelMenuKey] = useState<string | null>(null)
+  const labelMenuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!labelMenuOpen) return
+    const onClick = (e: MouseEvent) => {
+      if (labelMenuRef.current && !labelMenuRef.current.contains(e.target as Node)) {
+        setLabelMenuOpen(false)
+        setLabelMenuKey(null)
+      }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (labelMenuKey !== null) setLabelMenuKey(null)
+        else setLabelMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [labelMenuOpen, labelMenuKey])
+
+  // Sync the input to the URL whenever the parsed filter changes — debounced.
+  //
+  // Each `router.replace` triggers a Next.js RSC prefetch for the new URL.
+  // Firing per-keystroke (e.g. typing "repo:tf-data-pipelines") cascades
+  // ~20 prefetches in a few hundred ms, overwhelms Next's dev server with
+  // 503s, and can leave the address bar stuck on an early keystroke when
+  // a later prefetch wins the race. We debounce to a single replace once
+  // typing settles.
   //
   // Dedup via `lastSyncedQueryRef` — we track the last query string we
   // wrote and skip redundant `router.replace` calls. We deliberately do
   // NOT compare against `searchParams.get('q')`: `useSearchParams()` is
   // updated by Next.js asynchronously after `router.replace`, so its
   // value in the effect closure can be one render behind the URL we
-  // just wrote. That stale read was the cause of the workspaces filter
-  // sync being "hit and miss" — it would early-return on a comparison
-  // against an out-of-date `current`, leaving the address bar stuck.
-  // The ref is written-once-per-real-update and never reads back from
-  // the URL, so it can't go stale.
+  // just wrote.
   //
   // Initialised to the URL's current `q` so that mounting on a page
   // already loaded with `?q=...` (refresh, shared link) doesn't fire a
@@ -119,11 +151,14 @@ function WorkspacesPageInner() {
   useEffect(() => {
     const serialized = serializeFilter(parsedFilter)
     if (lastSyncedQueryRef.current === serialized) return
-    lastSyncedQueryRef.current = serialized
-    const url = serialized
-      ? `/workspaces?q=${encodeURIComponent(serialized)}`
-      : '/workspaces'
-    router.replace(url, { scroll: false })
+    const timer = setTimeout(() => {
+      lastSyncedQueryRef.current = serialized
+      const url = serialized
+        ? `/workspaces?q=${encodeURIComponent(serialized)}`
+        : '/workspaces'
+      router.replace(url, { scroll: false })
+    }, 250)
+    return () => clearTimeout(timer)
   }, [parsedFilter, router])
 
   const filteredWorkspaces = useMemo(() => {
@@ -180,6 +215,29 @@ function WorkspacesPageInner() {
     }
     return counts
   }, [workspaces])
+
+  // Distinct labels across the unfiltered list: key → sorted unique values
+  // with workspace counts. Drives the two-level "+ Label" picker. Computed
+  // once per workspace-list change so the menu render stays cheap.
+  const labelIndex = useMemo(() => {
+    const idx = new Map<string, Map<string, number>>()
+    for (const ws of workspaces) {
+      const labels = ws.attributes.labels || {}
+      for (const [k, v] of Object.entries(labels)) {
+        let values = idx.get(k)
+        if (!values) {
+          values = new Map<string, number>()
+          idx.set(k, values)
+        }
+        values.set(v, (values.get(v) || 0) + 1)
+      }
+    }
+    return idx
+  }, [workspaces])
+  const sortedLabelKeys = useMemo(
+    () => Array.from(labelIndex.keys()).sort(),
+    [labelIndex],
+  )
 
   const badgeColors: Record<string, string> = {
     amber: 'bg-amber-900/50 text-amber-300',
@@ -609,6 +667,99 @@ function WorkspacesPageInner() {
                     </div>
                   )}
                 </div>
+                {/* Label dropdown — two-level picker for arbitrary label
+                    key/value pairs. First level lists distinct label keys
+                    in the visible workspaces; clicking a key drills into a
+                    second menu of distinct values for that key. */}
+                <div className="relative" ref={labelMenuRef}>
+                  {(() => {
+                    const activeLabelCount = parsedFilter.terms.filter(t => t.kind === 'label' && t.value !== null).length
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          aria-haspopup="menu"
+                          aria-expanded={labelMenuOpen}
+                          onClick={() => {
+                            setLabelMenuOpen(o => !o)
+                            setLabelMenuKey(null)
+                          }}
+                          disabled={sortedLabelKeys.length === 0}
+                          className={
+                            'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ' +
+                            (activeLabelCount > 0
+                              ? 'bg-slate-700/60 text-slate-100 border-slate-600'
+                              : 'bg-slate-800/50 text-slate-300 border-slate-700/50 hover:bg-slate-700/60')
+                          }
+                        >
+                          <span>Label</span>
+                          {activeLabelCount > 0 && (
+                            <span className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
+                              {activeLabelCount}
+                            </span>
+                          )}
+                          <svg className={'w-3 h-3 transition-transform ' + (labelMenuOpen ? 'rotate-180' : '')} viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+                            <path d="M3 4.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                        {labelMenuOpen && labelMenuKey === null && (
+                          <div role="menu" className="absolute right-0 z-10 mt-1 w-64 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-96 overflow-y-auto">
+                            {sortedLabelKeys.map(k => (
+                              <button
+                                key={k}
+                                type="button"
+                                role="menuitem"
+                                onClick={() => setLabelMenuKey(k)}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700/40 transition-colors"
+                              >
+                                <span className="flex-1 text-left font-mono text-xs">{k}</span>
+                                <span className="text-xs text-slate-500">{labelIndex.get(k)?.size || 0} value{(labelIndex.get(k)?.size || 0) === 1 ? '' : 's'}</span>
+                                <span aria-hidden className="text-slate-500">›</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {labelMenuOpen && labelMenuKey !== null && (
+                          <div role="menu" className="absolute right-0 z-10 mt-1 w-64 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-96 overflow-y-auto">
+                            <button
+                              type="button"
+                              onClick={() => setLabelMenuKey(null)}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-700/40 transition-colors border-b border-slate-700/50"
+                            >
+                              <span aria-hidden>‹</span>
+                              <span>back</span>
+                              <span className="ml-auto font-mono text-slate-500">{labelMenuKey}</span>
+                            </button>
+                            {Array.from(labelIndex.get(labelMenuKey)?.entries() || [])
+                              .sort(([a], [b]) => a.localeCompare(b))
+                              .map(([v, count]) => {
+                                const active = hasLabelTerm(parsedFilter, labelMenuKey, v)
+                                return (
+                                  <button
+                                    key={v}
+                                    type="button"
+                                    role="menuitemcheckbox"
+                                    aria-checked={active}
+                                    onClick={() => {
+                                      setFilterInput(serializeFilter(toggleLabelTerm(parsedFilter, labelMenuKey, v)))
+                                    }}
+                                    className={
+                                      'w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors ' +
+                                      (active ? 'bg-slate-700/60 text-slate-100' : 'text-slate-300 hover:bg-slate-700/40')
+                                    }
+                                  >
+                                    <span className="w-3 inline-flex justify-center text-brand-400">{active ? '✓' : ''}</span>
+                                    <span className="flex-1 text-left font-mono text-xs">{v}</span>
+                                    <span className="text-xs text-slate-500">{count}</span>
+                                  </button>
+                                )
+                              })}
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
+                </div>
                 {parsedFilter.terms.length > 0 && (
                   <button
                     type="button"
@@ -677,12 +828,38 @@ function WorkspacesPageInner() {
                   return (
                   <tr key={ws.id} className="hover:bg-slate-700/20 transition-colors">
                     <td className="px-4 py-3">
-                      <Link
-                        href={`/workspaces/${ws.id}`}
-                        className="text-sm font-medium text-brand-400 hover:text-brand-300"
-                      >
-                        {ws.attributes.name}
-                      </Link>
+                      <div className="flex flex-col gap-1.5">
+                        <Link
+                          href={`/workspaces/${ws.id}`}
+                          className="text-sm font-medium text-brand-400 hover:text-brand-300"
+                        >
+                          {ws.attributes.name}
+                        </Link>
+                        {ws.attributes.labels && Object.keys(ws.attributes.labels).length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {Object.entries(ws.attributes.labels).map(([k, v]) => {
+                              const active = hasLabelTerm(parsedFilter, k, v)
+                              return (
+                                <button
+                                  key={`${k}=${v}`}
+                                  type="button"
+                                  onClick={() => setFilterInput(serializeFilter(toggleLabelTerm(parsedFilter, k, v)))}
+                                  className={
+                                    'inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-mono transition-colors ' +
+                                    (active
+                                      ? 'bg-brand-700/60 text-brand-100 hover:bg-brand-700'
+                                      : 'bg-slate-700/40 text-slate-400 hover:bg-slate-700/80 hover:text-slate-200')
+                                  }
+                                  title={active ? 'Click to remove from filter' : 'Click to filter by this label'}
+                                >
+                                  <span className="text-slate-500">{k}:</span>
+                                  <span className="ml-0.5">{v}</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
                       <span className="text-xs text-slate-400">{ws.attributes['execution-mode']}</span>
