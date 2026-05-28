@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.metrics import PROVIDER_CACHE_REQUESTS
@@ -277,7 +278,16 @@ async def fetch_and_cache_single_platform(
             shasum = stream.sha256_hex
             size_bytes = stream.size
 
-    # Record in database
+    # Record in database. Two API replicas can race on the same
+    # cache-miss when a `tofu init` downloads N providers in parallel
+    # against an empty cache — both successfully stream the binary
+    # into object storage (object writes are idempotent: same content,
+    # same key) but only the first INSERT wins on the
+    # `uq_cached_provider_packages` unique constraint. The loser gets
+    # a `UniqueViolationError`; we treat that as "lost the race, the
+    # winner's row is already there" rather than letting it bubble out
+    # as a 500 to the runner (which then fails `tofu init` entirely).
+    # Mirror of the same handling in binary_cache_service.py.
     entry = CachedProviderPackage(
         hostname=hostname,
         namespace=namespace,
@@ -289,16 +299,26 @@ async def fetch_and_cache_single_platform(
         shasum=shasum,
     )
     db.add(entry)
-    await db.flush()
-
-    logger.info(
-        "Provider binary cached (on-demand)",
-        hostname=hostname,
-        provider=f"{namespace}/{type_}",
-        version=version,
-        platform=platform_key,
-        size_bytes=size_bytes,
-    )
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        logger.info(
+            "Provider cache race — another fetcher won; serving from existing row",
+            hostname=hostname,
+            provider=f"{namespace}/{type_}",
+            version=version,
+            platform=platform_key,
+        )
+    else:
+        logger.info(
+            "Provider binary cached (on-demand)",
+            hostname=hostname,
+            provider=f"{namespace}/{type_}",
+            version=version,
+            platform=platform_key,
+            size_bytes=size_bytes,
+        )
 
     presigned = await storage.presigned_get_url(key)
     return presigned.url
