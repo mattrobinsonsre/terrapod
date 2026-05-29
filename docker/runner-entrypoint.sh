@@ -160,6 +160,47 @@ trap on_exit EXIT
 # untouched; same-server hostname rewrites (filesystem backend) are
 # normalised back to TP_API_URL.
 tp_curl_download() {
+    # Retry wrapper around `_tp_curl_download_once`. Re-tries up to
+    # `TP_DOWNLOAD_RETRIES` (default 3) attempts with `TP_DOWNLOAD_RETRY_DELAY`
+    # (default 5s) between, ONLY for failures we can plausibly recover
+    # from on a redo:
+    #
+    #   - curl couldn't establish a connection (network / TLS / DNS) →
+    #     TP_LAST_HTTP empty
+    #   - presigned-URL storage returned `000` (curl couldn't determine
+    #     a status code, usually mid-transfer connection drop)
+    #   - server returned 5xx or 408 (request timeout)
+    #
+    # 4xx (other than 408) are deterministic auth/permission/shape errors;
+    # retrying just wastes the runner's grace budget on a guaranteed
+    # repeat-failure.
+    _out="$1"
+    _retries="${TP_DOWNLOAD_RETRIES:-3}"
+    _delay="${TP_DOWNLOAD_RETRY_DELAY:-5}"
+    _attempt=1
+    while : ; do
+        if _tp_curl_download_once "$@"; then
+            return 0
+        fi
+        case "${TP_LAST_HTTP:-}" in
+            "" | "000" | 408 | 5*)
+                if [ "$_attempt" -lt "$_retries" ]; then
+                    echo "[entrypoint] download: transient failure (HTTP ${TP_LAST_HTTP:-network}) — retry $_attempt/$_retries in ${_delay}s" >&2
+                    sleep "$_delay"
+                    _attempt=$((_attempt + 1))
+                    rm -f "$_out"
+                    continue
+                fi
+                echo "[entrypoint] download: transient failure persisted across $_retries attempts (last HTTP ${TP_LAST_HTTP:-network})" >&2
+                ;;
+        esac
+        return 1
+    done
+}
+
+# Single-shot core: one attempt of the redirect-aware download. Callers
+# should go via the `tp_curl_download` wrapper above for retries.
+_tp_curl_download_once() {
     # $1 = output file, remaining args = curl options (URL last)
     _out="$1"; shift
     TP_LAST_HTTP=""
