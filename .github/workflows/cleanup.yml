@@ -16,7 +16,11 @@ jobs:
       packages: write
     strategy:
       matrix:
-        image: [terrapod-api, terrapod-web, terrapod-runner]
+        # All five published images. Omitting any (previously listener +
+        # migrations were missing) leaves its sha-tagged versions to
+        # accumulate in GHCR forever, since main pushes all five on every
+        # commit but only the listed ones get reaped.
+        image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
     steps:
       - name: Delete old SHA-tagged versions
         env:
