@@ -17,19 +17,32 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     libxmlsec1-openssl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN pip install --no-cache-dir poetry==1.8.4
+# Install Poetry into its own isolated venv so neither Poetry nor its
+# transitive dependencies (dulwich, cleo, cachecontrol, build, …) land in
+# the system site-packages that the runtime stage COPYs wholesale. A plain
+# `pip install poetry` + `pip uninstall -y poetry` leaves those transitive
+# deps orphaned in site-packages, where they drag Poetry-only CVEs into the
+# shipped image (e.g. dulwich CVE-2026-42305, Poetry CVE-2026-34591) even
+# though the application never imports them.
+ENV POETRY_HOME=/opt/poetry
+RUN python -m venv "$POETRY_HOME" \
+    && "$POETRY_HOME"/bin/pip install --no-cache-dir poetry==1.8.4
 
 WORKDIR /app
 
 # Copy dependency files
 COPY services/pyproject.toml services/poetry.lock* ./
 
-# Install dependencies into system Python (no virtualenv), then remove Poetry
-# from site-packages so it doesn't end up in the runtime image (CVE-2026-34591).
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi --only main --no-root \
-    && pip uninstall -y poetry
+# Resolve the project's `main` dependency closure with Poetry (running from
+# its isolated venv) and export it to a requirements file, then install ONLY
+# that closure into the system Python with pip. Poetry + its own deps stay in
+# /opt/poetry, which is never copied into the runtime image. The repo carries
+# no committed lock, so we resolve one at build time — same fresh resolution
+# the previous `poetry install` performed.
+RUN "$POETRY_HOME"/bin/poetry lock --no-interaction --no-ansi \
+    && "$POETRY_HOME"/bin/poetry export \
+        --only main --without-hashes -f requirements.txt -o /tmp/requirements.txt \
+    && pip install --no-cache-dir -r /tmp/requirements.txt
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM python:3.14-slim
