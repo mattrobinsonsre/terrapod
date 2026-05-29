@@ -881,22 +881,22 @@ function WorkspacesPageInner() {
                         ) : runId ? (
                           <Link
                             href={`/workspaces/${ws.id}/runs/${runId}`}
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium hover:opacity-80 transition-opacity ${badgeColors[def.color]}`}
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap hover:opacity-80 transition-opacity ${badgeColors[def.color]}`}
                           >
                             {def.label}
                           </Link>
                         ) : (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColors[def.color]}`}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${badgeColors[def.color]}`}>
                             {def.label}
                           </span>
                         )}
                         {ws.attributes['lifecycle-state'] === 'pending_deletion' && (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColors.amber}`}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${badgeColors.amber}`}>
                             Pending deletion
                           </span>
                         )}
                         {ws.attributes['lifecycle-state'] === 'archived' && (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeColors.slate}`}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${badgeColors.slate}`}>
                             Archived
                           </span>
                         )}
