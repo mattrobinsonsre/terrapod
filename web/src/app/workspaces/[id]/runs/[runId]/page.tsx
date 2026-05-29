@@ -119,6 +119,7 @@ function LogPanel({
 }) {
   const [colorMode, setColorMode] = useState(true)
   const [following, setFollowing] = useState(true)
+  const [copied, setCopied] = useState(false)
   const preRef = useRef<HTMLPreElement>(null)
 
   const cleanLog = useMemo(() => (log ? stripStxEtx(log) : null), [log])
@@ -248,6 +249,19 @@ function LogPanel({
             <ChevronsUp className="w-3 h-3" />
             Top
           </button>
+          {plainContent && (
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(plainContent)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }}
+              className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+              title="Copy plain text to clipboard"
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          )}
           <button
             onClick={() => downloadFile(cleanLog!, `${shortId}-${phase}.log`)}
             className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
