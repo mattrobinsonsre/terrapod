@@ -89,11 +89,13 @@ api:
       # invocation of newer Anthropic models, not the bare
       # foundation-model ID. `us.` = US cross-region profile.
       model: "bedrock/us.anthropic.claude-opus-4-8"
-      max_output_tokens: 1024
+      # Use the upstream default (16384); 1024 caused real-plan truncation.
+      # Override here only if you have a reason.
       request_timeout_seconds: 90
       daily_token_budget: 0  # no cap in local dev
       plan_json_max_bytes: 500000
       code_context_max_bytes: 200000
+      code_diff_max_bytes: 100000
       auth:
         aws_region: us-east-1
         # aws_role_arn intentionally unset — use the pod's env-var

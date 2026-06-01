@@ -377,7 +377,7 @@ async def test_handler_success_path_writes_ready_row():
         patch("terrapod.services.summariser._call_model", call_model),
         patch(
             "terrapod.services.summariser._gather_inputs",
-            AsyncMock(return_value=('{"resource_changes": []}', "PLAN_JSON", "json", "")),
+            AsyncMock(return_value=('{"resource_changes": []}', "PLAN_JSON", "json", "", "")),
         ),
         patch("terrapod.services.summariser._emit_ready_event", AsyncMock()),
     ):
@@ -415,7 +415,7 @@ async def test_handler_call_failure_writes_errored_row():
         patch("terrapod.services.summariser._upsert_summary", upsert),
         patch(
             "terrapod.services.summariser._gather_inputs",
-            AsyncMock(return_value=("plan_json", "PLAN_JSON", "json", "")),
+            AsyncMock(return_value=("plan_json", "PLAN_JSON", "json", "", "")),
         ),
         patch(
             "terrapod.services.summariser._call_model",
@@ -454,7 +454,7 @@ async def test_handler_missing_primary_input_writes_errored_row():
         patch("terrapod.services.summariser._upsert_summary", upsert),
         patch(
             "terrapod.services.summariser._gather_inputs",
-            AsyncMock(return_value=("", "PLAN_JSON", "json", "")),
+            AsyncMock(return_value=("", "PLAN_JSON", "json", "", "")),
         ),
         patch("terrapod.services.summariser._call_model") as call_model,
     ):
@@ -490,7 +490,7 @@ async def test_handler_normalises_invalid_risk_level():
         patch("terrapod.services.summariser._upsert_summary", upsert),
         patch(
             "terrapod.services.summariser._gather_inputs",
-            AsyncMock(return_value=("{}", "PLAN_JSON", "json", "")),
+            AsyncMock(return_value=("{}", "PLAN_JSON", "json", "", "")),
         ),
         patch(
             "terrapod.services.summariser._call_model",
@@ -510,3 +510,296 @@ async def test_handler_normalises_invalid_risk_level():
         await summariser.handle_ai_plan_summary({"run_id": str(run.id), "kind": "plan_summary"})
 
         assert upsert.await_args.kwargs["risk_level"] == "low"
+
+
+# ── _clean_plan_json_bytes (#406 / v0.30.4) ───────────────────────────────
+
+
+class TestCleanPlanJsonBytes:
+    """The cleaner physically removes definitionally-uninformative noise so
+    no-op snapshots cannot be hallucinated as changes.
+
+    Rules under test:
+      • drop resource_changes with actions ⊆ {no-op, read} AND no
+        `importing`
+      • keep import-via-no-op
+      • drop output_changes with actions == ["no-op"]
+      • drop top-level `prior_state`
+      • preserve `resource_drift` untouched
+      • degrade gracefully on malformed input
+    """
+
+    def _clean(self, plan: dict) -> dict:
+        import json as _json
+
+        out = summariser._clean_plan_json_bytes(_json.dumps(plan).encode())
+        return _json.loads(out)
+
+    def test_drops_pure_noop_resource_change(self):
+        plan = {
+            "resource_changes": [
+                {"address": "x", "change": {"actions": ["no-op"]}},
+                {"address": "y", "change": {"actions": ["update"]}},
+            ]
+        }
+        out = self._clean(plan)
+        addrs = [r["address"] for r in out["resource_changes"]]
+        assert addrs == ["y"]
+
+    def test_drops_pure_read_resource_change(self):
+        plan = {
+            "resource_changes": [
+                {"address": "ds", "change": {"actions": ["read"]}},
+                {"address": "y", "change": {"actions": ["delete"]}},
+            ]
+        }
+        out = self._clean(plan)
+        addrs = [r["address"] for r in out["resource_changes"]]
+        assert addrs == ["y"]
+
+    def test_keeps_noop_with_import(self):
+        """State-only adoption shows as actions=["no-op"] + importing set."""
+        plan = {
+            "resource_changes": [
+                {
+                    "address": "vault.ns",
+                    "change": {
+                        "actions": ["no-op"],
+                        "importing": {"id": "vault"},
+                    },
+                },
+            ]
+        }
+        out = self._clean(plan)
+        assert len(out["resource_changes"]) == 1
+        assert out["resource_changes"][0]["address"] == "vault.ns"
+
+    def test_keeps_create_update_delete_and_replace(self):
+        plan = {
+            "resource_changes": [
+                {"address": "c", "change": {"actions": ["create"]}},
+                {"address": "u", "change": {"actions": ["update"]}},
+                {"address": "d", "change": {"actions": ["delete"]}},
+                {"address": "r", "change": {"actions": ["create", "delete"]}},
+                {"address": "noop", "change": {"actions": ["no-op"]}},
+            ]
+        }
+        out = self._clean(plan)
+        addrs = sorted(r["address"] for r in out["resource_changes"])
+        assert addrs == ["c", "d", "r", "u"]
+
+    def test_drops_noop_output_changes(self):
+        plan = {
+            "output_changes": {
+                "stable": {"actions": ["no-op"]},
+                "changed": {"actions": ["update"]},
+            }
+        }
+        out = self._clean(plan)
+        assert "stable" not in out["output_changes"]
+        assert "changed" in out["output_changes"]
+
+    def test_drops_prior_state(self):
+        plan = {"prior_state": {"big": "snapshot"}, "resource_changes": []}
+        out = self._clean(plan)
+        assert "prior_state" not in out
+
+    def test_preserves_resource_drift_intact(self):
+        """resource_drift carries the only signal about out-of-band changes;
+        the prompt teaches the model to label it correctly, the cleaner
+        does NOT prune it. Regressions here would silence drift-revert
+        risk signals.
+        """
+        plan = {
+            "resource_drift": [
+                {"address": "drift_a", "change": {"actions": ["update"]}},
+                {"address": "drift_b", "change": {"actions": ["delete"]}},
+            ],
+            "resource_changes": [],
+        }
+        out = self._clean(plan)
+        assert out["resource_drift"] == plan["resource_drift"]
+
+    def test_keeps_weird_actions_shape(self):
+        """Defensive: never drop a resource_change whose shape we don't
+        recognise. Better to over-include than silently lose data.
+        """
+        plan = {
+            "resource_changes": [
+                {"address": "weird1", "change": {"actions": None}},
+                {"address": "weird2", "change": {}},
+                {"address": "weird3", "change": "not a dict"},
+                {"address": "weird4"},  # no change key
+            ]
+        }
+        out = self._clean(plan)
+        addrs = sorted(r["address"] for r in out["resource_changes"])
+        assert addrs == ["weird1", "weird2", "weird3", "weird4"]
+
+    def test_malformed_json_returns_unchanged(self):
+        raw = b"not json at all"
+        assert summariser._clean_plan_json_bytes(raw) == raw
+
+    def test_non_dict_top_level_returns_unchanged(self):
+        raw = b"[1, 2, 3]"
+        assert summariser._clean_plan_json_bytes(raw) == raw
+
+    def test_drops_in_real_world_shape(self):
+        """End-to-end: cluster + node-group + log-group all no-ops with
+        the snapshot fields that previously confused the model.
+        """
+        plan = {
+            "format_version": "1.2",
+            "resource_changes": [
+                {
+                    "address": "module.eks.aws_eks_cluster.this[0]",
+                    "type": "aws_eks_cluster",
+                    "change": {
+                        "actions": ["no-op"],
+                        "before": {"version": "1.35"},
+                        "after": {"version": "1.35"},
+                    },
+                },
+                {
+                    "address": "module.eks.aws_eks_node_group.ng1",
+                    "type": "aws_eks_node_group",
+                    "change": {
+                        "actions": ["no-op"],
+                        "before": {"version": "1.35"},
+                        "after": {"version": "1.35"},
+                    },
+                },
+                {
+                    "address": "module.vpc.aws_subnet.private[3]",
+                    "type": "aws_subnet",
+                    "change": {
+                        "actions": ["update"],
+                        "before": {"map_public_ip_on_launch": True},
+                        "after": {"map_public_ip_on_launch": False},
+                    },
+                },
+            ],
+        }
+        out = self._clean(plan)
+        addrs = [r["address"] for r in out["resource_changes"]]
+        assert addrs == ["module.vpc.aws_subnet.private[3]"]
+        # The cluster's "version: 1.35" snapshot — the exact field that
+        # confabulated the v0.30.3 hallucination — is GONE from the
+        # bytes the model will see. Hard guarantee, not prompt-based.
+        import json as _json
+
+        out_str = _json.dumps(out)
+        assert "aws_eks_cluster" not in out_str
+        assert "aws_eks_node_group" not in out_str
+
+
+# ── _build_code_diff (#406 / v0.30.4) ────────────────────────────────────
+
+
+class TestBuildCodeDiff:
+    """CODE_DIFF is best-effort context. The contract is:
+    • return "" on every plausible failure
+    • return a unified diff (with `+`/`-` lines) when both tarballs
+      exist and differ on *.tf / *.tfvars files
+    • only diff .tf / .tfvars — README.md, .terraform/, etc. don't count
+    • respect the byte cap
+    """
+
+    def test_returns_empty_when_prev_tarball_none(self):
+        cur = _build_tarball({"main.tf": b'resource "x" "y" {}'})
+        assert summariser._build_code_diff(None, cur, 100_000) == ""
+
+    def test_returns_empty_when_max_bytes_zero(self):
+        cur = _build_tarball({"main.tf": b'resource "x" "y" {}'})
+        prev = _build_tarball({"main.tf": b"# different"})
+        assert summariser._build_code_diff(prev, cur, 0) == ""
+
+    def test_returns_empty_when_tarballs_identical(self):
+        same = _build_tarball({"main.tf": b'resource "x" "y" {}'})
+        # Use literal-identical bytes for both sides → diff must be empty.
+        out = summariser._build_code_diff(same, same, 100_000)
+        assert out == ""
+
+    def test_returns_diff_when_tf_changed(self):
+        prev = _build_tarball(
+            {"main.tf": b'resource "aws_vpc" "this" {\n  cidr_block = "10.0.0.0/16"\n}\n'}
+        )
+        cur = _build_tarball(
+            {"main.tf": b'resource "aws_vpc" "this" {\n  cidr_block = "10.1.0.0/16"\n}\n'}
+        )
+        out = summariser._build_code_diff(prev, cur, 100_000)
+        assert out != ""
+        # Both sides of the change appear in the unified diff
+        assert "10.0.0.0/16" in out
+        assert "10.1.0.0/16" in out
+        # Standard unified-diff markers
+        assert "---" in out
+        assert "+++" in out
+
+    def test_ignores_non_tf_files(self):
+        prev = _build_tarball(
+            {
+                "main.tf": b'resource "x" "y" {}',
+                "README.md": b"old readme",
+            }
+        )
+        cur = _build_tarball(
+            {
+                "main.tf": b'resource "x" "y" {}',
+                "README.md": b"WILDLY DIFFERENT README CONTENT",
+            }
+        )
+        # Only README.md changed; *.tf is identical. Should be empty.
+        out = summariser._build_code_diff(prev, cur, 100_000)
+        assert out == ""
+
+    def test_includes_tfvars(self):
+        prev = _build_tarball({"terraform.tfvars": b'env = "dev"\n'})
+        cur = _build_tarball({"terraform.tfvars": b'env = "prod"\n'})
+        out = summariser._build_code_diff(prev, cur, 100_000)
+        assert "dev" in out
+        assert "prod" in out
+
+    def test_corrupt_prev_tarball_returns_empty(self):
+        cur = _build_tarball({"main.tf": b'resource "x" "y" {}'})
+        out = summariser._build_code_diff(b"not a tarball", cur, 100_000)
+        assert out == ""
+
+    def test_corrupt_cur_tarball_returns_empty(self):
+        prev = _build_tarball({"main.tf": b'resource "x" "y" {}'})
+        out = summariser._build_code_diff(prev, b"not a tarball", 100_000)
+        assert out == ""
+
+    def test_path_traversal_member_skipped(self):
+        """A tarball containing `../../etc/passwd` must not write outside
+        the temp dir. The malicious member is silently skipped.
+        """
+        prev = _build_tarball({"main.tf": b"# v1"})
+        # Build a tarball that includes a traversal entry alongside a
+        # legitimate .tf file. The legitimate .tf is what should be
+        # used for the diff; the traversal entry must be dropped.
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+            for name, content in [
+                ("../escape.tf", b"# escape attempt"),
+                ("main.tf", b"# v2"),
+            ]:
+                info = tarfile.TarInfo(name=name)
+                info.size = len(content)
+                tar.addfile(info, io.BytesIO(content))
+        cur = buf.getvalue()
+        out = summariser._build_code_diff(prev, cur, 100_000)
+        assert out != ""
+        assert "# v1" in out
+        assert "# v2" in out
+        assert "escape attempt" not in out  # never extracted
+
+    def test_diff_truncated_at_max_bytes(self):
+        # Construct a large diff by changing a single line many times
+        prev_content = ("a\n" * 5000).encode()
+        cur_content = ("b\n" * 5000).encode()
+        prev = _build_tarball({"main.tf": prev_content})
+        cur = _build_tarball({"main.tf": cur_content})
+        out = summariser._build_code_diff(prev, cur, 1000)
+        assert len(out) <= 1000 + 100  # 1000 cap + truncation marker
+        assert "truncated from tail" in out

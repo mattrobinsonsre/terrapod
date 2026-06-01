@@ -816,6 +816,17 @@ class AISummaryConfig(BaseModel):
             "against pathological monorepos producing 50MB plan files."
         ),
     )
+    code_diff_max_bytes: int = Field(
+        default=100_000,
+        description=(
+            "Max bytes of CODE_DIFF (unified diff of *.tf / *.tfvars "
+            "between this run's config version and the previously-applied "
+            "config version) attached to the request. The diff is computed "
+            "via `git diff --no-index` between the two tarballs. 0 disables "
+            "CODE_DIFF entirely. Diffs are usually tiny; this cap is a "
+            "safety net for monorepo-scale refactors."
+        ),
+    )
     auth: AISummaryAuthConfig = Field(default_factory=AISummaryAuthConfig)
     context: AISummaryContextConfig = Field(default_factory=AISummaryContextConfig)
 

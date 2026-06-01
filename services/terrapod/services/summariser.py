@@ -41,7 +41,10 @@ import asyncio
 import datetime as dt
 import io
 import json
+import pathlib
+import subprocess
 import tarfile
+import tempfile
 import uuid
 
 import litellm
@@ -130,12 +133,206 @@ def _extract_tf_sources(tarball: bytes, max_bytes: int) -> str:
     return buf.getvalue()
 
 
-async def _gather_inputs(run: Run, kind: str) -> tuple[str, str, str, str]:
-    """Return ``(primary_input, primary_label, primary_lang, code_context)``.
+def _clean_plan_json_bytes(raw: bytes) -> bytes:
+    """Strip definitionally-uninformative noise from terraform plan JSON.
 
-    primary_input is the plan JSON (for plan_summary) or the plan log
-    (for failure_analysis). code_context is the concatenated .tf source
-    or "" when the workspace has no config version.
+    The model was observed confabulating "upgrade" narratives from
+    `before` / `after` snapshot fields on no-op resources. The fix is
+    twofold: prompt the model to trust `change.actions` (done in the
+    skill prompt), and remove the snapshot noise so it physically
+    cannot be hallucinated.
+
+    Drops:
+      • resource_changes entries where every action is in
+        {no-op, read} AND change.importing is unset
+      • output_changes entries with actions == ["no-op"]
+      • the top-level "prior_state" key (full pre-refresh state
+        snapshot, redundant with resource_changes.before)
+
+    Preserves:
+      • resource_drift in full — the operator needs both "drift
+        accepted" (informational) and "drift reverted" (risk) signals;
+        the prompt teaches the model to label them.
+      • read-only entries when paired with import (rare but valid)
+
+    On any structural anomaly (non-dict plan, malformed entries) returns
+    the input unchanged. Cleaner is best-effort: never fail the call.
+    """
+    try:
+        plan = json.loads(raw)
+    except json.JSONDecodeError:
+        return raw
+    if not isinstance(plan, dict):
+        return raw
+
+    plan.pop("prior_state", None)
+
+    rcs = plan.get("resource_changes")
+    if isinstance(rcs, list):
+        plan["resource_changes"] = [r for r in rcs if _resource_change_is_informative(r)]
+
+    ocs = plan.get("output_changes")
+    if isinstance(ocs, dict):
+        plan["output_changes"] = {
+            k: v
+            for k, v in ocs.items()
+            if not (isinstance(v, dict) and v.get("actions") == ["no-op"])
+        }
+
+    return json.dumps(plan, separators=(",", ":")).encode("utf-8")
+
+
+def _resource_change_is_informative(r: object) -> bool:
+    """Return True when this resource_change should reach the model."""
+    if not isinstance(r, dict):
+        return True
+    change = r.get("change")
+    if not isinstance(change, dict):
+        return True
+    if change.get("importing") is not None:
+        return True
+    actions = change.get("actions")
+    if not isinstance(actions, list) or not actions:
+        return True
+    return any(a not in ("no-op", "read") for a in actions)
+
+
+def _extract_tf_files_to_dir(tarball: bytes, target: pathlib.Path) -> int:
+    """Extract *.tf / *.tfvars files from a config-version tarball.
+
+    Returns the number of files written. Defends against zip-slip via
+    member-name normalisation; skips entries whose path escapes target.
+    """
+    written = 0
+    with tarfile.open(fileobj=io.BytesIO(tarball), mode="r:gz") as tar:
+        for member in tar:
+            if not member.isfile():
+                continue
+            if not (member.name.endswith(".tf") or member.name.endswith(".tfvars")):
+                continue
+            safe = pathlib.PurePosixPath(member.name).as_posix()
+            if safe.startswith("/") or ".." in safe.split("/"):
+                continue
+            fobj = tar.extractfile(member)
+            if fobj is None:
+                continue
+            dest = target / safe
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(fobj.read())
+            written += 1
+    return written
+
+
+def _build_code_diff(prev_tarball: bytes | None, cur_tarball: bytes, max_bytes: int) -> str:
+    """Return a unified diff of *.tf / *.tfvars between two CV tarballs.
+
+    Returns "" when:
+      • max_bytes is 0 (feature disabled)
+      • prev_tarball is None (first run for this workspace, or the
+        previous CV's tarball has been GC'd by artifact retention)
+      • either tarball is unreadable
+      • the two trees contain no .tf / .tfvars files
+      • the trees are identical (empty diff)
+      • git is missing or times out
+
+    Uses `git diff --no-index` against two temp directories. Falls back
+    silently on any failure: CODE_DIFF is best-effort context, never
+    blocks the summariser.
+    """
+    if max_bytes <= 0 or prev_tarball is None:
+        return ""
+
+    with tempfile.TemporaryDirectory(prefix="tp-aisum-diff-") as tmp:
+        tmp_root = pathlib.Path(tmp)
+        prev_dir = tmp_root / "previous"
+        cur_dir = tmp_root / "current"
+        prev_dir.mkdir()
+        cur_dir.mkdir()
+        try:
+            prev_n = _extract_tf_files_to_dir(prev_tarball, prev_dir)
+            cur_n = _extract_tf_files_to_dir(cur_tarball, cur_dir)
+        except tarfile.TarError as e:
+            logger.debug("CODE_DIFF: tarball extract failed", error=str(e))
+            return ""
+
+        if prev_n == 0 and cur_n == 0:
+            return ""
+
+        try:
+            proc = subprocess.run(  # noqa: S603 — fixed argv, no shell
+                [
+                    "git",
+                    "diff",
+                    "--no-index",
+                    "--unified=3",
+                    "--no-color",
+                    "--",
+                    "previous",
+                    "current",
+                ],
+                cwd=tmp_root,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+            logger.debug("CODE_DIFF: git diff failed", error=str(e))
+            return ""
+
+        # git diff --no-index exits 1 when there's a diff, 0 when there
+        # isn't — both are success for us. Anything else (e.g. 128 from
+        # git missing) is a real failure.
+        if proc.returncode not in (0, 1):
+            logger.debug(
+                "CODE_DIFF: git diff returned unexpected exit code",
+                returncode=proc.returncode,
+                stderr=proc.stderr[:200],
+            )
+            return ""
+
+        diff = proc.stdout
+        if not diff.strip():
+            return ""
+
+        if len(diff) > max_bytes:
+            diff = (
+                diff[:max_bytes] + f"\n[... {len(diff) - max_bytes} bytes truncated from tail ...]"
+            )
+        return diff
+
+
+async def _find_previously_applied_cv_id(
+    db: AsyncSession, workspace_id: uuid.UUID, current_run_id: uuid.UUID
+) -> uuid.UUID | None:
+    """Return the configuration_version_id of the most recently *applied*
+    Run on the workspace, excluding ``current_run_id``.
+
+    None when no prior applied run exists (first run, or all prior
+    runs were plan-only / errored / discarded). The summariser falls
+    back to no CODE_DIFF in that case.
+    """
+    stmt = (
+        select(Run.configuration_version_id)
+        .where(
+            Run.workspace_id == workspace_id,
+            Run.status == "applied",
+            Run.id != current_run_id,
+            Run.configuration_version_id.is_not(None),
+        )
+        .order_by(Run.updated_at.desc())
+        .limit(1)
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def _gather_inputs(db: AsyncSession, run: Run, kind: str) -> tuple[str, str, str, str, str]:
+    """Return ``(primary_input, primary_label, primary_lang, code_context, code_diff)``.
+
+    primary_input is the (cleaned) plan JSON for ``plan_summary`` or
+    the plan log for ``failure_analysis``. code_context is the
+    concatenated current .tf source. code_diff is a unified diff of
+    *.tf / *.tfvars between this run's CV and the previously-applied
+    CV (when both tarballs are available).
     """
     storage = get_storage()
     cfg = settings.ai_summary
@@ -150,8 +347,11 @@ async def _gather_inputs(run: Run, kind: str) -> tuple[str, str, str, str]:
             logger.warning(
                 "plan JSON not available for summariser", run_id=str(run.id), error=str(e)
             )
-            return "", primary_label, primary_lang, ""
-        primary = _truncate_head(raw, cfg.plan_json_max_bytes)
+            return "", primary_label, primary_lang, "", ""
+        # Clean BEFORE truncation so the head-truncate budget is spent
+        # on actual changes, not no-op snapshot noise.
+        cleaned = await asyncio.to_thread(_clean_plan_json_bytes, raw)
+        primary = _truncate_head(cleaned, cfg.plan_json_max_bytes)
     else:
         key = plan_log_key(str(run.workspace_id), str(run.id))
         primary_label = "PLAN_LOG"
@@ -162,21 +362,47 @@ async def _gather_inputs(run: Run, kind: str) -> tuple[str, str, str, str]:
             logger.warning(
                 "plan log not available for summariser", run_id=str(run.id), error=str(e)
             )
-            return "", primary_label, primary_lang, ""
+            return "", primary_label, primary_lang, "", ""
         primary = _truncate_tail(raw, cfg.plan_json_max_bytes)
 
+    cur_tarball: bytes | None = None
     code_context = ""
-    if cfg.code_context_max_bytes > 0 and run.configuration_version_id:
+    if (
+        cfg.code_context_max_bytes > 0 or cfg.code_diff_max_bytes > 0
+    ) and run.configuration_version_id:
         cv_key = config_version_key(str(run.workspace_id), str(run.configuration_version_id))
         try:
-            tarball = await storage.get(cv_key)
-            code_context = await asyncio.to_thread(
-                _extract_tf_sources, tarball, cfg.code_context_max_bytes
-            )
+            cur_tarball = await storage.get(cv_key)
         except Exception as e:
-            logger.debug("CV tarball not available; running without code context", error=str(e))
+            logger.debug("Current CV tarball not available", error=str(e))
+            cur_tarball = None
+        if cur_tarball is not None and cfg.code_context_max_bytes > 0:
+            try:
+                code_context = await asyncio.to_thread(
+                    _extract_tf_sources, cur_tarball, cfg.code_context_max_bytes
+                )
+            except Exception as e:
+                logger.debug("Failed to extract code_context", error=str(e))
 
-    return primary, primary_label, primary_lang, code_context
+    code_diff = ""
+    if cfg.code_diff_max_bytes > 0 and cur_tarball is not None:
+        prev_cv_id = await _find_previously_applied_cv_id(db, run.workspace_id, run.id)
+        if prev_cv_id is not None:
+            prev_key = config_version_key(str(run.workspace_id), str(prev_cv_id))
+            try:
+                prev_tarball = await storage.get(prev_key)
+            except Exception as e:
+                logger.debug("Previous CV tarball not available (likely GC'd)", error=str(e))
+                prev_tarball = None
+            if prev_tarball is not None:
+                try:
+                    code_diff = await asyncio.to_thread(
+                        _build_code_diff, prev_tarball, cur_tarball, cfg.code_diff_max_bytes
+                    )
+                except Exception as e:
+                    logger.debug("Failed to build code_diff", error=str(e))
+
+    return primary, primary_label, primary_lang, code_context, code_diff
 
 
 # --- Daily budget ------------------------------------------------------------
@@ -524,7 +750,7 @@ async def handle_ai_plan_summary(payload: dict) -> None:
             await _emit_ready_event(ws.id, run_id)
             return
 
-        primary, label, lang, code_context = await _gather_inputs(run, kind)
+        primary, label, lang, code_context, code_diff = await _gather_inputs(db, run, kind)
         if not primary:
             await _upsert_summary(
                 db,
@@ -544,6 +770,7 @@ async def handle_ai_plan_summary(payload: dict) -> None:
             primary_input_label=label,
             primary_input_lang=lang,
             code_context_truncated=code_context,
+            code_diff=code_diff,
             prompt_prefix=cfg.context.prompt_prefix,
             prompt_suffix=cfg.context.prompt_suffix,
         )

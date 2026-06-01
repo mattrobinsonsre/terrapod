@@ -305,13 +305,24 @@ api:
       # Optional base URL override (vLLM, LiteLLM proxy, custom Azure).
       # Leave empty for vendor providers — LiteLLM knows the defaults.
       api_base: ""
-      max_output_tokens: 1024
+      # Upper bound on model response tokens. Cap, not a target: the
+      # model emits what it needs and stops on a natural stop token.
+      # 16384 leaves comfortable headroom for very large plans (100+
+      # resource changes with detailed risk listings) while staying
+      # under Opus's 32K output ceiling.
+      max_output_tokens: 16384
       request_timeout_seconds: 60
       # Output-token cap per UTC day across all summaries. 0 = unlimited.
       daily_token_budget: 0
       # Size caps on the inputs attached to the model request.
       plan_json_max_bytes: 500000
       code_context_max_bytes: 200000
+      # Size cap on the CODE_DIFF input (unified diff of *.tf / *.tfvars
+      # between this run's config version and the previously-applied
+      # config version). 0 disables CODE_DIFF entirely. Diffs are
+      # usually tiny; this cap is a safety net for monorepo-scale
+      # refactors.
+      code_diff_max_bytes: 100000
       auth:
         # Bearer key for non-AWS providers (OpenAI, Anthropic, Gemini,
         # Azure, vLLM). Inject via TERRAPOD_AI_SUMMARY__AUTH__API_KEY
