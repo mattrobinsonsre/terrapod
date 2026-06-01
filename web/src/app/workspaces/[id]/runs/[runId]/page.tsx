@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { PlanSummaryBadges } from '@/components/plan-summary-badges'
+import { PlanAiSummary } from '@/components/plan-ai-summary'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
@@ -316,6 +317,10 @@ export default function RunDetailPage() {
   const [applyHtml, setApplyHtml] = useState('')
   const [planLogLoading, setPlanLogLoading] = useState(false)
   const [applyLogLoading, setApplyLogLoading] = useState(false)
+  // Bumped when the SSE `plan_summary_ready` event arrives so the
+  // PlanAiSummary component refetches without forcing the whole run to
+  // reload.
+  const [aiSummaryRefresh, setAiSummaryRefresh] = useState(0)
 
   // Offset tracking for incremental log fetching (byte position in raw log data)
   const planLogOffset = useRef(0)
@@ -367,6 +372,9 @@ export default function RunDetailPage() {
     if (event.event === 'log_updated' && event.run_id === bareId) {
       if (event.phase === 'plan') loadPlanLog()
       else if (event.phase === 'apply') loadApplyLog()
+    }
+    if (event.event === 'plan_summary_ready' && event.run_id === bareId) {
+      setAiSummaryRefresh((n) => n + 1)
     }
   }, [runId, loadRun]))
 
@@ -683,6 +691,10 @@ export default function RunDetailPage() {
             )}
           </div>
         )}
+
+        {/* AI plan summary / failure analysis (#401) — renders nothing
+            when the feature is off or no row exists for this plan. */}
+        <PlanAiSummary runId={runId.replace(/^run-/, '')} refreshKey={aiSummaryRefresh} />
 
         {/* Run metadata */}
         <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 mb-6">

@@ -13,6 +13,8 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
 > **Drop-in replacement for HCP Terraform.** Point your existing `cloud` blocks, `go-tfe` clients, and CI/CD pipelines at Terrapod — zero code changes required.
 
+> **AI-augmented plans.** Every plan can carry an LLM-generated change description, risk assessment, and (on failure) suggested fixes — provider-agnostic via [LiteLLM](https://github.com/BerriAI/litellm). Wire AWS Bedrock (Claude, Nova, gpt-oss) with native IAM auth, or point at OpenAI, Anthropic, Gemini, Azure OpenAI, or any OpenAI-compatible endpoint. See [docs/ai-plan-summary.md](docs/ai-plan-summary.md).
+
 ---
 
 ## Key Features
@@ -35,6 +37,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | SSO (OIDC / SAML) | Implemented | Pluggable identity providers (Auth0, Okta, Azure AD, etc.) |
 | Drift Detection | Implemented | Scheduled plan-only runs to detect out-of-band changes |
 | Run Triggers | Implemented | Cross-workspace dependency chains — source apply triggers downstream runs |
+| **AI Plan Summary** | **Implemented** | **LLM-generated change summary + risk assessment on every plan; failure analysis on errored plans. Provider-agnostic via LiteLLM — AWS Bedrock (Claude, Nova, gpt-oss…), OpenAI, Anthropic direct, Google Gemini, Azure OpenAI, vLLM. IAM-native auth for Bedrock (IRSA + optional cross-account `sts:AssumeRole`).** |
 | Notifications | Implemented | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
 | Run Tasks | Implemented | Pre/post-plan webhook hooks for external validation |
 | Workspace Health | Implemented | Per-workspace health conditions, VCS polling status, drift detection indicators |

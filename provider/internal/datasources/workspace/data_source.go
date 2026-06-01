@@ -42,6 +42,8 @@ type workspaceDataSourceModel struct {
 	VarFiles                      types.List   `tfsdk:"var_files"`
 	DriftDetectionEnabled         types.Bool   `tfsdk:"drift_detection_enabled"`
 	DriftDetectionIntervalSeconds types.Int64  `tfsdk:"drift_detection_interval_seconds"`
+	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
+	AISummaryContext              types.String `tfsdk:"ai_summary_context"`
 	OwnerEmail                    types.String `tfsdk:"owner_email"`
 	DriftStatus                   types.String `tfsdk:"drift_status"`
 	DriftLastCheckedAt            types.String `tfsdk:"drift_last_checked_at"`
@@ -82,6 +84,8 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"var_files":                        computedList("Var files for -var-file arguments."),
 			"drift_detection_enabled":          computedBool("Drift detection enabled."),
 			"drift_detection_interval_seconds": computedInt64("Drift detection interval."),
+			"ai_summary_mode":                  computedString("Per-workspace AI plan-summary mode: 'default' (follow deployment global), 'enabled' (always summarise), or 'disabled' (never summarise)."),
+			"ai_summary_context":               computedString("Workspace-specific context appended to the AI summariser prompt."),
 			"owner_email":                      computedString("Owner email."),
 			"drift_status":                     computedString("Drift status."),
 			"drift_last_checked_at":            computedString("Last drift check."),
@@ -150,6 +154,13 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	m.CreatedAt = types.StringValue(terrapod.GetStringAttr(res, "created-at"))
 	m.UpdatedAt = types.StringValue(terrapod.GetStringAttr(res, "updated-at"))
 	m.DriftDetectionEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "drift-detection-enabled"))
+	// AI plan summary (#401)
+	mode := terrapod.GetStringAttr(res, "ai-summary-mode")
+	if mode == "" {
+		mode = "default"
+	}
+	m.AISummaryMode = types.StringValue(mode)
+	m.AISummaryContext = types.StringValue(terrapod.GetStringAttr(res, "ai-summary-context"))
 
 	setOptionalString(&m.TerraformVersion, terrapod.GetStringAttr(res, "terraform-version"))
 	setOptionalString(&m.VCSRepoURL, terrapod.GetStringAttr(res, "vcs-repo-url"))

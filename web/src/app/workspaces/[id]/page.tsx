@@ -53,6 +53,8 @@ interface WorkspaceAttrs {
   'vcs-workflow': 'merge_then_apply' | 'apply_then_merge'
   'auto-merge': boolean
   'auto-merge-strategy': 'merge' | 'squash' | 'rebase'
+  'ai-summary-mode': 'default' | 'enabled' | 'disabled'
+  'ai-summary-context': string
   'drift-detection-enabled': boolean
   'drift-detection-interval-seconds': number
   'drift-last-checked-at': string
@@ -337,6 +339,12 @@ function WorkspaceDetailContent() {
   const [savingDrift, setSavingDrift] = useState(false)
   const [checkingDrift, setCheckingDrift] = useState(false)
   const [dismissingDrift, setDismissingDrift] = useState(false)
+
+  // AI plan summary (#401). Local draft for the context textarea so we
+  // can autosave on blur rather than every keystroke; mode is saved on
+  // dropdown change directly.
+  const [savingAiSummary, setSavingAiSummary] = useState(false)
+  const [aiSummaryContextDraft, setAiSummaryContextDraft] = useState<string | null>(null)
 
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -933,6 +941,30 @@ function WorkspaceDetailContent() {
       await loadWorkspace()
     } catch (err) {
       setError(err instanceof Error ? err.message : `Failed to ${action} workspace`)
+    }
+  }
+
+  // AI plan summary (#401)
+  async function handleAiSummaryAttrUpdate(patch: { 'ai-summary-mode'?: string; 'ai-summary-context'?: string }) {
+    if (!workspace) return
+    setSavingAiSummary(true)
+    try {
+      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({ data: { type: 'workspaces', attributes: patch } }),
+      })
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(body || 'Failed to update AI summary settings')
+      }
+      const data = await res.json()
+      setWorkspace(data.data)
+      setAiSummaryContextDraft(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update AI summary settings')
+    } finally {
+      setSavingAiSummary(false)
     }
   }
 
@@ -1984,6 +2016,83 @@ function WorkspaceDetailContent() {
                     </button>
                   </div>
                 )}
+              </dl>
+            </div>
+
+            {/* AI Plan Summary (#401) */}
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-medium text-slate-300">AI Plan Summary</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Automatic LLM-generated change summary, risk assessment, and failure
+                    analysis on every plan-phase outcome for this workspace.
+                  </p>
+                </div>
+              </div>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <dt className="text-xs text-slate-500">Mode</dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <select
+                        value={attrs['ai-summary-mode'] || 'default'}
+                        onChange={(e) => handleAiSummaryAttrUpdate({ 'ai-summary-mode': e.target.value })}
+                        disabled={savingAiSummary}
+                        className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      >
+                        <option value="default">Follow deployment default</option>
+                        <option value="enabled">Always summarise</option>
+                        <option value="disabled">Never summarise</option>
+                      </select>
+                    ) : (
+                      <span className="text-sm text-slate-200">
+                        {attrs['ai-summary-mode'] === 'enabled'
+                          ? 'Always summarise'
+                          : attrs['ai-summary-mode'] === 'disabled'
+                            ? 'Never summarise'
+                            : 'Follow deployment default'}
+                      </span>
+                    )}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-slate-500">
+                    Workspace context
+                    <span className="ml-2 text-slate-600">(optional, additive)</span>
+                  </dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <textarea
+                        value={aiSummaryContextDraft ?? attrs['ai-summary-context'] ?? ''}
+                        onChange={(e) => setAiSummaryContextDraft(e.target.value)}
+                        onBlur={() => {
+                          if (
+                            aiSummaryContextDraft !== null &&
+                            aiSummaryContextDraft !== (attrs['ai-summary-context'] ?? '')
+                          ) {
+                            handleAiSummaryAttrUpdate({ 'ai-summary-context': aiSummaryContextDraft })
+                          } else {
+                            setAiSummaryContextDraft(null)
+                          }
+                        }}
+                        placeholder="Facts the AI should know about this workspace specifically. e.g. 'Fronts the vault for service X — destroying the KMS key causes a global outage.'"
+                        rows={3}
+                        maxLength={4000}
+                        disabled={savingAiSummary}
+                        className="w-full px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono"
+                      />
+                    ) : attrs['ai-summary-context'] ? (
+                      <p className="text-sm text-slate-200 whitespace-pre-wrap">{attrs['ai-summary-context']}</p>
+                    ) : (
+                      <p className="text-sm text-slate-500 italic">No workspace context set.</p>
+                    )}
+                    <p className="text-xs text-slate-500 mt-1">
+                      Added on top of deployment-wide context. Max 4000 characters.
+                      {savingAiSummary && <span className="ml-2 text-brand-400">Saving…</span>}
+                    </p>
+                  </dd>
+                </div>
               </dl>
             </div>
 

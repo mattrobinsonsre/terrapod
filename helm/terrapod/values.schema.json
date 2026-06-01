@@ -645,6 +645,41 @@
           }
         },
 
+        "ai_summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "model": { "type": "string" },
+            "api_base": { "type": "string" },
+            "max_output_tokens": { "type": "integer", "minimum": 1 },
+            "request_timeout_seconds": { "type": "integer", "minimum": 1 },
+            "daily_token_budget": { "type": "integer", "minimum": 0 },
+            "plan_json_max_bytes": { "type": "integer", "minimum": 0 },
+            "code_context_max_bytes": { "type": "integer", "minimum": 0 },
+            "auth": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "api_key": { "type": "string" },
+                "aws_region": { "type": "string" },
+                "aws_role_arn": { "type": "string" },
+                "aws_session_name": { "type": "string" },
+                "aws_external_id": { "type": "string" }
+              }
+            },
+            "context": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "prompt_prefix": { "type": "string" },
+                "prompt_suffix": { "type": "string" },
+                "fleet_context": { "type": "string" }
+              }
+            }
+          }
+        },
+
         "drift_detection": {
           "type": "object",
           "additionalProperties": false,

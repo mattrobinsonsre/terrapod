@@ -1,0 +1,257 @@
+'use client'
+
+/**
+ * AI-generated plan summary panel (#401).
+ *
+ * Renders one of:
+ *   - "ready"    → description (markdown) + risk pill + risk factor list
+ *   - "pending"  → spinner + "Summarising plan..."
+ *   - "skipped"  → grey muted line ("Workspace opted out" / "Daily budget exhausted")
+ *   - "errored"  → red banner with the error text
+ *   - 404         → nothing renders (caller decides whether feature is on)
+ *
+ * Refetches on the `plan_summary_ready` SSE event — the caller is
+ * responsible for hooking up `useRunEvents` and bumping the refresh
+ * counter passed in via `refreshKey`.
+ */
+
+import { useCallback, useEffect, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { Sparkles, AlertTriangle, Info, ShieldAlert, ShieldX } from 'lucide-react'
+import { apiFetch } from '@/lib/api'
+import { LoadingSpinner } from '@/components/loading-spinner'
+
+type Severity = 'low' | 'medium' | 'high' | 'critical' | ''
+
+interface RiskFactor {
+  severity: Severity
+  title: string
+  detail: string
+  resource_address?: string
+}
+
+interface PlanSummary {
+  id: string
+  type: string
+  attributes: {
+    kind: 'plan_summary' | 'failure_analysis'
+    status: 'pending' | 'ready' | 'skipped' | 'errored'
+    description: string
+    'risk-level': Severity
+    'risk-factors': RiskFactor[]
+    model: string
+    'input-tokens': number
+    'output-tokens': number
+    'error-message': string
+    'created-at': string
+    'updated-at': string
+  }
+}
+
+interface Props {
+  /** Bare run UUID, no `run-` prefix. */
+  runId: string
+  /** Bump to force refetch (typically from SSE plan_summary_ready). */
+  refreshKey?: number
+}
+
+const RISK_STYLES: Record<Severity, { pill: string; icon: typeof AlertTriangle }> = {
+  '': { pill: 'bg-slate-700 text-slate-300', icon: Info },
+  low: { pill: 'bg-emerald-900/40 text-emerald-300 border border-emerald-800/50', icon: Info },
+  medium: { pill: 'bg-amber-900/40 text-amber-300 border border-amber-800/50', icon: AlertTriangle },
+  high: { pill: 'bg-orange-900/40 text-orange-300 border border-orange-800/50', icon: ShieldAlert },
+  critical: { pill: 'bg-red-900/40 text-red-300 border border-red-800/50', icon: ShieldX },
+}
+
+export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
+  const [summary, setSummary] = useState<PlanSummary | null>(null)
+  const [missing, setMissing] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [transportError, setTransportError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/api/v2/plans/plan-${runId}/summary`)
+      if (res.status === 404) {
+        setMissing(true)
+        setSummary(null)
+        return
+      }
+      if (!res.ok) {
+        setTransportError(`HTTP ${res.status}`)
+        return
+      }
+      const data = await res.json()
+      setSummary(data.data as PlanSummary)
+      setMissing(false)
+      setTransportError(null)
+    } catch (e) {
+      setTransportError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoading(false)
+    }
+  }, [runId])
+
+  useEffect(() => {
+    load()
+  }, [load, refreshKey])
+
+  // When the feature is globally disabled (no row will ever appear) we
+  // render nothing — operators on a non-AI deployment don't see this
+  // panel at all.
+  if (missing) return null
+  if (loading && !summary) return null
+  if (transportError) return null
+
+  const attrs = summary?.attributes
+  const kind = attrs?.kind ?? 'plan_summary'
+  const heading = kind === 'failure_analysis' ? 'Failure analysis' : 'Plan summary'
+
+  return (
+    <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-brand-400" aria-hidden="true" />
+          <h3 className="text-sm font-medium text-slate-300">{heading}</h3>
+          <span className="text-xs text-slate-500">AI generated</span>
+        </div>
+        {attrs && attrs.status === 'ready' && attrs['risk-level'] && (
+          <RiskPill level={attrs['risk-level']} />
+        )}
+      </div>
+
+      {attrs?.status === 'pending' && (
+        <div className="flex items-center gap-3 text-sm text-slate-400">
+          <LoadingSpinner />
+          <span>
+            {kind === 'failure_analysis' ? 'Analysing failure…' : 'Summarising plan…'}
+          </span>
+        </div>
+      )}
+
+      {attrs?.status === 'skipped' && (
+        <p className="text-sm text-slate-500 italic">
+          {attrs['error-message'] || 'Summary skipped for this run.'}
+        </p>
+      )}
+
+      {attrs?.status === 'errored' && (
+        <div className="text-sm text-red-300 bg-red-900/20 border border-red-800/50 rounded p-3">
+          <div className="font-medium mb-1">Summariser failed</div>
+          <div className="text-red-400/80 text-xs font-mono whitespace-pre-wrap break-all">
+            {attrs['error-message']}
+          </div>
+        </div>
+      )}
+
+      {attrs?.status === 'ready' && (
+        <>
+          <div className="prose prose-sm prose-invert max-w-none text-slate-200">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                // Tighten markdown defaults to match our dark surface
+                code: ({ children, ...props }) => (
+                  <code
+                    {...props}
+                    className="px-1 py-0.5 rounded bg-slate-900 text-brand-300 font-mono text-xs"
+                  >
+                    {children}
+                  </code>
+                ),
+                a: ({ children, ...props }) => (
+                  <a {...props} className="text-brand-400 hover:text-brand-300 underline">
+                    {children}
+                  </a>
+                ),
+                ul: ({ children, ...props }) => (
+                  <ul {...props} className="list-disc list-inside space-y-1 my-2 text-slate-200">
+                    {children}
+                  </ul>
+                ),
+                ol: ({ children, ...props }) => (
+                  <ol {...props} className="list-decimal list-inside space-y-1 my-2 text-slate-200">
+                    {children}
+                  </ol>
+                ),
+                p: ({ children, ...props }) => (
+                  <p {...props} className="my-2 leading-relaxed">
+                    {children}
+                  </p>
+                ),
+              }}
+            >
+              {attrs.description}
+            </ReactMarkdown>
+          </div>
+
+          {attrs['risk-factors'].length > 0 && (
+            <div className="mt-5 pt-4 border-t border-slate-700/50">
+              <h4 className="text-xs font-medium text-slate-400 mb-3">
+                {kind === 'failure_analysis' ? 'Suggested fixes' : 'Risk factors'}
+              </h4>
+              <ul className="space-y-3">
+                {attrs['risk-factors'].map((rf, idx) => (
+                  <RiskFactorRow key={idx} factor={rf} />
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {attrs.model && (
+            <div className="mt-4 pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs text-slate-500">
+              <span className="font-mono">{attrs.model}</span>
+              <span>
+                {attrs['input-tokens']} in / {attrs['output-tokens']} out tokens
+              </span>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function RiskPill({ level }: { level: Severity }) {
+  const style = RISK_STYLES[level] ?? RISK_STYLES['']
+  const Icon = style.icon
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium uppercase tracking-wide ${style.pill}`}
+    >
+      <Icon className="w-3 h-3" aria-hidden="true" />
+      {level || 'unknown'}
+    </span>
+  )
+}
+
+function RiskFactorRow({ factor }: { factor: RiskFactor }) {
+  const style = RISK_STYLES[factor.severity] ?? RISK_STYLES['']
+  const Icon = style.icon
+  return (
+    <li className="flex gap-3">
+      <Icon
+        className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
+          factor.severity === 'critical'
+            ? 'text-red-400'
+            : factor.severity === 'high'
+              ? 'text-orange-400'
+              : factor.severity === 'medium'
+                ? 'text-amber-400'
+                : 'text-emerald-400'
+        }`}
+        aria-hidden="true"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-sm text-slate-200 font-medium">{factor.title}</span>
+          {factor.resource_address && (
+            <span className="font-mono text-xs text-brand-300">{factor.resource_address}</span>
+          )}
+        </div>
+        <p className="text-xs text-slate-400 mt-1 leading-relaxed">{factor.detail}</p>
+      </div>
+    </li>
+  )
+}

@@ -344,6 +344,21 @@ class Workspace(Base):
     # State divergence — set when an apply Job succeeds but state upload fails
     state_diverged: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
+    # AI plan summary (#401). `ai_summary_mode` is a three-state opt-in:
+    # - "default": follow the global ai_summary.enabled toggle
+    # - "enabled": always summarise (no-op if global is disabled — the UI
+    #   does not offer this state when global is off)
+    # - "disabled": never summarise, even when global is enabled
+    # `ai_summary_context` is workspace-specific facts added as the last
+    # layer of context before the plan JSON; it is ADDITIVE to the global
+    # fleet_context rather than replacing it.
+    ai_summary_mode: Mapped[str] = mapped_column(
+        String(10), nullable=False, server_default="default", default="default"
+    )
+    ai_summary_context: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="", default=""
+    )
+
     # Autodiscovery lifecycle (#314). lifecycle_state: active (normal) |
     # pending_deletion (origin dir/PR gone — needs explicit operator
     # action; NEVER auto-destroyed) | archived (soft-deleted after a
@@ -1715,3 +1730,76 @@ class PolicyEvaluation(Base):
         Index("ix_policy_evaluations_run_id", "run_id"),
         Index("ix_policy_evaluations_policy_set_id", "policy_set_id"),
     )
+
+
+class PlanSummary(Base):
+    """LLM-generated summary attached to a plan (#401).
+
+    One-to-one with Run, keyed by (run_id). The summariser fires once
+    when the plan phase reaches a terminal state and stores the result
+    here, then emits a `plan_summary_ready` SSE event. Stored separately
+    from `runs` so the column footprint of a 50-million-row table
+    doesn't grow for a feature only some deployments enable, and so the
+    (potentially large) description text doesn't bloat cold reads.
+
+    `kind` distinguishes two skills the API runs:
+      - "plan_summary": successful plan → describe proposed changes
+        and rate risk. Input: PLAN_JSON + code.
+      - "failure_analysis": errored plan → explain why it failed and
+        suggest fixes. Input: plan log + code.
+
+    Field reuse across kinds:
+      - description: change summary OR failure explanation.
+      - risk_level: change-risk severity OR failure severity.
+      - risk_factors: discrete risks ({severity,title,detail,address})
+        OR suggested fixes (same shape — severity = "how critical to
+        apply this fix"). The UI renders them differently per kind.
+
+    Status values:
+      - "pending": handler started, no result yet (transient)
+      - "ready": model returned a parseable structured response
+      - "skipped": daily budget hit, or workspace mode == "disabled"
+      - "errored": model call failed (HTTP / parse / refusal)
+
+    The handler upserts on (run_id) so retries on the same run are
+    idempotent — a "ready" row is never overwritten by a later errored
+    attempt for the same plan.
+    """
+
+    __tablename__ = "plan_summaries"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    kind: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="plan_summary", default="plan_summary"
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+
+    # Model fields — populated when status == "ready"
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    risk_level: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=""
+    )  # "low", "medium", "high", "critical", "" for non-ready
+    risk_factors: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, nullable=False)
+
+    # Telemetry / debugging
+    model: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    __table_args__ = (sa.UniqueConstraint("run_id", name="uq_plan_summaries_run"),)

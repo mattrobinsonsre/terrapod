@@ -176,6 +176,22 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
+			"ai_summary_mode": schema.StringAttribute{
+				Description: "Per-workspace AI plan-summary opt-in (#401). One of \"default\" (follow the deployment's global `ai_summary.enabled` setting), \"enabled\" (always summarise this workspace's plans), or \"disabled\" (never summarise — overrides global). Defaults to \"default\".",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"ai_summary_context": schema.StringAttribute{
+				Description: "Workspace-specific facts appended to the AI summariser's prompt (#401). Additive to the deployment-wide fleet context. Use to flag blast-radius concerns or domain knowledge the model should weigh when describing changes for this workspace. Max 4000 characters.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"remote_state_consumers": schema.SetAttribute{
 				Description: "Workspace IDs authorized to read this workspace's state via `terraform_remote_state` (#344). Optional + Computed: leave null to opt out of managing the set here (server side is left intact — useful when consumers are managed via standalone `terrapod_remote_state_consumer` resources elsewhere). Set to `[]` to explicitly remove all consumers. **Do not mix this attribute with standalone `terrapod_remote_state_consumer` resources targeting the same producer** — the two will drift on every plan and fight each other. Mutations require admin/write on this (producer) workspace; a consumer team cannot self-grant.",
 				Optional:    true,
@@ -461,6 +477,12 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.DriftDetectionIntervalSeconds.ValueInt64()
 		req.DriftDetectionIntervalSeconds = &v
 	}
+	if !m.AISummaryMode.IsNull() && !m.AISummaryMode.IsUnknown() {
+		req.AISummaryMode = m.AISummaryMode.ValueString()
+	}
+	if !m.AISummaryContext.IsNull() && !m.AISummaryContext.IsUnknown() {
+		req.AISummaryContext = m.AISummaryContext.ValueString()
+	}
 	return req, diags
 }
 
@@ -542,6 +564,13 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.DriftDetectionIntervalSeconds.ValueInt64()
 		req.DriftDetectionIntervalSeconds = &v
 	}
+	if !m.AISummaryMode.IsNull() && !m.AISummaryMode.IsUnknown() {
+		req.AISummaryMode = m.AISummaryMode.ValueString()
+	}
+	if !m.AISummaryContext.IsNull() && !m.AISummaryContext.IsUnknown() {
+		v := m.AISummaryContext.ValueString()
+		req.AISummaryContext = &v
+	}
 	return req, diags
 }
 
@@ -612,6 +641,17 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	} else {
 		m.DriftLastCheckedAt = types.StringNull()
 	}
+
+	// AI plan summary (#401). The server always returns a concrete
+	// value for `ai-summary-mode` (defaulting to "default"); the
+	// context is the empty string for new workspaces. Pin both to
+	// concrete StringValues so Terraform doesn't see "unknown" drift.
+	if ws.AISummaryMode != "" {
+		m.AISummaryMode = types.StringValue(ws.AISummaryMode)
+	} else {
+		m.AISummaryMode = types.StringValue("default")
+	}
+	m.AISummaryContext = types.StringValue(ws.AISummaryContext)
 
 	// Var files
 	if len(ws.VarFiles) > 0 {

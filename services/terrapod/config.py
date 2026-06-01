@@ -624,6 +624,195 @@ class MetricsConfig(BaseModel):
     )
 
 
+# --- AI Plan Summary Configuration ---
+
+
+class AISummaryAuthConfig(BaseModel):
+    """Auth configuration for the AI summariser.
+
+    LiteLLM picks the right auth path per provider automatically: bearer
+    for OpenAI/Anthropic/Gemini/Azure/vLLM (read from the relevant env
+    var or this config), AWS credential chain for Bedrock (boto3 inherits
+    the pod's IRSA creds and optionally hops through sts:AssumeRole).
+    No mode switch — the model string's prefix (``bedrock/``,
+    ``openai/``, ``anthropic/``, ``gemini/``, etc.) is what selects the
+    underlying auth path.
+    """
+
+    api_key: str = Field(
+        default="",
+        description=(
+            "Bearer API key for non-AWS providers (OpenAI, Anthropic "
+            "direct, Gemini, Azure OpenAI, vLLM gateway, etc.). Inject "
+            "from a K8s Secret via env var (TERRAPOD_AI_SUMMARY__AUTH__API_KEY) "
+            "rather than committing to values.yaml. Ignored when the "
+            "model string targets a provider LiteLLM authenticates "
+            "another way (e.g. ``bedrock/...`` uses the AWS credential "
+            "chain instead)."
+        ),
+    )
+    aws_region: str = Field(
+        default="us-east-1",
+        description=(
+            "AWS region for Bedrock invocation. Used only when the "
+            "model string starts with ``bedrock/``. Passed through to "
+            "LiteLLM as ``aws_region_name``."
+        ),
+    )
+    aws_role_arn: str = Field(
+        default="",
+        description=(
+            "Cross-account IAM role to assume for Bedrock access. Empty "
+            "means use the pod's ambient credentials (IRSA / env-var / "
+            "shared credentials file) directly. When set, LiteLLM calls "
+            "sts:AssumeRole and caches the temporary credentials, "
+            "refreshing them before expiry. Passed to LiteLLM as "
+            "``aws_role_name``."
+        ),
+    )
+    aws_session_name: str = Field(
+        default="terrapod-ai-summary",
+        description=(
+            "STS AssumeRole session name (visible in CloudTrail). Only "
+            "used when ``aws_role_arn`` is set."
+        ),
+    )
+    aws_external_id: str = Field(
+        default="",
+        description=(
+            "Optional ExternalId for the AssumeRole call. Set when the "
+            "destination role's trust policy requires it."
+        ),
+    )
+
+
+class AISummaryContextConfig(BaseModel):
+    """Layered context injected into the model prompt.
+
+    Layers (rendered top-to-bottom in the request):
+      1. In-code skill prompt — owns the JSON output contract, NOT
+         operator-overridable. Lives in `summariser_prompt.py`.
+      2. `prompt_prefix` (this block) — free-text prepended.
+      3. `fleet_context` — facts about this Terrapod deployment.
+      4. `prompt_suffix` — free-text appended.
+      5. Per-workspace `ai_summary_context` column — workspace-specific.
+
+    Layers 2 and 4 are escape hatches for tone/emphasis tweaks; do not
+    use them to change the output schema (it is wired to the DB schema
+    and the SSE/UI contract).
+    """
+
+    prompt_prefix: str = Field(
+        default="",
+        description=(
+            "Free-text prepended before the skill prompt. Use for tone "
+            "or emphasis tweaks ('be terse'). Do not change the output "
+            "schema instructions here — that breaks the UI contract."
+        ),
+    )
+    fleet_context: str = Field(
+        default="",
+        description=(
+            "Static deployment-wide facts about the infrastructure this "
+            "Terrapod instance manages (what runs here, naming "
+            "conventions, provider/action pairs to flag, etc.). Rendered "
+            "below the skill prompt and above the per-workspace context."
+        ),
+    )
+    prompt_suffix: str = Field(
+        default="",
+        description=(
+            "Free-text appended after fleet_context and before the "
+            "per-workspace context. Same caveats as prompt_prefix."
+        ),
+    )
+
+
+class AISummaryConfig(BaseModel):
+    """AI plan-summary configuration (#401).
+
+    When enabled, every successful plan triggers an asynchronous call to
+    an OpenAI-compatible Chat Completions endpoint. The model is given
+    the structured plan JSON plus optional code context and returns a
+    structured summary (human description + risk assessment). The
+    summary is stored in the plan_summaries table, surfaced in the run
+    UI, and (for VCS-driven runs) edited into the PR/MR comment in place.
+
+    All deployments default to disabled — enabling requires both an
+    auth secret AND explicit endpoint + model config.
+    """
+
+    enabled: bool = Field(
+        default=False,
+        description="Master switch. Off by default — no calls made.",
+    )
+    model: str = Field(
+        default="",
+        description=(
+            "LiteLLM model string. The prefix selects the provider and "
+            "auth path; the suffix names the model. Examples: "
+            "``bedrock/anthropic.claude-opus-4-8`` (AWS Bedrock + IAM), "
+            "``openai/gpt-5`` (OpenAI direct + api_key), "
+            "``anthropic/claude-opus-4-8`` (Anthropic direct + api_key), "
+            "``gemini/gemini-2.5-pro`` (Google AI Studio + api_key), "
+            "``azure/<deployment-name>`` (Azure OpenAI). For self-hosted "
+            "OpenAI-compat endpoints (vLLM, LiteLLM proxy), use "
+            "``openai/<model>`` with ``api_base`` set below."
+        ),
+    )
+    api_base: str = Field(
+        default="",
+        description=(
+            "Override the upstream base URL. Only needed for "
+            "self-hosted OpenAI-compat endpoints (vLLM, a deployed "
+            "LiteLLM proxy, etc.) or to pin a specific Azure OpenAI "
+            "instance. Leave empty for vendor providers — LiteLLM "
+            "knows the default URLs."
+        ),
+    )
+    max_output_tokens: int = Field(
+        default=1024,
+        description=(
+            "Max tokens for the model response. Sized for ~600 words "
+            "of human description plus a short structured risk block."
+        ),
+    )
+    request_timeout_seconds: int = Field(
+        default=60,
+        description="HTTP timeout for a single summariser call.",
+    )
+    daily_token_budget: int = Field(
+        default=0,
+        description=(
+            "Cap on output tokens spent per UTC day across all summaries. "
+            "0 = unlimited. Counter is maintained in Redis; calls past "
+            "the cap are skipped (with a log entry, no run failure)."
+        ),
+    )
+    code_context_max_bytes: int = Field(
+        default=200_000,
+        description=(
+            "Max bytes of .tf source attached as context alongside the "
+            "plan JSON. The runner already uploads the config tarball; "
+            "summariser reads it from object storage and concatenates "
+            "the .tf files (truncated to this cap). 0 disables code "
+            "context entirely (plan JSON only — terser, cheaper, less "
+            "accurate)."
+        ),
+    )
+    plan_json_max_bytes: int = Field(
+        default=500_000,
+        description=(
+            "Max bytes of plan JSON attached. The runner-uploaded "
+            "plan JSON is truncated to this cap (keeping resource_changes "
+            "intact via best-effort structural truncation). Defends "
+            "against pathological monorepos producing 50MB plan files."
+        ),
+    )
+    auth: AISummaryAuthConfig = Field(default_factory=AISummaryAuthConfig)
+    context: AISummaryContextConfig = Field(default_factory=AISummaryContextConfig)
+
+
 class DatabaseConfig(BaseModel):
     """SQLAlchemy connection pool settings.
 
@@ -747,6 +936,9 @@ class Settings(BaseSettings):
 
     # Artifact Retention
     artifact_retention: ArtifactRetentionConfig = Field(default_factory=ArtifactRetentionConfig)
+
+    # AI Plan Summary (#401)
+    ai_summary: AISummaryConfig = Field(default_factory=AISummaryConfig)
 
     # Workspace defaults
     default_execution_backend: str = Field(

@@ -73,6 +73,8 @@ def _mock_workspace(
     ws.lifecycle_state = "active"
     ws.lifecycle_reason = ""
     ws.autodiscovery_pr_number = None
+    ws.ai_summary_mode = "default"
+    ws.ai_summary_context = ""
     ws.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     ws.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
     return ws

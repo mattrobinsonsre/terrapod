@@ -7,6 +7,15 @@ api:
   # Hot reload for local dev
   command: ["uvicorn", "terrapod.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--timeout-graceful-shutdown", "5"]
 
+  # Local-only: inject AWS creds for the in-development AI plan-summary
+  # feature (#401). The k8s Secret is created out-of-band via kubectl;
+  # both the user and the inline policy auto-expire on 2026-06-08T23:59:59Z
+  # so this is safe to leave wired even if the Secret is forgotten.
+  extraEnvFrom:
+    - secretRef:
+        name: terrapod-ai-summary-aws-creds
+        optional: true
+
   autoscaling:
     enabled: false
 
@@ -66,6 +75,36 @@ api:
       local_enabled: true
       callback_base_url: "https://terrapod.local"
       session_ttl_hours: 12
+
+    # AI plan-summary (#401) — Bedrock Converse via LiteLLM. The
+    # terrapod-testing IAM user's static keys (delivered via the
+    # terrapod-ai-summary-aws-creds K8s Secret + extraEnvFrom above)
+    # are picked up by boto3's default credential chain. No AssumeRole
+    # hop in local dev — the user's inline policy grants Bedrock
+    # actions directly and auto-expires on 2026-06-08. Production
+    # deployments set aws_role_arn to chain into the central role.
+    ai_summary:
+      enabled: true
+      # Bedrock requires the inference-profile ID for on-demand
+      # invocation of newer Anthropic models, not the bare
+      # foundation-model ID. `us.` = US cross-region profile.
+      model: "bedrock/us.anthropic.claude-opus-4-8"
+      max_output_tokens: 1024
+      request_timeout_seconds: 90
+      daily_token_budget: 0  # no cap in local dev
+      plan_json_max_bytes: 500000
+      code_context_max_bytes: 200000
+      auth:
+        aws_region: us-east-1
+        # aws_role_arn intentionally unset — use the pod's env-var
+        # creds (terrapod-testing user) directly. Set to
+        # "arn:aws:iam::703581221739:role/terrapod" in production.
+      context:
+        fleet_context: |
+          This is a local Tilt development stack for Terrapod itself.
+          Workspaces here are throw-away test fixtures, not real
+          infrastructure. Bias toward low/medium risk ratings unless
+          the plan actually destroys data stores or IAM trust roots.
 
   serviceAccount:
     create: true

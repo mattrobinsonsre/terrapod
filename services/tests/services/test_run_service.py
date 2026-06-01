@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.services.run_service import (
     TERMINAL_STATES,
     VALID_TRANSITIONS,
+    _enqueue_ai_plan_summary,
     _publish_run_available,
     _publish_run_event,
     can_transition,
@@ -637,3 +638,52 @@ class TestCompleteApply:
         run = _mock_run(status="applying", apply_started_at=datetime.now(UTC))
         result = await complete_apply(_mock_db, run)
         assert result.status == "applied"
+
+
+# ── AI plan-summary trigger (#401) ─────────────────────────────────────
+
+
+class TestEnqueueAIPlanSummary:
+    async def test_no_op_when_globally_disabled(self):
+        run = _mock_run()
+        with (
+            patch("terrapod.config.settings") as mock_settings,
+            patch(
+                "terrapod.services.scheduler.enqueue_trigger",
+                new_callable=AsyncMock,
+            ) as mock_enq,
+        ):
+            mock_settings.ai_summary.enabled = False
+            await _enqueue_ai_plan_summary(run, "plan_summary")
+            mock_enq.assert_not_called()
+
+    async def test_enqueues_trigger_when_enabled(self):
+        run = _mock_run()
+        with (
+            patch("terrapod.config.settings") as mock_settings,
+            patch(
+                "terrapod.services.scheduler.enqueue_trigger",
+                new_callable=AsyncMock,
+            ) as mock_enq,
+        ):
+            mock_settings.ai_summary.enabled = True
+            await _enqueue_ai_plan_summary(run, "plan_summary")
+            mock_enq.assert_awaited_once()
+            args, kwargs = mock_enq.call_args
+            assert args[0] == "ai_plan_summary"
+            assert args[1] == {"run_id": str(run.id), "kind": "plan_summary"}
+            assert kwargs.get("dedup_key") == f"aisum:{run.id}:plan_summary"
+
+    async def test_handles_enqueue_failure_silently(self):
+        run = _mock_run()
+        with (
+            patch("terrapod.config.settings") as mock_settings,
+            patch(
+                "terrapod.services.scheduler.enqueue_trigger",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("redis down"),
+            ),
+        ):
+            mock_settings.ai_summary.enabled = True
+            # Must not raise — feature is best-effort, never breaks runs
+            await _enqueue_ai_plan_summary(run, "plan_summary")

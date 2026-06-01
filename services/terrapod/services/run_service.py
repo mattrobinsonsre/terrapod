@@ -140,6 +140,29 @@ async def _enqueue_module_test_status(run: Run, target_status: str) -> None:
         logger.warning("Failed to enqueue module test status", error=str(e))
 
 
+async def _enqueue_ai_plan_summary(run: Run, kind: str) -> None:
+    """Enqueue an ai_plan_summary trigger for the summariser handler.
+
+    Fast-path no-op when the feature is globally disabled so we don't
+    charge Redis traffic for runs that will never be summarised.
+    """
+    from terrapod.config import settings
+
+    if not settings.ai_summary.enabled:
+        return
+    from terrapod.services.scheduler import enqueue_trigger
+
+    try:
+        await enqueue_trigger(
+            "ai_plan_summary",
+            {"run_id": str(run.id), "kind": kind},
+            dedup_key=f"aisum:{run.id}:{kind}",
+            dedup_ttl=300,
+        )
+    except Exception as e:
+        logger.debug("Failed to enqueue ai_plan_summary", error=str(e))
+
+
 async def _enqueue_drift_completed(run: Run) -> None:
     """Enqueue a drift_run_completed trigger when a drift run finishes."""
     from terrapod.services.scheduler import enqueue_trigger
@@ -416,6 +439,16 @@ async def transition_run(
     drift_terminal = TERMINAL_STATES | {"planned"}
     if run.is_drift_detection and target_status in drift_terminal:
         await _enqueue_drift_completed(run)
+
+    # AI plan summariser (#401) — fires on plan-phase terminal transitions.
+    # `planned` → summarise the changes. `errored` *during the plan phase*
+    # (apply hasn't started) → analyse the failure cause. Apply-phase
+    # errored runs are skipped — the failure surface is different and
+    # belongs to a future feature.
+    if target_status == "planned":
+        await _enqueue_ai_plan_summary(run, "plan_summary")
+    elif target_status == "errored" and run.apply_started_at is None:
+        await _enqueue_ai_plan_summary(run, "failure_analysis")
 
     return run
 

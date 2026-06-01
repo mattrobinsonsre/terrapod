@@ -73,6 +73,8 @@ type workspaceModel struct {
 	VarFiles                      types.List   `tfsdk:"var_files"`
 	DriftDetectionEnabled         types.Bool   `tfsdk:"drift_detection_enabled"`
 	DriftDetectionIntervalSeconds types.Int64  `tfsdk:"drift_detection_interval_seconds"`
+	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
+	AISummaryContext              types.String `tfsdk:"ai_summary_context"`
 
 	// Set of workspace IDs authorized to read this workspace's state
 	// via `terraform_remote_state` (#344). Producer-controlled

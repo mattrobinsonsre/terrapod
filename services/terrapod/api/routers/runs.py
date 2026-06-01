@@ -43,7 +43,7 @@ from terrapod.api.dependencies import (
     get_current_user,
     get_listener_identity,
 )
-from terrapod.db.models import Run, StateVersion, VCSConnection, Workspace
+from terrapod.db.models import PlanSummary, Run, StateVersion, VCSConnection, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service, run_service
@@ -790,6 +790,10 @@ def _plan_json(run: Run) -> dict:
         attrs["resource-changes"] = run.resource_changes
         attrs["resource-destructions"] = run.resource_destructions
         attrs["resource-imports"] = run.resource_imports
+    # AI plan summary URL — surfaced as a Terrapod-native link on every
+    # plan response so the UI knows where to fetch the structured
+    # summary. 404s gracefully when no summary exists yet.
+    attrs["ai-summary-url"] = f"{base}/api/v2/plans/{run.id}/summary"
     return {
         "data": {
             "id": f"plan-{run.id}",
@@ -816,6 +820,55 @@ async def show_plan_by_id(
     run = await _get_run(plan_id.replace("plan-", "run-"), db)
     await _require_run_ws_permission(run, "read", user, db)
     return JSONResponse(content=_plan_json(run))
+
+
+@router.get("/plans/{plan_id}/summary")
+async def show_plan_summary(
+    plan_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """AI-generated plan summary or failure analysis (#401).
+
+    Returns 404 when no summary exists yet — the UI uses this as the
+    "not summarised" signal (vs a `pending` row which means "in flight").
+    The response shape is the same for both ``kind`` values; the UI
+    branches on the ``kind`` attribute.
+    """
+    run = await _get_run(plan_id.replace("plan-", "run-"), db)
+    await _require_run_ws_permission(run, "read", user, db)
+
+    summary = (
+        await db.execute(select(PlanSummary).where(PlanSummary.run_id == run.id))
+    ).scalar_one_or_none()
+    if summary is None:
+        raise HTTPException(status_code=404, detail="no summary for this plan")
+
+    return JSONResponse(
+        content={
+            "data": {
+                "id": f"plan-summary-{summary.id}",
+                "type": "plan-summaries",
+                "attributes": {
+                    "kind": summary.kind,
+                    "status": summary.status,
+                    "description": summary.description,
+                    "risk-level": summary.risk_level,
+                    "risk-factors": summary.risk_factors,
+                    "model": summary.model,
+                    "input-tokens": summary.input_tokens,
+                    "output-tokens": summary.output_tokens,
+                    "error-message": summary.error_message,
+                    "created-at": _rfc3339(summary.created_at),
+                    "updated-at": _rfc3339(summary.updated_at),
+                },
+                "relationships": {
+                    "plan": {"data": {"id": f"plan-{run.id}", "type": "plans"}},
+                    "run": {"data": {"id": f"run-{run.id}", "type": "runs"}},
+                },
+            }
+        }
+    )
 
 
 @extensions_router.get("/runs/{run_id}/plan")

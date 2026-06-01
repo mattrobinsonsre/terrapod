@@ -45,8 +45,16 @@ type Workspace struct {
 	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
 	DriftStatus                   string            `json:"drift-status,omitempty"`
 	DriftLastCheckedAt            string            `json:"drift-last-checked-at,omitempty"`
-	CreatedAt                     string            `json:"created-at,omitempty"`
-	UpdatedAt                     string            `json:"updated-at,omitempty"`
+	// AISummaryMode is the three-state per-workspace override (#401):
+	//   "default"  → follow the deployment-wide ai_summary.enabled flag
+	//   "enabled"  → always summarise (no-op when global is off)
+	//   "disabled" → never summarise this workspace's plans
+	AISummaryMode string `json:"ai-summary-mode,omitempty"`
+	// AISummaryContext is workspace-specific facts added on top of the
+	// deployment-wide fleet_context when the summariser builds its prompt.
+	AISummaryContext string `json:"ai-summary-context,omitempty"`
+	CreatedAt        string `json:"created-at,omitempty"`
+	UpdatedAt        string `json:"updated-at,omitempty"`
 }
 
 // CreateWorkspaceRequest is the input shape for Client.CreateWorkspace.
@@ -77,6 +85,13 @@ type CreateWorkspaceRequest struct {
 	VarFiles                      []string           `json:"var-files,omitempty"`
 	DriftDetectionEnabled         *bool              `json:"drift-detection-enabled,omitempty"`
 	DriftDetectionIntervalSeconds *int64             `json:"drift-detection-interval-seconds,omitempty"`
+	// AISummaryMode is the three-state per-workspace override (#401):
+	// "default" | "enabled" | "disabled". Empty string omits the field
+	// (server-side default applies — "default").
+	AISummaryMode string `json:"ai-summary-mode,omitempty"`
+	// AISummaryContext is workspace-specific context added to the model
+	// prompt. Capped at 4000 chars server-side.
+	AISummaryContext string `json:"ai-summary-context,omitempty"`
 }
 
 // UpdateWorkspaceRequest is the input shape for Client.UpdateWorkspace.
@@ -108,6 +123,14 @@ type UpdateWorkspaceRequest struct {
 	VarFiles                      []string          `json:"var-files,omitempty"`
 	DriftDetectionEnabled         *bool             `json:"drift-detection-enabled,omitempty"`
 	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
+	// AISummaryMode see CreateWorkspaceRequest. On UPDATE, empty string
+	// leaves the existing value untouched — to explicitly set "follow
+	// deployment default", pass "default".
+	AISummaryMode string `json:"ai-summary-mode,omitempty"`
+	// AISummaryContext see CreateWorkspaceRequest. To clear an existing
+	// context, set this to "" — but note empty string also means
+	// "leave alone" (a Terrapod-side limitation; clear via the UI).
+	AISummaryContext *string `json:"ai-summary-context,omitempty"`
 }
 
 // WorkspaceListOptions filters and paginates ListWorkspaces. Zero
@@ -309,6 +332,12 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.DriftDetectionIntervalSeconds != nil {
 		attrs["drift-detection-interval-seconds"] = *req.DriftDetectionIntervalSeconds
 	}
+	if req.AISummaryMode != "" {
+		attrs["ai-summary-mode"] = req.AISummaryMode
+	}
+	if req.AISummaryContext != "" {
+		attrs["ai-summary-context"] = req.AISummaryContext
+	}
 	return attrs
 }
 
@@ -373,6 +402,13 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.DriftDetectionIntervalSeconds != nil {
 		attrs["drift-detection-interval-seconds"] = *req.DriftDetectionIntervalSeconds
 	}
+	if req.AISummaryMode != "" {
+		attrs["ai-summary-mode"] = req.AISummaryMode
+	}
+	if req.AISummaryContext != nil {
+		// *string so callers can explicitly clear the context with &"".
+		attrs["ai-summary-context"] = *req.AISummaryContext
+	}
 	return attrs
 }
 
@@ -430,6 +466,8 @@ func workspaceFromResource(res *Resource) *Workspace {
 		DriftDetectionEnabled: GetBoolAttr(res, "drift-detection-enabled"),
 		DriftStatus:           GetStringAttr(res, "drift-status"),
 		DriftLastCheckedAt:    GetStringAttr(res, "drift-last-checked-at"),
+		AISummaryMode:         GetStringAttr(res, "ai-summary-mode"),
+		AISummaryContext:      GetStringAttr(res, "ai-summary-context"),
 		CreatedAt:             GetStringAttr(res, "created-at"),
 		UpdatedAt:             GetStringAttr(res, "updated-at"),
 	}

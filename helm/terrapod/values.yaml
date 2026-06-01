@@ -269,6 +269,72 @@ api:
       default_join_token_max_uses: 2
       default_join_token_ttl_seconds: 3600
 
+    # AI plan-summary (#401). Off by default. When enabled, every
+    # plan-phase terminal transition triggers an asynchronous LLM call
+    # via the LiteLLM library — successful plans get a change-summary +
+    # risk assessment; plan-phase failures get a failure analysis +
+    # suggested fixes. Results are stored in the plan_summaries table,
+    # surfaced in the run UI, and (for VCS-driven runs) edited into the
+    # PR/MR comment.
+    #
+    # The `model` string's prefix selects the provider AND its auth path:
+    #   bedrock/<id>     — AWS Bedrock via boto3 + IAM (IRSA / optional
+    #                      sts:AssumeRole via aws_role_arn below)
+    #   openai/<id>      — OpenAI direct, with auth.api_key
+    #   anthropic/<id>   — Anthropic direct, with auth.api_key
+    #   gemini/<id>      — Google AI Studio, with auth.api_key
+    #   azure/<deployment> — Azure OpenAI, with auth.api_key + api_base
+    #
+    # For self-hosted OpenAI-compat endpoints (vLLM, a deployed
+    # LiteLLM proxy, etc.), use `openai/<model>` with `api_base` set.
+    #
+    # Context layering (top → bottom of model prompt):
+    #   1. In-code skill prompt (owns the JSON output contract)
+    #   2. context.prompt_prefix (operator tone tweak)
+    #   3. context.fleet_context (deployment-wide facts)
+    #   4. context.prompt_suffix (operator tone tweak)
+    #   5. Per-workspace ai_summary_context (additive workspace facts)
+    ai_summary:
+      enabled: false
+      # LiteLLM model string. Examples:
+      #   bedrock/anthropic.claude-opus-4-8
+      #   openai/gpt-5
+      #   anthropic/claude-opus-4-8
+      #   gemini/gemini-2.5-pro
+      model: ""
+      # Optional base URL override (vLLM, LiteLLM proxy, custom Azure).
+      # Leave empty for vendor providers — LiteLLM knows the defaults.
+      api_base: ""
+      max_output_tokens: 1024
+      request_timeout_seconds: 60
+      # Output-token cap per UTC day across all summaries. 0 = unlimited.
+      daily_token_budget: 0
+      # Size caps on the inputs attached to the model request.
+      plan_json_max_bytes: 500000
+      code_context_max_bytes: 200000
+      auth:
+        # Bearer key for non-AWS providers (OpenAI, Anthropic, Gemini,
+        # Azure, vLLM). Inject via TERRAPOD_AI_SUMMARY__AUTH__API_KEY
+        # from a K8s Secret. Ignored when model="bedrock/..." (AWS
+        # credential chain takes over).
+        # api_key: ""
+        # AWS / Bedrock fields. Only used when model="bedrock/...".
+        # aws_role_arn empty → use pod's ambient IAM creds directly
+        # (IRSA via the service account annotation). Set to chain
+        # into a cross-account role via sts:AssumeRole.
+        aws_region: us-east-1
+        aws_role_arn: ""
+        aws_session_name: terrapod-ai-summary
+        aws_external_id: ""
+      context:
+        # Tone/emphasis tweaks around the in-code skill prompt. Do NOT
+        # use these to change the output schema — that breaks the UI.
+        prompt_prefix: ""
+        prompt_suffix: ""
+        # Deployment-wide facts about your infrastructure. Plain text
+        # or markdown. Multiline strings are supported via `|`.
+        fleet_context: ""
+
     # Drift Detection — scheduled plan-only runs to detect infrastructure drift
     drift_detection:
       enabled: true

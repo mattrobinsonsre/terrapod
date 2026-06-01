@@ -605,6 +605,8 @@ def _workspace_json(
                 else None,
                 "var-files": ws.var_files or [],
                 "trigger-prefixes": ws.trigger_prefixes or [],
+                "ai-summary-mode": ws.ai_summary_mode,
+                "ai-summary-context": ws.ai_summary_context,
                 "drift-detection-enabled": ws.drift_detection_enabled,
                 "drift-detection-interval-seconds": ws.drift_detection_interval_seconds,
                 "drift-last-checked-at": _rfc3339(ws.drift_last_checked_at),
@@ -1377,6 +1379,33 @@ async def update_workspace(
         ws.drift_detection_interval_seconds = _clamp_drift_interval(
             attrs["drift-detection-interval-seconds"]
         )
+
+    # AI plan summary opt-in (#401). The mode is a three-state enum
+    # constrained by a DB CHECK; reject other values up-front rather than
+    # surfacing a less-helpful 500 from the integrity error.
+    if "ai-summary-mode" in attrs:
+        mode = attrs["ai-summary-mode"]
+        if mode not in ("default", "enabled", "disabled"):
+            raise HTTPException(
+                status_code=422,
+                detail="ai-summary-mode must be 'default', 'enabled', or 'disabled'",
+            )
+        ws.ai_summary_mode = mode
+    if "ai-summary-context" in attrs:
+        ctx = attrs["ai-summary-context"]
+        if ctx is None:
+            ctx = ""
+        if not isinstance(ctx, str):
+            raise HTTPException(status_code=422, detail="ai-summary-context must be a string")
+        # Cap at a reasonable size — workspace context is a hint, not a
+        # repo. Anything bigger lives in fleet_context or a doc the user
+        # can paste into their prompt_suffix.
+        if len(ctx) > 4000:
+            raise HTTPException(
+                status_code=422,
+                detail="ai-summary-context max length is 4000 characters",
+            )
+        ws.ai_summary_context = ctx
 
     # VCS connection relationship
     relationships = body.get("data", {}).get("relationships", {})

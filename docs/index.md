@@ -90,6 +90,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Drift Detection](drift-detection.md) | Scheduled plan-only runs to detect infrastructure drift |
 | [Run Triggers](run-triggers.md) | Cross-workspace dependency chains |
 | [Remote State](remote-state.md) | Cross-workspace `terraform_remote_state` composition with producer-controlled allowlist |
+| [AI Plan Summary](ai-plan-summary.md) | LLM-generated change summary + risk assessment on every plan; failure analysis on errored plans. Bedrock, OpenAI, Anthropic, Gemini, vLLM — any provider via LiteLLM |
 | [Notifications](notifications.md) | Webhook, Slack, and email alerts on run events |
 | [Run Tasks](run-tasks.md) | Pre/post-plan webhook hooks for external validation |
 | [Policy-as-Code](policies.md) | OPA/Rego policy sets, advisory/mandatory enforcement, label scoping |
