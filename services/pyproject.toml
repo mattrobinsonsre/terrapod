@@ -57,6 +57,14 @@ standard-imghdr = "^3.13"
 # OpenAI, Anthropic direct, Gemini, Azure OpenAI, vLLM, etc. Terrapod
 # speaks OpenAI Chat Completions request shape to LiteLLM; LiteLLM
 # handles per-provider request translation and auth in-process.
+#
+# Upper bound <2.0 is the standard major-version cap. We can't bump
+# the lower bound to clear CVE-2026-40217 (litellm proxy sandbox
+# escape, patched in 1.83.11+) because the patched releases pin
+# Python <3.14 and our API image runs on 3.14. The CVE is in proxy
+# mode only — we use the library directly via acompletion(), never
+# start the proxy server — so it's not exploitable here. Ignored in
+# CI via --ignore-vuln (see .github/workflows/ci.yml).
 litellm = ">=1.78,<2.0"
 
 [tool.poetry.group.dev.dependencies]
