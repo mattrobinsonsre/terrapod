@@ -66,7 +66,6 @@ export default function VariableSetsPage() {
   usePollingInterval(!loading, 60_000, loadVarsets)
 
   async function loadVarsets() {
-    setLoading(true)
     try {
       const res = await apiFetch('/api/v2/organizations/default/varsets')
       if (!res.ok) throw new Error('Failed to load variable sets')

@@ -76,7 +76,6 @@ export default function TokensPage() {
   }, [userId, showAll])
 
   async function loadTokens() {
-    setLoading(true)
     try {
       const url = showAll
         ? '/api/terrapod/v1/admin/authentication-tokens'

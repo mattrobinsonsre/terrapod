@@ -148,7 +148,6 @@ export default function AgentPoolDetailPage() {
   }, [activeTab, pool])
 
   async function loadTokens() {
-    setTokensLoading(true)
     try {
       const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}/tokens`)
       if (!res.ok) throw new Error('Failed to load tokens')
@@ -162,7 +161,6 @@ export default function AgentPoolDetailPage() {
   }
 
   const loadListeners = useCallback(async () => {
-    setListenersLoading(true)
     try {
       const res = await apiFetch(`/api/terrapod/v1/agent-pools/${poolId}/listeners`)
       if (!res.ok) throw new Error('Failed to load listeners')

@@ -103,7 +103,6 @@ export default function VCSConnectionsPage() {
   usePollingInterval(!loading, 60_000, loadConnections)
 
   async function loadConnections() {
-    setLoading(true)
     try {
       const res = await apiFetch('/api/terrapod/v1/vcs-connections')
       if (!res.ok) throw new Error('Failed to load VCS connections')

@@ -76,7 +76,6 @@ export default function AgentPoolsPage() {
   usePollingInterval(!loading, 30_000, loadPools)
 
   async function loadPools() {
-    setLoading(true)
     try {
       const res = await apiFetch('/api/terrapod/v1/agent-pools')
       if (!res.ok) throw new Error('Failed to load agent pools')

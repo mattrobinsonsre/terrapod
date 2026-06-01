@@ -84,7 +84,6 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
   const [npSaving, setNpSaving] = useState(false)
 
   const load = useCallback(async () => {
-    setLoading(true)
     try {
       const res = await apiFetch(`/api/terrapod/v1/policy-sets/${id}`)
       if (!res.ok) throw new Error('Failed to load policy set')

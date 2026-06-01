@@ -451,7 +451,6 @@ function WorkspaceDetailContent() {
   }, [router, loadWorkspace])
 
   const loadRuns = useCallback(async () => {
-    setRunsLoading(true)
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/runs`)
       if (!res.ok) throw new Error('Failed to load runs')
@@ -516,7 +515,6 @@ function WorkspaceDetailContent() {
   }, [activeTab, loadRuns, loadWorkspace]))
 
   async function loadVariables() {
-    setVarsLoading(true)
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/vars`)
       if (!res.ok) throw new Error('Failed to load variables')
@@ -530,7 +528,6 @@ function WorkspaceDetailContent() {
   }
 
   async function loadStateVersions() {
-    setStateLoading(true)
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/state-versions`)
       if (!res.ok) throw new Error('Failed to load state versions')

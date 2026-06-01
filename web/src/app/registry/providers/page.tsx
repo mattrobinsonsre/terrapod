@@ -40,7 +40,6 @@ export default function ProvidersPage() {
   usePollingInterval(!loading, 60_000, loadProviders)
 
   async function loadProviders() {
-    setLoading(true)
     try {
       const res = await apiFetch('/api/terrapod/v1/registry-providers')
       if (!res.ok) throw new Error('Failed to load providers')

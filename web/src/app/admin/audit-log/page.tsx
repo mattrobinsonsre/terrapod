@@ -87,7 +87,6 @@ export default function AuditLogPage() {
   usePollingInterval(!loading, 30_000, loadEntries)
 
   async function loadEntries() {
-    setLoading(true)
     setError('')
     try {
       const params = new URLSearchParams()

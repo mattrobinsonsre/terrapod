@@ -121,7 +121,6 @@ export default function RolesPage() {
   }, [activeTab])
 
   async function loadRoles() {
-    setRolesLoading(true)
     try {
       const res = await apiFetch('/api/terrapod/v1/roles')
       if (!res.ok) throw new Error('Failed to load roles')

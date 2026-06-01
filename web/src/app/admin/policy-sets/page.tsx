@@ -66,7 +66,6 @@ export default function PolicySetsPage() {
   usePollingInterval(!loading, 60_000, loadSets)
 
   async function loadSets() {
-    setLoading(true)
     try {
       const res = await apiFetch('/api/terrapod/v1/policy-sets')
       if (!res.ok) throw new Error('Failed to load policy sets')

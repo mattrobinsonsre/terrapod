@@ -202,7 +202,6 @@ export default function ModuleDetailPage() {
   usePollingInterval(!loading, 60_000, loadModule)
 
   async function loadModule() {
-    setLoading(true)
     try {
       const res = await apiFetch(
         `/api/terrapod/v1/registry-modules/private/default/${name}/${provider}`

@@ -127,7 +127,6 @@ export default function VariableSetDetailPage() {
   }, [activeTab, varset])
 
   async function loadVariables() {
-    setVarsLoading(true)
     try {
       const res = await apiFetch(`/api/v2/varsets/${varsetId}/relationships/vars`)
       if (!res.ok) throw new Error('Failed to load variables')

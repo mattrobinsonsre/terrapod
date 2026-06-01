@@ -302,7 +302,6 @@ function WorkspacesPageInner() {
   }, [showCreate, newBackend, versionsBackend])
 
   async function loadWorkspaces() {
-    setLoading(true)
     try {
       const res = await apiFetch('/api/v2/organizations/default/workspaces')
       if (!res.ok) throw new Error('Failed to load workspaces')

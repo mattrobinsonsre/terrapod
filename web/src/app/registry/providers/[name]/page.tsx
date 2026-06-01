@@ -121,7 +121,6 @@ export default function ProviderDetailPage() {
   const basePath = `/api/terrapod/v1/registry-providers/private/default/${name}`
 
   async function loadVersions() {
-    setLoading(true)
     try {
       const res = await apiFetch(`${basePath}/versions`)
       if (!res.ok) throw new Error('Failed to load versions')

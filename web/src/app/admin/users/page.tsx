@@ -287,7 +287,6 @@ export default function UsersPage() {
   usePollingInterval(!loading, 60_000, loadUsers)
 
   async function loadUsers() {
-    setLoading(true)
     try {
       const res = await apiFetch('/api/terrapod/v1/users?page[size]=100')
       if (!res.ok) throw new Error('Failed to load users')

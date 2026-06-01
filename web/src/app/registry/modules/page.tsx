@@ -72,7 +72,6 @@ export default function ModulesPage() {
   }
 
   async function loadModules() {
-    setLoading(true)
     try {
       const res = await apiFetch('/api/terrapod/v1/registry-modules')
       if (!res.ok) throw new Error('Failed to load modules')

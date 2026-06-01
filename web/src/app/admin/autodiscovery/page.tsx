@@ -140,7 +140,6 @@ export default function AutodiscoveryPage() {
   }, [router])
 
   async function loadAll() {
-    setLoading(true)
     try {
       const [rulesRes, connsRes, poolsRes] = await Promise.all([
         apiFetch('/api/terrapod/v1/autodiscovery-rules'),

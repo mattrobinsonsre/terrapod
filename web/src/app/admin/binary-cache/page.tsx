@@ -91,7 +91,6 @@ export default function CachePage() {
   usePollingInterval(!loading, 60_000, loadAll)
 
   async function loadAll() {
-    setLoading(true)
     try {
       const [binaryRes, providerRes] = await Promise.all([
         apiFetch('/api/terrapod/v1/admin/binary-cache'),

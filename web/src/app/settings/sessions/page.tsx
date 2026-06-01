@@ -51,7 +51,6 @@ export default function SessionsPage() {
   }, [router])
 
   async function loadSessions(adminView: boolean) {
-    setLoading(true)
     try {
       const endpoint = adminView ? '/api/terrapod/v1/auth/sessions/all' : '/api/terrapod/v1/auth/sessions'
       const res = await apiFetch(endpoint)
