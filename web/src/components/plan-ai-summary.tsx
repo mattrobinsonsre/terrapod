@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Sparkles, AlertTriangle, Info, ShieldAlert, ShieldX } from 'lucide-react'
+import { Sparkles, AlertTriangle, Info, ShieldAlert, ShieldX, RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { LoadingSpinner } from '@/components/loading-spinner'
 
@@ -69,10 +69,12 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
   const [missing, setMissing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [transportError, setTransportError] = useState<string | null>(null)
+  const [regenerating, setRegenerating] = useState(false)
+  const [regenerateError, setRegenerateError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const res = await apiFetch(`/api/v2/plans/plan-${runId}/summary`)
+      const res = await apiFetch(`/api/terrapod/v1/runs/run-${runId}/plan-summary`)
       if (res.status === 404) {
         setMissing(true)
         setSummary(null)
@@ -97,6 +99,43 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
     load()
   }, [load, refreshKey])
 
+  const regenerate = useCallback(async () => {
+    // Skip confirmation modal: errored/skipped clicks are clearly an
+    // operator asking for a retry; ready→regen is also unambiguous —
+    // they're saying "this one wasn't good enough".
+    setRegenerating(true)
+    setRegenerateError(null)
+    try {
+      const res = await apiFetch(
+        `/api/terrapod/v1/runs/run-${runId}/plan-summary/regenerate`,
+        { method: 'POST' },
+      )
+      if (!res.ok) {
+        // Surface the API's structured detail when available.
+        let detail = `HTTP ${res.status}`
+        try {
+          const body = await res.json()
+          if (body?.detail) detail = body.detail
+        } catch {
+          /* fall through to status code */
+        }
+        setRegenerateError(detail)
+        return
+      }
+      // 202: server upserted a pending row + enqueued. Refetch
+      // immediately so the UI shows the pending state; the SSE
+      // `plan_summary_ready` event drives the next refresh when the
+      // handler finishes.
+      const data = await res.json()
+      setSummary(data.data as PlanSummary)
+      setMissing(false)
+    } catch (e) {
+      setRegenerateError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setRegenerating(false)
+    }
+  }, [runId])
+
   // When the feature is globally disabled (no row will ever appear) we
   // render nothing — operators on a non-AI deployment don't see this
   // panel at all.
@@ -116,10 +155,33 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
           <h3 className="text-sm font-medium text-slate-300">{heading}</h3>
           <span className="text-xs text-slate-500">AI generated</span>
         </div>
-        {attrs && attrs.status === 'ready' && attrs['risk-level'] && (
-          <RiskPill level={attrs['risk-level']} />
-        )}
+        <div className="flex items-center gap-3">
+          {attrs && attrs.status === 'ready' && attrs['risk-level'] && (
+            <RiskPill level={attrs['risk-level']} />
+          )}
+          {/* Regenerate is gated on the summary existing — once we know
+              the feature is enabled. While in `pending` we lock the
+              button so concurrent clicks can't double-enqueue. */}
+          {attrs && attrs.status !== 'pending' && (
+            <button
+              type="button"
+              onClick={regenerate}
+              disabled={regenerating}
+              className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed px-2 py-1 rounded border border-slate-700/50 hover:border-slate-600"
+              title="Re-run the AI summary against the same plan inputs"
+            >
+              <RefreshCw className={`w-3 h-3 ${regenerating ? 'animate-spin' : ''}`} />
+              {regenerating ? 'Queueing…' : 'Regenerate'}
+            </button>
+          )}
+        </div>
       </div>
+
+      {regenerateError && (
+        <div className="mb-3 text-xs text-red-300 bg-red-900/20 border border-red-800/50 rounded p-2">
+          Could not regenerate: <span className="font-mono">{regenerateError}</span>
+        </div>
+      )}
 
       {attrs?.status === 'pending' && (
         <div className="flex items-center gap-3 text-sm text-slate-400">

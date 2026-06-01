@@ -1,11 +1,12 @@
 """Tests for the AI plan summary API surface (#401).
 
 Covers:
-  - GET /api/v2/plans/{plan_id}/summary 404 / 200 / auth-required paths
+  - GET /api/terrapod/v1/runs/{run_id}/plan-summary 404 / 200 / auth-required paths
   - PATCH workspace ai-summary-mode validation
   - PATCH workspace ai-summary-context length cap
   - Workspace GET includes the new ai-summary-* attributes
   - /plans/{plan_id} response advertises the ai-summary-url link
+  - POST /api/terrapod/v1/runs/{run_id}/plan-summary/regenerate (v0.30.4)
 """
 
 import uuid
@@ -145,7 +146,7 @@ class TestGetPlanSummary:
         mock_db.get = AsyncMock(return_value=ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get(f"/api/v2/plans/plan-{run.id}/summary", headers=_AUTH)
+            resp = await c.get(f"/api/terrapod/v1/runs/run-{run.id}/plan-summary", headers=_AUTH)
 
         assert resp.status_code == 200
         attrs = resp.json()["data"]["attributes"]
@@ -173,7 +174,7 @@ class TestGetPlanSummary:
         mock_db.get = AsyncMock(return_value=ws)
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get(f"/api/v2/plans/plan-{run.id}/summary", headers=_AUTH)
+            resp = await c.get(f"/api/terrapod/v1/runs/run-{run.id}/plan-summary", headers=_AUTH)
 
         assert resp.status_code == 404
 
@@ -322,3 +323,188 @@ class TestWorkspaceAISummaryFields:
                 headers=_AUTH,
             )
         assert resp.status_code == 422
+
+
+# ── POST /runs/{id}/plan-summary/regenerate (v0.30.4) ───────────────────────
+
+
+class TestRegeneratePlanSummary:
+    """Manual regenerate endpoint. Anyone with workspace read can trigger,
+    cost is gated by ai_summary.daily_token_budget on the handler side,
+    dedup is bypassed so a click always goes through.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
+    async def test_regenerate_planned_run_returns_202_and_enqueues(
+        self, mock_enq, mock_resolve, *_mocks
+    ):
+        mock_resolve.return_value = "read"
+        run = _mock_run(status="planned")
+        run.plan_started_at = datetime(2026, 1, 1, tzinfo=UTC)
+        run.apply_started_at = None
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        summary = _mock_summary(run.id, status="pending")
+
+        app, mock_db = _make_app(_user())
+        # _get_run select → run; _require_run_ws_permission → ws (db.get);
+        # the upsert SQL execute returns nothing useful (None mock fine);
+        # the re-read select PlanSummary → pending summary.
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                MagicMock(scalar_one_or_none=MagicMock(return_value=run)),
+                MagicMock(),  # upsert
+                MagicMock(scalar_one_or_none=MagicMock(return_value=summary)),
+            ]
+        )
+        mock_db.get = AsyncMock(return_value=ws)
+        mock_db.commit = AsyncMock()
+
+        with patch("terrapod.config.settings") as mock_settings:
+            mock_settings.ai_summary.enabled = True
+            mock_settings.ai_summary.model = "bedrock/test"
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{run.id}/plan-summary/regenerate",
+                    headers=_AUTH,
+                )
+
+        assert resp.status_code == 202
+        body = resp.json()
+        assert body["data"]["attributes"]["status"] == "pending"
+
+        # Trigger enqueued with the right kind, and WITHOUT a dedup_key
+        # (manual clicks must bypass the 5-min auto-dedup).
+        mock_enq.assert_awaited_once()
+        args, kwargs = mock_enq.call_args
+        assert args[0] == "ai_plan_summary"
+        assert args[1] == {"run_id": str(run.id), "kind": "plan_summary"}
+        assert "dedup_key" not in kwargs
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
+    async def test_regenerate_plan_phase_errored_picks_failure_analysis(
+        self, mock_enq, mock_resolve, *_mocks
+    ):
+        mock_resolve.return_value = "read"
+        run = _mock_run(status="errored")
+        run.plan_started_at = datetime(2026, 1, 1, tzinfo=UTC)
+        run.apply_started_at = None  # errored during plan, not apply
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        summary = _mock_summary(run.id, status="pending", kind="failure_analysis")
+
+        app, mock_db = _make_app(_user())
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                MagicMock(scalar_one_or_none=MagicMock(return_value=run)),
+                MagicMock(),
+                MagicMock(scalar_one_or_none=MagicMock(return_value=summary)),
+            ]
+        )
+        mock_db.get = AsyncMock(return_value=ws)
+        mock_db.commit = AsyncMock()
+
+        with patch("terrapod.config.settings") as mock_settings:
+            mock_settings.ai_summary.enabled = True
+            mock_settings.ai_summary.model = "bedrock/test"
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{run.id}/plan-summary/regenerate",
+                    headers=_AUTH,
+                )
+
+        assert resp.status_code == 202
+        mock_enq.assert_awaited_once()
+        assert mock_enq.call_args.args[1]["kind"] == "failure_analysis"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
+    async def test_regenerate_409_when_no_summary_kind_applies(
+        self, mock_enq, mock_resolve, *_mocks
+    ):
+        """A run still in `pending` / `queued` / `planning` has nothing
+        to summarise; apply-phase errored runs are also out of scope.
+        """
+        mock_resolve.return_value = "read"
+        run = _mock_run(status="queued")
+        run.plan_started_at = None
+        run.apply_started_at = None
+        ws = _mock_workspace(ws_id=run.workspace_id)
+
+        app, mock_db = _make_app(_user())
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                MagicMock(scalar_one_or_none=MagicMock(return_value=run)),
+            ]
+        )
+        mock_db.get = AsyncMock(return_value=ws)
+        mock_db.commit = AsyncMock()
+
+        with patch("terrapod.config.settings") as mock_settings:
+            mock_settings.ai_summary.enabled = True
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{run.id}/plan-summary/regenerate",
+                    headers=_AUTH,
+                )
+        assert resp.status_code == 409
+        mock_enq.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
+    async def test_regenerate_503_when_ai_summary_globally_disabled(self, mock_enq, *_mocks):
+        run = _mock_run(status="planned")
+
+        app, mock_db = _make_app(_user())
+        mock_db.execute = AsyncMock()  # not reached past the gate
+        mock_db.commit = AsyncMock()
+
+        with patch("terrapod.config.settings") as mock_settings:
+            mock_settings.ai_summary.enabled = False
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{run.id}/plan-summary/regenerate",
+                    headers=_AUTH,
+                )
+        assert resp.status_code == 503
+        mock_enq.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
+    async def test_regenerate_403_when_no_workspace_read(self, mock_enq, mock_resolve, *_mocks):
+        """No workspace read → 403 (the permission helper raises)."""
+        mock_resolve.return_value = None  # no permission
+        run = _mock_run(status="planned")
+        ws = _mock_workspace(ws_id=run.workspace_id)
+
+        app, mock_db = _make_app(_user())
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                MagicMock(scalar_one_or_none=MagicMock(return_value=run)),
+            ]
+        )
+        mock_db.get = AsyncMock(return_value=ws)
+
+        with patch("terrapod.config.settings") as mock_settings:
+            mock_settings.ai_summary.enabled = True
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{run.id}/plan-summary/regenerate",
+                    headers=_AUTH,
+                )
+        assert resp.status_code in (401, 403)
+        mock_enq.assert_not_called()

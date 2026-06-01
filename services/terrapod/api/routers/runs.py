@@ -34,6 +34,7 @@ from typing import Literal
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
@@ -43,7 +44,7 @@ from terrapod.api.dependencies import (
     get_current_user,
     get_listener_identity,
 )
-from terrapod.db.models import PlanSummary, Run, StateVersion, VCSConnection, Workspace
+from terrapod.db.models import PlanSummary, Run, StateVersion, VCSConnection, Workspace, now_utc
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service, run_service
@@ -793,7 +794,7 @@ def _plan_json(run: Run) -> dict:
     # AI plan summary URL — surfaced as a Terrapod-native link on every
     # plan response so the UI knows where to fetch the structured
     # summary. 404s gracefully when no summary exists yet.
-    attrs["ai-summary-url"] = f"{base}/api/v2/plans/{run.id}/summary"
+    attrs["ai-summary-url"] = f"{base}/api/terrapod/v1/runs/{run.id}/plan-summary"
     return {
         "data": {
             "id": f"plan-{run.id}",
@@ -822,20 +823,23 @@ async def show_plan_by_id(
     return JSONResponse(content=_plan_json(run))
 
 
-@router.get("/plans/{plan_id}/summary")
+@extensions_router.get("/runs/{run_id}/plan-summary")
 async def show_plan_summary(
-    plan_id: str = Path(...),
+    run_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """AI-generated plan summary or failure analysis (#401).
+
+    Terrapod-native — not part of the TFE CLI surface. Lives under
+    ``/api/terrapod/v1/`` alongside the other run extensions.
 
     Returns 404 when no summary exists yet — the UI uses this as the
     "not summarised" signal (vs a `pending` row which means "in flight").
     The response shape is the same for both ``kind`` values; the UI
     branches on the ``kind`` attribute.
     """
-    run = await _get_run(plan_id.replace("plan-", "run-"), db)
+    run = await _get_run(run_id, db)
     await _require_run_ws_permission(run, "read", user, db)
 
     summary = (
@@ -868,6 +872,138 @@ async def show_plan_summary(
                 },
             }
         }
+    )
+
+
+def _summary_kind_for_run(run: Run) -> str | None:
+    """Pick the right summariser kind for a run's current state.
+
+    Returns "plan_summary" for runs that produced a plan (any state past
+    `planning` except plan-phase errored), "failure_analysis" for runs
+    that failed during the plan phase, and None when no summary kind
+    applies (still in `pending`/`queued`/`planning`, or apply-phase
+    errored — apply failures aren't part of #401).
+    """
+    if run.status == "errored" and run.plan_started_at and run.apply_started_at is None:
+        return "failure_analysis"
+    if run.status in {"planned", "confirmed", "applying", "applied", "discarded"}:
+        return "plan_summary"
+    return None
+
+
+@extensions_router.post("/runs/{run_id}/plan-summary/regenerate")
+async def regenerate_plan_summary(
+    run_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Re-fire the AI summary for an existing run (#401 follow-up).
+
+    Anyone with workspace `read` can regenerate; the call doesn't mutate
+    infrastructure. Cost is centrally gated by `ai_summary.daily_token_budget`.
+
+    The endpoint:
+      • picks `kind` from current run state (plan_summary vs failure_analysis)
+      • upserts the PlanSummary row to status='pending' synchronously
+        so the UI immediately reflects the regenerate
+      • enqueues the same `ai_plan_summary` trigger as the auto-fire path,
+        BYPASSING the 5-min dedup (the user explicitly asked)
+      • returns 202 with the now-pending row
+
+    Returns 409 if the run has no summarisable state (still planning, or
+    apply-phase errored). Returns 503 if AI summary is globally disabled.
+    """
+    from terrapod.config import settings as _settings
+    from terrapod.services.scheduler import enqueue_trigger
+
+    if not _settings.ai_summary.enabled:
+        raise HTTPException(status_code=503, detail="AI summary is disabled globally")
+
+    run = await _get_run(run_id, db)
+    await _require_run_ws_permission(run, "read", user, db)
+
+    kind = _summary_kind_for_run(run)
+    if kind is None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"run is in state '{run.status}' — no summary kind applies "
+                "(plan_summary needs a post-plan state; failure_analysis "
+                "needs plan-phase errored)"
+            ),
+        )
+
+    # Upsert to pending so the UI shows feedback immediately. Reuses the
+    # same model field so the operator sees which model is being called.
+    pending_values = {
+        "run_id": run.id,
+        "kind": kind,
+        "status": "pending",
+        "model": _settings.ai_summary.model,
+        "description": "",
+        "risk_level": "",
+        "risk_factors": [],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "error_message": "",
+    }
+    stmt = pg_insert(PlanSummary).values(**pending_values)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["run_id"],
+        set_={
+            "kind": stmt.excluded.kind,
+            "status": stmt.excluded.status,
+            "model": stmt.excluded.model,
+            "description": stmt.excluded.description,
+            "risk_level": stmt.excluded.risk_level,
+            "risk_factors": stmt.excluded.risk_factors,
+            "input_tokens": stmt.excluded.input_tokens,
+            "output_tokens": stmt.excluded.output_tokens,
+            "error_message": stmt.excluded.error_message,
+            "updated_at": now_utc(),
+        },
+    )
+    await db.execute(stmt)
+    await db.commit()
+
+    # Re-read so we return the fresh row (gives us the id + timestamps).
+    summary = (
+        await db.execute(select(PlanSummary).where(PlanSummary.run_id == run.id))
+    ).scalar_one_or_none()
+
+    # No dedup_key → bypass the 5-min auto-dedup. Operator clicks should
+    # always go through, even when an automatic enqueue happened seconds
+    # ago. Budget gating still applies on the handler side.
+    await enqueue_trigger(
+        "ai_plan_summary",
+        {"run_id": str(run.id), "kind": kind},
+    )
+
+    return JSONResponse(
+        status_code=202,
+        content={
+            "data": {
+                "id": f"plan-summary-{summary.id}",
+                "type": "plan-summaries",
+                "attributes": {
+                    "kind": summary.kind,
+                    "status": summary.status,
+                    "description": summary.description,
+                    "risk-level": summary.risk_level,
+                    "risk-factors": summary.risk_factors,
+                    "model": summary.model,
+                    "input-tokens": summary.input_tokens,
+                    "output-tokens": summary.output_tokens,
+                    "error-message": summary.error_message,
+                    "created-at": _rfc3339(summary.created_at),
+                    "updated-at": _rfc3339(summary.updated_at),
+                },
+                "relationships": {
+                    "plan": {"data": {"id": f"plan-{run.id}", "type": "plans"}},
+                    "run": {"data": {"id": f"run-{run.id}", "type": "runs"}},
+                },
+            }
+        },
     )
 
 
