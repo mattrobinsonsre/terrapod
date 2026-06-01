@@ -29,7 +29,7 @@ sqlalchemy = {extras = ["asyncio"], version = "^2.0"}
 asyncpg = "^0.31.0"
 alembic = "^1.14.0"
 # HCL parsing (module interface extraction)
-python-hcl2 = "^7.0.0"
+python-hcl2 = ">=7,<9"
 # Redis
 redis = ">=7.4,<9.0"
 # Auth
