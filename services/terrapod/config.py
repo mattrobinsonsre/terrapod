@@ -771,10 +771,17 @@ class AISummaryConfig(BaseModel):
         ),
     )
     max_output_tokens: int = Field(
-        default=1024,
+        default=16384,
         description=(
-            "Max tokens for the model response. Sized for ~600 words "
-            "of human description plus a short structured risk block."
+            "Upper bound on model response tokens. Must accommodate the "
+            "full JSON object: ~600 words of description + a risk-factor "
+            "list whose size scales with the plan. This is a CAP, not a "
+            "target — the model only emits what it needs and stops on a "
+            "natural stop token; only oversized plans approach it. 1024 "
+            "was undersized for medium plans and caused finish_reason="
+            "'length' truncation; 16384 leaves comfortable headroom for "
+            "very large plans (100+ resource changes with detailed risk "
+            "listings) while staying well under Opus's 32K output limit."
         ),
     )
     request_timeout_seconds: int = Field(

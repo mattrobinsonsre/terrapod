@@ -308,8 +308,33 @@ async def _call_model(
 
     if not resp.choices:
         raise RuntimeError("model response had no choices")
-    text = resp.choices[0].message.content or ""
-    parsed = _parse_model_json(text)
+    choice = resp.choices[0]
+    text = choice.message.content or ""
+    finish_reason = getattr(choice, "finish_reason", None)
+
+    # When the model runs out of output tokens it stops mid-JSON, so both
+    # strict json.loads and the balanced-brace fallback fail with a
+    # misleading "not JSON" — call out the real cause first.
+    if finish_reason == "length":
+        raise RuntimeError(
+            f"model response truncated at max_output_tokens={max_output_tokens} "
+            f"(finish_reason=length); raise ai_summary.max_output_tokens"
+        )
+
+    try:
+        parsed = _parse_model_json(text)
+    except ValueError as e:
+        # Log a head+tail snippet so future failures are diagnosable
+        # without rerunning. Limit size so we don't dump megabytes into
+        # the structured log.
+        snippet = text if len(text) <= 800 else f"{text[:400]}…{text[-400:]}"
+        logger.warning(
+            "Summariser response did not parse as JSON",
+            finish_reason=finish_reason,
+            response_length=len(text),
+            response_snippet=snippet,
+        )
+        raise ValueError(f"{e} (finish_reason={finish_reason}, len={len(text)})") from e
 
     usage = getattr(resp, "usage", None)
     in_tok = int(getattr(usage, "prompt_tokens", 0) or 0) if usage else 0
@@ -320,19 +345,43 @@ async def _call_model(
 def _parse_model_json(text: str) -> dict:
     """Parse the model's textual response as a JSON object.
 
-    Permits incidental wrapping (a leading code fence, a stray sentence)
-    by extracting the first balanced ``{...}`` block. The strict schema
-    in the request body should prevent this, but the fallback is cheap.
+    Permits incidental wrapping (a leading ``"Here's the JSON:"`` line, a
+    ```json fenced block, a stray sentence after the object) by trying:
+
+      1. Strict parse of the whole stripped body.
+      2. Strip a fenced ```json / ``` block if present.
+      3. Extract the first balanced ``{...}`` block.
+
+    The strict schema in the prompt should prevent any of this, but the
+    fallbacks are cheap and reduce flakes from chatty models.
     """
     text = text.strip()
     try:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
+
+    # Strip a ```json ... ``` (or plain ``` ... ```) fence — Opus
+    # occasionally adds one despite the "no fences" instruction.
+    if text.startswith("```"):
+        body = text[3:]
+        if body.lower().startswith("json"):
+            body = body[4:]
+        body = body.lstrip("\n")
+        end = body.rfind("```")
+        if end >= 0:
+            try:
+                return json.loads(body[:end].strip())
+            except json.JSONDecodeError:
+                pass
+
     start = text.find("{")
     end = text.rfind("}")
     if start >= 0 and end > start:
-        return json.loads(text[start : end + 1])
+        try:
+            return json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            pass
     raise ValueError("model response was not JSON")
 
 

@@ -160,6 +160,73 @@ def test_parse_unparseable_raises():
         summariser._parse_model_json("this is not json")
 
 
+def test_parse_fenced_block_with_trailing_prose():
+    """Opus sometimes emits ```json {...} ``` AND adds prose after the
+    fence. The balanced-brace fallback alone would slurp the trailing
+    text into the parse; the fence-aware path returns clean JSON.
+    """
+    text = '```json\n{"description": "ok", "risk_level": "low", "risk_factors": []}\n```\n\nLet me know if you want more detail.'
+    parsed = summariser._parse_model_json(text)
+    assert parsed["risk_level"] == "low"
+
+
+def test_parse_fenced_block_without_json_tag():
+    text = '```\n{"description": "ok", "risk_level": "low", "risk_factors": []}\n```'
+    parsed = summariser._parse_model_json(text)
+    assert parsed["description"] == "ok"
+
+
+# ── truncation handling ─────────────────────────────────────────────────
+
+
+async def test_call_model_raises_on_finish_length():
+    """When Bedrock stops mid-JSON because max_output_tokens ran out we
+    must call that out explicitly — not surface a misleading 'not JSON'.
+    """
+    truncated = '{"description": "this stops mid-way",'  # no closing brace
+    fake_choice = MagicMock()
+    fake_choice.message.content = truncated
+    fake_choice.finish_reason = "length"
+    fake_resp = MagicMock(
+        choices=[fake_choice], usage=MagicMock(prompt_tokens=10, completion_tokens=1024)
+    )
+
+    with (
+        patch.object(summariser.settings.ai_summary, "model", "test-model"),
+        patch(
+            "terrapod.services.summariser.litellm.acompletion", AsyncMock(return_value=fake_resp)
+        ),
+    ):
+        with pytest.raises(RuntimeError, match="truncated at max_output_tokens"):
+            await summariser._call_model(
+                system_message="s", user_message="u", max_output_tokens=1024
+            )
+
+
+async def test_call_model_parse_failure_includes_finish_reason():
+    """Non-length parse failures should surface finish_reason + length
+    in the error string so the operator can tell stop-vs-content
+    failures apart in the UI / logs.
+    """
+    fake_choice = MagicMock()
+    fake_choice.message.content = "I cannot summarise this plan."
+    fake_choice.finish_reason = "stop"
+    fake_resp = MagicMock(
+        choices=[fake_choice], usage=MagicMock(prompt_tokens=10, completion_tokens=8)
+    )
+
+    with (
+        patch.object(summariser.settings.ai_summary, "model", "test-model"),
+        patch(
+            "terrapod.services.summariser.litellm.acompletion", AsyncMock(return_value=fake_resp)
+        ),
+    ):
+        with pytest.raises(ValueError, match="finish_reason=stop"):
+            await summariser._call_model(
+                system_message="s", user_message="u", max_output_tokens=1024
+            )
+
+
 # ── _build_litellm_kwargs ───────────────────────────────────────────────
 
 
