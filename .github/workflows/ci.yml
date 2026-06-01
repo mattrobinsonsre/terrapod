@@ -528,7 +528,7 @@ jobs:
 
       - name: Download image artifacts (PR)
         if: needs.prepare.outputs.is_pr == 'true'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: image-*-amd64
           path: /tmp/images
@@ -634,7 +634,7 @@ jobs:
 
       - name: Download image artifact (PR)
         if: needs.prepare.outputs.is_pr == 'true'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: image-${{ matrix.image }}-amd64
           path: /tmp
