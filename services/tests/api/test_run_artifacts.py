@@ -293,6 +293,68 @@ class TestUploadPlanJsonOutput:
         assert run.resource_additions is None
         assert run.resource_changes is None
 
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    @patch("terrapod.api.routers.run_artifacts.settings")
+    @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
+    async def test_enqueues_ai_plan_summary_after_upload(
+        self, mock_enq, mock_settings, mock_get_storage, *_mocks
+    ):
+        """The plan_summary trigger must fire only after the JSON has
+        landed in storage — otherwise the summariser races the runner
+        and hits "Object not found" (v0.30.2 fix).
+        """
+        mock_settings.ai_summary.enabled = True
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=b'{"resource_changes":[]}',
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        mock_enq.assert_awaited_once()
+        args, kwargs = mock_enq.call_args
+        assert args[0] == "ai_plan_summary"
+        assert args[1] == {"run_id": str(run_id), "kind": "plan_summary"}
+        assert kwargs.get("dedup_key") == f"aisum:{run_id}:plan_summary"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    @patch("terrapod.api.routers.run_artifacts.settings")
+    @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
+    async def test_skips_ai_plan_summary_when_disabled(
+        self, mock_enq, mock_settings, mock_get_storage, *_mocks
+    ):
+        mock_settings.ai_summary.enabled = False
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=b'{"resource_changes":[]}',
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        mock_enq.assert_not_called()
+
 
 # ── lock-file (#306) ─────────────────────────────────────────────────────
 

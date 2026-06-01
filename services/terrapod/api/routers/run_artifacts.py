@@ -31,6 +31,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_runner_for_run
+from terrapod.config import settings
 from terrapod.db.models import Run, StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -253,6 +254,30 @@ async def upload_plan_json_output(
             body_bytes=len(body),
         )
     await db.commit()
+
+    # AI plan summariser (#401) — enqueue the `plan_summary` kind now
+    # that the JSON is actually in storage. Previously this fired from
+    # run_service.transition_run on the planned transition, which
+    # raced the runner: transition_run runs on the plan-result POST,
+    # which the runner sends BEFORE uploading plan-json-output. The
+    # summariser would then hit "Object not found" half the time and
+    # write status='errored'. Firing here closes the race — by the
+    # time the trigger is enqueued the storage put + db commit have
+    # both succeeded. Failure-analysis kind still fires from
+    # transition_run on errored runs (no JSON involved).
+    if settings.ai_summary.enabled:
+        try:
+            from terrapod.services.scheduler import enqueue_trigger
+
+            await enqueue_trigger(
+                "ai_plan_summary",
+                {"run_id": str(run.id), "kind": "plan_summary"},
+                dedup_key=f"aisum:{run.id}:plan_summary",
+                dedup_ttl=300,
+            )
+        except Exception as e:
+            logger.debug("Failed to enqueue ai_plan_summary after upload", error=str(e))
+
     return Response(status_code=204)
 
 

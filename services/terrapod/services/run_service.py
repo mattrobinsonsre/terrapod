@@ -440,14 +440,16 @@ async def transition_run(
     if run.is_drift_detection and target_status in drift_terminal:
         await _enqueue_drift_completed(run)
 
-    # AI plan summariser (#401) — fires on plan-phase terminal transitions.
-    # `planned` → summarise the changes. `errored` *during the plan phase*
-    # (apply hasn't started) → analyse the failure cause. Apply-phase
-    # errored runs are skipped — the failure surface is different and
-    # belongs to a future feature.
-    if target_status == "planned":
-        await _enqueue_ai_plan_summary(run, "plan_summary")
-    elif target_status == "errored" and run.apply_started_at is None:
+    # AI plan summariser (#401) — failure-analysis kind only.
+    # The `plan_summary` kind is enqueued from
+    # routers/run_artifacts.upload_plan_json_output AFTER the runner has
+    # uploaded the structured plan JSON. Firing it here on the `planned`
+    # transition raced the runner: transition_run runs on the
+    # plan-result POST, but plan-json-output upload happens a few
+    # operations later in the runner entrypoint, so the summariser
+    # would hit `Object not found` half the time. Errored plans never
+    # upload JSON, so failure-analysis still belongs here.
+    if target_status == "errored" and run.apply_started_at is None:
         await _enqueue_ai_plan_summary(run, "failure_analysis")
 
     return run
