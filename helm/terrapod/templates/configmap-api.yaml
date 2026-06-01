@@ -259,11 +259,14 @@ data:
       {{- if .Values.api.config.ai_summary.api_base }}
       api_base: {{ .Values.api.config.ai_summary.api_base | quote }}
       {{- end }}
-      max_output_tokens: {{ .Values.api.config.ai_summary.max_output_tokens | default 1024 }}
-      request_timeout_seconds: {{ .Values.api.config.ai_summary.request_timeout_seconds | default 60 }}
-      daily_token_budget: {{ .Values.api.config.ai_summary.daily_token_budget | default 0 }}
-      plan_json_max_bytes: {{ .Values.api.config.ai_summary.plan_json_max_bytes | default 500000 }}
-      code_context_max_bytes: {{ .Values.api.config.ai_summary.code_context_max_bytes | default 200000 }}
+      max_output_tokens: {{ .Values.api.config.ai_summary.max_output_tokens | default 1024 | int64 }}
+      request_timeout_seconds: {{ .Values.api.config.ai_summary.request_timeout_seconds | default 60 | int64 }}
+      # int64 cast prevents Helm's default float formatter from emitting
+      # YAML scientific notation (e.g. `5e+06`) for values above ~1M,
+      # which Pydantic on the API side refuses to parse as an int.
+      daily_token_budget: {{ .Values.api.config.ai_summary.daily_token_budget | default 0 | int64 }}
+      plan_json_max_bytes: {{ .Values.api.config.ai_summary.plan_json_max_bytes | default 500000 | int64 }}
+      code_context_max_bytes: {{ .Values.api.config.ai_summary.code_context_max_bytes | default 200000 | int64 }}
       {{- with .Values.api.config.ai_summary.auth }}
       auth:
         # api_key is injected via env var (TERRAPOD_AI_SUMMARY__AUTH__API_KEY)
