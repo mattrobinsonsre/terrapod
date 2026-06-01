@@ -8,8 +8,10 @@ commit statuses and PR/MR comments back to the VCS provider.
 import uuid
 from datetime import UTC, datetime
 
+from sqlalchemy import select
+
 from terrapod.config import settings
-from terrapod.db.models import Run, VCSConnection, Workspace
+from terrapod.db.models import PlanSummary, Run, VCSConnection, Workspace
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import github_service, gitlab_service
@@ -82,29 +84,83 @@ def _build_comment_body(
     plan_only: bool,
     has_changes: bool | None,
     run_url: str,
+    ai_summary: "PlanSummary | None" = None,
 ) -> str:
     """Build the markdown body for a PR/MR comment.
 
     `has_changes` is consumed by ``_resolve_status`` to form the status
     description ("Has changes" / "No changes"); we don't append a second
     has-changes line, which used to be redundant with the description.
+
+    When ``ai_summary`` is provided and its status is "ready", a
+    collapsible ``<details>`` block is appended with the LLM-generated
+    description + risk pill + risk-factor list (#401). Other statuses
+    (pending / skipped / errored) are skipped — the comment shouldn't
+    advertise empty or error rows to PR readers.
     """
     github_state, _, description = _resolve_status(run_status, plan_only, has_changes)
     emoji = _STATUS_EMOJI.get(run_status, ":grey_question:")
 
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    return "\n".join(
-        [
-            f"<!-- terrapod:ws:{workspace_id} -->",
-            f"### Terrapod — {workspace_name}",
-            "",
-            f"**Status:** {emoji} {description}",
-            f"**Run:** [{run_id}]({run_url})",
-            "",
-            f"*Updated {now}*",
-        ]
-    )
+    parts = [
+        f"<!-- terrapod:ws:{workspace_id} -->",
+        f"### Terrapod — {workspace_name}",
+        "",
+        f"**Status:** {emoji} {description}",
+        f"**Run:** [{run_id}]({run_url})",
+    ]
+    if ai_summary is not None and ai_summary.status == "ready":
+        parts.append("")
+        parts.append(_render_ai_summary_section(ai_summary))
+    parts.append("")
+    parts.append(f"*Updated {now}*")
+    return "\n".join(parts)
+
+
+def _render_ai_summary_section(s: "PlanSummary") -> str:
+    """Render one PlanSummary as a collapsible PR-comment section (#401).
+
+    Both GitHub and GitLab support raw HTML inside Markdown comments;
+    `<details>` keeps verbose summaries out of the default view so PRs
+    spanning many workspaces stay scannable. The summary header carries
+    the risk pill so a reviewer can triage without expanding.
+    """
+    kind_label = "Failure analysis" if s.kind == "failure_analysis" else "AI summary"
+    risk_emoji = {
+        "low": "🟢",
+        "medium": "🟡",
+        "high": "🟠",
+        "critical": "🔴",
+    }.get(s.risk_level, "⚪")
+    lines = [
+        f"<details><summary>🤖 {kind_label} &mdash; "
+        f"{risk_emoji} risk: <strong>{s.risk_level or 'unknown'}</strong></summary>",
+        "",
+        s.description.strip(),
+    ]
+    if s.risk_factors:
+        rf_heading = "**Suggested fixes:**" if s.kind == "failure_analysis" else "**Risk factors:**"
+        lines.extend(["", rf_heading, ""])
+        for rf in s.risk_factors:
+            sev = (rf.get("severity") or "").lower() if isinstance(rf, dict) else ""
+            sev_emoji = {
+                "low": "🟢",
+                "medium": "🟡",
+                "high": "🟠",
+                "critical": "🔴",
+            }.get(sev, "⚪")
+            title = rf.get("title", "") if isinstance(rf, dict) else ""
+            detail = (rf.get("detail", "") or "").strip() if isinstance(rf, dict) else ""
+            addr = rf.get("resource_address", "") if isinstance(rf, dict) else ""
+            head = f"- {sev_emoji} **{title}**"
+            if addr:
+                head += f" — `{addr}`"
+            lines.append(head)
+            if detail:
+                lines.append(f"  {detail}")
+    lines.extend(["", "</details>"])
+    return "\n".join(lines)
 
 
 def _comment_marker(workspace_id: str) -> str:
@@ -320,6 +376,19 @@ async def handle_vcs_commit_status(payload: dict) -> None:
         # Post/update PR comment (only for PR runs)
         if run.vcs_pull_request_number:
             run_url = target_url or f"run-{run.id}"
+            # AI plan summary (#401) — included in the comment body when
+            # a ready row exists for this run. The summariser re-enqueues
+            # this same trigger after a ready row lands so the comment
+            # picks up the LLM content as soon as it's available, not on
+            # the next status change.
+            ai_summary = (
+                await db.execute(
+                    select(PlanSummary).where(
+                        PlanSummary.run_id == run.id,
+                        PlanSummary.status == "ready",
+                    )
+                )
+            ).scalar_one_or_none()
             body = _build_comment_body(
                 workspace_name=ws.name,
                 workspace_id=str(ws.id),
@@ -328,6 +397,7 @@ async def handle_vcs_commit_status(payload: dict) -> None:
                 plan_only=run.plan_only,
                 has_changes=has_changes,
                 run_url=run_url,
+                ai_summary=ai_summary,
             )
             await _find_or_create_comment(
                 conn, owner, repo, run.vcs_pull_request_number, str(ws.id), body

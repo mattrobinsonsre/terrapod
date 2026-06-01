@@ -548,6 +548,30 @@ async def handle_ai_plan_summary(payload: dict) -> None:
     # Out-of-transaction side effects
     await _budget_charge(out_tok)
     await _emit_ready_event(ws.id, run_id)
+
+    # PR/MR comment refresh — re-enqueue the existing vcs_commit_status
+    # trigger so handle_vcs_commit_status picks up the now-ready
+    # PlanSummary and edits it into the per-workspace comment in place.
+    # The dedup key includes "aisum" so it doesn't collide with the
+    # standard run-state-change enqueues from run_service.
+    if run.vcs_pull_request_number:
+        try:
+            from terrapod.services.scheduler import enqueue_trigger
+
+            await enqueue_trigger(
+                "vcs_commit_status",
+                {
+                    "run_id": str(run_id),
+                    "workspace_id": str(ws.id),
+                    "target_status": run.status,
+                    "has_changes": run.has_changes,
+                },
+                dedup_key=f"vcs_status:aisum:{run_id}",
+                dedup_ttl=60,
+            )
+        except Exception as e:
+            logger.debug("Failed to refresh PR comment after AI summary", error=str(e))
+
     logger.info(
         "AI summary ready",
         run_id=str(run_id),
