@@ -338,6 +338,20 @@ Workspaces support the following drift detection attributes (settable on create 
 | `drift-detection-enabled` | boolean | `true` (VCS) / `false` (non-VCS) | Enable or disable automatic drift detection. Auto-enabled when a VCS connection is set |
 | `drift-detection-interval-seconds` | integer | `86400` | How often to run drift detection checks (minimum: 3600 seconds / 1 hour) |
 
+### AI Plan Summary Attributes
+
+Workspaces carry two attributes that govern the optional AI plan-summary feature (settable on create and update). When the feature is globally disabled at the deployment level (`api.config.ai_summary.enabled: false`), these fields are stored but inert — no calls are made. See [docs/ai-plan-summary.md](ai-plan-summary.md) for the full operator guide.
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `ai-summary-mode` | string | `"default"` | Per-workspace override. One of `"default"` (follow the global toggle), `"enabled"` (always summarise this workspace's plans), or `"disabled"` (never summarise this workspace — overrides global). |
+| `ai-summary-context` | string | `""` | Free text up to 4000 characters appended to the model's prompt as workspace-specific facts (e.g. "Fronts the vault for service X — destroying the KMS key causes a global outage."). Additive to the deployment-wide `fleet_context`. |
+
+422 errors:
+- `ai-summary-mode` outside the enum
+- `ai-summary-context` longer than 4000 characters
+- `ai-summary-context` not a string
+
 The following read-only attributes are included in workspace responses when drift detection is enabled:
 
 | Attribute | Type | Description |
@@ -700,6 +714,72 @@ GET /api/v2/plans/{plan_id}/json-output
 Returns the structured JSON representation of the plan, as produced by `terraform show -json tfplan`. Useful for downstream tooling that wants to consume the resource changes without parsing the human-readable log. Responds **302** to a presigned object-storage URL.
 
 The endpoint is mounted at `/api/v2/` because `go-tfe` and Terraform's `cloud` block expect it there. Returns **404** if the runner never uploaded the JSON output (older runs, runs that errored before the plan completed).
+
+### Plan Summary
+
+```
+GET /api/v2/plans/{plan_id}/summary
+```
+
+Returns the AI-generated plan summary (or failure analysis on errored plans) when the optional `ai_summary` feature is enabled and a summary has been produced for the run. See [docs/ai-plan-summary.md](ai-plan-summary.md) for the operator-side setup.
+
+**Required permission:** `read` on the workspace.
+
+`plan_id` accepts either `plan-{uuid}` (the canonical form, matching what's returned in the `plans` relationship of a Run) or a bare run UUID.
+
+**Responses:**
+- **200 OK** — the workspace has a summary row for this run. See response shape below.
+- **404 Not Found** — no summary row exists. Either the feature is globally disabled, the workspace opted out (`ai-summary-mode: disabled`), or the summariser hasn't run yet. The UI treats 404 as "no AI surface" and renders nothing.
+
+**Response shape:**
+
+```json
+{
+  "data": {
+    "id": "plan-summary-<uuid>",
+    "type": "plan-summaries",
+    "attributes": {
+      "kind": "plan_summary",
+      "status": "ready",
+      "description": "Adds a single root-level output named `marker` ...",
+      "risk-level": "low",
+      "risk-factors": [
+        {
+          "severity": "low",
+          "title": "Output-only addition",
+          "detail": "The plan only introduces the `marker` output ...",
+          "resource_address": "output.marker"
+        }
+      ],
+      "model": "bedrock/us.anthropic.claude-opus-4-8",
+      "input-tokens": 1335,
+      "output-tokens": 171,
+      "error-message": "",
+      "created-at": "2026-06-01T12:00:00Z",
+      "updated-at": "2026-06-01T12:00:30Z"
+    },
+    "relationships": {
+      "plan": { "data": { "id": "plan-<uuid>", "type": "plans" } },
+      "run":  { "data": { "id": "run-<uuid>",  "type": "runs"  } }
+    }
+  }
+}
+```
+
+**Attribute reference:**
+
+| Attribute | Type | Description |
+|---|---|---|
+| `kind` | string | `"plan_summary"` (successful plan → change description + risk assessment) or `"failure_analysis"` (plan-phase errored → root-cause + suggested fixes). |
+| `status` | string | `"pending"` (handler running), `"ready"` (model returned a parseable response), `"skipped"` (workspace disabled or daily budget hit — see `error-message`), or `"errored"` (model call failed — see `error-message`). |
+| `description` | string | Markdown body. For `kind=plan_summary`, ~600 words describing the proposed changes. For `kind=failure_analysis`, root-cause explanation. |
+| `risk-level` | string | One of `"low"`, `"medium"`, `"high"`, `"critical"`. Reflects blast radius + reversibility, not novelty. |
+| `risk-factors` | array of object | Each item carries `severity` (same enum as `risk-level`), `title` (max 120 chars), `detail` (max 600 chars), and optional `resource_address` (terraform address). For `kind=failure_analysis` these are suggested fixes ordered most-likely-to-resolve first. |
+| `model` | string | LiteLLM model string used for this summary (e.g. `bedrock/us.anthropic.claude-opus-4-8`). |
+| `input-tokens` / `output-tokens` | integer | Telemetry counts reported by the upstream provider. |
+| `error-message` | string | Populated only for `status=errored` or `status=skipped`. Empty for `ready`. |
+
+**Real-time updates:** when a summary lands, the per-workspace SSE channel (`GET /api/terrapod/v1/workspaces/{id}/runs/events`) emits a `plan_summary_ready` event with `{run_id, workspace_id}`. The UI re-fetches the summary on receipt. For VCS-driven runs, the per-workspace PR/MR status comment is also edited in place to include the summary content.
 
 ### Apply Details
 

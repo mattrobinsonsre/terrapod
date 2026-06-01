@@ -752,3 +752,107 @@ service=terrapod-api logger=terrapod.services.vcs_status_dispatcher
 
 - Run logs after the rotation show `level=info logger=terrapod.services.gitlab_service msg="GitLab commit status posted"` (or the equivalent for GitHub).
 - The PR check on the next pushed commit lands within ~30 seconds of the run completing.
+
+---
+
+## AI plan-summary daily token budget exhausted
+
+**Symptom**: AI plan summary panels on run detail pages start showing "Summary skipped for this run" (italic grey muted text) instead of the LLM description. New `plan_summaries` rows arrive with `status='skipped'` and `error_message='daily token budget exhausted'`. The run lifecycle itself is unaffected (plan / apply / lock state machine continues normally) — only the summary surface is muted.
+
+**Why**: `api.config.ai_summary.daily_token_budget` caps the total *output* tokens spent across all summaries per UTC day. A Redis counter at `tp:ai_summary:budget:YYYYMMDD` (key TTL ~36h) accumulates `usage.completion_tokens` from every successful summariser call. When the next call would push past the cap, the handler short-circuits before invoking LiteLLM, writes a `status='skipped'` row, and emits the `plan_summary_ready` SSE event. The counter rolls over at the next UTC midnight automatically — no operator action is required for normal recovery.
+
+### Diagnosis
+
+1. **Confirm the budget actually exhausted** rather than a provider outage:
+   ```bash
+   kubectl exec -n <ns> <redis-pod> -- redis-cli GET "tp:ai_summary:budget:$(date -u +%Y%m%d)"
+   # Compare against the configured cap:
+   kubectl get configmap <release>-api-config -n <ns> -o jsonpath='{.data.config\.yaml}' \
+     | grep -A1 ai_summary | grep daily_token_budget
+   ```
+   If the Redis value is at or above the cap, the budget is the cause. If well below, look at `plan_summaries.error_message` for the actual reason.
+
+2. **Quantify the runaway** — query the last 24h of summaries:
+   ```sql
+   SELECT kind, status, count(*), sum(output_tokens) AS out_tokens
+   FROM plan_summaries
+   WHERE created_at > now() - interval '24 hours'
+   GROUP BY kind, status ORDER BY out_tokens DESC;
+   ```
+   Look for a workspace or kind disproportionately consuming tokens (e.g. a flapping VCS workspace re-summarising the same plan many times).
+
+### Resolution
+
+- **Wait for UTC midnight reset.** If the spend is in line with normal usage and you just hit the cap because of a busy day, do nothing — the next plan after 00:00 UTC summarises again.
+- **Bump the cap and `helm upgrade`** if the cap is too tight for legitimate steady-state use:
+  ```yaml
+  api:
+    config:
+      ai_summary:
+        daily_token_budget: 10000000  # was 5000000
+  ```
+- **Set `daily_token_budget: 0`** for unlimited. Do this only if you have a separate cost guardrail upstream (provider-side spend limit, gateway quota, etc.).
+- **Force-reset the counter** as an emergency measure (e.g. a runaway workspace already fixed):
+  ```bash
+  kubectl exec -n <ns> <redis-pod> -- redis-cli DEL "tp:ai_summary:budget:$(date -u +%Y%m%d)"
+  ```
+  The counter rebuilds from the next successful summary. Reset doesn't replay missed summaries — they stay `status='skipped'` for the historical runs.
+
+### Verification
+
+- Redis `tp:ai_summary:budget:<date>` is below the configured cap.
+- New plans land with `plan_summaries.status='ready'` rather than `skipped`.
+- The run-detail UI panel re-renders with markdown content within ~30 seconds of the plan reaching `planned`.
+
+---
+
+## AI plan-summary provider outage / credential failure
+
+**Symptom**: AI summary panels show "Summariser failed" with an upstream error (HTTP 401 / 403 / 5xx, timeout, or model-not-found). The `plan_summaries` table accumulates rows with `status='errored'` and `error_message` carrying the LiteLLM exception. The run lifecycle is unaffected.
+
+**Why**: the summariser's failure path is best-effort by design — every exception from `litellm.acompletion()` is caught, logged, and recorded as an `errored` row. The trigger handler never raises into the scheduler, so a sustained provider outage does NOT block plans, applies, VCS comments, or any other run state. Only the summary surface goes red.
+
+### Diagnosis
+
+1. **Inspect the most recent failure messages** to identify the upstream issue:
+   ```sql
+   SELECT kind, error_message, count(*)
+   FROM plan_summaries
+   WHERE status = 'errored' AND created_at > now() - interval '1 hour'
+   GROUP BY kind, error_message ORDER BY count DESC;
+   ```
+   The error text comes straight from LiteLLM — Bedrock IAM, OpenAI 429, Anthropic 401, etc. each present distinctively.
+
+2. **Confirm the provider isn't degraded** (Bedrock service health dashboard, OpenAI status, Anthropic status). Provider-side incidents auto-clear once upstream stabilises; no operator action is needed.
+
+3. **For Bedrock IAM failures** specifically — verify the API pod's IRSA identity is still admitted by the cross-account trust policy on the `ai_summary.auth.aws_role_arn`:
+   ```bash
+   kubectl exec -n <ns> <api-pod> -- aws sts get-caller-identity
+   kubectl exec -n <ns> <api-pod> -- aws sts assume-role \
+     --role-arn "$(grep aws_role_arn /etc/terrapod/config.yaml | awk '{print $2}' | tr -d '"')" \
+     --role-session-name diag
+   ```
+
+### Resolution
+
+- **Provider outage**: no action; summaries auto-recover when upstream stabilises. The run-detail UI shows the latest errored row's message so reviewers see what's failing.
+- **Credential / scope issue** (API key revoked, IRSA trust policy edited, cross-account role deleted): fix at the source. If using the bearer path, rotate the secret value:
+  ```bash
+  kubectl edit secret terrapod-ai-summary-credentials -n <ns>
+  # update TERRAPOD_AI_SUMMARY__AUTH__API_KEY, save
+  kubectl rollout restart deployment/<release>-api -n <ns>
+  ```
+- **Emergency disable** if the provider is down for an extended period and the red panels are visible to many reviewers, flip the global toggle off without restart-required code changes:
+  ```yaml
+  api:
+    config:
+      ai_summary:
+        enabled: false
+  ```
+  followed by `helm upgrade ...`. The API pod re-reads its config on rollout and the trigger handler stops registering. All subsequent plans go through without ever attempting to summarise — no `plan_summaries` row is written at all (the handler short-circuits before the DB write). Re-enable when the upstream is healthy.
+
+### Verification
+
+- Errored rows stop accumulating: `SELECT count(*) FROM plan_summaries WHERE status='errored' AND created_at > now() - interval '15 minutes';` returns 0.
+- The run-detail UI panel renders summaries with `status='ready'` (after re-enable + a new plan).
+- If you emergency-disabled, no `plan_summaries` row appears for new runs and the UI panel doesn't render at all.
