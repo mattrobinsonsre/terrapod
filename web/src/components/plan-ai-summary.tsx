@@ -15,6 +15,7 @@
  * counter passed in via `refreshKey`.
  */
 
+import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -209,40 +210,15 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
 
       {attrs?.status === 'ready' && (
         <>
-          <div className="prose prose-sm prose-invert max-w-none text-slate-200">
+          {/* Same xs / slate-400 baseline as risk_factor.detail so the two
+              sections read as one coherent voice. Description gets a touch
+              more vertical breathing room between paragraphs since it's
+              usually multi-paragraph; everything else (inline code, lists,
+              links) shares typography with the risk-factor detail. */}
+          <div className="text-xs text-slate-400 leading-relaxed">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
-              components={{
-                // Tighten markdown defaults to match our dark surface
-                code: ({ children, ...props }) => (
-                  <code
-                    {...props}
-                    className="px-1 py-0.5 rounded bg-slate-900 text-brand-300 font-mono text-xs"
-                  >
-                    {children}
-                  </code>
-                ),
-                a: ({ children, ...props }) => (
-                  <a {...props} className="text-brand-400 hover:text-brand-300 underline">
-                    {children}
-                  </a>
-                ),
-                ul: ({ children, ...props }) => (
-                  <ul {...props} className="list-disc list-inside space-y-1 my-2 text-slate-200">
-                    {children}
-                  </ul>
-                ),
-                ol: ({ children, ...props }) => (
-                  <ol {...props} className="list-decimal list-inside space-y-1 my-2 text-slate-200">
-                    {children}
-                  </ol>
-                ),
-                p: ({ children, ...props }) => (
-                  <p {...props} className="my-2 leading-relaxed">
-                    {children}
-                  </p>
-                ),
-              }}
+              components={SUMMARY_MARKDOWN_COMPONENTS}
             >
               {attrs.description}
             </ReactMarkdown>
@@ -312,8 +288,52 @@ function RiskFactorRow({ factor }: { factor: RiskFactor }) {
             <span className="font-mono text-xs text-brand-300">{factor.resource_address}</span>
           )}
         </div>
-        <p className="text-xs text-slate-400 mt-1 leading-relaxed">{factor.detail}</p>
+        {/* Match the description: ReactMarkdown so backticks render as
+            inline <code>, same xs / slate-400 typography. */}
+        <div className="text-xs text-slate-400 mt-1 leading-relaxed">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={SUMMARY_MARKDOWN_COMPONENTS}
+          >
+            {factor.detail}
+          </ReactMarkdown>
+        </div>
       </div>
     </li>
   )
+}
+
+// Shared markdown components — paragraphs collapse to plain `<p>` with
+// no extra margin so detail blocks stay tight; description gets vertical
+// spacing from a `space-y-2` on its first paragraph via the prose layout.
+// Inline `<code>` uses the same monospace pill in both places.
+const SUMMARY_MARKDOWN_COMPONENTS = {
+  code: ({ children, ...props }: React.ComponentPropsWithoutRef<'code'>) => (
+    <code
+      {...props}
+      className="px-1 py-0.5 rounded bg-slate-900 text-brand-300 font-mono text-[0.7rem]"
+    >
+      {children}
+    </code>
+  ),
+  a: ({ children, ...props }: React.ComponentPropsWithoutRef<'a'>) => (
+    <a {...props} className="text-brand-400 hover:text-brand-300 underline">
+      {children}
+    </a>
+  ),
+  ul: ({ children, ...props }: React.ComponentPropsWithoutRef<'ul'>) => (
+    <ul {...props} className="list-disc list-inside space-y-1 my-1.5">
+      {children}
+    </ul>
+  ),
+  ol: ({ children, ...props }: React.ComponentPropsWithoutRef<'ol'>) => (
+    <ol {...props} className="list-decimal list-inside space-y-1 my-1.5">
+      {children}
+    </ol>
+  ),
+  p: ({ children, ...props }: React.ComponentPropsWithoutRef<'p'>) => (
+    <p {...props} className="my-2 first:mt-0 last:mb-0 leading-relaxed">
+      {children}
+    </p>
+  ),
 }
