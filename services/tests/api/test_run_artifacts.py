@@ -444,3 +444,115 @@ class TestLockFile:
         mock_storage.presigned_get_url.assert_awaited_once_with(
             f"plans/{ws_id}/{run_id}.terraform.lock.hcl"
         )
+
+
+# ── upload_plan_log / upload_apply_log — log_updated SSE publish ──────
+
+
+class TestLogUploadPublishesEvent:
+    """Final log uploads from the runner's EXIT trap MUST publish a
+    `log_updated` SSE event. Otherwise the UI — which only re-fetches
+    on `log_updated` — sits on its last Redis-snapshot polled
+    mid-flight and never picks up the trailing bytes that storage now
+    holds (PR #424's symptom: `[entrypoint] PLAN_HAS_CHANGES=true` and
+    post-plan OPA lines missing until refresh).
+
+    The companion server-side fix (PR #423) already keeps the stream
+    open by withholding ETX on the Redis path; this event is the
+    matching nudge that makes the UI come back for the tail.
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_event", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_plan_log_upload_publishes_log_updated(
+        self, mock_get_storage, mock_publish, *_mocks
+    ):
+        run_id = uuid.uuid4()
+        ws_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id, ws_id=ws_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-log",
+                content=b"final plan log bytes",
+                headers={**_AUTH, "Content-Type": "text/plain"},
+            )
+
+        assert resp.status_code == 204
+        mock_publish.assert_awaited_once()
+        channel, payload = mock_publish.await_args.args
+        assert channel == f"tp:run_events:{ws_id}"
+        body = json.loads(payload)
+        assert body == {
+            "event": "log_updated",
+            "run_id": str(run_id),
+            "workspace_id": str(ws_id),
+            "phase": "plan",
+        }
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_event", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_apply_log_upload_publishes_log_updated(
+        self, mock_get_storage, mock_publish, *_mocks
+    ):
+        run_id = uuid.uuid4()
+        ws_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id, ws_id=ws_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/apply-log",
+                content=b"final apply log bytes",
+                headers={**_AUTH, "Content-Type": "text/plain"},
+            )
+
+        assert resp.status_code == 204
+        mock_publish.assert_awaited_once()
+        _, payload = mock_publish.await_args.args
+        body = json.loads(payload)
+        assert body["event"] == "log_updated"
+        assert body["phase"] == "apply"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.redis.client.publish_event", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_publish_failure_does_not_break_upload(
+        self, mock_get_storage, mock_publish, *_mocks
+    ):
+        """A Redis publish error must NOT fail the artifact upload —
+        the log file has already landed in storage; the worst case is
+        the UI falls back to its pre-fix behaviour (refresh-required).
+        Matches the same try/except guarantee in `upload_log_stream`.
+        """
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+        mock_publish.side_effect = RuntimeError("redis is angry")
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-log",
+                content=b"x",
+                headers={**_AUTH, "Content-Type": "text/plain"},
+            )
+
+        assert resp.status_code == 204

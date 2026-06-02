@@ -59,6 +59,38 @@ async def _get_run(run_id: str, db: AsyncSession) -> Run:
     return run
 
 
+async def _publish_log_updated(workspace_id: str, run_id: str, phase: str) -> None:
+    """Notify the UI that a fresh log artifact landed in storage.
+
+    The runner's EXIT trap uploads the authoritative final log to storage
+    AFTER it POSTs plan-result / apply-result and the run has already
+    transitioned to a terminal state. Without this notification the UI
+    sits on the last Redis-snapshot it fetched mid-flight: `_serve_log`
+    correctly omits ETX on the Redis path so polling stays open, but the
+    UI only triggers a re-fetch when a `log_updated` event arrives. The
+    mid-flight listener `upload_log_stream` emits one per chunk; without
+    a corresponding emit here, the trailing bytes from the EXIT trap are
+    invisible until the user hits Refresh.
+    """
+    try:
+        from terrapod.redis.client import RUN_EVENTS_PREFIX, publish_event
+
+        payload = json.dumps(
+            {
+                "event": "log_updated",
+                "run_id": run_id,
+                "workspace_id": workspace_id,
+                "phase": phase,
+            }
+        )
+        await publish_event(f"{RUN_EVENTS_PREFIX}{workspace_id}", payload)
+    except Exception:
+        # Match upload_log_stream: SSE publishing failures must never break
+        # an in-flight artifact upload. Worst case we fall back to the old
+        # behaviour (UI waits until next event or manual refresh).
+        logger.debug("Failed to publish log_updated after artifact upload")
+
+
 # ── Downloads (302 redirect to presigned GET URL) ────────────────────────
 
 
@@ -167,6 +199,7 @@ async def upload_plan_log(
     storage = get_storage()
     key = plan_log_key(str(run.workspace_id), str(run.id))
     await storage.put(key, body)
+    await _publish_log_updated(str(run.workspace_id), str(run.id), "plan")
     return Response(status_code=204)
 
 
@@ -296,6 +329,7 @@ async def upload_apply_log(
     storage = get_storage()
     key = apply_log_key(str(run.workspace_id), str(run.id))
     await storage.put(key, body)
+    await _publish_log_updated(str(run.workspace_id), str(run.id), "apply")
     return Response(status_code=204)
 
 
