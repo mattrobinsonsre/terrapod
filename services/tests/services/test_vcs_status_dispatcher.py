@@ -1,10 +1,12 @@
 """Tests for VCS commit-status resolution — has-changes descriptions."""
 
+import asyncio
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from terrapod.db.models import VCSConnection
 from terrapod.services.vcs_status_dispatcher import (
     _build_comment_body,
     _resolve_status,
@@ -362,3 +364,123 @@ class TestSupersededRunComment:
             )
 
         mock_comment.assert_awaited_once()
+
+
+# ── _find_or_create_comment — race-on-first-status regression ─────────
+
+
+class _FakeRedis:
+    """Minimal in-memory async Redis stand-in for the comment dispatcher.
+
+    Supports the operations `_find_or_create_comment` exercises:
+      - `set(key, value, nx=bool, ex=int)` with the SETNX semantics the
+        lock relies on (returns False when nx=True and key exists)
+      - `get(key)`
+      - `delete(key)`
+      - `eval(script, numkeys, key, arg)` — the only script in play is
+        the CAS-release; emulate it directly rather than parsing Lua.
+    """
+
+    def __init__(self):
+        self._store: dict[str, str] = {}
+
+    async def set(self, key, value, *, nx=False, ex=None):
+        # Real redis-py awaits a TCP round-trip; yield to model that —
+        # otherwise asyncio.gather runs each coroutine to completion in
+        # one slice and the test can't actually exercise contention.
+        await asyncio.sleep(0)
+        if nx and key in self._store:
+            return False
+        self._store[key] = str(value)
+        return True
+
+    async def get(self, key):
+        await asyncio.sleep(0)
+        return self._store.get(key)
+
+    async def delete(self, key):
+        await asyncio.sleep(0)
+        self._store.pop(key, None)
+        return 1
+
+    async def eval(self, script, numkeys, key, arg):
+        # The only script we ever pass is the lock-release CAS:
+        # `if get(K)==ARG then del(K) else 0`. Emulate that contract;
+        # don't try to actually run the Lua.
+        await asyncio.sleep(0)
+        if self._store.get(key) == arg:
+            self._store.pop(key, None)
+            return 1
+        return 0
+
+
+class TestFindOrCreateCommentRaceFix:
+    """Two concurrent dispatchers for the same PR (e.g. queued → planning
+    flipping fast enough that both `vcs_commit_status` triggers run on
+    different scheduler replicas at the same moment) must produce exactly
+    ONE created comment. The (workspace_id, pr_number) Redis mutex
+    serialises the find-or-create flow so the second caller sees the
+    cached ID and updates, rather than racing through cache-miss +
+    list-miss + create. Regression for the duplicate-comment screenshot
+    on terrapod-config PR #31.
+    """
+
+    @pytest.mark.asyncio
+    async def test_concurrent_first_status_creates_only_one_comment(self):
+        from terrapod.services import vcs_status_dispatcher as dispatcher
+
+        conn = MagicMock(spec=VCSConnection)
+        conn.provider = "github"
+        ws_id = "11111111-1111-1111-1111-111111111111"
+        owner, repo, pr_number = "markupai", "terrapod-config", 31
+
+        fake_redis = _FakeRedis()
+
+        # Empty repo: nothing in cache, no existing comments.
+        list_comments = AsyncMock(return_value=[])
+        # Each create returns a distinct id so we can prove only one fired.
+        create_calls: list[int] = []
+
+        async def _create(*args, **kwargs):
+            new_id = 1000 + len(create_calls)
+            create_calls.append(new_id)
+            return new_id
+
+        update_calls: list[int] = []
+
+        # Signature must match github_service.update_pr_comment exactly —
+        # the dispatcher invokes it as (conn, owner, repo, comment_id, body).
+        # A mismatched signature would raise TypeError, which the existing
+        # cache-stale except catches and silently falls through to the
+        # list+create path — so a wrong mock would mask the lock working.
+        async def _update(conn, owner, repo, comment_id, body):
+            update_calls.append(comment_id)
+
+        with (
+            patch(
+                "terrapod.redis.client.get_redis_client",
+                return_value=fake_redis,
+            ),
+            patch.object(dispatcher.github_service, "list_pr_comments", new=list_comments),
+            patch.object(dispatcher.github_service, "create_pr_comment", new=_create),
+            patch.object(dispatcher.github_service, "update_pr_comment", new=_update),
+        ):
+            # Two distinct status-flip bodies firing concurrently.
+            await asyncio.gather(
+                dispatcher._find_or_create_comment(
+                    conn, owner, repo, pr_number, ws_id, "body for queued"
+                ),
+                dispatcher._find_or_create_comment(
+                    conn, owner, repo, pr_number, ws_id, "body for planning"
+                ),
+            )
+
+        # The whole point: exactly one comment created, the other became an update.
+        assert len(create_calls) == 1, (
+            f"expected exactly 1 create, got {len(create_calls)}: {create_calls}"
+        )
+        assert len(update_calls) == 1, (
+            f"expected exactly 1 update on the cached id, got {update_calls}"
+        )
+        # And the update targeted the freshly-created comment, not a phantom one.
+        assert update_calls[0] == create_calls[0]
