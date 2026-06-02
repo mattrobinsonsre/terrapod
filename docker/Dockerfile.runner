@@ -41,9 +41,19 @@ RUN ARCH="${TARGETARCH:-$(apk --print-arch | sed 's/aarch64/arm64/;s/x86_64/amd6
 COPY docker/runner-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-RUN mkdir -p /workspace /tmp/bin && chown -R 1000:1000 /workspace /tmp/bin
+# /home/runner is the writable HOME for UID 1000 — without it, tools
+# that consult $HOME (helm's repository/index cache, kubectl's
+# ~/.kube/cache, git's ~/.gitconfig, AWS CLI's ~/.aws) fall back to
+# os.UserHomeDir() lookups that resolve to "/" for a UID with no
+# /etc/passwd entry, then write to /.cache/… which isn't writable
+# and triggers misleading "cannot be reached" errors from helm
+# specifically. Keeping HOME off /workspace so terraform's .terraform/
+# and the user's HCL stay separate from tool caches.
+RUN mkdir -p /workspace /tmp/bin /home/runner \
+    && chown -R 1000:1000 /workspace /tmp/bin /home/runner
 
 USER 1000:1000
+ENV HOME=/home/runner
 WORKDIR /workspace
 
 ENTRYPOINT ["/entrypoint.sh"]

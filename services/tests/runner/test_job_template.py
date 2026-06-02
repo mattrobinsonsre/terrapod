@@ -173,6 +173,28 @@ class TestAuthTokenInjection:
         assert auth_env["valueFrom"]["secretKeyRef"]["name"] == "tprun-abc12345-auth"
         assert auth_env["valueFrom"]["secretKeyRef"]["key"] == "token"
 
+    def test_home_env_set_to_home_runner(self):
+        """HOME must be present in the Job's env so tools that consult
+        $HOME (helm's cache, kubectl's cache, AWS CLI, git) don't fall
+        back to "/" — the misleading "looks like X is not a valid chart
+        repository" error from terraform-provider-helm traces back to
+        an unset HOME and Helm writing to /.cache/...
+        """
+        from terrapod.runner.job_template import build_job_spec
+
+        spec = build_job_spec(
+            run_id="abc123",
+            phase="apply",
+            runner_config=_runner_config(),
+            auth_secret_name="tprun-abc12345-auth",
+            env_vars=[],
+            terraform_vars=[],
+        )
+        container = spec["spec"]["template"]["spec"]["containers"][0]
+        home_env = next((e for e in container["env"] if e["name"] == "HOME"), None)
+        assert home_env is not None, "HOME env var missing from runner Job spec"
+        assert home_env["value"] == "/home/runner"
+
 
 class TestPublicApiUrl:
     """Split-networking: TP_PUBLIC_API_URL only emitted when distinct from TP_API_URL."""

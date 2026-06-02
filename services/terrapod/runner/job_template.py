@@ -85,6 +85,18 @@ def build_job_spec(
     # Build container env vars
     api_url = os.environ.get("TERRAPOD_API_URL", "http://terrapod-api:8000")
     container_env = [
+        # HOME defends against tools that consult $HOME without a
+        # passwd entry (helm's repository/index cache,
+        # kubectl's ~/.kube/cache, AWS CLI's ~/.aws, git's
+        # ~/.gitconfig). Without it, Go's os.UserHomeDir() returns
+        # "" and downstream code writes to /.cache/… which isn't
+        # writable for UID 1000 and surfaces as misleading
+        # "cannot be reached" errors from helm specifically.
+        # The default Terrapod runner image ships /home/runner
+        # owned by 1000 (see Dockerfile.runner); setting it here
+        # too means custom runner images that miss the ENV line
+        # still get the right behaviour.
+        {"name": "HOME", "value": "/home/runner"},
         {"name": "TP_RUN_ID", "value": run_id},
         {"name": "TP_PHASE", "value": phase},
         {"name": "TP_API_URL", "value": api_url},
