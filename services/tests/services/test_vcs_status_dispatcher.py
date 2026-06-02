@@ -228,10 +228,10 @@ class TestSupersededRunComment:
         session.get.side_effect = _get
 
         class _Ctx:
-            async def __aenter__(self_inner):
+            async def __aenter__(self):
                 return session
 
-            async def __aexit__(self_inner, *a):
+            async def __aexit__(self, *a):
                 return False
 
         with (
@@ -325,10 +325,10 @@ class TestSupersededRunComment:
         session.get.side_effect = _get
 
         class _Ctx:
-            async def __aenter__(self_inner):
+            async def __aenter__(self):
                 return session
 
-            async def __aexit__(self_inner, *a):
+            async def __aexit__(self, *a):
                 return False
 
         # _find_or_create_comment uses Redis; stub it out wholesale rather
