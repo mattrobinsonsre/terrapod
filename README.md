@@ -15,6 +15,8 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
 > **AI-augmented plans.** Every plan can carry an LLM-generated change description, risk assessment, and (on failure) suggested fixes — provider-agnostic via [LiteLLM](https://github.com/BerriAI/litellm). Wire AWS Bedrock (Claude, Nova, gpt-oss) with native IAM auth, or point at OpenAI, Anthropic, Gemini, Azure OpenAI, or any OpenAI-compatible endpoint. See [docs/ai-plan-summary.md](docs/ai-plan-summary.md).
 
+> **Policy-as-code with OPA.** Block applies on policy violations using [Open Policy Agent](https://www.openpolicyagent.org/) and the Rego language — the open-source equivalent of TFE's proprietary Sentinel. Policy sets are scoped to workspaces with the same label-based model as roles, evaluated on the runner against the plan JSON, and gated as `advisory` (warn) or `mandatory` (block). See [docs/policies.md](docs/policies.md).
+
 ---
 
 ## Key Features
@@ -38,6 +40,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | Drift Detection | Implemented | Scheduled plan-only runs to detect out-of-band changes |
 | Run Triggers | Implemented | Cross-workspace dependency chains — source apply triggers downstream runs |
 | **AI Plan Summary** | **Implemented** | **LLM-generated change summary + risk assessment on every plan; failure analysis on errored plans. Provider-agnostic via LiteLLM — AWS Bedrock (Claude, Nova, gpt-oss…), OpenAI, Anthropic direct, Google Gemini, Azure OpenAI, vLLM. IAM-native auth for Bedrock (IRSA + optional cross-account `sts:AssumeRole`).** |
+| **Policy-as-Code (OPA)** | **Implemented** | **Rego-based policy enforcement on plan output — the open-source equivalent of Sentinel. Advisory or mandatory sets, label-scoped to workspaces, evaluated on the runner against plan JSON, with admin-override on mandatory blocks. Author Rego, attach to workspaces by label, see pass/fail per policy on every run.** |
 | Notifications | Implemented | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
 | Run Tasks | Implemented | Pre/post-plan webhook hooks for external validation |
 | Workspace Health | Implemented | Per-workspace health conditions, VCS polling status, drift detection indicators |
@@ -253,6 +256,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Deployment](docs/deployment.md) | Production Helm deployment, storage backends, scaling |
 | [Registry](docs/registry.md) | Private module/provider registry, caching layers |
 | [VCS Integration](docs/vcs-integration.md) | GitHub and GitLab setup, polling, webhooks |
+| [Policies (OPA)](docs/policies.md) | Rego policy authoring, advisory vs mandatory enforcement, label-based scoping, admin override |
 | [Autodiscovery](docs/autodiscovery.md) | Atlantis-style monorepo workspace autodiscovery |
 | [Drift Detection](docs/drift-detection.md) | Scheduled plan-only runs to detect infrastructure drift |
 | [Run Triggers](docs/run-triggers.md) | Cross-workspace dependency chains |
@@ -334,7 +338,7 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 | [Terrateam](https://terrateam.io/) | GitHub-integrated TF automation | GitHub-coupled; limited community edition |
 | [Spacelift](https://spacelift.io/) | Commercial TF management platform | Not open source |
 
-Terrapod is the only open-source project that covers the full TFE surface: state management, agent execution, private registry, RBAC, VCS integration, drift detection, and a production-grade UI -- all in a single self-hosted Kubernetes deployment.
+Terrapod is the only open-source project that covers the full TFE surface: state management, agent execution, private registry, RBAC, VCS integration, drift detection, OPA policy enforcement, and a production-grade UI -- all in a single self-hosted Kubernetes deployment.
 
 Terrapod is a single, self-hosted platform covering the full TFE surface (state + runs + registry + governance + UI + API) under a copyleft (GPLv3) license.
 
