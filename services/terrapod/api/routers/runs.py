@@ -1617,12 +1617,24 @@ async def _serve_log(
     1. Object storage (authoritative — final log uploaded by Job on completion)
     2. Redis live stream (live-streamed data from listener during execution)
     3. Empty response (no data available yet — client retries)
+
+    ETX (end-of-log sentinel that tells the UI to stop polling) is appended
+    ONLY when the data came from object storage. The Redis live-stream
+    snapshot is inherently incomplete — the runner uploads the
+    authoritative log to storage from its EXIT trap, which fires AFTER it
+    POSTs plan-result and the run transitions to terminal. If we appended
+    ETX on the Redis path the moment `phase_done` flipped true, the UI
+    would stop polling before the EXIT trap landed the trailing bytes
+    (typically the entrypoint's `PLAN_HAS_CHANGES=...` line and post-plan
+    OPA output). The user then has to refresh to see the tail.
     """
     storage = get_storage()
     phase_done = run.status in phase_complete_states
+    from_storage = False
 
     try:
         data = await storage.get(log_key)
+        from_storage = True
     except ObjectNotFoundError:
         # Try live-streamed data from Redis (available for both in-progress
         # and recently-completed runs where the Job didn't upload final logs)
@@ -1636,7 +1648,8 @@ async def _serve_log(
                     live_data = live_data.encode()
                 data = live_data
             elif phase_done:
-                # Phase finished, no log in storage or Redis — empty stream
+                # Phase finished and neither storage nor Redis has anything —
+                # nothing more is ever coming. Send ETX so the UI gives up.
                 return Response(content=_STX + _ETX, media_type="text/plain")
             else:
                 # Still running, no log yet — return empty (client retries)
@@ -1657,7 +1670,10 @@ async def _serve_log(
     if offset == 0:
         result += _STX
     result += chunk
-    # Append ETX if phase is done and this is the last chunk
-    if phase_done and (limit == 0 or offset + limit >= len(data)):
+    # Append ETX only when serving from storage (authoritative final log)
+    # AND the client has consumed everything. Redis-served data can be a
+    # mid-flight snapshot even when phase_done is true; closing the stream
+    # there truncates the visible log.
+    if from_storage and phase_done and (limit == 0 or offset + limit >= len(data)):
         result += _ETX
     return Response(content=result, media_type="text/plain")
