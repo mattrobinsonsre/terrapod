@@ -39,11 +39,45 @@ VALID_TRANSITIONS: dict[str, set[str]] = {
     # constraint anyway). The reconciler short-circuits to applied
     # without launching a Job.
     "planned": {"confirmed", "applied", "discarded", "errored", "canceled"},
-    "confirmed": {"applying", "errored", "canceled"},
-    "applying": {"applied", "errored", "canceled"},
+    # `confirmed → canceled` stays valid: the listener hasn't claimed
+    # the run yet (the claim is atomic with `confirmed → applying`),
+    # so there is no Job in flight to wait on. The cancel route picks
+    # `canceled` for this branch.
+    "confirmed": {"applying", "canceling", "canceled", "errored"},
+    # `applying → canceled` is intentionally NOT included. Once an
+    # apply Job is in flight, a cancel goes through `canceling` so the
+    # reconciler can resolve the terminal from observable Job outcome
+    # (state-version present → applied; clean kill → canceled;
+    # otherwise → errored).
+    "applying": {"applied", "canceling", "errored"},
+    # `canceling` is the intermediate status entered when a user cancels
+    # a run that may have already launched (or be in the middle of) an
+    # apply Job. We send the runner a cancel_job event but the Job's
+    # actual terminal outcome decides this run's final status:
+    #
+    #   - state-version uploaded for this run → applied
+    #       (apply landed; we cannot say "canceled" without lying about
+    #       reality. Bookkeeping follows state, never the other way.)
+    #   - Job ended with no state-version → canceled, and the workspace's
+    #       state_diverged flag is set so the operator knows real infra
+    #       may have moved without a state record.
+    #   - Job errored without a state-version → errored.
+    #
+    # Pre-execution cancels (pending/queued/planning/planned/confirmed)
+    # still go straight to `canceled` — no apply Job has run yet, so
+    # there's no possible mid-apply outcome to honour.
+    "canceling": {"canceled", "applied", "errored"},
 }
 
 TERMINAL_STATES = {"applied", "errored", "discarded", "canceled"}
+# Statuses that mean a Job has not yet started any infra mutation.
+# Cancelling from any of these can go straight to `canceled` — the
+# canceling-intermediate state is only required when an apply Job
+# may be mid-mutation. `planning` is a pure read; killing it doesn't
+# affect infra. `confirmed` has been picked up logically but the
+# listener has not yet transitioned it to `applying` and launched
+# the Job (that's atomic in claim_next_run).
+PRE_EXECUTION_STATES = frozenset({"pending", "queued", "planning", "planned", "confirmed"})
 
 
 async def _enqueue_notification(run: Run, target_status: str) -> None:
@@ -838,17 +872,161 @@ async def cancel_run(db: AsyncSession, run: Run, *, force: bool = False) -> Run:
     Pass `force=True` to bypass that check — only for internal callers
     that need to cancel superseded `planned` runs as part of cleanup.
     Terminal states are always rejected.
+
+    Behaviour by source state:
+
+      - `applying` → `canceling`. The Job may already be mid-apply.
+        Workspace stays locked. We publish `cancel_job` so the listener
+        deletes the K8s Job, but we DO NOT prejudge the terminal status
+        — the reconciler resolves canceling → applied / canceled /
+        errored based on whether a state-version was uploaded for this
+        run (see [resolve_canceling_run] in run_reconciler.py). If
+        infra mutated, the truth (applied) wins over the cancel intent.
+
+      - Anything else in CANCELABLE_STATES → `canceled` directly. No
+        apply Job has launched, so there is no possible mid-apply
+        outcome to honour. Workspace is unlocked immediately and a
+        `cancel_job` event is still published (the listener may have a
+        plan-phase Job running; killing it is cheap and correct).
     """
     if run.status in TERMINAL_STATES:
         raise ValueError(f"Cannot cancel run in terminal state '{run.status}'")
     if not force and run.status not in CANCELABLE_STATES:
         raise ValueError(f"Cannot cancel run in state '{run.status}'")
-    # Unlock workspace
-    workspace = await db.get(Workspace, run.workspace_id)
-    if workspace and workspace.locked:
-        workspace.locked = False
-        workspace.lock_id = None
-    return await transition_run(db, run, "canceled")
+
+    # Choose the target status. `applying` is the only state where a
+    # Job may already be mutating real infrastructure; everything else
+    # is safe to mark terminal-canceled immediately.
+    if run.status == "applying":
+        target = "canceling"
+    else:
+        target = "canceled"
+
+    # Workspace lock only releases on terminal transition. Holding it
+    # through `canceling` prevents a fresh run from racing the still-
+    # running apply Job and stomping its state upload.
+    if target == "canceled":
+        workspace = await db.get(Workspace, run.workspace_id)
+        if workspace and workspace.locked:
+            workspace.locked = False
+            workspace.lock_id = None
+
+    # Tell the listener to delete the K8s Job, best-effort. Publish
+    # before transitioning so a same-tick run_status_change observer
+    # sees the cancel intent reflected when it polls. The publish path
+    # is wrapped — SSE plumbing failures must never break the cancel.
+    await _publish_cancel_job(run)
+
+    return await transition_run(db, run, target)
+
+
+async def resolve_canceling_run(db: AsyncSession, run: Run, *, job_status: str) -> Run:
+    """Pick the terminal status for a `canceling` run from observable reality.
+
+    Called by the reconciler when a Job-completion signal (`succeeded`,
+    `failed`, or `deleted`) lands for a run that the user previously
+    asked to cancel mid-`applying`.
+
+    Ground truth for "did the apply land?" is whether a StateVersion was
+    uploaded for this run_id — state-version creation is the runner's
+    last act after a successful (or partially successful) apply, and
+    Terrapod **never** rejects a state upload based on tracking status
+    (see the cancel-zombie design note: tracking must follow reality,
+    not the other way around). Outcomes:
+
+      - State exists → `applied`. Apply landed before the kill, or
+        completed naturally before the cancel arrived. We can't claim
+        the run was canceled when real infra changed and we recorded
+        the change.
+      - `job_status == "deleted"` (listener killed the Job) and no
+        state → `canceled`. Workspace `state_diverged` is set: in the
+        worst case, tofu apply was already mid-mutation when SIGKILL
+        landed, so real resources may have changed without a state
+        record. The flag is the existing operator-visible drift
+        signal; it's how the runner entrypoint reports failed state
+        uploads, and it interacts correctly with retention sweeps.
+      - Anything else (Job `failed` with no state, or any unrecognised
+        terminal) → `errored`. Workspace `state_diverged` set for the
+        same drift-warning reason.
+    """
+    if run.status != "canceling":
+        return run
+
+    from terrapod.db.models import StateVersion
+
+    sv_result = await db.execute(select(StateVersion).where(StateVersion.run_id == run.id).limit(1))
+    state_uploaded = sv_result.scalar_one_or_none() is not None
+
+    if state_uploaded:
+        run = await transition_run(db, run, "applied")
+        target = "applied"
+    elif job_status == "deleted":
+        run = await transition_run(db, run, "canceled")
+        target = "canceled"
+    else:
+        run = await transition_run(
+            db,
+            run,
+            "errored",
+            error_message=(
+                f"Run canceled mid-apply; Job ended with status "
+                f"{job_status!r} and no state-version was uploaded."
+            ),
+        )
+        target = "errored"
+
+    # Workspace lock + drift bookkeeping. Lock releases on any terminal
+    # exit from `canceling`. state_diverged is set on the non-applied
+    # exits because we can't tell from here whether tofu apply ran any
+    # of its planned mutations before the kill signal landed.
+    ws = await db.get(Workspace, run.workspace_id)
+    if ws:
+        if ws.locked:
+            ws.locked = False
+            ws.lock_id = None
+        if target != "applied":
+            ws.state_diverged = True
+
+    logger.info(
+        "Canceling run resolved",
+        run_id=str(run.id),
+        terminal=target,
+        state_uploaded=state_uploaded,
+        job_status=job_status,
+    )
+    return run
+
+
+async def _publish_cancel_job(run: Run) -> None:
+    """Send a `cancel_job` SSE event to the pool's listeners.
+
+    The reconciler's check_job_status / stream_logs events publish on
+    `tp:listener_events:<pool_id>`; the listener consumes them via its
+    SSE loop. `cancel_job` follows the same channel so the same
+    listener that claimed the run (or any listener in the pool — they
+    can all answer cancellation, since the K8s Job is named on the
+    run row and the listener has cluster-wide CRUD on Jobs in the
+    runner namespace) deletes the Job promptly.
+
+    No-op when there's no Job (`run.job_name` empty / null) or no pool
+    (`run.pool_id` null) — that means the cancel landed before claim
+    + Job-launch, and there's nothing for a listener to do.
+    """
+    if not run.pool_id or not getattr(run, "job_name", None):
+        return
+    try:
+        from terrapod.redis.client import LISTENER_EVENTS_PREFIX, publish_event
+
+        payload = json.dumps(
+            {
+                "event": "cancel_job",
+                "run_id": str(run.id),
+                "job_name": run.job_name,
+            }
+        )
+        await publish_event(f"{LISTENER_EVENTS_PREFIX}{run.pool_id}", payload)
+    except Exception as e:
+        logger.warning("Failed to publish cancel_job event", error=str(e), run_id=str(run.id))
 
 
 async def get_run(db: AsyncSession, run_id: uuid.UUID) -> Run | None:

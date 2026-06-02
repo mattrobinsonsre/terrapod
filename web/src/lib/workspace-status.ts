@@ -40,6 +40,7 @@ export const WORKSPACE_STATUSES: ReadonlyArray<WorkspaceStatusDef> = [
   { filter: 'needs-confirm', label: 'Needs Confirm', color: 'amber', dot: 'bg-amber-400', priority: 3 },
   { filter: 'planning', label: 'Planning', color: 'blue', dot: 'bg-blue-400', priority: 4 },
   { filter: 'applying', label: 'Applying', color: 'blue', dot: 'bg-blue-400', priority: 4 },
+  { filter: 'canceling', label: 'Canceling', color: 'amber', dot: 'bg-amber-400', priority: 4 },
   { filter: 'confirmed', label: 'Confirmed', color: 'blue', dot: 'bg-blue-400', priority: 4 },
   { filter: 'queued', label: 'Queued', color: 'blue', dot: 'bg-blue-400', priority: 4 },
   { filter: 'pending', label: 'Pending', color: 'slate', dot: 'bg-slate-500', priority: 5 },

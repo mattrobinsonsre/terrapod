@@ -381,11 +381,11 @@ export default function RunDetailPage() {
   useEffect(() => {
     if (!run) return
     const status = run.attributes.status
-    if (['planning', 'planned', 'confirmed', 'applying', 'applied', 'errored', 'canceled', 'discarded'].includes(status)) {
+    if (['planning', 'planned', 'confirmed', 'applying', 'canceling', 'applied', 'errored', 'canceled', 'discarded'].includes(status)) {
       setPlanLogLoading(prev => planLog === null ? true : prev)
       loadPlanLog(true).finally(() => setPlanLogLoading(false))
     }
-    if (['applying', 'applied', 'errored'].includes(status) && !run.attributes['plan-only']) {
+    if (['applying', 'canceling', 'applied', 'errored'].includes(status) && !run.attributes['plan-only']) {
       setApplyLogLoading(prev => applyLog === null ? true : prev)
       loadApplyLog(true).finally(() => setApplyLogLoading(false))
     }
@@ -522,7 +522,7 @@ export default function RunDetailPage() {
     switch (status) {
       case 'applied': return 'bg-green-900/50 text-green-300'
       case 'planned': case 'confirmed': return 'bg-blue-900/50 text-blue-300'
-      case 'planning': case 'applying': case 'queued': return 'bg-yellow-900/50 text-yellow-300'
+      case 'planning': case 'applying': case 'canceling': case 'queued': return 'bg-yellow-900/50 text-yellow-300'
       case 'errored': return 'bg-red-900/50 text-red-300'
       case 'canceled': case 'discarded': return 'bg-slate-700 text-slate-400'
       case 'pending': return 'bg-slate-700 text-slate-300'

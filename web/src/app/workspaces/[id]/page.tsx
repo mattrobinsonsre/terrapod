@@ -1374,7 +1374,7 @@ function WorkspaceDetailContent() {
     switch (status) {
       case 'applied': return 'bg-green-900/50 text-green-300'
       case 'planned': return 'bg-blue-900/50 text-blue-300'
-      case 'planning': case 'applying': return 'bg-yellow-900/50 text-yellow-300'
+      case 'planning': case 'applying': case 'canceling': return 'bg-yellow-900/50 text-yellow-300'
       case 'errored': return 'bg-red-900/50 text-red-300'
       case 'canceled': case 'discarded': return 'bg-slate-700 text-slate-400'
       default: return 'bg-slate-700 text-slate-400'

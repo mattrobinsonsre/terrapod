@@ -81,7 +81,16 @@ async def reconcile_runs() -> None:
        this cohort so failures surface in minutes, not hours.
     """
     async with get_db_session() as db:
-        result = await db.execute(select(Run).where(Run.status.in_(["planning", "applying"])))
+        # `canceling` joins planning/applying here: it's the intermediate
+        # state entered when a user cancels an in-flight apply. The
+        # reconciler waits for the listener's Job-status report (the
+        # listener deletes the K8s Job on receiving cancel_job; the next
+        # check_job_status reports "deleted") and then resolves the
+        # canceling run to applied/canceled/errored based on whether a
+        # state-version was actually uploaded.
+        result = await db.execute(
+            select(Run).where(Run.status.in_(["planning", "applying", "canceling"]))
+        )
         runs = list(result.scalars().all())
 
         if not runs:
@@ -104,6 +113,8 @@ async def _reconcile_one(db: AsyncSession, run: Run) -> None:
     """Reconcile a single run."""
     from terrapod.redis.client import get_job_status_from_redis, publish_listener_event
 
+    # `canceling` was entered from `applying`, so the Job that may need
+    # resolution is the apply Job — `phase` follows the same mapping.
     phase = "plan" if run.status == "planning" else "apply"
 
     # If no Job has been launched yet (listener never POSTed job-launched),
@@ -150,6 +161,18 @@ async def _reconcile_one(db: AsyncSession, run: Run) -> None:
 
     if status == "running":
         return  # Still running, no-op
+
+    # `canceling` resolution is keyed on the Job-completion signal AND
+    # whether a state-version was uploaded by this run; both branches
+    # of the normal-path handlers (succeeded → applied, failed →
+    # errored) would skip the StateVersion check and the
+    # state_diverged signalling.
+    if run.status == "canceling":
+        from terrapod.services import run_service
+
+        await _persist_live_log_if_missing(run, phase)
+        await run_service.resolve_canceling_run(db, run, job_status=status)
+        return
 
     if status == "succeeded":
         await _handle_succeeded(db, run)

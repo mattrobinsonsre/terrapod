@@ -86,8 +86,17 @@ class TestCanTransition:
         assert can_transition("applying", "applied") is True
 
     def test_any_non_terminal_to_canceled(self):
-        for state in ["pending", "queued", "planning", "planned", "confirmed", "applying"]:
+        # `applying` is intentionally excluded: cancel-while-applying
+        # routes through `canceling` and the reconciler picks the
+        # terminal from observable Job outcome (state-version present
+        # → applied; clean kill → canceled; otherwise → errored). The
+        # direct `applying → canceled` path is closed because it would
+        # silently mark a run "canceled" while real infra may have
+        # changed.
+        for state in ["pending", "queued", "planning", "planned", "confirmed"]:
             assert can_transition(state, "canceled") is True
+        assert can_transition("applying", "canceling") is True
+        assert can_transition("applying", "canceled") is False
 
     def test_any_non_terminal_to_errored(self):
         for state in ["pending", "queued", "planning", "planned", "confirmed", "applying"]:
@@ -687,3 +696,200 @@ class TestEnqueueAIPlanSummary:
             mock_settings.ai_summary.enabled = True
             # Must not raise — feature is best-effort, never breaks runs
             await _enqueue_ai_plan_summary(run, "plan_summary")
+
+
+# ── Cancel-while-applying: canceling intermediate + reality-wins resolution ──
+
+
+class TestCancelWhileApplying:
+    """`applying` → `canceling` (not direct → `canceled`).
+
+    The cancel route sends `cancel_job` to the listener so the K8s Job
+    is deleted, but the run's terminal status is decided by what the
+    apply actually did — never by the cancel intent alone. Otherwise
+    we risk marking a run "canceled" while real infrastructure
+    changed (the worst possible outcome for an IaC platform).
+    """
+
+    @pytest.mark.asyncio
+    async def test_applying_cancel_transitions_to_canceling_not_canceled(self):
+        from terrapod.services import run_service
+
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        run.workspace_id = uuid.uuid4()
+        run.pool_id = uuid.uuid4()
+        run.job_name = "tpjob-abc"
+        run.status = "applying"
+
+        db = AsyncMock()
+        ws = MagicMock()
+        ws.locked = True
+        db.get.return_value = ws
+
+        async def _transition(_db, _run, target, **_):
+            _run.status = target
+            return _run
+
+        with (
+            patch.object(run_service, "transition_run", new=AsyncMock(side_effect=_transition)),
+            patch.object(run_service, "_publish_cancel_job", new=AsyncMock()) as mock_publish,
+        ):
+            result = await run_service.cancel_run(db, run)
+
+        # Reality check: status went to canceling, NOT canceled. Workspace
+        # stays locked (the apply Job is still alive until reconciler
+        # confirms otherwise).
+        assert result.status == "canceling"
+        assert ws.locked is True
+        # The cancel_job event MUST have been published — without it the
+        # listener doesn't know to delete the Job and we have a true
+        # zombie apply.
+        mock_publish.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_confirmed_cancel_goes_direct_to_canceled(self):
+        """confirmed has no Job yet (claim is atomic with confirmed→applying)
+        so the canceling intermediate isn't needed — straight to canceled
+        and unlock the workspace."""
+        from terrapod.services import run_service
+
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        run.workspace_id = uuid.uuid4()
+        run.pool_id = None
+        run.job_name = None
+        run.status = "confirmed"
+
+        db = AsyncMock()
+        ws = MagicMock()
+        ws.locked = True
+        ws.lock_id = "lock-1"
+        db.get.return_value = ws
+
+        async def _transition(_db, _run, target, **_):
+            _run.status = target
+            return _run
+
+        with (
+            patch.object(run_service, "transition_run", new=AsyncMock(side_effect=_transition)),
+            patch.object(run_service, "_publish_cancel_job", new=AsyncMock()),
+        ):
+            result = await run_service.cancel_run(db, run)
+
+        assert result.status == "canceled"
+        assert ws.locked is False
+        assert ws.lock_id is None
+
+
+class TestResolveCancelingRun:
+    """The reconciler resolves a `canceling` run to a terminal status
+    based on observable Job outcome and whether a state-version was
+    actually uploaded. State-version presence is the ground truth: if
+    state landed, real infra changed, and the run is `applied`
+    regardless of the cancel intent.
+    """
+
+    @pytest.mark.asyncio
+    async def test_state_uploaded_resolves_to_applied(self):
+        """Apply landed before the kill (or completed naturally) — state
+        is recorded, so the terminal MUST be applied. We never claim
+        "canceled" while a state-version exists for this run."""
+        from terrapod.services import run_service
+
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        run.workspace_id = uuid.uuid4()
+        run.status = "canceling"
+
+        db = AsyncMock()
+        # One StateVersion row → state was uploaded.
+        sv_result = MagicMock()
+        sv_result.scalar_one_or_none = MagicMock(return_value=MagicMock())
+        db.execute.return_value = sv_result
+
+        ws = MagicMock()
+        ws.locked = True
+        ws.state_diverged = False
+        db.get.return_value = ws
+
+        async def _transition(_db, _run, target, **_):
+            _run.status = target
+            return _run
+
+        with patch.object(run_service, "transition_run", new=AsyncMock(side_effect=_transition)):
+            result = await run_service.resolve_canceling_run(db, run, job_status="deleted")
+
+        assert result.status == "applied"
+        # Workspace lock released; state_diverged NOT set (state is fine).
+        assert ws.locked is False
+        assert ws.state_diverged is False
+
+    @pytest.mark.asyncio
+    async def test_clean_kill_no_state_resolves_to_canceled_with_drift_flag(self):
+        """Job was killed before state was uploaded — best case the cancel
+        arrived before any mutation, worst case it killed mid-mutation.
+        Without a runner-side "nothing applied" report we can't tell,
+        so we set state_diverged as the operator-visible drift signal.
+        """
+        from terrapod.services import run_service
+
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        run.workspace_id = uuid.uuid4()
+        run.status = "canceling"
+
+        db = AsyncMock()
+        sv_result = MagicMock()
+        sv_result.scalar_one_or_none = MagicMock(return_value=None)
+        db.execute.return_value = sv_result
+
+        ws = MagicMock()
+        ws.locked = True
+        ws.state_diverged = False
+        db.get.return_value = ws
+
+        async def _transition(_db, _run, target, **_):
+            _run.status = target
+            return _run
+
+        with patch.object(run_service, "transition_run", new=AsyncMock(side_effect=_transition)):
+            result = await run_service.resolve_canceling_run(db, run, job_status="deleted")
+
+        assert result.status == "canceled"
+        assert ws.locked is False
+        # The whole point: signal the operator that real infra may have
+        # moved without a state record. Without this flag the
+        # "canceled" outcome would silently hide possible drift.
+        assert ws.state_diverged is True
+
+    @pytest.mark.asyncio
+    async def test_failed_no_state_resolves_to_errored_with_drift_flag(self):
+        from terrapod.services import run_service
+
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        run.workspace_id = uuid.uuid4()
+        run.status = "canceling"
+
+        db = AsyncMock()
+        sv_result = MagicMock()
+        sv_result.scalar_one_or_none = MagicMock(return_value=None)
+        db.execute.return_value = sv_result
+
+        ws = MagicMock()
+        ws.locked = True
+        ws.state_diverged = False
+        db.get.return_value = ws
+
+        async def _transition(_db, _run, target, error_message=""):
+            _run.status = target
+            _run.error_message = error_message
+            return _run
+
+        with patch.object(run_service, "transition_run", new=AsyncMock(side_effect=_transition)):
+            result = await run_service.resolve_canceling_run(db, run, job_status="failed")
+
+        assert result.status == "errored"
+        assert "no state-version" in result.error_message
+        assert ws.state_diverged is True

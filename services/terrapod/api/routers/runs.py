@@ -688,7 +688,9 @@ def _plan_status(run: Run) -> str:
         return "pending"
     if s == "planning":
         return "running"
-    if s in ("planned", "confirmed", "applying", "applied"):
+    if s in ("planned", "confirmed", "applying", "canceling", "applied"):
+        # `canceling` only arises from `applying`, by which point the
+        # plan phase is finished — report it accordingly.
         return "finished"
     if s == "errored":
         # Errored during plan phase (plan never finished)
@@ -707,7 +709,10 @@ def _apply_status(run: Run) -> str:
         return "unreachable"
     if s == "confirmed":
         return "pending"
-    if s == "applying":
+    if s in ("applying", "canceling"):
+        # `canceling` is "apply is in flight and being killed". From the
+        # phase-status view it's still running until the reconciler
+        # resolves it to a terminal.
         return "running"
     if s == "applied":
         return "finished"
