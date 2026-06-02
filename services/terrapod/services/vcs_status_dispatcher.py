@@ -373,8 +373,39 @@ async def handle_vcs_commit_status(payload: dict) -> None:
                 error=str(e),
             )
 
-        # Post/update PR comment (only for PR runs)
+        # Post/update PR comment (only for PR runs).
+        #
+        # The comment is shared across every run for this (workspace, PR)
+        # tuple — keyed by `<!-- terrapod:ws:{ws.id} -->` and updated in
+        # place by `_find_or_create_comment`. That means a stale run's
+        # transition (typically the supersede-cancel that fires when a
+        # force-push creates a fresh run for the new HEAD SHA) can land
+        # AFTER the fresh run's writes and clobber the comment with the
+        # old run's status. The per-SHA commit status check is unaffected
+        # (GitHub only surfaces the head SHA's checks), but the comment
+        # is the only shared surface, so only the latest run for this PR
+        # may write to it.
         if run.vcs_pull_request_number:
+            latest_run_id = (
+                await db.execute(
+                    select(Run.id)
+                    .where(
+                        Run.workspace_id == ws.id,
+                        Run.vcs_pull_request_number == run.vcs_pull_request_number,
+                    )
+                    .order_by(Run.created_at.desc())
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+            if latest_run_id is not None and latest_run_id != run.id:
+                logger.debug(
+                    "Skipping PR comment write for superseded run",
+                    run_id=run_id_str,
+                    latest_run_id=str(latest_run_id),
+                    pr=run.vcs_pull_request_number,
+                )
+                return
+
             run_url = target_url or f"run-{run.id}"
             # AI plan summary (#401) — included in the comment body when
             # a ready row exists for this run. The summariser re-enqueues
