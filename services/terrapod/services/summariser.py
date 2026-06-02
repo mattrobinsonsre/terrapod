@@ -873,6 +873,21 @@ async def handle_ai_plan_summary(payload: dict) -> None:
         if not isinstance(risk_factors, list):
             risk_factors = []
 
+        # Telemetry for the prompt rule "empty risk_factors is acceptable
+        # ONLY when risk_level == low". The schema enforces presence but
+        # not non-emptiness, and constrained decoding can't express the
+        # conditional, so the model occasionally returns an elevated
+        # risk_level with no enumerated factors. Log it so we can see how
+        # often the prompt-level guard fails — no auto-repair yet.
+        if risk_level != "low" and not risk_factors:
+            logger.warning(
+                "summariser.risk_factors_empty_at_elevated_level",
+                run_id=str(run_id),
+                kind=kind,
+                risk_level=risk_level,
+                model=cfg.model,
+            )
+
         await _upsert_summary(
             db,
             run_id=run_id,

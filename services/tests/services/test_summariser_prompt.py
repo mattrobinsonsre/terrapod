@@ -193,6 +193,23 @@ def test_code_diff_described_in_skill_prompt():
     assert "resource_drift" in system
 
 
+def test_plan_summary_skill_forbids_empty_risk_factors_at_elevated_level():
+    """The prompt MUST state that an empty risk_factors array is
+    permitted only when risk_level == "low". The JSON Schema can't
+    express this conditional, and constrained decoding doesn't enforce
+    it, so the prompt is the only place this rule lives. Violations
+    have been observed in production: a plan with mixed in-place
+    updates returned `risk_level: medium` with `risk_factors: []`.
+    """
+    skill = PLAN_SUMMARY_SKILL_PROMPT
+    # The rule names all three elevated levels explicitly so the model
+    # can't pattern-match on "medium" alone and ignore the others.
+    assert "`medium`, `high`, or `critical`" in skill
+    # And the empty-array carve-out is bound to risk_level == "low".
+    assert "empty `risk_factors` array is permitted ONLY when" in skill
+    assert '`risk_level == "low"`' in skill
+
+
 def test_failure_analysis_skill_also_describes_code_diff():
     """Failure analysis benefits from CODE_DIFF too — the recent change
     is the most likely cause of a new failure.
