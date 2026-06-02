@@ -8,14 +8,23 @@ here — changing the schema means changing all three.
 Helm-provided `prompt_prefix` and `prompt_suffix` strings wrap this skill
 prompt; they are intended for tone/emphasis tweaks, NOT for changing the
 output contract. See `AISummaryContextConfig` in `config.py`.
+
+Structured output is delivered via LiteLLM tool-calling: the model is
+forced (``tool_choice``) to call ``submit_plan_summary`` /
+``submit_failure_analysis`` with arguments matching
+``PLAN_SUMMARY_JSON_SCHEMA``. Providers that support constrained
+decoding (Bedrock Converse for Anthropic, OpenAI function calling,
+etc.) guarantee the arguments are valid JSON. The legacy "ask for
+JSON in the response body" path remains in the summariser as a
+defensive fallback for providers / models that ignore tools.
 """
 
 from __future__ import annotations
 
-# Single source of truth for the schema. The JSON-schema dict is sent in
-# the request `response_format` and the prose schema is also embedded in
-# the user message — Bedrock OpenAI-compat ignores `response_format` for
-# some Anthropic models, so the in-prompt schema is the durable backstop.
+# Single source of truth for the schema. Used both as the tool's
+# `parameters` JSON Schema (the canonical structured-output path) and
+# previously also embedded in the user message as prose — the in-prompt
+# schema is the durable backstop if a model ignores the tool definition.
 PLAN_SUMMARY_JSON_SCHEMA: dict = {
     "type": "object",
     "additionalProperties": False,
@@ -74,6 +83,48 @@ PLAN_SUMMARY_JSON_SCHEMA: dict = {
 }
 
 
+# Tool / function-call definitions. The model is forced (via
+# ``tool_choice``) to call the appropriate one with arguments matching
+# the schema. Providers with constrained decoding (Bedrock Converse for
+# Anthropic, OpenAI function calling, Anthropic direct, Gemini, etc.)
+# guarantee the arguments are valid JSON — no more "model response was
+# not JSON" parse failures from mid-string escaping bugs.
+PLAN_SUMMARY_TOOL: dict = {
+    "type": "function",
+    "function": {
+        "name": "submit_plan_summary",
+        "description": (
+            "Submit the structured plan summary. Call this tool exactly once "
+            "with the description, overall risk_level, and discrete risk_factors."
+        ),
+        "parameters": PLAN_SUMMARY_JSON_SCHEMA,
+    },
+}
+
+FAILURE_ANALYSIS_TOOL: dict = {
+    "type": "function",
+    "function": {
+        "name": "submit_failure_analysis",
+        "description": (
+            "Submit the structured failure analysis. Call this tool exactly "
+            "once. `description` is the root-cause explanation; `risk_factors` "
+            "are candidate fixes ordered most-likely-to-resolve first; "
+            "`risk_level` is how blocking the failure is."
+        ),
+        "parameters": PLAN_SUMMARY_JSON_SCHEMA,
+    },
+}
+
+
+def tool_for_kind(kind: str) -> dict:
+    """Return the LiteLLM tool definition matching this summariser kind."""
+    if kind == "plan_summary":
+        return PLAN_SUMMARY_TOOL
+    if kind == "failure_analysis":
+        return FAILURE_ANALYSIS_TOOL
+    raise ValueError(f"unknown summariser kind: {kind!r}")
+
+
 PLAN_SUMMARY_SKILL_PROMPT = """\
 You are a Terraform plan reviewer embedded in Terrapod. You receive the
 proposed changes from a terraform/tofu plan and the HCL that produced
@@ -95,21 +146,11 @@ You will receive these inputs in the user message:
   • FLEET_CONTEXT — deployment-wide notes from the operator. May be empty.
   • WORKSPACE_CONTEXT — workspace-specific notes. May be empty.
 
-You return a single JSON object matching this schema, with no
-surrounding text, markdown fences, or commentary:
-
-  {
-    "description": "<plain language summary of what changes, ~600 words max>",
-    "risk_level": "<low | medium | high | critical>",
-    "risk_factors": [
-      {
-        "severity": "<low | medium | high | critical>",
-        "title": "<short label, max 120 chars>",
-        "detail": "<explanation, max 600 chars>",
-        "resource_address": "<terraform address, optional>"
-      }
-    ]
-  }
+You submit your answer by calling the `submit_plan_summary` tool
+exactly once. The tool's parameters carry the schema; the provider
+guarantees your arguments are well-formed JSON. Do not respond with
+prose, do not paraphrase the JSON in your message body — just call
+the tool.
 
 CRITICAL — trust `change.actions`, not snapshots:
 
@@ -198,21 +239,11 @@ You will receive these inputs in the user message:
   • FLEET_CONTEXT — deployment-wide notes. May be empty.
   • WORKSPACE_CONTEXT — workspace-specific notes. May be empty.
 
-You return a single JSON object matching this schema, with no
-surrounding text, markdown fences, or commentary:
-
-  {
-    "description": "<plain language explanation of what went wrong, ~600 words max>",
-    "risk_level": "<low | medium | high | critical>",
-    "risk_factors": [
-      {
-        "severity": "<low | medium | high | critical>",
-        "title": "<short fix label, max 120 chars>",
-        "detail": "<concrete steps or change to make, max 600 chars>",
-        "resource_address": "<terraform address, optional>"
-      }
-    ]
-  }
+You submit your answer by calling the `submit_failure_analysis` tool
+exactly once. The tool's parameters carry the schema; the provider
+guarantees your arguments are well-formed JSON. Do not respond with
+prose, do not paraphrase the JSON in your message body — just call
+the tool.
 
 For failure analysis, the fields carry these meanings:
   • description: what failed and why — the root cause in operator
@@ -305,10 +336,8 @@ def render_prompt(
     if code_context_truncated.strip():
         user_parts.append(f"CODE_CONTEXT:\n```hcl\n{code_context_truncated}\n```")
 
-    user_parts.append(
-        "Now produce the JSON object per the schema in the system prompt. "
-        "Output JSON only — no surrounding text or code fences."
-    )
+    tool_name = "submit_plan_summary" if kind == "plan_summary" else "submit_failure_analysis"
+    user_parts.append(f"Now call the `{tool_name}` tool exactly once with your structured answer.")
 
     user_message = "\n\n".join(user_parts)
     return system_message, user_message

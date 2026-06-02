@@ -56,7 +56,7 @@ from terrapod.config import settings
 from terrapod.db.models import PlanSummary, Run, Workspace, now_utc
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
-from terrapod.services.summariser_prompt import render_prompt
+from terrapod.services.summariser_prompt import render_prompt, tool_for_kind
 from terrapod.storage import get_storage
 from terrapod.storage.keys import (
     config_version_key,
@@ -462,9 +462,15 @@ def _resolve_workspace_mode(ws: Workspace) -> bool:
 
 
 def _build_litellm_kwargs(
-    *, system_message: str, user_message: str, max_output_tokens: int
+    *, kind: str, system_message: str, user_message: str, max_output_tokens: int
 ) -> dict:
     """Assemble the keyword arguments for ``litellm.acompletion``.
+
+    Includes the ``tools`` definition and a forcing ``tool_choice`` so
+    the provider returns structured output via its native tool-calling
+    surface (Bedrock Converse toolConfig, OpenAI function calling,
+    Anthropic direct, etc.). LiteLLM translates per provider; we always
+    write OpenAI-shape on the way in.
 
     Provider-specific keys (``api_key``, ``api_base``, ``aws_*``) are
     passed through unconditionally — LiteLLM ignores the ones that
@@ -473,14 +479,9 @@ def _build_litellm_kwargs(
     """
     cfg = settings.ai_summary
     auth = cfg.auth
+    tool = tool_for_kind(kind)
+    tool_name = tool["function"]["name"]
 
-    # We deliberately don't set response_format — Bedrock Converse for
-    # Anthropic models rejects the OpenAI json_schema field with
-    # "output_config.format: Extra inputs are not permitted", and other
-    # providers' translations vary in quality. The skill prompt embeds
-    # the JSON schema in the system message and instructs "Output JSON
-    # only"; _parse_model_json forgives incidental fence wrapping. That
-    # gives us portable behaviour across every LiteLLM backend.
     kwargs: dict = {
         "model": cfg.model,
         "max_tokens": max_output_tokens,
@@ -488,6 +489,10 @@ def _build_litellm_kwargs(
             {"role": "system", "content": system_message},
             {"role": "user", "content": user_message},
         ],
+        "tools": [tool],
+        # Force the named tool — without this, models can choose to
+        # respond in plain prose and we lose the schema guarantee.
+        "tool_choice": {"type": "function", "function": {"name": tool_name}},
         "timeout": cfg.request_timeout_seconds,
     }
 
@@ -511,14 +516,23 @@ def _build_litellm_kwargs(
 
 async def _call_model(
     *,
+    kind: str,
     system_message: str,
     user_message: str,
     max_output_tokens: int,
 ) -> tuple[dict, int, int]:
-    """Drive a Chat Completions call via the LiteLLM library.
+    """Drive a tool-calling completion via the LiteLLM library.
 
-    Returns ``(parsed_json, input_tokens, output_tokens)``. Raises on
-    HTTP errors, missing choices, or JSON parse errors.
+    The model is forced (via ``tool_choice``) to call the
+    kind-specific submission tool with arguments matching
+    ``PLAN_SUMMARY_JSON_SCHEMA``. Provider-side constrained decoding
+    (Bedrock Converse, OpenAI function calling, etc.) guarantees the
+    arguments are valid JSON — no more mid-string escape bugs.
+
+    Returns ``(parsed_args, input_tokens, output_tokens)``. Raises on
+    HTTP errors, missing choices, truncation, or — defensively — if a
+    model ignores ``tool_choice`` and returns prose, in which case we
+    fall back to parsing the response body as JSON.
     """
     cfg = settings.ai_summary
     if not cfg.model:
@@ -526,6 +540,7 @@ async def _call_model(
 
     resp = await litellm.acompletion(
         **_build_litellm_kwargs(
+            kind=kind,
             system_message=system_message,
             user_message=user_message,
             max_output_tokens=max_output_tokens,
@@ -535,37 +550,87 @@ async def _call_model(
     if not resp.choices:
         raise RuntimeError("model response had no choices")
     choice = resp.choices[0]
-    text = choice.message.content or ""
     finish_reason = getattr(choice, "finish_reason", None)
 
-    # When the model runs out of output tokens it stops mid-JSON, so both
-    # strict json.loads and the balanced-brace fallback fail with a
-    # misleading "not JSON" — call out the real cause first.
+    # Truncation diagnostic stays — applies to both tool args and
+    # plain text. `tool_calls` is the finish_reason for a successful
+    # tool call on most providers; `stop` is also valid (Bedrock
+    # Converse normalises everything to `stop` after a clean tool call
+    # in LiteLLM's translation). `length` always means trouble.
     if finish_reason == "length":
         raise RuntimeError(
             f"model response truncated at max_output_tokens={max_output_tokens} "
             f"(finish_reason=length); raise ai_summary.max_output_tokens"
         )
 
-    try:
-        parsed = _parse_model_json(text)
-    except ValueError as e:
-        # Log a head+tail snippet so future failures are diagnosable
-        # without rerunning. Limit size so we don't dump megabytes into
-        # the structured log.
-        snippet = text if len(text) <= 800 else f"{text[:400]}…{text[-400:]}"
+    tool_calls = getattr(choice.message, "tool_calls", None) or []
+    if tool_calls:
+        parsed = _parse_tool_call_arguments(tool_calls[0])
+    else:
+        # Defensive fallback: model ignored tool_choice and replied in
+        # prose. Shouldn't happen with constrained-decoding providers
+        # but keeps us working against self-hosted endpoints that don't
+        # support tool calling.
+        text = choice.message.content or ""
         logger.warning(
-            "Summariser response did not parse as JSON",
+            "Model returned no tool_calls despite tool_choice; "
+            "falling back to body-content JSON parse",
             finish_reason=finish_reason,
             response_length=len(text),
-            response_snippet=snippet,
         )
-        raise ValueError(f"{e} (finish_reason={finish_reason}, len={len(text)})") from e
+        try:
+            parsed = _parse_model_json(text)
+        except ValueError as e:
+            snippet = text if len(text) <= 800 else f"{text[:400]}…{text[-400:]}"
+            logger.warning(
+                "Summariser body content did not parse as JSON either",
+                finish_reason=finish_reason,
+                response_length=len(text),
+                response_snippet=snippet,
+            )
+            raise ValueError(f"{e} (finish_reason={finish_reason}, len={len(text)})") from e
 
     usage = getattr(resp, "usage", None)
     in_tok = int(getattr(usage, "prompt_tokens", 0) or 0) if usage else 0
     out_tok = int(getattr(usage, "completion_tokens", 0) or 0) if usage else 0
     return parsed, in_tok, out_tok
+
+
+def _parse_tool_call_arguments(tool_call: object) -> dict:
+    """Extract the parsed arguments dict from a LiteLLM tool_call object.
+
+    LiteLLM normalises to OpenAI shape: ``tool_call.function.arguments``
+    is the canonical location, and it can come back as either a JSON
+    string (most providers) or an already-parsed dict (some translations).
+    Handles both, plus the failure modes (missing function attr,
+    malformed JSON despite the constrained-decode promise).
+    """
+    fn = getattr(tool_call, "function", None)
+    if fn is None and isinstance(tool_call, dict):
+        fn = tool_call.get("function")
+    if fn is None:
+        raise ValueError("tool_call had no `function` attribute")
+
+    args = getattr(fn, "arguments", None)
+    if args is None and isinstance(fn, dict):
+        args = fn.get("arguments")
+    if args is None:
+        raise ValueError("tool_call.function had no `arguments`")
+
+    if isinstance(args, dict):
+        return args
+    if isinstance(args, str):
+        try:
+            return json.loads(args)
+        except json.JSONDecodeError as e:
+            snippet = args if len(args) <= 800 else f"{args[:400]}…{args[-400:]}"
+            logger.warning(
+                "Tool-call arguments were not valid JSON despite tool_choice",
+                response_length=len(args),
+                response_snippet=snippet,
+            )
+            raise ValueError(f"tool-call arguments invalid JSON: {e}") from e
+    raise ValueError(f"tool_call.function.arguments had unexpected type: {type(args).__name__}")
 
 
 def _parse_model_json(text: str) -> dict:
@@ -777,6 +842,7 @@ async def handle_ai_plan_summary(payload: dict) -> None:
 
         try:
             parsed, in_tok, out_tok = await _call_model(
+                kind=kind,
                 system_message=system_message,
                 user_message=user_message,
                 max_output_tokens=cfg.max_output_tokens,

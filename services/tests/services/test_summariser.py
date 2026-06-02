@@ -179,51 +179,149 @@ def test_parse_fenced_block_without_json_tag():
 # ── truncation handling ─────────────────────────────────────────────────
 
 
-async def test_call_model_raises_on_finish_length():
-    """When Bedrock stops mid-JSON because max_output_tokens ran out we
-    must call that out explicitly — not surface a misleading 'not JSON'.
-    """
-    truncated = '{"description": "this stops mid-way",'  # no closing brace
-    fake_choice = MagicMock()
-    fake_choice.message.content = truncated
-    fake_choice.finish_reason = "length"
-    fake_resp = MagicMock(
-        choices=[fake_choice], usage=MagicMock(prompt_tokens=10, completion_tokens=1024)
+def _fake_tool_call(arguments):
+    """Build a MagicMock shaped like LiteLLM's tool_call entry."""
+    tc = MagicMock()
+    tc.function.arguments = arguments
+    return tc
+
+
+def _fake_response(*, tool_calls=None, content="", finish_reason="stop", in_tok=10, out_tok=20):
+    """Build a MagicMock shaped like LiteLLM's `ModelResponse.choices[0]`."""
+    choice = MagicMock()
+    choice.message.tool_calls = tool_calls
+    choice.message.content = content
+    choice.finish_reason = finish_reason
+    return MagicMock(
+        choices=[choice],
+        usage=MagicMock(prompt_tokens=in_tok, completion_tokens=out_tok),
     )
 
+
+async def test_call_model_raises_on_finish_length():
+    """Truncation must surface as a specific error, regardless of whether
+    we got a partial tool-call or partial body content.
+    """
+    resp = _fake_response(content='{"partial"', finish_reason="length")
     with (
         patch.object(summariser.settings.ai_summary, "model", "test-model"),
-        patch(
-            "terrapod.services.summariser.litellm.acompletion", AsyncMock(return_value=fake_resp)
-        ),
+        patch("terrapod.services.summariser.litellm.acompletion", AsyncMock(return_value=resp)),
     ):
         with pytest.raises(RuntimeError, match="truncated at max_output_tokens"):
             await summariser._call_model(
-                system_message="s", user_message="u", max_output_tokens=1024
+                kind="plan_summary",
+                system_message="s",
+                user_message="u",
+                max_output_tokens=1024,
             )
 
 
-async def test_call_model_parse_failure_includes_finish_reason():
-    """Non-length parse failures should surface finish_reason + length
-    in the error string so the operator can tell stop-vs-content
-    failures apart in the UI / logs.
+async def test_call_model_parses_tool_call_arguments_string():
+    """Happy path: provider returns the tool call with arguments as a
+    JSON string (OpenAI native shape, also what Bedrock Converse for
+    Anthropic produces via LiteLLM's translation).
     """
-    fake_choice = MagicMock()
-    fake_choice.message.content = "I cannot summarise this plan."
-    fake_choice.finish_reason = "stop"
-    fake_resp = MagicMock(
-        choices=[fake_choice], usage=MagicMock(prompt_tokens=10, completion_tokens=8)
-    )
-
+    args_str = '{"description":"adds a VPC","risk_level":"low","risk_factors":[]}'
+    resp = _fake_response(tool_calls=[_fake_tool_call(args_str)])
     with (
         patch.object(summariser.settings.ai_summary, "model", "test-model"),
-        patch(
-            "terrapod.services.summariser.litellm.acompletion", AsyncMock(return_value=fake_resp)
-        ),
+        patch("terrapod.services.summariser.litellm.acompletion", AsyncMock(return_value=resp)),
+    ):
+        parsed, in_tok, out_tok = await summariser._call_model(
+            kind="plan_summary",
+            system_message="s",
+            user_message="u",
+            max_output_tokens=1024,
+        )
+    assert parsed["description"] == "adds a VPC"
+    assert parsed["risk_level"] == "low"
+    assert in_tok == 10
+    assert out_tok == 20
+
+
+async def test_call_model_parses_tool_call_arguments_dict():
+    """Some LiteLLM provider translations return `arguments` as a dict
+    rather than a JSON string. Both shapes must work.
+    """
+    args_dict = {
+        "description": "deletes a Lambda",
+        "risk_level": "medium",
+        "risk_factors": [],
+    }
+    resp = _fake_response(tool_calls=[_fake_tool_call(args_dict)])
+    with (
+        patch.object(summariser.settings.ai_summary, "model", "test-model"),
+        patch("terrapod.services.summariser.litellm.acompletion", AsyncMock(return_value=resp)),
+    ):
+        parsed, *_ = await summariser._call_model(
+            kind="plan_summary",
+            system_message="s",
+            user_message="u",
+            max_output_tokens=1024,
+        )
+    assert parsed == args_dict
+
+
+async def test_call_model_falls_back_to_body_when_no_tool_calls():
+    """If a provider ignores tool_choice and replies in prose, we fall
+    back to the legacy `_parse_model_json` path. Defensive — shouldn't
+    happen with constrained-decode providers but keeps self-hosted
+    backends working.
+    """
+    body = '{"description":"fallback path","risk_level":"low","risk_factors":[]}'
+    resp = _fake_response(tool_calls=None, content=body)
+    with (
+        patch.object(summariser.settings.ai_summary, "model", "test-model"),
+        patch("terrapod.services.summariser.litellm.acompletion", AsyncMock(return_value=resp)),
+    ):
+        parsed, *_ = await summariser._call_model(
+            kind="plan_summary",
+            system_message="s",
+            user_message="u",
+            max_output_tokens=1024,
+        )
+    assert parsed["description"] == "fallback path"
+
+
+async def test_call_model_surfaces_malformed_tool_arguments():
+    """If the provider somehow returns a malformed-JSON string for the
+    tool arguments (shouldn't happen, but defensive), surface as an
+    actionable ValueError that mentions the JSON cause.
+    """
+    bad = '{"description":"truncated mid'  # unterminated string + obj
+    resp = _fake_response(tool_calls=[_fake_tool_call(bad)])
+    with (
+        patch.object(summariser.settings.ai_summary, "model", "test-model"),
+        patch("terrapod.services.summariser.litellm.acompletion", AsyncMock(return_value=resp)),
+    ):
+        with pytest.raises(ValueError, match="tool-call arguments invalid JSON"):
+            await summariser._call_model(
+                kind="plan_summary",
+                system_message="s",
+                user_message="u",
+                max_output_tokens=1024,
+            )
+
+
+async def test_call_model_fallback_parse_failure_includes_finish_reason():
+    """When the body-fallback path itself fails to parse, surface
+    finish_reason + length so the operator can tell from the run UI
+    whether they got a refusal, a truncation, or a malformed JSON
+    blob from a provider that ignored tools.
+    """
+    resp = _fake_response(
+        tool_calls=None, content="I cannot summarise this plan.", finish_reason="stop"
+    )
+    with (
+        patch.object(summariser.settings.ai_summary, "model", "test-model"),
+        patch("terrapod.services.summariser.litellm.acompletion", AsyncMock(return_value=resp)),
     ):
         with pytest.raises(ValueError, match="finish_reason=stop"):
             await summariser._call_model(
-                system_message="s", user_message="u", max_output_tokens=1024
+                kind="plan_summary",
+                system_message="s",
+                user_message="u",
+                max_output_tokens=1024,
             )
 
 
@@ -242,7 +340,10 @@ def test_build_litellm_kwargs_includes_aws_role_when_set():
         patch.object(summariser.settings.ai_summary.auth, "aws_external_id", "ext-id-123"),
     ):
         kw = summariser._build_litellm_kwargs(
-            system_message="sys", user_message="usr", max_output_tokens=100
+            kind="plan_summary",
+            system_message="sys",
+            user_message="usr",
+            max_output_tokens=100,
         )
         assert kw["model"] == "bedrock/anthropic.claude-opus-4-8"
         assert kw["aws_region_name"] == "us-east-1"
@@ -263,10 +364,70 @@ def test_build_litellm_kwargs_omits_role_when_unset():
         patch.object(summariser.settings.ai_summary.auth, "aws_external_id", ""),
     ):
         kw = summariser._build_litellm_kwargs(
-            system_message="sys", user_message="usr", max_output_tokens=100
+            kind="plan_summary",
+            system_message="sys",
+            user_message="usr",
+            max_output_tokens=100,
         )
         assert "aws_role_name" not in kw
         assert "aws_external_id" not in kw
+
+
+def test_build_litellm_kwargs_includes_tool_choice_for_plan_summary():
+    """Tool-calling is the canonical structured-output path. The kwargs
+    must include the submit_plan_summary tool AND force it via
+    tool_choice — without the force, models can opt to reply in prose.
+    """
+    with (
+        patch.object(summariser.settings.ai_summary, "model", "bedrock/anthropic.claude-opus-4-8"),
+        patch.object(summariser.settings.ai_summary, "api_base", ""),
+        patch.object(summariser.settings.ai_summary.auth, "api_key", ""),
+        patch.object(summariser.settings.ai_summary.auth, "aws_region", "us-east-1"),
+        patch.object(summariser.settings.ai_summary.auth, "aws_role_arn", ""),
+        patch.object(summariser.settings.ai_summary.auth, "aws_session_name", "x"),
+        patch.object(summariser.settings.ai_summary.auth, "aws_external_id", ""),
+    ):
+        kw = summariser._build_litellm_kwargs(
+            kind="plan_summary",
+            system_message="sys",
+            user_message="usr",
+            max_output_tokens=100,
+        )
+        assert isinstance(kw["tools"], list) and len(kw["tools"]) == 1
+        tool = kw["tools"][0]
+        assert tool["type"] == "function"
+        assert tool["function"]["name"] == "submit_plan_summary"
+        # Schema lands on the tool, not in the user message.
+        assert "description" in tool["function"]["parameters"]["properties"]
+        assert "risk_level" in tool["function"]["parameters"]["properties"]
+        assert kw["tool_choice"] == {
+            "type": "function",
+            "function": {"name": "submit_plan_summary"},
+        }
+
+
+def test_build_litellm_kwargs_uses_failure_analysis_tool_for_failure_kind():
+    """failure_analysis kind selects the submit_failure_analysis tool
+    (same JSON schema, different name + description). The wrong tool
+    would confuse the model about whether it's summarising or analysing.
+    """
+    with (
+        patch.object(summariser.settings.ai_summary, "model", "openai/gpt-5"),
+        patch.object(summariser.settings.ai_summary, "api_base", ""),
+        patch.object(summariser.settings.ai_summary.auth, "api_key", "sk-x"),
+        patch.object(summariser.settings.ai_summary.auth, "aws_region", "us-east-1"),
+        patch.object(summariser.settings.ai_summary.auth, "aws_role_arn", ""),
+        patch.object(summariser.settings.ai_summary.auth, "aws_session_name", "x"),
+        patch.object(summariser.settings.ai_summary.auth, "aws_external_id", ""),
+    ):
+        kw = summariser._build_litellm_kwargs(
+            kind="failure_analysis",
+            system_message="sys",
+            user_message="usr",
+            max_output_tokens=100,
+        )
+        assert kw["tools"][0]["function"]["name"] == "submit_failure_analysis"
+        assert kw["tool_choice"]["function"]["name"] == "submit_failure_analysis"
 
 
 def test_build_litellm_kwargs_passes_api_key_and_base():
@@ -281,7 +442,10 @@ def test_build_litellm_kwargs_passes_api_key_and_base():
         patch.object(summariser.settings.ai_summary.auth, "aws_external_id", ""),
     ):
         kw = summariser._build_litellm_kwargs(
-            system_message="sys", user_message="usr", max_output_tokens=100
+            kind="plan_summary",
+            system_message="sys",
+            user_message="usr",
+            max_output_tokens=100,
         )
         assert kw["api_key"] == "sk-abc"
         assert kw["api_base"] == "https://vllm.local/v1"
