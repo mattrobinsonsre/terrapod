@@ -211,7 +211,7 @@ CRITICAL — `risk_level` and `risk_factors` are paired, not independent:
      "detail": "Aurora minor-version upgrade applies immediately on
      apply (apply_immediately=true); expect a brief connection drop
      while the writer restarts.",
-     "resource_address": "module.helios_rds[0].aws_rds_cluster.this[0]"}
+     "resource_address": "module.app_rds[0].aws_rds_cluster.this[0]"}
 
   Order `risk_factors` worst-first. Severities on each factor match
   the schema enum; the overall `risk_level` should equal the highest
