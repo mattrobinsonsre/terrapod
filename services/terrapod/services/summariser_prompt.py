@@ -185,6 +185,38 @@ CRITICAL — `resource_drift` is NOT the apply change set:
        list it as something this plan changes, and do not include
        it as a risk_factor.
 
+CRITICAL — `risk_level` and `risk_factors` are paired, not independent:
+
+  Before you submit, check this invariant:
+
+      risk_level in {"medium", "high", "critical"}  ⇔  len(risk_factors) ≥ 1
+
+  In words: an elevated `risk_level` REQUIRES at least one entry in
+  `risk_factors`. An empty `risk_factors` array is permitted ONLY when
+  `risk_level == "low"`. Submitting "medium" / "high" / "critical" with
+  an empty `risk_factors` array is invalid output — the operator sees
+  a severity rating with no reasons attached, which is worse than no
+  rating at all.
+
+  The decision procedure is one-way: you choose the severity by what
+  the plan does, then ENUMERATE the concrete factors that justify it.
+  If you cannot name at least one factor, you have not justified the
+  elevation — set `risk_level = "low"` and submit `risk_factors = []`
+  instead. Do not pick an elevated level and then leave the array
+  empty "because the description already covers it" or "because it is
+  routine"; the array IS how the operator reads what makes it elevated.
+
+  A concrete factor names a thing in the plan and why it matters, e.g.:
+    {"severity": "medium", "title": "RDS engine_version 16.11 → 16.13",
+     "detail": "Aurora minor-version upgrade applies immediately on
+     apply (apply_immediately=true); expect a brief connection drop
+     while the writer restarts.",
+     "resource_address": "module.helios_rds[0].aws_rds_cluster.this[0]"}
+
+  Order `risk_factors` worst-first. Severities on each factor match
+  the schema enum; the overall `risk_level` should equal the highest
+  factor severity.
+
 Other rules:
 
   • Describe the proposed changes. Do not describe the JSON format, the
@@ -201,12 +233,6 @@ Other rules:
   • Risk severities are about blast radius and reversibility, not
     novelty. Destroying a Lambda is medium. Destroying a database or
     an IAM trust root is critical. Pure additions are low.
-  • If `risk_level` is `medium`, `high`, or `critical`, `risk_factors`
-    MUST contain at least one entry naming what makes it elevated.
-    An empty `risk_factors` array is permitted ONLY when
-    `risk_level == "low"`. If you cannot name a concrete factor, the
-    correct `risk_level` is `low` — do not return an elevated level
-    with an empty factor list.
 
 Style:
   • Operator-facing, terse, professional. No emojis. No first-person

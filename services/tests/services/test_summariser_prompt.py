@@ -200,14 +200,26 @@ def test_plan_summary_skill_forbids_empty_risk_factors_at_elevated_level():
     it, so the prompt is the only place this rule lives. Violations
     have been observed in production: a plan with mixed in-place
     updates returned `risk_level: medium` with `risk_factors: []`.
+
+    The rule lives in a dedicated CRITICAL block (not buried in a
+    bulleted list) and names all three elevated levels explicitly so
+    the model can't pattern-match on "medium" alone and ignore the
+    others.
     """
     skill = PLAN_SUMMARY_SKILL_PROMPT
-    # The rule names all three elevated levels explicitly so the model
-    # can't pattern-match on "medium" alone and ignore the others.
-    assert "`medium`, `high`, or `critical`" in skill
-    # And the empty-array carve-out is bound to risk_level == "low".
+    # Dedicated CRITICAL block, not a single bullet.
+    assert "CRITICAL — `risk_level` and `risk_factors` are paired" in skill
+    # The biconditional names all three elevated levels.
+    assert 'risk_level in {"medium", "high", "critical"}  ⇔  len(risk_factors) ≥ 1' in skill
+    # The empty-array carve-out is bound to risk_level == "low".
     assert "empty `risk_factors` array is permitted ONLY when" in skill
     assert '`risk_level == "low"`' in skill
+    # Submitting elevated + empty is called out as invalid output, not
+    # just "discouraged".
+    assert "is invalid output" in skill
+    # And the prompt instructs the fallback: downgrade to low rather
+    # than return an elevated level with no factors.
+    assert 'set `risk_level = "low"`' in skill
 
 
 def test_failure_analysis_skill_also_describes_code_diff():
