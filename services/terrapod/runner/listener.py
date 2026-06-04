@@ -722,7 +722,11 @@ class RunnerListener:
 
     async def _handle_check_job_status(self, data: dict) -> None:
         """Query K8s for Job status and POST the result back to the API."""
-        from terrapod.runner.job_manager import get_job_status, get_pod_terminated_info
+        from terrapod.runner.job_manager import (
+            get_job_failure_info,
+            get_job_status,
+            get_pod_terminated_info,
+        )
 
         job_name = data.get("job_name", "")
         job_namespace = data.get("job_namespace", "")
@@ -743,19 +747,32 @@ class RunnerListener:
         # For Failed Jobs, also collect the container terminated info — exit
         # code + K8s termination reason (OOMKilled / Error / Completed).
         # The API maps `reason` to the typed runner_exit_status bucket (#430).
-        # Best-effort: if the pod has been GC'd or the call errors, we leave
-        # exit_code/reason unset and the reconciler falls back to generic
-        # "Job failed" handling.
+        #
+        # Two-tier lookup:
+        #   1. Pod-side: list the Job's pods and read the runner container's
+        #      terminated state. This is the authoritative source — both
+        #      exit_code AND reason (which carries "OOMKilled" when relevant).
+        #   2. Job-side fallback: when the pod has been GC'd before we
+        #      observed it (taint-eviction, TTL controller, manual cleanup),
+        #      the Job itself carries the failure cause in
+        #      status.conditions[?].reason="PodFailurePolicy". Parse the
+        #      exit code out so we can still typify the run as `killed`
+        #      or `error` instead of an empty status. Reason stays empty
+        #      because the Job-controller event doesn't carry the K8s
+        #      container terminated.reason — the API's typed-bucket
+        #      mapping handles `reason=""` + `exit_code=137` correctly.
         body: dict = {"status": status, "phase": phase}
         if status == "failed":
             try:
                 info = await get_pod_terminated_info(job_name, namespace=job_namespace)
+                if info is None:
+                    info = await get_job_failure_info(job_name, namespace=job_namespace)
                 if info is not None:
                     body["exit_code"] = info["exit_code"]
                     body["reason"] = info["reason"]
             except Exception as e:
                 logger.debug(
-                    "Failed to get pod terminated info",
+                    "Failed to get pod/job terminated info",
                     job=job_name,
                     run_id=run_id,
                     error=str(e),

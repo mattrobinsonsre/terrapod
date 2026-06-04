@@ -204,19 +204,52 @@ def build_job_spec(
         },
         "spec": {
             "backoffLimit": 3,
+            # PodFailurePolicy differs by phase:
+            #   plan  — K8s-native retry on disruption (eviction, preemption,
+            #           node drain). Plan never mutates Terrapod state or
+            #           live AWS infra, so partial execution is safe to
+            #           retry.
+            #   apply — never retry on disruption. Once the container ran,
+            #           terraform may have mutated state. K8s PodFailurePolicy
+            #           can't reliably distinguish "container started" from
+            #           "container never ran" — kubelet behaviour differs
+            #           across cluster versions/distributions for pre-start
+            #           disruption — so apply is conservatively never-retry.
+            #           Operator decides whether to re-run from the Run UI.
+            #
+            # Order matters: PodFailurePolicy evaluates rules in order, first
+            # match wins. The Ignore rule for plan MUST precede the FailJob
+            # rule so that eviction (which produces exit 137 via SIGKILL on
+            # an already-running container) is ignored before the FailJob
+            # rule catches it.
             "podFailurePolicy": {
-                "rules": [
+                "rules": (
+                    [
+                        {
+                            # Plan-only: ignore disruption-triggered failures
+                            # so K8s retries via backoffLimit.
+                            "action": "Ignore",
+                            "onPodConditions": [
+                                {"type": "DisruptionTarget", "status": "True"},
+                            ],
+                        },
+                    ]
+                    if phase == "plan"
+                    else []
+                )
+                + [
                     {
+                        # Any non-zero exit fails the Job (applies to both
+                        # plan and apply). For plan, a disruption-driven
+                        # SIGKILL would have matched the Ignore rule above
+                        # and skipped this; what remains here is a real
+                        # tofu error code (or other non-disruption kill).
                         "action": "FailJob",
                         "onExitCodes": {
                             "containerName": "runner",
                             "operator": "NotIn",
                             "values": [0],
                         },
-                    },
-                    {
-                        "action": "Count",
-                        "onPodConditions": [{"type": "DisruptionTarget", "status": "True"}],
                     },
                 ],
             },

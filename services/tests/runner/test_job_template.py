@@ -107,50 +107,70 @@ class TestVarFilesInjection:
 
 
 class TestPodFailurePolicy:
-    """Verify pod failure policy prevents retries after container execution."""
+    """Phase-conditional pod failure policy.
 
-    def _build_default_spec(self):
+    plan jobs: K8s-native retry on disruption (eviction, preemption, drain)
+               because plan is read-only on AWS — partial execution is safe
+               to retry. Rule order matters: Ignore-on-DisruptionTarget MUST
+               come BEFORE FailJob-on-non-zero, otherwise the SIGKILL-derived
+               exit 137 from eviction would fail the Job before the disruption
+               rule could ignore it.
+
+    apply jobs: never retry on disruption. Once the container has run, it may
+                have mutated state (resources created/modified/destroyed);
+                K8s retry would risk double-create or split-brain. Operator
+                decides whether to re-run from the Run UI.
+    """
+
+    def _build(self, phase: str):
         from terrapod.runner.job_template import build_job_spec
 
         return build_job_spec(
             run_id="abc123",
-            phase="plan",
+            phase=phase,
             runner_config=_runner_config(),
             auth_secret_name="tprun-abc12345-auth",
             env_vars=[],
             terraform_vars=[],
         )
 
-    def test_backoff_limit(self):
-        """backoffLimit should be 3 to allow retries for pod disruptions."""
-        spec = self._build_default_spec()
-        assert spec["spec"]["backoffLimit"] == 3
+    def test_backoff_limit_unchanged(self):
+        for phase in ("plan", "apply"):
+            spec = self._build(phase)
+            assert spec["spec"]["backoffLimit"] == 3
 
-    def test_container_exit_fails_job(self):
-        """First rule: any non-zero container exit → FailJob (no retry)."""
-        spec = self._build_default_spec()
-        rules = spec["spec"]["podFailurePolicy"]["rules"]
-        rule = rules[0]
-        assert rule["action"] == "FailJob"
-        assert rule["onExitCodes"]["containerName"] == "runner"
-        assert rule["onExitCodes"]["operator"] == "NotIn"
-        assert rule["onExitCodes"]["values"] == [0]
+    def test_plan_ignores_disruption_first(self):
+        """Plan rule[0] must Ignore on DisruptionTarget=True."""
+        rules = self._build("plan")["spec"]["podFailurePolicy"]["rules"]
+        assert rules[0] == {
+            "action": "Ignore",
+            "onPodConditions": [{"type": "DisruptionTarget", "status": "True"}],
+        }
 
-    def test_disruption_counted(self):
-        """Second rule: DisruptionTarget → Count toward backoffLimit."""
-        spec = self._build_default_spec()
-        rules = spec["spec"]["podFailurePolicy"]["rules"]
-        rule = rules[1]
-        assert rule["action"] == "Count"
-        assert rule["onPodConditions"] == [{"type": "DisruptionTarget", "status": "True"}]
-
-    def test_exit_rule_before_disruption_rule(self):
-        """Exit rule must be evaluated before disruption rule."""
-        spec = self._build_default_spec()
-        rules = spec["spec"]["podFailurePolicy"]["rules"]
+    def test_plan_then_fails_on_nonzero_exit(self):
+        """Plan rule[1] is FailJob on non-zero exit."""
+        rules = self._build("plan")["spec"]["podFailurePolicy"]["rules"]
         assert len(rules) == 2
-        assert "onExitCodes" in rules[0]
-        assert "onPodConditions" in rules[1]
+        assert rules[1]["action"] == "FailJob"
+        assert rules[1]["onExitCodes"] == {
+            "containerName": "runner",
+            "operator": "NotIn",
+            "values": [0],
+        }
+
+    def test_apply_only_fails_on_nonzero_exit(self):
+        """Apply has no Ignore rule — DisruptionTarget falls through to FailJob via exit-137."""
+        rules = self._build("apply")["spec"]["podFailurePolicy"]["rules"]
+        assert len(rules) == 1
+        assert rules[0]["action"] == "FailJob"
+        assert rules[0]["onExitCodes"] == {
+            "containerName": "runner",
+            "operator": "NotIn",
+            "values": [0],
+        }
+        # Critically: NO Ignore-on-DisruptionTarget rule. An eviction's
+        # exit-137 will hit the FailJob rule and the run will error.
+        assert not any(r["action"] == "Ignore" for r in rules)
 
 
 class TestAuthTokenInjection:

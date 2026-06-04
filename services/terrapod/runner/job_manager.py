@@ -5,6 +5,7 @@ Uses the kubernetes Python client to interact with the K8s API.
 
 import asyncio
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 
 from kubernetes import client, config
@@ -297,6 +298,64 @@ async def get_pod_terminated_info(
                 "exit_code": int(term.exit_code) if term.exit_code is not None else -1,
                 "reason": term.reason or "",
             }
+
+    return None
+
+
+async def get_job_failure_info(job_name: str, namespace: str = "") -> dict[str, int | str] | None:
+    """Fallback to `get_pod_terminated_info` when the pod has been GC'd.
+
+    When the listener observes Job=failed but the pod is already gone
+    (eviction by taint-eviction-controller, TTL controller, manual
+    cleanup, etc.), pod-level terminated state is unreadable.
+
+    The Job itself still records the failure cause in
+    `status.conditions[?].reason == "PodFailurePolicy"`. The condition's
+    `message` field contains the exit code that triggered the
+    FailJob rule, e.g.:
+
+        Container runner for pod terrapod/tprun-...-lx72v failed
+        with exit code 137 matching FailJob rule at index 0
+
+    Parse the exit code out and return it so the listener can still
+    typify the failure (`runner_exit_status = "killed"` for exit 137
+    without OOMKilled reason) rather than leaving an empty status that
+    the reconciler renders as a generic "Job failed".
+
+    Returns the same shape as get_pod_terminated_info:
+        { "exit_code": <int>, "reason": <str> }
+    Reason is left empty because the Job-controller event doesn't
+    carry the K8s container terminated.reason — only the exit code.
+    The API's typed-bucket mapping handles `reason=""` + `exit_code=137`
+    correctly (→ "killed").
+
+    Returns None if no PodFailurePolicy condition is present or the
+    message can't be parsed. Never raises.
+    """
+    if not namespace:
+        namespace = _default_namespace()
+
+    batch_api = _get_batch_api()
+
+    try:
+        loop = asyncio.get_event_loop()
+        job = await loop.run_in_executor(
+            None,
+            lambda: batch_api.read_namespaced_job(name=job_name, namespace=namespace),
+        )
+    except ApiException:
+        return None
+
+    conditions = getattr(getattr(job, "status", None), "conditions", None) or []
+    for cond in conditions:
+        if getattr(cond, "reason", None) != "PodFailurePolicy":
+            continue
+        msg = getattr(cond, "message", "") or ""
+        # Format: "... failed with exit code <N> matching FailJob rule ..."
+        m = re.search(r"exit code (\d+)", msg)
+        if not m:
+            continue
+        return {"exit_code": int(m.group(1)), "reason": ""}
 
     return None
 
