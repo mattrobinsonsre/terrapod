@@ -133,9 +133,56 @@ upload_log() {
     return 0
 }
 
+# --- Runner resource profile (#430) ---
+# Captures peak memory + cumulative CPU usage from cgroup v2 + the
+# script's exit code, POSTed at exit to /runs/{id}/resource-profile.
+# OOM-killed exits don't fire this trap (SIGKILL is uncatchable), so
+# those cases are picked up by the listener reading K8s pod terminated
+# state — both paths converge on the same DB columns.
+#
+# Best-effort: if cgroup files don't exist (dev environment without
+# cgroups v2) or the POST fails, the runner exits silently rather
+# than disturbing the run's real exit code.
+upload_resource_profile() {
+    if [ -z "$TP_API_URL" ] || [ -z "$TP_RUN_ID" ]; then
+        return 0
+    fi
+
+    _peak_mem=""
+    _peak_cpu=""
+    if [ -r /sys/fs/cgroup/memory.peak ]; then
+        _peak_mem=$(cat /sys/fs/cgroup/memory.peak 2>/dev/null || echo "")
+    fi
+    if [ -r /sys/fs/cgroup/cpu.stat ]; then
+        _peak_cpu=$(awk '/^usage_usec / { print $2 }' /sys/fs/cgroup/cpu.stat 2>/dev/null || echo "")
+    fi
+
+    # Build the JSON body. Only include fields we actually read — the
+    # API accepts any subset and treats missing fields as "unknown".
+    _body="{\"exit_code\": $1"
+    if [ -n "$_peak_mem" ]; then
+        _body="${_body}, \"peak_memory_bytes\": ${_peak_mem}"
+    fi
+    if [ -n "$_peak_cpu" ]; then
+        _body="${_body}, \"peak_cpu_usec\": ${_peak_cpu}"
+    fi
+    _body="${_body}}"
+
+    # 5s timeout — runner is exiting; we don't want to hang on a
+    # struggling API. Single attempt, no retry — best-effort.
+    curl -sSf --max-time 5 -X POST \
+         -H "$AUTH_HEADER" \
+         -H "Content-Type: application/json" \
+         -d "$_body" \
+         "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/resource-profile" \
+         >/dev/null 2>&1 || true
+    return 0
+}
+
 on_exit() {
     _rc=$?
     upload_log || true
+    upload_resource_profile "$_rc" || true
     exit "$_rc"
 }
 trap on_exit EXIT

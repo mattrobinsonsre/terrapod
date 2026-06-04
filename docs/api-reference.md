@@ -620,6 +620,29 @@ Run objects include the following drift detection attributes in responses:
 
 Drift detection runs are always plan-only and are not counted in the workspace's normal run queue.
 
+### Run Response Attributes (Resource Profile / OOM)
+
+Run objects include peak resource usage + an abnormal-exit signal so the UI (and external clients) can surface memory pressure without operators having to grep pod logs. All five attributes are `null` / `""` for runs that pre-date the feature or never started a Job.
+
+| Attribute | Type | Source | Description |
+|---|---|---|---|
+| `resource-cpu` | string | Workspace setting (snapshot) | CPU request applied to the Job (K8s quantity, e.g. `"1"`, `"500m"`). Limit is `2×` this |
+| `resource-memory` | string | Workspace setting (snapshot) | Memory request applied to the Job (K8s quantity, e.g. `"2Gi"`). Limit is `2×` this |
+| `peak-memory-bytes` | integer or null | Runner (cgroup v2) | Peak resident memory observed during the run — `/sys/fs/cgroup/memory.peak` |
+| `peak-cpu-usec` | integer or null | Runner (cgroup v2) | Cumulative CPU time consumed by the run, microseconds — `usage_usec` from `/sys/fs/cgroup/cpu.stat` |
+| `runner-exit-code` | integer or null | Runner | Runner script's exit code captured at exit. `null` if the trap didn't fire (e.g. SIGKILL) |
+| `runner-exit-reason` | string | Listener (K8s) | Raw K8s `container.state.terminated.reason` (e.g. `"OOMKilled"`, `"Error"`, `"Completed"`). `""` if not observed |
+| `runner-exit-status` | string | Reconciler (typed bucket) | Stable typed value: `""` (unknown / not yet observed), `"clean"`, `"oom"`, `"killed"`, `"error"`. The UI keys on this; reason is shown for context |
+
+Two independent capture paths feed these fields:
+
+- **Runner path** — `POST /api/terrapod/v1/runs/{run_id}/resource-profile` from the runner's EXIT trap with `peak_memory_bytes` / `peak_cpu_usec` / `exit_code`. Fires for any catchable exit (success, plan errored, OPA failed, SIGTERM during apply).
+- **Listener path** — when a Job fails, the listener reads `container.state.terminated.{reason, exit_code}` and POSTs them on the job-status report. The reconciler maps them to `runner_exit_status`.
+
+OOM (`exit 137 + reason "OOMKilled"`) is uncatchable, so the runner path never fires on OOM — the listener path is the only signal. Both paths converge on the same five DB columns; whichever signal arrives wins. `runner-exit-status` is set **only** by the reconciler (single source of truth for typed bucketing) and is what drives the UI's OOM badge + the typed error message ("Runner OOM-killed (peak memory N.NN Gi). Workspace resource_memory is …. Increase resource_memory + retry.").
+
+See [runners.md — Memory Pressure & OOM Visibility](runners.md#memory-pressure--oom-visibility-430) for the operator-facing tuning workflow.
+
 ### Show Run
 
 ```
@@ -1987,6 +2010,35 @@ Content-Type: application/octet-stream
 ```
 
 Upload new state after apply. Returns 204 on success.
+
+### Record Resource Profile
+
+```
+POST /api/terrapod/v1/runs/{run_id}/resource-profile
+Content-Type: application/json
+```
+
+Called by the runner entrypoint at exit (EXIT trap, fires on every catchable termination — clean success, plan errored, OPA failed, SIGTERM during apply). Captures cgroup-v2 peak memory + cumulative CPU + the runner script's exit code.
+
+Body (all fields optional — the runner sends whatever it could read):
+
+```json
+{
+  "peak_memory_bytes": 1500000000,
+  "peak_cpu_usec": 42000000,
+  "exit_code": 0
+}
+```
+
+- `peak_memory_bytes` — from `/sys/fs/cgroup/memory.peak`
+- `peak_cpu_usec` — `usage_usec` from `/sys/fs/cgroup/cpu.stat`
+- `exit_code` — script's actual exit status
+
+Negative values, non-integers, or booleans return `400`. Missing fields are not clobbered (existing values preserved).
+
+Note: **SIGKILL is uncatchable**, so this endpoint never fires on OOM-killed runs. Those are covered by the listener's K8s-terminated-state report on the job-status path; `runner-exit-status` ends up `"oom"` either way. See [Run Response Attributes (Resource Profile / OOM)](#run-response-attributes-resource-profile--oom) for the full signal flow.
+
+Returns 204 on success.
 
 ---
 

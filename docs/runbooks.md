@@ -78,6 +78,50 @@ A run is marked "stale" by the reconciler when it has been in `planning` or `app
 
 ---
 
+## Runner OOM-Killed (#430)
+
+A runner Job was killed by Kubernetes because its container exceeded its memory limit (`2 × workspace.resource_memory`). This usually shows up after a provider schema grows or a workspace acquires a lot more managed resources than it had when `resource_memory` was first set.
+
+### Symptoms
+
+- Run status `errored` with one of:
+  - `Runner OOM-killed (peak memory N.NN Gi). Workspace resource_memory is XGi; limit is 2× that. Increase resource_memory + retry.`
+  - `Runner killed (SIGKILL, exit 137) without an explicit K8s reason. Most likely OOM…`
+- Run detail page shows the **Resource usage** panel with a red `OOM-killed` or `Killed (likely OOM)` badge
+- AI plan summary (if enabled) is marked `skipped — runner exited abnormally (oom|killed)`
+- No plan log uploaded, or only a partial log
+
+### Diagnosis
+
+1. **Confirm the failure mode** — open the Run detail page. The Resource usage panel shows peak memory next to the workspace's request + limit. If the memory bar is solid red, this is a true OOM.
+2. **Check the runner_exit_status** — `oom` is definitive (we read it from `container.state.terminated.reason == "OOMKilled"`). `killed` is "exit 137 with no reason" — usually still OOM, but the pod was GCed before the listener could capture the terminated state; could also be a node-level eviction (e.g. spot instance preemption).
+3. **Look at workload-shape changes** — has the workspace grown? `terraform state list | wc -l` against the latest applied state version, compared to a known-good run from before the OOM started happening.
+4. **For `killed` runs, rule out preemption** — check node events around the run's `apply_started_at`. If the node disappeared (spot instance, autoscaler scale-down), it's not strictly OOM and the workspace is sized correctly; the run can be retried on a stable node.
+
+### Resolution
+
+**For true OOMs (`oom` status):**
+
+1. Bump `resource_memory` on the workspace. UI: workspace settings. API: `PATCH /api/v2/workspaces/{id}` with `data.attributes.resource-memory`.
+2. The limit auto-derives as `2 × request`, so doubling the request doubles the limit.
+3. Re-queue the run (Retry button on the Run detail page).
+4. After the new run succeeds, re-check the Resource usage panel — the bar should be in amber (80–95%) or green (<80%). If it's still red, bump again.
+
+**Rule of thumb**: set `resource_memory` to ~50% above typical peak. Anything tracking ≥95% is one provider-schema change away from OOMing.
+
+**For ambiguous `killed` runs:**
+
+- If multiple consecutive runs `killed` at the same workspace, treat as OOM and bump `resource_memory` anyway.
+- If only one isolated `killed` and the node is gone, it was preemption — retry as-is.
+
+### Verification
+
+- New run completes successfully
+- Resource usage panel shows memory bar in green or amber, not red
+- `runner_exit_status` is `clean` on the successful run (visible in the API response, not currently rendered in UI)
+
+---
+
 ## State Diverged
 
 The runner entrypoint marks a workspace as "state diverged" when an `apply` succeeds (infrastructure changed) but the state file upload to object storage fails. This is a critical situation — real infrastructure has changed but Terrapod's state doesn't reflect it.

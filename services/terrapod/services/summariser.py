@@ -856,6 +856,25 @@ async def handle_ai_plan_summary(payload: dict) -> None:
         if ws is None:
             return
 
+        # Skip summarisation when the runner died abnormally (#430). The plan
+        # log + JSON upload happens AFTER the runner posts plan-result, so an
+        # OOM / SIGKILL between those steps leaves us with an empty log + the
+        # plan resource at status="finished, has-changes=false". Summarising
+        # from the empty log produces a confidently-wrong "no changes here"
+        # narrative — exactly the failure mode #430 cites. Mark skipped with
+        # a clear reason so the UX can show "summary unavailable, runner
+        # died" instead of either silence or the misleading summary.
+        if run.runner_exit_status in ("oom", "killed"):
+            await _upsert_summary(
+                db,
+                run_id=run_id,
+                kind=kind,
+                status="skipped",
+                error_message=f"runner exited abnormally ({run.runner_exit_status})",
+            )
+            await db.commit()
+            return
+
         if not _resolve_workspace_mode(ws):
             await _upsert_summary(
                 db,

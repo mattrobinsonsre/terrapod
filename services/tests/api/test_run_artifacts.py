@@ -556,3 +556,137 @@ class TestLogUploadPublishesEvent:
             )
 
         assert resp.status_code == 204
+
+
+# ── resource-profile (#430) ──────────────────────────────────────────
+
+
+class TestResourceProfile:
+    """The runner POSTs its cgroup-v2 peak memory/CPU + exit code at exit.
+
+    Hard rules being protected here:
+      - Runner-token auth, scoped to this run_id (mirrors other artifact endpoints)
+      - Subset bodies accepted (runner may not be able to read all cgroup files)
+      - Non-int / negative values → 400 (DB schema is unsigned-ish BIGINT)
+      - runner_exit_status is NEVER set by this endpoint — that bucketing is
+        owned by report_job_status / the reconciler (single source of truth)
+    """
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_persists_all_fields(self, *_mocks):
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        run.runner_exit_status = ""
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.post(
+                f"/api/terrapod/v1/runs/{run.id}/resource-profile",
+                json={
+                    "peak_memory_bytes": 1_500_000_000,
+                    "peak_cpu_usec": 42_000_000,
+                    "exit_code": 0,
+                },
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 204
+        assert run.peak_memory_bytes == 1_500_000_000
+        assert run.peak_cpu_usec == 42_000_000
+        assert run.runner_exit_code == 0
+        # The endpoint must NOT set runner_exit_status — that's the reconciler's job.
+        assert run.runner_exit_status == ""
+        mock_db.commit.assert_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_accepts_partial_body(self, *_mocks):
+        """Runner may not be able to read every cgroup file (dev env without
+        cgroup v2). Missing fields must NOT clobber existing columns."""
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        run.peak_memory_bytes = None
+        run.peak_cpu_usec = 99  # pre-existing — must be preserved
+        run.runner_exit_code = None
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.post(
+                f"/api/terrapod/v1/runs/{run.id}/resource-profile",
+                json={"peak_memory_bytes": 42},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 204
+        assert run.peak_memory_bytes == 42
+        assert run.peak_cpu_usec == 99
+        assert run.runner_exit_code is None
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_rejects_negative_value(self, *_mocks):
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.post(
+                f"/api/terrapod/v1/runs/{run.id}/resource-profile",
+                json={"peak_memory_bytes": -1},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 400
+        assert "peak_memory_bytes" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_rejects_bool_for_int_field(self, *_mocks):
+        """Python booleans are `int` subclasses — naive isinstance accepts
+        True/False as 1/0. Reject them so a client bug can't corrupt
+        the column."""
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.post(
+                f"/api/terrapod/v1/runs/{run.id}/resource-profile",
+                json={"exit_code": True},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 400
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_403_for_wrong_run_scope(self, *_mocks):
+        run_id = uuid.uuid4()
+        wrong_run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+
+        app = _make_app(_runner_user(wrong_run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.post(
+                f"/api/terrapod/v1/runs/{run.id}/resource-profile",
+                json={"exit_code": 0},
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 403

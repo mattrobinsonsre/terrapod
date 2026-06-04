@@ -153,6 +153,34 @@ All runner Jobs inherit the following settings from `runners.*` in Helm values:
 
 Each workspace has `resource_cpu` and `resource_memory` settings (default: 1 CPU / 2Gi memory) that control the resource **requests** for its runner Jobs. Limits are computed as 2x the requests automatically. These are set via the workspace API or UI.
 
+### Memory Pressure & OOM Visibility (#430)
+
+Terraform/OpenTofu provider plugins can consume substantial memory — particularly the AWS provider when refreshing thousands of resources, or any provider that pulls a large module tarball into memory. If a runner Job hits its memory limit (`2 × resource_memory`), Kubernetes OOM-kills the container. Without explicit surfacing, the symptom is just a "Job failed" with no signal that memory was the cause — leaving an operator to guess + incrementally bump the limit. Terrapod surfaces it explicitly.
+
+**Every run records its actual usage.** The runner entrypoint reads `/sys/fs/cgroup/memory.peak` and `/sys/fs/cgroup/cpu.stat` at exit and POSTs them to `/api/terrapod/v1/runs/{run_id}/resource-profile`. The Run detail page renders a **Resource usage** panel showing peak memory + CPU **alongside the workspace's request and limit** — peak alone has no meaning, so it's always anchored. The memory bar turns amber at ≥80% of the limit and red at ≥95%, so high-water marks that are approaching the cliff are visible before they push a run over the edge.
+
+**OOM-killed runs are tagged explicitly.** SIGKILL is uncatchable, so the runner's own EXIT trap doesn't fire on OOM. The complementary signal comes from the **listener**: when a Job fails, the listener queries the pod's `container.state.terminated` field and reports the `reason` (`OOMKilled`) and `exit_code` (`137`) back via the job-status endpoint. The reconciler maps that to a typed `runner_exit_status`:
+
+| `runner_exit_status` | Trigger | Error message points at |
+|---|---|---|
+| `oom` | K8s reason == `OOMKilled` | `resource_memory` (bump it + retry) |
+| `killed` | Exit 137 with no explicit reason (pod GCed before we could read terminated state) | `resource_memory` as most likely cause, node eviction as the alternative |
+| `error` | Non-zero exit, not 137 | Exit code |
+| `clean` | Exit 0 (success path) | — |
+
+The Run detail page surfaces an **OOM-killed / Killed (likely OOM)** badge when the status is `oom` or `killed`, and the error message itself names the actionable knob ("Workspace resource_memory is 1Gi … Increase resource_memory + retry") rather than the historical generic "Job failed".
+
+**AI plan summary is skipped on abnormal exit.** When the runner is OOM-killed, the plan JSON upload usually never happens — summarising from a missing/empty plan would produce a confidently-wrong "no changes here" narrative. The summariser detects `runner_exit_status in {"oom", "killed"}` and marks the summary as `skipped` with an explicit reason, instead of generating a hallucinated one.
+
+**Tuning workflow.** If a workspace OOMs, the operator's playbook is:
+
+1. Check the Run detail page — confirm the OOM badge + peak memory shown.
+2. The error message will name the current `resource_memory` value.
+3. Bump it (UI workspace settings, or API `PATCH /api/v2/workspaces/{id}`) and retry. The limit will be `2 × resource_memory` automatically.
+4. After the next successful run, re-check the Resource usage panel — the memory bar should be in the amber or green band, not red.
+
+The peak data accumulates across runs (per-run snapshot on the row, plus visible on each Run detail page), so right-sizing the workspace is a matter of looking at a few representative runs' peaks and setting `resource_memory` to roughly half-again the typical peak. Anything tracking ≥95% (red) is one provider-schema change away from OOMing.
+
 ---
 
 ## Cloud Workload Identity

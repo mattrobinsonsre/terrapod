@@ -73,6 +73,15 @@ def _mock_run(
     run.resource_destructions = None
     run.resource_replacements = None
     run.resource_imports = None
+    # Runner resource profile + OOM detection (#430). None on every run
+    # until the runner posts /resource-profile or the listener sees a
+    # terminated container reason — the JSON serializer must still
+    # render these as nulls / empty strings.
+    run.peak_memory_bytes = None
+    run.peak_cpu_usec = None
+    run.runner_exit_code = None
+    run.runner_exit_reason = ""
+    run.runner_exit_status = ""
     return run
 
 

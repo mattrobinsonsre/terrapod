@@ -10,6 +10,7 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { PlanSummaryBadges } from '@/components/plan-summary-badges'
 import { PlanAiSummary } from '@/components/plan-ai-summary'
+import { ResourceUsage } from '@/components/resource-usage'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
@@ -53,6 +54,13 @@ interface RunAttrs {
   'module-overrides': Record<string, string> | null
   'status-timestamps': Record<string, string>
   'created-by': string
+  'resource-cpu': string
+  'resource-memory': string
+  'peak-memory-bytes': number | null
+  'peak-cpu-usec': number | null
+  'runner-exit-code': number | null
+  'runner-exit-reason': string
+  'runner-exit-status': string
   actions: RunActions
   permissions: Record<string, boolean>
 }
@@ -619,6 +627,22 @@ export default function RunDetailPage() {
             <pre className="text-sm text-red-300 whitespace-pre-wrap font-mono">{attrs['error-message']}</pre>
           </div>
         )}
+
+        {/* Resource usage panel (#430) — peak memory/CPU alongside the
+            workspace's requested/limit, plus an OOM tag when the
+            listener observed an OOMKilled / exit-137 termination. The
+            ResourceUsage component returns null when no peak data is
+            present (pre-#430 runs), so this block is safe to render
+            unconditionally for new runs. */}
+        <div className="mb-6">
+          <ResourceUsage
+            resourceCpu={attrs['resource-cpu']}
+            resourceMemory={attrs['resource-memory']}
+            peakMemoryBytes={attrs['peak-memory-bytes']}
+            peakCpuUsec={attrs['peak-cpu-usec']}
+            runnerExitStatus={attrs['runner-exit-status']}
+          />
+        </div>
 
         {/* OPA policy evaluations (#343) */}
         <PolicyPanel runId={runId} runStatus={attrs.status} onChanged={loadRun} />

@@ -325,6 +325,90 @@ class TestHandleFailed:
         mock_persist.assert_called_once_with(run, "plan")
 
 
+# ── _build_failure_message (#430) ─────────────────────────────────────
+
+
+class TestBuildFailureMessage:
+    """The reconciler renders a typed error message from runner_exit_status.
+
+    The signal flows: listener observes K8s container-terminated reason →
+    report_job_status sets runner_exit_status to a stable bucket
+    ("oom" / "killed" / "error" / "clean") → reconciler reads it here and
+    renders the operator-facing message. This test pins the four buckets
+    so a refactor of either side keeps the contract intact.
+
+    For OOM the message MUST name the actionable knob (resource_memory)
+    because #430's whole motivation is "OOMs were invisible / surfaced
+    as generic 'Job failed'".
+    """
+
+    def test_oom_with_peak_names_resource_memory_and_peak(self):
+        from terrapod.services.run_reconciler import _build_failure_message
+
+        run = _mock_run()
+        run.runner_exit_status = "oom"
+        run.peak_memory_bytes = 2 * (1 << 30)  # 2 GiB
+        run.resource_memory = "1Gi"
+
+        msg = _build_failure_message(run, "failed")
+        assert "OOM" in msg
+        assert "2.00 Gi" in msg  # peak rendered binary
+        assert "1Gi" in msg  # workspace's request, verbatim
+        assert "Increase resource_memory" in msg
+
+    def test_oom_without_peak_still_actionable(self):
+        from terrapod.services.run_reconciler import _build_failure_message
+
+        run = _mock_run()
+        run.runner_exit_status = "oom"
+        run.peak_memory_bytes = None
+        run.resource_memory = "4Gi"
+
+        msg = _build_failure_message(run, "failed")
+        assert "OOM" in msg
+        assert "4Gi" in msg
+        assert "Increase resource_memory" in msg
+
+    def test_killed_points_at_likely_oom(self):
+        """exit 137 with no explicit K8s reason — pod was probably GCed
+        before we could read terminated.reason. Still surface OOM as the
+        most likely cause + the alternative (node eviction)."""
+        from terrapod.services.run_reconciler import _build_failure_message
+
+        run = _mock_run()
+        run.runner_exit_status = "killed"
+        run.runner_exit_code = 137
+        run.resource_memory = "2Gi"
+
+        msg = _build_failure_message(run, "failed")
+        assert "137" in msg
+        assert "OOM" in msg
+        assert "eviction" in msg.lower()
+
+    def test_error_includes_exit_code(self):
+        from terrapod.services.run_reconciler import _build_failure_message
+
+        run = _mock_run()
+        run.runner_exit_status = "error"
+        run.runner_exit_code = 2
+
+        msg = _build_failure_message(run, "failed")
+        assert "2" in msg
+        assert "OOM" not in msg
+
+    def test_unset_status_falls_back_to_generic(self):
+        """Backwards-compat: runs that pre-date #430 have empty
+        runner_exit_status and must still get the historical message
+        shape (no NameError, no 'OOM' false alarm)."""
+        from terrapod.services.run_reconciler import _build_failure_message
+
+        run = _mock_run()
+        run.runner_exit_status = ""
+
+        msg = _build_failure_message(run, "failed")
+        assert msg == "Job failed"
+
+
 # ── _check_stale ──────────────────────────────────────────────────────
 
 
