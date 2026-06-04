@@ -722,7 +722,7 @@ class RunnerListener:
 
     async def _handle_check_job_status(self, data: dict) -> None:
         """Query K8s for Job status and POST the result back to the API."""
-        from terrapod.runner.job_manager import get_job_status
+        from terrapod.runner.job_manager import get_job_status, get_pod_terminated_info
 
         job_name = data.get("job_name", "")
         job_namespace = data.get("job_namespace", "")
@@ -740,11 +740,32 @@ class RunnerListener:
             logger.warning("Failed to get Job status", job=job_name, error=str(e))
             return
 
+        # For Failed Jobs, also collect the container terminated info — exit
+        # code + K8s termination reason (OOMKilled / Error / Completed).
+        # The API maps `reason` to the typed runner_exit_status bucket (#430).
+        # Best-effort: if the pod has been GC'd or the call errors, we leave
+        # exit_code/reason unset and the reconciler falls back to generic
+        # "Job failed" handling.
+        body: dict = {"status": status, "phase": phase}
+        if status == "failed":
+            try:
+                info = await get_pod_terminated_info(job_name, namespace=job_namespace)
+                if info is not None:
+                    body["exit_code"] = info["exit_code"]
+                    body["reason"] = info["reason"]
+            except Exception as e:
+                logger.debug(
+                    "Failed to get pod terminated info",
+                    job=job_name,
+                    run_id=run_id,
+                    error=str(e),
+                )
+
         try:
             await self._http_client.post(
                 f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}"
                 f"/runs/run-{run_id}/job-status",
-                json={"status": status, "phase": phase},
+                json=body,
                 headers=self._auth_headers(),
             )
         except Exception as e:

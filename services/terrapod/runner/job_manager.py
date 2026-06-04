@@ -235,6 +235,72 @@ async def get_job_status(job_name: str, namespace: str = "") -> str | None:
         raise
 
 
+async def get_pod_terminated_info(
+    job_name: str, namespace: str = ""
+) -> dict[str, int | str] | None:
+    """Return the runner container's terminated info for a Failed Job (#430).
+
+    Lists the Job's pods, picks the most-recently-terminated one with a
+    `runner` container in a terminated state, and returns:
+        { "exit_code": <int>, "reason": <str> }
+
+    Returns None if no terminated runner container is found (job still
+    running, pod GC'd, container not yet observed, etc.).
+
+    `reason` is the K8s container.state.terminated.reason — most commonly
+    "OOMKilled" / "Error" / "Completed". The API maps this to the typed
+    `runner_exit_status` bucket on the run.
+
+    Never raises; on any K8s API error or unexpected shape, returns None.
+    The reconciler falls back to its launch_timeout for those cases.
+    """
+    if not namespace:
+        namespace = _default_namespace()
+
+    core_api = _get_core_api()
+
+    try:
+        loop = asyncio.get_event_loop()
+        pods = await loop.run_in_executor(
+            _executor,
+            lambda: core_api.list_namespaced_pod(
+                namespace=namespace,
+                label_selector=f"job-name={job_name}",
+            ),
+        )
+        core_api.api_client.last_response = None
+    except ApiException:
+        return None
+
+    if not pods.items:
+        return None
+
+    # Most-recently-terminated pod first — same selection the K8s Job
+    # controller uses when deciding whether to mark itself Failed.
+    def _terminated_at(p: object) -> str:
+        for c in getattr(p.status, "container_statuses", None) or []:
+            term = getattr(c.state, "terminated", None)
+            if term and term.finished_at:
+                return str(term.finished_at)
+        return ""
+
+    pods_sorted = sorted(pods.items, key=_terminated_at, reverse=True)
+
+    for pod in pods_sorted:
+        for c in getattr(pod.status, "container_statuses", None) or []:
+            if c.name != "runner":
+                continue
+            term = getattr(c.state, "terminated", None)
+            if term is None:
+                continue
+            return {
+                "exit_code": int(term.exit_code) if term.exit_code is not None else -1,
+                "reason": term.reason or "",
+            }
+
+    return None
+
+
 async def get_job_uid(job_name: str, namespace: str = "") -> str:
     """Get the UID of a Job. Used for ownerReference on auth Secrets."""
     if not namespace:

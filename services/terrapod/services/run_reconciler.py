@@ -177,7 +177,56 @@ async def _reconcile_one(db: AsyncSession, run: Run) -> None:
     if status == "succeeded":
         await _handle_succeeded(db, run)
     elif status in ("failed", "deleted"):
-        await _handle_failed(db, run, f"Job {status}")
+        # Typed OOM message when the listener captured the K8s
+        # terminated reason (#430). runner_exit_status is set by
+        # report_job_status; we just read it here.
+        await _handle_failed(db, run, _build_failure_message(run, status))
+
+
+def _build_failure_message(run: Run, status: str) -> str:
+    """Render a typed error message from runner_exit_status when set.
+
+    When the listener captured a K8s container-terminated `reason`, the
+    job-status endpoint sets `run.runner_exit_status` to one of:
+        "oom"    — reason == "OOMKilled"
+        "killed" — exit 137 with no explicit reason (could be OOM,
+                   could be eviction; we can't tell after pod GC)
+        "error"  — non-zero exit, not 137
+        "clean"  — exit 0 (shouldn't reach here since status==failed)
+    Returns a human-readable message naming the cause and pointing at
+    the actionable knob (resource_memory bump for OOM).
+    """
+    if run.runner_exit_status == "oom":
+        peak_h = _human_bytes(run.peak_memory_bytes) if run.peak_memory_bytes else None
+        if peak_h:
+            return (
+                f"Runner OOM-killed (peak memory {peak_h}). "
+                f"Workspace resource_memory is {run.resource_memory}; "
+                f"limit is 2× that. Increase resource_memory + retry."
+            )
+        return (
+            f"Runner OOM-killed (workspace resource_memory={run.resource_memory}, "
+            f"limit is 2× that). Increase resource_memory + retry."
+        )
+    if run.runner_exit_status == "killed":
+        return (
+            "Runner killed (SIGKILL, exit 137) without an explicit K8s reason. "
+            "Most likely OOM — check the workspace's resource_memory; could "
+            "also be a node-level eviction."
+        )
+    if run.runner_exit_status == "error" and run.runner_exit_code is not None:
+        return f"Runner exited with code {run.runner_exit_code}"
+    # Fall back to the generic message — matches pre-#430 behaviour.
+    return f"Job {status}"
+
+
+def _human_bytes(n: int) -> str:
+    """Render a byte count as a short human string. Matches K8s convention
+    (Gi/Mi/Ki for binary units; matches values shown in resource_memory)."""
+    for unit, scale in (("Gi", 1 << 30), ("Mi", 1 << 20), ("Ki", 1 << 10)):
+        if n >= scale:
+            return f"{n / scale:.2f} {unit}"
+    return f"{n} B"
 
 
 async def _handle_succeeded(db: AsyncSession, run: Run) -> None:
