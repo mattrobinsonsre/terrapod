@@ -129,6 +129,11 @@ def _mock_run(
     run.resource_destructions = None
     run.resource_replacements = None
     run.resource_imports = None
+    run.peak_memory_bytes = None
+    run.peak_cpu_usec = None
+    run.runner_exit_code = None
+    run.runner_exit_reason = ""
+    run.runner_exit_status = ""
     return run
 
 
