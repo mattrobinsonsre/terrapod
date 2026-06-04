@@ -435,6 +435,84 @@ async def upload_state(
     return Response(status_code=204)
 
 
+@router.post("/runs/{run_id}/resource-profile")
+async def record_resource_profile(
+    run_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Record the runner Job's resource-usage peak (#430).
+
+    Called by the runner entrypoint at exit (via the EXIT trap, so it
+    fires on every normal exit path — clean success, plan errored,
+    OPA failed, SIGTERM during apply, etc.).
+
+    Captures:
+        peak_memory_bytes — /sys/fs/cgroup/memory.peak (cgroup v2)
+        peak_cpu_usec     — cumulative usage_usec from /sys/fs/cgroup/cpu.stat
+        exit_code         — the runner script's actual exit code (0 = clean)
+
+    Body shape (JSON):
+        { "peak_memory_bytes": <int>, "peak_cpu_usec": <int>, "exit_code": <int> }
+
+    For OOMKill / external SIGKILL the runner's trap doesn't fire — those
+    cases are filled in by the listener's job-status report (run_reconciler
+    reads the K8s container terminated state and writes runner_exit_reason
+    + runner_exit_status separately). Both paths converge on the same DB
+    columns; whichever signal arrives wins. The runner_exit_status field
+    is *only* set by the reconciler (never by the runner directly) so the
+    typed bucketing stays in one place.
+
+    Runner-token auth, scoped to this run_id.
+    """
+    require_runner_for_run(user, run_id)
+    run = await _get_run(run_id, db)
+
+    try:
+        body = await request.json()
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"invalid JSON body: {e}") from e
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="body must be a JSON object")
+
+    # All three fields optional — the runner sends what it could read.
+    # Negative / non-int values are rejected to keep the DB schema sane.
+    def _opt_nonneg_int(name: str) -> int | None:
+        v = body.get(name)
+        if v is None:
+            return None
+        if not isinstance(v, int) or isinstance(v, bool) or v < 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{name} must be a non-negative integer, got {v!r}",
+            )
+        return v
+
+    peak_memory_bytes = _opt_nonneg_int("peak_memory_bytes")
+    peak_cpu_usec = _opt_nonneg_int("peak_cpu_usec")
+    exit_code = _opt_nonneg_int("exit_code")
+
+    if peak_memory_bytes is not None:
+        run.peak_memory_bytes = peak_memory_bytes
+    if peak_cpu_usec is not None:
+        run.peak_cpu_usec = peak_cpu_usec
+    if exit_code is not None:
+        run.runner_exit_code = exit_code
+
+    await db.commit()
+
+    logger.info(
+        "runner_resource_profile_recorded",
+        run_id=run_id,
+        peak_memory_bytes=peak_memory_bytes,
+        peak_cpu_usec=peak_cpu_usec,
+        exit_code=exit_code,
+    )
+
+    return Response(status_code=204)
+
+
 @router.post("/runs/{run_id}/state-diverged")
 async def mark_state_diverged(
     run_id: str,

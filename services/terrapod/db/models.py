@@ -15,6 +15,7 @@ from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     DateTime,
     ForeignKey,
@@ -1195,6 +1196,22 @@ class Run(Base):
         nullable=True,
     )
     error_message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    # Runner resource profile + OOM detection (#430).
+    # peak_memory_bytes / peak_cpu_usec — captured by the runner at exit
+    #   (cgroup v2 /sys/fs/cgroup/memory.peak + cpu.stat usage_usec).
+    # runner_exit_code / runner_exit_reason — set by the listener when
+    #   the K8s Job terminates (exit code + container.state.terminated.reason).
+    # runner_exit_status — Terrapod-side typed bucket distinguishing
+    #   "" (unset / pre-feature run), "clean" (runner exited 0),
+    #   "oom" (OOMKilled), "killed" (other SIGKILL), "error" (nonzero exit).
+    #   Lets the run UX and AI summary gate behave consistently regardless
+    #   of which signal (cgroup vs K8s) actually triggered detection.
+    peak_memory_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    peak_cpu_usec: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    runner_exit_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    runner_exit_reason: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    runner_exit_status: Mapped[str] = mapped_column(String(20), nullable=False, default="")
 
     # Run options (CLI flags)
     target_addrs: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)

@@ -120,6 +120,14 @@ def _run_json(
                 "terraform-version": run.terraform_version,
                 "resource-cpu": run.resource_cpu,
                 "resource-memory": run.resource_memory,
+                # Runner resource profile + OOM detection (#430). All
+                # nullable / empty-string for runs that pre-date the
+                # feature (or where the runner died before capturing).
+                "peak-memory-bytes": run.peak_memory_bytes,
+                "peak-cpu-usec": run.peak_cpu_usec,
+                "runner-exit-code": run.runner_exit_code,
+                "runner-exit-reason": run.runner_exit_reason or "",
+                "runner-exit-status": run.runner_exit_status or "",
                 "error-message": run.error_message,
                 "target-addrs": run.target_addrs or [],
                 "replace-addrs": run.replace_addrs or [],
