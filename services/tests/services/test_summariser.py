@@ -768,21 +768,98 @@ class TestCleanPlanJsonBytes:
         out = self._clean(plan)
         assert "prior_state" not in out
 
-    def test_preserves_resource_drift_intact(self):
-        """resource_drift carries the only signal about out-of-band changes;
-        the prompt teaches the model to label it correctly, the cleaner
-        does NOT prune it. Regressions here would silence drift-revert
-        risk signals.
+    def test_partitions_drift_reverted_vs_observed_only(self):
+        """resource_drift is split based on whether each address ALSO has
+        a real resource_changes entry:
+          - matched → stays in resource_drift (the apply IS reverting it,
+            elevated risk)
+          - unmatched → moved to drift_observed_no_apply_action with
+            actions rewritten to ["drift_observed"] so the model can't
+            pattern-match destroy framing onto it.
         """
         plan = {
             "resource_drift": [
+                # matched: also in resource_changes — drift being reverted
                 {"address": "drift_a", "change": {"actions": ["update"]}},
+                # unmatched: no resource_changes — accepted, apply no-ops
                 {"address": "drift_b", "change": {"actions": ["delete"]}},
+            ],
+            "resource_changes": [
+                {"address": "drift_a", "change": {"actions": ["update"]}},
+            ],
+        }
+        out = self._clean(plan)
+        assert out["resource_drift"] == [
+            {"address": "drift_a", "change": {"actions": ["update"]}},
+        ]
+        assert out["drift_observed_no_apply_action"] == [
+            {"address": "drift_b", "change": {"actions": ["drift_observed"]}},
+        ]
+
+    def test_drift_without_resource_changes_all_moves(self):
+        """When no resource_changes match, every drift entry moves to
+        drift_observed_no_apply_action and its actions are neutralised.
+        Reproduces the failure mode from the prod-us2-services1 AKS
+        plan summary: node pools missing in Azure showed as drift
+        deletes, model hallucinated them as planned destroys.
+        """
+        plan = {
+            "resource_drift": [
+                {
+                    "address": 'module.aks.azurerm_kubernetes_cluster_node_pool.this["gpu0"]',
+                    "change": {"actions": ["delete"]},
+                },
+                {
+                    "address": 'module.aks.azurerm_kubernetes_cluster_node_pool.this["pulsar1"]',
+                    "change": {"actions": ["delete"]},
+                },
             ],
             "resource_changes": [],
         }
         out = self._clean(plan)
+        assert out["resource_drift"] == []
+        assert [d["address"] for d in out["drift_observed_no_apply_action"]] == [
+            'module.aks.azurerm_kubernetes_cluster_node_pool.this["gpu0"]',
+            'module.aks.azurerm_kubernetes_cluster_node_pool.this["pulsar1"]',
+        ]
+        for d in out["drift_observed_no_apply_action"]:
+            assert d["change"]["actions"] == ["drift_observed"]
+
+    def test_drift_partition_skips_noop_resource_changes(self):
+        """no-op resource_changes are dropped first; the drift partition
+        must run against the pruned set, so a drift entry matched only
+        by a no-op resource_change is moved to drift_observed (apply
+        does nothing about it).
+        """
+        plan = {
+            "resource_drift": [
+                {"address": "addr_a", "change": {"actions": ["delete"]}},
+            ],
+            "resource_changes": [
+                {"address": "addr_a", "change": {"actions": ["no-op"]}},
+            ],
+        }
+        out = self._clean(plan)
+        assert out["resource_drift"] == []
+        assert out["drift_observed_no_apply_action"] == [
+            {"address": "addr_a", "change": {"actions": ["drift_observed"]}},
+        ]
+
+    def test_no_drift_observed_key_when_no_unmatched(self):
+        """Don't emit drift_observed_no_apply_action when there's nothing
+        to put in it — keeps the input minimal.
+        """
+        plan = {
+            "resource_drift": [
+                {"address": "a", "change": {"actions": ["update"]}},
+            ],
+            "resource_changes": [
+                {"address": "a", "change": {"actions": ["update"]}},
+            ],
+        }
+        out = self._clean(plan)
         assert out["resource_drift"] == plan["resource_drift"]
+        assert "drift_observed_no_apply_action" not in out
 
     def test_keeps_weird_actions_shape(self):
         """Defensive: never drop a resource_change whose shape we don't

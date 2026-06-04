@@ -149,10 +149,18 @@ def _clean_plan_json_bytes(raw: bytes) -> bytes:
       • the top-level "prior_state" key (full pre-refresh state
         snapshot, redundant with resource_changes.before)
 
+    Partitions resource_drift into two top-level keys:
+      • resource_drift — entries whose address ALSO has a real
+        resource_changes entry. These are drift the apply IS
+        reverting; the model treats them as elevated risk.
+      • drift_observed_no_apply_action — entries whose address has
+        no corresponding resource_changes (terraform refreshed and
+        reconciled, apply does nothing). The change.actions array
+        is rewritten to ["drift_observed"] so the model cannot
+        pattern-match destroy/update framing onto them — that
+        conflation produced false destroy summaries in practice.
+
     Preserves:
-      • resource_drift in full — the operator needs both "drift
-        accepted" (informational) and "drift reverted" (risk) signals;
-        the prompt teaches the model to label them.
       • read-only entries when paired with import (rare but valid)
 
     On any structural anomaly (non-dict plan, malformed entries) returns
@@ -169,7 +177,10 @@ def _clean_plan_json_bytes(raw: bytes) -> bytes:
 
     rcs = plan.get("resource_changes")
     if isinstance(rcs, list):
-        plan["resource_changes"] = [r for r in rcs if _resource_change_is_informative(r)]
+        kept_rcs = [r for r in rcs if _resource_change_is_informative(r)]
+        plan["resource_changes"] = kept_rcs
+
+    _partition_resource_drift(plan)
 
     ocs = plan.get("output_changes")
     if isinstance(ocs, dict):
@@ -180,6 +191,61 @@ def _clean_plan_json_bytes(raw: bytes) -> bytes:
         }
 
     return json.dumps(plan, separators=(",", ":")).encode("utf-8")
+
+
+def _partition_resource_drift(plan: dict[str, object]) -> None:
+    """Split `resource_drift` based on whether each address has a real change.
+
+    Mutates `plan` in place. See `_clean_plan_json_bytes` for the
+    rationale. Must be called AFTER `resource_changes` no-ops have been
+    pruned so the address lookup is over the informative set only.
+    """
+    drift = plan.get("resource_drift")
+    if not isinstance(drift, list) or not drift:
+        return
+
+    rcs = plan.get("resource_changes")
+    rc_addresses: set[object] = set()
+    if isinstance(rcs, list):
+        for r in rcs:
+            if isinstance(r, dict):
+                addr = r.get("address")
+                if addr is not None:
+                    rc_addresses.add(addr)
+
+    reverted: list[object] = []
+    observed: list[object] = []
+    for d in drift:
+        if not isinstance(d, dict):
+            reverted.append(d)
+            continue
+        addr = d.get("address")
+        if addr in rc_addresses:
+            reverted.append(d)
+            continue
+        observed.append(_neutralize_drift_actions(d))
+
+    plan["resource_drift"] = reverted
+    if observed:
+        plan["drift_observed_no_apply_action"] = observed
+
+
+def _neutralize_drift_actions(entry: dict[str, object]) -> dict[str, object]:
+    """Replace ["delete"]/["update"] action labels with ["drift_observed"].
+
+    The replacement is intentionally non-standard — the model treats
+    `create`/`update`/`delete` as planned actions, so any of those
+    appearing on a drift entry is a fertile source of misreads. A
+    label the model has never seen before forces it to consult the
+    prompt's drift-handling section instead of pattern-matching.
+    """
+    out = dict(entry)
+    change = out.get("change")
+    if isinstance(change, dict):
+        new_change = dict(change)
+        new_change["actions"] = ["drift_observed"]
+        out["change"] = new_change
+    return out
 
 
 def _resource_change_is_informative(r: object) -> bool:

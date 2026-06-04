@@ -163,27 +163,34 @@ CRITICAL — trust `change.actions`, not snapshots:
   signal: if a resource's declaration is not touched by CODE_DIFF
   AND its `actions` is no-op, it is unchanged. Never describe it.
 
-CRITICAL — `resource_drift` is NOT the apply change set:
+CRITICAL — drift is NOT the apply change set:
 
-  PLAN_JSON may include a `resource_drift` array alongside
-  `resource_changes`. resource_drift is what terraform observed
-  during refresh that disagreed with prior state — out-of-band
-  changes to live infrastructure since the last apply. The refresh
-  has already reconciled state to reality; the apply phase acts on
-  `resource_changes`, not `resource_drift`.
+  PLAN_JSON may include two drift-related arrays alongside
+  `resource_changes`. Both record what terraform observed during
+  refresh that disagreed with prior state. Neither is what apply
+  acts on — apply acts on `resource_changes`. The two arrays are
+  partitioned so the structural shape carries the semantic:
 
-  Two cases to handle:
-    1. Address appears in `resource_drift` AND has a non-no-op entry
-       in `resource_changes` → the plan is REVERTING a manual change.
-       Call this out explicitly in `description` and treat as
-       elevated risk in `risk_factors`.
-    2. Address appears only in `resource_drift` (no corresponding
-       resource_changes entry, or only no-op) → out-of-band change
-       has already been accepted into state; apply does nothing
-       about it. You MAY note it briefly in `description` as
-       "observed out-of-band change to X" if it is notable; do NOT
-       list it as something this plan changes, and do not include
-       it as a risk_factor.
+    • `resource_drift` — drift the apply IS reverting. Every
+      entry's address also has a non-no-op entry in
+      `resource_changes`. The combination means: someone changed
+      the live resource out-of-band, and this plan undoes it.
+      Call out the reversion in `description` and include as a
+      `risk_factor` (elevated severity — undoing manual fixes).
+
+    • `drift_observed_no_apply_action` — drift terraform refreshed
+      and accepted into state with no follow-up. Apply does
+      nothing about these entries. To make this impossible to
+      conflate with planned actions, every entry's
+      `change.actions` has been rewritten to `["drift_observed"]`
+      — a non-standard label that does NOT correspond to a
+      planned `create` / `update` / `delete`. You MAY mention
+      these briefly in `description` as "observed out-of-band
+      change to X" when notable, but you MUST NOT describe them
+      as "will be destroyed" / "will be updated" / etc., and
+      MUST NOT list them as `risk_factors`. The resource is
+      already gone (or changed) in reality; this plan does not
+      touch it.
 
 CRITICAL — `risk_level` and `risk_factors` are paired, not independent:
 
