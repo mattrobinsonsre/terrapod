@@ -253,34 +253,32 @@ jobs:
         # version is published. Suppress until a fix lands or the dispute
         # is resolved upstream.
         #
-        # CVE-2026-40217 (litellm <1.83.11): proxy-mode sandbox escape
-        # in POST /guardrails/test_custom_code. Terrapod uses litellm as a
-        # library via litellm.acompletion() and never starts the proxy
-        # server, so the vulnerable endpoint is not reachable. Patched
-        # versions pin Python <3.14; the API image is on 3.14, so we can't
-        # bump the lower bound until upstream restores 3.14 compatibility.
-        # Drop this ignore once a 3.14-compatible patched release lands.
+        # The remaining four ignores are all transitively gated by
+        # litellm 1.83.x. Patched releases (1.83.11+) pin Python
+        # <3.14 and our API image is on 3.14. Re-checked 2026-06-04:
+        # latest 1.87.0 still requires_python = <3.14. Until litellm
+        # restores 3.14 compatibility, ALL FOUR of the below have to
+        # stay.  See services/pyproject.toml for the matching
+        # dependency-side comment.
+        #
+        # CVE-2026-40217 (litellm <1.83.11): proxy-mode sandbox
+        # escape in POST /guardrails/test_custom_code. Terrapod uses
+        # litellm as a library via acompletion(), never starts the
+        # proxy server — endpoint unreachable.
         #
         # CVE-2026-28684 (python-dotenv <1.2.2): symlink follow in
-        # set_key() / unset_key() when rewriting .env files across
-        # filesystems. Terrapod and its direct deps do not call those
-        # write APIs (we only ever READ env vars via os.environ and
-        # python-dotenv's load_dotenv). The vulnerability requires the
-        # application itself to call the affected functions. Drop this
-        # ignore once a transitive dep bumps python-dotenv naturally.
+        # set_key()/unset_key(). Terrapod only READS env vars
+        # (load_dotenv / os.environ); never calls the affected write
+        # APIs. Cannot bump independently — litellm 1.83.7+ pins
+        # python-dotenv==1.0.1 exactly, so forcing >=1.2.2 here
+        # pushes the resolver back to litellm 1.83.0 (strictly worse
+        # — three more proxy CVEs).
         #
-        # CVE-2026-34993 + CVE-2026-47265 (aiohttp <3.14.0): published
-        # 2026-06. The first is RCE via CookieJar.load() on untrusted
-        # input; the second leaks `cookies`-param cookies across a
-        # cross-origin redirect. aiohttp is pulled in transitively
-        # and litellm 1.83.7 pins it to exactly ==3.13.5, so we can't
-        # set a >=3.14.0 floor without breaking the resolver (litellm
-        # also blocks bumping its own lower bound — see the
-        # CVE-2026-40217 note above). Neither path is reachable in
-        # Terrapod's litellm-driven outbound calls: we never call
-        # CookieJar.load(), and we don't set request cookies via the
-        # `cookies` param. Drop these two ignores when the litellm
-        # chain bumps aiohttp.
+        # CVE-2026-34993 + CVE-2026-47265 (aiohttp <3.14.0): RCE via
+        # CookieJar.load() on untrusted input; cross-origin leak of
+        # cookies set via the `cookies` request param. litellm
+        # 1.83.x pins aiohttp==3.13.5; not reachable from how we
+        # call litellm.
         run: |
           pip install pip-audit
           pip-audit -r services/requirements.txt --strict --desc \

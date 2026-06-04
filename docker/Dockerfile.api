@@ -57,7 +57,7 @@ LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapo
 # CVE-2026-27135). Without this the apt-upgrade layer is reused from
 # before the patch was published — same cache-staleness issue the
 # runner image's APK_REFRESH solves.
-ARG APT_REFRESH=2026-05-15
+ARG APT_REFRESH=2026-06-04
 RUN echo "apt-refresh=${APT_REFRESH}" \
     && apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     curl \

@@ -21,7 +21,7 @@ LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapo
 # Pick up post-publish Debian security patches. Bump APT_REFRESH to
 # bust the cached apt layer and re-pull patches (CVE-2026-27135 etc.) —
 # see Dockerfile.api. No new packages installed — just upgrades.
-ARG APT_REFRESH=2026-05-15
+ARG APT_REFRESH=2026-06-04
 RUN echo "apt-refresh=${APT_REFRESH}" \
     && apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 

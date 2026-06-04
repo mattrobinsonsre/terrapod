@@ -58,14 +58,25 @@ standard-imghdr = "^3.13"
 # speaks OpenAI Chat Completions request shape to LiteLLM; LiteLLM
 # handles per-provider request translation and auth in-process.
 #
-# Upper bound <2.0 is the standard major-version cap. We can't bump
-# the lower bound to clear CVE-2026-40217 (litellm proxy sandbox
-# escape, patched in 1.83.11+) because the patched releases pin
-# Python <3.14 and our API image runs on 3.14. The CVE is in proxy
-# mode only — we use the library directly via acompletion(), never
-# start the proxy server — so it's not exploitable here. Ignored in
-# CI via --ignore-vuln (see .github/workflows/ci.yml).
-litellm = ">=1.78,<2.0"
+# Upper bound <2.0 is the standard major-version cap. The lower bound
+# is 1.83.7, which patches three proxy-mode CVEs (CVE-2026-42203,
+# CVE-2026-42208, CVE-2026-42271) — all proxy-only and not reachable
+# from how Terrapod uses litellm (library-only via acompletion(),
+# proxy never started), but tightening the floor keeps the resolver
+# off the older line.
+#
+# We can't push the floor past 1.83.x to clear CVE-2026-40217 (also
+# proxy-mode, patched in 1.83.11+): every release from 1.83.11 onwards
+# pins Python <3.14, and our API image is on 3.14. Re-checked
+# 2026-06-04: latest 1.87.0 still requires_python = <3.14.
+#
+# We also can't directly bump python-dotenv past 1.0.1 to clear
+# CVE-2026-28684: litellm 1.83.7+ pins python-dotenv==1.0.1 exactly,
+# so a >=1.2.2 floor on dotenv would force the resolver back to
+# litellm 1.83.0 (which has CVEs 42203/42208/42271 unpatched —
+# strictly worse). Tracked together with CVE-2026-40217 — both
+# clear when litellm restores 3.14 compatibility.
+litellm = ">=1.83.7,<2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.2"
