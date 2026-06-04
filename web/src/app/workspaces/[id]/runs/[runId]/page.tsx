@@ -636,10 +636,8 @@ export default function RunDetailPage() {
             unconditionally for new runs. */}
         <div className="mb-6">
           <ResourceUsage
-            resourceCpu={attrs['resource-cpu']}
             resourceMemory={attrs['resource-memory']}
             peakMemoryBytes={attrs['peak-memory-bytes']}
-            peakCpuUsec={attrs['peak-cpu-usec']}
             runnerExitStatus={attrs['runner-exit-status']}
           />
         </div>

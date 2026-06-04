@@ -629,7 +629,7 @@ Run objects include peak resource usage + an abnormal-exit signal so the UI (and
 | `resource-cpu` | string | Workspace setting (snapshot) | CPU request applied to the Job (K8s quantity, e.g. `"1"`, `"500m"`). Limit is `2×` this |
 | `resource-memory` | string | Workspace setting (snapshot) | Memory request applied to the Job (K8s quantity, e.g. `"2Gi"`). Limit is `2×` this |
 | `peak-memory-bytes` | integer or null | Runner (cgroup v2) | Peak resident memory observed during the run — `/sys/fs/cgroup/memory.peak` |
-| `peak-cpu-usec` | integer or null | Runner (cgroup v2) | Cumulative CPU time consumed by the run, microseconds — `usage_usec` from `/sys/fs/cgroup/cpu.stat` |
+| `peak-cpu-usec` | integer or null | Runner (cgroup v2) | Cumulative CPU time consumed by the run, microseconds — `usage_usec` from `/sys/fs/cgroup/cpu.stat`. **Captured but not surfaced in the UI** — see note below |
 | `runner-exit-code` | integer or null | Runner | Runner script's exit code captured at exit. `null` if the trap didn't fire (e.g. SIGKILL) |
 | `runner-exit-reason` | string | Listener (K8s) | Raw K8s `container.state.terminated.reason` (e.g. `"OOMKilled"`, `"Error"`, `"Completed"`). `""` if not observed |
 | `runner-exit-status` | string | Reconciler (typed bucket) | Stable typed value: `""` (unknown / not yet observed), `"clean"`, `"oom"`, `"killed"`, `"error"`. The UI keys on this; reason is shown for context |

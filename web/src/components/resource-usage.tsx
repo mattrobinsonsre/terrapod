@@ -10,12 +10,19 @@
 // 100% marker is the limit so proximity is visible at a glance.
 
 interface ResourceUsageProps {
-  resourceCpu: string // "1", "2", "500m", etc. — K8s quantity string
   resourceMemory: string // "2Gi", "4Gi", "64Mi", etc.
   peakMemoryBytes: number | null
-  peakCpuUsec: number | null
   runnerExitStatus: string // "" | "clean" | "oom" | "killed" | "error"
 }
+
+// CPU is intentionally NOT rendered here. peak_cpu_usec is cumulative
+// core-time over the whole run; comparing it to the cores-allocated
+// limit requires dividing by phase wall-clock, and even then the
+// resulting *average* utilisation can hide bursts that briefly peg
+// the limit. A proper CPU panel needs instantaneous sampling, not
+// cumulative-counter math — tracked as a follow-up to #430. The
+// backend still records peak_cpu_usec so the data is there when the
+// sampling layer lands.
 
 // Parse a K8s memory quantity string to bytes. Supports Ei/Pi/Ti/Gi/Mi/Ki
 // (binary) and E/P/T/G/M/K (decimal). Returns NaN on parse failure.
@@ -55,50 +62,25 @@ function humanBytes(n: number): string {
   return `${n} B`
 }
 
-// Parse a K8s CPU quantity to cores (1 = "1", 0.5 = "500m").
-function parseCpuToCores(s: string): number {
-  const t = s.trim()
-  if (t.endsWith('m')) {
-    const n = parseFloat(t.slice(0, -1))
-    return Number.isFinite(n) ? n / 1000 : NaN
-  }
-  const n = parseFloat(t)
-  return Number.isFinite(n) ? n : NaN
-}
-
 export function ResourceUsage({
-  resourceCpu,
   resourceMemory,
   peakMemoryBytes,
-  peakCpuUsec,
   runnerExitStatus,
 }: ResourceUsageProps) {
   // Only render when we have anything to show — peak from runner, OR an
   // abnormal exit signal from the listener (oom / killed). For runs that
   // pre-date #430, both are null/empty and the panel stays hidden.
-  if (
-    peakMemoryBytes === null &&
-    peakCpuUsec === null &&
-    !runnerExitStatus
-  ) {
+  if (peakMemoryBytes === null && !runnerExitStatus) {
     return null
   }
 
   const reqMem = parseMemoryToBytes(resourceMemory)
   const limitMem = Number.isFinite(reqMem) ? reqMem * 2 : NaN
-  const reqCpu = parseCpuToCores(resourceCpu)
-  const limitCpu = Number.isFinite(reqCpu) ? reqCpu * 2 : NaN
 
   const memPct =
     peakMemoryBytes !== null && Number.isFinite(limitMem) && limitMem > 0
       ? Math.min(100, (peakMemoryBytes / limitMem) * 100)
       : null
-
-  // CPU usage is cumulative across the run's wall-clock; we don't have a
-  // wall-clock here without threading through more state. Show absolute
-  // CPU-seconds + cores-allocated for now; UI can grow a duration-aware
-  // utilisation read in a follow-up.
-  const peakCpuSec = peakCpuUsec !== null ? peakCpuUsec / 1_000_000 : null
 
   // Bar colour: red ≥95% (OOM cliff), amber 80–95%, green <80%.
   // Forced red regardless of memPct when the listener observed OOM.
@@ -127,58 +109,31 @@ export function ResourceUsage({
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {/* Memory row */}
-        <div data-testid="resource-usage-memory">
-          <div className="mb-1 flex items-baseline justify-between text-xs text-slate-400">
-            <span>Memory</span>
-            <span className="font-mono">
-              {peakMemoryBytes !== null ? humanBytes(peakMemoryBytes) : '—'}
-              {memPct !== null && (
-                <span className="ml-2 text-slate-500">{memPct.toFixed(0)}%</span>
-              )}
-            </span>
-          </div>
-          <div className="h-2 overflow-hidden rounded bg-slate-800">
+      <div data-testid="resource-usage-memory">
+        <div className="mb-1 flex items-baseline justify-between text-xs text-slate-400">
+          <span>Memory</span>
+          <span className="font-mono">
+            {peakMemoryBytes !== null ? humanBytes(peakMemoryBytes) : '—'}
             {memPct !== null && (
-              <div
-                className={`h-full ${barColour}`}
-                style={{ width: `${memPct}%` }}
-                data-testid="resource-usage-memory-bar"
-              />
+              <span className="ml-2 text-slate-500">{memPct.toFixed(0)}%</span>
             )}
-          </div>
-          <div className="mt-1 flex justify-between font-mono text-[10px] text-slate-500">
-            <span>Requested {resourceMemory}</span>
-            <span>
-              Limit{' '}
-              {Number.isFinite(limitMem) ? humanBytes(limitMem) : `${resourceMemory} × 2`}
-            </span>
-          </div>
+          </span>
         </div>
-
-        {/* CPU row */}
-        <div data-testid="resource-usage-cpu">
-          <div className="mb-1 flex items-baseline justify-between text-xs text-slate-400">
-            <span>CPU</span>
-            <span className="font-mono">
-              {peakCpuSec !== null ? `${peakCpuSec.toFixed(1)} core·s` : '—'}
-            </span>
-          </div>
-          {/*
-            CPU shown without a bar — peak usage in cumulative core-seconds
-            isn't directly comparable to the cores-allocated limit without
-            wall-clock context. Numbers shown for the operator's reference.
-          */}
-          <div className="mt-1 flex justify-between font-mono text-[10px] text-slate-500">
-            <span>
-              Requested {Number.isFinite(reqCpu) ? `${reqCpu} core` : resourceCpu}
-            </span>
-            <span>
-              Limit{' '}
-              {Number.isFinite(limitCpu) ? `${limitCpu} core` : `${resourceCpu} × 2`}
-            </span>
-          </div>
+        <div className="h-2 overflow-hidden rounded bg-slate-800">
+          {memPct !== null && (
+            <div
+              className={`h-full ${barColour}`}
+              style={{ width: `${memPct}%` }}
+              data-testid="resource-usage-memory-bar"
+            />
+          )}
+        </div>
+        <div className="mt-1 flex justify-between font-mono text-[10px] text-slate-500">
+          <span>Requested {resourceMemory}</span>
+          <span>
+            Limit{' '}
+            {Number.isFinite(limitMem) ? humanBytes(limitMem) : `${resourceMemory} × 2`}
+          </span>
         </div>
       </div>
     </div>
