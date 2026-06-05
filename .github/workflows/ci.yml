@@ -733,8 +733,23 @@ jobs:
             "$REGISTRY/${{ matrix.image }}:sha-${sha_short}-arm64"
 
   # ── Release ────────────────────────────────────────────
-  release:
-    name: Release
+  # The release stage used to be a single 10–15 min serial job. It's
+  # now split into three parallel branches that join in `release-finalize`:
+  #
+  #   release-images   — image retag (5 images) + Helm chart push + SBOMs.
+  #                      Pushes the chart to GHCR directly; saves SBOMs +
+  #                      chart + checksums as a workflow artifact for
+  #                      release-finalize to upload to the GitHub Release.
+  #   release-provider — GoReleaser provider builds (8 platforms, signed).
+  #                      CREATES the GitHub Release for this tag.
+  #   release-migrate  — GoReleaser migrate builds. APPENDS to the Release
+  #                      created by release-provider; needs that job.
+  #   release-finalize — joins all three. Generates release notes from
+  #                      conventional-commit titles, edits the Release's
+  #                      title/notes, and uploads chart + SBOMs + checksums.
+
+  release-images:
+    name: Release — Images, Helm, SBOMs
     needs: [prepare, create-manifests]
     if: |
       always()
@@ -743,12 +758,10 @@ jobs:
       && (needs.create-manifests.result == 'success' || needs.create-manifests.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       packages: write
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - name: Install Helm
         uses: azure/setup-helm@v5
@@ -787,6 +800,45 @@ jobs:
           .github/scripts/with-retry.sh "helm push" -- \
             helm push "dist/terrapod-${chart_version}.tgz" "oci://$REGISTRY"
 
+      - name: Generate SBOMs
+        run: |
+          version="${{ needs.prepare.outputs.version }}"
+
+          # Install syft
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+          for image in terrapod-api terrapod-web terrapod-runner terrapod-listener terrapod-migrations; do
+            echo "Generating SBOM for $image:$version"
+            syft "$REGISTRY/$image:$version" -o spdx-json="dist/sbom-${image}.spdx.json"
+          done
+
+      - name: Generate checksums
+        run: |
+          (cd dist && sha256sum -- *.tgz *.spdx.json > checksums.txt)
+
+      - name: Upload artifact for release-finalize
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-images-assets
+          path: dist/
+          retention-days: 1
+
+  release-provider:
+    name: Release — Provider (GoReleaser)
+    needs: [prepare, create-manifests]
+    if: |
+      always()
+      && needs.prepare.outputs.is_tag == 'true'
+      && needs.prepare.result == 'success'
+      && (needs.create-manifests.result == 'success' || needs.create-manifests.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
       - uses: actions/setup-go@v6
         with:
           go-version-file: provider/go.mod
@@ -810,12 +862,39 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.gpg.outputs.fingerprint }}
 
-      # Build terrapod-migrate binaries and append them to the release
-      # created by the provider's GoReleaser run. Linux/Windows ship as
-      # per-arch zips; macOS ships as a single Universal 2 binary built
-      # by lipo-merging darwin/amd64 + darwin/arm64. See
-      # migrate/.goreleaser.yml — release.mode=append keeps this step
-      # from trying to create a duplicate GitHub Release for the same tag.
+  release-migrate:
+    name: Release — Migrate tool (GoReleaser)
+    # Needs release-provider because migrate/.goreleaser.yml is
+    # release.mode=append — the GitHub Release must already exist
+    # (created by release-provider) for the append upload to land.
+    needs: [prepare, release-provider]
+    if: |
+      always()
+      && needs.prepare.outputs.is_tag == 'true'
+      && needs.release-provider.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: migrate/go.mod
+          cache-dependency-path: migrate/go.sum
+
+      - name: Import GPG signing key
+        id: gpg
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          fingerprint=$(gpg --with-colons --import-options show-only --import <<< "${{ secrets.GPG_PRIVATE_KEY }}" | awk -F: '/^fpr:/{print $10; exit}')
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+
+      # Linux/Windows ship as per-arch zips; macOS ships as a single
+      # Universal 2 binary built by lipo-merging darwin/amd64 +
+      # darwin/arm64. See migrate/.goreleaser.yml.
       - name: Build migrate-tool binaries with GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
@@ -827,8 +906,30 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.gpg.outputs.fingerprint }}
 
+  release-finalize:
+    name: Release — Finalize (notes + chart + SBOMs)
+    needs: [prepare, release-images, release-provider, release-migrate]
+    if: |
+      always()
+      && needs.prepare.outputs.is_tag == 'true'
+      && needs.release-images.result == 'success'
+      && needs.release-provider.result == 'success'
+      && needs.release-migrate.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download release-images artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-images-assets
+          path: dist/
+
       - name: Generate release notes
-        id: notes
         run: |
           version="${{ needs.prepare.outputs.version }}"
 
@@ -872,27 +973,12 @@ jobs:
           # Write to file to preserve newlines
           echo "$notes" > /tmp/release-notes.md
 
-      - name: Generate SBOMs
-        run: |
-          version="${{ needs.prepare.outputs.version }}"
-
-          # Install syft
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-
-          for image in terrapod-api terrapod-web terrapod-runner terrapod-listener terrapod-migrations; do
-            echo "Generating SBOM for $image:$version"
-            syft "$REGISTRY/$image:$version" -o spdx-json="dist/sbom-${image}.spdx.json"
-          done
-
-      - name: Upload release assets
+      - name: Edit Release title/notes + upload chart, SBOMs, checksums
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           version="${{ needs.prepare.outputs.version }}"
           chart_version="${version#v}"
-
-          # Generate checksums
-          (cd dist && sha256sum -- *.tgz *.spdx.json > checksums.txt)
 
           # GoReleaser already created the release with provider binaries.
           # Update title/notes and upload remaining assets.
@@ -913,11 +999,11 @@ jobs:
   # ── Cleanup Tag on Failure ─────────────────────────────
   cleanup-tag:
     name: Cleanup Tag
-    needs: [prepare, build-images, scan-images, create-manifests, release]
+    needs: [prepare, build-images, scan-images, create-manifests, release-images, release-provider, release-migrate, release-finalize]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
-      && (needs.build-images.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release.result == 'failure')
+      && (needs.build-images.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-finalize.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -960,7 +1046,10 @@ jobs:
       - scan-images
       - e2e-test
       - create-manifests
-      - release
+      - release-images
+      - release-provider
+      - release-migrate
+      - release-finalize
     runs-on: ubuntu-latest
     steps:
       - name: Check results
@@ -987,7 +1076,10 @@ jobs:
             "${{ needs.scan-images.result }}"
             "${{ needs.e2e-test.result }}"
             "${{ needs.create-manifests.result }}"
-            "${{ needs.release.result }}"
+            "${{ needs.release-images.result }}"
+            "${{ needs.release-provider.result }}"
+            "${{ needs.release-migrate.result }}"
+            "${{ needs.release-finalize.result }}"
           )
 
           for r in "${results[@]}"; do
