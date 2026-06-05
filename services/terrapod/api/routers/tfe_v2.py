@@ -1497,6 +1497,7 @@ async def delete_workspace(
 
 @router.get("/workspaces/{workspace_id}/state-versions")
 async def list_state_versions(
+    request: Request,
     workspace_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1513,7 +1514,7 @@ async def list_state_versions(
 
     return JSONResponse(
         content={
-            "data": [_state_version_json(sv)["data"] for sv in state_versions],
+            "data": [_state_version_json(sv, request)["data"] for sv in state_versions],
         },
         headers=_tfe_headers(),
     )
@@ -1521,6 +1522,7 @@ async def list_state_versions(
 
 @router.get("/workspaces/{workspace_id}/current-state-version")
 async def current_state_version(
+    request: Request,
     workspace_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1552,7 +1554,7 @@ async def current_state_version(
     if sv is None:
         raise HTTPException(status_code=404, detail="No state versions found")
 
-    return JSONResponse(content=_state_version_json(sv), headers=_tfe_headers())
+    return JSONResponse(content=_state_version_json(sv, request), headers=_tfe_headers())
 
 
 @router.get("/state-versions/{state_version_id}/download")
@@ -1597,15 +1599,61 @@ async def download_state(
     return Response(content=data, media_type="application/json")
 
 
-def _state_version_json(sv: StateVersion) -> dict:
-    """Serialize a StateVersion to TFE V2 JSON:API format.
+def _request_base_url(request: Request | None) -> str:
+    """Reconstruct the URL the *client* used to reach the API, so the
+    hosted-state-{download,upload}-url values we emit round-trip back
+    to the same hostname.
 
-    Uses callback_base_url for absolute URLs (go-tfe requires absolute URLs
-    for hosted-state-upload-url).
+    Why this matters: internal-ingress deployments expose the API on
+    two hostnames — a public one (browsers, terraform login, external
+    CLI) and an internal cluster-only one (in-cluster runners hitting
+    their cloud-block backend). A single global `callback_base_url`
+    can't serve both audiences: the URL we put in
+    `hosted-state-download-url` has to come back through a hostname
+    the caller can actually reach. Mirroring the request's host on
+    each response solves that — external requests get the public URL
+    back, internal requests get the internal URL back.
+
+    Lookup order:
+      1. X-Forwarded-Host + X-Forwarded-Proto (set by every standard
+         ingress / reverse proxy: Traefik, ingress-nginx, the Next.js
+         BFF, etc.). Preserved across the BFF chain.
+      2. The bare Host header — only used if it looks like a real
+         hostname (contains a `.`). Service-DNS names like
+         `terrapod-api:8000` are skipped because emitting them would
+         publish a URL only the API pod itself can resolve.
+      3. settings.auth.callback_base_url — last-resort fallback for
+         direct calls that bypass any proxy.
+
+    request may be None (legacy callers, tests) — fall straight to
+    callback_base_url in that case.
     """
     from terrapod.config import settings
 
-    base = settings.auth.callback_base_url.rstrip("/")
+    fallback = settings.auth.callback_base_url.rstrip("/")
+    if request is None:
+        return fallback
+    xfh = request.headers.get("x-forwarded-host")
+    if xfh:
+        proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+        return f"{proto}://{xfh.split(',', 1)[0].strip()}"
+    host = request.headers.get("host")
+    if host and "." in host:
+        # Plain Host header that looks like an external hostname.
+        # Use request.url.scheme — we may not have x-forwarded-proto
+        # so the scheme reflects what FastAPI saw on the wire.
+        return f"{request.url.scheme}://{host}"
+    return fallback
+
+
+def _state_version_json(sv: StateVersion, request: Request | None = None) -> dict:
+    """Serialize a StateVersion to TFE V2 JSON:API format.
+
+    go-tfe requires absolute URLs for hosted-state-{download,upload}-url.
+    Pass `request` so the URLs use the same hostname the caller used —
+    see `_request_base_url`.
+    """
+    base = _request_base_url(request)
     sv_id = f"sv-{sv.id}"
     return {
         "data": {
@@ -1637,6 +1685,7 @@ def _state_version_json(sv: StateVersion) -> dict:
 
 @router.get("/state-versions/{state_version_id}")
 async def show_state_version(
+    request: Request,
     state_version_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1658,7 +1707,7 @@ async def show_state_version(
         if perm is None:
             raise HTTPException(status_code=404, detail="State version not found")
 
-    return JSONResponse(content=_state_version_json(sv), headers=_tfe_headers())
+    return JSONResponse(content=_state_version_json(sv, request), headers=_tfe_headers())
 
 
 @router.post("/workspaces/{workspace_id}/state-versions")
@@ -1728,7 +1777,7 @@ async def create_state_version(
     await publish_workspace_event(str(ws.id), "state_version_created")
 
     return JSONResponse(
-        content=_state_version_json(sv),
+        content=_state_version_json(sv, request),
         status_code=201,
         headers=_tfe_headers(),
     )

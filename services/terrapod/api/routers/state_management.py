@@ -130,6 +130,7 @@ async def delete_state_version(
 
 @router.post("/state-versions/{state_version_id}/actions/rollback")
 async def rollback_state_version(
+    request: Request,
     state_version_id: str = Path(...),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -203,7 +204,7 @@ async def rollback_state_version(
     from terrapod.api.routers.tfe_v2 import _state_version_json
 
     return JSONResponse(
-        content=_state_version_json(new_sv),
+        content=_state_version_json(new_sv, request),
         status_code=201,
     )
 
@@ -287,6 +288,6 @@ async def upload_state_manual(
     from terrapod.api.routers.tfe_v2 import _state_version_json
 
     return JSONResponse(
-        content=_state_version_json(sv),
+        content=_state_version_json(sv, request),
         status_code=201,
     )
