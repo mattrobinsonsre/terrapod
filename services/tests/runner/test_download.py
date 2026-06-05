@@ -58,8 +58,9 @@ class TestDownloadToFile:
         )
         assert result.ok
         assert out.read_bytes() == b"cloud bytes"
-        # Cloud redirect URL is NOT rewritten.
-        assert any("bucket.s3.amazonaws.com" in u for u in seen_urls)
+        # Cloud redirect URL is NOT rewritten — second hop's host is the S3 bucket.
+        hosts = [httpx.URL(u).host for u in seen_urls]
+        assert "bucket.s3.amazonaws.com" in hosts
 
     def test_filesystem_backend_redirect_hostname_rewritten(self, tmp_path) -> None:
         """A redirect to a different hostname under /api/terrapod/v1/storage/

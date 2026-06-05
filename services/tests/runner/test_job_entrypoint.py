@@ -123,7 +123,12 @@ class TestModuleEndToEndExecvp:
             ):
                 try:
                     job_entrypoint.main(argv=[])
-                except BaseException:  # noqa: BLE001
+                except Exception:
+                    # In a forked child we must exit promptly with a
+                    # distinct status so the parent can tell a real
+                    # exec failure from a clean exit. Caught Exception
+                    # (not BaseException) — SystemExit and KeyboardInterrupt
+                    # are intentionally left to bubble.
                     os._exit(99)
             os._exit(98)
 

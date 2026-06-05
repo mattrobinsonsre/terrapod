@@ -78,7 +78,10 @@ class TestUpstreamFallback:
             cfg, tmp_dir=tmp_path, bin_dir=tmp_path / "bin", client=client
         )
         assert result.exists()
-        assert "github.com" in call_log
+        # Membership test on a list of exact host strings — not a
+        # substring sanitizer pattern. handler() only appends
+        # request.url.host so the list elements are already canonical.
+        assert "github.com" in set(call_log)
 
 
 class TestInvalidZip:
