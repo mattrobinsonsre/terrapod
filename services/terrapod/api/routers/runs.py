@@ -659,13 +659,43 @@ async def retry_run(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
+    # Defensive: if the source run has no CV (e.g. it was queued by an
+    # older fire_run_triggers before #439, or by some other path that
+    # forgot to attach one), pick the workspace's latest uploaded CV
+    # rather than faithfully copying the null forward. A retry with no
+    # CV would just re-hit the runner's "no configuration archive (HTTP
+    # 404)" exit — preserving the bug instead of clearing it. Existing
+    # null-CV runs already in the DB become retry-able after this.
+    cv_id_for_retry = run.configuration_version_id
+    if cv_id_for_retry is None:
+        from terrapod.db.models import ConfigurationVersion
+
+        cv_result = await db.execute(
+            select(ConfigurationVersion.id)
+            .where(
+                ConfigurationVersion.workspace_id == ws.id,
+                ConfigurationVersion.status == "uploaded",
+            )
+            .order_by(ConfigurationVersion.created_at.desc())
+            .limit(1)
+        )
+        cv_id_for_retry = cv_result.scalar_one_or_none()
+        if cv_id_for_retry is None:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Source run has no configuration version and the workspace has "
+                    "never had one uploaded; nothing to retry against."
+                ),
+            )
+
     new_run = await run_service.create_run(
         db,
         workspace=ws,
         message=f"Retry of run-{run.id}",
         source=run.source,
         plan_only=run.plan_only,
-        configuration_version_id=run.configuration_version_id,
+        configuration_version_id=cv_id_for_retry,
         created_by=user.email,
         target_addrs=run.target_addrs,
         replace_addrs=run.replace_addrs,

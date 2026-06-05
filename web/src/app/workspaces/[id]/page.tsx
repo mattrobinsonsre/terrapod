@@ -205,9 +205,9 @@ const ALL_TRIGGERS = [
 const ALL_STAGES = ['pre_plan', 'post_plan', 'pre_apply'] as const
 const ALL_ENFORCEMENT_LEVELS = ['mandatory', 'advisory'] as const
 
-type Tab = 'overview' | 'variables' | 'runs' | 'state' | 'configurations' | 'notifications' | 'run-tasks' | 'sharing'
+type Tab = 'overview' | 'variables' | 'runs' | 'state' | 'configurations' | 'notifications' | 'run-tasks' | 'run-triggers' | 'sharing'
 
-const VALID_TABS: Set<string> = new Set(['overview', 'variables', 'runs', 'state', 'configurations', 'notifications', 'run-tasks', 'sharing'])
+const VALID_TABS: Set<string> = new Set(['overview', 'variables', 'runs', 'state', 'configurations', 'notifications', 'run-tasks', 'run-triggers', 'sharing'])
 
 export default function WorkspaceDetailPage() {
   return (
@@ -369,6 +369,21 @@ function WorkspaceDetailContent() {
   const [rscAddName, setRscAddName] = useState('')
   const [rscAdding, setRscAdding] = useState(false)
 
+  // Run Triggers — cross-workspace apply-fires-plan dependency edges
+  interface RunTriggerEdge {
+    id: string
+    workspaceId: string
+    workspaceName: string
+    sourceableId: string
+    sourceableName: string
+    createdAt: string
+  }
+  const [trgInbound, setTrgInbound] = useState<RunTriggerEdge[]>([])
+  const [trgOutbound, setTrgOutbound] = useState<RunTriggerEdge[]>([])
+  const [trgLoading, setTrgLoading] = useState(false)
+  const [trgAddName, setTrgAddName] = useState('')
+  const [trgAdding, setTrgAdding] = useState(false)
+
   // Notifications
   const [notifications, setNotifications] = useState<NotificationConfig[]>([])
   const [notifLoading, setNotifLoading] = useState(false)
@@ -499,6 +514,7 @@ function WorkspaceDetailContent() {
     if (activeTab === 'configurations') loadConfigurations()
     if (activeTab === 'notifications') loadNotifications()
     if (activeTab === 'run-tasks') loadRunTasks()
+    if (activeTab === 'run-triggers') loadRunTriggers()
   }, [activeTab, workspace, loadRuns])
 
   // Load VCS refs when plan options panel opens on a VCS-connected workspace
@@ -741,6 +757,87 @@ function WorkspaceDetailContent() {
       await loadRemoteStateConsumers()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to revoke consumer')
+    }
+  }
+
+  function _trgFromRow(row: { id: string; relationships?: { workspace?: { data?: { id: string } }; sourceable?: { data?: { id: string } } }; attributes: { 'workspace-name'?: string; 'sourceable-name'?: string; 'created-at'?: string } }): RunTriggerEdge {
+    return {
+      id: row.id,
+      workspaceId: row.relationships?.workspace?.data?.id || '',
+      workspaceName: row.attributes['workspace-name'] || '',
+      sourceableId: row.relationships?.sourceable?.data?.id || '',
+      sourceableName: row.attributes['sourceable-name'] || '',
+      createdAt: row.attributes['created-at'] || '',
+    }
+  }
+
+  async function loadRunTriggers() {
+    setTrgLoading(true)
+    try {
+      const base = `/api/terrapod/v1/workspaces/${workspaceId}/run-triggers`
+      const [inRes, outRes] = await Promise.all([
+        apiFetch(`${base}?filter[run-trigger][type]=inbound`),
+        apiFetch(`${base}?filter[run-trigger][type]=outbound`),
+      ])
+      if (!inRes.ok) throw new Error('Failed to load inbound run triggers')
+      if (!outRes.ok) throw new Error('Failed to load outbound run triggers')
+      const inData = await inRes.json()
+      const outData = await outRes.json()
+      setTrgInbound((inData.data || []).map(_trgFromRow))
+      setTrgOutbound((outData.data || []).map(_trgFromRow))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load run triggers')
+    } finally {
+      setTrgLoading(false)
+    }
+  }
+
+  async function addRunTrigger() {
+    const name = trgAddName.trim()
+    if (!name) return
+    setTrgAdding(true)
+    try {
+      const lookup = await apiFetch(`/api/v2/organizations/default/workspaces/${encodeURIComponent(name)}`)
+      if (!lookup.ok) {
+        throw new Error(lookup.status === 404 ? `Workspace "${name}" not found` : 'Failed to resolve source workspace')
+      }
+      const wsBody = await lookup.json()
+      const sourceId = wsBody.data?.id
+      if (!sourceId) throw new Error('Workspace lookup returned no id')
+
+      const res = await apiFetch(
+        `/api/terrapod/v1/workspaces/${workspaceId}/run-triggers`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/vnd.api+json' },
+          body: JSON.stringify({
+            data: { relationships: { sourceable: { data: { id: sourceId, type: 'workspaces' } } } },
+          }),
+        },
+      )
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Failed to add run trigger' }))
+        throw new Error(err.detail || 'Failed to add run trigger')
+      }
+      setTrgAddName('')
+      await loadRunTriggers()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add run trigger')
+    } finally {
+      setTrgAdding(false)
+    }
+  }
+
+  async function removeRunTrigger(triggerId: string) {
+    try {
+      const res = await apiFetch(`/api/terrapod/v1/run-triggers/${triggerId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Failed to remove run trigger' }))
+        throw new Error(err.detail || 'Failed to remove run trigger')
+      }
+      await loadRunTriggers()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove run trigger')
     }
   }
 
@@ -1367,6 +1464,7 @@ function WorkspaceDetailContent() {
     { key: 'configurations', label: 'Configurations' },
     { key: 'notifications', label: 'Notifications' },
     { key: 'run-tasks', label: 'Run Tasks' },
+    { key: 'run-triggers', label: 'Run Triggers' },
     { key: 'sharing', label: 'Sharing' },
   ]
 
@@ -3134,6 +3232,90 @@ function WorkspaceDetailContent() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Run Triggers Tab — cross-workspace apply-fires-plan edges */}
+        {activeTab === 'run-triggers' && (
+          <div>
+            <div className="flex items-baseline justify-between mb-1">
+              <h3 className="text-lg font-semibold text-slate-200">Run Triggers</h3>
+              {trgLoading && <span className="text-xs text-slate-500">loading…</span>}
+            </div>
+            <p className="text-xs text-slate-500 mb-6">
+              When a source workspace completes an apply, downstream workspaces get a new run queued automatically. Up to 20 source workspaces per destination.
+            </p>
+
+            {/* Inbound — source workspaces that trigger runs HERE */}
+            <div className="mb-8">
+              <h4 className="text-sm font-medium text-slate-300 mb-2">Source workspaces that trigger runs here</h4>
+              {trgInbound.length === 0 ? (
+                <p className="text-sm text-slate-500 italic">No source workspaces trigger runs on this workspace.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {trgInbound.map((t) => (
+                    <li key={t.id} className="flex items-center justify-between gap-3 rounded bg-slate-800/40 px-3 py-2 text-sm">
+                      <div>
+                        <a href={`/workspaces/${t.sourceableId}`} className="text-brand-400 hover:text-brand-300 font-medium">
+                          {t.sourceableName || t.sourceableId}
+                        </a>
+                      </div>
+                      {perms['can-update'] && (
+                        <button
+                          type="button"
+                          onClick={() => removeRunTrigger(t.id)}
+                          className="rounded px-2 py-1 text-xs font-medium bg-red-900/40 text-red-200 hover:bg-red-900/60"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {perms['can-update'] && (
+                <form
+                  onSubmit={(e) => { e.preventDefault(); addRunTrigger() }}
+                  className="mt-3 flex items-center gap-2"
+                >
+                  <input
+                    type="text"
+                    value={trgAddName}
+                    onChange={(e) => setTrgAddName(e.target.value)}
+                    placeholder="Add source workspace by name"
+                    className="flex-1 rounded border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500"
+                    disabled={trgAdding}
+                  />
+                  <button
+                    type="submit"
+                    disabled={trgAdding || !trgAddName.trim()}
+                    className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {trgAdding ? 'Adding…' : 'Add'}
+                  </button>
+                </form>
+              )}
+            </div>
+
+            {/* Outbound — destination workspaces this one triggers */}
+            <div>
+              <h4 className="text-sm font-medium text-slate-300 mb-2">Destination workspaces this workspace triggers</h4>
+              {trgOutbound.length === 0 ? (
+                <p className="text-sm text-slate-500 italic">This workspace does not trigger runs on any other workspace.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {trgOutbound.map((t) => (
+                    <li key={t.id} className="rounded bg-slate-800/40 px-3 py-2 text-sm">
+                      <a href={`/workspaces/${t.workspaceId}`} className="text-brand-400 hover:text-brand-300 font-medium">
+                        {t.workspaceName || t.workspaceId}
+                      </a>
+                      <span className="ml-2 text-xs text-slate-500">(destination; remove from there)</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         )}
 

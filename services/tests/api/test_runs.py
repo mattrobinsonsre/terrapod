@@ -1069,3 +1069,79 @@ class TestPlanJsonAttribute:
 
         attrs = resp.json()["data"]["attributes"]
         assert "json-output" not in attrs
+
+
+class TestRetryRun:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    async def test_retry_attaches_latest_cv_when_source_has_none(
+        self, mock_resolve, mock_get_run, mock_create_run, mock_queue, *mocks
+    ):
+        """#439: retrying a run whose CV is null falls back to the workspace's
+        latest uploaded CV rather than faithfully copying the null forward."""
+        mock_resolve.return_value = "plan"
+
+        original = _mock_run(status="errored")
+        original.configuration_version_id = None  # The bug
+        mock_get_run.return_value = original
+
+        ws = _mock_workspace(ws_id=original.workspace_id)
+        new_run = _mock_run(status="pending", ws_id=ws.id)
+        mock_create_run.return_value = new_run
+        mock_queue.return_value = new_run
+
+        latest_cv_id = uuid.uuid4()
+        cv_result = MagicMock()
+        cv_result.scalar_one_or_none.return_value = latest_cv_id
+
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+        mock_db.execute.return_value = cv_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/terrapod/v1/runs/run-{original.id}/actions/retry",
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 201
+        assert mock_create_run.await_args.kwargs["configuration_version_id"] == latest_cv_id
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    async def test_retry_rejects_when_workspace_has_no_cv(
+        self, mock_resolve, mock_get_run, mock_create_run, *mocks
+    ):
+        """If the source run has no CV AND the workspace has never had one
+        uploaded, the retry is rejected with 422 (nothing the runner could do)."""
+        mock_resolve.return_value = "plan"
+
+        original = _mock_run(status="errored")
+        original.configuration_version_id = None
+        mock_get_run.return_value = original
+
+        ws = _mock_workspace(ws_id=original.workspace_id)
+        cv_result = MagicMock()
+        cv_result.scalar_one_or_none.return_value = None
+
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+        mock_db.execute.return_value = cv_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/terrapod/v1/runs/run-{original.id}/actions/retry",
+                headers=_AUTH,
+            )
+
+        assert resp.status_code == 422
+        mock_create_run.assert_not_called()

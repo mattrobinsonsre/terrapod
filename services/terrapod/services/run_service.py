@@ -709,9 +709,23 @@ async def fire_run_triggers(
     """Fire run triggers for downstream workspaces after a successful apply.
 
     Queries all RunTrigger rows where this workspace is the source,
-    then creates and queues a new run for each destination workspace.
+    then creates and queues a new run on each destination workspace
+    against its latest successfully-uploaded configuration version.
+
+    Without a CV attached, the runner has no code to plan against:
+    its first action is `GET /api/terrapod/v1/runs/{id}/artifacts/config`,
+    which the API answers with 404 when `run.configuration_version_id`
+    is null. The runner then exits 1 in ~8 seconds and the run shows
+    as errored — exactly the failure that #439 fixed (this code path
+    used to call `create_run` with no CV reference at all).
+
+    If the destination has never had a CV uploaded, the trigger is
+    skipped with a warning: there is nothing the runner could
+    sensibly do, and queueing a doomed run is just noise.
     """
     from sqlalchemy.orm import selectinload
+
+    from terrapod.db.models import ConfigurationVersion
 
     result = await db.execute(
         select(RunTrigger)
@@ -732,6 +746,27 @@ async def fire_run_triggers(
         if dest_ws is None:
             continue
 
+        # Latest uploaded CV for the destination — required so the
+        # runner has code to plan against.
+        cv_result = await db.execute(
+            select(ConfigurationVersion.id)
+            .where(
+                ConfigurationVersion.workspace_id == dest_ws.id,
+                ConfigurationVersion.status == "uploaded",
+            )
+            .order_by(ConfigurationVersion.created_at.desc())
+            .limit(1)
+        )
+        latest_cv_id = cv_result.scalar_one_or_none()
+
+        if latest_cv_id is None:
+            logger.warning(
+                "Run trigger skipped: destination workspace has no uploaded CV",
+                source_workspace=source_name,
+                destination_workspace=dest_ws.name,
+            )
+            continue
+
         run = await create_run(
             db,
             workspace=dest_ws,
@@ -739,6 +774,7 @@ async def fire_run_triggers(
             auto_apply=dest_ws.auto_apply,
             plan_only=False,
             source="tfe-api",
+            configuration_version_id=latest_cv_id,
         )
         await queue_run(db, run)
 
@@ -747,6 +783,7 @@ async def fire_run_triggers(
             source_workspace=source_name,
             destination_workspace=dest_ws.name,
             run_id=str(run.id),
+            configuration_version_id=str(latest_cv_id),
         )
 
 
