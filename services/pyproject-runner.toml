@@ -1,0 +1,14 @@
+[project]
+name = "terrapod-runner-job"
+version = "0.1.0"
+requires-python = ">=3.13,<3.14"
+# Minimal deps for the runner Job entrypoint. Anything that ports a
+# bash phase into Python gets added here. Kept disjoint from the
+# listener's pyproject so the runner image (which ships on every Job
+# pod) stays as lean as possible.
+dependencies = [
+    "httpx>=0.28",
+    "structlog>=25.5",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+]

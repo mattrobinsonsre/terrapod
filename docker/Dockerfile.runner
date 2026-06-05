@@ -1,35 +1,50 @@
-# Minimal runner image for Terrapod K8s Jobs.
+# Runner image for Terrapod K8s Jobs.
 #
-# No terraform/tofu binary baked in — downloaded at runtime from binary cache.
-# Includes signal-forwarding entrypoint for graceful spot instance termination.
+# Successor to the alpine-based image. Switched to python:3.13-slim so
+# the runner can host its own Python entrypoint (terrapod.runner.job_entrypoint).
+# For now the Python entrypoint exec's into the existing bash script —
+# subsequent commits port each phase into Python.
+#
+# Still includes the bash-era tooling (curl, jq, tar, unzip, git, openssh)
+# until the bash entrypoint is deleted in the final cleanup PR. After
+# that, only python + git + opa stay.
 
-FROM alpine:3.23.4
+# ── Builder ────────────────────────────────────────────────────────────
+FROM python:3.13-slim AS builder
+
+WORKDIR /build
+COPY services/pyproject-runner.toml pyproject.toml
+RUN pip install --no-cache-dir .
+
+# ── Runtime ────────────────────────────────────────────────────────────
+FROM python:3.13-slim
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
-# Bump APK_REFRESH to invalidate the cached layer and pick up the latest
-# Alpine security patches (e.g. nghttp2 1.68.1 fix for CVE-2026-27135).
-ARG APK_REFRESH=2026-05-11
-RUN echo "apk-refresh=${APK_REFRESH}" \
-    && apk upgrade --no-cache \
-    && apk add --no-cache \
-    curl \
-    tar \
-    jq \
-    unzip \
-    git \
-    openssh-client \
-    openssl
+# Bump APT_REFRESH to bust the cached apt layer and re-pull Debian
+# security patches. See Dockerfile.api for the same pattern.
+ARG APT_REFRESH=2026-06-05
+RUN echo "apt-refresh=${APT_REFRESH}" \
+    && apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+        curl \
+        tar \
+        jq \
+        unzip \
+        git \
+        openssh-client \
+        openssl \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 # OPA (Open Policy Agent) — the policy-as-code evaluation engine (#343).
 # The runner evaluates applicable policy sets against the local plan JSON
 # and posts results to the API before reporting plan-result. Pinned,
 # statically-linked binary, SHA256-verified. Kept in sync with the same
 # OPA_VERSION baked into docker/Dockerfile.api and docker/Dockerfile.test.
-# TARGETARCH is set by buildx; fall back to `apk --print-arch` for plain
-# `docker build`.
+# TARGETARCH is set by buildx; fall back to dpkg --print-architecture for
+# plain `docker build`.
 ARG TARGETARCH
 ARG OPA_VERSION=1.16.2
-RUN ARCH="${TARGETARCH:-$(apk --print-arch | sed 's/aarch64/arm64/;s/x86_64/amd64/')}" \
+RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && BASE="https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}" \
     && curl -fsSL -o /usr/local/bin/opa "${BASE}/opa_linux_${ARCH}_static" \
     && curl -fsSL -o /tmp/opa.sha256 "${BASE}/opa_linux_${ARCH}_static.sha256" \
@@ -38,6 +53,17 @@ RUN ARCH="${TARGETARCH:-$(apk --print-arch | sed 's/aarch64/arm64/;s/x86_64/amd6
     && chmod 0755 /usr/local/bin/opa \
     && /usr/local/bin/opa version
 
+# Python deps from builder
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Runner Python module — only what the Job entrypoint imports.
+WORKDIR /app
+COPY services/terrapod/runner/__init__.py ./terrapod/runner/__init__.py
+COPY services/terrapod/runner/job_entrypoint.py ./terrapod/runner/job_entrypoint.py
+
+# Bash entrypoint stays for now — the Python entrypoint exec's into it.
+# Deleted in the cleanup PR once all phases are ported.
 COPY docker/runner-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
@@ -53,7 +79,10 @@ RUN mkdir -p /workspace /tmp/bin /home/runner \
     && chown -R 1000:1000 /workspace /tmp/bin /home/runner
 
 USER 1000:1000
-ENV HOME=/home/runner
+ENV HOME=/home/runner \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app
 WORKDIR /workspace
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["python", "-m", "terrapod.runner.job_entrypoint"]
