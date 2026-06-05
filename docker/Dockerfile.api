@@ -4,7 +4,7 @@
 # Multi-stage: builder has gcc for compiling C extensions (asyncpg),
 # runtime image is slim with only runtime libraries.
 
-FROM python:3.14-slim AS builder
+FROM python:3.13-slim AS builder
 
 # Install build + runtime dependencies
 # apt-get upgrade picks up security patches for base OS packages
@@ -45,7 +45,7 @@ RUN "$POETRY_HOME"/bin/poetry lock --no-interaction --no-ansi \
     && pip install --no-cache-dir -r /tmp/requirements.txt
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
-FROM python:3.14-slim
+FROM python:3.13-slim
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
 # Runtime-only system libraries (no gcc, no -dev headers)

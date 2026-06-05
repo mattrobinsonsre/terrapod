@@ -3,7 +3,7 @@
 # Only includes httpx, kubernetes, prometheus-client, structlog, pydantic.
 # No cloud SDKs, no SQLAlchemy, no authlib, no SAML.
 
-FROM python:3.14-slim AS builder
+FROM python:3.13-slim AS builder
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     pkg-config \
@@ -16,7 +16,7 @@ COPY services/pyproject-listener.toml pyproject.toml
 RUN pip install --no-cache-dir .
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
-FROM python:3.14-slim
+FROM python:3.13-slim
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
 # Bump APT_REFRESH to bust the cached apt layer and re-pull Debian
