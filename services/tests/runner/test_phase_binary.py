@@ -58,9 +58,7 @@ class TestUpstreamFallback:
         client = httpx.Client(transport=httpx.MockTransport(handler))
         cfg = _cfg(TP_VERSION="1.11")
         with pytest.raises(binary.BinaryDownloadError, match="fully-qualified"):
-            binary.download_binary(
-                cfg, tmp_dir=tmp_path, bin_dir=tmp_path / "bin", client=client
-            )
+            binary.download_binary(cfg, tmp_dir=tmp_path, bin_dir=tmp_path / "bin", client=client)
 
     def test_full_version_falls_through_to_upstream(self, tmp_path) -> None:
         zip_bytes = _make_zip_bytes("tofu")
@@ -94,9 +92,7 @@ class TestInvalidZip:
         client = httpx.Client(transport=httpx.MockTransport(handler))
         cfg = _cfg()
         with pytest.raises(binary.BinaryDownloadError, match="not a valid zip"):
-            binary.download_binary(
-                cfg, tmp_dir=tmp_path, bin_dir=tmp_path / "bin", client=client
-            )
+            binary.download_binary(cfg, tmp_dir=tmp_path, bin_dir=tmp_path / "bin", client=client)
 
 
 class TestNoApiContext:
@@ -116,7 +112,5 @@ class TestUpstreamUrlConstruction:
     def test_tofu_upstream_url(self) -> None:
         cfg = _cfg(TP_BACKEND="tofu", TP_VERSION="1.12.1")
         url = binary._upstream_url(cfg)
-        assert url.startswith(
-            "https://github.com/opentofu/opentofu/releases/download/v1.12.1/"
-        )
+        assert url.startswith("https://github.com/opentofu/opentofu/releases/download/v1.12.1/")
         assert url.endswith(f"_1.12.1_{cfg.os}_{cfg.arch}.zip")

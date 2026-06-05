@@ -37,19 +37,19 @@ def _cfg(**overrides) -> RunnerConfig:
 
 class TestDownloadConfiguration:
     def test_extracts_into_work_dir_and_writes_override(self, tmp_path) -> None:
-        tar_bytes = _make_tarball({
-            "main.tf": 'terraform { cloud { organization = "default" } }\n',
-            "variables.tf": 'variable "x" { type = string }\n',
-        })
+        tar_bytes = _make_tarball(
+            {
+                "main.tf": 'terraform { cloud { organization = "default" } }\n',
+                "variables.tf": 'variable "x" { type = string }\n',
+            }
+        )
 
         def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(200, content=tar_bytes)
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
         work_dir = tmp_path / "workspace"
-        result = cfg_phase.download_configuration(
-            _cfg(), work_dir=work_dir, client=client
-        )
+        result = cfg_phase.download_configuration(_cfg(), work_dir=work_dir, client=client)
 
         assert result.downloaded
         assert result.strip_dir == work_dir
@@ -59,9 +59,11 @@ class TestDownloadConfiguration:
         assert 'backend "local"' in override
 
     def test_working_directory_selects_subpath(self, tmp_path) -> None:
-        tar_bytes = _make_tarball({
-            "envs/dev/main.tf": "# nested\n",
-        })
+        tar_bytes = _make_tarball(
+            {
+                "envs/dev/main.tf": "# nested\n",
+            }
+        )
 
         def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(200, content=tar_bytes)

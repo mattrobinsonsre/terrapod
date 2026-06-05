@@ -30,9 +30,7 @@ class TestDownloadState:
             return httpx.Response(200, content=body)
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
-        present = state_phase.download_state(
-            _cfg(), strip_dir=tmp_path, client=client
-        )
+        present = state_phase.download_state(_cfg(), strip_dir=tmp_path, client=client)
         assert present
         assert (tmp_path / "terraform.tfstate").read_bytes() == body
 
@@ -41,16 +39,12 @@ class TestDownloadState:
             return httpx.Response(404)
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
-        present = state_phase.download_state(
-            _cfg(), strip_dir=tmp_path, client=client
-        )
+        present = state_phase.download_state(_cfg(), strip_dir=tmp_path, client=client)
         assert present is False
         assert not (tmp_path / "terraform.tfstate").exists()
 
     def test_no_api_context_returns_false(self, tmp_path) -> None:
-        present = state_phase.download_state(
-            _cfg(TP_API_URL="", TP_RUN_ID=""), strip_dir=tmp_path
-        )
+        present = state_phase.download_state(_cfg(TP_API_URL="", TP_RUN_ID=""), strip_dir=tmp_path)
         assert present is False
 
 

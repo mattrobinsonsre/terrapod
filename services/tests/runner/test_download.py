@@ -74,9 +74,7 @@ class TestDownloadToFile:
                 return httpx.Response(
                     302,
                     headers={
-                        "location": (
-                            "https://terrapod.local/api/terrapod/v1/storage/abc?sig=xyz"
-                        )
+                        "location": ("https://terrapod.local/api/terrapod/v1/storage/abc?sig=xyz")
                     },
                 )
             # Second hop — the rewritten URL. Serves the artifact.

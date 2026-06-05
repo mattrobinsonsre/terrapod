@@ -73,8 +73,5 @@ def test_has_api_requires_both_url_and_run_id() -> None:
     assert RunnerConfig.from_env(env={"TP_API_URL": "https://x"}).has_api is False
     assert RunnerConfig.from_env(env={"TP_RUN_ID": "r-1"}).has_api is False
     assert (
-        RunnerConfig.from_env(
-            env={"TP_API_URL": "https://x", "TP_RUN_ID": "r-1"}
-        ).has_api
-        is True
+        RunnerConfig.from_env(env={"TP_API_URL": "https://x", "TP_RUN_ID": "r-1"}).has_api is True
     )

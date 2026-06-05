@@ -111,10 +111,7 @@ class TestModuleEndToEndExecvp:
         exec. Catches argv/env plumbing bugs that a mock would silently
         paper over."""
         fake_bash = tmp_path / "entrypoint.sh"
-        fake_bash.write_text(
-            "#!/bin/sh\n"
-            '[ "$TP_RUNNER_BINARY_DONE" = "1" ] && exit 0 || exit 42\n'
-        )
+        fake_bash.write_text('#!/bin/sh\n[ "$TP_RUNNER_BINARY_DONE" = "1" ] && exit 0 || exit 42\n')
         fake_bash.chmod(0o755)
 
         pid = os.fork()

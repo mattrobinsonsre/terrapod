@@ -179,8 +179,10 @@ def download_to_file(
                 return result
 
             # Same retry semantics as bash: retry only transient signals.
-            transient = result.status is None or result.status == 408 or (
-                result.status is not None and 500 <= result.status < 600
+            transient = (
+                result.status is None
+                or result.status == 408
+                or (result.status is not None and 500 <= result.status < 600)
             )
             if transient and attempt < retries:
                 logger.info(

@@ -99,8 +99,7 @@ def reuse_plan_lock_file(
     if not result.ok:
         lock_file.unlink(missing_ok=True)
         logger.info(
-            "no plan-phase lock file available; apply init will resolve "
-            "providers independently",
+            "no plan-phase lock file available; apply init will resolve providers independently",
             status=result.status,
         )
         return False
