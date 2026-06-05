@@ -800,7 +800,16 @@ async def show_workspace(
 
     perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
     if perm is None:
-        raise HTTPException(status_code=404, detail="Workspace not found")
+        # Runner-token consumers can resolve the producer workspace by name
+        # so the OpenTofu `remote` backend's first hop (workspace lookup) in
+        # `data "terraform_remote_state"` finds it instead of falling through
+        # to its create-if-not-found code path (which then 403s on the
+        # runner's missing org-write permission). Allowlist check mirrors
+        # the state-read endpoints below.
+        if await _runner_state_read_allowed(db, user, ws):
+            perm = "read"
+        else:
+            raise HTTPException(status_code=404, detail="Workspace not found")
 
     # Load latest primary run for this workspace (excludes module-test / speculative PR runs)
     run_result = await db.execute(
@@ -1030,8 +1039,23 @@ async def show_workspace_by_id(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Show a workspace by its ID."""
-    ws, perm = await _require_ws_permission(workspace_id, "read", user, db)
+    """Show a workspace by its ID.
+
+    Mirrors the name-keyed handler's allowlist treatment so runner-token
+    consumers (cross-workspace ``terraform_remote_state``) can resolve
+    the producer workspace through this endpoint as well as the
+    state-read endpoints further down.
+    """
+    ws = await _get_workspace_by_id(workspace_id, db)
+    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    if not has_permission(perm, "read"):
+        if await _runner_state_read_allowed(db, user, ws):
+            perm = "read"
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Requires read permission on workspace",
+            )
 
     # Load latest primary run for this workspace (excludes module-test / speculative PR runs)
     run_result = await db.execute(
