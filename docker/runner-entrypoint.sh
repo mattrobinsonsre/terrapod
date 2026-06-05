@@ -856,6 +856,30 @@ if [ "$TP_CONFIGURED_BACKEND" != "local" ]; then
 fi
 log "[entrypoint] Backend verified: local"
 
+# --- Plan phase: extend .terraform.lock.hcl with the other Linux arch ---
+# `init` only records `h1:` checksums for the arch it just ran on. If
+# the apply phase ends up on a different arch (mixed-arch nodepool,
+# spot reschedule across phases, multi-day wait between plan and
+# apply) the reused single-arch lock fails the apply-side `init`
+# with "doesn't match any of the checksums previously recorded in
+# the dependency lock file" after ~16 seconds. `providers lock`
+# downloads the other-arch archives and appends their checksums to
+# the existing entries — exactly the canonical "extend my lock with
+# another platform's hashes" tool terraform/tofu give us. Bounded
+# by amd64 + arm64 because that's what runner Jobs ever land on.
+#
+# Best-effort: a provider that doesn't publish both archs (rare —
+# `local`, `archive`, niche third-party) will fail this and the
+# warning surfaces it. We carry on with whatever did succeed.
+if [ "$TP_PHASE" = "plan" ] && [ -f .terraform.lock.hcl ]; then
+    log "[entrypoint] Extending .terraform.lock.hcl with linux/amd64 + linux/arm64 checksums..."
+    if ! "$TP_BIN" providers lock \
+            -platform=linux_amd64 \
+            -platform=linux_arm64 2>&1 | sed 's/^/[providers-lock] /'; then
+        log "[entrypoint] Warning: providers lock failed; an apply on a different arch may fail tofu init"
+    fi
+fi
+
 # --- Plan phase: upload the lock file produced (or augmented) by init ---
 # Apply phase will download this so its init resolves to the same
 # provider versions. Best-effort — a failure here just means the
