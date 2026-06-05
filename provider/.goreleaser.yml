@@ -2,6 +2,11 @@ version: 2
 
 project_name: terraform-provider-terrapod
 
+# Saturate the runner's cores when crunching the 8-platform matrix.
+# ubuntu-latest has 4 vCPUs; 6 oversubscribes slightly because part
+# of each build is I/O (go module download, GPG signing).
+parallelism: 6
+
 builds:
   - env:
       - CGO_ENABLED=0
@@ -39,7 +44,12 @@ signs:
       - "${artifact}"
 
 release:
-  disable: false
+  # The GitHub Release for this tag is pre-created by the
+  # `release-create` CI job so that provider and migrate goreleaser
+  # runs can both upload to it in parallel. append-mode tells
+  # goreleaser to upload to the existing Release instead of trying
+  # to create a fresh one.
+  mode: append
   extra_files:
     - glob: signing-key.asc
 

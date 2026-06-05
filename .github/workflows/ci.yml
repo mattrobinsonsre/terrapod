@@ -733,20 +733,60 @@ jobs:
             "$REGISTRY/${{ matrix.image }}:sha-${sha_short}-arm64"
 
   # ── Release ────────────────────────────────────────────
-  # The release stage used to be a single 10–15 min serial job. It's
-  # now split into three parallel branches that join in `release-finalize`:
+  # The release stage is five jobs — a tiny pre-create that owns the
+  # Release object and four branches that all upload into it in
+  # parallel:
   #
-  #   release-images   — image retag (5 images) + Helm chart push + SBOMs.
-  #                      Pushes the chart to GHCR directly; saves SBOMs +
-  #                      chart + checksums as a workflow artifact for
-  #                      release-finalize to upload to the GitHub Release.
-  #   release-provider — GoReleaser provider builds (8 platforms, signed).
-  #                      CREATES the GitHub Release for this tag.
-  #   release-migrate  — GoReleaser migrate builds. APPENDS to the Release
-  #                      created by release-provider; needs that job.
-  #   release-finalize — joins all three. Generates release notes from
-  #                      conventional-commit titles, edits the Release's
-  #                      title/notes, and uploads chart + SBOMs + checksums.
+  #   release-create   — pre-creates an empty GitHub Release for the tag
+  #                      with a placeholder title. Owning Release
+  #                      creation here means provider AND migrate can
+  #                      both run in append mode at the same time
+  #                      instead of provider gating migrate (#435 had
+  #                      provider create the Release → migrate append).
+  #   release-images   — image retag + Helm push + SBOM generation.
+  #                      Saves chart + SBOMs + checksums as a workflow
+  #                      artifact for release-finalize to upload.
+  #   release-provider — GoReleaser provider, append mode.
+  #   release-migrate  — GoReleaser migrate, append mode.
+  #   release-finalize — joins all four; sets real title + release notes
+  #                      and uploads the workflow artifact from
+  #                      release-images.
+  #
+  # Both goreleaser configs are also run with `parallelism: 8` so each
+  # process saturates the runner's cores when crunching its own
+  # platform matrix.
+
+  release-create:
+    name: Release — Create empty GitHub Release
+    needs: [prepare, create-manifests]
+    if: |
+      always()
+      && needs.prepare.outputs.is_tag == 'true'
+      && needs.prepare.result == 'success'
+      && (needs.create-manifests.result == 'success' || needs.create-manifests.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Create empty Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ needs.prepare.outputs.version }}"
+
+          # Idempotent: if the Release already exists (e.g. this job
+          # is being re-run), skip. release-finalize will set the
+          # real title/notes; we just need the Release object so the
+          # append-mode goreleaser runs have somewhere to upload to.
+          if gh release view "$version" >/dev/null 2>&1; then
+            echo "Release $version already exists; skipping create"
+            exit 0
+          fi
+          gh release create "$version" \
+            --title "$version (in progress)" \
+            --notes "Release in progress — assets are being attached by parallel CI jobs."
 
   release-images:
     name: Release — Images, Helm, SBOMs
@@ -825,12 +865,14 @@ jobs:
 
   release-provider:
     name: Release — Provider (GoReleaser)
-    needs: [prepare, create-manifests]
+    # Both goreleaser jobs depend only on release-create — they no
+    # longer gate on each other. provider/.goreleaser.yml is
+    # release.mode=append.
+    needs: [prepare, release-create]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
-      && needs.prepare.result == 'success'
-      && (needs.create-manifests.result == 'success' || needs.create-manifests.result == 'skipped')
+      && needs.release-create.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -864,14 +906,13 @@ jobs:
 
   release-migrate:
     name: Release — Migrate tool (GoReleaser)
-    # Needs release-provider because migrate/.goreleaser.yml is
-    # release.mode=append — the GitHub Release must already exist
-    # (created by release-provider) for the append upload to land.
-    needs: [prepare, release-provider]
+    # Parallel with release-provider — both append to the Release that
+    # release-create made.
+    needs: [prepare, release-create]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
-      && needs.release-provider.result == 'success'
+      && needs.release-create.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -908,10 +949,11 @@ jobs:
 
   release-finalize:
     name: Release — Finalize (notes + chart + SBOMs)
-    needs: [prepare, release-images, release-provider, release-migrate]
+    needs: [prepare, release-create, release-images, release-provider, release-migrate]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
+      && needs.release-create.result == 'success'
       && needs.release-images.result == 'success'
       && needs.release-provider.result == 'success'
       && needs.release-migrate.result == 'success'
@@ -999,11 +1041,11 @@ jobs:
   # ── Cleanup Tag on Failure ─────────────────────────────
   cleanup-tag:
     name: Cleanup Tag
-    needs: [prepare, build-images, scan-images, create-manifests, release-images, release-provider, release-migrate, release-finalize]
+    needs: [prepare, build-images, scan-images, create-manifests, release-create, release-images, release-provider, release-migrate, release-finalize]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
-      && (needs.build-images.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-finalize.result == 'failure')
+      && (needs.build-images.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-finalize.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -1046,6 +1088,7 @@ jobs:
       - scan-images
       - e2e-test
       - create-manifests
+      - release-create
       - release-images
       - release-provider
       - release-migrate
@@ -1076,6 +1119,7 @@ jobs:
             "${{ needs.scan-images.result }}"
             "${{ needs.e2e-test.result }}"
             "${{ needs.create-manifests.result }}"
+            "${{ needs.release-create.result }}"
             "${{ needs.release-images.result }}"
             "${{ needs.release-provider.result }}"
             "${{ needs.release-migrate.result }}"
