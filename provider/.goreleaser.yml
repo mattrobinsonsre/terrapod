@@ -2,10 +2,11 @@ version: 2
 
 project_name: terraform-provider-terrapod
 
-# Saturate the runner's cores when crunching the 8-platform matrix.
-# ubuntu-latest has 4 vCPUs; 6 oversubscribes slightly because part
-# of each build is I/O (go module download, GPG signing).
-parallelism: 6
+# Build parallelism is set via the `--parallelism` CLI flag in
+# .github/workflows/ci.yml (goreleaser v2 has no project-level
+# `parallelism` field in the schema). ubuntu-latest has 4 vCPUs;
+# 6 oversubscribes slightly because part of each build is I/O
+# (go module download, GPG signing).
 
 builds:
   - env:

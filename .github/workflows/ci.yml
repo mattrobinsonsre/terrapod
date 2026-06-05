@@ -752,7 +752,7 @@ jobs:
   #                      and uploads the workflow artifact from
   #                      release-images.
   #
-  # Both goreleaser configs are also run with `parallelism: 8` so each
+  # Both goreleaser invocations also pass `--parallelism 6` so each
   # process saturates the runner's cores when crunching its own
   # platform matrix.
 
@@ -898,7 +898,10 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean
+          # --parallelism saturates the runner's 4 vCPUs across the
+          # 8-platform build matrix (slightly oversubscribed because
+          # part of each build is I/O — module download, GPG signing).
+          args: release --clean --parallelism 6
           workdir: provider
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -941,7 +944,8 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean
+          # See note on release-provider — same parallelism rationale.
+          args: release --clean --parallelism 6
           workdir: migrate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

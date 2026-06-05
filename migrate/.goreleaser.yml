@@ -20,9 +20,9 @@ version: 2
 
 project_name: terrapod-migrate
 
-# Same parallelism setting as provider/.goreleaser.yml — saturates
-# the runner's cores when crunching the platform matrix.
-parallelism: 6
+# Build parallelism is set via the `--parallelism` CLI flag in
+# .github/workflows/ci.yml (goreleaser v2 has no project-level
+# `parallelism` field in the schema).
 
 builds:
   - main: ./cmd/terrapod-migrate
