@@ -60,7 +60,10 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Runner Python module — only what the Job entrypoint imports.
 WORKDIR /app
 COPY services/terrapod/runner/__init__.py ./terrapod/runner/__init__.py
+COPY services/terrapod/runner/runner_config.py ./terrapod/runner/runner_config.py
+COPY services/terrapod/runner/download.py ./terrapod/runner/download.py
 COPY services/terrapod/runner/job_entrypoint.py ./terrapod/runner/job_entrypoint.py
+COPY services/terrapod/runner/phases/ ./terrapod/runner/phases/
 
 # Bash entrypoint stays for now — the Python entrypoint exec's into it.
 # Deleted in the cleanup PR once all phases are ported.

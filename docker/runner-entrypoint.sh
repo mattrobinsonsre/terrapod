@@ -462,7 +462,9 @@ tp_evaluate_policies() {
 }
 
 # --- Download binary from cache ---
-# Detect platform architecture for correct binary download
+# Detect platform architecture for correct binary download. Used by
+# the bash fallback (when TP_RUNNER_BINARY_DONE is unset) and also by
+# the providers-lock arch detection further down — always compute.
 TP_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 TP_ARCH=$(uname -m)
 case "$TP_ARCH" in
@@ -470,7 +472,9 @@ case "$TP_ARCH" in
     aarch64) TP_ARCH="arm64" ;;
 esac
 
-if [ -n "$TP_API_URL" ] && [ -n "$TP_VERSION" ]; then
+if [ -n "$TP_RUNNER_BINARY_DONE" ] && [ -n "$TP_BIN" ]; then
+    log "[entrypoint] Binary download already handled by Python orchestrator: $TP_BIN"
+elif [ -n "$TP_API_URL" ] && [ -n "$TP_VERSION" ]; then
     BINARY_URL="${TP_API_URL}/api/terrapod/v1/binary-cache/${TP_BACKEND}/${TP_VERSION}/${TP_OS}/${TP_ARCH}"
     log "[entrypoint] Downloading $TP_BACKEND $TP_VERSION ($TP_OS/$TP_ARCH) from binary cache..."
     if ! tp_curl_download "/tmp/${TP_BACKEND}.zip" -H "$AUTH_HEADER" "$BINARY_URL"; then
@@ -521,7 +525,9 @@ if [ -z "$TP_BIN" ]; then
 fi
 
 # --- Download configuration archive ---
-if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
+if [ -n "$TP_RUNNER_CONFIGURATION_DONE" ]; then
+    log "[entrypoint] Configuration archive already handled by Python orchestrator"
+elif [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
     log "[entrypoint] Downloading configuration..."
     # No `2>/dev/null || true`: a storage auth failure here (e.g. an
     # SSE-KMS bucket rejecting a SigV2 presigned URL) must be visible,
@@ -755,7 +761,9 @@ fi
 # Must run AFTER working directory change so terraform.tfstate ends up in the
 # directory where tofu init/plan/apply will execute (the working directory for
 # monorepo subdirectory setups, or $WORK_DIR for root-level workspaces).
-if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
+if [ -n "$TP_RUNNER_STATE_DONE" ]; then
+    log "[entrypoint] State download already handled by Python orchestrator"
+elif [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
     log "[entrypoint] Downloading current state..."
     tp_curl_download terraform.tfstate -H "$AUTH_HEADER" \
         "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/state" 2>/dev/null || true
@@ -771,7 +779,9 @@ fi
 # works (with the today-behaviour drift risk) if the plan ran on an
 # older runner that didn't upload a lock file, or an older API without
 # the /lock-file endpoint.
-if [ "$TP_PHASE" = "apply" ] && [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
+if [ -n "$TP_RUNNER_LOCK_FILE_DONE" ]; then
+    log "[entrypoint] Lock-file reuse already handled by Python orchestrator"
+elif [ "$TP_PHASE" = "apply" ] && [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ]; then
     if tp_curl_download .terraform.lock.hcl -H "$AUTH_HEADER" \
         "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/lock-file" 2>/dev/null; then
         log "[entrypoint] Reusing .terraform.lock.hcl from plan phase"

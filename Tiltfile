@@ -114,7 +114,10 @@ local_resource(
         'docker/runner-entrypoint.sh',
         'services/pyproject-runner.toml',
         'services/terrapod/runner/__init__.py',
+        'services/terrapod/runner/runner_config.py',
+        'services/terrapod/runner/download.py',
         'services/terrapod/runner/job_entrypoint.py',
+        'services/terrapod/runner/phases',
     ],
     labels=['build'],
 )
