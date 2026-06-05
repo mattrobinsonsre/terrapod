@@ -856,26 +856,39 @@ if [ "$TP_CONFIGURED_BACKEND" != "local" ]; then
 fi
 log "[entrypoint] Backend verified: local"
 
-# --- Plan phase: extend .terraform.lock.hcl with the other Linux arch ---
+# --- Plan phase: extend .terraform.lock.hcl with the OTHER Linux arch ---
 # `init` only records `h1:` checksums for the arch it just ran on. If
 # the apply phase ends up on a different arch (mixed-arch nodepool,
 # spot reschedule across phases, multi-day wait between plan and
 # apply) the reused single-arch lock fails the apply-side `init`
 # with "doesn't match any of the checksums previously recorded in
 # the dependency lock file" after ~16 seconds. `providers lock`
-# downloads the other-arch archives and appends their checksums to
-# the existing entries — exactly the canonical "extend my lock with
-# another platform's hashes" tool terraform/tofu give us. Bounded
-# by amd64 + arm64 because that's what runner Jobs ever land on.
+# downloads the requested-arch archives and appends their checksums
+# to the existing entries — exactly the canonical "extend my lock
+# with another platform's hashes" tool terraform/tofu give us.
 #
-# Best-effort: a provider that doesn't publish both archs (rare —
+# Bounded by amd64 + arm64 because that's what runner Jobs ever land
+# on. Importantly we only run it for the OTHER arch — `init` above
+# already downloaded the current arch and updated the lock with its
+# `h1:`, and `providers lock` would re-download regardless of whether
+# the archive is already on disk (h1 is computed over the unzipped
+# contents, sourced from the network mirror not the local cache). So
+# duplicating the current arch here doubles the lock-extension
+# download volume per plan for no functional gain.
+#
+# Best-effort: a provider that doesn't publish the other arch (rare —
 # `local`, `archive`, niche third-party) will fail this and the
 # warning surfaces it. We carry on with whatever did succeed.
-if [ "$TP_PHASE" = "plan" ] && [ -f .terraform.lock.hcl ]; then
-    log "[entrypoint] Extending .terraform.lock.hcl with linux/amd64 + linux/arm64 checksums..."
+case "$(uname -m)" in
+    aarch64) OTHER_PLATFORM="linux_amd64" ;;
+    x86_64)  OTHER_PLATFORM="linux_arm64" ;;
+    *)       OTHER_PLATFORM="" ;;
+esac
+
+if [ "$TP_PHASE" = "plan" ] && [ -f .terraform.lock.hcl ] && [ -n "$OTHER_PLATFORM" ]; then
+    log "[entrypoint] Extending .terraform.lock.hcl with $OTHER_PLATFORM checksums (current arch already locked by init)..."
     if ! "$TP_BIN" providers lock \
-            -platform=linux_amd64 \
-            -platform=linux_arm64 2>&1 | sed 's/^/[providers-lock] /'; then
+            -platform="$OTHER_PLATFORM" 2>&1 | sed 's/^/[providers-lock] /'; then
         log "[entrypoint] Warning: providers lock failed; an apply on a different arch may fail tofu init"
     fi
 fi
