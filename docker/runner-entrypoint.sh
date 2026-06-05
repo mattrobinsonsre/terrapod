@@ -707,6 +707,18 @@ host "$TP_PUBLIC_HOST" {
   services = {
     "modules.v1"   = "${TP_API_URL}/api/v2/registry/modules/"
     "providers.v1" = "${TP_API_URL}/api/v2/registry/providers/"
+    # tfe.v2 + tfe.v2.1 + tfe.v2.2 are required so that
+    # `data "terraform_remote_state" { backend = "remote" }` resolves
+    # the API base URL through this redirect instead of giving up
+    # with "Host <X> does not provide a tfe service". The cloud-block
+    # state path doesn't go through service discovery so the cloud
+    # block keeps working without these, but every other consumer of
+    # the discovery doc (terraform_remote_state, future TFE V2 RPCs)
+    # does and needs them. All three minor versions point at the same
+    # /api/v2/ base — matches what the public discovery doc serves.
+    "tfe.v2"       = "${TP_API_URL}/api/v2/"
+    "tfe.v2.1"     = "${TP_API_URL}/api/v2/"
+    "tfe.v2.2"     = "${TP_API_URL}/api/v2/"
   }
 }
 TFEOF
