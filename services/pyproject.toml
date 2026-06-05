@@ -58,20 +58,16 @@ standard-imghdr = "^3.13"
 # speaks OpenAI Chat Completions request shape to LiteLLM; LiteLLM
 # handles per-provider request translation and auth in-process.
 #
-# Upper bound <2.0 is the standard major-version cap. The lower bound
-# is 1.83.7, which patches three proxy-mode CVEs (CVE-2026-42203,
-# CVE-2026-42208, CVE-2026-42271) — all proxy-only and not reachable
-# from how Terrapod uses litellm (library-only via acompletion(),
-# proxy never started), but tightening the floor keeps the resolver
-# off the older line.
-#
-# Bumped floor to 1.87 (the latest as of 2026-06-05): clears
-# CVE-2026-40217 (proxy-mode, patched in 1.83.11+) and relaxes the
-# aiohttp pin from `==3.13.5` to `<4.0,>=3.10`, which lets us pull in
-# aiohttp 3.14+ for GHSA-hg6j-4rv6-33pg + GHSA-jg22-mg44-37j8. This is
-# only reachable now that we sit on Python 3.13 — every litellm
-# release from 1.83.11 onwards requires_python = <3.14. The 3.13
-# floor stays until litellm restores 3.14 compatibility.
+# Upper bound <2.0 is the standard major-version cap. Lower bound
+# 1.87 patches the proxy-mode CVEs (CVE-2026-40217, CVE-2026-42203,
+# CVE-2026-42208, CVE-2026-42271) — all proxy-only, not reachable from
+# how Terrapod uses litellm (library-only via acompletion(), proxy
+# never started) — and relaxes the aiohttp pin from ==3.13.5 to
+# <4.0,>=3.10, which lets aiohttp resolve to 3.14+ and clears
+# GHSA-hg6j-4rv6-33pg + GHSA-jg22-mg44-37j8 + CVE-2026-34993 +
+# CVE-2026-47265. Reachable only on Python 3.13 — litellm 1.83.11+
+# requires_python = <3.14. The 3.13 floor stays until litellm
+# restores 3.14 compatibility.
 litellm = ">=1.87,<2.0"
 
 [tool.poetry.group.dev.dependencies]
