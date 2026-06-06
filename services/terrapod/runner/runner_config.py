@@ -28,6 +28,7 @@ class RunnerConfig:
 
     # Identity + auth — present on every Job
     api_url: str
+    public_api_url: str
     auth_token: str
     run_id: str
     phase: Literal["plan", "apply"]
@@ -43,10 +44,12 @@ class RunnerConfig:
     # Plan/apply options
     target_addrs: list[str]
     replace_addrs: list[str]
+    var_files: list[str]
     refresh: bool
     refresh_only: bool
     allow_empty_apply: bool
     destroy: bool
+    plan_only: bool
 
     # Misc behaviours
     setup_script: str
@@ -98,6 +101,7 @@ class RunnerConfig:
 
         return cls(
             api_url=e.get("TP_API_URL", "").rstrip("/"),
+            public_api_url=e.get("TP_PUBLIC_API_URL", "").rstrip("/"),
             auth_token=e.get("TP_AUTH_TOKEN", ""),
             run_id=e.get("TP_RUN_ID", ""),
             phase=e.get("TP_PHASE", "plan"),  # type: ignore[arg-type]
@@ -107,10 +111,12 @@ class RunnerConfig:
             working_dir=e.get("TP_WORKING_DIR", ""),
             target_addrs=_json_list("TP_TARGET_ADDRS"),
             replace_addrs=_json_list("TP_REPLACE_ADDRS"),
+            var_files=_json_list("TP_VAR_FILES"),
             refresh=_bool("TP_REFRESH", default=True),
             refresh_only=_bool("TP_REFRESH_ONLY"),
             allow_empty_apply=_bool("TP_ALLOW_EMPTY_APPLY"),
             destroy=_bool("TP_DESTROY"),
+            plan_only=_bool("TP_PLAN_ONLY"),
             setup_script=e.get("TP_SETUP_SCRIPT", ""),
             termination_grace_period_seconds=_int("TP_TERMINATION_GRACE", 120),
             upload_timeout_seconds=_int("TP_UPLOAD_TIMEOUT", 60),

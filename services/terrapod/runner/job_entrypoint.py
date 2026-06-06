@@ -1,37 +1,73 @@
-"""Entrypoint for runner K8s Jobs.
+"""Entrypoint for runner K8s Jobs — pure Python orchestrator.
 
-Owns the whole life of a single Terrapod run inside a Job pod: parses
-the listener-supplied env vars, drives each phase, then hands off to
-the bash script for phases not yet ported.
+Owns the whole life of a single Terrapod run inside a Job pod:
 
-Successor to docker/runner-entrypoint.sh — phases migrate from bash
-to Python one PR at a time. The bash script honors per-phase
-TP_RUNNER_*_DONE env-var markers set here so an already-handled phase
-is a no-op when bash inherits control.
+  1. Parse env vars into RunnerConfig
+  2. LogCapture wrap (combined log → uploaded on EVERY exit path)
+  3. Download terraform/tofu binary (FATAL on miss)
+  4. Download configuration tarball (FATAL on miss / extract failure)
+  5. Download current state (best-effort)
+  6. Apply-phase only: download plan-phase lock file
+  7. Write terraform.rc (credentials + provider mirror + host redirect)
+  8. Chdir into working subdirectory
+  9. Setup script (if configured)
+  10. Build var-file / target / replace argv pieces
+  11. Run init (FATAL on non-zero)
+  12. Backend backstop (FATAL if backend != local)
+  13. Plan phase only: lock-file h1 injection + lock-file upload
+  14. Plan: run plan; on success run show -json + OPA + plan-result
+      + plan-file + plan-json upload
+  15. Apply: download plan file (if exists); run apply; upload state
+      (FATAL on state upload failure); apply-result
 
-Invocation: `python -m terrapod.runner.job_entrypoint` from the Job
-spec. Env vars set by the listener are inherited verbatim.
+EXIT trap equivalent: a try/finally around the entire body uploads
+the combined log + posts the resource profile no matter how we exit.
+
+Successor to docker/runner-entrypoint.sh. Run as
+`python -m terrapod.runner.job_entrypoint`. Returns the process exit
+code; the K8s Job phase tracking maps any non-zero to "failed".
 """
 
 from __future__ import annotations
 
 import os
+import signal
 import sys
 from pathlib import Path
 
 import structlog
 
+from terrapod.runner import lock_extender
+from terrapod.runner.phases import (
+    backend_backstop,
+    init_phase,
+    log_capture,
+    mirror_config,
+    opa,
+    plan_apply,
+    resource_profile,
+    setup_script,
+    tf_args,
+    uploads,
+    working_dir,
+)
 from terrapod.runner.phases.binary import BinaryDownloadError, download_binary
 from terrapod.runner.phases.configuration import download_configuration
 from terrapod.runner.phases.state import download_state, reuse_plan_lock_file
 from terrapod.runner.runner_config import RunnerConfig
 
-# Where docker/runner-entrypoint.sh is copied to in the runner image.
-_BASH_ENTRYPOINT_PATH = "/entrypoint.sh"
-
-# The K8s Job emptyDir mount we treat as the run's working directory.
-# Matches the Dockerfile's `WORKDIR /workspace`.
 _DEFAULT_WORK_DIR = Path("/workspace")
+
+_COMBINED_LOG = Path("/tmp/combined.log")
+_INIT_LOG = Path("/tmp/init.log")
+_PLAN_LOG = Path("/tmp/plan.log")
+_APPLY_LOG = Path("/tmp/apply.log")
+_PLAN_JSON = Path("/tmp/plan.json")
+_TF_RC = Path("/tmp/terraform.rc")
+_OPA_WORK = Path("/tmp/opa")
+
+_UPLOAD_BUDGET_SECONDS = 25  # reserved for artifact uploads at end of grace
+_MIN_CHILD_GRACE_SECONDS = 30
 
 
 def _configure_logging() -> None:
@@ -47,84 +83,365 @@ def _configure_logging() -> None:
     )
 
 
-def _exec_bash(env: dict[str, str], argv: list[str]) -> int:
+def _install_signal_logger() -> None:
+    """Log SIGTERM/SIGQUIT receipt for visibility; the per-subprocess
+    signal handler in exec_subprocess.run does the actual forwarding to
+    the child. We DON'T re-raise — we want the Python orchestrator to
+    keep running so the finally block uploads the log + resource
+    profile."""
+
+    def _handle(signum, frame):
+        # Don't write to stdout from within a signal handler — the I/O
+        # buffer might be mid-write from a subprocess tee. Just stash
+        # that we saw it; the next user-space write will surface it.
+        signal.signal(signum, signal.SIG_DFL)  # second signal → default
+        log = structlog.get_logger("runner.job_entrypoint")
+        log.info("received signal — graceful shutdown", signum=signum)
+
+    for s in (signal.SIGTERM, signal.SIGQUIT):
+        try:
+            signal.signal(s, _handle)
+        except (ValueError, OSError):
+            pass
+
+
+def _child_grace_seconds(cfg: RunnerConfig) -> float:
+    grace = cfg.termination_grace_period_seconds - _UPLOAD_BUDGET_SECONDS
+    if grace < _MIN_CHILD_GRACE_SECONDS:
+        grace = _MIN_CHILD_GRACE_SECONDS
+    return float(grace)
+
+
+def _run_plan_phase(
+    cfg: RunnerConfig,
+    *,
+    binary: str,
+    var_file_argv: list[str],
+    strip_dir: Path,
+    child_grace: float,
+) -> int:
+    """Plan-phase body: optional lock-extender splice + lock-file upload,
+    plan invocation, plan-json export, OPA gate, plan-result POST,
+    plan-file + plan-json uploads.
+
+    Returns the orchestrator's exit code (0 on success, non-zero on
+    failure / OPA mandatory-set deny)."""
     log = structlog.get_logger("runner.job_entrypoint")
 
-    if not os.path.exists(_BASH_ENTRYPOINT_PATH):
-        log.error("Bash entrypoint not found", path=_BASH_ENTRYPOINT_PATH)
-        return 127
-    if not os.access(_BASH_ENTRYPOINT_PATH, os.X_OK):
-        log.error("Bash entrypoint not executable", path=_BASH_ENTRYPOINT_PATH)
-        return 126
+    # Lock-file h1 splice (best-effort) and lock-file upload. Done
+    # BEFORE plan invocation so the apply phase's lock-file download
+    # picks up the splice. The lock file lives at strip_dir.
+    lock_path = strip_dir / ".terraform.lock.hcl"
+    other_arch = lock_extender.detect_other_arch()
+    if lock_path.exists() and other_arch and cfg.has_api:
+        try:
+            seen, extended = lock_extender.extend_lock_file(
+                lock_path,
+                api_url=cfg.api_url,
+                auth_token=cfg.auth_token,
+                other_arch=other_arch,
+            )
+            if seen - extended > 0:
+                log.info(
+                    "lock extender did not cover every provider — "
+                    "falling back to `providers lock` for the rest",
+                    seen=seen,
+                    extended=extended,
+                )
+                # Best-effort fallback. We deliberately don't fail the
+                # plan if this fails — apply may simply re-init on its
+                # own arch.
+                try:
+                    import subprocess as _sp
 
-    log.info("Delegating remaining phases to bash", path=_BASH_ENTRYPOINT_PATH)
-    os.execvpe(_BASH_ENTRYPOINT_PATH, [_BASH_ENTRYPOINT_PATH, *argv], env)
-    # execvpe only returns on error; raise to avoid silent fall-through.
-    return 1
+                    _sp.run(  # noqa: S603
+                        [binary, "providers", "lock", f"-platform={other_arch}"],
+                        check=False,
+                        timeout=300,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log.warning(
+                        "providers lock fallback failed (non-fatal)",
+                        err=str(exc),
+                    )
+        except Exception as exc:  # noqa: BLE001
+            log.warning("lock extender raised (non-fatal)", err=str(exc))
+
+    if lock_path.exists() and cfg.has_api:
+        try:
+            uploads.upload_lock_file(cfg, lock_path)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("lock-file upload raised (non-fatal)", err=str(exc))
+
+    # Plan invocation.
+    _PLAN_LOG.write_bytes(b"")
+    plan_result = plan_apply.run_plan(
+        cfg,
+        binary=binary,
+        var_file_args=var_file_argv,
+        log_file=str(_PLAN_LOG),
+        child_grace_seconds=child_grace,
+    )
+    if plan_result.exit_code != 0:
+        log.warning("plan failed", rc=plan_result.exit_code)
+        return plan_result.exit_code
+
+    log.info("plan completed", has_changes=plan_result.has_changes)
+
+    # Export show -json (for OPA + UI artifact). Best-effort.
+    plan_show_ok = False
+    if Path("tfplan").exists():
+        plan_show_ok = plan_apply.run_plan_show_json(
+            binary=binary, plan_file="tfplan", json_out=str(_PLAN_JSON)
+        )
+
+    # OPA evaluation. Mandatory-set denials → non-zero exit.
+    try:
+        opa.evaluate_policies(
+            cfg,
+            plan_json=_PLAN_JSON if plan_show_ok else _PLAN_JSON,
+            work_dir=_OPA_WORK,
+        )
+    except opa.PolicyEvaluationError as exc:
+        log.error("policy evaluation failed", err=str(exc))
+        return 1
+
+    # plan-result POST.
+    try:
+        uploads.post_plan_result(cfg, has_changes=plan_result.has_changes)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("plan-result raised (non-fatal)", err=str(exc))
+
+    # Plan binary upload (skip for plan-only).
+    if Path("tfplan").exists() and not cfg.plan_only:
+        try:
+            uploads.upload_plan_file(cfg, Path("tfplan"))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("plan-file upload raised (non-fatal)", err=str(exc))
+
+    # Plan JSON upload (best-effort).
+    if _PLAN_JSON.exists() and _PLAN_JSON.stat().st_size > 0:
+        try:
+            uploads.upload_plan_json(cfg, _PLAN_JSON)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("plan-json upload raised (non-fatal)", err=str(exc))
+
+    return 0
 
 
-def _run_phases(cfg: RunnerConfig, work_dir: Path) -> dict[str, str]:
-    """Drive the ported phases. Returns env-var deltas the bash sub-
-    phase needs to inherit (TP_BIN, WORK_DIR, and TP_RUNNER_*_DONE
-    markers).
-    """
+def _run_apply_phase(
+    cfg: RunnerConfig,
+    *,
+    binary: str,
+    var_file_argv: list[str],
+    strip_dir: Path,
+    child_grace: float,
+) -> int:
+    """Apply-phase body: download plan binary, run apply, upload state
+    (FATAL on failure), apply-result POST."""
     log = structlog.get_logger("runner.job_entrypoint")
-    env_delta: dict[str, str] = {}
 
-    # Phase: binary cache download. Hard-fails the run on cache + upstream
-    # both unreachable; the listener will mark the run errored.
+    # Download plan file from plan phase. Best-effort — when missing,
+    # apply re-plans inline.
+    plan_file = strip_dir / "tfplan"
+    has_plan_file = False
+    if cfg.has_api:
+        try:
+            import httpx as _httpx
+
+            url = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/plan-file"
+            with _httpx.Client(
+                timeout=_httpx.Timeout(cfg.upload_timeout_seconds, connect=10.0)
+            ) as client:
+                headers = {"Authorization": f"Bearer {cfg.auth_token}"}
+                resp = client.get(url, headers=headers, follow_redirects=True)
+                if resp.status_code == 200 and resp.content:
+                    plan_file.write_bytes(resp.content)
+                    has_plan_file = True
+                else:
+                    log.info("plan-file not available", status=resp.status_code)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("plan-file download failed (non-fatal)", err=str(exc))
+
+    _APPLY_LOG.write_bytes(b"")
+    rc = plan_apply.run_apply(
+        cfg,
+        binary=binary,
+        var_file_args=var_file_argv,
+        log_file=str(_APPLY_LOG),
+        has_plan_file=has_plan_file,
+        child_grace_seconds=child_grace,
+    )
+    if rc != 0:
+        log.warning("apply failed", rc=rc)
+
+    # State upload — FATAL if non-empty state file exists and upload
+    # fails. Apply may have written state even on a failed apply (partial
+    # apply). Always try to upload if the file exists.
+    state_path = strip_dir / "terraform.tfstate"
+    if state_path.exists() and state_path.stat().st_size > 0:
+        try:
+            ok = uploads.upload_state(cfg, state_path)
+            if not ok:
+                # signal_state_diverged and force a non-zero exit.
+                try:
+                    uploads.signal_state_diverged(cfg)
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("state-diverged signal raised", err=str(exc))
+                if rc == 0:
+                    rc = 1
+        except Exception as exc:  # noqa: BLE001
+            log.error("state upload raised — flagging diverged", err=str(exc))
+            try:
+                uploads.signal_state_diverged(cfg)
+            except Exception:  # noqa: BLE001, S110
+                pass
+            if rc == 0:
+                rc = 1
+
+    if rc == 0:
+        try:
+            uploads.post_apply_result(cfg)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("apply-result raised (non-fatal)", err=str(exc))
+
+    return rc
+
+
+def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
+    """Drive every phase. Caller wraps this in try/finally for log +
+    profile upload."""
+    log = structlog.get_logger("runner.job_entrypoint")
+
+    # 1. Binary cache download.
     binary_path = download_binary(cfg)
-    env_delta["TP_BIN"] = str(binary_path)
-    env_delta["TP_RUNNER_BINARY_DONE"] = "1"
+    binary = str(binary_path)
+    log.info("binary ready", path=binary)
 
-    # Phase: configuration tarball.
+    # 2. Configuration tarball.
     work_dir.mkdir(parents=True, exist_ok=True)
     config_result = download_configuration(cfg, work_dir=work_dir)
-    env_delta["TP_RUNNER_CONFIGURATION_DONE"] = "1"
-    if config_result.downloaded and config_result.override_file is not None:
-        env_delta["TP_RUNNER_OVERRIDE_FILE"] = str(config_result.override_file)
-    # `strip_dir` may differ from work_dir for monorepos. Bash needs to chdir
-    # to it before init.
-    env_delta["TP_RUNNER_STRIP_DIR"] = str(config_result.strip_dir)
+    strip_dir = config_result.strip_dir
 
-    # Phase: current state.
-    state_present = download_state(cfg, strip_dir=config_result.strip_dir)
-    env_delta["TP_RUNNER_STATE_DONE"] = "1"
+    # 3. Mirror config + TF_CLI_CONFIG_FILE. Sets env vars on os.environ
+    # so subsequent subprocess invocations inherit them.
+    mirror_config.write_terraform_rc(
+        api_url=cfg.api_url,
+        auth_token=cfg.auth_token,
+        public_api_url=cfg.public_api_url,
+        config_path=_TF_RC,
+    )
+    for k, v in mirror_config.export_env(config_path=_TF_RC, env={}).items():
+        os.environ[k] = v
+
+    # 4. Chdir into working subdirectory.
+    cwd = working_dir.resolve_and_chdir(strip_dir, cfg.working_dir)
+    log.info("chdir", cwd=str(cwd))
+
+    # 5. State download — AFTER chdir so terraform.tfstate lands beside
+    # the user's .tf files.
+    state_present = download_state(cfg, strip_dir=cwd)
     if state_present:
-        env_delta["TP_RUNNER_STATE_PRESENT"] = "1"
+        log.info("state file present after download")
 
-    # Phase: apply-only lock-file reuse.
+    # 6. Apply-phase: try to reuse plan-phase lock file.
     if cfg.phase == "apply":
-        lock_reused = reuse_plan_lock_file(cfg, strip_dir=config_result.strip_dir)
-        env_delta["TP_RUNNER_LOCK_FILE_DONE"] = "1"
-        if lock_reused:
-            env_delta["TP_RUNNER_LOCK_FILE_REUSED"] = "1"
+        reuse_plan_lock_file(cfg, strip_dir=cwd)
 
-    log.info("Python-ported phases complete", env_delta=env_delta)
-    return env_delta
+    # 7. Setup script (operator-supplied tfvars / cloud auth / etc.).
+    try:
+        setup_script.run(cfg.setup_script, env=os.environ.copy())
+    except setup_script.SetupScriptError as exc:
+        log.error("setup script failed", rc=exc.exit_code)
+        return exc.exit_code
+
+    # 8. Build var-file / target / replace argv pieces.
+    var_file_argv = tf_args.var_file_args(cfg.var_files)
+
+    # 9. Init.
+    child_grace = _child_grace_seconds(cfg)
+    try:
+        init_phase.run_init(
+            binary=binary,
+            var_file_args=var_file_argv,
+            log_file=str(_INIT_LOG),
+            child_grace_seconds=child_grace,
+        )
+    except init_phase.InitError as exc:
+        log.error("init failed", rc=exc.exit_code)
+        return exc.exit_code
+
+    # 10. Backend backstop.
+    try:
+        backend_backstop.verify_local_backend(cwd)
+    except backend_backstop.BackendBackstopError as exc:
+        log.error("backend backstop failed", err=str(exc))
+        return 1
+
+    # 11. Phase-specific execution.
+    if cfg.phase == "plan":
+        return _run_plan_phase(
+            cfg,
+            binary=binary,
+            var_file_argv=var_file_argv,
+            strip_dir=cwd,
+            child_grace=child_grace,
+        )
+    if cfg.phase == "apply":
+        return _run_apply_phase(
+            cfg,
+            binary=binary,
+            var_file_argv=var_file_argv,
+            strip_dir=cwd,
+            child_grace=child_grace,
+        )
+    log.error("unknown phase", phase=cfg.phase)
+    return 1
 
 
 def main(argv: list[str] | None = None) -> int:
     _configure_logging()
+    _install_signal_logger()
     log = structlog.get_logger("runner.job_entrypoint")
-
-    if argv is None:
-        argv = sys.argv[1:]
 
     work_dir_env = os.environ.get("WORK_DIR")
     work_dir = Path(work_dir_env) if work_dir_env else _DEFAULT_WORK_DIR
 
-    try:
-        cfg = RunnerConfig.from_env()
-        env_delta = _run_phases(cfg, work_dir)
-    except BinaryDownloadError as exc:
-        log.error("Binary download failed", err=str(exc))
-        return 1
+    cfg = RunnerConfig.from_env()
+    # Phase-aware artifact name: combined log uploads to {phase}-log.
+    log_artifact_phase = cfg.phase
 
-    merged_env = {**os.environ, **env_delta}
-    # WORK_DIR is read by bash even on dev invocations.
-    merged_env.setdefault("WORK_DIR", str(work_dir))
-    return _exec_bash(merged_env, argv)
+    exit_code = 1
+    with log_capture.LogCapture(_COMBINED_LOG) as combined:
+        try:
+            exit_code = _run_body(cfg, work_dir)
+        except BinaryDownloadError as exc:
+            log.error("binary download failed", err=str(exc))
+            exit_code = 1
+        except SystemExit as exc:
+            exit_code = int(exc.code) if isinstance(exc.code, int) else 1
+        except Exception as exc:  # noqa: BLE001
+            log.exception("orchestrator crashed", err=str(exc))
+            exit_code = 1
+        finally:
+            # Roll per-phase logs into combined before uploading.
+            for f in (_INIT_LOG, _PLAN_LOG, _APPLY_LOG):
+                combined.append_file(f)
+
+    # Best-effort: combined log and resource profile uploads. These
+    # happen AFTER LogCapture exits so its file handle is flushed.
+    try:
+        log_capture.upload_combined_log(cfg, _COMBINED_LOG, phase=log_artifact_phase)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("combined log upload raised", err=str(exc))
+
+    try:
+        resource_profile.post_profile(cfg, exit_code=exit_code)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("resource profile post raised", err=str(exc))
+
+    log.info("phase complete", phase=cfg.phase, exit_code=exit_code)
+    return exit_code
 
 
 if __name__ == "__main__":

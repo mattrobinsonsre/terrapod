@@ -1,141 +1,149 @@
 """Tests for terrapod.runner.job_entrypoint.
 
-The Python entrypoint runs the ported phases, then hands off to the
-bash script for unported phases. Tests pin the skeleton contract so
-porting work has a baseline and so the env-var markers Bash relies on
-are produced consistently.
+The full orchestrator drives ten phases through subprocess + HTTP; an
+end-to-end test would be a smoke test, not a unit test. These tests
+pin the orchestrator-level invariants:
+
+  - main() returns the body's exit code.
+  - main() ALWAYS uploads the combined log and posts the resource
+    profile, regardless of the body's outcome (the EXIT-trap
+    equivalent).
+  - BinaryDownloadError → exit code 1.
+  - Unexpected exception → exit code 1 (but log is still uploaded).
+  - WORK_DIR env var is honoured.
 """
 
 from __future__ import annotations
 
-import os
 from unittest.mock import patch
 
 from terrapod.runner import job_entrypoint
+from terrapod.runner.phases.binary import BinaryDownloadError
 
 
-class TestMainDelegatesToBash:
-    def test_execvpe_called_with_bash_entrypoint(self, tmp_path) -> None:
-        """When the bash entrypoint exists and is executable, the Python
-        wrapper exec's into it with no munging of argv."""
-        fake_bash = tmp_path / "entrypoint.sh"
-        fake_bash.write_text("#!/bin/sh\nexit 0\n")
-        fake_bash.chmod(0o755)
+def _env(monkeypatch):
+    monkeypatch.setenv("TP_API_URL", "https://api.example.com")
+    monkeypatch.setenv("TP_AUTH_TOKEN", "tok")
+    monkeypatch.setenv("TP_RUN_ID", "run-1")
+    monkeypatch.setenv("TP_BACKEND", "tofu")
+    monkeypatch.setenv("TP_VERSION", "1.12.1")
+    monkeypatch.setenv("TP_PHASE", "plan")
+
+
+class TestMainReturnCode:
+    def test_returns_body_exit_code(self, monkeypatch, tmp_path) -> None:
+        _env(monkeypatch)
+        monkeypatch.setenv("WORK_DIR", str(tmp_path))
+        with (
+            patch.object(job_entrypoint, "_run_body", return_value=0) as body,
+            patch.object(job_entrypoint.log_capture, "upload_combined_log"),
+            patch.object(job_entrypoint.resource_profile, "post_profile"),
+        ):
+            rc = job_entrypoint.main()
+        assert rc == 0
+        body.assert_called_once()
+
+    def test_propagates_non_zero(self, monkeypatch, tmp_path) -> None:
+        _env(monkeypatch)
+        monkeypatch.setenv("WORK_DIR", str(tmp_path))
+        with (
+            patch.object(job_entrypoint, "_run_body", return_value=7),
+            patch.object(job_entrypoint.log_capture, "upload_combined_log"),
+            patch.object(job_entrypoint.resource_profile, "post_profile"),
+        ):
+            rc = job_entrypoint.main()
+        assert rc == 7
+
+
+class TestExitTrapEquivalent:
+    def test_uploads_log_and_posts_profile_on_success(self, monkeypatch, tmp_path) -> None:
+        _env(monkeypatch)
+        monkeypatch.setenv("WORK_DIR", str(tmp_path))
+        with (
+            patch.object(job_entrypoint, "_run_body", return_value=0),
+            patch.object(job_entrypoint.log_capture, "upload_combined_log") as ulog,
+            patch.object(job_entrypoint.resource_profile, "post_profile") as upro,
+        ):
+            job_entrypoint.main()
+        ulog.assert_called_once()
+        upro.assert_called_once()
+        # Profile body uses the body's exit code.
+        assert upro.call_args.kwargs.get("exit_code") == 0 or upro.call_args.args[1] == 0
+
+    def test_uploads_log_and_posts_profile_on_failure(self, monkeypatch, tmp_path) -> None:
+        _env(monkeypatch)
+        monkeypatch.setenv("WORK_DIR", str(tmp_path))
+        with (
+            patch.object(job_entrypoint, "_run_body", return_value=42),
+            patch.object(job_entrypoint.log_capture, "upload_combined_log") as ulog,
+            patch.object(job_entrypoint.resource_profile, "post_profile") as upro,
+        ):
+            rc = job_entrypoint.main()
+        assert rc == 42
+        ulog.assert_called_once()
+        upro.assert_called_once()
+
+    def test_uploads_log_even_when_body_raises(self, monkeypatch, tmp_path) -> None:
+        _env(monkeypatch)
+        monkeypatch.setenv("WORK_DIR", str(tmp_path))
+        with (
+            patch.object(job_entrypoint, "_run_body", side_effect=RuntimeError("boom")),
+            patch.object(job_entrypoint.log_capture, "upload_combined_log") as ulog,
+            patch.object(job_entrypoint.resource_profile, "post_profile") as upro,
+        ):
+            rc = job_entrypoint.main()
+        assert rc == 1
+        ulog.assert_called_once()
+        upro.assert_called_once()
+
+
+class TestBinaryDownloadError:
+    def test_returns_1_and_still_uploads(self, monkeypatch, tmp_path) -> None:
+        _env(monkeypatch)
+        monkeypatch.setenv("WORK_DIR", str(tmp_path))
+        with (
+            patch.object(
+                job_entrypoint,
+                "_run_body",
+                side_effect=BinaryDownloadError("nope"),
+            ),
+            patch.object(job_entrypoint.log_capture, "upload_combined_log") as ulog,
+            patch.object(job_entrypoint.resource_profile, "post_profile") as upro,
+        ):
+            rc = job_entrypoint.main()
+        assert rc == 1
+        ulog.assert_called_once()
+        upro.assert_called_once()
+
+
+class TestWorkDirOverride:
+    def test_honours_WORK_DIR_env(self, monkeypatch, tmp_path) -> None:
+        _env(monkeypatch)
+        custom = tmp_path / "custom-work"
+        monkeypatch.setenv("WORK_DIR", str(custom))
+        seen: dict[str, object] = {}
+
+        def fake_body(cfg, work_dir):
+            seen["work_dir"] = work_dir
+            return 0
 
         with (
-            patch.object(job_entrypoint, "_BASH_ENTRYPOINT_PATH", str(fake_bash)),
-            patch.object(job_entrypoint.os, "execvpe") as exec_mock,
+            patch.object(job_entrypoint, "_run_body", side_effect=fake_body),
+            patch.object(job_entrypoint.log_capture, "upload_combined_log"),
+            patch.object(job_entrypoint.resource_profile, "post_profile"),
         ):
-            rc = job_entrypoint.main(argv=[])
-
-        assert rc == 1  # belt-and-braces; mock doesn't actually replace process
-        # Three-arg form: (path, argv-list, env-dict).
-        assert exec_mock.call_count == 1
-        args, _ = exec_mock.call_args
-        assert args[0] == str(fake_bash)
-        assert args[1] == [str(fake_bash)]
-        assert isinstance(args[2], dict)
-
-    def test_extra_argv_passed_through(self, tmp_path) -> None:
-        fake_bash = tmp_path / "entrypoint.sh"
-        fake_bash.write_text("#!/bin/sh\nexit 0\n")
-        fake_bash.chmod(0o755)
-
-        with (
-            patch.object(job_entrypoint, "_BASH_ENTRYPOINT_PATH", str(fake_bash)),
-            patch.object(job_entrypoint.os, "execvpe") as exec_mock,
-        ):
-            job_entrypoint.main(argv=["--foo", "bar"])
-
-        args, _ = exec_mock.call_args
-        assert args[1] == [str(fake_bash), "--foo", "bar"]
-
-    def test_bash_env_includes_phase_markers(self, tmp_path) -> None:
-        """The bash continuation must see TP_RUNNER_BINARY_DONE etc. so
-        it skips the already-handled blocks. Without API context, the
-        Python phases short-circuit but still emit the markers."""
-        fake_bash = tmp_path / "entrypoint.sh"
-        fake_bash.write_text("#!/bin/sh\nexit 0\n")
-        fake_bash.chmod(0o755)
-
-        with (
-            patch.object(job_entrypoint, "_BASH_ENTRYPOINT_PATH", str(fake_bash)),
-            patch.object(job_entrypoint.os, "execvpe") as exec_mock,
-        ):
-            job_entrypoint.main(argv=[])
-
-        env = exec_mock.call_args[0][2]
-        assert env.get("TP_RUNNER_BINARY_DONE") == "1"
-        assert env.get("TP_RUNNER_CONFIGURATION_DONE") == "1"
-        assert env.get("TP_RUNNER_STATE_DONE") == "1"
-        # TP_BIN is set even on the no-API code path (bare backend name).
-        assert env.get("TP_BIN") in ("tofu", "terraform")
+            job_entrypoint.main()
+        assert str(seen["work_dir"]) == str(custom)
 
 
-class TestMainPreFlightChecks:
-    def test_returns_127_when_bash_missing(self, tmp_path) -> None:
-        missing = tmp_path / "absent.sh"
-        with patch.object(job_entrypoint, "_BASH_ENTRYPOINT_PATH", str(missing)):
-            rc = job_entrypoint.main(argv=[])
-        assert rc == 127
-
-    def test_returns_126_when_bash_not_executable(self, tmp_path) -> None:
-        not_exec = tmp_path / "entrypoint.sh"
-        not_exec.write_text("#!/bin/sh\nexit 0\n")
-        not_exec.chmod(0o644)
-
-        with (
-            patch.object(job_entrypoint, "_BASH_ENTRYPOINT_PATH", str(not_exec)),
-            patch.object(job_entrypoint.os, "execvpe"),
-        ):
-            rc = job_entrypoint.main(argv=[])
-
-        assert rc == 126
-
-
-class TestModuleEntrypoint:
-    def test_module_executable_via_python_m(self) -> None:
+class TestModuleSurface:
+    def test_main_callable(self) -> None:
         assert callable(job_entrypoint.main)
-        assert hasattr(job_entrypoint, "_BASH_ENTRYPOINT_PATH")
-        assert job_entrypoint._BASH_ENTRYPOINT_PATH == "/entrypoint.sh"
 
     def test_logging_idempotent(self) -> None:
         job_entrypoint._configure_logging()
         job_entrypoint._configure_logging()
 
-
-class TestModuleEndToEndExecvp:
-    def test_real_execvpe_into_short_script(self, tmp_path) -> None:
-        """One real execvp call, without mocking, against a tiny shell
-        script that exits 0. Forks so the test process survives the
-        exec. Catches argv/env plumbing bugs that a mock would silently
-        paper over."""
-        fake_bash = tmp_path / "entrypoint.sh"
-        fake_bash.write_text('#!/bin/sh\n[ "$TP_RUNNER_BINARY_DONE" = "1" ] && exit 0 || exit 42\n')
-        fake_bash.chmod(0o755)
-
-        pid = os.fork()
-        if pid == 0:
-            with patch.object(
-                job_entrypoint,
-                "_BASH_ENTRYPOINT_PATH",
-                str(fake_bash),
-            ):
-                try:
-                    job_entrypoint.main(argv=[])
-                except Exception:
-                    # In a forked child we must exit promptly with a
-                    # distinct status so the parent can tell a real
-                    # exec failure from a clean exit. Caught Exception
-                    # (not BaseException) — SystemExit and KeyboardInterrupt
-                    # are intentionally left to bubble.
-                    os._exit(99)
-            os._exit(98)
-
-        _, status = os.waitpid(pid, 0)
-        assert os.WIFEXITED(status), "child did not exit cleanly"
-        # 0 means bash saw the marker we set; 42 means it didn't.
-        assert os.WEXITSTATUS(status) == 0, (
-            f"bash continuation didn't see TP_RUNNER_BINARY_DONE marker "
-            f"(exit {os.WEXITSTATUS(status)})"
-        )
+    def test_no_bash_entrypoint_path_constant(self) -> None:
+        # The bash-handoff escape hatch is gone in v0.32.1.
+        assert not hasattr(job_entrypoint, "_BASH_ENTRYPOINT_PATH")

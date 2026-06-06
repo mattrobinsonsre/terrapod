@@ -3,7 +3,7 @@
 `policy_engine.py` now exposes a single function: ``check_rego``, used
 at write time to reject broken Rego before it ever reaches a runner.
 Evaluation itself runs on the runner (see
-``docker/runner-entrypoint.sh`` and the runner-side bash tests).
+``terrapod.runner.phases.opa`` and its tests).
 
 The tests skip cleanly when the ``opa`` binary isn't on PATH so the
 suite can still run in environments without OPA. The test image
