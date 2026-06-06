@@ -948,8 +948,6 @@ EXIT_CODE=0
 
 if [ "$TP_PHASE" = "plan" ]; then
     echo "[entrypoint] Running $TP_BACKEND plan..."
-    # Redirect to file so $! gives the plan PID for correct signal forwarding.
-    # A background tail -f streams output to pod logs in real-time.
     PLAN_ARGS="-input=false -detailed-exitcode"
     # Always write the binary plan file. For non-plan-only runs the apply
     # phase consumes it; for plan-only runs we still need it as input to
@@ -965,15 +963,19 @@ if [ "$TP_PHASE" = "plan" ]; then
         PLAN_ARGS="$PLAN_ARGS -destroy"
     fi
     : > /tmp/plan.log
-    "$TP_BIN" plan $PLAN_ARGS "$@" > /tmp/plan.log 2>&1 &
-    CHILD_PID=$!
-    # Stream log to pod stdout in real-time so the listener can capture it
-    # for live log display in the UI. The file redirect preserves $! as
-    # the tofu PID for correct signal forwarding.
-    tail -f /tmp/plan.log &
-    TAIL_PID=$!
-    wait_for_child
-    kill "$TAIL_PID" 2>/dev/null; wait "$TAIL_PID" 2>/dev/null || true
+    # Subprocess + SIGTERM→SIGINT forwarding + SIGKILL watchdog are now
+    # the Python helper's job — bash's two background processes (tofu +
+    # tail -f) and the wait_for_child / forward_signal traps were
+    # fragile; the Python module exists to be unit-tested with real
+    # signals. The helper exits with the child's exit code, so
+    # EXIT_CODE captures naturally.
+    set +e
+    python -m terrapod.runner.exec_subprocess \
+        --log-file /tmp/plan.log \
+        --child-grace-seconds "$CHILD_GRACE" \
+        -- "$TP_BIN" plan $PLAN_ARGS "$@"
+    EXIT_CODE=$?
+    set -e
 
     # -detailed-exitcode: 0=no changes, 1=error, 2=changes present
     PLAN_HAS_CHANGES="false"
@@ -1059,18 +1061,21 @@ elif [ "$TP_PHASE" = "apply" ]; then
 
     echo "[entrypoint] Running $TP_BACKEND apply..."
     : > /tmp/apply.log
+    set +e
     if [ -f tfplan ]; then
         # Plan file already includes var-file inputs — no need to re-specify
-        "$TP_BIN" apply -input=false tfplan > /tmp/apply.log 2>&1 &
+        python -m terrapod.runner.exec_subprocess \
+            --log-file /tmp/apply.log \
+            --child-grace-seconds "$CHILD_GRACE" \
+            -- "$TP_BIN" apply -input=false tfplan
     else
-        "$TP_BIN" apply -input=false -auto-approve "$@" > /tmp/apply.log 2>&1 &
+        python -m terrapod.runner.exec_subprocess \
+            --log-file /tmp/apply.log \
+            --child-grace-seconds "$CHILD_GRACE" \
+            -- "$TP_BIN" apply -input=false -auto-approve "$@"
     fi
-    CHILD_PID=$!
-    # Stream log to pod stdout in real-time for live log display in the UI
-    tail -f /tmp/apply.log &
-    TAIL_PID=$!
-    wait_for_child
-    kill "$TAIL_PID" 2>/dev/null; wait "$TAIL_PID" 2>/dev/null || true
+    EXIT_CODE=$?
+    set -e
 
     # Append apply.log to combined; on_exit trap uploads the combined log.
     [ -f /tmp/apply.log ] && cat /tmp/apply.log >> "$COMBINED_LOG"
