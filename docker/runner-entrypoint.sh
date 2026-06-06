@@ -896,10 +896,21 @@ case "$(uname -m)" in
 esac
 
 if [ "$TP_PHASE" = "plan" ] && [ -f .terraform.lock.hcl ] && [ -n "$OTHER_PLATFORM" ]; then
-    log "[entrypoint] Extending .terraform.lock.hcl with $OTHER_PLATFORM checksums (current arch already locked by init)..."
-    if ! "$TP_BIN" providers lock \
-            -platform="$OTHER_PLATFORM" 2>&1 | sed 's/^/[providers-lock] /'; then
-        log "[entrypoint] Warning: providers lock failed; an apply on a different arch may fail tofu init"
+    log "[entrypoint] Extending .terraform.lock.hcl with $OTHER_PLATFORM h1 hashes from mirror metadata..."
+    # First pass: ask Terrapod's mirror for the other-arch h1 hashes
+    # and splice them directly into the lock file. ~1 KB JSON request
+    # per provider instead of the full archive download `tofu providers
+    # lock` would do. Exit 0 = mirror covered every provider; exit 2 =
+    # some providers were uncached and need the slow fallback below.
+    LOCK_EXTENDER_RC=0
+    python -m terrapod.runner.lock_extender || LOCK_EXTENDER_RC=$?
+
+    if [ "$LOCK_EXTENDER_RC" = "2" ]; then
+        log "[entrypoint] Some providers not covered by mirror — falling back to `tofu providers lock`..."
+        if ! "$TP_BIN" providers lock \
+                -platform="$OTHER_PLATFORM" 2>&1 | sed 's/^/[providers-lock-fallback] /'; then
+            log "[entrypoint] Warning: providers lock fallback failed; an apply on a different arch may fail tofu init"
+        fi
     fi
 fi
 

@@ -118,6 +118,7 @@ local_resource(
         'services/terrapod/runner/download.py',
         'services/terrapod/runner/exec_subprocess.py',
         'services/terrapod/runner/upload_cli.py',
+        'services/terrapod/runner/lock_extender.py',
         'services/terrapod/runner/job_entrypoint.py',
         'services/terrapod/runner/phases',
     ],
