@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # pin and verify the same OPA_VERSION + SHA256 so a bump in one without
 # the other can't silently land an unverified binary in either image.
 ARG TARGETARCH
-ARG OPA_VERSION=1.16.2
+ARG OPA_VERSION=1.17.0
 RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && BASE="https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}" \
     && curl -fsSL -o /usr/local/bin/opa "${BASE}/opa_linux_${ARCH}_static" \

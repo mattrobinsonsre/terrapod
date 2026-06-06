@@ -72,7 +72,7 @@ RUN echo "apt-refresh=${APT_REFRESH}" \
 # OPA version via the image tag — see docs/policies.md). TARGETARCH is set
 # by buildx; fall back to dpkg for a plain `docker build`.
 ARG TARGETARCH
-ARG OPA_VERSION=1.16.2
+ARG OPA_VERSION=1.17.0
 RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && BASE="https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}" \
     && curl -fsSL -o /usr/local/bin/opa "${BASE}/opa_linux_${ARCH}_static" \
