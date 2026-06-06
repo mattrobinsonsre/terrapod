@@ -39,7 +39,7 @@ USER 1000:1000
 
 Important:
 - Switch back to `USER 1000:1000` -- runner Jobs run as non-root
-- The entrypoint (`/entrypoint.sh`) must remain unchanged -- it handles signal forwarding and graceful shutdown
+- The canonical entrypoint is `python -m terrapod.runner.job_entrypoint` -- it drives signal forwarding, graceful shutdown, phase orchestration, and artifact uploads. Custom images should not override `ENTRYPOINT`; layer additional tooling on top via `RUN` and let the inherited entrypoint stand. (A transitional `/entrypoint.sh` bash script still exists in the image for unported phases — it's invoked by the Python entrypoint, not by the kubelet.)
 - The working directory is `/workspace` and `/tmp` is writable (both are emptyDir volumes)
 
 ### Using a Custom Image

@@ -604,7 +604,17 @@ Returns a version list for the provider.
 GET /v1/providers/{hostname}/{namespace}/{type}/{version}.json
 ```
 
-Returns platform-specific download info with `zh:` (zip hash) checksums. Cached platforms get presigned storage URLs; uncached platforms get proxy download URLs.
+Returns platform-specific download info with `zh:` (zip hash) checksums. Cached platforms get presigned storage URLs; uncached platforms get proxy download URLs. Cached platforms additionally carry the precomputed `h1:` directory hash in their `hashes` array (see "Cross-arch lock-file extension" below).
+
+### Cross-arch lock-file extension
+
+When a runner Job's plan phase runs on `linux/arm64` but the matching apply lands on `linux/amd64` (or vice-versa) — common on mixed-arch nodepools or after a spot reschedule — `tofu init` at the apply pod will reject the workspace's `.terraform.lock.hcl` because its `h1:` hashes only cover the plan-arch's archive contents.
+
+Terrapod extends the lock file at plan time so the OTHER architecture's `h1:` is present when the apply runs. The cheap path: the mirror has already cached the archive, so it returns the precomputed `h1:` in `{version}.json`'s `hashes` array; the runner's lock-extender splices the hash directly into `.terraform.lock.hcl` — one ~1 KB JSON request per provider, **no archive downloads**.
+
+The fallback path: if the mirror returns no `h1:` for a provider (uncached, or upstream-only), the runner falls through to `tofu providers lock -platform=<other_arch>`, which downloads the archive itself to compute the hash. This costs what v0.31.6's mitigation cost — one archive download per uncached provider. Each download then primes the mirror's cache, so subsequent plans take the cheap path.
+
+Operators don't need to configure anything for this — the lock-extender runs automatically during the plan phase whenever `.terraform.lock.hcl` exists and the runner detects a supported arch (`linux_amd64` or `linux_arm64`). Look for `runner.lock_extender` log lines in plan output to see hit/miss per provider.
 
 ```
 GET /v1/providers/{hostname}/{namespace}/{type}/{version}/download/{os}/{arch}
