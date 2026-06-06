@@ -137,6 +137,7 @@ class TestSignalForwarding:
             # child (the helper) is NOT in our process group, so this
             # ONLY hits the wrapper.
             proc.send_signal(signal.SIGTERM)
+            stdout = b""
             try:
                 stdout, _ = proc.communicate(timeout=10.0)
             except subprocess.TimeoutExpired:
