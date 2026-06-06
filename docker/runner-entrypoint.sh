@@ -907,16 +907,10 @@ fi
 # Apply phase will download this so its init resolves to the same
 # provider versions. Best-effort — a failure here just means the
 # apply phase falls back to today's behaviour.
-if [ "$TP_PHASE" = "plan" ] && [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ] && [ -f .terraform.lock.hcl ]; then
-    LOCK_UP_HTTP=$(curl -sS -o /dev/null -w "%{http_code}" \
-        -X PUT -H "$AUTH_HEADER" --max-time "${TP_UPLOAD_TIMEOUT:-60}" \
-        --data-binary @.terraform.lock.hcl \
-        "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/lock-file" 2>/dev/null || echo "000")
-    if [ "$LOCK_UP_HTTP" = "204" ] || [ "$LOCK_UP_HTTP" = "200" ]; then
-        log "[entrypoint] Uploaded .terraform.lock.hcl for apply-phase reuse"
-    else
-        log "[entrypoint] Lock file upload returned HTTP $LOCK_UP_HTTP (non-fatal); apply phase will resolve providers independently"
-    fi
+if [ "$TP_PHASE" = "plan" ] && [ -f .terraform.lock.hcl ]; then
+    # Best-effort. The Python helper logs its own status; exits 0
+    # even on upload failure since the apply phase tolerates a miss.
+    python -m terrapod.runner.upload_cli lock-file .terraform.lock.hcl || true
 fi
 
 # --- Extend positional args with -target / -replace for plan/apply ---
@@ -1016,12 +1010,8 @@ if [ "$TP_PHASE" = "plan" ]; then
     # The API's post-plan policy gate now runs against the rows the
     # runner posted in tp_evaluate_policies above, so by the time
     # complete_plan handles this plan-result the gate state is settled.
-    if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ] && [ "$EXIT_CODE" = "0" ]; then
-        HAS_CHANGES_JSON="$PLAN_HAS_CHANGES"
-        curl -sSf --max-time 10 -X POST -H "$AUTH_HEADER" \
-            -H "Content-Type: application/json" \
-            -d "{\"has_changes\": $HAS_CHANGES_JSON}" \
-            "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/plan-result" || true
+    if [ "$EXIT_CODE" = "0" ]; then
+        python -m terrapod.runner.upload_cli plan-result --has-changes "$PLAN_HAS_CHANGES" || true
     fi
 
     # Append plan.log to combined; on_exit trap uploads the combined log.
@@ -1030,22 +1020,15 @@ if [ "$TP_PHASE" = "plan" ]; then
     # Upload plan file (best-effort) — separate artifact, not a log.
     # Skip for plan-only runs: there is no apply phase that would consume
     # the binary, so don't burn storage on it.
-    if [ -n "$TP_API_URL" ] && [ -f tfplan ] && [ "${TP_PLAN_ONLY:-false}" != "true" ]; then
-        curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
-            -H "Content-Type: application/octet-stream" \
-            --data-binary @tfplan \
-            "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/plan-file" || true
+    if [ -f tfplan ] && [ "${TP_PLAN_ONLY:-false}" != "true" ]; then
+        python -m terrapod.runner.upload_cli plan-file tfplan || true
     fi
 
     # Upload structured JSON plan (already produced above for OPA).
     # Best-effort: a failed upload here MUST NOT fail the run — the
     # read endpoint just returns 404.
-    if [ -n "$TP_API_URL" ] && [ -s /tmp/plan.json ]; then
-        curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
-            -H "Content-Type: application/json" \
-            --data-binary @/tmp/plan.json \
-            "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/plan-json-output" \
-            || log "[entrypoint] plan-json-output upload failed (non-fatal)"
+    if [ -s /tmp/plan.json ]; then
+        python -m terrapod.runner.upload_cli plan-json /tmp/plan.json || true
     fi
 
 elif [ "$TP_PHASE" = "apply" ]; then
@@ -1080,15 +1063,12 @@ elif [ "$TP_PHASE" = "apply" ]; then
     # Append apply.log to combined; on_exit trap uploads the combined log.
     [ -f /tmp/apply.log ] && cat /tmp/apply.log >> "$COMBINED_LOG"
 
-    # Upload new state (FATAL — missing state = infrastructure/state divergence)
-    if [ -n "$TP_API_URL" ] && [ -f terraform.tfstate ]; then
-        if ! curl -sSf --max-time "$TP_UPLOAD_TIMEOUT" -X PUT -H "$AUTH_HEADER" \
-            -H "Content-Type: application/octet-stream" \
-            --data-binary @terraform.tfstate \
-            "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/artifacts/state"; then
-            echo "[entrypoint] FATAL: state upload failed — flagging workspace"
-            curl -sS --max-time 5 -X POST -H "$AUTH_HEADER" \
-                "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/state-diverged" || true
+    # Upload new state (FATAL — missing state = infrastructure/state divergence).
+    # The Python helper signals state-diverged on its own when the upload fails,
+    # then returns 1; we propagate that into EXIT_CODE.
+    if [ -f terraform.tfstate ]; then
+        if ! python -m terrapod.runner.upload_cli state terraform.tfstate; then
+            echo "[entrypoint] FATAL: state upload failed — workspace flagged as state-diverged"
             EXIT_CODE=1
         fi
     fi
@@ -1097,9 +1077,8 @@ elif [ "$TP_PHASE" = "apply" ]; then
     # `applying → applied` transition without waiting for the listener-
     # driven Job-status round-trip. Best-effort; the reconciler's listener
     # path is the fallback.
-    if [ -n "$TP_API_URL" ] && [ -n "$TP_RUN_ID" ] && [ "$EXIT_CODE" = "0" ]; then
-        curl -sSf --max-time 10 -X POST -H "$AUTH_HEADER" \
-            "${TP_API_URL}/api/terrapod/v1/runs/${TP_RUN_ID}/apply-result" || true
+    if [ "$EXIT_CODE" = "0" ]; then
+        python -m terrapod.runner.upload_cli apply-result || true
     fi
 fi
 

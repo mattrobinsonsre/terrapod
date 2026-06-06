@@ -63,6 +63,7 @@ COPY services/terrapod/runner/__init__.py ./terrapod/runner/__init__.py
 COPY services/terrapod/runner/runner_config.py ./terrapod/runner/runner_config.py
 COPY services/terrapod/runner/download.py ./terrapod/runner/download.py
 COPY services/terrapod/runner/exec_subprocess.py ./terrapod/runner/exec_subprocess.py
+COPY services/terrapod/runner/upload_cli.py ./terrapod/runner/upload_cli.py
 COPY services/terrapod/runner/job_entrypoint.py ./terrapod/runner/job_entrypoint.py
 COPY services/terrapod/runner/phases/ ./terrapod/runner/phases/
 
