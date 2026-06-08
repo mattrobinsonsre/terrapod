@@ -1,10 +1,15 @@
-"""AI plan summariser + plan-failure analyser (#401).
+"""AI plan summariser + run-failure analyser (#401, #419).
 
 When enabled via ``ai_summary.enabled``, the API triggers an
-asynchronous call after every plan-phase terminal transition:
+asynchronous call after every terminal run transition:
   - ``planned`` → ``kind=plan_summary``: describe changes + rate risk.
-  - ``errored`` while still in the plan phase → ``kind=failure_analysis``:
-    explain why the plan failed and suggest fixes.
+  - ``errored`` at any point → ``kind=failure_analysis``: explain why
+    the run failed and suggest fixes. Plan-phase errors read the
+    plan log; apply-phase errors read the apply log and the prompt
+    grows apply-specific guidance (identify the failed resource,
+    identify resources that completed before the failure, call out
+    partial-state, rank fixes by recovery type). Workspaces flagged
+    ``state_diverged`` also surface that in a dedicated prompt block.
 
 The model call goes through the LiteLLM Python library
 (``litellm.acompletion``). Terrapod always speaks the OpenAI Chat

@@ -28,11 +28,20 @@ For a plan that succeeds (`status=planned`):
 - A list of `risk_factors` ordered worst first, each with a severity,
   title, detail, and (optionally) the affected resource address
 
-For a plan that errors before apply (plan-phase `errored`):
+For a run that errored during EITHER plan or apply (`errored`):
 
-- A description of the root cause in operator terms
-- A severity rating for how blocking the failure is
-- A list of suggested fixes with concrete steps
+- A description of the root cause in operator terms. For apply-phase
+  failures the description also identifies the specific resource
+  whose Create/Modify/Destroy failed, calls out which resources had
+  already completed before the failure (the infrastructure is in a
+  partial state), and flags the state gap when the workspace is
+  marked `state_diverged` (the runner couldn't upload the post-apply
+  state).
+- A severity rating for how blocking the failure is.
+- A list of suggested fixes with concrete steps. For apply-phase
+  failures these are ranked by recovery type: re-run safe vs.
+  needs `terraform refresh` vs. needs manual cleanup vs. needs a
+  targeted re-apply (`-target=...`).
 
 Both kinds are persisted in the `plan_summaries` table, returned by
 `GET /api/v2/plans/{plan-id}/summary`, and announced over the
@@ -240,14 +249,23 @@ and never blocks plan or apply.
 
 ## How it works under the hood
 
-1. A plan reaches a terminal state (`planned` or `errored` while still
-   in the plan phase).
+1. A run reaches a terminal state (`planned` → `plan_summary` kind,
+   or `errored` at any point → `failure_analysis` kind, plan-phase or
+   apply-phase).
 2. The API enqueues an `ai_plan_summary` trigger via the distributed
    scheduler (multi-replica safe; deduped per `(run_id, kind)`).
-3. Any API replica picks up the trigger, gathers the inputs (plan JSON
-   or plan log, plus the configuration version's `.tf` source for
-   code context), renders the prompt with the layered context, and
-   calls `litellm.acompletion`.
+3. Any API replica picks up the trigger, gathers the inputs:
+   - `plan_summary` reads the structured plan JSON.
+   - `failure_analysis` reads the **apply log** when
+     `apply_started_at` is set, otherwise the **plan log**. When the
+     workspace's `state_diverged` flag is true, a `STATE_DIVERGED`
+     block is included in the prompt so the model flags the
+     state-vs-reality gap explicitly.
+   - Both kinds also include the configuration version's `.tf` source
+     for code context and a unified diff against the previously-
+     applied configuration when one is available.
+   Renders the prompt with the layered context and calls
+   `litellm.acompletion`.
 4. The structured JSON response is parsed and upserted into the
    `plan_summaries` table.
 5. A `plan_summary_ready` SSE event is published on the per-workspace

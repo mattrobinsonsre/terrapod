@@ -1,6 +1,6 @@
 # Runners
 
-Runners are ephemeral Kubernetes Jobs that execute `terraform` or `tofu` plan and apply operations. The default runner image is a minimal Alpine container with `curl`, `tar`, `jq`, `unzip`, and `git` -- no terraform/tofu binary baked in. The correct version is downloaded at runtime from the [binary cache](registry.md).
+Runners are ephemeral Kubernetes Jobs that execute `terraform` or `tofu` plan and apply operations. The default runner image is a slim Debian (`python:3.13-slim`) container with `git`, `openssh-client`, `ca-certificates`, and a pinned `opa` binary -- no terraform/tofu binary baked in. The correct version is downloaded at runtime from the [binary cache](registry.md). The whole runner orchestrator is Python; nothing from the bash era survives.
 
 ---
 
@@ -10,36 +10,48 @@ The default image covers most use cases, but you may need additional tools -- cl
 
 ### Building a Custom Image
 
-Base your image on the default runner and add what you need:
+Base your image on the default runner and add what you need. The base is Debian, so use `apt-get` (not `apk`):
 
 ```dockerfile
 FROM ghcr.io/mattrobinsonsre/terrapod-runner:latest
 
 USER root
 
+# `curl` and `unzip` aren't in the base image; install them just for
+# the duration of this layer and remove afterwards.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl unzip \
+    && rm -rf /var/lib/apt/lists/*
+
 # Example: AWS CLI v2
-RUN apk add --no-cache gcompat \
-    && curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip \
+RUN curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-$(dpkg --print-architecture).zip" -o /tmp/awscliv2.zip \
     && unzip -q /tmp/awscliv2.zip -d /tmp \
     && /tmp/aws/install \
     && rm -rf /tmp/awscliv2.zip /tmp/aws
 
-# Example: Azure CLI
-RUN apk add --no-cache py3-pip \
-    && pip3 install --break-system-packages azure-cli
+# Example: Azure CLI (via apt repo)
+RUN curl -sSL https://packages.microsoft.com/keys/microsoft.asc \
+    | gpg --dearmor -o /usr/share/keyrings/microsoft.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ $(. /etc/os-release && echo $VERSION_CODENAME) main" \
+       > /etc/apt/sources.list.d/azure-cli.list \
+    && apt-get update && apt-get install -y --no-install-recommends azure-cli \
+    && rm -rf /var/lib/apt/lists/*
 
 # Example: gcloud CLI
-RUN curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz \
+RUN curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-$(uname -m).tar.gz \
     | tar -xz -C /opt \
     && /opt/google-cloud-sdk/install.sh --quiet \
     && ln -s /opt/google-cloud-sdk/bin/gcloud /usr/local/bin/gcloud
+
+# Drop the install-time tools so they don't sit in the final image.
+RUN apt-get purge -y curl unzip && apt-get autoremove -y
 
 USER 1000:1000
 ```
 
 Important:
 - Switch back to `USER 1000:1000` -- runner Jobs run as non-root
-- The canonical entrypoint is `python -m terrapod.runner.job_entrypoint` -- it drives signal forwarding, graceful shutdown, phase orchestration, and artifact uploads. Custom images should not override `ENTRYPOINT`; layer additional tooling on top via `RUN` and let the inherited entrypoint stand. (A transitional `/entrypoint.sh` bash script still exists in the image for unported phases — it's invoked by the Python entrypoint, not by the kubelet.)
+- The canonical entrypoint is `python -m terrapod.runner.job_entrypoint` -- it drives signal forwarding, graceful shutdown, phase orchestration, and artifact uploads. Custom images should not override `ENTRYPOINT`; layer additional tooling on top via `RUN` and let the inherited entrypoint stand.
 - The working directory is `/workspace` and `/tmp` is writable (both are emptyDir volumes)
 
 ### Using a Custom Image
@@ -245,12 +257,12 @@ Terraform and OpenTofu merge any file matching `*_override.tf` over the main con
 
 Policy-as-code evaluation runs **on the runner**, between the plan phase and posting plan-result. The plan JSON is already on disk (just produced by `tofu show -json tfplan`), so the runner can evaluate OPA policies against it without a round-trip to storage and without any server-side concurrent-eval load. See [`docs/policies.md`](policies.md) for the authoring contract.
 
-Sequence inside `runner-entrypoint.sh`, after `tofu plan` completes successfully:
+Sequence inside the Python runner orchestrator (`services/terrapod/runner/job_entrypoint.py`), after `tofu plan` completes successfully:
 
-1. `tofu show -json tfplan > /tmp/plan.json` — produces the JSON form used by both OPA and the `plan-json-output` artifact.
-2. `tp_evaluate_policies` (the shell function in the entrypoint):
+1. `plan_apply.run_plan_show_json` runs `tofu show -json tfplan` and writes `/tmp/plan.json` — the JSON form used by both OPA and the `plan-json-output` artifact.
+2. `phases.opa.evaluate_policies`:
    - `GET /api/terrapod/v1/runs/{id}/policy-bundle` — fetches the policy sets in scope for this workspace, plus the run/workspace context. Bounded retries (3 attempts, 3s backoff); a persistent fetch failure is **fatal** to the run, never silently skipped.
-   - For each applicable set, for each policy: `opa eval --format json --stdin-input --data <rego> --data <context> 'data.terrapod' < /tmp/plan.json`. Parses `deny` / `warn` from the OPA output. One eval per policy preserves per-policy attribution in the UI.
+   - For each applicable set, for each policy: `opa eval --format json --stdin-input --data <rego> --data <context> 'data.terrapod' < /tmp/plan.json`. Parses `deny` / `warn` from the OPA output with defensive coercion (a misauthored `deny := "msg"` scalar is not allowed to silently pass). One eval per policy preserves per-policy attribution in the UI.
    - `POST /api/terrapod/v1/runs/{id}/policy-results` — uploads the aggregated results. Persisted via Postgres `ON CONFLICT DO NOTHING` on `(run_id, policy_set_id)` so retries are idempotent.
 3. The runner posts `plan-result`. The API's post-plan gate is now a pure DB query — by this point the policy_evaluation rows already exist (or there were no applicable sets, which is the right answer too).
 
