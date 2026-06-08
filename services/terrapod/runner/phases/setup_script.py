@@ -37,13 +37,12 @@ def run(script: str, *, env: dict[str, str] | None = None) -> None:
     if not script:
         return
     logger.info("running setup script")
-    # nosemgrep: python.lang.security.audit.subprocess-shell-true.subprocess-shell-true
     # The setup script body IS shell input by design — the feature exists
     # so operators can run arbitrary shell setup (auth, tool config, env
     # prep) before plan/apply. Source is the workspace's TP_SETUP_SCRIPT
     # field, only writable by users with workspace `admin`; the runner's
     # auth boundary, not subprocess flags, is what gates this.
-    result = subprocess.run(  # noqa: S602
+    result = subprocess.run(  # noqa: S602  # nosemgrep: python.lang.security.audit.subprocess-shell-true.subprocess-shell-true
         script,
         shell=True,
         check=False,
