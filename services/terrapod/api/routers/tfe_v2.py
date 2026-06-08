@@ -1636,14 +1636,38 @@ def _request_base_url(request: Request | None) -> str:
     xfh = request.headers.get("x-forwarded-host")
     if xfh:
         proto = request.headers.get("x-forwarded-proto") or request.url.scheme
-        return f"{proto}://{xfh.split(',', 1)[0].strip()}"
+        candidate = xfh.split(",", 1)[0].strip()
+        if _is_safe_host(candidate) and _is_safe_scheme(proto):
+            return f"{proto}://{candidate}"
+        return fallback
     host = request.headers.get("host")
-    if host and "." in host:
+    if host and "." in host and _is_safe_host(host):
         # Plain Host header that looks like an external hostname.
         # Use request.url.scheme — we may not have x-forwarded-proto
         # so the scheme reflects what FastAPI saw on the wire.
-        return f"{request.url.scheme}://{host}"
+        scheme = request.url.scheme
+        if _is_safe_scheme(scheme):
+            return f"{scheme}://{host}"
     return fallback
+
+
+# RFC 1123 hostname + optional port. Strict whitelist — letters, digits,
+# dot, hyphen, plus an optional `:NNNN` suffix. Length capped at 253
+# (DNS label limit) + 6 for the port. Defense in depth against a
+# malicious upstream proxy injecting CRLF or other separators into
+# X-Forwarded-Host / Host: the resulting string is concatenated into
+# URLs we emit in JSON:API bodies; without validation a header carrying
+# `evil.com\r\nLocation: ...` could end up in a downstream redirect or
+# response header.
+_HOST_RE = re.compile(r"^[A-Za-z0-9.\-]{1,253}(:\d{1,5})?$")
+
+
+def _is_safe_host(value: str) -> bool:
+    return bool(value) and bool(_HOST_RE.match(value))
+
+
+def _is_safe_scheme(value: str) -> bool:
+    return value in ("http", "https")
 
 
 def _state_version_json(sv: StateVersion, request: Request | None = None) -> dict:
