@@ -347,10 +347,10 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     profile upload."""
     log = structlog.get_logger("runner.job_entrypoint")
 
-    # 1. Binary cache download.
+    # 1. Binary cache download. (download_binary itself logs "binary
+    # ready" on success — no need to repeat it here.)
     binary_path = download_binary(cfg)
     binary = str(binary_path)
-    log.info("binary ready", path=binary)
 
     # 2. Configuration tarball.
     work_dir.mkdir(parents=True, exist_ok=True)

@@ -74,7 +74,7 @@ class TestConcurrentCacheMissRace:
         presigned.url = "https://example/presigned/dns.zip"
         storage.presigned_get_url = AsyncMock(return_value=presigned)
 
-        url = await fetch_and_cache_single_platform(
+        url, _h1 = await fetch_and_cache_single_platform(
             db,
             storage,
             hostname="registry.opentofu.org",
@@ -88,3 +88,105 @@ class TestConcurrentCacheMissRace:
         # The race is handled: presigned URL is returned, not propagated as 500.
         assert url == "https://example/presigned/dns.zip"
         db.rollback.assert_awaited_once()
+
+
+class TestH1Backfill:
+    """When a cached_provider_packages row has empty h1_hash (e.g.
+    pre-h1-tracking, or h1 compute failed at ingest), the mirror should
+    compute h1 from the cached archive bytes on the next request and
+    persist it — eliminating the runner's fallback to `tofu providers
+    lock` for that provider.
+    """
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.provider_cache_service._get_cached_metadata", new_callable=AsyncMock)
+    async def test_empty_h1_backfilled_from_archive_bytes(
+        self,
+        mock_get_cached_metadata: AsyncMock,
+    ) -> None:
+        # Build a valid provider zip so the h1 compute succeeds.
+        import io
+        import zipfile
+
+        from terrapod.services.provider_cache_service import get_or_fetch_platforms
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("terraform-provider-null_v3.3.0", b"binary contents")
+        archive_bytes = buf.getvalue()
+
+        # DB entry with empty h1.
+        entry = MagicMock()
+        entry.id = "cpp-1"
+        entry.filename = "terraform-provider-null_3.3.0_linux_amd64.zip"
+        entry.os = "linux"
+        entry.arch = "amd64"
+        entry.shasum = "0123456789abcdef" * 4
+        entry.h1_hash = ""  # the backfill trigger
+
+        db = MagicMock()
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = [entry]
+        db.execute = AsyncMock(return_value=result)
+        db.flush = AsyncMock()
+
+        storage = MagicMock()
+        storage.exists = AsyncMock(return_value=True)
+        storage.presigned_get_url = AsyncMock(return_value=MagicMock(url="https://x/p.zip"))
+        storage.get = AsyncMock(return_value=archive_bytes)
+
+        # No upstream metadata fetch needed when only a cached platform is queried.
+        mock_get_cached_metadata.return_value = None
+
+        out = await get_or_fetch_platforms(
+            db, storage, "registry.opentofu.org", "hashicorp", "null", "3.3.0"
+        )
+
+        # entry.h1_hash was assigned (the SQLAlchemy session would flush this
+        # on commit; for the unit test it's enough that the in-memory value
+        # changed — the object is tracked by the session).
+        assert entry.h1_hash, "expected backfill to populate h1_hash"
+        assert not entry.h1_hash.startswith("h1:"), "stored value omits the prefix"
+        # And the served response includes the h1: hash.
+        archive = out["archives"]["linux_amd64"]
+        h1_entries = [h for h in archive["hashes"] if h.startswith("h1:")]
+        assert h1_entries, f"response missing h1 hash: {archive['hashes']}"
+        # storage.get was called exactly once for backfill.
+        storage.get.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.provider_cache_service._get_cached_metadata", new_callable=AsyncMock)
+    async def test_existing_h1_not_recomputed(
+        self,
+        mock_get_cached_metadata: AsyncMock,
+    ) -> None:
+        """The hot path: rows with an h1_hash already stored serve it
+        without re-reading the archive."""
+        from terrapod.services.provider_cache_service import get_or_fetch_platforms
+
+        entry = MagicMock()
+        entry.id = "cpp-1"
+        entry.filename = "terraform-provider-null_3.3.0_linux_amd64.zip"
+        entry.os = "linux"
+        entry.arch = "amd64"
+        entry.shasum = "0123456789abcdef" * 4
+        entry.h1_hash = "preexisting-h1-from-db"
+
+        db = MagicMock()
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = [entry]
+        db.execute = AsyncMock(return_value=result)
+
+        storage = MagicMock()
+        storage.exists = AsyncMock(return_value=True)
+        storage.presigned_get_url = AsyncMock(return_value=MagicMock(url="https://x/p.zip"))
+        storage.get = AsyncMock()  # should NOT be called
+
+        mock_get_cached_metadata.return_value = None
+
+        out = await get_or_fetch_platforms(
+            db, storage, "registry.opentofu.org", "hashicorp", "null", "3.3.0"
+        )
+
+        storage.get.assert_not_awaited()
+        assert "h1:preexisting-h1-from-db" in out["archives"]["linux_amd64"]["hashes"]

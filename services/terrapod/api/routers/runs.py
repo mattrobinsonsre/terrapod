@@ -1495,7 +1495,13 @@ async def upload_log_stream(
     )
 
     redis = get_redis_client()
-    await redis.setex(f"{LOG_STREAM_PREFIX}{run.id}:{phase}", 300, body_bytes)
+    # decode_responses=True on the Redis client means a bytes value
+    # going through SETEX gets stringified via str(bytes) — yielding
+    # the literal `b'…\\n…'` text. Decode to UTF-8 str so the value
+    # round-trips cleanly. errors=replace covers any stray non-UTF-8
+    # bytes (e.g. from a stack-trace's escape sequence).
+    body_text = body_bytes.decode("utf-8", errors="replace")
+    await redis.setex(f"{LOG_STREAM_PREFIX}{run.id}:{phase}", 300, body_text)
 
     # Notify frontend that fresh log data is available
     try:

@@ -410,12 +410,24 @@ async def get_pod_logs(
         if limit_bytes is not None:
             log_kwargs["limit_bytes"] = limit_bytes
 
-        logs = await loop.run_in_executor(
+        # _preload_content=False so the kubernetes client returns the raw
+        # urllib3 HTTPResponse instead of round-tripping through its
+        # broken text-response deserializer (which calls str(bytes_obj),
+        # producing literal `b'...'`-prefixed garbage in the streaming
+        # log view — see #449 / v0.33.0 smoke).
+        log_kwargs["_preload_content"] = False
+        resp = await loop.run_in_executor(
             _executor,
             lambda: core_api.read_namespaced_pod_log(**log_kwargs),
         )
-        # Clear last_response to release the raw log string from K8s client memory
-        core_api.api_client.last_response = None
-        return logs
+        try:
+            data = resp.data
+            return data.decode("utf-8", errors="replace") if isinstance(data, bytes) else data
+        finally:
+            try:
+                resp.release_conn()
+            except Exception:
+                pass
+            core_api.api_client.last_response = None
     except ApiException:
         return ""
