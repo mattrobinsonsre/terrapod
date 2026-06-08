@@ -190,3 +190,190 @@ class TestH1Backfill:
 
         storage.get.assert_not_awaited()
         assert "h1:preexisting-h1-from-db" in out["archives"]["linux_amd64"]["hashes"]
+
+
+class TestSelfHostedRegistryTier:
+    """Tier-0: a self-hostname request for a registered provider is served
+    from the registry tables (not the cache tables, not upstream). This
+    is what makes `terrapod.example.com/default/terrapod` resolvable via
+    the mirror so the runner's lock-extender can splice h1 into
+    .terraform.lock.hcl without a `tofu providers lock` fallback.
+    """
+
+    def _make_provider_zip(self) -> bytes:
+        import io
+        import zipfile
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("terraform-provider-terrapod_v0.33.0", b"binary contents")
+        return buf.getvalue()
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.provider_cache_service.settings")
+    async def test_self_hostname_registry_hit_returns_tier0(
+        self,
+        mock_settings: MagicMock,
+    ) -> None:
+        from terrapod.services.provider_cache_service import get_or_fetch_platforms
+
+        # Settings: external_url's host matches the request hostname.
+        mock_settings.external_url = "https://terrapod.example.com"
+        mock_settings.registry.provider_cache.platforms = [
+            {"os": "linux", "arch": "amd64"},
+        ]
+
+        # A registered provider/version/platform with non-empty h1.
+        platform = MagicMock()
+        platform.os = "linux"
+        platform.arch = "amd64"
+        platform.shasum = "deadbeef" * 8
+        platform.upload_status = "uploaded"
+        platform.h1_hash = "preexisting-h1"
+
+        prov_version = MagicMock()
+        prov_version.platforms = [platform]
+
+        db = MagicMock()
+        result = MagicMock()
+        result.scalars.return_value.first.return_value = prov_version
+        db.execute = AsyncMock(return_value=result)
+        db.flush = AsyncMock()
+
+        storage = MagicMock()
+        storage.exists = AsyncMock(return_value=True)
+        storage.presigned_get_url = AsyncMock(return_value=MagicMock(url="https://example/p.zip"))
+        storage.get = AsyncMock()  # should NOT be called — h1 is present
+
+        out = await get_or_fetch_platforms(
+            db, storage, "terrapod.example.com", "default", "terrapod", "0.33.0"
+        )
+
+        # Tier-0 served: zh + h1 hashes, preexisting h1 not recomputed.
+        archive = out["archives"]["linux_amd64"]
+        assert "zh:" + ("deadbeef" * 8) in archive["hashes"]
+        assert "h1:preexisting-h1" in archive["hashes"]
+        storage.get.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.provider_cache_service.settings")
+    async def test_self_hostname_registry_lazy_h1_backfill(
+        self,
+        mock_settings: MagicMock,
+    ) -> None:
+        from terrapod.services.provider_cache_service import get_or_fetch_platforms
+
+        mock_settings.external_url = "https://terrapod.example.com"
+        mock_settings.registry.provider_cache.platforms = []
+
+        # Empty h1 — should be computed from the uploaded bytes.
+        platform = MagicMock()
+        platform.os = "linux"
+        platform.arch = "amd64"
+        platform.shasum = "cafef00d" * 8
+        platform.upload_status = "uploaded"
+        platform.h1_hash = ""
+
+        prov_version = MagicMock()
+        prov_version.platforms = [platform]
+
+        db = MagicMock()
+        result = MagicMock()
+        result.scalars.return_value.first.return_value = prov_version
+        db.execute = AsyncMock(return_value=result)
+        db.flush = AsyncMock()
+
+        archive_bytes = self._make_provider_zip()
+
+        storage = MagicMock()
+        storage.exists = AsyncMock(return_value=True)
+        storage.presigned_get_url = AsyncMock(return_value=MagicMock(url="https://example/p.zip"))
+        storage.get = AsyncMock(return_value=archive_bytes)
+
+        out = await get_or_fetch_platforms(
+            db, storage, "terrapod.example.com", "default", "terrapod", "0.33.0"
+        )
+
+        # h1 was computed and persisted on the row.
+        assert platform.h1_hash, "expected lazy backfill to populate h1_hash"
+        assert not platform.h1_hash.startswith("h1:")
+
+        # Response carries both zh and h1.
+        archive = out["archives"]["linux_amd64"]
+        h1_entries = [h for h in archive["hashes"] if h.startswith("h1:")]
+        assert h1_entries, f"response missing h1 hash: {archive['hashes']}"
+        storage.get.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.provider_cache_service._get_cached_metadata", new_callable=AsyncMock)
+    @patch("terrapod.services.provider_cache_service.settings")
+    async def test_non_self_hostname_falls_through_to_tier1(
+        self,
+        mock_settings: MagicMock,
+        mock_get_cached_metadata: AsyncMock,
+    ) -> None:
+        """Upstream-hostname requests must NOT consult the registry tables —
+        e.g. `registry.opentofu.org/hashicorp/aws` is not ours."""
+        from terrapod.services.provider_cache_service import get_or_fetch_platforms
+
+        mock_settings.external_url = "https://terrapod.example.com"
+        mock_settings.registry.provider_cache.platforms = []
+        mock_settings.registry.provider_cache.warm_on_first_request = False
+
+        # Tier-1 DB: empty.
+        db = MagicMock()
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = []
+        db.execute = AsyncMock(return_value=result)
+
+        storage = MagicMock()
+
+        mock_get_cached_metadata.return_value = None
+
+        out = await get_or_fetch_platforms(
+            db, storage, "registry.opentofu.org", "hashicorp", "aws", "5.0.0"
+        )
+
+        # Only one DB query — the Tier-1 cached_provider_packages select.
+        # Tier-0 did NOT fire (would have been a separate query).
+        assert db.execute.await_count == 1
+        # Empty mirror response (no cached binaries, no upstream warm).
+        assert out["archives"] == {}
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.provider_cache_service._get_cached_metadata", new_callable=AsyncMock)
+    @patch("terrapod.services.provider_cache_service.settings")
+    async def test_self_hostname_unknown_version_falls_through(
+        self,
+        mock_settings: MagicMock,
+        mock_get_cached_metadata: AsyncMock,
+    ) -> None:
+        """Self-hostname request for a provider we don't have: Tier-0
+        returns None, then standard tiers run (and also find nothing
+        since the hostname isn't in upstream_registries)."""
+        from terrapod.services.provider_cache_service import get_or_fetch_platforms
+
+        mock_settings.external_url = "https://terrapod.example.com"
+        mock_settings.registry.provider_cache.platforms = []
+        mock_settings.registry.provider_cache.warm_on_first_request = False
+        mock_settings.registry.provider_cache.upstream_registries = []
+
+        # Tier-0 query returns no version; Tier-1 query also returns empty.
+        db = MagicMock()
+        tier0_result = MagicMock()
+        tier0_result.scalars.return_value.first.return_value = None
+        tier1_result = MagicMock()
+        tier1_result.scalars.return_value.all.return_value = []
+        db.execute = AsyncMock(side_effect=[tier0_result, tier1_result])
+
+        storage = MagicMock()
+
+        mock_get_cached_metadata.return_value = None
+
+        out = await get_or_fetch_platforms(
+            db, storage, "terrapod.example.com", "default", "nonexistent", "1.0.0"
+        )
+
+        # Both Tier-0 and Tier-1 queries fired.
+        assert db.execute.await_count == 2
+        assert out["archives"] == {}

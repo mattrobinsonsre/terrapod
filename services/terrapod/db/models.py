@@ -684,6 +684,7 @@ class RegistryProviderPlatform(Base):
     shasum: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     filename: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     upload_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    h1_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False

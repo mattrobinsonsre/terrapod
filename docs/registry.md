@@ -567,7 +567,8 @@ The provider cache implements the Terraform network mirror protocol. Runner Jobs
    }
    ```
 2. Terraform requests `{version}.json` from the mirror URL (authenticated via credentials block)
-3. Terrapod uses a **three-tier cache lookup**:
+3. Terrapod uses a **four-tier cache lookup**:
+   - **Tier 0 — Self-hosted registry**: when the request hostname matches Terrapod's own `external_url`, the private provider registry tables are authoritative. Self-served providers (e.g. the platform `terrapod` provider, or any operator-published provider) are returned with presigned URLs plus both `zh:` (SHA-256) and `h1:` (terraform/tofu dirhash) so the runner's lock-extender can splice the lock entry directly into `.terraform.lock.hcl` without a `tofu providers lock` fallback. The `h1_hash` is computed eagerly at upload-confirm time and lazy-backfilled on first read for older rows.
    - **Tier 1 — Postgres**: check for cached binaries in object storage. Cached platforms get presigned download URLs
    - **Tier 2 — Redis**: check for upstream metadata (24h TTL). Uncached platforms get proxy download URLs
    - **Tier 3 — Upstream**: fetch metadata from upstream registry, cache in Redis, return proxy URLs

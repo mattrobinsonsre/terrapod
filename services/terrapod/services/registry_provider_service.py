@@ -4,6 +4,7 @@ Handles CRUD for registry providers, versions, and platforms, with presigned
 URL generation for binary upload/download via object storage.
 """
 
+import asyncio
 import hashlib
 import uuid
 
@@ -514,6 +515,27 @@ async def upload_provider_binary(
     platform.shasum = sha256
     platform.filename = filename
     platform.upload_status = "uploaded"
+
+    # Eagerly compute the terraform/tofu h1 dirhash from the uploaded
+    # archive so the mirror's Tier-0 lookup can serve it without a
+    # lazy backfill on the first download. Best-effort — h1 compute
+    # failure (corrupt zip, etc.) is logged but doesn't fail the
+    # upload; the lazy backfill in `_serve_from_registry` will retry
+    # on the next read.
+    try:
+        from terrapod.services.provider_cache_service import _compute_h1_from_zip_bytes
+
+        h1 = await asyncio.to_thread(_compute_h1_from_zip_bytes, data)
+        platform.h1_hash = h1.removeprefix("h1:")
+    except Exception:
+        logger.warning(
+            "Eager h1 compute failed at provider upload; will lazy-backfill on first read",
+            provider=f"{namespace}/{name}",
+            version=version_str,
+            platform=f"{os_}_{arch}",
+            exc_info=True,
+        )
+
     await db.flush()
 
     # Regenerate SHA256SUMS for this version

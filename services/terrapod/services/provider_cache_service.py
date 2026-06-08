@@ -16,18 +16,24 @@ Cache layers:
 import asyncio
 import json
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 import httpx
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from terrapod.api.metrics import PROVIDER_CACHE_REQUESTS
 from terrapod.config import settings
-from terrapod.db.models import CachedProviderPackage
+from terrapod.db.models import (
+    CachedProviderPackage,
+    RegistryProvider,
+    RegistryProviderVersion,
+)
 from terrapod.logging_config import get_logger
 from terrapod.services.hashing_stream import HashingStream
-from terrapod.storage.keys import provider_cache_key
+from terrapod.storage.keys import provider_binary_key, provider_cache_key
 from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
@@ -39,6 +45,21 @@ _META_TTL = 86400  # 24 hours
 
 def _meta_redis_key(hostname: str, namespace: str, type_: str, version: str) -> str:
     return f"{_META_KEY_PREFIX}:{hostname}:{namespace}:{type_}:{version}"
+
+
+def _self_hostname() -> str | None:
+    """The host portion of `settings.external_url`, lowercased, or None.
+
+    Used by the Tier-0 registry lookup to decide whether a mirror request
+    is asking for one of *our* registered providers (e.g.
+    `terrapod.example.com/default/terrapod`) vs an upstream public
+    registry (e.g. `registry.opentofu.org/hashicorp/aws`). We never want
+    to fall through to the upstream tiers for our own hostname.
+    """
+    if not settings.external_url:
+        return None
+    host = urlparse(settings.external_url).hostname
+    return host.lower() if host else None
 
 
 # Redis key for cached upstream version index (24h TTL)
@@ -116,6 +137,26 @@ async def get_or_fetch_platforms(
     configured_platforms: set[str] = {
         f"{p['os']}_{p['arch']}" for p in settings.registry.provider_cache.platforms
     }
+
+    # --- Tier 0: self-hosted registry (this operator's own providers) ---
+    # The mirror is also the canonical CLI download path for providers
+    # published into Terrapod's own registry (e.g. the platform
+    # `terrapod` provider, or any operator-published provider). When the
+    # request hostname matches our external URL, the registry tables are
+    # authoritative — never fall through to upstream tiers for our own
+    # providers (we ARE the upstream).
+    self_host = _self_hostname()
+    if self_host and hostname.lower() == self_host:
+        registry_resp = await _serve_from_registry(
+            db, storage, namespace, type_, version, configured_platforms
+        )
+        if registry_resp is not None:
+            PROVIDER_CACHE_REQUESTS.labels(result="hit_registry").inc()
+            return registry_resp
+        # Provider/version not in our registry — fall through; the
+        # standard tiers will return empty (we won't proxy to an
+        # upstream for our own hostname since it's not in
+        # upstream_registries anyway).
 
     # --- Tier 1: check Postgres for cached binaries ---
     result = await db.execute(
@@ -277,6 +318,95 @@ async def get_or_fetch_platforms(
             }
 
     return _resp()
+
+
+async def _serve_from_registry(
+    db: AsyncSession,
+    storage: ObjectStore,
+    namespace: str,
+    type_: str,
+    version: str,
+    configured_platforms: set[str],
+) -> dict | None:
+    """Tier-0: serve a self-hosted provider version from the registry tables.
+
+    Returns the mirror-protocol {version}.json dict (presigned URLs +
+    `zh:` / `h1:` hashes), or None if the requested (namespace, name,
+    version) doesn't exist in the registry. When non-None, the caller
+    MUST return it verbatim — for self-hosted providers there is no
+    upstream to fall through to.
+
+    h1 is included whenever a row already has it stored. Empty h1 is
+    backfilled lazily here exactly the way Tier-1 does it: download
+    bytes, compute, persist. Compute failures are logged warn but the
+    `zh:` hash is still served (the runner falls back to `tofu providers
+    lock` for that provider in that case).
+    """
+    version_q = await db.execute(
+        select(RegistryProviderVersion)
+        .join(RegistryProvider, RegistryProvider.id == RegistryProviderVersion.provider_id)
+        .where(
+            RegistryProvider.namespace == namespace,
+            RegistryProvider.name == type_,
+            RegistryProviderVersion.version == version,
+        )
+        .options(selectinload(RegistryProviderVersion.platforms))
+    )
+    prov_version = version_q.scalars().first()
+    if prov_version is None:
+        return None
+
+    archives: dict = {}
+    for platform in prov_version.platforms:
+        if platform.upload_status != "uploaded":
+            continue
+        platform_key = f"{platform.os}_{platform.arch}"
+        key = provider_binary_key(namespace, type_, version, platform.os, platform.arch)
+
+        if not await storage.exists(key):
+            logger.warning(
+                "Registry provider platform missing from storage; skipping",
+                provider=f"{namespace}/{type_}",
+                version=version,
+                platform=platform_key,
+            )
+            continue
+
+        presigned = await storage.presigned_get_url(key)
+        archive: dict = {
+            "url": presigned.url,
+            "hashes": [f"zh:{platform.shasum}"] if platform.shasum else [],
+        }
+
+        # Lazy h1 backfill — same shape as the Tier-1 backfill.
+        if not platform.h1_hash:
+            try:
+                archive_bytes = await storage.get(key)
+                h1 = await asyncio.to_thread(_compute_h1_from_zip_bytes, archive_bytes)
+                platform.h1_hash = h1.removeprefix("h1:")
+                logger.info(
+                    "backfilled h1 for registry provider",
+                    provider=f"{namespace}/{type_}",
+                    version=version,
+                    platform=platform_key,
+                )
+            except Exception:
+                logger.warning(
+                    "h1 backfill failed for registry provider; runner falls back to providers lock",
+                    provider=f"{namespace}/{type_}",
+                    version=version,
+                    platform=platform_key,
+                    exc_info=True,
+                )
+
+        if platform.h1_hash:
+            archive["hashes"].append(f"h1:{platform.h1_hash}")
+        archives[platform_key] = archive
+
+    return {
+        "archives": archives,
+        "cached_platforms": sorted(configured_platforms),
+    }
 
 
 def _compute_h1_from_zip_bytes(data: bytes) -> str:
