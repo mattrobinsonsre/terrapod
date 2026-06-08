@@ -90,12 +90,27 @@ class TestConcurrentCacheMissRace:
         db.rollback.assert_awaited_once()
 
 
+def _stream_mock(data: bytes, chunk_size: int = 64 * 1024):
+    """Return an async generator yielding `data` in chunks — shaped
+    to slot into `storage.get_stream = MagicMock(return_value=...)`.
+    Used by the h1-backfill tests because the production path streams
+    from storage to a tempfile (constant memory) rather than loading
+    the whole archive via `storage.get`."""
+
+    async def _gen():
+        for i in range(0, len(data), chunk_size):
+            yield data[i : i + chunk_size]
+
+    return _gen()
+
+
 class TestH1Backfill:
     """When a cached_provider_packages row has empty h1_hash (e.g.
     pre-h1-tracking, or h1 compute failed at ingest), the mirror should
-    compute h1 from the cached archive bytes on the next request and
-    persist it — eliminating the runner's fallback to `tofu providers
-    lock` for that provider.
+    compute h1 from the cached archive on the next request and persist
+    it — eliminating the runner's fallback to `tofu providers lock` for
+    that provider. The backfill streams from storage to a tempfile so
+    large archives don't OOM the API.
     """
 
     @pytest.mark.asyncio
@@ -133,7 +148,8 @@ class TestH1Backfill:
         storage = MagicMock()
         storage.exists = AsyncMock(return_value=True)
         storage.presigned_get_url = AsyncMock(return_value=MagicMock(url="https://x/p.zip"))
-        storage.get = AsyncMock(return_value=archive_bytes)
+        storage.get_stream = MagicMock(return_value=_stream_mock(archive_bytes))
+        storage.get = AsyncMock()  # should NOT be called — backfill streams
 
         # No upstream metadata fetch needed when only a cached platform is queried.
         mock_get_cached_metadata.return_value = None
@@ -151,8 +167,9 @@ class TestH1Backfill:
         archive = out["archives"]["linux_amd64"]
         h1_entries = [h for h in archive["hashes"] if h.startswith("h1:")]
         assert h1_entries, f"response missing h1 hash: {archive['hashes']}"
-        # storage.get was called exactly once for backfill.
-        storage.get.assert_awaited_once()
+        # Backfill streamed the archive (not the bytes-loading `storage.get`).
+        storage.get_stream.assert_called_once()
+        storage.get.assert_not_awaited()
 
     @pytest.mark.asyncio
     @patch("terrapod.services.provider_cache_service._get_cached_metadata", new_callable=AsyncMock)
@@ -181,6 +198,7 @@ class TestH1Backfill:
         storage.exists = AsyncMock(return_value=True)
         storage.presigned_get_url = AsyncMock(return_value=MagicMock(url="https://x/p.zip"))
         storage.get = AsyncMock()  # should NOT be called
+        storage.get_stream = MagicMock()  # should NOT be called either
 
         mock_get_cached_metadata.return_value = None
 
@@ -189,6 +207,7 @@ class TestH1Backfill:
         )
 
         storage.get.assert_not_awaited()
+        storage.get_stream.assert_not_called()
         assert "h1:preexisting-h1-from-db" in out["archives"]["linux_amd64"]["hashes"]
 
 
@@ -244,6 +263,7 @@ class TestSelfHostedRegistryTier:
         storage.exists = AsyncMock(return_value=True)
         storage.presigned_get_url = AsyncMock(return_value=MagicMock(url="https://example/p.zip"))
         storage.get = AsyncMock()  # should NOT be called — h1 is present
+        storage.get_stream = MagicMock()  # likewise
 
         out = await get_or_fetch_platforms(
             db, storage, "terrapod.example.com", "default", "terrapod", "0.33.0"
@@ -254,6 +274,7 @@ class TestSelfHostedRegistryTier:
         assert "zh:" + ("deadbeef" * 8) in archive["hashes"]
         assert "h1:preexisting-h1" in archive["hashes"]
         storage.get.assert_not_awaited()
+        storage.get_stream.assert_not_called()
 
     @pytest.mark.asyncio
     @patch("terrapod.services.provider_cache_service.settings")
@@ -288,7 +309,8 @@ class TestSelfHostedRegistryTier:
         storage = MagicMock()
         storage.exists = AsyncMock(return_value=True)
         storage.presigned_get_url = AsyncMock(return_value=MagicMock(url="https://example/p.zip"))
-        storage.get = AsyncMock(return_value=archive_bytes)
+        storage.get_stream = MagicMock(return_value=_stream_mock(archive_bytes))
+        storage.get = AsyncMock()  # should NOT be called — backfill streams
 
         out = await get_or_fetch_platforms(
             db, storage, "terrapod.example.com", "default", "terrapod", "0.33.0"
@@ -302,7 +324,10 @@ class TestSelfHostedRegistryTier:
         archive = out["archives"]["linux_amd64"]
         h1_entries = [h for h in archive["hashes"] if h.startswith("h1:")]
         assert h1_entries, f"response missing h1 hash: {archive['hashes']}"
-        storage.get.assert_awaited_once()
+        # Backfill streamed (constant-memory path), did not load the
+        # whole archive into RAM via storage.get.
+        storage.get_stream.assert_called_once()
+        storage.get.assert_not_awaited()
 
     @pytest.mark.asyncio
     @patch("terrapod.services.provider_cache_service._get_cached_metadata", new_callable=AsyncMock)

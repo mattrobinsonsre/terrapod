@@ -204,13 +204,17 @@ async def get_or_fetch_platforms(
             # init reusing a plan-phase lock) needs h1 — without it
             # they fall back to a full `tofu providers lock` archive
             # download, defeating the mirror. Compute h1 once from the
-            # cached archive bytes, persist, and serve from then on.
+            # cached archive, persist, and serve from then on.
+            #
+            # Stream storage → tempfile → compute (constant memory).
+            # Earlier versions called `storage.get(key)` which loaded
+            # the whole archive into RAM and OOMed the pod on large
+            # providers like hashicorp/aws (~500 MB per platform).
             if not entry.h1_hash:
+                tmp_path: str | None = None
                 try:
-                    archive_bytes = await storage.get(key)
-                    entry.h1_hash = await asyncio.to_thread(
-                        _compute_h1_from_zip_bytes, archive_bytes
-                    )
+                    tmp_path = await _stream_storage_to_tempfile(storage, key)
+                    entry.h1_hash = await asyncio.to_thread(_compute_h1_from_zip_path, tmp_path)
                     # removeprefix matches the format stored at ingest.
                     entry.h1_hash = entry.h1_hash.removeprefix("h1:")
                     logger.info(
@@ -231,6 +235,14 @@ async def get_or_fetch_platforms(
                         platform=platform_key,
                         exc_info=True,
                     )
+                finally:
+                    if tmp_path is not None:
+                        import os as _os
+
+                        try:
+                            _os.unlink(tmp_path)
+                        except OSError:
+                            pass
             if entry.h1_hash:
                 archive["hashes"].append(f"h1:{entry.h1_hash}")
             archives[platform_key] = archive
@@ -379,10 +391,13 @@ async def _serve_from_registry(
         }
 
         # Lazy h1 backfill — same shape as the Tier-1 backfill.
+        # Stream storage → tempfile → compute; never load the whole
+        # archive into RAM (would OOM on large providers).
         if not platform.h1_hash:
+            tmp_path: str | None = None
             try:
-                archive_bytes = await storage.get(key)
-                h1 = await asyncio.to_thread(_compute_h1_from_zip_bytes, archive_bytes)
+                tmp_path = await _stream_storage_to_tempfile(storage, key)
+                h1 = await asyncio.to_thread(_compute_h1_from_zip_path, tmp_path)
                 platform.h1_hash = h1.removeprefix("h1:")
                 logger.info(
                     "backfilled h1 for registry provider",
@@ -398,6 +413,14 @@ async def _serve_from_registry(
                     platform=platform_key,
                     exc_info=True,
                 )
+            finally:
+                if tmp_path is not None:
+                    import os as _os
+
+                    try:
+                        _os.unlink(tmp_path)
+                    except OSError:
+                        pass
 
         if platform.h1_hash:
             archive["hashes"].append(f"h1:{platform.h1_hash}")
@@ -407,6 +430,38 @@ async def _serve_from_registry(
         "archives": archives,
         "cached_platforms": sorted(configured_platforms),
     }
+
+
+_H1_ENTRY_CHUNK = 1024 * 1024  # 1 MB — bounds per-entry decompression memory
+
+
+def _compute_h1_from_zip_path(path: str) -> str:
+    """Constant-memory h1 from a zip on disk.
+
+    Use this for production hot paths where archives can be hundreds of
+    MB (the aws/google providers are 400-600 MB per platform). Reads
+    each zip entry in `_H1_ENTRY_CHUNK`-sized pieces; total memory cost
+    is the chunk size plus zipfile/hashlib bookkeeping, regardless of
+    archive or entry size.
+
+    See `_compute_h1_from_zip_bytes` for the format definition.
+    """
+    import base64
+    import hashlib
+    import zipfile
+
+    h = hashlib.sha256()
+    with zipfile.ZipFile(path) as zf:
+        for name in sorted(zf.namelist()):
+            entry_h = hashlib.sha256()
+            with zf.open(name) as fh:
+                while True:
+                    chunk = fh.read(_H1_ENTRY_CHUNK)
+                    if not chunk:
+                        break
+                    entry_h.update(chunk)
+            h.update(f"{entry_h.hexdigest()}  {name}\n".encode())
+    return "h1:" + base64.standard_b64encode(h.digest()).decode("ascii")
 
 
 def _compute_h1_from_zip_bytes(data: bytes) -> str:
@@ -423,6 +478,12 @@ def _compute_h1_from_zip_bytes(data: bytes) -> str:
     `tofu init` at apply time recomputes h1 from its downloaded archive
     and looks for the result in the lock file. As long as ours matches
     bit-for-bit, the lock entry we inject satisfies init.
+
+    Reads each zip entry in `_H1_ENTRY_CHUNK`-sized pieces so a single
+    400 MB provider binary inside the archive doesn't double-allocate
+    its bytes via `fh.read()`. Callers that hold a large archive in
+    `bytes` already pay the archive's own memory cost; this just
+    avoids the second copy.
     """
     import base64
     import hashlib
@@ -432,10 +493,75 @@ def _compute_h1_from_zip_bytes(data: bytes) -> str:
     h = hashlib.sha256()
     with zipfile.ZipFile(io.BytesIO(data)) as zf:
         for name in sorted(zf.namelist()):
+            entry_h = hashlib.sha256()
             with zf.open(name) as fh:
-                content_hash = hashlib.sha256(fh.read()).hexdigest()
-            h.update(f"{content_hash}  {name}\n".encode())
+                while True:
+                    chunk = fh.read(_H1_ENTRY_CHUNK)
+                    if not chunk:
+                        break
+                    entry_h.update(chunk)
+            h.update(f"{entry_h.hexdigest()}  {name}\n".encode())
     return "h1:" + base64.standard_b64encode(h.digest()).decode("ascii")
+
+
+def _resolve_ephemeral_tmpdir() -> str | None:
+    """Path to a writable mount on attached storage (PVC), or None.
+
+    The Helm chart mounts a per-pod ephemeral PVC at `settings.vcs.tmpdir`
+    (default `/var/lib/terrapod/tmp`) so tempfiles don't land on the
+    node's tmpfs `/tmp`. Backfill streams (and other "large blob to disk"
+    paths) write there instead. Mirrors the same lookup used by
+    `cv_diff_service._resolve_tmpdir`.
+
+    Returns None if the path isn't configured or doesn't exist — caller
+    falls back to the system default (fine for local dev + tests, the
+    OOM risk only bites in production where archives are large).
+    """
+    import os
+
+    configured = settings.vcs.tmpdir
+    if configured and os.path.isdir(configured):
+        return configured
+    return None
+
+
+async def _stream_storage_to_tempfile(storage: ObjectStore, key: str) -> str:
+    """Stream a stored object to a tempfile on attached PVC and return its path.
+
+    Caller is responsible for `os.unlink(path)` after use.
+
+    Used by the h1 backfill paths to avoid loading the entire archive
+    into memory just to hash it. Provider archives can be hundreds of
+    MB per platform; `storage.get(key)` would allocate that whole blob
+    in RAM and OOM the API pod (issue: v0.33.0 regression).
+
+    Writes go to the CSP-attached PVC at `settings.vcs.tmpdir` rather
+    than `/tmp` — on the API pods `/tmp` is a tmpfs (RAM-backed) and
+    streaming there would only move the OOM, not fix it.
+    """
+    import os
+    import tempfile
+
+    tmpdir = _resolve_ephemeral_tmpdir()
+    fd, path = await asyncio.to_thread(tempfile.mkstemp, suffix=".zip", dir=tmpdir)
+    os.close(fd)
+    try:
+        async for chunk in storage.get_stream(key):
+            # Off-thread the write so the event loop isn't blocked by
+            # disk I/O on busy nodes.
+            await asyncio.to_thread(_append_chunk, path, chunk)
+    except Exception:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+        raise
+    return path
+
+
+def _append_chunk(path: str, chunk: bytes) -> None:
+    with open(path, "ab") as fh:
+        fh.write(chunk)
 
 
 async def fetch_and_cache_single_platform(
@@ -497,7 +623,10 @@ async def fetch_and_cache_single_platform(
         import tempfile
         import zipfile
 
-        tmp_fd, tmp_path = tempfile.mkstemp(suffix=".zip")
+        # Land on the CSP-attached PVC rather than node tmpfs — provider
+        # archives can be hundreds of MB and `/tmp` is RAM-backed in the
+        # API pod.
+        tmp_fd, tmp_path = tempfile.mkstemp(suffix=".zip", dir=_resolve_ephemeral_tmpdir())
         os.close(tmp_fd)
         try:
             # Phase 1: stream upstream → tempfile (computing shasum/size
@@ -511,17 +640,19 @@ async def fetch_and_cache_single_platform(
                     shasum = stream.sha256_hex
                     size_bytes = stream.size
 
-            # Phase 2: compute h1 from the archive bytes. Wrapped in
-            # try/except so a corrupted download (storage error returning
-            # a non-zip body, or a download truncated before completion)
-            # is logged but doesn't fail the run — we'll just persist an
-            # empty h1 and the runner falls back to `tofu providers lock`
-            # for that provider. Empty h1 is also how unit tests with
-            # mocked streams hit this branch: no zip bytes to hash.
+            # Phase 2: compute h1 from the on-disk archive (constant
+            # memory). Earlier versions called `_compute_h1_from_zip_bytes(fh.read())`
+            # which loaded the whole archive into RAM and OOMed the
+            # API pod on large providers like hashicorp/aws.
+            #
+            # Wrapped in try/except so a corrupted download (storage
+            # error returning a non-zip body, or a download truncated
+            # before completion) is logged but doesn't fail the run —
+            # we'll just persist an empty h1 and the runner falls back
+            # to `tofu providers lock` for that provider.
             h1_hash_raw = ""
             try:
-                with open(tmp_path, "rb") as fh:
-                    h1_hash = _compute_h1_from_zip_bytes(fh.read())
+                h1_hash = _compute_h1_from_zip_path(tmp_path)
                 h1_hash_raw = h1_hash.removeprefix("h1:")
             except (zipfile.BadZipFile, OSError) as exc:
                 logger.warning(
