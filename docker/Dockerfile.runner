@@ -10,14 +10,14 @@
 # that, only python + git + opa stay.
 
 # ── Builder ────────────────────────────────────────────────────────────
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /build
 COPY services/pyproject-runner.toml pyproject.toml
 RUN pip install --no-cache-dir .
 
 # ── Runtime ────────────────────────────────────────────────────────────
-FROM python:3.13-slim
+FROM python:3.14-slim
 LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapod
 
 # Bump APT_REFRESH to bust the cached apt layer and re-pull Debian
