@@ -142,7 +142,10 @@ def download_configuration(
     if not cfg.has_api:
         return ConfigurationResult(downloaded=False, strip_dir=strip_dir)
 
-    tarball = work_dir.parent / "config.tar.gz"
+    # /tmp: writable by uid 1000. Previously work_dir.parent, which
+    # for the default work_dir of /workspace resolves to / — not
+    # writable for a non-root runner.
+    tarball = Path("/tmp") / "config.tar.gz"
     headers = {"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {}
 
     logger.info("downloading configuration tarball", run_id=cfg.run_id)

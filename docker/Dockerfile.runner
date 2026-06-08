@@ -17,7 +17,28 @@
 # TLS stack.
 
 # ── Builder ────────────────────────────────────────────────────────────
+# Two jobs: install the runner Python deps, AND download+verify OPA. OPA
+# lives in the builder so the runtime image stays free of curl; the
+# binary is COPY'd into the runtime stage below.
 FROM python:3.13-slim AS builder
+
+# curl + ca-certificates for the OPA download — present only in the
+# builder image, not the runtime.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG TARGETARCH
+ARG OPA_VERSION=1.17.0
+# GitHub Releases intermittently 5xx; --retry-all-errors covers 5xx as
+# well as transport errors. 6 attempts × 4s base = ~25s ceiling.
+RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
+    && BASE="https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}" \
+    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/opa "${BASE}/opa_linux_${ARCH}_static" \
+    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/opa.sha256 "${BASE}/opa_linux_${ARCH}_static.sha256" \
+    && echo "$(cut -d' ' -f1 /tmp/opa.sha256)  /tmp/opa" | sha256sum -c - \
+    && rm /tmp/opa.sha256 \
+    && chmod 0755 /tmp/opa
 
 WORKDIR /build
 COPY services/pyproject-runner.toml pyproject.toml
@@ -29,7 +50,7 @@ LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapo
 
 # Bump APT_REFRESH to bust the cached apt layer and re-pull Debian
 # security patches. See Dockerfile.api for the same pattern.
-ARG APT_REFRESH=2026-06-06
+ARG APT_REFRESH=2026-06-08
 RUN echo "apt-refresh=${APT_REFRESH}" \
     && apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
         git \
@@ -37,26 +58,9 @@ RUN echo "apt-refresh=${APT_REFRESH}" \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# OPA (Open Policy Agent) — the policy-as-code evaluation engine (#343).
-# Statically-linked binary; we download it via the builder stage's
-# Python toolchain rather than apt because OPA isn't packaged for
-# Debian. Pinned, SHA256-verified. The Python-side download keeps the
-# runtime image free of curl. TARGETARCH is set by buildx.
-ARG TARGETARCH
-ARG OPA_VERSION=1.17.0
-COPY --from=builder /usr/local/bin/python /tmp/python
-RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
-    && /tmp/python -c "import urllib.request, hashlib, sys; \
-        base=f'https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}'; \
-        url=f'{base}/opa_linux_${ARCH}_static'; \
-        sha_url=f'{url}.sha256'; \
-        urllib.request.urlretrieve(url, '/usr/local/bin/opa'); \
-        expected=urllib.request.urlopen(sha_url).read().decode().split()[0]; \
-        h=hashlib.sha256(open('/usr/local/bin/opa','rb').read()).hexdigest(); \
-        assert h == expected, f'sha256 mismatch: {h} vs {expected}'" \
-    && rm /tmp/python \
-    && chmod 0755 /usr/local/bin/opa \
-    && /usr/local/bin/opa version
+# OPA from the builder stage. Verified there; just copy it.
+COPY --from=builder /tmp/opa /usr/local/bin/opa
+RUN /usr/local/bin/opa version
 
 # Python deps from builder
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages

@@ -101,7 +101,7 @@ docker_build(
     dockerfile='docker/Dockerfile.migrations',
 )
 
-# Runner Job image (python:3.13-slim + bash entrypoint until porting is done).
+# Runner Job image (python:3.13-slim, pure-Python orchestrator).
 # Built as a local_resource (not docker_build) because the runner image is
 # referenced in the runners.yaml ConfigMap, not in a pod spec — Tilt's image
 # injection doesn't apply.  values-local.yaml sets terrapod-runner:local with
@@ -111,13 +111,11 @@ local_resource(
     cmd='docker build -f docker/Dockerfile.runner -t terrapod-runner:local .',
     deps=[
         'docker/Dockerfile.runner',
-        'docker/runner-entrypoint.sh',
         'services/pyproject-runner.toml',
         'services/terrapod/runner/__init__.py',
         'services/terrapod/runner/runner_config.py',
         'services/terrapod/runner/download.py',
         'services/terrapod/runner/exec_subprocess.py',
-        'services/terrapod/runner/upload_cli.py',
         'services/terrapod/runner/lock_extender.py',
         'services/terrapod/runner/job_entrypoint.py',
         'services/terrapod/runner/phases',

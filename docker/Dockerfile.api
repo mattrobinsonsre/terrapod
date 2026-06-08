@@ -75,8 +75,8 @@ ARG TARGETARCH
 ARG OPA_VERSION=1.17.0
 RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && BASE="https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}" \
-    && curl -fsSL -o /usr/local/bin/opa "${BASE}/opa_linux_${ARCH}_static" \
-    && curl -fsSL -o /tmp/opa.sha256 "${BASE}/opa_linux_${ARCH}_static.sha256" \
+    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /usr/local/bin/opa "${BASE}/opa_linux_${ARCH}_static" \
+    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/opa.sha256 "${BASE}/opa_linux_${ARCH}_static.sha256" \
     && echo "$(cut -d' ' -f1 /tmp/opa.sha256)  /usr/local/bin/opa" | sha256sum -c - \
     && rm /tmp/opa.sha256 \
     && chmod 0755 /usr/local/bin/opa \
