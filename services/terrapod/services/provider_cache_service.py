@@ -32,6 +32,7 @@ from terrapod.db.models import (
     RegistryProviderVersion,
 )
 from terrapod.logging_config import get_logger
+from terrapod.redis.client import get_redis_client
 from terrapod.services.hashing_stream import HashingStream
 from terrapod.storage.keys import provider_binary_key, provider_cache_key
 from terrapod.storage.protocol import ObjectStore
@@ -138,25 +139,39 @@ async def get_or_fetch_platforms(
         f"{p['os']}_{p['arch']}" for p in settings.registry.provider_cache.platforms
     }
 
-    # --- Tier 0: self-hosted registry (this operator's own providers) ---
-    # The mirror is also the canonical CLI download path for providers
-    # published into Terrapod's own registry (e.g. the platform
-    # `terrapod` provider, or any operator-published provider). When the
-    # request hostname matches our external URL, the registry tables are
-    # authoritative — never fall through to upstream tiers for our own
-    # providers (we ARE the upstream).
+    # --- Tier 0: self-hosted providers (this operator owns the source) ---
+    # Two shapes coexist:
+    #   (a) The platform Terrapod provider (`default/terrapod`) — has NO
+    #       row in registry_provider_versions. It's fetched on demand
+    #       from GitHub Releases by `platform_provider_service` and
+    #       cached at `cache/provider/terrapod/...` storage keys. Special-
+    #       case it; the registry-table lookup would always miss.
+    #   (b) Operator-published providers — live in the registry tables
+    #       (registry_providers / _versions / _platforms) and are stored
+    #       at `registry/providers/...` storage keys via `upload_provider_binary`.
+    #
+    # In both cases the operator is authoritative — never fall through
+    # to upstream tiers for our own hostname.
     self_host = _self_hostname()
     if self_host and hostname.lower() == self_host:
-        registry_resp = await _serve_from_registry(
-            db, storage, namespace, type_, version, configured_platforms
-        )
-        if registry_resp is not None:
-            PROVIDER_CACHE_REQUESTS.labels(result="hit_registry").inc()
-            return registry_resp
-        # Provider/version not in our registry — fall through; the
-        # standard tiers will return empty (we won't proxy to an
+        if namespace == "default" and type_ == "terrapod":
+            platform_resp = await _serve_platform_terrapod(storage, version, configured_platforms)
+            if platform_resp is not None:
+                PROVIDER_CACHE_REQUESTS.labels(result="hit_platform_terrapod").inc()
+                return platform_resp
+        else:
+            registry_resp = await _serve_from_registry(
+                db, storage, namespace, type_, version, configured_platforms
+            )
+            if registry_resp is not None:
+                PROVIDER_CACHE_REQUESTS.labels(result="hit_registry").inc()
+                return registry_resp
+        # Self-hosted but not found / not yet cached. Fall through to the
+        # standard tiers; they'll return empty (we won't proxy to an
         # upstream for our own hostname since it's not in
-        # upstream_registries anyway).
+        # upstream_registries anyway). For the platform Terrapod provider
+        # specifically, the runner's next CLI download request will hit
+        # platform_provider_service and warm the cache.
 
     # --- Tier 1: check Postgres for cached binaries ---
     result = await db.execute(
@@ -330,6 +345,128 @@ async def get_or_fetch_platforms(
             }
 
     return _resp()
+
+
+# Redis cache for the platform Terrapod provider's h1 hashes.
+# Archive contents are immutable per (version, os, arch) — a published
+# tag's binary never changes — so we can cache the computed h1 forever.
+# 30-day TTL is a defence-in-depth window against accidental rebuild +
+# overwrite (which shouldn't happen but we don't want a stale h1 to
+# linger across an unlikely incident).
+_PLATFORM_TERRAPOD_H1_KEY = "tp:platform_provider_h1"
+_PLATFORM_TERRAPOD_H1_TTL = 86400 * 30  # 30 days
+
+
+def _platform_terrapod_h1_redis_key(version: str, os_: str, arch: str) -> str:
+    return f"{_PLATFORM_TERRAPOD_H1_KEY}:{version}:{os_}:{arch}"
+
+
+async def _serve_platform_terrapod(
+    storage: ObjectStore,
+    version: str,
+    configured_platforms: set[str],
+) -> dict | None:
+    """Tier-0a: serve the platform Terrapod provider from its on-disk cache.
+
+    The platform Terrapod provider has NO row in `registry_provider_versions`.
+    It's fetched on demand from GitHub Releases by `platform_provider_service`
+    and cached at `platform_provider_binary_key` paths. This helper mirrors
+    that storage layout, returns presigned URLs + `zh:`/`h1:` hashes for any
+    platforms that are already cached, and skips platforms that aren't (the
+    runner's next CLI download request will warm them via
+    `platform_provider_service`).
+
+    h1 is computed lazily on first request per (version, os, arch) and cached
+    in Redis with a long TTL (archives are immutable). Computed via the same
+    constant-memory streaming path as the Tier-1 backfill — never loads the
+    archive into RAM.
+
+    Returns None when no platforms are cached (caller falls through to the
+    standard tiers, which will also return empty for this hostname).
+    """
+    # Late imports — platform_provider_service depends on terrapod.config
+    # being importable, which is fine in production but the tests patch
+    # `settings` at module scope here.
+    from terrapod.services.platform_provider_service import _get_shasum_for_file
+    from terrapod.storage.keys import (
+        platform_provider_binary_key,
+        platform_provider_shasums_key,
+    )
+
+    archives: dict = {}
+    shasums_key = platform_provider_shasums_key(version)
+    shasums_cached: bool | None = None  # lazy: don't hit storage if no platforms exist
+    redis = get_redis_client()
+
+    for platform_key in sorted(configured_platforms):
+        os_, arch = platform_key.split("_", 1)
+        binary_key = platform_provider_binary_key(version, os_, arch)
+
+        if not await storage.exists(binary_key):
+            continue
+
+        # Resolve shasum from the cached SHA256SUMS file (one storage read
+        # per request when any platforms are present). The file is tiny
+        # (a few hundred bytes) so the bytes-load is fine.
+        if shasums_cached is None:
+            shasums_cached = await storage.exists(shasums_key)
+        shasum = ""
+        if shasums_cached:
+            filename = f"terraform-provider-terrapod_{version}_{os_}_{arch}.zip"
+            shasum = await _get_shasum_for_file(storage, shasums_key, filename)
+
+        presigned = await storage.presigned_get_url(binary_key)
+        archive: dict = {
+            "url": presigned.url,
+            "hashes": [f"zh:{shasum}"] if shasum else [],
+        }
+
+        # Lazy h1 backfill via Redis cache. No DB column needed — the
+        # platform Terrapod provider isn't in the registry tables.
+        redis_key = _platform_terrapod_h1_redis_key(version, os_, arch)
+        h1_cached = await redis.get(redis_key)
+        if h1_cached:
+            h1 = h1_cached.decode("utf-8") if isinstance(h1_cached, bytes) else h1_cached
+            archive["hashes"].append(f"h1:{h1}")
+        else:
+            tmp_path: str | None = None
+            try:
+                tmp_path = await _stream_storage_to_tempfile(storage, binary_key)
+                h1_full = await asyncio.to_thread(_compute_h1_from_zip_path, tmp_path)
+                h1 = h1_full.removeprefix("h1:")
+                await redis.set(redis_key, h1, ex=_PLATFORM_TERRAPOD_H1_TTL)
+                archive["hashes"].append(f"h1:{h1}")
+                logger.info(
+                    "backfilled h1 for platform terrapod provider",
+                    version=version,
+                    platform=platform_key,
+                )
+            except Exception:
+                logger.warning(
+                    "h1 backfill failed for platform terrapod provider; "
+                    "runner falls back to providers lock",
+                    version=version,
+                    platform=platform_key,
+                    exc_info=True,
+                )
+            finally:
+                if tmp_path is not None:
+                    import os as _os
+
+                    try:
+                        _os.unlink(tmp_path)
+                    except OSError:
+                        pass
+
+        archives[platform_key] = archive
+
+    if not archives:
+        return None
+
+    return {
+        "archives": archives,
+        "cached_platforms": sorted(configured_platforms),
+    }
 
 
 async def _serve_from_registry(

@@ -212,11 +212,11 @@ class TestH1Backfill:
 
 
 class TestSelfHostedRegistryTier:
-    """Tier-0: a self-hostname request for a registered provider is served
-    from the registry tables (not the cache tables, not upstream). This
-    is what makes `terrapod.example.com/default/terrapod` resolvable via
-    the mirror so the runner's lock-extender can splice h1 into
-    .terraform.lock.hcl without a `tofu providers lock` fallback.
+    """Tier-0: a self-hostname request for a registered (operator-published)
+    provider is served from the registry tables. Uses an `op-addon` name
+    rather than `terrapod` to avoid the platform-Terrapod-provider
+    short-circuit (see TestPlatformTerrapodTier for that path) — the
+    platform provider has no registry-table rows.
     """
 
     def _make_provider_zip(self) -> bytes:
@@ -266,7 +266,7 @@ class TestSelfHostedRegistryTier:
         storage.get_stream = MagicMock()  # likewise
 
         out = await get_or_fetch_platforms(
-            db, storage, "terrapod.example.com", "default", "terrapod", "0.33.0"
+            db, storage, "terrapod.example.com", "default", "op-addon", "0.33.0"
         )
 
         # Tier-0 served: zh + h1 hashes, preexisting h1 not recomputed.
@@ -313,7 +313,7 @@ class TestSelfHostedRegistryTier:
         storage.get = AsyncMock()  # should NOT be called — backfill streams
 
         out = await get_or_fetch_platforms(
-            db, storage, "terrapod.example.com", "default", "terrapod", "0.33.0"
+            db, storage, "terrapod.example.com", "default", "op-addon", "0.33.0"
         )
 
         # h1 was computed and persisted on the row.
@@ -401,4 +401,171 @@ class TestSelfHostedRegistryTier:
 
         # Both Tier-0 and Tier-1 queries fired.
         assert db.execute.await_count == 2
+        assert out["archives"] == {}
+
+
+class TestPlatformTerrapodTier:
+    """Tier-0a: the platform Terrapod provider is fetched on demand from
+    GitHub Releases by `platform_provider_service` and cached at
+    `platform_provider_binary_key` paths — it has NO row in
+    `registry_provider_versions`. The mirror's self-hostname branch
+    short-circuits to `_serve_platform_terrapod` for
+    `(namespace=default, type=terrapod)` rather than the registry-tables
+    lookup, which would always miss.
+    """
+
+    def _make_provider_zip(self) -> bytes:
+        import io
+        import zipfile
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("terraform-provider-terrapod_v0.33.1", b"binary contents")
+        return buf.getvalue()
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.provider_cache_service.get_redis_client")
+    @patch("terrapod.services.provider_cache_service.settings")
+    async def test_serves_cached_platforms_with_h1_from_redis(
+        self,
+        mock_settings: MagicMock,
+        mock_get_redis: MagicMock,
+    ) -> None:
+        """Cached binary + cached h1 in Redis → served from Tier-0a
+        with zh + h1 hashes, no archive read, no h1 compute, no DB
+        query."""
+        from terrapod.services.provider_cache_service import get_or_fetch_platforms
+
+        mock_settings.external_url = "https://terrapod.example.com"
+        mock_settings.registry.provider_cache.platforms = [
+            {"os": "linux", "arch": "amd64"},
+        ]
+
+        db = MagicMock()
+        db.execute = AsyncMock()
+
+        storage = MagicMock()
+        storage.exists = AsyncMock(return_value=True)
+        storage.presigned_get_url = AsyncMock(return_value=MagicMock(url="https://example/p.zip"))
+        shasums_body = (
+            b"deadbeefcafef00d0123456789abcdef0123456789abcdef0123456789abcdef"
+            b"  terraform-provider-terrapod_0.33.1_linux_amd64.zip\n"
+        )
+        storage.get = AsyncMock(return_value=shasums_body)
+        storage.get_stream = MagicMock()  # should NOT be called
+
+        redis = MagicMock()
+        redis.get = AsyncMock(return_value=b"preexisting-h1-from-redis")
+        redis.set = AsyncMock()
+        mock_get_redis.return_value = redis
+
+        out = await get_or_fetch_platforms(
+            db, storage, "terrapod.example.com", "default", "terrapod", "0.33.1"
+        )
+
+        archive = out["archives"]["linux_amd64"]
+        zh_entries = [h for h in archive["hashes"] if h.startswith("zh:")]
+        h1_entries = [h for h in archive["hashes"] if h.startswith("h1:")]
+        assert zh_entries == ["zh:deadbeefcafef00d0123456789abcdef0123456789abcdef0123456789abcdef"]
+        assert "h1:preexisting-h1-from-redis" in h1_entries
+        # No archive streaming (h1 came from Redis).
+        storage.get_stream.assert_not_called()
+        redis.set.assert_not_awaited()
+        # Tier-1 never reached.
+        db.execute.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.provider_cache_service.get_redis_client")
+    @patch("terrapod.services.provider_cache_service.settings")
+    async def test_lazy_h1_backfill_via_redis(
+        self,
+        mock_settings: MagicMock,
+        mock_get_redis: MagicMock,
+    ) -> None:
+        """Cached binary but no Redis h1 → compute via streaming, cache
+        in Redis with the 30-day TTL, return with zh + h1."""
+        from terrapod.services.provider_cache_service import get_or_fetch_platforms
+
+        mock_settings.external_url = "https://terrapod.example.com"
+        mock_settings.registry.provider_cache.platforms = [
+            {"os": "linux", "arch": "amd64"},
+        ]
+
+        archive_bytes = self._make_provider_zip()
+        db = MagicMock()
+        db.execute = AsyncMock()
+
+        storage = MagicMock()
+        storage.exists = AsyncMock(return_value=True)
+        storage.presigned_get_url = AsyncMock(return_value=MagicMock(url="https://example/p.zip"))
+        storage.get = AsyncMock(
+            return_value=(b"abc123  terraform-provider-terrapod_0.33.1_linux_amd64.zip\n")
+        )
+        storage.get_stream = MagicMock(return_value=_stream_mock(archive_bytes))
+
+        redis = MagicMock()
+        redis.get = AsyncMock(return_value=None)
+        redis.set = AsyncMock()
+        mock_get_redis.return_value = redis
+
+        out = await get_or_fetch_platforms(
+            db, storage, "terrapod.example.com", "default", "terrapod", "0.33.1"
+        )
+
+        archive = out["archives"]["linux_amd64"]
+        h1_entries = [h for h in archive["hashes"] if h.startswith("h1:")]
+        assert h1_entries, f"expected h1 in hashes, got {archive['hashes']}"
+        zh_entries = [h for h in archive["hashes"] if h.startswith("zh:")]
+        assert zh_entries == ["zh:abc123"]
+
+        # Redis was populated with the computed h1 (30-day TTL).
+        redis.set.assert_awaited_once()
+        call_args = redis.set.await_args
+        assert call_args.args[0] == "tp:platform_provider_h1:0.33.1:linux:amd64"
+        assert call_args.kwargs.get("ex") == 86400 * 30
+        # Tier-1 never reached.
+        db.execute.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.provider_cache_service.get_redis_client")
+    @patch("terrapod.services.provider_cache_service._get_cached_metadata", new_callable=AsyncMock)
+    @patch("terrapod.services.provider_cache_service.settings")
+    async def test_no_cached_platforms_returns_none_falls_through(
+        self,
+        mock_settings: MagicMock,
+        mock_get_cached_metadata: AsyncMock,
+        mock_get_redis: MagicMock,
+    ) -> None:
+        """Cold cache: no platforms exist on disk → Tier-0a returns
+        None and the standard tiers run. Tier-1 also finds nothing
+        (self-hostname isn't in upstream_registries) so we end with an
+        empty archives response. This is the runner's first-ever lookup
+        before any CLI download has warmed the cache."""
+        from terrapod.services.provider_cache_service import get_or_fetch_platforms
+
+        mock_settings.external_url = "https://terrapod.example.com"
+        mock_settings.registry.provider_cache.platforms = [
+            {"os": "linux", "arch": "amd64"},
+        ]
+        mock_settings.registry.provider_cache.warm_on_first_request = False
+        mock_settings.registry.provider_cache.upstream_registries = []
+
+        db = MagicMock()
+        tier1_result = MagicMock()
+        tier1_result.scalars.return_value.all.return_value = []
+        db.execute = AsyncMock(return_value=tier1_result)
+
+        storage = MagicMock()
+        storage.exists = AsyncMock(return_value=False)  # no cached binary
+
+        redis = MagicMock()
+        mock_get_redis.return_value = redis
+        mock_get_cached_metadata.return_value = None
+
+        out = await get_or_fetch_platforms(
+            db, storage, "terrapod.example.com", "default", "terrapod", "0.33.1"
+        )
+
+        # Tier-0a returned None → Tier-1 select fired.
+        assert db.execute.await_count == 1
         assert out["archives"] == {}
