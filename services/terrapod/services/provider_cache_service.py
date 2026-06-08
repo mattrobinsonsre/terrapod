@@ -110,6 +110,13 @@ async def get_or_fetch_platforms(
     For a mix of cached and uncached platforms, cached platforms get presigned
     URLs and uncached platforms get proxy URLs (from Redis metadata).
     """
+    # The operator's eager-cache config — surfaced in every response so
+    # the runner's lock extender can distinguish "deliberate skip" from
+    # "compute failed" when no h1 is present for a given platform.
+    configured_platforms: set[str] = {
+        f"{p['os']}_{p['arch']}" for p in settings.registry.provider_cache.platforms
+    }
+
     # --- Tier 1: check Postgres for cached binaries ---
     result = await db.execute(
         select(CachedProviderPackage).where(
@@ -200,6 +207,12 @@ async def get_or_fetch_platforms(
     else:
         PROVIDER_CACHE_REQUESTS.labels(result="miss").inc()
 
+    def _resp() -> dict:
+        return {
+            "archives": archives,
+            "cached_platforms": sorted(configured_platforms),
+        }
+
     # --- Tier 2: check Redis for upstream metadata ---
     meta = await _get_cached_metadata(hostname, namespace, type_, version)
 
@@ -207,22 +220,19 @@ async def get_or_fetch_platforms(
         # --- Tier 3: fetch from upstream and cache in Redis ---
         cfg = settings.registry.provider_cache
         if not cfg.warm_on_first_request:
-            return {"archives": archives} if archives else {"archives": {}}
+            return _resp()
 
         if hostname not in cfg.upstream_registries:
-            return {"archives": archives} if archives else {"archives": {}}
+            return _resp()
 
         meta = await _fetch_and_cache_upstream_metadata(hostname, namespace, type_, version)
 
     if meta is None:
-        return {"archives": archives} if archives else {"archives": {}}
+        return _resp()
 
     # For uncached platforms: eagerly cache platforms matching the configured
     # filter (returning presigned storage URLs), and return upstream direct
     # download URLs for all others (no auth needed — public registries).
-    configured_platforms = {
-        f"{p['os']}_{p['arch']}" for p in settings.registry.provider_cache.platforms
-    }
 
     for platform_key, platform_meta in meta.items():
         if platform_key in cached_platforms:
@@ -266,7 +276,7 @@ async def get_or_fetch_platforms(
                 "hashes": [f"zh:{platform_meta['shasum']}"],
             }
 
-    return {"archives": archives}
+    return _resp()
 
 
 def _compute_h1_from_zip_bytes(data: bytes) -> str:

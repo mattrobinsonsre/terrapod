@@ -922,12 +922,11 @@ def _summary_kind_for_run(run: Run) -> str | None:
     """Pick the right summariser kind for a run's current state.
 
     Returns "plan_summary" for runs that produced a plan (any state past
-    `planning` except plan-phase errored), "failure_analysis" for runs
-    that failed during the plan phase, and None when no summary kind
-    applies (still in `pending`/`queued`/`planning`, or apply-phase
-    errored — apply failures aren't part of #401).
+    `planning` except errored), "failure_analysis" for runs that
+    errored during EITHER plan or apply (#419), and None when no
+    summary kind applies (still in `pending`/`queued`/`planning`).
     """
-    if run.status == "errored" and run.plan_started_at and run.apply_started_at is None:
+    if run.status == "errored" and run.plan_started_at:
         return "failure_analysis"
     if run.status in {"planned", "confirmed", "applying", "applied", "discarded"}:
         return "plan_summary"

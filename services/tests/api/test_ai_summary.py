@@ -428,11 +428,56 @@ class TestRegeneratePlanSummary:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.resolve_workspace_permission")
     @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
+    async def test_regenerate_apply_phase_errored_picks_failure_analysis(
+        self, mock_enq, mock_resolve, *_mocks
+    ):
+        """#419: apply-phase errored runs were previously 409 on
+        regenerate; now they're in scope and the regenerate flow
+        produces a failure_analysis summary against the apply log.
+        """
+        mock_resolve.return_value = "read"
+        run = _mock_run(status="errored")
+        run.plan_started_at = datetime(2026, 1, 1, tzinfo=UTC)
+        run.apply_started_at = datetime(2026, 1, 1, 0, 5, tzinfo=UTC)  # apply BEGAN
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        summary = _mock_summary(run.id, status="pending", kind="failure_analysis")
+
+        app, mock_db = _make_app(_user())
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                MagicMock(scalar_one_or_none=MagicMock(return_value=run)),
+                MagicMock(),
+                MagicMock(scalar_one_or_none=MagicMock(return_value=summary)),
+            ]
+        )
+        mock_db.get = AsyncMock(return_value=ws)
+        mock_db.commit = AsyncMock()
+
+        with patch("terrapod.config.settings") as mock_settings:
+            mock_settings.ai_summary.enabled = True
+            mock_settings.ai_summary.model = "bedrock/test"
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{run.id}/plan-summary/regenerate",
+                    headers=_AUTH,
+                )
+
+        assert resp.status_code == 202
+        mock_enq.assert_awaited_once()
+        assert mock_enq.call_args.args[1]["kind"] == "failure_analysis"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
     async def test_regenerate_409_when_no_summary_kind_applies(
         self, mock_enq, mock_resolve, *_mocks
     ):
         """A run still in `pending` / `queued` / `planning` has nothing
-        to summarise; apply-phase errored runs are also out of scope.
+        to summarise — no plan output yet, no failure log yet. Apply-
+        phase errored runs ARE in scope post-#419 and tested
+        separately below.
         """
         mock_resolve.return_value = "read"
         run = _mock_run(status="queued")

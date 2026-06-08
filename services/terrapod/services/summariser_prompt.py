@@ -261,15 +261,17 @@ Style:
 
 
 FAILURE_ANALYSIS_SKILL_PROMPT = """\
-You are a Terraform run failure analyst embedded in Terrapod. A plan
-failed to execute. You receive the operator's plan log and the source
-HCL that was being processed. Your job is to explain WHY the plan
-failed and suggest concrete fixes. Nothing else.
+You are a Terraform run failure analyst embedded in Terrapod. A run
+failed to execute, either during `plan` or during `apply`. You
+receive the operator's log for the failed phase plus the source HCL
+that was being processed. Your job is to explain WHY the run failed
+and suggest concrete fixes. Nothing else.
 
 You will receive these inputs in the user message:
-  • PLAN_LOG — the terraform/tofu stdout+stderr leading up to the
-    failure. May be truncated from the head; the tail (where the error
-    typically appears) is preserved.
+  • PLAN_LOG or APPLY_LOG — the terraform/tofu stdout+stderr leading
+    up to the failure. The label tells you which phase failed. May be
+    truncated from the head; the tail (where the error typically
+    appears) is preserved.
   • CODE_DIFF — unified diff of *.tf / *.tfvars between this run's
     configuration and the previously-applied configuration. May be
     absent. When present, suspect it as a potential cause — recent
@@ -277,6 +279,29 @@ You will receive these inputs in the user message:
   • CODE_CONTEXT — concatenated .tf source. May be absent.
   • FLEET_CONTEXT — deployment-wide notes. May be empty.
   • WORKSPACE_CONTEXT — workspace-specific notes. May be empty.
+  • STATE_DIVERGED (apply-phase only, when set) — flags that the
+    runner couldn't upload the post-apply state to Terrapod. Real
+    infrastructure may have been mutated by the partial apply but
+    Terrapod's recorded state no longer matches. Call this gap out
+    explicitly in `description` and weight remediation accordingly.
+
+When the label is APPLY_LOG, this is an APPLY-PHASE failure — extra
+rules apply:
+  • Identify the specific resource whose Create/Modify/Destroy
+    failed. Apply output names it directly ("Error: ... with
+    aws_instance.foo, on main.tf line N").
+  • Identify which resources had ALREADY completed before the
+    failure. Apply prints "Creation complete after Ns" / "Destruction
+    complete after Ns" / "Modifications complete after Ns" per
+    resource as it goes. Anything between the start of the apply and
+    the first "Error:" succeeded; anything in flight or after did not.
+  • The infrastructure is now in a PARTIAL state. State on the
+    Terrapod side should still reflect what actually completed (state
+    is written after each resource), but the operator needs to know
+    the gap explicitly. Mention it in `description`.
+  • Rank fixes by whether the apply is safe to re-run as-is, requires
+    a `terraform refresh` first, requires manual cleanup of orphaned
+    resources, or requires a targeted re-apply (`-target=...`).
 
 You submit your answer by calling the `submit_failure_analysis` tool
 exactly once. The tool's parameters carry the schema; the provider
@@ -331,6 +356,7 @@ def render_prompt(
     code_diff: str = "",
     prompt_prefix: str = "",
     prompt_suffix: str = "",
+    state_diverged: bool = False,
 ) -> tuple[str, str]:
     """Render the system + user messages for the Chat Completions request.
 
@@ -369,6 +395,13 @@ def render_prompt(
     if workspace_context.strip():
         user_parts.append(f"WORKSPACE_CONTEXT:\n{workspace_context.strip()}")
 
+    if state_diverged and kind == "failure_analysis":
+        user_parts.append(
+            "STATE_DIVERGED: true\n"
+            "(the runner could not upload post-apply state to Terrapod; "
+            "real infrastructure may have been mutated by the partial "
+            "apply but Terrapod's recorded state no longer reflects it.)"
+        )
     user_parts.append(f"{primary_input_label}:\n```{primary_input_lang}\n{primary_input}\n```")
     if code_diff.strip():
         user_parts.append(f"CODE_DIFF:\n```diff\n{code_diff}\n```")

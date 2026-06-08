@@ -105,7 +105,7 @@ class TestFetchH1Hashes:
             )
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
-        out = lock_extender.fetch_h1_hashes(
+        out, _ = lock_extender.fetch_h1_hashes(
             "https://api.example.com",
             "token",
             self._block(),
@@ -130,7 +130,7 @@ class TestFetchH1Hashes:
             )
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
-        out = lock_extender.fetch_h1_hashes(
+        out, _ = lock_extender.fetch_h1_hashes(
             "https://api.example.com",
             "token",
             self._block(),
@@ -144,7 +144,7 @@ class TestFetchH1Hashes:
             return httpx.Response(404)
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
-        out = lock_extender.fetch_h1_hashes(
+        out, cached = lock_extender.fetch_h1_hashes(
             "https://api.example.com",
             "token",
             self._block(),
@@ -152,6 +152,27 @@ class TestFetchH1Hashes:
             client=client,
         )
         assert out == {}
+        assert cached == set()
+
+    def test_returns_cached_platforms_from_response(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "archives": {},
+                    "cached_platforms": ["linux_amd64", "linux_arm64"],
+                },
+            )
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        _, cached = lock_extender.fetch_h1_hashes(
+            "https://api.example.com",
+            "token",
+            self._block(),
+            ["linux_amd64"],
+            client=client,
+        )
+        assert cached == {"linux_amd64", "linux_arm64"}
 
 
 class TestSpliceHashesIntoBlock:
@@ -245,7 +266,17 @@ class TestEndToEndExtend:
         lock.write_text(_SAMPLE_LOCK)
 
         def handler(request: httpx.Request) -> httpx.Response:
-            return httpx.Response(200, json={"archives": {}})
+            # No h1 AND the response advertises the requested arch IS
+            # supposed to be cached — so this is the "compute failed"
+            # case, NOT the deliberate-skip case. Caller should see a
+            # real gap and run `providers lock` for it.
+            return httpx.Response(
+                200,
+                json={
+                    "archives": {},
+                    "cached_platforms": ["linux_amd64", "linux_arm64"],
+                },
+            )
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
         seen, extended = lock_extender.extend_lock_file(
@@ -258,6 +289,38 @@ class TestEndToEndExtend:
         assert seen == 2
         assert extended == 0
         # File unchanged.
+        assert lock.read_text() == _SAMPLE_LOCK
+
+    def test_silently_skips_when_arch_not_in_operators_cache_config(self, tmp_path) -> None:
+        """Operator has narrowed mirror's `provider_cache.platforms` to
+        a single arch; the lock-extender should NOT log a warning or
+        ask the orchestrator to fall back — no apply will ever land
+        on the other arch."""
+        lock = tmp_path / ".terraform.lock.hcl"
+        lock.write_text(_SAMPLE_LOCK)
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "archives": {},
+                    # other_arch (linux_arm64) NOT in this list — the
+                    # operator only cares about linux_amd64.
+                    "cached_platforms": ["linux_amd64"],
+                },
+            )
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        seen, extended = lock_extender.extend_lock_file(
+            lock,
+            api_url="https://api.example.com",
+            auth_token="tok",
+            other_arch="linux_arm64",
+            client=client,
+        )
+        # seen == handled: no fallback needed (gap == 0)
+        assert seen == 2
+        assert extended == 2
         assert lock.read_text() == _SAMPLE_LOCK
 
 

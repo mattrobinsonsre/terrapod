@@ -236,3 +236,77 @@ def test_failure_analysis_skill_also_describes_code_diff():
         code_context_truncated="",
     )
     assert "CODE_DIFF" in system
+
+
+def test_failure_analysis_skill_includes_apply_phase_guidance():
+    """#419: the skill prompt must explicitly cover APPLY-PHASE
+    failures: partial-state callout, completed-vs-failed-resource
+    identification, fix-ordering by re-run safety.
+    """
+    system, _ = render_prompt(
+        kind="failure_analysis",
+        fleet_context="",
+        workspace_context="",
+        primary_input="ERROR: ...",
+        primary_input_label="APPLY_LOG",
+        primary_input_lang="text",
+        code_context_truncated="",
+    )
+    assert "APPLY_LOG" in system
+    assert "APPLY-PHASE" in system
+    # Partial-state language is the key signal that this is apply-aware.
+    assert "PARTIAL" in system or "partial" in system
+    # Remediation-ordering hint.
+    assert "-target" in system
+
+
+def test_failure_analysis_user_message_omits_state_diverged_when_false():
+    _, user = render_prompt(
+        kind="failure_analysis",
+        fleet_context="",
+        workspace_context="",
+        primary_input="ERROR: ...",
+        primary_input_label="APPLY_LOG",
+        primary_input_lang="text",
+        code_context_truncated="",
+        state_diverged=False,
+    )
+    assert "STATE_DIVERGED" not in user
+
+
+def test_failure_analysis_user_message_emits_state_diverged_when_true():
+    """When the workspace is flagged state-diverged, the user message
+    surfaces it as a labeled block so the model treats the gap as
+    primary context, not boilerplate.
+    """
+    _, user = render_prompt(
+        kind="failure_analysis",
+        fleet_context="",
+        workspace_context="",
+        primary_input="ERROR: ...",
+        primary_input_label="APPLY_LOG",
+        primary_input_lang="text",
+        code_context_truncated="",
+        state_diverged=True,
+    )
+    assert "STATE_DIVERGED: true" in user
+    # Order matters — STATE_DIVERGED must precede APPLY_LOG so the
+    # model has the framing before reading the log.
+    assert user.index("STATE_DIVERGED") < user.index("APPLY_LOG")
+
+
+def test_plan_summary_user_message_ignores_state_diverged_flag():
+    """state_diverged is only emitted for failure_analysis; for a
+    plan_summary on a healthy run we don't want to muddy the prompt.
+    """
+    _, user = render_prompt(
+        kind="plan_summary",
+        fleet_context="",
+        workspace_context="",
+        primary_input='{"resource_changes": []}',
+        primary_input_label="PLAN_JSON",
+        primary_input_lang="json",
+        code_context_truncated="",
+        state_diverged=True,  # ignored for this kind
+    )
+    assert "STATE_DIVERGED" not in user

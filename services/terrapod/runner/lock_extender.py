@@ -121,16 +121,22 @@ def fetch_h1_hashes(
     *,
     client: httpx.Client | None = None,
     timeout_seconds: float = 60.0,
-) -> dict[str, str]:
+) -> tuple[dict[str, str], set[str]]:
     """Query Terrapod's provider mirror for `{version}.json` and pull
     the `h1:` hash for each requested platform.
 
-    Returns a {platform: "h1:..."} dict. Missing platforms (mirror
-    didn't have h1 for them) are absent — caller decides how to
-    handle the gap.
+    Returns `(hashes, cached_platforms)`:
+      - `hashes`: `{platform: "h1:..."}` for each platform the mirror
+        had an h1 for.
+      - `cached_platforms`: the set of platforms the mirror is
+        configured to eagerly cache (operator's `provider_cache.platforms`
+        setting). Used by the caller to distinguish "h1 missing because
+        compute failed → fall back to `providers lock`" from "h1 missing
+        because this platform isn't in the operator's cache filter →
+        silently skip (no apply will run on this arch anyway)".
     """
     if not cfg_api_url:
-        return {}
+        return {}, set()
 
     url = (
         f"{cfg_api_url.rstrip('/')}/v1/providers/"
@@ -151,7 +157,7 @@ def fetch_h1_hashes(
                 version=block.version,
                 err=str(exc),
             )
-            return {}
+            return {}, set()
         if resp.status_code != 200:
             logger.info(
                 "mirror returned non-200 for provider metadata",
@@ -159,13 +165,14 @@ def fetch_h1_hashes(
                 version=block.version,
                 status=resp.status_code,
             )
-            return {}
+            return {}, set()
         payload = resp.json()
     finally:
         if own_client:
             client.close()
 
     archives = payload.get("archives", {})
+    cached_platforms = set(payload.get("cached_platforms") or [])
     out: dict[str, str] = {}
     for plat in platforms:
         entry = archives.get(plat)
@@ -175,7 +182,7 @@ def fetch_h1_hashes(
             if isinstance(h, str) and h.startswith("h1:"):
                 out[plat] = h
                 break
-    return out
+    return out, cached_platforms
 
 
 def splice_hashes_into_block(block_text: str, new_hashes: list[str]) -> str:
@@ -221,9 +228,14 @@ def extend_lock_file(
     """Read `lock_path`, query the mirror for the OTHER arch's h1 per
     provider, splice it into the file, write back.
 
-    Returns (providers_seen, providers_extended). The caller can use
-    `providers_seen - providers_extended` to decide whether to fall
-    back to `tofu providers lock` for the gap.
+    Returns `(providers_seen, providers_handled)` where `handled`
+    counts providers we either successfully spliced OR knowingly
+    skipped because the operator's `provider_cache.platforms` config
+    doesn't include `other_arch` (i.e. no future apply will land on
+    that arch, so no splice is needed). The caller uses
+    `providers_seen - providers_handled` to decide whether to fall
+    back to `tofu providers lock` for the gap — and that gap now
+    excludes deliberate config-driven skips.
     """
     if not lock_path.exists():
         logger.info("no lock file — nothing to extend", path=str(lock_path))
@@ -239,12 +251,13 @@ def extend_lock_file(
         client = httpx.Client(timeout=httpx.Timeout(60.0, connect=10.0))
 
     extended = 0
+    not_cached_by_config = 0
     new_text = text
     try:
         # We iterate in REVERSE so splice offsets stay valid as we
         # rewrite the text from end to start.
         for block in reversed(blocks):
-            hashes = fetch_h1_hashes(
+            hashes, cached_platforms = fetch_h1_hashes(
                 api_url,
                 auth_token,
                 block,
@@ -253,12 +266,20 @@ def extend_lock_file(
             )
             h1 = hashes.get(other_arch)
             if h1 is None:
-                logger.info(
-                    "no h1 from mirror for provider — caller may fall back to providers lock",
-                    source=block.source,
-                    version=block.version,
-                    platform=other_arch,
-                )
+                # Two cases: operator has deliberately not configured
+                # the mirror to cache this arch (silent skip — no apply
+                # will run on it anyway), or the platform IS in the
+                # cache config but the mirror failed to compute h1
+                # (warn + caller falls back to `providers lock`).
+                if cached_platforms and other_arch not in cached_platforms:
+                    not_cached_by_config += 1
+                else:
+                    logger.info(
+                        "no h1 from mirror for provider — caller may fall back to providers lock",
+                        source=block.source,
+                        version=block.version,
+                        platform=other_arch,
+                    )
                 continue
             spliced = splice_hashes_into_block(block.block_text, [h1])
             if spliced == block.block_text:
@@ -270,6 +291,18 @@ def extend_lock_file(
     finally:
         if own_client:
             client.close()
+
+    if not_cached_by_config:
+        logger.info(
+            "skipped h1 splice for platform not in mirror's cache config",
+            platform=other_arch,
+            providers_skipped=not_cached_by_config,
+        )
+        # Count config-driven skips as "handled" — the caller's gap
+        # math (`seen - handled`) should NOT trigger the expensive
+        # `tofu providers lock` fallback in this case, because no apply
+        # will ever land on `other_arch` anyway.
+        extended += not_cached_by_config
 
     if new_text != text:
         lock_path.write_text(new_text)

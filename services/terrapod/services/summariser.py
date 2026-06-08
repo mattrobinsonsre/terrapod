@@ -59,6 +59,7 @@ from terrapod.logging_config import get_logger
 from terrapod.services.summariser_prompt import render_prompt, tool_for_kind
 from terrapod.storage import get_storage
 from terrapod.storage.keys import (
+    apply_log_key,
     config_version_key,
     plan_json_output_key,
     plan_log_key,
@@ -419,14 +420,26 @@ async def _gather_inputs(db: AsyncSession, run: Run, kind: str) -> tuple[str, st
         cleaned = await asyncio.to_thread(_clean_plan_json_bytes, raw)
         primary = _truncate_head(cleaned, cfg.plan_json_max_bytes)
     else:
-        key = plan_log_key(str(run.workspace_id), str(run.id))
-        primary_label = "PLAN_LOG"
+        # failure_analysis. Choose log key by phase: apply-phase errors
+        # carry their detail in the apply log (#419). Plan-phase errors
+        # use the plan log as before. apply_started_at is the
+        # discriminator: set as soon as the apply phase begins, never
+        # unset.
+        if run.apply_started_at is not None:
+            key = apply_log_key(str(run.workspace_id), str(run.id))
+            primary_label = "APPLY_LOG"
+        else:
+            key = plan_log_key(str(run.workspace_id), str(run.id))
+            primary_label = "PLAN_LOG"
         primary_lang = "text"
         try:
             raw = await storage.get(key)
         except Exception as e:
             logger.warning(
-                "plan log not available for summariser", run_id=str(run.id), error=str(e)
+                "log not available for failure_analysis",
+                run_id=str(run.id),
+                label=primary_label,
+                error=str(e),
             )
             return "", primary_label, primary_lang, "", ""
         primary = _truncate_tail(raw, cfg.plan_json_max_bytes)
@@ -923,6 +936,7 @@ async def handle_ai_plan_summary(payload: dict) -> None:
             code_diff=code_diff,
             prompt_prefix=cfg.context.prompt_prefix,
             prompt_suffix=cfg.context.prompt_suffix,
+            state_diverged=bool(ws.state_diverged),
         )
 
         try:

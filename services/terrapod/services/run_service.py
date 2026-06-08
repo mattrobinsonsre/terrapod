@@ -483,7 +483,13 @@ async def transition_run(
     # operations later in the runner entrypoint, so the summariser
     # would hit `Object not found` half the time. Errored plans never
     # upload JSON, so failure-analysis still belongs here.
-    if target_status == "errored" and run.apply_started_at is None:
+    # Fire failure-analysis for any errored run — plan-phase OR apply-
+    # phase (#419). Apply failures are arguably the case where the
+    # structured analysis helps most: they often leave infrastructure
+    # in a partial state, and the operator needs to know what changed
+    # and what didn't before retrying. The summariser reads the
+    # apply log when apply_started_at is set, else the plan log.
+    if target_status == "errored":
         await _enqueue_ai_plan_summary(run, "failure_analysis")
 
     return run
