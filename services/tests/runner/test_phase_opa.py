@@ -116,9 +116,8 @@ class TestFetchPolicyBundle:
         client = httpx.Client(transport=httpx.MockTransport(handler))
         sleeps: list[float] = []
         cfg = _cfg()
-        assert opa.fetch_policy_bundle(cfg, client=client, sleep=lambda s: sleeps.append(s)) == {
-            "policy_sets": []
-        }
+        result = opa.fetch_policy_bundle(cfg, client=client, sleep=lambda s: sleeps.append(s))
+        assert result == {"policy_sets": []}
         assert attempts["n"] == 3
         assert sleeps == [3, 3]
 

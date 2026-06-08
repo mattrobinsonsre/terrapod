@@ -68,6 +68,14 @@ class LogCapture:
 
         def tee_stdout(s: str) -> int:
             n = self._orig_stdout_write(s)
+            # Flush the live stream so each log line reaches kubectl
+            # logs immediately. structlog's JSONRenderer + bare print
+            # both end here; without this the line sits in the stream's
+            # block buffer if PYTHONUNBUFFERED isn't set in the env.
+            try:
+                sys.stdout.flush()
+            except (BrokenPipeError, OSError, ValueError):
+                pass
             try:
                 self._fh.write(s.encode("utf-8", errors="replace"))  # type: ignore[union-attr]
                 self._fh.flush()  # type: ignore[union-attr]
@@ -77,6 +85,10 @@ class LogCapture:
 
         def tee_stderr(s: str) -> int:
             n = self._orig_stderr_write(s)
+            try:
+                sys.stderr.flush()
+            except (BrokenPipeError, OSError, ValueError):
+                pass
             try:
                 self._fh.write(s.encode("utf-8", errors="replace"))  # type: ignore[union-attr]
                 self._fh.flush()  # type: ignore[union-attr]

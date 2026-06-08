@@ -70,6 +70,33 @@ _UPLOAD_BUDGET_SECONDS = 25  # reserved for artifact uploads at end of grace
 _MIN_CHILD_GRACE_SECONDS = 30
 
 
+def _configure_stdio() -> None:
+    """Make stdout/stderr line-buffered so each log line lands in
+    `kubectl logs` promptly. PYTHONUNBUFFERED=1 in the Dockerfile makes
+    the OS-level buffer unbuffered, but if the entrypoint is launched
+    with the default block buffering (e.g. in a test harness, or when a
+    future image change drops the env var) we still want line-by-line
+    output. reconfigure(line_buffering=True) was added in Python 3.7
+    and is a no-op if the stream is already line-buffered.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
+        except (AttributeError, OSError):
+            # Wrapped (e.g. pytest capture) — best-effort only.
+            pass
+
+
+def _flush_stdio() -> None:
+    """Flush stdout and stderr. Safe to call from any phase boundary;
+    swallows errors so a broken pipe doesn't propagate."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except (BrokenPipeError, OSError, ValueError):
+            pass
+
+
 def _configure_logging() -> None:
     structlog.configure(
         processors=[
@@ -175,6 +202,7 @@ def _run_plan_phase(
 
     # Plan invocation.
     _PLAN_LOG.write_bytes(b"")
+    _flush_stdio()
     plan_result = plan_apply.run_plan(
         cfg,
         binary=binary,
@@ -182,6 +210,7 @@ def _run_plan_phase(
         log_file=str(_PLAN_LOG),
         child_grace_seconds=child_grace,
     )
+    _flush_stdio()
     if plan_result.exit_code != 0:
         log.warning("plan failed", rc=plan_result.exit_code)
         return plan_result.exit_code
@@ -264,6 +293,7 @@ def _run_apply_phase(
             log.warning("plan-file download failed (non-fatal)", err=str(exc))
 
     _APPLY_LOG.write_bytes(b"")
+    _flush_stdio()
     rc = plan_apply.run_apply(
         cfg,
         binary=binary,
@@ -272,6 +302,7 @@ def _run_apply_phase(
         has_plan_file=has_plan_file,
         child_grace_seconds=child_grace,
     )
+    _flush_stdio()
     if rc != 0:
         log.warning("apply failed", rc=rc)
 
@@ -360,6 +391,7 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
 
     # 9. Init.
     child_grace = _child_grace_seconds(cfg)
+    _flush_stdio()
     try:
         init_phase.run_init(
             binary=binary,
@@ -369,7 +401,9 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
         )
     except init_phase.InitError as exc:
         log.error("init failed", rc=exc.exit_code)
+        _flush_stdio()
         return exc.exit_code
+    _flush_stdio()
 
     # 10. Backend backstop.
     try:
@@ -400,6 +434,7 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _configure_stdio()
     _configure_logging()
     _install_signal_logger()
     log = structlog.get_logger("runner.job_entrypoint")
@@ -427,6 +462,9 @@ def main(argv: list[str] | None = None) -> int:
             # Roll per-phase logs into combined before uploading.
             for f in (_INIT_LOG, _PLAN_LOG, _APPLY_LOG):
                 combined.append_file(f)
+            # Flush stdout/stderr so anything buffered before the
+            # LogCapture handle closes is visible in `kubectl logs`.
+            _flush_stdio()
 
     # Best-effort: combined log and resource profile uploads. These
     # happen AFTER LogCapture exits so its file handle is flushed.
@@ -441,6 +479,7 @@ def main(argv: list[str] | None = None) -> int:
         log.warning("resource profile post raised", err=str(exc))
 
     log.info("phase complete", phase=cfg.phase, exit_code=exit_code)
+    _flush_stdio()
     return exit_code
 
 
