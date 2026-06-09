@@ -297,11 +297,25 @@ api:
     ai_summary:
       enabled: false
       # LiteLLM model string. Examples:
+      #   bedrock/us.anthropic.claude-sonnet-4-6  (default — recommended for chat)
       #   bedrock/anthropic.claude-opus-4-8
       #   openai/gpt-5
       #   anthropic/claude-opus-4-8
       #   gemini/gemini-2.5-pro
-      model: ""
+      #
+      # The default targets Anthropic Sonnet 4.6 on Bedrock — chosen
+      # because it supports Bedrock prompt caching (chat follow-ups
+      # are ~10% the input-token cost of fresh requests), is in the
+      # recommended-for-chat tier (multi-turn coherence proven), and
+      # is ~5× cheaper than Opus while better at JSON-schema
+      # compliance for the structured tool calls. `enabled: false`
+      # remains the chart default so the feature is still
+      # double-opt-in; setting a sensible model just means operators
+      # don't ALSO have to look one up.
+      #
+      # See `docs/ai-plan-summary.md#choosing-a-model-for-chat` for
+      # the full recommended tier when picking a different provider.
+      model: "bedrock/us.anthropic.claude-sonnet-4-6"
       # Optional base URL override (vLLM, LiteLLM proxy, custom Azure).
       # Leave empty for vendor providers — LiteLLM knows the defaults.
       api_base: ""

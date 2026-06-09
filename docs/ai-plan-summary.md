@@ -312,6 +312,107 @@ blast-radius concerns specific to your deployment. Add workspace-level
 Telemetry (input + output tokens per summary) is recorded on every
 row.
 
+## Follow-up chat (#463)
+
+Once the initial summary lands, the run-detail panel shows a chat
+input. Operators can ask clarifying questions ("you say my RDS
+instance will be updated in place, how long will that take?") and
+the model answers grounded in the same plan context.
+
+**One shared thread per run.** Anyone with workspace read can see
+and post in the thread — modeled on GitHub Copilot's per-PR
+conversation, not per-user. Closing the tab doesn't end the thread.
+
+**Same hard constraints as the initial summary.** No state file is
+ever sent to the AI. No tool access (text-in / text-out only). The
+follow-up prompt reuses the byte-identical system + initial-user
+prefix the initial summary used, so prompt-caching providers serve
+the heavyweight plan-context prefix from cache — a follow-up turn
+typically costs ~10% the input-token price of a fresh request.
+
+**Bounds (Helm-configurable):**
+
+| Setting | Default | Effect |
+|---|---|---|
+| `ai_summary.followup_max_messages_per_run` | 20 | User-turn cap. Once reached, the UI disables the input. `0` disables chat entirely (initial summary still fires). |
+| `ai_summary.followup_max_output_tokens` | 2048 | Per-reply output-token cap. Smaller than `max_output_tokens` because follow-ups are conversational, not full re-summaries. |
+| `ai_summary.daily_token_budget` | 0 (unlimited) | Whole conversation contributes to the same daily pool as the initial summary. Once hit, the chat input shows the budget-exhausted banner. |
+
+No on-the-fly summarisation of older turns: every follow-up sends
+the full conversation. Per-turn cost stays bounded by the caps
+above + the prefix cache hit.
+
+### Choosing a model for chat
+
+Prompt caching matters more for chat than for one-shot summaries.
+Providers that cache the prefix amortise the cost across every
+follow-up; providers that don't pay full price for the plan
+context on each turn.
+
+**Recommended** (caching + chat-tuned):
+- **Anthropic Claude** — direct (`anthropic/claude-sonnet-4-6`,
+  `anthropic/claude-opus-4-8`) or via Bedrock
+  (`bedrock/us.anthropic.claude-sonnet-4-6`).
+- **OpenAI GPT-4.x / o-series** — automatic prefix caching past
+  ~1024 tokens.
+- **Amazon Nova Pro / Lite** on Bedrock — Anthropic-compatible
+  cache markers.
+- **DeepSeek** direct — automatic prefix caching.
+
+The chart default (`bedrock/us.anthropic.claude-sonnet-4-6`) sits
+in this tier — chosen for the Bedrock prompt-caching support,
+proven multi-turn coherence, and ~5× lower cost than Opus while
+better at the structured-output tool calls used by the initial
+summary.
+
+**Usable but suboptimal** (no caching; expect higher cost per turn
+AND degraded coherence over long conversations):
+- Bedrock Llama / Mistral / Cohere
+- Gemini
+- Azure OpenAI on older deployments
+- Groq
+- Self-hosted vLLM / LiteLLM proxy
+- OpenRouter (even when proxying a cacheable upstream — the cache
+  is keyed on the OpenRouter prefix, not the upstream's)
+
+Detection is by model-string prefix only. Switching providers is a
+config change — `ai_summary.model` in Helm values + the matching
+auth block.
+
+### Disabling chat
+
+Set `ai_summary.followup_max_messages_per_run: 0` to disable the
+chat surface entirely while keeping the initial summary. The
+panel still renders the summary; no chat input appears. Existing
+threads stay readable.
+
+## Feedback
+
+The AI surface is new; quality reports drive iteration.
+
+Please raise GitHub issues against
+[mattrobinsonsre/terrapod](https://github.com/mattrobinsonsre/terrapod/issues)
+with any constructive feedback on the AI surface. The most useful
+reports include:
+
+- **The model you're using** — the
+  `api.config.ai_summary.model` value (e.g.
+  `bedrock/us.anthropic.claude-sonnet-4-6`).
+- **Any prompt customisations** — per-workspace
+  `ai_summary_context`, platform-level `prompt_prefix` /
+  `prompt_suffix`. The project can only learn from prompt
+  mutations it knows about.
+- **Whether the issue is with `plan_summary` or
+  `failure_analysis`** — the two kinds have different prompt
+  skeletons and different failure modes.
+- **The chat exchange that surfaced the issue**, if applicable —
+  copy the relevant turns out of the thread (omit anything
+  sensitive about your fleet).
+
+No backend submission flow, no anonymisation pipeline, no
+aggregation — operators review what they share and submit
+manually so privacy stays with them.
+
 ## See also
 
 - [Authentication](authentication.md) — how API tokens and runner

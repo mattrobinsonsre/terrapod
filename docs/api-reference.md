@@ -802,7 +802,104 @@ Returns the AI-generated plan summary (or failure analysis on errored plans) whe
 | `input-tokens` / `output-tokens` | integer | Telemetry counts reported by the upstream provider. |
 | `error-message` | string | Populated only for `status=errored` or `status=skipped`. Empty for `ready`. |
 
-**Real-time updates:** when a summary lands, the per-workspace SSE channel (`GET /api/terrapod/v1/workspaces/{id}/runs/events`) emits a `plan_summary_ready` event with `{run_id, workspace_id}`. The UI re-fetches the summary on receipt. For VCS-driven runs, the per-workspace PR/MR status comment is also edited in place to include the summary content.
+**Real-time updates:** the per-workspace SSE channel (`GET /api/terrapod/v1/workspaces/{id}/runs/events`) emits one of five lifecycle events as the summary progresses (#463):
+
+| Event | Fires when |
+|---|---|
+| `plan_summary_pending` | Handler dispatched (or operator clicked Regenerate). UI shows a placeholder. |
+| `plan_summary_ready` | Initial summary landed; refetch to render. |
+| `plan_summary_errored` | Handler/model failure; refetch to render the error. |
+| `plan_summary_skipped` | Runner died abnormally / workspace opted out / daily budget hit. |
+| `plan_summary_message_posted` | A chat follow-up turn landed (carries `message_id`). Refetch the transcript. |
+
+All five payloads carry `{run_id, workspace_id}` at minimum. The UI re-fetches the summary on any of them. For VCS-driven runs, the per-workspace PR/MR status comment is edited in place to include the summary content when it lands.
+
+### Regenerate Plan Summary
+
+```
+POST /api/terrapod/v1/runs/{run_id}/plan-summary/regenerate
+```
+
+Re-fires the AI summary handler for a run. Anyone with workspace `read` can regenerate — the call doesn't mutate infrastructure. Bypasses the 5-minute auto-dedup so operator clicks always go through; budget gating still applies handler-side.
+
+**Required permission:** `read` on the workspace.
+
+**Responses:**
+- **202 Accepted** — pending row upserted and trigger enqueued. Response shape matches the GET above with `status=pending`.
+- **409 Conflict** — run is in a state with no summarisable output yet (still planning, or apply-phase errored).
+- **503 Service Unavailable** — AI summary is globally disabled (`api.config.ai_summary.enabled: false`).
+
+### List Plan-Summary Chat Messages
+
+```
+GET /api/terrapod/v1/runs/{run_id}/plan-summary/messages
+```
+
+Full transcript of the AI plan-summary chat thread in chronological order. The initial structured summary lives on the parent `PlanSummary` row (`description` + `risk-factors`); this endpoint returns ONLY the conversational follow-ups. The UI renders `message[0]` from the parent summary and appends these.
+
+**Required permission:** `read` on the workspace.
+
+**Responses:**
+- **200 OK** with an array (possibly empty) of `plan-summary-messages` resources.
+- **404 Not Found** — no initial summary exists for this run.
+- **409 Conflict** — the initial summary is still `pending` or `errored`. Can't chat against an unready summary.
+
+```json
+{
+  "data": [
+    {
+      "id": "plan-summary-message-<uuid>",
+      "type": "plan-summary-messages",
+      "attributes": {
+        "role": "user",
+        "content": "How long will the RDS update take?",
+        "model": "",
+        "input-tokens": 0,
+        "output-tokens": 0,
+        "error-message": "",
+        "created-at": "2026-06-01T12:01:00Z"
+      }
+    },
+    {
+      "id": "plan-summary-message-<uuid>",
+      "type": "plan-summary-messages",
+      "attributes": {
+        "role": "assistant",
+        "content": "An in-place RDS modify with `apply_immediately = false` typically completes during the next maintenance window…",
+        "model": "bedrock/us.anthropic.claude-sonnet-4-6",
+        "input-tokens": 14823,
+        "output-tokens": 412,
+        "error-message": "",
+        "created-at": "2026-06-01T12:01:14Z"
+      }
+    }
+  ],
+  "meta": { "count": 2 }
+}
+```
+
+### Post Plan-Summary Chat Message
+
+```
+POST /api/terrapod/v1/runs/{run_id}/plan-summary/messages
+Content-Type: application/vnd.api+json
+
+{ "data": { "attributes": { "content": "..." } } }
+```
+
+Posts a user follow-up + returns the synchronous assistant reply. Authorisation is read-on-workspace — anyone who can see the run can chat in the thread (GitHub PR conversation semantics, not per-user threads).
+
+**Required permission:** `read` on the workspace.
+
+**Responses:**
+- **201 Created** — the response body is the assistant turn (same shape as the GET list entries). The persisted user turn is visible via the next GET call.
+- **400 Bad Request** — empty body or body > 32 KiB.
+- **409 Conflict** — initial summary not `ready`, or this run already has `followup_max_messages_per_run` user turns. The user-turn counter is **server-tracked, not advisory**.
+- **429 Too Many Requests** — daily AI token budget exhausted.
+- **503 Service Unavailable** — chat globally disabled (`followup_max_messages_per_run: 0`) or workspace opted out.
+- **502 Bad Gateway** — model HTTP / parse failure. The user turn is still persisted in the transcript, and a separate errored assistant row is recorded — so a reload shows the failure cleanly.
+
+The model call uses the same cacheable prefix as the initial summary (provider prompt caching serves the prefix hit). See [docs/ai-plan-summary.md#follow-up-chat-463](ai-plan-summary.md#follow-up-chat-463) for the operator-side caps + provider matrix.
 
 ### Apply Details
 
