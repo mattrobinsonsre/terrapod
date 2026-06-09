@@ -73,6 +73,7 @@ COPY services/terrapod/runner/runner_config.py ./terrapod/runner/runner_config.p
 COPY services/terrapod/runner/download.py ./terrapod/runner/download.py
 COPY services/terrapod/runner/exec_subprocess.py ./terrapod/runner/exec_subprocess.py
 COPY services/terrapod/runner/lock_extender.py ./terrapod/runner/lock_extender.py
+COPY services/terrapod/runner/plan_artifacts.py ./terrapod/runner/plan_artifacts.py
 COPY services/terrapod/runner/job_entrypoint.py ./terrapod/runner/job_entrypoint.py
 COPY services/terrapod/runner/phases/ ./terrapod/runner/phases/
 

@@ -324,26 +324,35 @@ def _run_apply_phase(
     log = structlog.get_logger("runner.job_entrypoint")
 
     # Download plan file from plan phase. Best-effort — when missing,
-    # apply re-plans inline.
+    # apply re-plans inline. Routed through `download_to_file` so the
+    # redirect-hostname-rewrite logic kicks in: filesystem-backend
+    # storage emits presigned URLs at the deployment's public hostname
+    # (e.g. terrapod.local in dev), which the runner pod can't reach
+    # from inside the cluster. `download_to_file` rewrites those back
+    # to TP_API_URL for the /api/terrapod/v1/storage/ path prefix.
+    # Cloud-backend redirects (S3 / GCS / Azure) are passed through
+    # untouched. Using raw `httpx.get(follow_redirects=True)` here used
+    # to silently 502 in Tilt because the filesystem URL is
+    # unreachable from inside the cluster.
     plan_file = strip_dir / "tfplan"
     has_plan_file = False
     if cfg.has_api:
-        try:
-            import httpx as _httpx
+        from terrapod.runner.download import download_to_file as _download_to_file
 
-            url = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/plan-file"
-            with _httpx.Client(
-                timeout=_httpx.Timeout(cfg.upload_timeout_seconds, connect=10.0)
-            ) as client:
-                headers = {"Authorization": f"Bearer {cfg.auth_token}"}
-                resp = client.get(url, headers=headers, follow_redirects=True)
-                if resp.status_code == 200 and resp.content:
-                    plan_file.write_bytes(resp.content)
-                    has_plan_file = True
-                else:
-                    log.info("plan-file not available", status=resp.status_code)
-        except Exception as exc:  # noqa: BLE001
-            log.warning("plan-file download failed (non-fatal)", err=str(exc))
+        headers = {"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {}
+        result = _download_to_file(
+            f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/plan-file",
+            plan_file,
+            headers=headers,
+            api_url=cfg.api_url,
+            retries=cfg.download_retries,
+            retry_delay_seconds=cfg.download_retry_delay_seconds,
+        )
+        if result.ok and plan_file.exists() and plan_file.stat().st_size > 0:
+            has_plan_file = True
+        else:
+            plan_file.unlink(missing_ok=True)
+            log.info("plan-file not available", status=result.status)
 
     # Download + extract the plan-phase workspace-diff tarball over the
     # initialised workspace. This restores files plan generated but
