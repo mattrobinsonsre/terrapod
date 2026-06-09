@@ -855,6 +855,27 @@ class AISummaryConfig(BaseModel):
             "safety net for monorepo-scale refactors."
         ),
     )
+    followup_max_messages_per_run: int = Field(
+        default=20,
+        description=(
+            "Cap on user-posted follow-up messages per run (#463). "
+            "The UI disables the chat input once a run reaches this "
+            "many user turns. 0 disables the chat feature entirely "
+            "(initial summary still fires). Counts user rows in "
+            "`plan_summary_messages` for the run — assistant rows "
+            "don't count against the cap."
+        ),
+    )
+    followup_max_output_tokens: int = Field(
+        default=2048,
+        description=(
+            "Upper bound on follow-up reply tokens (#463). Smaller "
+            "than `max_output_tokens` because follow-ups are "
+            "conversational text-in / text-out, not a full structured "
+            "re-summary. Bumped only when operators report routinely "
+            "hitting `finish_reason=length` on detailed answers."
+        ),
+    )
     auth: AISummaryAuthConfig = Field(default_factory=AISummaryAuthConfig)
     context: AISummaryContextConfig = Field(default_factory=AISummaryContextConfig)
 

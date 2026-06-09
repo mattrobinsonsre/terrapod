@@ -44,7 +44,15 @@ from terrapod.api.dependencies import (
     get_current_user,
     get_listener_identity,
 )
-from terrapod.db.models import PlanSummary, Run, StateVersion, VCSConnection, Workspace, now_utc
+from terrapod.db.models import (
+    PlanSummary,
+    PlanSummaryMessage,
+    Run,
+    StateVersion,
+    VCSConnection,
+    Workspace,
+    now_utc,
+)
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service, run_service
@@ -1044,6 +1052,170 @@ async def regenerate_plan_summary(
                     "plan": {"data": {"id": f"plan-{run.id}", "type": "plans"}},
                     "run": {"data": {"id": f"run-{run.id}", "type": "runs"}},
                 },
+            }
+        },
+    )
+
+
+# ── Plan summary follow-up chat (#463) ─────────────────────────────────
+
+
+def _plan_summary_message_attr(msg: PlanSummaryMessage) -> dict:
+    """JSON:API attributes block for a single chat turn."""
+    return {
+        "role": msg.role,
+        "content": msg.content,
+        "model": msg.model,
+        "input-tokens": msg.input_tokens,
+        "output-tokens": msg.output_tokens,
+        "error-message": msg.error_message,
+        "created-at": _rfc3339(msg.created_at),
+    }
+
+
+async def _resolve_plan_summary_for_chat(
+    run_id: str, user: AuthenticatedUser, db: AsyncSession
+) -> tuple[Run, PlanSummary, Workspace]:
+    """Shared header for both chat endpoints.
+
+    Verifies the run exists, the user has workspace `read`, an
+    initial summary has landed (404 otherwise — can't chat against a
+    plan that hasn't been summarised), and returns the joined rows.
+    """
+    run = await _get_run(run_id, db)
+    await _require_run_ws_permission(run, "read", user, db)
+    summary = (
+        await db.execute(select(PlanSummary).where(PlanSummary.run_id == run.id))
+    ).scalar_one_or_none()
+    if summary is None:
+        raise HTTPException(status_code=404, detail="no summary for this plan")
+    if summary.status != "ready":
+        raise HTTPException(
+            status_code=409,
+            detail=f"initial summary is '{summary.status}', not 'ready' — cannot start chat",
+        )
+    workspace = (
+        await db.execute(select(Workspace).where(Workspace.id == run.workspace_id))
+    ).scalar_one_or_none()
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="workspace not found")
+    return run, summary, workspace
+
+
+@extensions_router.get("/runs/{run_id}/plan-summary/messages")
+async def list_plan_summary_messages(
+    run_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Full transcript of the AI plan-summary chat thread (#463).
+
+    Returns the messages in chronological order. The initial
+    structured summary lives on the parent `PlanSummary` row
+    (`description` + `risk_factors`); this endpoint returns ONLY the
+    conversational follow-ups. The UI renders message[0] from the
+    parent summary and appends these.
+
+    Empty list when no follow-ups have been posted yet.
+    """
+    _run, summary, _ws = await _resolve_plan_summary_for_chat(run_id, user, db)
+    rows = (
+        (
+            await db.execute(
+                select(PlanSummaryMessage)
+                .where(PlanSummaryMessage.plan_summary_id == summary.id)
+                .order_by(PlanSummaryMessage.created_at, PlanSummaryMessage.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return JSONResponse(
+        content={
+            "data": [
+                {
+                    "id": f"plan-summary-message-{row.id}",
+                    "type": "plan-summary-messages",
+                    "attributes": _plan_summary_message_attr(row),
+                }
+                for row in rows
+            ],
+            "meta": {
+                "count": len(rows),
+            },
+        }
+    )
+
+
+@extensions_router.post("/runs/{run_id}/plan-summary/messages")
+async def post_plan_summary_message(
+    run_id: str = Path(...),
+    body: dict = Body(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Post a user follow-up + get the synchronous assistant reply (#463).
+
+    Body: ``{"data": {"attributes": {"content": "..."}}}`` (JSON:API
+    shape, matches the rest of Terrapod's POST endpoints).
+
+    The service path persists the user row first (so a failed model
+    call still records what was asked), then calls the model with
+    the cacheable prefix the initial summary used (Anthropic /
+    Bedrock-Anthropic / Bedrock-Nova get the prompt-cache hit), then
+    persists the assistant turn + telemetry.
+
+    Returns 201 with the assistant message attributes. Authorisation
+    is read-on-workspace — anyone who can see the run can chat in
+    its thread (matches PR conversation semantics, not per-user
+    threads).
+    """
+    from terrapod.services.summariser import (
+        FollowupBudgetExhausted,
+        FollowupCapReached,
+        FollowupDisabled,
+        FollowupError,
+        post_followup,
+    )
+
+    content = ""
+    try:
+        attrs = body.get("data", {}).get("attributes", {}) or {}
+        content = str(attrs.get("content", "") or "")
+    except AttributeError:
+        raise HTTPException(status_code=400, detail="malformed body") from None
+
+    run, summary, workspace = await _resolve_plan_summary_for_chat(run_id, user, db)
+
+    try:
+        assistant_row = await post_followup(
+            db=db,
+            plan_summary=summary,
+            run=run,
+            workspace=workspace,
+            user_message_text=content,
+        )
+    except FollowupDisabled as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except FollowupCapReached as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except FollowupBudgetExhausted as e:
+        raise HTTPException(status_code=429, detail=str(e)) from e
+    except FollowupError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except (RuntimeError, ValueError) as e:
+        # Model HTTP / parse failure. The service has persisted both
+        # the user turn AND an errored assistant turn, so the
+        # transcript reflects the failure.
+        raise HTTPException(status_code=502, detail=f"model call failed: {e}") from e
+
+    return JSONResponse(
+        status_code=201,
+        content={
+            "data": {
+                "id": f"plan-summary-message-{assistant_row.id}",
+                "type": "plan-summary-messages",
+                "attributes": _plan_summary_message_attr(assistant_row),
             }
         },
     )

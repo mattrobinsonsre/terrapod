@@ -273,6 +273,8 @@ data:
       plan_json_max_bytes: {{ .Values.api.config.ai_summary.plan_json_max_bytes | default 500000 | int64 }}
       code_context_max_bytes: {{ .Values.api.config.ai_summary.code_context_max_bytes | default 200000 | int64 }}
       code_diff_max_bytes: {{ .Values.api.config.ai_summary.code_diff_max_bytes | default 100000 | int64 }}
+      followup_max_messages_per_run: {{ .Values.api.config.ai_summary.followup_max_messages_per_run | default 20 | int64 }}
+      followup_max_output_tokens: {{ .Values.api.config.ai_summary.followup_max_output_tokens | default 2048 | int64 }}
       {{- with .Values.api.config.ai_summary.auth }}
       auth:
         # api_key is injected via env var (TERRAPOD_AI_SUMMARY__AUTH__API_KEY)

@@ -53,12 +53,13 @@ import tempfile
 import uuid
 
 import litellm
+import sqlalchemy as sa
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.config import settings
-from terrapod.db.models import PlanSummary, Run, Workspace, now_utc
+from terrapod.db.models import PlanSummary, PlanSummaryMessage, Run, Workspace, now_utc
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services.summariser_prompt import render_prompt, tool_for_kind
@@ -644,6 +645,7 @@ def _build_litellm_kwargs(
     user_message: str,
     max_output_tokens: int,
     history: list[dict] | None = None,
+    use_tools: bool = True,
 ) -> dict:
     """Assemble the keyword arguments for ``litellm.acompletion``.
 
@@ -664,11 +666,17 @@ def _build_litellm_kwargs(
     prior turns back to the model. The cacheable prefix (system +
     initial user) stays first so prompt caching kicks in for every
     turn against the same plan.
+
+    ``use_tools``: when False, omits the ``tools`` definition and
+    ``tool_choice`` from the request. Used by the chat follow-up
+    path where we want prose replies, not structured output. The
+    initial-user message still contains the prompt's "call the
+    tool" instruction — that's referring to the FIRST turn (already
+    answered as the synthesised assistant turn-0); the model handles
+    multi-turn correctly even with that instruction in the prefix.
     """
     cfg = settings.ai_summary
     auth = cfg.auth
-    tool = tool_for_kind(kind)
-    tool_name = tool["function"]["name"]
 
     messages: list[dict] = [
         {"role": "system", "content": system_message},
@@ -683,12 +691,16 @@ def _build_litellm_kwargs(
         "model": cfg.model,
         "max_tokens": max_output_tokens,
         "messages": messages,
-        "tools": [tool],
-        # Force the named tool — without this, models can choose to
-        # respond in plain prose and we lose the schema guarantee.
-        "tool_choice": {"type": "function", "function": {"name": tool_name}},
         "timeout": cfg.request_timeout_seconds,
     }
+
+    if use_tools:
+        tool = tool_for_kind(kind)
+        tool_name = tool["function"]["name"]
+        kwargs["tools"] = [tool]
+        # Force the named tool — without this, models can choose to
+        # respond in plain prose and we lose the schema guarantee.
+        kwargs["tool_choice"] = {"type": "function", "function": {"name": tool_name}}
 
     if cfg.api_base:
         kwargs["api_base"] = cfg.api_base
@@ -1151,3 +1163,295 @@ async def handle_ai_plan_summary(payload: dict) -> None:
         in_tok=in_tok,
         out_tok=out_tok,
     )
+
+
+# ── Follow-up chat (#463) ───────────────────────────────────────────────────
+
+
+class FollowupError(Exception):
+    """Raised by ``post_followup`` for any path the caller must surface
+    to the operator (router maps these to HTTP 4xx / 5xx). Pure-domain
+    so the service doesn't import FastAPI types."""
+
+
+class FollowupDisabled(FollowupError):
+    """Chat globally off (``ai_summary.enabled=False`` or
+    ``followup_max_messages_per_run=0``) or workspace disabled."""
+
+
+class FollowupCapReached(FollowupError):
+    """Run already has ``followup_max_messages_per_run`` user turns."""
+
+
+class FollowupBudgetExhausted(FollowupError):
+    """Daily AI token budget hit before this turn could run."""
+
+
+async def _build_followup_history(
+    db: AsyncSession,
+    plan_summary: PlanSummary,
+    new_user_text: str,
+) -> list[dict]:
+    """Return the chat history to append AFTER the cacheable
+    (system + initial-user) prefix.
+
+    Layout:
+      [0]            assistant — initial summary description (text)
+      [1..2N]        prior user / assistant follow-up turns from
+                     ``plan_summary_messages`` in chronological order
+      [last]         the just-posted user message (caller hasn't
+                     committed it yet)
+
+    The initial summary description is rendered as a plain assistant
+    text turn rather than synthesising an OpenAI tool_call object —
+    keeps history simple, model handles the prose-vs-tool flip fine
+    once ``tool_choice`` is omitted from the request. Risk factors are
+    deliberately NOT replayed in history; follow-ups rarely need them
+    and inflating tokens would defeat the budget gate.
+    """
+
+    history: list[dict] = []
+    if plan_summary.description:
+        history.append({"role": "assistant", "content": plan_summary.description})
+
+    prior = (
+        (
+            await db.execute(
+                sa.select(PlanSummaryMessage)
+                .where(PlanSummaryMessage.plan_summary_id == plan_summary.id)
+                .order_by(PlanSummaryMessage.created_at, PlanSummaryMessage.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for msg in prior:
+        # Skip assistant rows that errored — they have empty content
+        # and would just confuse the model. User rows always pass
+        # through so the model sees the question they're answering.
+        if msg.role == "assistant" and not msg.content.strip():
+            continue
+        history.append({"role": msg.role, "content": msg.content})
+
+    history.append({"role": "user", "content": new_user_text})
+    return history
+
+
+async def _call_chat_model(
+    *,
+    system_message: str,
+    user_message: str,
+    history: list[dict],
+    max_output_tokens: int,
+) -> tuple[str, int, int]:
+    """Drive a prose completion via the LiteLLM library.
+
+    No tools, no tool_choice — follow-ups are text-in / text-out.
+    Reuses ``_build_litellm_kwargs`` so the cacheable prefix gets the
+    same ``cache_control: ephemeral`` markers the initial summary
+    used; the provider's prompt cache amortises plan-context cost
+    across every follow-up.
+
+    ``kind`` is irrelevant when ``use_tools=False`` (the tool
+    definition isn't included in the request); we pass
+    ``"plan_summary"`` for shape only.
+
+    Returns ``(reply_text, input_tokens, output_tokens)``. Raises on
+    HTTP failure / truncation / empty response.
+    """
+    cfg = settings.ai_summary
+    if not cfg.model:
+        raise RuntimeError("ai_summary.model must be set")
+
+    resp = await litellm.acompletion(
+        **_build_litellm_kwargs(
+            kind="plan_summary",
+            system_message=system_message,
+            user_message=user_message,
+            max_output_tokens=max_output_tokens,
+            history=history,
+            use_tools=False,
+        )
+    )
+
+    if not resp.choices:
+        raise RuntimeError("model response had no choices")
+    choice = resp.choices[0]
+    finish_reason = getattr(choice, "finish_reason", None)
+    if finish_reason == "length":
+        raise RuntimeError(
+            f"chat reply truncated at max_output_tokens={max_output_tokens} "
+            "(finish_reason=length); raise ai_summary.followup_max_output_tokens"
+        )
+
+    text = (getattr(choice.message, "content", "") or "").strip()
+    if not text:
+        raise RuntimeError("chat reply was empty")
+
+    usage = getattr(resp, "usage", None)
+    in_tok = int(getattr(usage, "prompt_tokens", 0) or 0) if usage else 0
+    out_tok = int(getattr(usage, "completion_tokens", 0) or 0) if usage else 0
+    return text, in_tok, out_tok
+
+
+async def post_followup(
+    *,
+    db: AsyncSession,
+    plan_summary: PlanSummary,
+    run: Run,
+    workspace: Workspace,
+    user_message_text: str,
+) -> PlanSummaryMessage:
+    """Process a single user follow-up turn (#463).
+
+    The router has already authorised the request and loaded the
+    PlanSummary / Run / Workspace rows. This function:
+
+      1. Validates feature flags + per-run cap + daily budget.
+      2. Persists the user turn (so it's visible even if the model
+         call fails — gives the operator a record of what they
+         asked).
+      3. Calls the model with the SAME cacheable prefix the initial
+         summary used (so caching providers serve the prefix hit).
+      4. Persists the assistant turn + telemetry, debits the daily
+         budget, commits.
+
+    Returns the persisted assistant ``PlanSummaryMessage`` row.
+
+    Raises:
+      FollowupDisabled — chat off (global / workspace), 403/503 surface
+      FollowupCapReached — per-run user-turn cap hit, 409 surface
+      FollowupBudgetExhausted — daily token budget hit, 429 surface
+      RuntimeError / ValueError — model HTTP / parse failures; the
+        router maps these to 502 and the user row has already been
+        committed so the failure is visible in the transcript with
+        an errored assistant row recorded too.
+    """
+
+    cfg = settings.ai_summary
+    if not cfg.enabled or cfg.followup_max_messages_per_run <= 0:
+        raise FollowupDisabled("AI follow-up chat is disabled")
+    if not _resolve_workspace_mode(workspace):
+        raise FollowupDisabled("AI summary is disabled for this workspace")
+
+    text = (user_message_text or "").strip()
+    if not text:
+        raise FollowupError("message body is empty")
+    # 32 KiB hard cap on a single user turn — defends the DB column
+    # and the model's context from a paste-bomb. Generous enough that
+    # operators pasting a log excerpt are fine.
+    if len(text) > 32 * 1024:
+        raise FollowupError("message body exceeds 32 KiB")
+
+    # Per-run user-turn cap. Counts USER rows only — assistant rows
+    # don't count, otherwise the cap halves silently.
+    user_count = (
+        await db.execute(
+            sa.select(sa.func.count())
+            .select_from(PlanSummaryMessage)
+            .where(
+                PlanSummaryMessage.plan_summary_id == plan_summary.id,
+                PlanSummaryMessage.role == "user",
+            )
+        )
+    ).scalar() or 0
+    if user_count >= cfg.followup_max_messages_per_run:
+        raise FollowupCapReached(
+            f"reached the {cfg.followup_max_messages_per_run}-message cap for this run"
+        )
+
+    # Daily token budget. Same accounting as the initial summary —
+    # output_tokens against the workspace's daily allowance.
+    remaining = await _budget_remaining()
+    if remaining is not None and remaining <= 0:
+        raise FollowupBudgetExhausted("daily AI token budget exhausted")
+
+    # Persist the user row first so an operator sees their question
+    # even if the model call fails downstream.
+    user_row = PlanSummaryMessage(
+        plan_summary_id=plan_summary.id,
+        role="user",
+        content=text,
+    )
+    db.add(user_row)
+    await db.flush()
+
+    # Build the cacheable prefix — SAME inputs the initial summary
+    # used, so the provider's prompt cache serves the prefix hit.
+    primary, label, lang, code_context, code_diff = await _gather_inputs(db, run, plan_summary.kind)
+    if not primary:
+        # The CV/log was GC'd or never existed. Record an errored
+        # assistant row so the transcript is uniform, commit, surface.
+        err = f"no {label} available to ground the follow-up"
+        assistant_row = PlanSummaryMessage(
+            plan_summary_id=plan_summary.id,
+            role="assistant",
+            content="",
+            model=cfg.model,
+            error_message=err,
+        )
+        db.add(assistant_row)
+        await db.commit()
+        raise FollowupError(err)
+
+    system_message, initial_user_message = render_prompt(
+        kind=plan_summary.kind,
+        fleet_context=cfg.context.fleet_context,
+        workspace_context=workspace.ai_summary_context,
+        primary_input=primary,
+        primary_input_label=label,
+        primary_input_lang=lang,
+        code_context_truncated=code_context,
+        code_diff=code_diff,
+        prompt_prefix=cfg.context.prompt_prefix,
+        prompt_suffix=cfg.context.prompt_suffix,
+        state_diverged=bool(workspace.state_diverged),
+    )
+    history = await _build_followup_history(db, plan_summary, text)
+
+    try:
+        reply_text, in_tok, out_tok = await _call_chat_model(
+            system_message=system_message,
+            user_message=initial_user_message,
+            history=history,
+            max_output_tokens=cfg.followup_max_output_tokens,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(
+            "AI follow-up call failed",
+            plan_summary_id=str(plan_summary.id),
+            run_id=str(run.id),
+            error=str(e),
+        )
+        assistant_row = PlanSummaryMessage(
+            plan_summary_id=plan_summary.id,
+            role="assistant",
+            content="",
+            model=cfg.model,
+            error_message=str(e)[:500],
+        )
+        db.add(assistant_row)
+        await db.commit()
+        raise
+
+    assistant_row = PlanSummaryMessage(
+        plan_summary_id=plan_summary.id,
+        role="assistant",
+        content=reply_text,
+        model=cfg.model,
+        input_tokens=in_tok,
+        output_tokens=out_tok,
+    )
+    db.add(assistant_row)
+    await _budget_charge(out_tok)
+    await db.commit()
+
+    logger.info(
+        "AI follow-up reply",
+        plan_summary_id=str(plan_summary.id),
+        run_id=str(run.id),
+        in_tok=in_tok,
+        out_tok=out_tok,
+        user_turn=user_count + 1,
+    )
+    return assistant_row

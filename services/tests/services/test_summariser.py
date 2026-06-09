@@ -1333,3 +1333,198 @@ class TestCacheControlMarkers:
                 history=[{"role": "user", "content": "follow up"}],
             )
             assert a["messages"][:2] == b["messages"][:2]
+
+
+# ── Follow-up chat (#463 Phase 3) ───────────────────────────────────────
+
+
+class TestBuildLitellmKwargsToolsOff:
+    """`use_tools=False` drops the tool definition + tool_choice from
+    the request — the follow-up chat path wants prose replies, not
+    structured tool calls.
+    """
+
+    def test_use_tools_false_omits_tool_and_tool_choice(self):
+        with (
+            patch.object(summariser.settings.ai_summary, "model", "openai/gpt-5"),
+            patch.object(summariser.settings.ai_summary, "api_base", ""),
+            patch.object(summariser.settings.ai_summary.auth, "api_key", "sk-x"),
+            patch.object(summariser.settings.ai_summary.auth, "aws_region", "us-east-1"),
+            patch.object(summariser.settings.ai_summary.auth, "aws_role_arn", ""),
+            patch.object(summariser.settings.ai_summary.auth, "aws_session_name", "x"),
+            patch.object(summariser.settings.ai_summary.auth, "aws_external_id", ""),
+        ):
+            kw = summariser._build_litellm_kwargs(
+                kind="plan_summary",
+                system_message="sys",
+                user_message="usr",
+                max_output_tokens=100,
+                use_tools=False,
+            )
+            assert "tools" not in kw
+            assert "tool_choice" not in kw
+
+    def test_use_tools_true_still_includes_them(self):
+        with (
+            patch.object(summariser.settings.ai_summary, "model", "openai/gpt-5"),
+            patch.object(summariser.settings.ai_summary, "api_base", ""),
+            patch.object(summariser.settings.ai_summary.auth, "api_key", "sk-x"),
+            patch.object(summariser.settings.ai_summary.auth, "aws_region", "us-east-1"),
+            patch.object(summariser.settings.ai_summary.auth, "aws_role_arn", ""),
+            patch.object(summariser.settings.ai_summary.auth, "aws_session_name", "x"),
+            patch.object(summariser.settings.ai_summary.auth, "aws_external_id", ""),
+        ):
+            kw = summariser._build_litellm_kwargs(
+                kind="plan_summary",
+                system_message="sys",
+                user_message="usr",
+                max_output_tokens=100,
+                use_tools=True,
+            )
+            assert "tools" in kw
+            assert "tool_choice" in kw
+
+
+class TestPostFollowupValidation:
+    """`post_followup` synchronous validation BEFORE the model call.
+    Tests the guard layer — feature flags, per-run cap, daily budget,
+    body-shape constraints. The Bedrock call is patched out; we only
+    inspect the FollowupError subclasses raised before it would fire.
+    """
+
+    @pytest.fixture
+    def fake_plan_summary(self):
+        import uuid as _uuid
+
+        ps = MagicMock()
+        ps.id = _uuid.uuid4()
+        ps.kind = "plan_summary"
+        ps.description = "initial summary text"
+        ps.status = "ready"
+        return ps
+
+    @pytest.fixture
+    def fake_run(self):
+        import uuid as _uuid
+
+        r = MagicMock()
+        r.id = _uuid.uuid4()
+        r.workspace_id = _uuid.uuid4()
+        return r
+
+    @pytest.fixture
+    def fake_workspace(self, fake_run):
+        ws = _mock_workspace(ws_id=fake_run.workspace_id)
+        ws.state_diverged = False
+        return ws
+
+    @pytest.mark.asyncio
+    async def test_disabled_globally_raises_followup_disabled(
+        self, fake_plan_summary, fake_run, fake_workspace
+    ):
+        with (
+            patch.object(summariser.settings.ai_summary, "enabled", False),
+            patch.object(summariser.settings.ai_summary, "followup_max_messages_per_run", 20),
+        ):
+            with pytest.raises(summariser.FollowupDisabled):
+                await summariser.post_followup(
+                    db=AsyncMock(),
+                    plan_summary=fake_plan_summary,
+                    run=fake_run,
+                    workspace=fake_workspace,
+                    user_message_text="hello",
+                )
+
+    @pytest.mark.asyncio
+    async def test_cap_zero_raises_followup_disabled(
+        self, fake_plan_summary, fake_run, fake_workspace
+    ):
+        # 0 = chat feature off (initial summary still works).
+        with (
+            patch.object(summariser.settings.ai_summary, "enabled", True),
+            patch.object(summariser.settings.ai_summary, "followup_max_messages_per_run", 0),
+        ):
+            with pytest.raises(summariser.FollowupDisabled):
+                await summariser.post_followup(
+                    db=AsyncMock(),
+                    plan_summary=fake_plan_summary,
+                    run=fake_run,
+                    workspace=fake_workspace,
+                    user_message_text="hello",
+                )
+
+    @pytest.mark.asyncio
+    async def test_workspace_disabled_raises_followup_disabled(self, fake_plan_summary, fake_run):
+        ws_disabled = _mock_workspace(mode="disabled")
+        ws_disabled.state_diverged = False
+        with (
+            patch.object(summariser.settings.ai_summary, "enabled", True),
+            patch.object(summariser.settings.ai_summary, "followup_max_messages_per_run", 20),
+        ):
+            with pytest.raises(summariser.FollowupDisabled):
+                await summariser.post_followup(
+                    db=AsyncMock(),
+                    plan_summary=fake_plan_summary,
+                    run=fake_run,
+                    workspace=ws_disabled,
+                    user_message_text="hello",
+                )
+
+    @pytest.mark.asyncio
+    async def test_empty_body_raises_followup_error(
+        self, fake_plan_summary, fake_run, fake_workspace
+    ):
+        with (
+            patch.object(summariser.settings.ai_summary, "enabled", True),
+            patch.object(summariser.settings.ai_summary, "followup_max_messages_per_run", 20),
+        ):
+            with pytest.raises(summariser.FollowupError):
+                await summariser.post_followup(
+                    db=AsyncMock(),
+                    plan_summary=fake_plan_summary,
+                    run=fake_run,
+                    workspace=fake_workspace,
+                    user_message_text="   ",  # whitespace only
+                )
+
+    @pytest.mark.asyncio
+    async def test_oversize_body_raises_followup_error(
+        self, fake_plan_summary, fake_run, fake_workspace
+    ):
+        big = "x" * (32 * 1024 + 1)
+        with (
+            patch.object(summariser.settings.ai_summary, "enabled", True),
+            patch.object(summariser.settings.ai_summary, "followup_max_messages_per_run", 20),
+        ):
+            with pytest.raises(summariser.FollowupError):
+                await summariser.post_followup(
+                    db=AsyncMock(),
+                    plan_summary=fake_plan_summary,
+                    run=fake_run,
+                    workspace=fake_workspace,
+                    user_message_text=big,
+                )
+
+    @pytest.mark.asyncio
+    async def test_cap_reached_raises_followup_cap_reached(
+        self, fake_plan_summary, fake_run, fake_workspace
+    ):
+        """Count of existing user-role rows ≥ cap raises immediately."""
+        db = AsyncMock()
+        # First execute() in post_followup is the user-count COUNT(*).
+        result = MagicMock()
+        result.scalar.return_value = 20  # at cap
+        db.execute.return_value = result
+
+        with (
+            patch.object(summariser.settings.ai_summary, "enabled", True),
+            patch.object(summariser.settings.ai_summary, "followup_max_messages_per_run", 20),
+        ):
+            with pytest.raises(summariser.FollowupCapReached):
+                await summariser.post_followup(
+                    db=db,
+                    plan_summary=fake_plan_summary,
+                    run=fake_run,
+                    workspace=fake_workspace,
+                    user_message_text="another question",
+                )

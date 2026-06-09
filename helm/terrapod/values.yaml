@@ -314,6 +314,16 @@ api:
       request_timeout_seconds: 60
       # Output-token cap per UTC day across all summaries. 0 = unlimited.
       daily_token_budget: 0
+      # Follow-up chat (#463). Per-run cap on USER turns — once an
+      # operator has posted this many follow-ups on a single run,
+      # the UI disables the chat input. Set to 0 to disable the
+      # chat feature entirely (initial summary still fires).
+      followup_max_messages_per_run: 20
+      # Output-token cap per follow-up reply. Smaller than
+      # max_output_tokens because follow-ups are conversational,
+      # not full re-summaries. Bump only if operators routinely
+      # hit `finish_reason=length` on detailed answers.
+      followup_max_output_tokens: 2048
       # Size caps on the inputs attached to the model request.
       plan_json_max_bytes: 500000
       code_context_max_bytes: 200000

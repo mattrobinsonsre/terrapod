@@ -659,6 +659,8 @@
             "plan_json_max_bytes": { "type": "integer", "minimum": 0 },
             "code_context_max_bytes": { "type": "integer", "minimum": 0 },
             "code_diff_max_bytes": { "type": "integer", "minimum": 0 },
+            "followup_max_messages_per_run": { "type": "integer", "minimum": 0 },
+            "followup_max_output_tokens": { "type": "integer", "minimum": 1 },
             "auth": {
               "type": "object",
               "additionalProperties": false,
