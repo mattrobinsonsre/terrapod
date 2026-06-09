@@ -194,13 +194,42 @@ class TestGetPlanSummary:
         )
         mock_db.get = AsyncMock(return_value=ws)
 
-        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
-            resp = await c.get(f"/api/v2/plans/plan-{run.id}", headers=_AUTH)
+        with patch("terrapod.api.routers.runs.settings") as mock_settings:
+            mock_settings.ai_summary.enabled = True
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.get(f"/api/v2/plans/plan-{run.id}", headers=_AUTH)
 
         assert resp.status_code == 200
         attrs = resp.json()["data"]["attributes"]
         assert "ai-summary-url" in attrs
         assert str(run.id) in attrs["ai-summary-url"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    async def test_plan_response_omits_ai_summary_url_when_disabled(self, mock_resolve, *mocks):
+        """AI globally disabled → plan response carries no ai-summary-url
+        so the UI doesn't fetch /plan-summary and waste a round-trip
+        getting back a guaranteed 404 (#463 phase 7)."""
+        mock_resolve.return_value = "read"
+        run = _mock_run()
+        ws = _mock_workspace(ws_id=run.workspace_id)
+
+        app, mock_db = _make_app(_user())
+        mock_db.execute = AsyncMock(
+            return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=run))
+        )
+        mock_db.get = AsyncMock(return_value=ws)
+
+        with patch("terrapod.api.routers.runs.settings") as mock_settings:
+            mock_settings.ai_summary.enabled = False
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.get(f"/api/v2/plans/plan-{run.id}", headers=_AUTH)
+
+        assert resp.status_code == 200
+        attrs = resp.json()["data"]["attributes"]
+        assert "ai-summary-url" not in attrs
 
 
 # ── Workspace PATCH ─────────────────────────────────────────────────────────

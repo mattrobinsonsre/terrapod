@@ -44,6 +44,7 @@ from terrapod.api.dependencies import (
     get_current_user,
     get_listener_identity,
 )
+from terrapod.config import settings
 from terrapod.db.models import (
     PlanSummary,
     PlanSummaryMessage,
@@ -823,8 +824,6 @@ async def list_run_events(
 
 def _plan_json(run: Run) -> dict:
     """Build plan JSON:API response for a run."""
-    from terrapod.config import settings
-
     base = settings.auth.callback_base_url.rstrip("/")
     attrs: dict = {
         "status": _plan_status(run),
@@ -844,8 +843,11 @@ def _plan_json(run: Run) -> dict:
         attrs["resource-imports"] = run.resource_imports
     # AI plan summary URL — surfaced as a Terrapod-native link on every
     # plan response so the UI knows where to fetch the structured
-    # summary. 404s gracefully when no summary exists yet.
-    attrs["ai-summary-url"] = f"{base}/api/terrapod/v1/runs/{run.id}/plan-summary"
+    # summary. 404s gracefully when no summary exists yet. Omitted
+    # entirely when the feature is globally disabled so the UI
+    # doesn't make a doomed fetch for every page load (#463 phase 7).
+    if settings.ai_summary.enabled:
+        attrs["ai-summary-url"] = f"{base}/api/terrapod/v1/runs/{run.id}/plan-summary"
     return {
         "data": {
             "id": f"plan-{run.id}",

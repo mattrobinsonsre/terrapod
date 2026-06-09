@@ -922,7 +922,7 @@ async def _emit_summary_event(
             json.dumps(payload),
         )
     except Exception as e:  # SSE is best-effort
-        logger.debug("Failed to publish summary event", event=event, error=str(e))
+        logger.debug("Failed to publish summary event", event_name=event, error=str(e))
 
 
 # Backwards-compat shim — existing call sites use _emit_ready_event.

@@ -488,7 +488,9 @@ async def test_handler_skips_when_workspace_disabled():
         await summariser.handle_ai_plan_summary({"run_id": str(run.id), "kind": "plan_summary"})
 
         call_model.assert_not_called()
-        upsert.assert_awaited_once()
+        # Two upserts: pending-at-start (#463 phase 4) + terminal status.
+        # await_args is the LAST call — the terminal one.
+        assert upsert.await_count >= 1
         kwargs = upsert.await_args.kwargs
         assert kwargs["status"] == "skipped"
         assert "workspace disabled" in kwargs["error_message"]
@@ -551,7 +553,9 @@ async def test_handler_success_path_writes_ready_row():
         await summariser.handle_ai_plan_summary({"run_id": str(run.id), "kind": "plan_summary"})
 
         call_model.assert_awaited_once()
-        upsert.assert_awaited_once()
+        # Two upserts: pending-at-start (#463 phase 4) + terminal status.
+        # await_args is the LAST call — the terminal one.
+        assert upsert.await_count >= 1
         kwargs = upsert.await_args.kwargs
         assert kwargs["status"] == "ready"
         assert kwargs["risk_level"] == "medium"
@@ -591,7 +595,9 @@ async def test_handler_call_failure_writes_errored_row():
 
         await summariser.handle_ai_plan_summary({"run_id": str(run.id), "kind": "plan_summary"})
 
-        upsert.assert_awaited_once()
+        # Two upserts: pending-at-start (#463 phase 4) + terminal status.
+        # await_args is the LAST call — the terminal one.
+        assert upsert.await_count >= 1
         kwargs = upsert.await_args.kwargs
         assert kwargs["status"] == "errored"
         assert "upstream 500" in kwargs["error_message"]
@@ -628,7 +634,8 @@ async def test_handler_missing_primary_input_writes_errored_row():
         await summariser.handle_ai_plan_summary({"run_id": str(run.id), "kind": "plan_summary"})
 
         call_model.assert_not_called()
-        upsert.assert_awaited_once()
+        # Pending+terminal under #463 phase 4. Last call is the errored upsert.
+        assert upsert.await_count >= 1
         assert upsert.await_args.kwargs["status"] == "errored"
 
 
