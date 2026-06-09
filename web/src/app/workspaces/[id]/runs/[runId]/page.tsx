@@ -381,7 +381,18 @@ export default function RunDetailPage() {
       if (event.phase === 'plan') loadPlanLog()
       else if (event.phase === 'apply') loadApplyLog()
     }
-    if (event.event === 'plan_summary_ready' && event.run_id === bareId) {
+    // Any of the summary-lifecycle events should trigger a refetch
+    // (pending, ready, errored, skipped, message_posted). The
+    // component handles rendering for each status.
+    if (
+      [
+        'plan_summary_ready',
+        'plan_summary_pending',
+        'plan_summary_errored',
+        'plan_summary_skipped',
+        'plan_summary_message_posted',
+      ].includes(event.event) && event.run_id === bareId
+    ) {
       setAiSummaryRefresh((n) => n + 1)
     }
   }, [runId, loadRun]))

@@ -885,22 +885,49 @@ def _parse_model_json(text: str) -> dict:
 # --- Trigger handler ---------------------------------------------------------
 
 
-async def _emit_ready_event(workspace_id: uuid.UUID, run_id: uuid.UUID) -> None:
+async def _emit_summary_event(
+    event: str,
+    workspace_id: uuid.UUID,
+    run_id: uuid.UUID,
+    **extra,
+) -> None:
+    """Best-effort SSE notify for the per-workspace run-events channel.
+
+    Used by every plan-summary status change so the run-detail page
+    updates without a reload (#463 phase 4):
+
+      - ``plan_summary_pending`` — handler dispatched; show spinner.
+      - ``plan_summary_ready`` — initial summary landed; render it.
+      - ``plan_summary_errored`` — initial summary failed; show error.
+      - ``plan_summary_skipped`` — initial summary skipped (budget /
+        workspace disabled / runner died); render skipped state.
+      - ``plan_summary_message_posted`` — a chat turn landed; refetch
+        the transcript so other open browsers see it.
+
+    ``extra`` keys ride the event payload — used by
+    ``plan_summary_message_posted`` to carry the new message ID for
+    callers that want to scroll-to-message.
+    """
     try:
         from terrapod.redis.client import RUN_EVENTS_PREFIX, publish_event
 
+        payload = {
+            "event": event,
+            "run_id": str(run_id),
+            "workspace_id": str(workspace_id),
+        }
+        payload.update(extra)
         await publish_event(
             f"{RUN_EVENTS_PREFIX}{workspace_id}",
-            json.dumps(
-                {
-                    "event": "plan_summary_ready",
-                    "run_id": str(run_id),
-                    "workspace_id": str(workspace_id),
-                }
-            ),
+            json.dumps(payload),
         )
     except Exception as e:  # SSE is best-effort
-        logger.debug("Failed to publish plan_summary_ready", error=str(e))
+        logger.debug("Failed to publish summary event", event=event, error=str(e))
+
+
+# Backwards-compat shim — existing call sites use _emit_ready_event.
+async def _emit_ready_event(workspace_id: uuid.UUID, run_id: uuid.UUID) -> None:
+    await _emit_summary_event("plan_summary_ready", workspace_id, run_id)
 
 
 async def _upsert_summary(
@@ -996,6 +1023,23 @@ async def handle_ai_plan_summary(payload: dict) -> None:
         if ws is None:
             return
 
+        # Upsert a `pending` row + emit `plan_summary_pending` so the UI
+        # shows a placeholder from the moment the handler starts (#463
+        # phase 4). Without this the run-detail page silently 404s on
+        # /plan-summary until the handler finishes, leaving users
+        # wondering if anything is happening. Every exit path below
+        # transitions this row to its terminal state and emits the
+        # matching event.
+        await _upsert_summary(
+            db,
+            run_id=run_id,
+            kind=kind,
+            status="pending",
+            model=cfg.model,
+        )
+        await db.commit()
+        await _emit_summary_event("plan_summary_pending", ws.id, run_id)
+
         # Skip summarisation when the runner died abnormally (#430). The plan
         # log + JSON upload happens AFTER the runner posts plan-result, so an
         # OOM / SIGKILL between those steps leaves us with an empty log + the
@@ -1013,6 +1057,7 @@ async def handle_ai_plan_summary(payload: dict) -> None:
                 error_message=f"runner exited abnormally ({run.runner_exit_status})",
             )
             await db.commit()
+            await _emit_summary_event("plan_summary_skipped", ws.id, run_id)
             return
 
         if not _resolve_workspace_mode(ws):
@@ -1024,6 +1069,7 @@ async def handle_ai_plan_summary(payload: dict) -> None:
                 error_message="workspace disabled",
             )
             await db.commit()
+            await _emit_summary_event("plan_summary_skipped", ws.id, run_id)
             return
 
         remaining = await _budget_remaining()
@@ -1037,7 +1083,7 @@ async def handle_ai_plan_summary(payload: dict) -> None:
                 error_message="daily token budget exhausted",
             )
             await db.commit()
-            await _emit_ready_event(ws.id, run_id)
+            await _emit_summary_event("plan_summary_skipped", ws.id, run_id)
             return
 
         primary, label, lang, code_context, code_diff = await _gather_inputs(db, run, kind)
@@ -1050,6 +1096,7 @@ async def handle_ai_plan_summary(payload: dict) -> None:
                 error_message=f"no {label} available",
             )
             await db.commit()
+            await _emit_summary_event("plan_summary_errored", ws.id, run_id)
             return
 
         system_message, user_message = render_prompt(
@@ -1089,6 +1136,7 @@ async def handle_ai_plan_summary(payload: dict) -> None:
                 error_message=str(e)[:500],
             )
             await db.commit()
+            await _emit_summary_event("plan_summary_errored", ws.id, run_id)
             return
 
         description = str(parsed.get("description", ""))[:50_000]
@@ -1445,6 +1493,15 @@ async def post_followup(
     db.add(assistant_row)
     await _budget_charge(out_tok)
     await db.commit()
+
+    # SSE so other open browsers viewing this run pick up the new
+    # turn without a reload. `message_id` lets the client scroll-to.
+    await _emit_summary_event(
+        "plan_summary_message_posted",
+        workspace.id,
+        run.id,
+        message_id=str(assistant_row.id),
+    )
 
     logger.info(
         "AI follow-up reply",

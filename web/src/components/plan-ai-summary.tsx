@@ -22,6 +22,7 @@ import remarkGfm from 'remark-gfm'
 import { Sparkles, AlertTriangle, Info, ShieldAlert, ShieldX, RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { LoadingSpinner } from '@/components/loading-spinner'
+import { PlanSummaryChat } from '@/components/plan-summary-chat'
 
 type Severity = 'low' | 'medium' | 'high' | 'critical' | ''
 
@@ -245,6 +246,13 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
               </span>
             </div>
           )}
+
+          {/* Chat thread — only meaningful against a ready initial
+              summary. Reuses the same SSE refresh signal: the
+              `plan_summary_message_posted` event in the workspace's
+              run-events channel bumps refreshKey, which we pass
+              through so other tabs see new turns. */}
+          <PlanSummaryChat runId={runId} refreshKey={refreshKey} />
         </>
       )}
     </div>

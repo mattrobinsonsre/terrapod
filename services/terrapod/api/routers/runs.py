@@ -1029,6 +1029,16 @@ async def regenerate_plan_summary(
         {"run_id": str(run.id), "kind": kind},
     )
 
+    # SSE so the run-detail page reverts to the pending placeholder
+    # immediately on regenerate, without waiting for the handler to
+    # fire its own pending event (#463 phase 4).
+    try:
+        from terrapod.services.summariser import _emit_summary_event
+
+        await _emit_summary_event("plan_summary_pending", run.workspace_id, run.id)
+    except Exception as e:  # SSE is best-effort
+        logger.debug("Failed to publish pending event on regenerate", error=str(e))
+
     return JSONResponse(
         status_code=202,
         content={
