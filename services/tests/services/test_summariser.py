@@ -1044,3 +1044,94 @@ class TestBuildCodeDiff:
         out = summariser._build_code_diff(prev, cur, 1000)
         assert len(out) <= 1000 + 100  # 1000 cap + truncation marker
         assert "truncated from tail" in out
+
+
+# ── No-state-leakage invariant (#463) ────────────────────────────────────
+
+
+class TestNoStateLeakage:
+    """The AI summary path MUST NEVER read or reference Terraform state.
+
+    State files contain raw resource attributes including secrets. Even
+    with tofu's `sensitive: true` masking, provider-specific outputs and
+    env-var defaults can slip through. Today the summariser only reads
+    PLAN_JSON / PLAN_LOG / APPLY_LOG / CV tarballs — never state. These
+    tests pin that property at module-source level so a future
+    well-intentioned change ("we should let the AI see the current
+    state too") fails CI loudly rather than silently shipping the leak.
+
+    Same invariant applies to the upcoming follow-up chat path (#463) —
+    the assertions inspect the whole `summariser` module so any new
+    code path that pulls state in will fail here.
+    """
+
+    @staticmethod
+    def _source() -> str:
+        import inspect
+
+        return inspect.getsource(summariser)
+
+    def test_no_state_storage_key_helpers_referenced(self):
+        """`state_key`, `state_index_key`, `state_backup_key` are the
+        three storage-key helpers that point at on-disk state tarballs.
+        Any reference (import or call) gives the summariser the means
+        to read state contents into the prompt. Disallow at source level.
+        """
+        src = self._source()
+        for helper in ("state_key", "state_index_key", "state_backup_key"):
+            assert helper not in src, (
+                f"summariser must not reference storage key helper {helper!r}; "
+                f"state contents must never enter the AI prompt"
+            )
+
+    def test_no_state_version_model_references(self):
+        """The DB-side path into state is `StateVersion` (or
+        `Workspace.state_versions` relationship). The summariser uses
+        `Run.configuration_version_id` for code context — never a state
+        version. Pin that.
+        """
+        src = self._source()
+        for name in ("StateVersion", "state_versions", "state_version_id"):
+            assert name not in src, (
+                f"summariser must not reference {name!r}; "
+                f"state contents must never enter the AI prompt"
+            )
+
+    def test_no_sensitive_marker_field_references(self):
+        """`before_sensitive` / `after_sensitive` are the plan-JSON
+        sensitive-attribute marker fields. `_clean_plan_json_bytes`
+        already strips `prior_state` so they don't reach the model, but
+        the summariser itself should never enumerate them either —
+        that would imply a code path that handles sensitive values
+        intentionally, which is the opposite of the rule (don't
+        receive them at all).
+        """
+        src = self._source()
+        for marker in ("before_sensitive", "after_sensitive"):
+            assert marker not in src, (
+                f"summariser must not reference {marker!r}; "
+                f"sensitive marker fields are state-derived and must "
+                f"not enter the AI prompt"
+            )
+
+    def test_clean_plan_json_strips_prior_state(self):
+        """Sanity check that `_clean_plan_json_bytes` continues to drop
+        `prior_state` — the embedded state snapshot in plan JSON. If
+        this regressed, plan JSON itself would carry state into the
+        prompt regardless of how vigilant the summariser code is.
+        """
+        import json
+
+        plan = {
+            "format_version": "1.2",
+            "prior_state": {"values": {"root_module": {"resources": [{"secret": "CANARY"}]}}},
+            "resource_changes": [
+                {
+                    "address": "aws_iam_user.admin",
+                    "change": {"actions": ["update"], "before": {}, "after": {}},
+                },
+            ],
+        }
+        cleaned = summariser._clean_plan_json_bytes(json.dumps(plan).encode())
+        assert b"prior_state" not in cleaned
+        assert b"CANARY" not in cleaned
