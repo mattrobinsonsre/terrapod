@@ -545,8 +545,105 @@ def _resolve_workspace_mode(ws: Workspace) -> bool:
 # --- Model call --------------------------------------------------------------
 
 
+def _supports_anthropic_cache_control(model: str) -> bool:
+    """Whether the model honours ``cache_control: {"type": "ephemeral"}``
+    blocks for prompt caching.
+
+    Three families take the marker:
+      - ``anthropic/<id>`` — Anthropic direct.
+      - ``bedrock/[us\\.|eu\\.]anthropic.<id>`` and any
+        ``bedrock/.*claude.*`` — Anthropic models on Bedrock.
+      - ``bedrock/[us\\.|eu\\.]amazon.nova-*`` — Amazon Nova on
+        Bedrock (Nova Pro / Lite both support the same marker).
+
+    Other providers either cache automatically given a long enough
+    repeated prefix (OpenAI direct, DeepSeek direct) or don't cache
+    at all (Gemini, Azure OpenAI on older deployments, Bedrock →
+    Llama / Mistral / Cohere, Groq, self-hosted vLLM). In both cases
+    no marker is needed; the request still works.
+
+    Detection is by model-string prefix only — same routing surface
+    LiteLLM uses to pick the provider. No live capability probing.
+    """
+    if not model:
+        return False
+    m = model.lower()
+    if m.startswith("anthropic/"):
+        return True
+    if m.startswith("bedrock/"):
+        tail = m[len("bedrock/") :]
+        # Bedrock cross-region inference prefixes its model IDs with
+        # ``us.`` / ``eu.`` / ``apac.``. Strip them so the family
+        # check below matches on the same shape as direct-region IDs.
+        for prefix in ("us.", "eu.", "apac.", "ap-southeast.", "ap-northeast."):
+            if tail.startswith(prefix):
+                tail = tail[len(prefix) :]
+                break
+        if tail.startswith("anthropic.") or "claude" in tail:
+            return True
+        if tail.startswith("amazon.nova-") or tail.startswith("nova-"):
+            return True
+    return False
+
+
+def _apply_anthropic_cache_markers(messages: list[dict]) -> list[dict]:
+    """Mark the system + initial user message for ephemeral caching.
+
+    The Anthropic / Bedrock-Anthropic / Bedrock-Nova prompt-caching
+    protocol takes plain string ``content`` and rewrites it into a
+    one-element list of content blocks with ``cache_control`` on the
+    last (and only) block. The cacheable prefix is everything up to
+    and including the marked block.
+
+    Two markers are emitted: one on the system prompt (mostly static
+    skill + style instructions) and one on the initial user message
+    (carries the plan JSON + code diff — the bulk of the prompt).
+    Everything after that — follow-up user / assistant turns — is
+    uncached and re-sent each turn, which is fine: those payloads
+    are small.
+
+    The cached prefix must be byte-identical across turns or the
+    provider hashes a different key and the cache misses. Callers
+    must not sneak per-turn timestamps / nonces into the cached
+    blocks.
+    """
+    if not messages:
+        return messages
+    out: list[dict] = []
+    seen_user = False
+    for msg in messages:
+        role = msg.get("role")
+        content = msg.get("content")
+        # Mark the system prompt + the FIRST user message only;
+        # subsequent user / assistant turns stay plain string and
+        # land after the cacheable prefix.
+        if role == "system" or (role == "user" and not seen_user):
+            if isinstance(content, str):
+                rewritten = dict(msg)
+                rewritten["content"] = [
+                    {
+                        "type": "text",
+                        "text": content,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ]
+                out.append(rewritten)
+            else:
+                out.append(msg)
+            if role == "user":
+                seen_user = True
+        else:
+            out.append(msg)
+    return out
+
+
 def _build_litellm_kwargs(
-    *, kind: str, system_message: str, user_message: str, max_output_tokens: int
+    *,
+    kind: str,
+    system_message: str,
+    user_message: str,
+    max_output_tokens: int,
+    history: list[dict] | None = None,
 ) -> dict:
     """Assemble the keyword arguments for ``litellm.acompletion``.
 
@@ -560,19 +657,32 @@ def _build_litellm_kwargs(
     passed through unconditionally — LiteLLM ignores the ones that
     don't apply to the resolved provider, so this keeps the dispatch
     table flat (no per-provider branching in Terrapod).
+
+    ``history``: optional chronologically-ordered list of
+    ``{"role": ..., "content": ...}`` dicts appended after the
+    cacheable prefix. Used by the follow-up chat path (#463) to feed
+    prior turns back to the model. The cacheable prefix (system +
+    initial user) stays first so prompt caching kicks in for every
+    turn against the same plan.
     """
     cfg = settings.ai_summary
     auth = cfg.auth
     tool = tool_for_kind(kind)
     tool_name = tool["function"]["name"]
 
+    messages: list[dict] = [
+        {"role": "system", "content": system_message},
+        {"role": "user", "content": user_message},
+    ]
+    if history:
+        messages.extend(history)
+    if _supports_anthropic_cache_control(cfg.model):
+        messages = _apply_anthropic_cache_markers(messages)
+
     kwargs: dict = {
         "model": cfg.model,
         "max_tokens": max_output_tokens,
-        "messages": [
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": user_message},
-        ],
+        "messages": messages,
         "tools": [tool],
         # Force the named tool — without this, models can choose to
         # respond in plain prose and we lose the schema guarantee.

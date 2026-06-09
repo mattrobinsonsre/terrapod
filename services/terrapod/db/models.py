@@ -1821,3 +1821,61 @@ class PlanSummary(Base):
     )
 
     __table_args__ = (sa.UniqueConstraint("run_id", name="uq_plan_summaries_run"),)
+
+
+class PlanSummaryMessage(Base):
+    """One turn in the AI plan-summary chat thread (#463).
+
+    Attached to a PlanSummary; the initial structured summary stays on
+    the parent `PlanSummary` row (description + risk_factors). This
+    table only stores conversational follow-ups — user questions and
+    assistant replies — that build on top of that initial summary.
+
+    Roles:
+      - "user": operator follow-up question
+      - "assistant": model reply
+
+    Each assistant row carries its own telemetry (model, token counts,
+    error) so the daily-budget gate debits per turn and an operator
+    can audit cost across the thread. User rows have zero tokens; the
+    columns exist so the table shape is uniform.
+
+    Ordering is by `(plan_summary_id, created_at)` — the SDK / API
+    returns rows in chronological order. uuid7 IDs are time-ordered
+    too, so PK order matches `created_at` order for any sane clock.
+    """
+
+    __tablename__ = "plan_summary_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    plan_summary_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("plan_summaries.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    # Telemetry — meaningful on assistant rows, zero on user rows.
+    model: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+    __table_args__ = (
+        sa.CheckConstraint(
+            "role IN ('user', 'assistant')",
+            name="ck_plan_summary_messages_role",
+        ),
+        sa.Index(
+            "ix_plan_summary_messages_plan_created",
+            "plan_summary_id",
+            "created_at",
+        ),
+    )

@@ -1135,3 +1135,201 @@ class TestNoStateLeakage:
         cleaned = summariser._clean_plan_json_bytes(json.dumps(plan).encode())
         assert b"prior_state" not in cleaned
         assert b"CANARY" not in cleaned
+
+
+# ── Prompt caching (#463 Phase 2) ───────────────────────────────────────
+
+
+class TestCacheControlSupport:
+    """`_supports_anthropic_cache_control` decides which providers
+    get the ``cache_control: ephemeral`` marker. The matrix below
+    pins the supported model-id prefixes — adding or removing one
+    here is a deliberate scope change to the recommended-for-chat
+    tier in docs/ai-plan-summary.md.
+    """
+
+    def test_anthropic_direct(self):
+        assert summariser._supports_anthropic_cache_control("anthropic/claude-opus-4-8")
+        assert summariser._supports_anthropic_cache_control("anthropic/claude-sonnet-4-6")
+
+    def test_bedrock_anthropic(self):
+        assert summariser._supports_anthropic_cache_control("bedrock/anthropic.claude-opus-4-8")
+        assert summariser._supports_anthropic_cache_control(
+            "bedrock/us.anthropic.claude-sonnet-4-6"
+        )
+        assert summariser._supports_anthropic_cache_control("bedrock/eu.anthropic.claude-opus-4-8")
+
+    def test_bedrock_amazon_nova(self):
+        assert summariser._supports_anthropic_cache_control("bedrock/amazon.nova-pro-v1:0")
+        assert summariser._supports_anthropic_cache_control("bedrock/us.amazon.nova-lite-v1:0")
+
+    def test_openai_direct_no_marker(self):
+        # OpenAI caches automatically past a 1024-token repeated
+        # prefix — we don't emit a marker for it.
+        assert not summariser._supports_anthropic_cache_control("openai/gpt-5")
+        assert not summariser._supports_anthropic_cache_control("openai/gpt-4.1")
+
+    def test_other_providers_no_marker(self):
+        for m in [
+            "deepseek/deepseek-chat",
+            "gemini/gemini-2.5-pro",
+            "azure/gpt-4o",
+            "groq/llama-3.3-70b-versatile",
+            "bedrock/meta.llama3-3-70b-instruct-v1:0",
+            "bedrock/mistral.mistral-large-2402-v1:0",
+            "bedrock/cohere.command-r-plus-v1:0",
+            "openrouter/anthropic/claude-sonnet-4",  # routed via openrouter — no direct cache
+        ]:
+            assert not summariser._supports_anthropic_cache_control(m), m
+
+    def test_empty_or_unknown(self):
+        assert not summariser._supports_anthropic_cache_control("")
+        assert not summariser._supports_anthropic_cache_control("some-random-model")
+
+
+class TestCacheControlMarkers:
+    """End-to-end: when the configured model supports cache control,
+    `_build_litellm_kwargs` rewrites the system + initial-user
+    messages as a one-block content list with the marker on the
+    block. Follow-up turns appended via `history` stay plain string
+    (uncached, after the prefix).
+
+    The cacheable prefix must be byte-identical across turns. These
+    tests assert (a) the marker is present, (b) the inner text
+    matches the input verbatim, and (c) no extra fields slipped in.
+    """
+
+    def _patched(self, model: str):
+        return (
+            patch.object(summariser.settings.ai_summary, "model", model),
+            patch.object(summariser.settings.ai_summary, "api_base", ""),
+            patch.object(summariser.settings.ai_summary.auth, "api_key", ""),
+            patch.object(summariser.settings.ai_summary.auth, "aws_region", "us-east-1"),
+            patch.object(summariser.settings.ai_summary.auth, "aws_role_arn", ""),
+            patch.object(summariser.settings.ai_summary.auth, "aws_session_name", "x"),
+            patch.object(summariser.settings.ai_summary.auth, "aws_external_id", ""),
+        )
+
+    def test_anthropic_bedrock_emits_cache_marker_on_prefix(self):
+        with (
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[0],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[1],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[2],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[3],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[4],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[5],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[6],
+        ):
+            kw = summariser._build_litellm_kwargs(
+                kind="plan_summary",
+                system_message="SYS_TEXT",
+                user_message="USR_TEXT",
+                max_output_tokens=100,
+            )
+            sys_msg, usr_msg = kw["messages"]
+            assert sys_msg["role"] == "system"
+            assert sys_msg["content"] == [
+                {
+                    "type": "text",
+                    "text": "SYS_TEXT",
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+            assert usr_msg["role"] == "user"
+            assert usr_msg["content"] == [
+                {
+                    "type": "text",
+                    "text": "USR_TEXT",
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+
+    def test_openai_keeps_plain_string_content(self):
+        with (
+            self._patched("openai/gpt-5")[0],
+            self._patched("openai/gpt-5")[1],
+            self._patched("openai/gpt-5")[2],
+            self._patched("openai/gpt-5")[3],
+            self._patched("openai/gpt-5")[4],
+            self._patched("openai/gpt-5")[5],
+            self._patched("openai/gpt-5")[6],
+        ):
+            kw = summariser._build_litellm_kwargs(
+                kind="plan_summary",
+                system_message="SYS_TEXT",
+                user_message="USR_TEXT",
+                max_output_tokens=100,
+            )
+            sys_msg, usr_msg = kw["messages"]
+            # Plain strings — OpenAI does automatic prefix caching;
+            # any structured marker would be a content-shape change
+            # the API would reject or ignore.
+            assert sys_msg["content"] == "SYS_TEXT"
+            assert usr_msg["content"] == "USR_TEXT"
+
+    def test_history_lands_after_cacheable_prefix(self):
+        """`history` is appended AFTER the system + initial user
+        messages so the cacheable prefix stays byte-identical
+        across turns. Each follow-up turn just adds new
+        plain-string messages at the tail.
+        """
+        with (
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[0],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[1],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[2],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[3],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[4],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[5],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[6],
+        ):
+            kw = summariser._build_litellm_kwargs(
+                kind="plan_summary",
+                system_message="SYS_TEXT",
+                user_message="USR_TEXT",
+                max_output_tokens=100,
+                history=[
+                    {"role": "assistant", "content": "initial summary"},
+                    {"role": "user", "content": "how long will the RDS update take?"},
+                ],
+            )
+            messages = kw["messages"]
+            # Prefix carries the markers.
+            assert isinstance(messages[0]["content"], list)
+            assert messages[0]["content"][0]["cache_control"] == {"type": "ephemeral"}
+            assert isinstance(messages[1]["content"], list)
+            assert messages[1]["content"][0]["cache_control"] == {"type": "ephemeral"}
+            # Follow-ups land as plain strings AFTER the prefix.
+            assert messages[2] == {"role": "assistant", "content": "initial summary"}
+            assert messages[3] == {
+                "role": "user",
+                "content": "how long will the RDS update take?",
+            }
+
+    def test_prefix_is_byte_identical_across_turns(self):
+        """Sanity check that two consecutive _build_litellm_kwargs
+        calls with the SAME system + initial user message produce
+        identical first two messages — caching depends on this.
+        """
+        with (
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[0],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[1],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[2],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[3],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[4],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[5],
+            self._patched("bedrock/us.anthropic.claude-sonnet-4-6")[6],
+        ):
+            a = summariser._build_litellm_kwargs(
+                kind="plan_summary",
+                system_message="SYS",
+                user_message="USR",
+                max_output_tokens=100,
+            )
+            b = summariser._build_litellm_kwargs(
+                kind="plan_summary",
+                system_message="SYS",
+                user_message="USR",
+                max_output_tokens=100,
+                history=[{"role": "user", "content": "follow up"}],
+            )
+            assert a["messages"][:2] == b["messages"][:2]
