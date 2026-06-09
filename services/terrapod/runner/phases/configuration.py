@@ -133,14 +133,27 @@ def download_configuration(
     workspace. Matches the bash behaviour at line 524.
     """
     work_dir.mkdir(parents=True, exist_ok=True)
-    strip_dir = work_dir
+    # `override_dir` is where the local-backend override file goes — it
+    # MUST land inside the configured working_dir so tofu/terraform
+    # picks it up at init time. `strip_dir` is what we return to
+    # job_entrypoint, which then passes it to
+    # `working_dir.resolve_and_chdir(strip_dir, cfg.working_dir)`. The
+    # descent into `working_dir` must happen exactly ONCE — here
+    # we'd descend, and `resolve_and_chdir` would descend again on top,
+    # producing `<work_dir>/<wd>/<wd>` (doesn't exist) and a confusing
+    # "working directory '…' not found in config" error. So we keep
+    # the two variables separate: `override_dir` carries the descent
+    # for the override-write side-effect; `strip_dir` stays at the
+    # un-descended `work_dir` and lets `resolve_and_chdir` own the
+    # single canonical descent + chdir + path-traversal guard.
+    override_dir = work_dir
     if cfg.working_dir:
         candidate = work_dir / cfg.working_dir
         if candidate.exists():
-            strip_dir = candidate
+            override_dir = candidate
 
     if not cfg.has_api:
-        return ConfigurationResult(downloaded=False, strip_dir=strip_dir)
+        return ConfigurationResult(downloaded=False, strip_dir=work_dir)
 
     # /tmp matches every other scratch artifact this orchestrator
     # writes (combined.log, plan.log, apply.log, plan.json,
@@ -167,7 +180,7 @@ def download_configuration(
             "configuration archive download failed — see storage error above",
             status=result.status,
         )
-        return ConfigurationResult(downloaded=False, strip_dir=strip_dir)
+        return ConfigurationResult(downloaded=False, strip_dir=work_dir)
 
     try:
         with tarfile.open(tarball, "r:gz") as tar:
@@ -176,20 +189,23 @@ def download_configuration(
         # Match bash: tolerate but log. tofu will fail later if needed.
         logger.warning("tar extract reported a problem", err=str(exc))
 
-    # Resolve strip_dir again in case it appeared during extraction.
+    # Resolve override_dir again in case the configured working_dir
+    # appeared during extraction (this is the common case — the tarball
+    # contains the directory; the pre-extraction candidate.exists()
+    # check is only useful in dev where the operator pre-populates).
     if cfg.working_dir:
         candidate = work_dir / cfg.working_dir
         if candidate.exists():
-            strip_dir = candidate
+            override_dir = candidate
 
-    _warn_on_user_override(strip_dir)
+    _warn_on_user_override(override_dir)
 
-    override_file = strip_dir / "zzzz_terrapod_backend_override.tf"
+    override_file = override_dir / "zzzz_terrapod_backend_override.tf"
     override_file.write_text(_LOCAL_BACKEND_OVERRIDE)
     logger.info("wrote local-backend override", path=str(override_file))
 
     return ConfigurationResult(
         downloaded=True,
-        strip_dir=strip_dir,
+        strip_dir=work_dir,
         override_file=override_file,
     )

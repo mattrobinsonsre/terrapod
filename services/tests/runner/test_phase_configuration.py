@@ -58,7 +58,25 @@ class TestDownloadConfiguration:
         override = result.override_file.read_text()
         assert 'backend "local"' in override
 
-    def test_working_directory_selects_subpath(self, tmp_path) -> None:
+    def test_working_directory_writes_override_in_subdir_but_strip_dir_is_root(
+        self, tmp_path
+    ) -> None:
+        """When `working_dir` is set, the override file MUST land
+        inside that subdirectory (so tofu/terraform picks it up via
+        the override-file merge at init time), but the returned
+        `strip_dir` MUST be the un-descended work_dir root.
+
+        Regression for the v0.32.0 Python rewrite of the runner: the
+        configuration phase was returning the descended path as
+        `strip_dir`, and `_run_body` was then calling
+        `working_dir.resolve_and_chdir(strip_dir, cfg.working_dir)`
+        which descended again — producing
+        `<work_dir>/<wd>/<wd>` (doesn't exist) and a confusing
+        "working directory '…' not found in config" error for every
+        workspace with a working_dir set (helios-auth0-local-dev run
+        019eac5e was the report). The descent must happen exactly
+        once and `resolve_and_chdir` is the single canonical site.
+        """
         tar_bytes = _make_tarball(
             {
                 "envs/dev/main.tf": "# nested\n",
@@ -75,10 +93,18 @@ class TestDownloadConfiguration:
         )
 
         assert result.downloaded
-        assert result.strip_dir == work_dir / "envs" / "dev"
-        # The override file goes in strip_dir, not work_dir root.
-        assert result.override_file == result.strip_dir / "zzzz_terrapod_backend_override.tf"
+        # CRITICAL invariant: returned strip_dir is the un-descended
+        # work_dir, so `resolve_and_chdir` owns the single descent +
+        # chdir + path-traversal guard.
+        assert result.strip_dir == work_dir
+        # But the override DOES land in the working subdir so tofu's
+        # override-file merge picks it up.
+        assert result.override_file is not None
+        assert (
+            result.override_file == work_dir / "envs" / "dev" / "zzzz_terrapod_backend_override.tf"
+        )
         assert result.override_file.exists()
+        assert 'backend "local"' in result.override_file.read_text()
 
     def test_missing_api_context_returns_undownloaded(self, tmp_path) -> None:
         result = cfg_phase.download_configuration(
