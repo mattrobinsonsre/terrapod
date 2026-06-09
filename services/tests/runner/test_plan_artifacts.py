@@ -69,16 +69,18 @@ class TestSnapshotPaths:
         assert "alias.tf" not in out
 
     def test_includes_archive_file_output_location(self, tmp_path: Path) -> None:
-        """The real-world failure case (cdn-dev run 019eac35): the
-        archive_file output sits under `.terraform/modules/<name>/`.
-        Make sure that path makes it into the snapshot.
+        """`archive_file` outputs commonly land under
+        `.terraform/modules/<name>/` when the module path is reused as
+        the output_path target. Make sure that path makes it into the
+        snapshot — this was the original failure case the feature
+        exists to fix.
         """
         _touch(
-            tmp_path / ".terraform/modules/cdn/acrolinx-cdn-dev-retention.zip",
+            tmp_path / ".terraform/modules/example/retention.zip",
             b"PK\x03\x04",
         )
         out = plan_artifacts.snapshot_paths(tmp_path)
-        assert ".terraform/modules/cdn/acrolinx-cdn-dev-retention.zip" in out
+        assert ".terraform/modules/example/retention.zip" in out
 
 
 class TestComputeDiff:
@@ -261,34 +263,34 @@ class TestEndToEndRoundTrip:
         """
         plan_ws = tmp_path / "plan-ws"
         # 1. post-init state
-        _touch(plan_ws / ".terraform/modules/cdn/main.tf", b"module main")
-        _touch(plan_ws / ".terraform/modules/cdn/retention.py", b"# py")
+        _touch(plan_ws / ".terraform/modules/example/main.tf", b"module main")
+        _touch(plan_ws / ".terraform/modules/example/retention.py", b"# py")
         post_init = plan_artifacts.snapshot_paths(plan_ws)
         # 3. plan creates the archive_file output
         _touch(
-            plan_ws / ".terraform/modules/cdn/acrolinx-cdn-dev-retention.zip",
+            plan_ws / ".terraform/modules/example/retention.zip",
             b"PK\x03\x04 fake zip",
         )
         post_plan = plan_artifacts.snapshot_paths(plan_ws)
         # 4. diff + tar
         new = plan_artifacts.compute_diff(post_init, post_plan)
-        assert new == {".terraform/modules/cdn/acrolinx-cdn-dev-retention.zip"}
+        assert new == {".terraform/modules/example/retention.zip"}
         tar = tmp_path / "plan-artifacts.tar"
         plan_artifacts.tar_files(plan_ws, new, tar)
 
         # 5-7. Apply phase: fresh workspace + post-init module sources +
         # tar extract.
         apply_ws = tmp_path / "apply-ws"
-        _touch(apply_ws / ".terraform/modules/cdn/main.tf", b"module main")
-        _touch(apply_ws / ".terraform/modules/cdn/retention.py", b"# py")
+        _touch(apply_ws / ".terraform/modules/example/main.tf", b"module main")
+        _touch(apply_ws / ".terraform/modules/example/retention.py", b"# py")
         extracted = plan_artifacts.extract_over(tar, apply_ws)
         assert extracted == 1
         # 8. The zip is now where the lambda resource expects it.
         assert (
-            apply_ws / ".terraform/modules/cdn/acrolinx-cdn-dev-retention.zip"
+            apply_ws / ".terraform/modules/example/retention.zip"
         ).read_bytes() == b"PK\x03\x04 fake zip"
         # Apply-phase init's outputs are untouched.
-        assert (apply_ws / ".terraform/modules/cdn/main.tf").read_bytes() == b"module main"
+        assert (apply_ws / ".terraform/modules/example/main.tf").read_bytes() == b"module main"
 
 
 def test_storage_key_shape() -> None:

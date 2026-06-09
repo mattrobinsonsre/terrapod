@@ -2011,6 +2011,28 @@ Content-Type: application/octet-stream
 
 Upload new state after apply. Returns 204 on success.
 
+### Download Plan Artifacts
+
+```
+GET /api/terrapod/v1/runs/{run_id}/artifacts/plan-artifacts
+```
+
+Returns 302 redirect to presigned storage URL for the plan-phase workspace-diff tarball. Used by the apply phase to restore files generated during plan (e.g. `data.archive_file` outputs, `null_resource` local-exec scratch) into the apply Job's fresh workspace. Returns 404 if the run was produced by a pre-v0.34.0 runner (no plan-artifacts uploaded). The apply phase tolerates 404 — it logs an error and proceeds.
+
+### Upload Plan Artifacts
+
+```
+PUT /api/terrapod/v1/runs/{run_id}/artifacts/plan-artifacts
+Content-Type: application/x-tar
+Content-Length: <bytes>
+```
+
+Upload the plan-phase workspace-diff tarball. The body is the diff (`post_plan - post_init`) of files plan created, excluding `tfplan`, `.terraform.lock.hcl`, and `.terraform/terraform.tfstate` (handled by other endpoints). An empty tar is always uploaded — even when plan generated no new files — so the apply-side contract is "404 means upload genuinely failed", not "no new files".
+
+The body is streamed to an ephemeral tempfile on the API pod's PVC and forwarded to object storage; nothing is fully buffered in RAM. Maximum tarball size is `runners.planArtifactsMaxBytes` (default 256 MiB; minimum 10240 bytes). Both the `Content-Length` header and the streamed length are enforced — oversize uploads receive HTTP 413.
+
+Returns 204 on success.
+
 ### Record Resource Profile
 
 ```

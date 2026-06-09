@@ -246,6 +246,23 @@ terraform {
 
 Terraform and OpenTofu merge any file matching `*_override.tf` over the main configuration with *replacement* semantics, so this single block displaces whatever the main config declared — `cloud {}`, `backend "remote" {}`, `backend "s3" {}`, or nothing at all. The user's committed files are never modified, which keeps "why does my plan differ locally" diagnosable.
 
+---
+
+## Plan → Apply File Bridging (plan-artifacts)
+
+The plan and apply phases run as **separate K8s Jobs**, so anything plan generates on disk — `data.archive_file` outputs, `null_resource` local-exec scratch, dynamically rendered `local_file` content — is gone by the time apply starts, even though the saved `tfplan` references those exact paths. The runner bridges them with a **workspace-diff snapshot**:
+
+1. After `tofu init` (and lock-file upload), the plan phase snapshots the relative-path set of the workspace tree.
+2. It runs `tofu plan -out=tfplan`, snapshots again, and computes `new_files = post_plan − post_init` (pure set difference; ignores existing-file mutations).
+3. New files are tarred and uploaded to `plans/{workspace_id}/{run_id}.plan-artifacts.tar`.
+4. The apply phase downloads the tarball after its own `tofu init -lockfile=readonly` and extracts it over the workspace before `tofu apply tfplan`.
+
+Excluded from the snapshot: `tfplan` (separate endpoint), `.terraform.lock.hcl` (separate endpoint, modified by the lock-extender), and `.terraform/terraform.tfstate` (apply's fresh init re-creates it). Symlinks are skipped — we don't try to restore symlinks across the pod boundary.
+
+The plan phase **always uploads**, even an empty tar when plan produced nothing new. That makes the apply-side contract explicit: a 404 on download means a real upload failure, not "no new files". For runs created by a pre-v0.34.0 runner where no tarball was ever uploaded, the apply phase logs the missing artifact and proceeds — the contract is enforced once both phases run feature-aware images.
+
+The cap is set by `runners.planArtifactsMaxBytes` in Helm values (default 256 MiB; minimum 10240 bytes). Uploads exceeding the cap are rejected with HTTP 413 and the run errors. Tune up for runs that build big lambda zips or other large generated archives.
+
 **Our override always wins.** Local execution is a hard correctness requirement, so the override is written unconditionally — the runner never defers to a user-supplied backend declaration (deferring to a committed `cloud {}` or `backend "remote"` would hand the runner a remote backend and recurse). Two mechanisms enforce this:
 
 1. **Merge order.** Override files are merged in lexical order with the *last* file winning. The `zzzz` filename prefix sorts after `override.tf` and the overwhelming majority of `*_override.tf` names, so Terrapod's `backend "local"` is the one that takes effect. If the workspace does ship its own override file declaring a backend/cloud block, the runner logs a `takes precedence` note so the override is visible — but still writes and wins with its own.

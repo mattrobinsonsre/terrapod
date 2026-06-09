@@ -11,7 +11,7 @@ When enabled, a daily background task (via the distributed scheduler) iterates s
 | Category | Retention Key | Default | What Gets Deleted |
 |---|---|---|---|
 | **State versions** | `state_versions_keep` | 20 per workspace | Excess state versions beyond the keep count (oldest first) |
-| **Run artifacts** | `run_artifacts_retention_days` | 90 days | Plan output, plan logs, and apply logs for terminal runs |
+| **Run artifacts** | `run_artifacts_retention_days` | 90 days | Plan output, plan logs, apply logs, and plan-artifacts tarballs for terminal runs |
 | **Config versions (age)** | `config_versions_retention_days` | 90 days | Uploaded configuration tarballs no longer referenced by active runs, older than the threshold |
 | **Config versions (count)** | `config_versions_keep` | 50 per workspace | Excess CVs beyond the keep count (oldest first); CVs referenced by an active run are always preserved |
 | **Provider cache** | `provider_cache_retention_days` | 30 days | Cached upstream provider binaries not accessed within the retention window |
