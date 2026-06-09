@@ -238,6 +238,11 @@ data:
     metrics:
       enabled: {{ .Values.api.config.metrics.enabled }}
     {{- end }}
+    runner_artifacts:
+      # int64 cast keeps Helm from emitting YAML scientific notation
+      # for values above ~1M (Pydantic refuses to parse those as int).
+      # Default 256 MiB (256 * 1024 * 1024 = 268435456).
+      plan_artifacts_max_bytes: {{ .Values.runners.planArtifactsMaxBytes | default 268435456 | int64 }}
     {{- if .Values.api.config.artifact_retention }}
     artifact_retention:
       enabled: {{ .Values.api.config.artifact_retention.enabled }}

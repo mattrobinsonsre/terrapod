@@ -693,6 +693,17 @@ runners:
   maxTokenTTLSeconds: 7200      # Runner token max TTL (default 2 hours)
   staleTimeoutSeconds: 3600     # Seconds before a run with no Job status is marked errored
 
+  # Maximum size in bytes of the plan-phase workspace-diff tarball that
+  # the runner uploads at end of plan and downloads at start of apply.
+  # That tarball restores files plan generated on disk (data.archive_file
+  # outputs, null_resource local-exec scratch, etc.) that would otherwise
+  # be missing in the apply pod's fresh workspace. Uploads exceeding
+  # this size are rejected with HTTP 413; the runner logs the rejection
+  # and apply will then fail on the resource that depended on the
+  # missing file (no worse than the pre-feature behaviour).
+  # Default 256 MiB (256 * 1024 * 1024 = 268435456).
+  planArtifactsMaxBytes: 268435456
+
   # ServiceAccount for runner Jobs (cloud workload identity)
   serviceAccount:
     # Set to false to use a pre-existing SA managed externally

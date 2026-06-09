@@ -146,6 +146,83 @@ def upload_plan_file(
     return ok
 
 
+def upload_plan_artifacts(
+    cfg: RunnerConfig,
+    tar_path: Path,
+    *,
+    client: httpx.Client | None = None,
+) -> bool:
+    """Plan phase. Upload the workspace-diff tarball produced by
+    `plan_artifacts.tar_files`. The apply phase downloads + extracts
+    it after its own init, restoring any plan-time generated files
+    (`data.archive_file` zips, etc.) that would otherwise be missing.
+
+    Streamed (httpx iterates the open file handle) so multi-MB
+    tarballs don't double-allocate via the runner-side bytes buffer.
+    The API enforces a size cap on receipt and returns 413 if it's
+    exceeded; the runner logs but keeps going — apply will then fail
+    on whatever resource needs the missing file, which is no worse
+    than the pre-fix behaviour.
+
+    Best-effort: any non-2xx status here just means apply will hit
+    the same "missing file" error as before this feature existed.
+    """
+    if not cfg.has_api:
+        return False
+    if not tar_path.exists() or tar_path.stat().st_size == 0:
+        logger.info(
+            "plan-artifacts tar missing or empty — skipping upload",
+            path=str(tar_path),
+        )
+        return False
+
+    url = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/plan-artifacts"
+    own_client = client is None
+    if client is None:
+        client = _client_for(cfg)
+
+    try:
+        size = tar_path.stat().st_size
+        with tar_path.open("rb") as fh:
+            # httpx iterates a binary file object → streamed PUT, no
+            # bytes.read() into RAM.
+            resp = client.put(
+                url,
+                content=fh,
+                headers={
+                    "Content-Type": "application/x-tar",
+                    "Content-Length": str(size),
+                },
+            )
+        ok = 200 <= resp.status_code < 300
+        if ok:
+            logger.info(
+                "uploaded plan-artifacts tarball",
+                bytes=size,
+                status=resp.status_code,
+            )
+        elif resp.status_code == 413:
+            logger.warning(
+                "plan-artifacts upload rejected: tarball exceeds API cap "
+                "(apply may fail on missing data.archive_file output etc.)",
+                bytes=size,
+                status=resp.status_code,
+            )
+        else:
+            logger.warning(
+                "plan-artifacts upload non-OK (apply restore disabled)",
+                bytes=size,
+                status=resp.status_code,
+            )
+        return ok
+    except httpx.RequestError as exc:
+        logger.warning("plan-artifacts upload request failed", url=url, err=str(exc))
+        return False
+    finally:
+        if own_client:
+            client.close()
+
+
 def upload_plan_json(
     cfg: RunnerConfig,
     json_path: Path,

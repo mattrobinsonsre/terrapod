@@ -37,7 +37,7 @@ from pathlib import Path
 
 import structlog
 
-from terrapod.runner import lock_extender
+from terrapod.runner import lock_extender, plan_artifacts
 from terrapod.runner.phases import (
     backend_backstop,
     init_phase,
@@ -53,7 +53,11 @@ from terrapod.runner.phases import (
 )
 from terrapod.runner.phases.binary import BinaryDownloadError, download_binary
 from terrapod.runner.phases.configuration import download_configuration
-from terrapod.runner.phases.state import download_state, reuse_plan_lock_file
+from terrapod.runner.phases.state import (
+    download_plan_artifacts,
+    download_state,
+    reuse_plan_lock_file,
+)
 from terrapod.runner.runner_config import RunnerConfig
 
 _DEFAULT_WORK_DIR = Path("/workspace")
@@ -203,6 +207,17 @@ def _run_plan_phase(
         except Exception as exc:  # noqa: BLE001
             log.warning("lock-file upload raised (non-fatal)", err=str(exc))
 
+    # Snapshot the workspace file tree AFTER init + lock-extender +
+    # lock upload, BEFORE plan. The diff between this and the
+    # post-plan snapshot is exactly the set of files plan generated
+    # (data.archive_file outputs etc.) — uploaded as `plan-artifacts`
+    # so apply can restore them.
+    try:
+        post_init_paths = plan_artifacts.snapshot_paths(strip_dir)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("plan-artifacts pre-plan snapshot failed (non-fatal)", err=str(exc))
+        post_init_paths = None
+
     # Plan invocation.
     _PLAN_LOG.write_bytes(b"")
     _flush_stdio()
@@ -219,6 +234,41 @@ def _run_plan_phase(
         return plan_result.exit_code
 
     log.info("plan completed", has_changes=plan_result.has_changes)
+
+    # Plan-artifacts: ALWAYS upload a tar, even when the diff is empty
+    # (`tar_files` writes a 1024-byte EOF-only archive in that case).
+    # An always-present upload lets apply treat a download 404 as a
+    # real "something is wrong" signal rather than the ambiguous
+    # "either no diff OR the runner that ran plan didn't have this
+    # feature".
+    if post_init_paths is not None and cfg.has_api:
+        try:
+            post_plan_paths = plan_artifacts.snapshot_paths(strip_dir)
+            new_files = plan_artifacts.compute_diff(post_init_paths, post_plan_paths)
+            import tempfile as _tempfile
+
+            fd, tmp = _tempfile.mkstemp(suffix=".plan-artifacts.tar")
+            os.close(fd)
+            tmp_path = Path(tmp)
+            try:
+                size = plan_artifacts.tar_files(strip_dir, new_files, tmp_path)
+                log.info(
+                    "plan-artifacts tar built",
+                    files=len(new_files),
+                    bytes=size,
+                    empty=not new_files,
+                )
+                uploads.upload_plan_artifacts(cfg, tmp_path)
+            finally:
+                try:
+                    tmp_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "plan-artifacts upload pipeline raised (non-fatal)",
+                err=str(exc),
+            )
 
     # Export show -json (for OPA + UI artifact). Best-effort.
     plan_show_ok = False
@@ -294,6 +344,56 @@ def _run_apply_phase(
                     log.info("plan-file not available", status=resp.status_code)
         except Exception as exc:  # noqa: BLE001
             log.warning("plan-file download failed (non-fatal)", err=str(exc))
+
+    # Download + extract the plan-phase workspace-diff tarball over the
+    # initialised workspace. This restores files plan generated but
+    # apply's fresh-pod init doesn't reproduce (`data.archive_file`
+    # outputs, `null_resource` local-exec scratch, etc.).
+    #
+    # Transition contract: plan phase always uploads (even an empty
+    # tar) starting at the version that introduced this feature, so a
+    # download 404 is a real "where's the plan?" signal in steady
+    # state. But during the rollout window an apply may run against a
+    # plan that ran on a pre-feature runner image and never uploaded.
+    # Log loudly but DO NOT abort — let tofu apply hit the original
+    # "no such file or directory" error on whichever resource needs
+    # the missing file. That gives operators a clear, in-context
+    # diagnostic instead of a generic pre-flight refusal, and once
+    # the upgrade window closes the 404 becomes vanishingly rare.
+    if cfg.has_api and has_plan_file:
+        import tempfile as _tempfile
+
+        fd, tmp = _tempfile.mkstemp(suffix=".plan-artifacts.tar")
+        os.close(fd)
+        tar_path = Path(tmp)
+        try:
+            ok = download_plan_artifacts(cfg, dest=tar_path)
+            if not ok:
+                log.error(
+                    "plan-artifacts tarball not available — apply will "
+                    "proceed but any resource that depends on a plan-time "
+                    "generated file (data.archive_file output, "
+                    "null_resource local-exec scratch, etc.) will fail "
+                    "at tofu time with a 'no such file or directory' "
+                    "error. This is expected during the rollout window "
+                    "for plans that ran on a pre-feature runner image."
+                )
+            else:
+                try:
+                    extracted = plan_artifacts.extract_over(tar_path, strip_dir)
+                    log.info("plan-artifacts extracted", files=extracted)
+                except Exception as exc:  # noqa: BLE001
+                    log.error(
+                        "plan-artifacts extract failed; apply will "
+                        "proceed without restore (see above for "
+                        "the resource-level error this will produce)",
+                        err=str(exc),
+                    )
+        finally:
+            try:
+                tar_path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     _APPLY_LOG.write_bytes(b"")
     _flush_stdio()

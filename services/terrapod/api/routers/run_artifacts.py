@@ -7,21 +7,25 @@ Downloads return 302 redirects to presigned storage URLs.
 Uploads accept raw bytes and write to storage directly.
 
 Endpoints:
-    GET  /api/terrapod/v1/runs/{run_id}/artifacts/config      — download config archive
-    GET  /api/terrapod/v1/runs/{run_id}/artifacts/state        — download current state
-    GET  /api/terrapod/v1/runs/{run_id}/artifacts/plan-file    — download plan file
-    GET  /api/terrapod/v1/runs/{run_id}/artifacts/lock-file    — download .terraform.lock.hcl from plan
-    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-log     — upload plan log
-    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-file    — upload plan file
-    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/lock-file    — upload .terraform.lock.hcl from plan
+    GET  /api/terrapod/v1/runs/{run_id}/artifacts/config         — download config archive
+    GET  /api/terrapod/v1/runs/{run_id}/artifacts/state           — download current state
+    GET  /api/terrapod/v1/runs/{run_id}/artifacts/plan-file       — download plan file
+    GET  /api/terrapod/v1/runs/{run_id}/artifacts/lock-file       — download .terraform.lock.hcl from plan
+    GET  /api/terrapod/v1/runs/{run_id}/artifacts/plan-artifacts  — download plan-phase workspace diff tarball
+    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-log        — upload plan log
+    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-file       — upload plan file
+    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/lock-file       — upload .terraform.lock.hcl from plan
+    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-artifacts  — upload plan-phase workspace diff tarball (streamed)
     PUT  /api/terrapod/v1/runs/{run_id}/artifacts/plan-json-output — upload plan JSON
-    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/apply-log    — upload apply log
-    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/state        — upload new state
+    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/apply-log       — upload apply log
+    PUT  /api/terrapod/v1/runs/{run_id}/artifacts/state           — upload new state
 """
 
 import asyncio
 import hashlib
 import json
+import os
+import tempfile
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -41,6 +45,7 @@ from terrapod.storage.keys import (
     apply_log_key,
     config_version_key,
     lock_file_key,
+    plan_artifacts_key,
     plan_json_output_key,
     plan_log_key,
     plan_output_key,
@@ -543,5 +548,135 @@ async def mark_state_diverged(
     from terrapod.redis.client import publish_workspace_event
 
     await publish_workspace_event(str(run.workspace_id), "state_diverged")
+
+    return Response(status_code=204)
+
+
+# ── Plan-artifacts tarball (workspace diff between init and plan) ────────
+
+
+def _resolve_ephemeral_tmpdir() -> str | None:
+    """Resolve the API pod's ephemeral-storage PVC mount.
+
+    Matches the pattern used by `cv_diff_service._resolve_tmpdir`,
+    `vcs_archive_cache._resolve_tmpdir`,
+    `provider_cache_service._resolve_ephemeral_tmpdir`. On the API pod
+    `/tmp` is a RAM-backed `emptyDir{}`; tempfiles that can plausibly
+    grow to tens of MB MUST land on the dedicated PVC at
+    `settings.vcs.tmpdir` (default `/var/lib/terrapod/tmp`). Returning
+    `None` falls back to the system default for local dev and tests.
+    """
+    configured = settings.vcs.tmpdir
+    if configured and os.path.isdir(configured):
+        return configured
+    return None
+
+
+@router.get("/runs/{run_id}/artifacts/plan-artifacts")
+async def download_plan_artifacts(
+    run_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Download the plan-phase workspace-diff tarball.
+
+    Returned via 302 → presigned storage URL, matching the other
+    artifact-download endpoints. The runner treats a 404 here as
+    expected (older plans, plans that produced no new files); the
+    apply phase proceeds without the restore.
+    """
+    require_runner_for_run(user, run_id)
+    run = await _get_run(run_id, db)
+
+    storage = get_storage()
+    key = plan_artifacts_key(str(run.workspace_id), str(run.id))
+    url = await storage.presigned_get_url(key)
+    return RedirectResponse(url=url.url, status_code=302)
+
+
+@router.put("/runs/{run_id}/artifacts/plan-artifacts")
+async def upload_plan_artifacts(
+    run_id: str,
+    request: Request,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Upload the plan-phase workspace-diff tarball.
+
+    Streams the request body to a tempfile on the API pod's ephemeral
+    PVC (`settings.vcs.tmpdir`) and then `put_stream`s the tempfile to
+    object storage. Does NOT load the body into memory — required for
+    the user-configurable 256 MiB default cap to be safe on small API
+    pods.
+
+    Cheap pre-check: if `Content-Length` exceeds the cap, refuse with
+    HTTP 413 before opening the tempfile. Then enforce the cap again
+    during streaming (HTTP clients may lie about Content-Length or omit
+    it under chunked transfer encoding). The runner treats 413 as a
+    skip-the-restore signal — apply proceeds without it.
+    """
+    require_runner_for_run(user, run_id)
+    run = await _get_run(run_id, db)
+
+    max_bytes = settings.runner_artifacts.plan_artifacts_max_bytes
+
+    # Pre-check Content-Length when the client provides it (let the
+    # runner give up faster than waiting on the full upload).
+    declared = request.headers.get("content-length")
+    if declared is not None:
+        try:
+            if int(declared) > max_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=(f"plan-artifacts upload too large: {declared} bytes > {max_bytes} cap"),
+                )
+        except ValueError:
+            pass  # Malformed Content-Length — fall through to streamed enforcement.
+
+    tmpdir = _resolve_ephemeral_tmpdir()
+    fd, tmp_path = await asyncio.to_thread(
+        tempfile.mkstemp, suffix=".plan-artifacts.tar", dir=tmpdir
+    )
+    f = await asyncio.to_thread(os.fdopen, fd, "wb")
+    received = 0
+    try:
+        async for chunk in request.stream():
+            if not chunk:
+                continue
+            received += len(chunk)
+            if received > max_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=(
+                        f"plan-artifacts upload exceeded the {max_bytes}-byte cap "
+                        f"after streaming {received} bytes"
+                    ),
+                )
+            await asyncio.to_thread(f.write, chunk)
+        await asyncio.to_thread(f.flush)
+        await asyncio.to_thread(f.close)
+
+        # Stream the tempfile into storage (constant-memory put).
+        async def _chunks():
+            with open(tmp_path, "rb") as src:  # noqa: ASYNC230 -- bounded reads
+                while True:
+                    buf = await asyncio.to_thread(src.read, 1024 * 1024)
+                    if not buf:
+                        break
+                    yield buf
+
+        storage = get_storage()
+        key = plan_artifacts_key(str(run.workspace_id), str(run.id))
+        await storage.put_stream(key, _chunks(), content_type="application/x-tar")
+    finally:
+        if not f.closed:
+            try:
+                await asyncio.to_thread(f.close)
+            except OSError:
+                pass
+        try:
+            await asyncio.to_thread(os.unlink, tmp_path)
+        except OSError:
+            pass
 
     return Response(status_code=204)

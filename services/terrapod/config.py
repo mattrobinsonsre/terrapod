@@ -616,6 +616,34 @@ class ArtifactRetentionConfig(BaseModel):
     )
 
 
+class RunnerArtifactsConfig(BaseModel):
+    """API-side limits for runner artifact uploads.
+
+    Distinct from `RunnerConfig` (which lives in `runners.yaml` and
+    configures the listener / runner Jobs). These knobs control the
+    API endpoints that runners upload artifacts to.
+    """
+
+    plan_artifacts_max_bytes: int = Field(
+        default=256 * 1024 * 1024,
+        ge=10240,
+        description=(
+            "Maximum size (bytes) of the plan-phase workspace-diff "
+            "tarball that the runner uploads at end of plan and "
+            "downloads at start of apply. Restores plan-time generated "
+            "artifacts (data.archive_file outputs, etc.) that would "
+            "otherwise be missing across the plan→apply Job boundary. "
+            "Uploads exceeding this size are rejected with 413; the "
+            "runner logs the rejection, apply proceeds without the "
+            "restore, and any resource that depended on a plan-time "
+            "generated file will fail at apply with a clear error. "
+            "Default 256 MiB. Minimum 10240 bytes — the size of an "
+            "empty tar with Python's default 20-block padding, which "
+            "every run uploads even when plan produced no new files."
+        ),
+    )
+
+
 class MetricsConfig(BaseModel):
     """Prometheus metrics configuration."""
 
@@ -954,6 +982,9 @@ class Settings(BaseSettings):
 
     # Artifact Retention
     artifact_retention: ArtifactRetentionConfig = Field(default_factory=ArtifactRetentionConfig)
+
+    # Runner artifact upload limits (API-side enforcement)
+    runner_artifacts: RunnerArtifactsConfig = Field(default_factory=RunnerArtifactsConfig)
 
     # AI Plan Summary (#401)
     ai_summary: AISummaryConfig = Field(default_factory=AISummaryConfig)

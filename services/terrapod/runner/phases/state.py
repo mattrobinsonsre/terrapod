@@ -1,14 +1,16 @@
-"""Phases: download the current state (every run) and re-use the
-plan-phase lock file (apply phase only).
+"""Phases: download the current state (every run), re-use the
+plan-phase lock file (apply phase only), and re-use the plan-phase
+workspace-diff tarball (apply phase only).
 
 Ports of the `# --- Download current state ---` and `# --- Apply
 phase: try to reuse the plan-phase lock file ---` blocks of
-docker/runner-entrypoint.sh (~lines 754–782 in the v0.31.x tree).
+docker/runner-entrypoint.sh (~lines 754–782 in the v0.31.x tree),
+extended for the plan-artifacts feature.
 
-Both are best-effort — a 404 means there's nothing to download (first
-run, no state yet; plan didn't upload a lock file) which the next
-phase tolerates. Hard storage errors are logged but don't fail the
-run; the bash version did the same (`|| true`).
+All three are best-effort — a 404 means there's nothing to download
+(first run / older plan / plan that produced no new files) which the
+next phase tolerates. Hard storage errors are logged but don't fail
+the run.
 """
 
 from __future__ import annotations
@@ -105,4 +107,49 @@ def reuse_plan_lock_file(
         return False
 
     logger.info("reusing .terraform.lock.hcl from plan phase")
+    return True
+
+
+def download_plan_artifacts(
+    cfg: RunnerConfig,
+    *,
+    dest: Path,
+    client: httpx.Client | None = None,
+) -> bool:
+    """Apply phase: download the plan-phase workspace-diff tarball.
+
+    Apply will extract it over its initialised workspace so that any
+    files plan generated (data.archive_file outputs, etc.) are present
+    when `tofu apply tfplan` runs. A 404 is the expected common case
+    (older plan, plan that produced no new files) — the orchestrator
+    logs at info, deletes the partial download, and proceeds without
+    the restore.
+    """
+    if cfg.phase != "apply" or not cfg.has_api:
+        return False
+
+    headers = {"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {}
+
+    result = download_to_file(
+        f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/artifacts/plan-artifacts",
+        dest,
+        headers=headers,
+        api_url=cfg.api_url,
+        retries=cfg.download_retries,
+        retry_delay_seconds=cfg.download_retry_delay_seconds,
+        client=client,
+    )
+
+    if not result.ok:
+        dest.unlink(missing_ok=True)
+        # Quiet info — no plan-artifacts is the common case (plan that
+        # produced no archive_file outputs, an older runner that didn't
+        # upload the tarball, an opt-out via tar size cap on the API).
+        logger.info(
+            "no plan-artifacts available; apply proceeds without restore",
+            status=result.status,
+        )
+        return False
+
+    logger.info("downloaded plan-artifacts tarball for apply restore")
     return True

@@ -52,6 +52,21 @@ def lock_file_key(workspace_id: str, run_id: str) -> str:
     return f"plans/{workspace_id}/{run_id}.terraform.lock.hcl"
 
 
+def plan_artifacts_key(workspace_id: str, run_id: str) -> str:
+    """Key for the plan-phase workspace diff tarball.
+
+    The runner snapshots the workspace file tree after init and again
+    after plan, and uploads the set difference (paths that exist after
+    plan but didn't after init) as a plain `tar`. The apply phase
+    downloads + extracts this over its initialised workspace, restoring
+    any plan-time generated artifacts (e.g. `data.archive_file` zips)
+    that would otherwise be missing because each phase runs in a
+    fresh K8s Job. tfplan + lock file are uploaded via their own
+    endpoints and are excluded from this tarball to avoid duplication.
+    """
+    return f"plans/{workspace_id}/{run_id}.plan-artifacts.tar"
+
+
 def config_version_key(workspace_id: str, config_version_id: str) -> str:
     """Key for a configuration version archive."""
     return f"config/{workspace_id}/{config_version_id}.tar.gz"
