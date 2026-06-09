@@ -87,7 +87,7 @@ class TestFetchH1Hashes:
             block_end=0,
         )
 
-    def test_returns_h1_for_requested_platform(self) -> None:
+    def test_returns_h1_and_zh_for_requested_platform(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(
                 200,
@@ -105,16 +105,18 @@ class TestFetchH1Hashes:
             )
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
-        out, _ = lock_extender.fetch_h1_hashes(
+        out, _ = lock_extender.fetch_archive_hashes(
             "https://api.example.com",
             "token",
             self._block(),
             ["linux_amd64"],
             client=client,
         )
-        assert out == {"linux_amd64": "h1:abcdefghij="}
+        # Both hash types captured — the splice needs the pair to
+        # produce a lock entry tofu's apply-init won't mutate.
+        assert out == {"linux_amd64": ["zh:486a1c921e", "h1:abcdefghij="]}
 
-    def test_skips_platforms_without_h1_in_response(self) -> None:
+    def test_dedupes_repeated_hashes_in_response(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(
                 200,
@@ -122,7 +124,40 @@ class TestFetchH1Hashes:
                     "archives": {
                         "linux_amd64": {
                             "url": "https://example.com/zip",
-                            # No h1 — only zh.
+                            "hashes": [
+                                "h1:abcdefghij=",
+                                "h1:abcdefghij=",  # dup
+                                "zh:486a1c921e",
+                                "zh:486a1c921e",  # dup
+                            ],
+                        }
+                    }
+                },
+            )
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        out, _ = lock_extender.fetch_archive_hashes(
+            "https://api.example.com",
+            "token",
+            self._block(),
+            ["linux_amd64"],
+            client=client,
+        )
+        assert out == {"linux_amd64": ["h1:abcdefghij=", "zh:486a1c921e"]}
+
+    def test_returns_only_zh_when_mirror_lacks_h1(self) -> None:
+        """Mirror cached the archive but didn't compute h1 yet. Returns
+        the zh: alone; the caller (`extend_lock_file`) will reject as
+        incomplete and fall back to `providers lock`.
+        """
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "archives": {
+                        "linux_amd64": {
+                            "url": "https://example.com/zip",
                             "hashes": ["zh:486a1c921e"],
                         }
                     }
@@ -130,21 +165,21 @@ class TestFetchH1Hashes:
             )
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
-        out, _ = lock_extender.fetch_h1_hashes(
+        out, _ = lock_extender.fetch_archive_hashes(
             "https://api.example.com",
             "token",
             self._block(),
             ["linux_amd64"],
             client=client,
         )
-        assert out == {}
+        assert out == {"linux_amd64": ["zh:486a1c921e"]}
 
     def test_handles_404_silently(self) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(404)
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
-        out, cached = lock_extender.fetch_h1_hashes(
+        out, cached = lock_extender.fetch_archive_hashes(
             "https://api.example.com",
             "token",
             self._block(),
@@ -165,7 +200,7 @@ class TestFetchH1Hashes:
             )
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
-        _, cached = lock_extender.fetch_h1_hashes(
+        _, cached = lock_extender.fetch_archive_hashes(
             "https://api.example.com",
             "token",
             self._block(),
@@ -204,7 +239,7 @@ class TestSpliceHashesIntoBlock:
 
 
 class TestEndToEndExtend:
-    def test_extends_every_provider_when_mirror_has_h1(self, tmp_path) -> None:
+    def test_extends_every_provider_when_mirror_has_h1_and_zh(self, tmp_path) -> None:
         lock = tmp_path / ".terraform.lock.hcl"
         lock.write_text(_SAMPLE_LOCK)
 
@@ -212,14 +247,14 @@ class TestEndToEndExtend:
 
         def handler(request: httpx.Request) -> httpx.Response:
             seen_paths.append(request.url.path)
-            # Both providers get a synthetic linux_arm64 h1.
+            # Both providers get a synthetic linux_arm64 (h1, zh) pair.
             return httpx.Response(
                 200,
                 json={
                     "archives": {
                         "linux_arm64": {
                             "url": "https://example.com/zip",
-                            "hashes": ["h1:NEW_arm64_h1="],
+                            "hashes": ["h1:NEW_arm64_h1=", "zh:NEW_arm64_zh"],
                         }
                     }
                 },
@@ -237,10 +272,14 @@ class TestEndToEndExtend:
         assert extended == 2
 
         out = lock.read_text()
-        # Both blocks now carry the injected h1.
+        # Both blocks now carry the injected h1: AND zh: for the other
+        # arch — the asymmetric "only h1:" splice is what caused
+        # apply-init lock mutations + tfplan invalidation (regression
+        # discovered on cdn-dev run 019eabad).
         assert "hashicorp/random" in out
         assert "hashicorp/null" in out
         assert out.count("h1:NEW_arm64_h1=") == 2
+        assert out.count("zh:NEW_arm64_zh") == 2
         # Original existing entries preserved.
         assert "h1:/xwPFz7kMERBIEk8i6UJt2fTvgzMFbwKlcyCvRJO8Ok=" in out
         assert "h1:NULLFAKEH1FAKE=" in out
@@ -256,18 +295,19 @@ class TestEndToEndExtend:
             client=httpx.Client(transport=httpx.MockTransport(handler)),
         )
         assert seen2 == 2
-        # `extended` counts "had h1 available" — re-runs still count.
+        # `extended` counts "had pair available" — re-runs still count.
         assert extended2 == 2
         # But the file content didn't change.
         assert lock.read_text().count("h1:NEW_arm64_h1=") == 2
+        assert lock.read_text().count("zh:NEW_arm64_zh") == 2
 
-    def test_falls_through_when_mirror_returns_no_h1(self, tmp_path) -> None:
+    def test_falls_through_when_mirror_returns_no_hashes(self, tmp_path) -> None:
         lock = tmp_path / ".terraform.lock.hcl"
         lock.write_text(_SAMPLE_LOCK)
 
         def handler(request: httpx.Request) -> httpx.Response:
-            # No h1 AND the response advertises the requested arch IS
-            # supposed to be cached — so this is the "compute failed"
+            # No archives AND the response advertises the requested arch
+            # IS supposed to be cached — so this is the "compute failed"
             # case, NOT the deliberate-skip case. Caller should see a
             # real gap and run `providers lock` for it.
             return httpx.Response(
@@ -290,6 +330,45 @@ class TestEndToEndExtend:
         assert extended == 0
         # File unchanged.
         assert lock.read_text() == _SAMPLE_LOCK
+
+    def test_falls_through_when_mirror_returns_only_h1(self, tmp_path) -> None:
+        """Mirror has the archive cached but never computed zh: (or vice
+        versa). Splicing the half-pair would leave an asymmetric lock
+        entry — tofu's apply-init then completes the missing half,
+        mutating the lock and breaking `apply tfplan` (cdn-dev run
+        019eabad reproducer). Caller falls back to `providers lock` to
+        produce a complete entry instead.
+        """
+        lock = tmp_path / ".terraform.lock.hcl"
+        lock.write_text(_SAMPLE_LOCK)
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "archives": {
+                        "linux_arm64": {
+                            "url": "https://example.com/zip",
+                            "hashes": ["h1:ONLY_h1="],
+                        }
+                    },
+                    "cached_platforms": ["linux_amd64", "linux_arm64"],
+                },
+            )
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        seen, extended = lock_extender.extend_lock_file(
+            lock,
+            api_url="https://api.example.com",
+            auth_token="tok",
+            other_arch="linux_arm64",
+            client=client,
+        )
+        assert seen == 2
+        assert extended == 0
+        # Lock untouched — better an empty splice than an asymmetric one.
+        assert lock.read_text() == _SAMPLE_LOCK
+        assert "ONLY_h1" not in lock.read_text()
 
     def test_silently_skips_when_arch_not_in_operators_cache_config(self, tmp_path) -> None:
         """Operator has narrowed mirror's `provider_cache.platforms` to

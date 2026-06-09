@@ -1,12 +1,12 @@
-"""Inject `h1:` hashes from Terrapod's provider mirror into the
-runner's `.terraform.lock.hcl`.
+"""Inject `h1:` + `zh:` hashes from Terrapod's provider mirror into
+the runner's `.terraform.lock.hcl`.
 
 Replaces the `tofu providers lock -platform=<other_arch>` invocation
 in the bash entrypoint (v0.31.6: only-other-arch mitigation). Where
 that command costs one full archive download per provider per plan,
 this module makes one ~1 KB JSON request per provider — the mirror
-already cached the archive and computed h1 server-side, so the
-runner just splices the returned hash into the lock.
+already cached the archive and computed both hashes server-side, so
+the runner just splices the returned pair into the lock.
 
 Algorithm:
 
@@ -14,10 +14,14 @@ Algorithm:
   2. For each provider block:
      a. GET /v1/providers/{hostname}/{namespace}/{type}/{version}.json
         from Terrapod's mirror.
-     b. Pull the `h1:` hash for `<other_arch>` from
-        `archives.<platform>.hashes`. (Skip if absent — uncached
-        provider; mirror only knew the upstream zh:.)
-     c. Splice the `h1:` line into the provider's `hashes = [...]`
+     b. Pull EVERY hash entry (`h1:` + `zh:`) for `<other_arch>` from
+        `archives.<platform>.hashes`. Both must be present — splicing
+        only one would still let tofu's apply-init mutate the lock to
+        complete the missing half (it computes the other from the
+        downloaded archive when it sees an asymmetric entry), which
+        then invalidates `tofu apply tfplan` with "Inconsistent
+        dependency lock file".
+     c. Splice the new hash lines into the provider's `hashes = [...]`
         list, preserving existing entries.
   3. Write the file back.
 
@@ -113,7 +117,7 @@ def parse_lock_file(text: str) -> list[ProviderBlock]:
     return blocks
 
 
-def fetch_h1_hashes(
+def fetch_archive_hashes(
     cfg_api_url: str,
     auth_token: str,
     block: ProviderBlock,
@@ -121,19 +125,21 @@ def fetch_h1_hashes(
     *,
     client: httpx.Client | None = None,
     timeout_seconds: float = 60.0,
-) -> tuple[dict[str, str], set[str]]:
+) -> tuple[dict[str, list[str]], set[str]]:
     """Query Terrapod's provider mirror for `{version}.json` and pull
-    the `h1:` hash for each requested platform.
+    BOTH the `h1:` and `zh:` hashes for each requested platform.
 
     Returns `(hashes, cached_platforms)`:
-      - `hashes`: `{platform: "h1:..."}` for each platform the mirror
-        had an h1 for.
+      - `hashes`: `{platform: ["h1:...", "zh:..."]}` for each platform
+        the mirror had at least one of the pair for. Order within the
+        list is not significant; callers check via prefix.
       - `cached_platforms`: the set of platforms the mirror is
         configured to eagerly cache (operator's `provider_cache.platforms`
-        setting). Used by the caller to distinguish "h1 missing because
-        compute failed → fall back to `providers lock`" from "h1 missing
-        because this platform isn't in the operator's cache filter →
-        silently skip (no apply will run on this arch anyway)".
+        setting). Used by the caller to distinguish "hashes missing
+        because compute failed → fall back to `providers lock`" from
+        "hashes missing because this platform isn't in the operator's
+        cache filter → silently skip (no apply will run on this arch
+        anyway)".
     """
     if not cfg_api_url:
         return {}, set()
@@ -173,15 +179,18 @@ def fetch_h1_hashes(
 
     archives = payload.get("archives", {})
     cached_platforms = set(payload.get("cached_platforms") or [])
-    out: dict[str, str] = {}
+    out: dict[str, list[str]] = {}
     for plat in platforms:
         entry = archives.get(plat)
         if not entry:
             continue
+        plat_hashes: list[str] = []
         for h in entry.get("hashes", []):
-            if isinstance(h, str) and h.startswith("h1:"):
-                out[plat] = h
-                break
+            if isinstance(h, str) and (h.startswith("h1:") or h.startswith("zh:")):
+                if h not in plat_hashes:
+                    plat_hashes.append(h)
+        if plat_hashes:
+            out[plat] = plat_hashes
     return out, cached_platforms
 
 
@@ -257,33 +266,47 @@ def extend_lock_file(
         # We iterate in REVERSE so splice offsets stay valid as we
         # rewrite the text from end to start.
         for block in reversed(blocks):
-            hashes, cached_platforms = fetch_h1_hashes(
+            hashes, cached_platforms = fetch_archive_hashes(
                 api_url,
                 auth_token,
                 block,
                 [other_arch],
                 client=client,
             )
-            h1 = hashes.get(other_arch)
-            if h1 is None:
-                # Two cases: operator has deliberately not configured
-                # the mirror to cache this arch (silent skip — no apply
-                # will run on it anyway), or the platform IS in the
-                # cache config but the mirror failed to compute h1
-                # (warn + caller falls back to `providers lock`).
+            plat_hashes = hashes.get(other_arch, [])
+            has_h1 = any(h.startswith("h1:") for h in plat_hashes)
+            has_zh = any(h.startswith("zh:") for h in plat_hashes)
+            if not (has_h1 and has_zh):
+                # Need BOTH h1: and zh: for a clean splice. Splicing only
+                # one half leaves an asymmetric lock entry; tofu's
+                # apply-init will detect the gap and add the missing
+                # hash itself, mutating the lock and breaking
+                # `apply tfplan` with "Inconsistent dependency lock
+                # file".
+                #
+                # Two cases when we don't have the pair: operator
+                # didn't configure the mirror to cache this arch
+                # (silent skip — no apply will run on it anyway), or
+                # the platform IS in the cache config but the mirror
+                # failed to compute one or both hashes (warn + caller
+                # falls back to `providers lock` to get a complete
+                # lock entry).
                 if cached_platforms and other_arch not in cached_platforms:
                     not_cached_by_config += 1
                 else:
                     logger.info(
-                        "no h1 from mirror for provider — caller may fall back to providers lock",
+                        "incomplete hash pair from mirror for provider — "
+                        "caller may fall back to providers lock",
                         source=block.source,
                         version=block.version,
                         platform=other_arch,
+                        have_h1=has_h1,
+                        have_zh=has_zh,
                     )
                 continue
-            spliced = splice_hashes_into_block(block.block_text, [h1])
+            spliced = splice_hashes_into_block(block.block_text, plat_hashes)
             if spliced == block.block_text:
-                # Hash already present — already extended on a prior plan.
+                # Hashes already present — already extended on a prior plan.
                 extended += 1
                 continue
             new_text = new_text[: block.block_start] + spliced + new_text[block.block_end :]
