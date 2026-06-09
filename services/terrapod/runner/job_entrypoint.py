@@ -392,7 +392,12 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # 8. Build var-file / target / replace argv pieces.
     var_file_argv = tf_args.var_file_args(cfg.var_files)
 
-    # 9. Init.
+    # 9. Init. Apply-phase init runs with -lockfile=readonly so it
+    # doesn't drop the other-arch hashes the plan phase's lock_extender
+    # spliced in (tofu's network_mirror code path only records hashes
+    # for the target platform — see init_phase.run_init docstring).
+    # Plan phase runs init normally so the splice has a complete
+    # base lock to extend.
     child_grace = _child_grace_seconds(cfg)
     _flush_stdio()
     try:
@@ -401,6 +406,7 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
             var_file_args=var_file_argv,
             log_file=str(_INIT_LOG),
             child_grace_seconds=child_grace,
+            lockfile_readonly=(cfg.phase == "apply"),
         )
     except init_phase.InitError as exc:
         log.error("init failed", rc=exc.exit_code)

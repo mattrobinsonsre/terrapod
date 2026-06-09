@@ -83,3 +83,66 @@ class TestRunInit:
             init_phase.run_init(binary="tofu", var_file_args=[], log_file="/tmp/x")
             probe.assert_not_called()
         assert captured["argv"] == ["tofu", "init", "-input=false"]
+
+    def test_lockfile_readonly_appends_flag(self) -> None:
+        """Apply-phase init must run with -lockfile=readonly so it
+        doesn't drop the other-arch hashes the plan phase's
+        lock_extender spliced in. Without readonly, tofu's
+        network_mirror code path silently records only the
+        target-platform hashes, the lock falls out of sync with the
+        snapshot recorded in tfplan, and `tofu apply tfplan` then
+        refuses with "Inconsistent dependency lock file" (#470).
+        """
+        captured: dict[str, object] = {}
+
+        def fake_run(argv, log_file, child_grace_seconds, tee_to_stdout):
+            captured["argv"] = argv
+            return _Result(0)
+
+        with (
+            patch("terrapod.runner.exec_subprocess.run", side_effect=fake_run),
+            patch(
+                "terrapod.runner.phases.init_phase.init_supports_var_file",
+                return_value=True,
+            ),
+        ):
+            init_phase.run_init(
+                binary="tofu",
+                var_file_args=["-var-file=prod.tfvars"],
+                log_file="/tmp/init.log",
+                lockfile_readonly=True,
+            )
+        # Order: binary, init, -input=false, var-files..., -lockfile=readonly
+        assert captured["argv"] == [
+            "tofu",
+            "init",
+            "-input=false",
+            "-var-file=prod.tfvars",
+            "-lockfile=readonly",
+        ]
+
+    def test_lockfile_readonly_default_false(self) -> None:
+        """Plan-phase init runs WITHOUT readonly so the lock_extender
+        and its providers-lock fallback have a writable base lock to
+        extend. The default must be False so we don't accidentally lock
+        plan-phase init out of rewriting on first run.
+        """
+        captured: dict[str, object] = {}
+
+        def fake_run(argv, log_file, child_grace_seconds, tee_to_stdout):
+            captured["argv"] = argv
+            return _Result(0)
+
+        with (
+            patch("terrapod.runner.exec_subprocess.run", side_effect=fake_run),
+            patch(
+                "terrapod.runner.phases.init_phase.init_supports_var_file",
+                return_value=True,
+            ),
+        ):
+            init_phase.run_init(
+                binary="tofu",
+                var_file_args=[],
+                log_file="/tmp/init.log",
+            )
+        assert "-lockfile=readonly" not in captured["argv"]

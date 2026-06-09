@@ -34,9 +34,24 @@ def run_init(
     var_file_args: list[str],
     log_file: str,
     child_grace_seconds: float = 25.0,
+    lockfile_readonly: bool = False,
 ) -> None:
     """Run `<binary> init -input=false [var_file_args...]` via
     exec_subprocess, redirecting combined stdout/stderr to log_file.
+
+    `lockfile_readonly=True` appends `-lockfile=readonly`, which tells
+    terraform/tofu to verify the existing `.terraform.lock.hcl` against
+    what install would produce but NOT to rewrite it. Required on
+    apply-phase init when the lock has been carried over from the plan
+    phase (with other-arch hashes spliced in by `lock_extender`):
+    without readonly, tofu's network_mirror code path silently drops
+    the spliced other-arch hashes (it only records hashes for the
+    target platform — `internal/getproviders/http_mirror_source.go:223`),
+    the lock falls out of sync with the snapshot recorded in tfplan,
+    and `tofu apply tfplan` then refuses with "Inconsistent dependency
+    lock file" (#470, follow-up). Provider source + version are the
+    same across plan and apply, so readonly passes with a warning
+    rather than erroring.
 
     Raises InitError on non-zero exit so the orchestrator can short-
     circuit (skip plan/apply, still flush the log)."""
@@ -51,6 +66,8 @@ def run_init(
                 "variables in backend/required_providers/module-source will fail.",
                 binary=binary,
             )
+    if lockfile_readonly:
+        argv.append("-lockfile=readonly")
 
     logger.info("running init", binary=binary, argv_tail=argv[1:])
     result = exec_subprocess.run(
