@@ -30,6 +30,7 @@ code; the K8s Job phase tracking maps any non-zero to "failed".
 
 from __future__ import annotations
 
+import hashlib
 import os
 import signal
 import sys
@@ -311,6 +312,23 @@ def _run_plan_phase(
     return 0
 
 
+def _state_digest(state_path: Path) -> str | None:
+    """SHA-256 of the state file, or None if it doesn't exist. Used to
+    detect a serial-neutral no-op apply: tofu/terraform does NOT rewrite
+    the state with a bumped serial when the persisted state is unchanged
+    (e.g. a resource with a perpetual phantom diff — write-only attributes
+    re-sent every apply). In that case the post-apply state is byte-identical
+    to the state we downloaded, so there is nothing to upload — and uploading
+    it would collide with the existing serial and be mis-flagged as a state
+    divergence."""
+    try:
+        if state_path.exists() and state_path.stat().st_size > 0:
+            return hashlib.sha256(state_path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+    return None
+
+
 def _run_apply_phase(
     cfg: RunnerConfig,
     *,
@@ -322,6 +340,12 @@ def _run_apply_phase(
     """Apply-phase body: download plan binary, run apply, upload state
     (FATAL on failure), apply-result POST."""
     log = structlog.get_logger("runner.job_entrypoint")
+
+    # Snapshot the pre-apply state so we can tell whether apply actually
+    # changed it. tofu overwrites terraform.tfstate in place, so a digest
+    # taken now (the state we downloaded) versus after apply tells us if
+    # the serial was bumped. See _state_digest for why this matters.
+    pre_apply_state_digest = _state_digest(strip_dir / "terraform.tfstate")
 
     # Download plan file from plan phase. Best-effort — when missing,
     # apply re-plans inline. Routed through `download_to_file` so the
@@ -421,8 +445,23 @@ def _run_apply_phase(
     # State upload — FATAL if non-empty state file exists and upload
     # fails. Apply may have written state even on a failed apply (partial
     # apply). Always try to upload if the file exists.
+    #
+    # ...UNLESS the apply was serial-neutral: if the post-apply state is
+    # byte-identical to the state we downloaded, tofu did not bump the
+    # serial (a no-op apply driven by a perpetual phantom diff). Re-uploading
+    # it would collide with the already-recorded serial and be mis-flagged as
+    # a state divergence. There is nothing to persist — the API already holds
+    # this exact state — so skip the upload cleanly. Only skip on a successful
+    # apply (rc == 0); a failed/partial apply must still try to upload whatever
+    # state was written.
     state_path = strip_dir / "terraform.tfstate"
-    if state_path.exists() and state_path.stat().st_size > 0:
+    if (
+        rc == 0
+        and pre_apply_state_digest is not None
+        and _state_digest(state_path) == pre_apply_state_digest
+    ):
+        log.info("state unchanged after apply — skipping upload (serial-neutral no-op)")
+    elif state_path.exists() and state_path.stat().st_size > 0:
         try:
             ok = uploads.upload_state(cfg, state_path)
             if not ok:

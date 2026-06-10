@@ -136,6 +136,87 @@ class TestWorkDirOverride:
         assert str(seen["work_dir"]) == str(custom)
 
 
+class TestStateDigest:
+    def test_returns_none_for_missing_file(self, tmp_path) -> None:
+        assert job_entrypoint._state_digest(tmp_path / "absent.tfstate") is None
+
+    def test_returns_none_for_empty_file(self, tmp_path) -> None:
+        p = tmp_path / "empty.tfstate"
+        p.write_bytes(b"")
+        assert job_entrypoint._state_digest(p) is None
+
+    def test_hashes_content(self, tmp_path) -> None:
+        p = tmp_path / "s.tfstate"
+        p.write_bytes(b'{"serial": 8}')
+        d1 = job_entrypoint._state_digest(p)
+        assert d1 is not None and len(d1) == 64
+        # Identical content → identical digest; changed content → different.
+        p.write_bytes(b'{"serial": 8}')
+        assert job_entrypoint._state_digest(p) == d1
+        p.write_bytes(b'{"serial": 9}')
+        assert job_entrypoint._state_digest(p) != d1
+
+
+class TestApplyPhaseStateUploadSkip:
+    """Serial-neutral no-op apply: when tofu applies but leaves the state
+    byte-identical (a perpetual phantom diff, e.g. auth0 write-only secrets),
+    the runner must NOT upload — there is nothing to persist and a re-upload at
+    the unchanged serial would be mis-flagged as a state divergence."""
+
+    def _cfg(self):
+        from terrapod.runner.runner_config import RunnerConfig
+
+        # has_api False (empty TP_API_URL) skips the plan-file / plan-artifacts
+        # downloads so the test exercises only the apply + state-upload decision.
+        return RunnerConfig.from_env(
+            env={"TP_API_URL": "", "TP_RUN_ID": "", "TP_BACKEND": "tofu", "TP_VERSION": "1.12.1"}
+        )
+
+    def _run(self, tmp_path, *, apply_writes: bytes | None):
+        state = tmp_path / "terraform.tfstate"
+        state.write_bytes(b'{"serial": 164, "stable": true}')
+
+        def _fake_run_apply(cfg, **kwargs):
+            if apply_writes is not None:
+                state.write_bytes(apply_writes)
+            return 0
+
+        with (
+            patch.object(job_entrypoint.plan_apply, "run_apply", side_effect=_fake_run_apply),
+            patch.object(job_entrypoint.uploads, "upload_state", return_value=True) as up,
+            patch.object(job_entrypoint.uploads, "signal_state_diverged") as div,
+            patch.object(job_entrypoint.uploads, "post_apply_result") as par,
+        ):
+            rc = job_entrypoint._run_apply_phase(
+                self._cfg(),
+                binary="/tmp/bin/tofu",
+                var_file_argv=[],
+                strip_dir=tmp_path,
+                child_grace=10.0,
+            )
+        return rc, up, div, par
+
+    def test_skips_upload_when_state_unchanged(self, tmp_path) -> None:
+        # apply_writes=None → run_apply leaves the state file untouched.
+        rc, up, div, par = self._run(tmp_path, apply_writes=None)
+        assert rc == 0
+        up.assert_not_called()
+        div.assert_not_called()
+        par.assert_called_once()
+
+    def test_skips_upload_when_apply_rewrites_identical_bytes(self, tmp_path) -> None:
+        # tofu rewrites the file but with byte-identical content (serial unchanged).
+        rc, up, div, par = self._run(tmp_path, apply_writes=b'{"serial": 164, "stable": true}')
+        assert rc == 0
+        up.assert_not_called()
+
+    def test_uploads_when_state_changed(self, tmp_path) -> None:
+        rc, up, div, par = self._run(tmp_path, apply_writes=b'{"serial": 165, "changed": true}')
+        assert rc == 0
+        up.assert_called_once()
+        div.assert_not_called()
+
+
 class TestModuleSurface:
     def test_main_callable(self) -> None:
         assert callable(job_entrypoint.main)

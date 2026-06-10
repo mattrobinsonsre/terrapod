@@ -393,31 +393,49 @@ async def upload_state(
     # Hash off the event loop — runner state uploads can be multi-MB
     md5 = await asyncio.to_thread(lambda: hashlib.md5(body).hexdigest())  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
 
-    # Reject duplicate-serial uploads with 409 Conflict instead of letting
-    # the unique constraint surface as a 500. tofu doesn't bump the state
-    # serial on a no-op apply, so a runner re-uploading the same state would
-    # otherwise blow up with `IntegrityError on uq_state_versions`. The
-    # reconciler short-circuits planned→applied for has_changes=False so
-    # this path shouldn't be reached in steady state, but explicit 409 is
-    # correct semantics regardless: a stale serial is a client-visible
-    # conflict, not a server error.
+    # tofu/terraform does NOT bump the state serial when an apply leaves the
+    # persisted state byte-identical to the prior state. This happens whenever a
+    # resource carries a *perpetual phantom diff* — write-only attributes that are
+    # re-sent on every apply (e.g. auth0 client secrets), values the provider
+    # normalises, etc. The plan reports "1 changed", the apply calls the provider's
+    # Update, but the resulting state equals the prior state, so the serial is
+    # unchanged. That is NOT a divergence: the API's state already matches the
+    # state the runner holds. Treat an identical (same serial + same md5) upload as
+    # an idempotent no-op success rather than flagging state-diverged.
     #
-    # Two-layer check: (1) pre-INSERT lookup gives the common case a clean
-    # 409 with a helpful message; (2) IntegrityError catch on the INSERT
-    # closes the race window where a concurrent upload inserts between our
-    # SELECT and INSERT — the unique constraint is the source of truth.
+    # Only a *different* state body at an already-recorded serial is a genuine
+    # conflict (two distinct states claiming the same serial → real divergence) →
+    # 409. The IntegrityError catch on the INSERT below closes the race window
+    # where a concurrent upload inserts between our SELECT and INSERT.
     _existing_serial_msg = (
-        f"State serial {serial} already exists for this workspace. "
-        "tofu apply did not bump the serial — likely a no-op apply that "
-        "should not have produced a state upload."
+        f"State serial {serial} already exists for this workspace with different "
+        "content. The runner's post-apply state diverged from the recorded state "
+        "at this serial."
     )
-    existing = await db.execute(
-        select(StateVersion).where(
-            StateVersion.workspace_id == run.workspace_id,
-            StateVersion.serial == serial,
+    existing = (
+        await db.execute(
+            select(StateVersion).where(
+                StateVersion.workspace_id == run.workspace_id,
+                StateVersion.serial == serial,
+            )
         )
-    )
-    if existing.scalar_one_or_none() is not None:
+    ).scalar_one_or_none()
+    if existing is not None:
+        if existing.md5 == md5:
+            # Serial-neutral no-op apply: state is provably identical. Clear any
+            # stale divergence flag and return success so the runner does NOT
+            # signal state-diverged and the run transitions to applied.
+            ws = await db.get(Workspace, run.workspace_id)
+            if ws and ws.state_diverged:
+                ws.state_diverged = False
+                await db.commit()
+            logger.info(
+                "state_upload_noop_serial_unchanged",
+                run_id=run_id,
+                workspace_id=str(run.workspace_id),
+                serial=serial,
+            )
+            return Response(status_code=200)
         raise HTTPException(status_code=409, detail=_existing_serial_msg)
 
     # Create StateVersion record

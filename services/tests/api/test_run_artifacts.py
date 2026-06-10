@@ -165,6 +165,58 @@ class TestUploadStateDuplicateSerial:
         mock_db.add.assert_called_once()
         mock_storage.put.assert_called_once()
 
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_existing_serial_same_md5_is_idempotent_200(self, mock_get_storage, *_mocks):
+        """A serial-neutral no-op apply (state byte-identical to the recorded
+        state at the same serial) is NOT a divergence. The API treats it as an
+        idempotent success (200), does NOT insert a new row, does NOT store the
+        blob, and clears any stale state_diverged flag — so the runner never
+        signals state-diverged. This is the defence-in-depth half of the
+        auth0-perpetual-diff fix (the runner also skips the upload entirely)."""
+        import hashlib
+
+        run_id = uuid.uuid4()
+        ws_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id, ws_id=ws_id)
+
+        state_json = json.dumps({"version": 4, "serial": 8, "lineage": "abc"})
+        body_md5 = hashlib.md5(state_json.encode()).hexdigest()  # noqa: S324
+
+        mock_db = AsyncMock()
+        # The existing state version at serial 8 has the SAME content hash.
+        existing_sv = MagicMock(spec=StateVersion)
+        existing_sv.md5 = body_md5
+        ws = MagicMock()
+        ws.state_diverged = True  # stale flag from a prior mis-fire
+        # db.get: first _get_run(Run), then db.get(Workspace) in the no-op branch.
+        mock_db.get.side_effect = [run, ws]
+        lookup = MagicMock()
+        lookup.scalar_one_or_none.return_value = existing_sv
+        mock_db.execute.return_value = lookup
+
+        mock_storage = AsyncMock()
+        mock_get_storage.return_value = mock_storage
+
+        app = _make_app(_runner_user(run_id), mock_db)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/state",
+                content=state_json,
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 200
+        # No new row, no blob write — there is nothing to persist.
+        mock_db.add.assert_not_called()
+        mock_storage.put.assert_not_called()
+        # Stale divergence flag cleared.
+        assert ws.state_diverged is False
+        mock_db.commit.assert_awaited()
+
 
 # ── upload_plan_json_output (#280) ─────────────────────────────────────
 
