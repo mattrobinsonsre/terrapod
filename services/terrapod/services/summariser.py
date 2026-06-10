@@ -1262,6 +1262,41 @@ async def _build_followup_history(
     if plan_summary.description:
         history.append({"role": "assistant", "content": plan_summary.description})
 
+    # Mode-switch framing turn. The cacheable prefix's last line tells
+    # the model "Now call the submit_plan_summary tool exactly once
+    # with your structured answer." Without an explicit hand-off, the
+    # model reads any subsequent user turn as off-task and refuses
+    # ("I don't answer questions like that — my role here is limited
+    # to ... submitting a single structured summary via the tool. I've
+    # already done that for this plan."). This synthesised
+    # user/assistant exchange establishes follow-up mode — prose
+    # replies, no further tool calls — and sits AFTER the cache marker
+    # so prompt caching still hits.
+    history.append(
+        {
+            "role": "user",
+            "content": (
+                "Thanks. The structured summary above has been recorded "
+                "via the tool. From here on I'd like to ask follow-up "
+                "questions about the plan in plain prose — no more tool "
+                "calls. Please answer concisely, grounded in the plan "
+                "JSON, code, and diff already provided. If a question "
+                "asks for information that isn't in the materials I "
+                "shared, say so rather than guessing."
+            ),
+        }
+    )
+    history.append(
+        {
+            "role": "assistant",
+            "content": (
+                "Understood. I'll answer follow-up questions in prose "
+                "based on the plan and the code I've already reviewed. "
+                "What would you like to know?"
+            ),
+        }
+    )
+
     prior = (
         (
             await db.execute(

@@ -85,10 +85,11 @@ api:
     # deployments set aws_role_arn to chain into the central role.
     ai_summary:
       enabled: true
-      # Bedrock requires the inference-profile ID for on-demand
-      # invocation of newer Anthropic models, not the bare
-      # foundation-model ID. `us.` = US cross-region profile.
-      model: "bedrock/us.anthropic.claude-opus-4-8"
+      # Model is intentionally NOT overridden here — falls through to
+      # the chart default in values.yaml
+      # (bedrock/us.anthropic.claude-sonnet-4-6 as of #463), which is
+      # in the recommended-for-chat tier (Bedrock prompt caching,
+      # ~5× cheaper than Opus, better at structured tool calls).
       # Use the upstream default (16384); 1024 caused real-plan truncation.
       # Override here only if you have a reason.
       request_timeout_seconds: 90
