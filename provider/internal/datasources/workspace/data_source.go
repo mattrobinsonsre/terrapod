@@ -41,6 +41,7 @@ type workspaceDataSourceModel struct {
 	AgentPoolID                   types.String `tfsdk:"agent_pool_id"`
 	VarFiles                      types.List   `tfsdk:"var_files"`
 	TriggerPrefixes               types.List   `tfsdk:"trigger_prefixes"`
+	DriftIgnoreRules              types.List   `tfsdk:"drift_ignore_rules"`
 	DriftDetectionEnabled         types.Bool   `tfsdk:"drift_detection_enabled"`
 	DriftDetectionIntervalSeconds types.Int64  `tfsdk:"drift_detection_interval_seconds"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
@@ -91,6 +92,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"agent_pool_id":                    computedString("Agent pool ID."),
 			"var_files":                        computedList("Var files for -var-file arguments."),
 			"trigger_prefixes":                 computedList("Repo-root-relative paths the VCS sparse-checkout must include in addition to working_directory (e.g. sibling modules referenced via `source = \"../foo\"`)."),
+			"drift_ignore_rules":               computedList("Glob-aware patterns suppressed by the drift-result classifier (#482). See the resource attribute docs for syntax."),
 			"drift_detection_enabled":          computedBool("Drift detection enabled."),
 			"drift_detection_interval_seconds": computedInt64("Drift detection interval."),
 			"ai_summary_mode":                  computedString("Per-workspace AI plan-summary mode: 'default' (follow deployment global), 'enabled' (always summarise), or 'disabled' (never summarise)."),
@@ -220,6 +222,14 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 		m.TriggerPrefixes = val
 	} else {
 		m.TriggerPrefixes = types.ListNull(types.StringType)
+	}
+
+	if rules := terrapod.GetListAttr(res, "drift-ignore-rules"); len(rules) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, rules)
+		diags.Append(d...)
+		m.DriftIgnoreRules = val
+	} else {
+		m.DriftIgnoreRules = types.ListNull(types.StringType)
 	}
 
 	if labels := terrapod.GetMapAttr(res, "labels"); len(labels) > 0 {

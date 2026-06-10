@@ -348,6 +348,18 @@ class Workspace(Base):
     # that to break workspace deletion via cascade. The UI handles a 404 on the
     # click-through gracefully.
     drift_latest_run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    # Per-workspace allowlist of resource-address + attribute-path glob
+    # patterns (#482). When a drift run reports `has_changes=True`, every
+    # changed attribute is matched against this list before drift_status
+    # is computed. If every change matches a rule → drift_status=no_drift.
+    # Empty list (default) means classic behaviour: every change counts
+    # as drift. Examples:
+    #   "aws_iam_role.foo.tags.Environment"   (single attr on one resource)
+    #   "module.eks*.argocd_cluster.*.config.tls_client_config.ca_data"
+    #   "aws_autoscaling_group.workers[*]"   (any change to any workers[i])
+    drift_ignore_rules: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default="[]", default=list
+    )
 
     # State divergence — set when an apply Job succeeds but state upload fails
     state_diverged: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")

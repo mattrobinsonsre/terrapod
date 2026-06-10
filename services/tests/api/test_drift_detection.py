@@ -60,6 +60,7 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.agent_pool_id = overrides.get("agent_pool_id", None)
     ws.var_files = []
     ws.trigger_prefixes = []
+    ws.drift_ignore_rules = []
     ws.vcs_last_polled_at = None
     ws.vcs_last_error = None
     ws.vcs_last_error_at = None

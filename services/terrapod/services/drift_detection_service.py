@@ -89,6 +89,84 @@ async def _has_state(db: AsyncSession, workspace_id: uuid.UUID) -> bool:
     return result.scalar_one() > 0
 
 
+async def _apply_drift_ignore_rules(run: Run, rules: list[str]) -> str:
+    """Run a drift-detection plan through `drift_ignore_classifier` (#482).
+
+    Fetches the plan JSON from storage, feeds it through the classifier
+    along with the workspace's rules, and returns the resulting drift
+    status — `"no_drift"` when every change is suppressed, `"drifted"`
+    otherwise. Any failure path (missing object, malformed JSON,
+    classifier crash) is logged and conservatively falls back to
+    `"drifted"` so a runtime hiccup never *silences* drift the
+    operator intended to surface.
+    """
+    import json
+
+    from terrapod.services.drift_ignore_classifier import classify_drift
+    from terrapod.storage import get_storage
+    from terrapod.storage.keys import plan_json_output_key
+    from terrapod.storage.protocol import ObjectNotFoundError
+
+    storage = get_storage()
+    key = plan_json_output_key(str(run.workspace_id), str(run.id))
+    try:
+        raw = await storage.get(key)
+    except ObjectNotFoundError:
+        logger.warning(
+            "drift_ignore: plan JSON missing; treating as drift",
+            run_id=str(run.id),
+            key=key,
+        )
+        return "drifted"
+    except Exception as e:
+        logger.warning(
+            "drift_ignore: storage error; treating as drift",
+            run_id=str(run.id),
+            error=str(e),
+        )
+        return "drifted"
+
+    try:
+        plan = json.loads(raw)
+    except (ValueError, TypeError) as e:
+        logger.warning(
+            "drift_ignore: plan JSON unparseable; treating as drift",
+            run_id=str(run.id),
+            error=str(e),
+        )
+        return "drifted"
+
+    try:
+        still_drifted, suppressed = classify_drift(plan, rules)
+    except Exception as e:
+        logger.warning(
+            "drift_ignore: classifier crashed; treating as drift",
+            run_id=str(run.id),
+            error=str(e),
+            exc_info=True,
+        )
+        return "drifted"
+
+    if not still_drifted and suppressed:
+        # Surface what we silenced so operators can audit the rule set
+        # against the run it just classified.
+        logger.info(
+            "drift_ignore: all changes suppressed by rules",
+            run_id=str(run.id),
+            suppressed=suppressed,
+            rules=rules,
+        )
+        return "no_drift"
+    if suppressed:
+        logger.info(
+            "drift_ignore: partial suppression — drift still flagged",
+            run_id=str(run.id),
+            suppressed=suppressed,
+            rules=rules,
+        )
+    return "drifted"
+
+
 async def _create_drift_run_vcs(
     db: AsyncSession,
     ws: Workspace,
@@ -352,7 +430,20 @@ async def handle_drift_run_completed(payload: dict) -> None:
         # Map run outcome to drift status
         if run.status == "planned":
             if run.has_changes is True:
-                ws.drift_status = "drifted"
+                # If the workspace has `drift_ignore_rules` configured (#482),
+                # filter the plan JSON before declaring drift. Every changed
+                # attribute is matched against the rule globs; if all
+                # match, the drift is suppressed and the status flips to
+                # no_drift. Empty rules → fall through to the historical
+                # "any change is drift" behaviour. Plan JSON has to be
+                # actually available (has_json_output=True) — runs that
+                # errored mid-upload are conservatively treated as drift.
+                if ws.drift_ignore_rules and run.has_json_output:
+                    ws.drift_status = await _apply_drift_ignore_rules(
+                        run, list(ws.drift_ignore_rules)
+                    )
+                else:
+                    ws.drift_status = "drifted"
             elif run.has_changes is False:
                 ws.drift_status = "no_drift"
             else:

@@ -337,6 +337,7 @@ Workspaces support the following drift detection attributes (settable on create 
 |---|---|---|---|
 | `drift-detection-enabled` | boolean | `true` (VCS) / `false` (non-VCS) | Enable or disable automatic drift detection. Auto-enabled when a VCS connection is set |
 | `drift-detection-interval-seconds` | integer | `86400` | How often to run drift detection checks (minimum: 3600 seconds / 1 hour) |
+| `drift-ignore-rules` | list[string] | `[]` | Glob-aware patterns silenced by the drift-result classifier (#482). Each rule is a Terraform address optionally suffixed with a dotted attribute path; `*` matches zero or more non-`.` chars (spans `[N]` indices), `[*]` matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys — so use carefully. Max 50 entries, ≤ 500 chars each. Examples: `aws_iam_role.foo.tags.Environment`, `aws_autoscaling_group.workers[*].desired_capacity`, `module.eks*.argocd_cluster.*.config.tls_client_config.ca_data`. Affects drift-detection runs only — regular plan/apply is untouched. See [drift-ignore-rules.md](drift-ignore-rules.md) for the full grammar and recipes |
 
 ### AI Plan Summary Attributes
 

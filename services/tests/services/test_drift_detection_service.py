@@ -14,6 +14,7 @@ def _mock_workspace(**overrides):
     ws.drift_last_checked_at = overrides.get("drift_last_checked_at", None)
     ws.drift_status = overrides.get("drift_status", "")
     ws.drift_latest_run_id = overrides.get("drift_latest_run_id", None)
+    ws.drift_ignore_rules = overrides.get("drift_ignore_rules", [])
     ws.locked = overrides.get("locked", False)
     ws.vcs_connection_id = overrides.get("vcs_connection_id", None)
     ws.vcs_repo_url = overrides.get("vcs_repo_url", "")

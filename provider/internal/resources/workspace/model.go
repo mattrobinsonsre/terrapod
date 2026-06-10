@@ -73,6 +73,7 @@ type workspaceModel struct {
 	AgentPoolID                   types.String `tfsdk:"agent_pool_id"`
 	VarFiles                      types.List   `tfsdk:"var_files"`
 	TriggerPrefixes               types.List   `tfsdk:"trigger_prefixes"`
+	DriftIgnoreRules              types.List   `tfsdk:"drift_ignore_rules"`
 	DriftDetectionEnabled         types.Bool   `tfsdk:"drift_detection_enabled"`
 	DriftDetectionIntervalSeconds types.Int64  `tfsdk:"drift_detection_interval_seconds"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`

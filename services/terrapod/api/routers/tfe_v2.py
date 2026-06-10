@@ -180,6 +180,55 @@ def _validate_trigger_prefixes(raw: object) -> list[str]:
     return result
 
 
+_DRIFT_IGNORE_RULE_RE = re.compile(r"^[A-Za-z0-9_*.\-\[\]\"]+$")
+
+
+def _validate_drift_ignore_rules(raw: object) -> list[str]:
+    """Validate `drift-ignore-rules` input (#482).
+
+    Each entry is a glob-aware Terraform-address-plus-attribute-path
+    string consumed by `drift_ignore_classifier.classify_drift`. The
+    character set is intentionally narrow — letters, digits, the
+    delimiters `.` `[` `]` `*`, plus underscore, hyphen, double quote
+    (for `for_each` keys). Anything else is rejected so a stray space
+    or backtick can't sneak through and cause a regex-compile failure
+    later in the drift-classifier path. Max 50 entries; max 500 chars
+    per entry (loose enough for `module.x.module.y.aws_iam_policy.z
+    .statements[*].conditions[*].values[*]`-style paths without
+    risking unbounded growth).
+    """
+    if not isinstance(raw, list):
+        raise HTTPException(status_code=422, detail="drift-ignore-rules must be a list of strings")
+    if len(raw) > 50:
+        raise HTTPException(status_code=422, detail="drift-ignore-rules: maximum 50 entries")
+    result: list[str] = []
+    for entry in raw:
+        if not isinstance(entry, str):
+            raise HTTPException(
+                status_code=422, detail="drift-ignore-rules entries must be strings"
+            )
+        v = entry.strip()
+        if not v:
+            raise HTTPException(
+                status_code=422, detail="drift-ignore-rules entries must be non-empty"
+            )
+        if len(v) > 500:
+            raise HTTPException(
+                status_code=422,
+                detail="drift-ignore-rules entries must be ≤ 500 characters",
+            )
+        if not _DRIFT_IGNORE_RULE_RE.match(v):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "drift-ignore-rules entries may only contain letters, digits, "
+                    "underscores, hyphens, dots, brackets, asterisks, and double quotes"
+                ),
+            )
+        result.append(v)
+    return result
+
+
 _WORKSPACE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
 
 
@@ -605,6 +654,7 @@ def _workspace_json(
                 else None,
                 "var-files": ws.var_files or [],
                 "trigger-prefixes": ws.trigger_prefixes or [],
+                "drift-ignore-rules": ws.drift_ignore_rules or [],
                 "ai-summary-mode": ws.ai_summary_mode,
                 "ai-summary-context": ws.ai_summary_context,
                 "drift-detection-enabled": ws.drift_detection_enabled,
@@ -909,6 +959,7 @@ async def create_workspace(
         vcs_branch=attrs.get("vcs-branch", ""),
         var_files=_validate_var_files(attrs.get("var-files", [])),
         trigger_prefixes=_validate_trigger_prefixes(attrs.get("trigger-prefixes", [])),
+        drift_ignore_rules=_validate_drift_ignore_rules(attrs.get("drift-ignore-rules", [])),
         drift_detection_enabled=attrs.get(
             "drift-detection-enabled",
             True if vcs_connection_id else False,
@@ -1368,6 +1419,8 @@ async def update_workspace(
         ws.var_files = _validate_var_files(attrs["var-files"])
     if "trigger-prefixes" in attrs:
         ws.trigger_prefixes = _validate_trigger_prefixes(attrs["trigger-prefixes"])
+    if "drift-ignore-rules" in attrs:
+        ws.drift_ignore_rules = _validate_drift_ignore_rules(attrs["drift-ignore-rules"])
     if "agent-pool-id" in attrs:
         import uuid as _uuid
 

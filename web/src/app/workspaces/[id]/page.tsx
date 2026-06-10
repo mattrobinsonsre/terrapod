@@ -46,6 +46,7 @@ interface WorkspaceAttrs {
   'owner-email': string
   'var-files': string[]
   'trigger-prefixes': string[]
+  'drift-ignore-rules': string[]
   'vcs-repo-url': string
   'vcs-branch': string
   'vcs-connection-id': string | null
@@ -252,6 +253,8 @@ function WorkspaceDetailContent() {
   const [newVarFile, setNewVarFile] = useState('')
   const [editTriggerPrefixes, setEditTriggerPrefixes] = useState<string[]>([])
   const [newTriggerPrefix, setNewTriggerPrefix] = useState('')
+  const [editDriftIgnoreRules, setEditDriftIgnoreRules] = useState<string[]>([])
+  const [newDriftIgnoreRule, setNewDriftIgnoreRule] = useState('')
   const [editWorkingDir, setEditWorkingDir] = useState('')
   const [editVcsConnectionId, setEditVcsConnectionId] = useState<string | null>(null)
   const [editVcsRepoUrl, setEditVcsRepoUrl] = useState('')
@@ -934,6 +937,8 @@ function WorkspaceDetailContent() {
     setNewVarFile('')
     setEditTriggerPrefixes(workspace.attributes['trigger-prefixes'] || [])
     setNewTriggerPrefix('')
+    setEditDriftIgnoreRules(workspace.attributes['drift-ignore-rules'] || [])
+    setNewDriftIgnoreRule('')
     setEditWorkingDir(workspace.attributes['working-directory'] || '')
     setEditVcsConnectionId(workspace.attributes['vcs-connection-id'] || null)
     setEditVcsRepoUrl(workspace.attributes['vcs-repo-url'] || '')
@@ -990,6 +995,7 @@ function WorkspaceDetailContent() {
               'working-directory': editWorkingDir,
               'var-files': editVarFiles,
               'trigger-prefixes': editTriggerPrefixes,
+              'drift-ignore-rules': editDriftIgnoreRules,
               'vcs-repo-url': editVcsRepoUrl,
               'vcs-branch': editVcsBranch,
               'vcs-workflow': editVcsWorkflow,
@@ -1987,6 +1993,68 @@ function WorkspaceDetailContent() {
                         </div>
                       ) : (
                         <span className="text-slate-500">None (uses working directory)</span>
+                      )}
+                    </dd>
+                  )}
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-xs text-slate-500 mb-1">Drift Ignore Rules</dt>
+                  {editing && perms['can-update'] ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-slate-400">
+                        Glob-aware Terraform address + attribute paths suppressed by the drift classifier. <code className="text-[10px] bg-slate-800 px-1">*</code> matches zero or more non-<code className="text-[10px] bg-slate-800 px-1">.</code> chars (spans <code className="text-[10px] bg-slate-800 px-1">[N]</code> indices); <code className="text-[10px] bg-slate-800 px-1">[*]</code> matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys. Affects drift only, not regular plan/apply. See <a href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/drift-ignore-rules.md" target="_blank" rel="noreferrer" className="text-brand-400 hover:underline">drift-ignore-rules.md</a> for the full grammar.
+                      </p>
+                      {editDriftIgnoreRules.map((r, i) => (
+                        <div key={`${r}-${i}`} className="flex items-center gap-2">
+                          <code className="text-sm text-slate-200 bg-slate-700 px-2 py-0.5 rounded flex-1 truncate">{r}</code>
+                          <button
+                            onClick={() => setEditDriftIgnoreRules(editDriftIgnoreRules.filter((_, j) => j !== i))}
+                            className="text-xs text-red-400 hover:text-red-300"
+                          >Remove</button>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={newDriftIgnoreRule}
+                          onChange={(e) => setNewDriftIgnoreRule(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newDriftIgnoreRule.trim()) {
+                              e.preventDefault()
+                              const v = newDriftIgnoreRule.trim()
+                              if (v && !editDriftIgnoreRules.includes(v)) {
+                                setEditDriftIgnoreRules([...editDriftIgnoreRules, v])
+                              }
+                              setNewDriftIgnoreRule('')
+                            }
+                          }}
+                          placeholder="e.g. module.eks*.argocd_cluster.*.config.tls_client_config.ca_data"
+                          className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono"
+                        />
+                        <button
+                          onClick={() => {
+                            if (newDriftIgnoreRule.trim()) {
+                              const v = newDriftIgnoreRule.trim()
+                              if (v && !editDriftIgnoreRules.includes(v)) {
+                                setEditDriftIgnoreRules([...editDriftIgnoreRules, v])
+                              }
+                              setNewDriftIgnoreRule('')
+                            }
+                          }}
+                          className="text-xs text-brand-400 hover:text-brand-300"
+                        >Add</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">
+                      {(attrs['drift-ignore-rules'] || []).length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {attrs['drift-ignore-rules'].map((r) => (
+                            <code key={r} className="bg-slate-700 px-2 py-0.5 rounded text-xs font-mono">{r}</code>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-500">None (every plan diff counts as drift)</span>
                       )}
                     </dd>
                   )}

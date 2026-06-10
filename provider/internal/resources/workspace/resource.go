@@ -165,6 +165,11 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Optional:    true,
 				ElementType: types.StringType,
 			},
+			"drift_ignore_rules": schema.ListAttribute{
+				Description: "Glob-aware patterns suppressed by the drift-result classifier (#482). Each entry is a Terraform resource address optionally suffixed with a dotted attribute path; `*` matches zero or more non-`.` characters (so it can span `[N]` indices but not segment boundaries), and `[*]` matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys — so use carefully. Examples: `aws_iam_role.foo.tags.Environment`, `aws_autoscaling_group.workers[*].desired_capacity`, `module.eks*.argocd_cluster.*.config.tls_client_config.ca_data`, `aws_iam_role.foo`. Empty list (the default) means classic drift behaviour: every plan diff counts. Affects drift-detection runs only — regular plan/apply is untouched.",
+				Optional:    true,
+				ElementType: types.StringType,
+			},
 			"drift_detection_enabled": schema.BoolAttribute{
 				Description: "Enable drift detection for this workspace. Defaults to true for VCS-connected workspaces, false otherwise.",
 				Optional:    true,
@@ -549,6 +554,13 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		}
 		req.TriggerPrefixes = triggerPrefixes
 	}
+	if !m.DriftIgnoreRules.IsNull() && !m.DriftIgnoreRules.IsUnknown() {
+		rules := []string{}
+		for _, v := range m.DriftIgnoreRules.Elements() {
+			rules = append(rules, v.(types.String).ValueString())
+		}
+		req.DriftIgnoreRules = rules
+	}
 	if !m.DriftDetectionEnabled.IsNull() && !m.DriftDetectionEnabled.IsUnknown() {
 		v := m.DriftDetectionEnabled.ValueBool()
 		req.DriftDetectionEnabled = &v
@@ -642,6 +654,13 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 			triggerPrefixes = append(triggerPrefixes, v.(types.String).ValueString())
 		}
 		req.TriggerPrefixes = triggerPrefixes
+	}
+	if !m.DriftIgnoreRules.IsNull() && !m.DriftIgnoreRules.IsUnknown() {
+		rules := []string{}
+		for _, v := range m.DriftIgnoreRules.Elements() {
+			rules = append(rules, v.(types.String).ValueString())
+		}
+		req.DriftIgnoreRules = rules
 	}
 	if !m.DriftDetectionEnabled.IsNull() && !m.DriftDetectionEnabled.IsUnknown() {
 		v := m.DriftDetectionEnabled.ValueBool()
@@ -822,6 +841,17 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		tpVal, tpDiag := types.ListValueFrom(ctx, types.StringType, ws.TriggerPrefixes)
 		diags.Append(tpDiag...)
 		m.TriggerPrefixes = tpVal
+	}
+
+	// Drift-ignore rules (#482) — same null-vs-empty preservation rule
+	// as trigger_prefixes. Server default `[]` is preserved as null in
+	// state when the caller didn't declare the attribute.
+	if m.DriftIgnoreRules.IsNull() && len(ws.DriftIgnoreRules) == 0 {
+		m.DriftIgnoreRules = types.ListNull(types.StringType)
+	} else {
+		dirVal, dirDiag := types.ListValueFrom(ctx, types.StringType, ws.DriftIgnoreRules)
+		diags.Append(dirDiag...)
+		m.DriftIgnoreRules = dirVal
 	}
 
 	// Labels — same null-vs-empty-map rule as trigger_prefixes above.

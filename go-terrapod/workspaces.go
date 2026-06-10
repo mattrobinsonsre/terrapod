@@ -42,6 +42,11 @@ type Workspace struct {
 	Labels                        map[string]string `json:"labels,omitempty"`
 	VarFiles                      []string          `json:"var-files,omitempty"`
 	TriggerPrefixes               []string          `json:"trigger-prefixes,omitempty"`
+	// DriftIgnoreRules is a list of resource-address-plus-attribute-path
+	// glob patterns suppressed by the drift-result classifier (#482).
+	// Empty list (default) means classic behaviour: every plan diff
+	// counts as drift. See docs/api-reference.md for the rule grammar.
+	DriftIgnoreRules              []string          `json:"drift-ignore-rules,omitempty"`
 	DriftDetectionEnabled         bool              `json:"drift-detection-enabled"`
 	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
 	DriftStatus                   string            `json:"drift-status,omitempty"`
@@ -114,6 +119,7 @@ type CreateWorkspaceRequest struct {
 	Labels                        map[string]string  `json:"labels,omitempty"`
 	VarFiles                      []string           `json:"var-files,omitempty"`
 	TriggerPrefixes               []string           `json:"trigger-prefixes,omitempty"`
+	DriftIgnoreRules              []string           `json:"drift-ignore-rules,omitempty"`
 	DriftDetectionEnabled         *bool              `json:"drift-detection-enabled,omitempty"`
 	DriftDetectionIntervalSeconds *int64             `json:"drift-detection-interval-seconds,omitempty"`
 	// AISummaryMode is the three-state per-workspace override (#401):
@@ -153,6 +159,7 @@ type UpdateWorkspaceRequest struct {
 	Labels                        map[string]string `json:"labels,omitempty"`
 	VarFiles                      []string          `json:"var-files,omitempty"`
 	TriggerPrefixes               []string          `json:"trigger-prefixes,omitempty"`
+	DriftIgnoreRules              []string          `json:"drift-ignore-rules,omitempty"`
 	DriftDetectionEnabled         *bool             `json:"drift-detection-enabled,omitempty"`
 	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
 	// AISummaryMode see CreateWorkspaceRequest. On UPDATE, empty string
@@ -361,6 +368,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.TriggerPrefixes != nil {
 		attrs["trigger-prefixes"] = req.TriggerPrefixes
 	}
+	if req.DriftIgnoreRules != nil {
+		attrs["drift-ignore-rules"] = req.DriftIgnoreRules
+	}
 	if req.DriftDetectionEnabled != nil {
 		attrs["drift-detection-enabled"] = *req.DriftDetectionEnabled
 	}
@@ -434,6 +444,9 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.TriggerPrefixes != nil {
 		attrs["trigger-prefixes"] = req.TriggerPrefixes
 	}
+	if req.DriftIgnoreRules != nil {
+		attrs["drift-ignore-rules"] = req.DriftIgnoreRules
+	}
 	if req.DriftDetectionEnabled != nil {
 		attrs["drift-detection-enabled"] = *req.DriftDetectionEnabled
 	}
@@ -502,6 +515,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		Labels:                GetMapAttr(res, "labels"),
 		VarFiles:              GetListAttr(res, "var-files"),
 		TriggerPrefixes:       GetListAttr(res, "trigger-prefixes"),
+		DriftIgnoreRules:      GetListAttr(res, "drift-ignore-rules"),
 		DriftDetectionEnabled: GetBoolAttr(res, "drift-detection-enabled"),
 		DriftStatus:           GetStringAttr(res, "drift-status"),
 		DriftLastCheckedAt:    GetStringAttr(res, "drift-last-checked-at"),

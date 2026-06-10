@@ -56,6 +56,7 @@ def _mock_workspace(ws_id=None, **overrides):
     ws.owner_email = "test@example.com"
     ws.var_files = []
     ws.trigger_prefixes = []
+    ws.drift_ignore_rules = []
     ws.vcs_last_polled_at = None
     ws.vcs_last_error = None
     ws.vcs_last_error_at = None
