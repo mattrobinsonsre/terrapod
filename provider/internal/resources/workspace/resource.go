@@ -215,53 +215,102 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			// Read-only computed attrs all carry `UseStateForUnknown` so a
+			// PATCH on any other attribute doesn't make Terraform mark
+			// these as `(known after apply)` in the plan diff. They're
+			// still refreshed on every Read; the plan modifier just
+			// stops the framework from speculatively unsetting them
+			// when an unrelated field is changing. The values DO
+			// legitimately drift server-side (drift cycles complete,
+			// VCS polls run, autodiscovery moves workspaces through
+			// lifecycle states) — those updates land via Read and
+			// surface as the next plan's diff. Without these modifiers
+			// every plan that touches any workspace produces ~10 lines
+			// of "no_drift -> (known after apply)" noise that obscures
+			// the actual change.
 			"drift_status": schema.StringAttribute{
 				Description: "Current drift status: \"\" (never checked), \"no_drift\", \"drifted\", or \"errored\".",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"drift_last_checked_at": schema.StringAttribute{
 				Description: "Timestamp of the last drift check.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"drift_latest_run_id": schema.StringAttribute{
 				Description: "ID of the drift run that produced the current `drift_status`, prefixed `run-…`. Empty when drift has never run or when cleared by a successful apply.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"state_diverged": schema.BoolAttribute{
 				Description: "True when an apply Job succeeded but uploading the resulting state to Terrapod failed; the recorded state is out of sync with reality.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"lifecycle_state": schema.StringAttribute{
 				Description: "Autodiscovery lifecycle state for managed workspaces: \"active\", \"pending_deletion\", or \"archived\".",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"lifecycle_reason": schema.StringAttribute{
 				Description: "Human-readable explanation of `lifecycle_state`. Empty for active workspaces.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"vcs_last_polled_at": schema.StringAttribute{
 				Description: "Timestamp of the most recent successful VCS poll cycle.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"vcs_last_error": schema.StringAttribute{
 				Description: "Most recent VCS poll error message. Empty when the last poll succeeded.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"vcs_last_error_at": schema.StringAttribute{
 				Description: "Timestamp of `vcs_last_error`.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"agent_pool_name": schema.StringAttribute{
 				Description: "Human-readable name of the assigned agent pool, server-derived from `agent_pool_id`.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"vcs_connection_name": schema.StringAttribute{
 				Description: "Human-readable name of the assigned VCS connection, server-derived from `vcs_connection_id`.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"locked": schema.BoolAttribute{
 				Description: "Whether the workspace is locked.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"created_at": schema.StringAttribute{
 				Description: "Creation timestamp.",
@@ -273,6 +322,9 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"updated_at": schema.StringAttribute{
 				Description: "Last update timestamp.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -754,26 +806,27 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	}
 	m.AISummaryContext = types.StringValue(ws.AISummaryContext)
 
-	// Var files
-	if len(ws.VarFiles) > 0 {
-		val, d := types.ListValueFrom(ctx, types.StringType, ws.VarFiles)
-		diags.Append(d...)
-		m.VarFiles = val
-	} else {
-		m.VarFiles = types.ListNull(types.StringType)
-	}
+	// Var files — same null-vs-empty rule as trigger_prefixes above.
+	// API always returns `[]`, so we always materialise a typed list.
+	vfVal, vfDiag := types.ListValueFrom(ctx, types.StringType, ws.VarFiles)
+	diags.Append(vfDiag...)
+	m.VarFiles = vfVal
 
 	// Trigger prefixes — repo paths beyond `working_directory` that must
 	// land in the sparse-checkout fetch (typically because the workspace's
 	// terraform references siblings via `module ... { source = "../foo" }`
 	// — sparse cone mode includes parents but not siblings).
-	if len(ws.TriggerPrefixes) > 0 {
-		val, d := types.ListValueFrom(ctx, types.StringType, ws.TriggerPrefixes)
-		diags.Append(d...)
-		m.TriggerPrefixes = val
-	} else {
-		m.TriggerPrefixes = types.ListNull(types.StringType)
-	}
+	//
+	// Always materialise as a typed list (empty when nil/empty), never
+	// null. The API consistently returns `[]` (never absent), and an
+	// HCL caller that declares `trigger_prefixes = []` produces a
+	// non-null empty list at plan time — flipping to null on Read
+	// triggers terraform-plugin-framework's "Provider produced
+	// inconsistent result after apply" check. This was v0.35.4's apply
+	// bug on terrapod-config (#481).
+	tpVal, tpDiag := types.ListValueFrom(ctx, types.StringType, ws.TriggerPrefixes)
+	diags.Append(tpDiag...)
+	m.TriggerPrefixes = tpVal
 
 	// Labels
 	if len(ws.Labels) > 0 {
