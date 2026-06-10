@@ -287,6 +287,51 @@ class TestTransitionRun:
         assert ws.drift_status == ""
         assert ws.drift_last_checked_at is None
 
+    @patch("terrapod.services.run_service.fire_run_triggers", new_callable=AsyncMock)
+    async def test_applied_clears_state_diverged(self, mock_fire):
+        """A successful non-speculative apply brings state into agreement with
+        reality, so a stale state_diverged flag must clear. This is the ONLY
+        thing that clears it for a workspace whose applies are serial-neutral
+        no-ops (perpetual phantom diff): the runner skips the redundant state
+        upload, so the upload-path clear never fires.
+        """
+        db = AsyncMock(spec=AsyncSession)
+        ws = MagicMock()
+        ws.drift_detection_enabled = False
+        ws.state_diverged = True
+        db.get = AsyncMock(return_value=ws)
+
+        run = _mock_run(
+            status="applying",
+            source="tfe-api",
+            plan_only=False,
+            apply_started_at=datetime.now(UTC),
+        )
+        await transition_run(db, run, "applied")
+
+        assert ws.state_diverged is False
+
+    @patch("terrapod.services.run_service.fire_run_triggers", new_callable=AsyncMock)
+    async def test_applied_does_not_clear_state_diverged_for_plan_only(self, mock_fire):
+        """plan_only runs don't mutate infrastructure, so they don't resolve a
+        divergence. Leave the flag set.
+        """
+        db = AsyncMock(spec=AsyncSession)
+        ws = MagicMock()
+        ws.drift_detection_enabled = False
+        ws.state_diverged = True
+        db.get = AsyncMock(return_value=ws)
+
+        run = _mock_run(
+            status="applying",
+            source="tfe-api",
+            plan_only=True,
+            apply_started_at=datetime.now(UTC),
+        )
+        await transition_run(db, run, "applied")
+
+        assert ws.state_diverged is True  # untouched
+
     async def test_error_message_stored(self):
         db = AsyncMock(spec=AsyncSession)
         run = _mock_run(status="planning")

@@ -443,6 +443,22 @@ async def transition_run(
     if target_status == "applied" and not run.plan_only:
         await fire_run_triggers(db, run.workspace_id)
 
+    # A successful (non-speculative) apply brings tofu/terraform state into
+    # agreement with the recorded state — by definition there is no divergence
+    # right now, so clear any stale state_diverged flag. This is the ONLY thing
+    # that clears it for a workspace whose applies are serial-neutral no-ops (a
+    # perpetual phantom diff — write-only attributes re-sent every apply, e.g.
+    # auth0 client secrets): tofu doesn't bump the serial, the runner skips the
+    # redundant state upload, so the upload-path clear (run_artifacts / tfe_v2
+    # state-version content) never fires. Without this the flag — once set —
+    # sticks forever even though every subsequent apply succeeds. db.get is
+    # identity-mapped, so this shares the session-cached Workspace with the
+    # drift-status block below (no extra round trip).
+    if target_status == "applied" and not run.plan_only:
+        ws = await db.get(Workspace, run.workspace_id)
+        if ws is not None and ws.state_diverged:
+            ws.state_diverged = False
+
     # A successful non-speculative apply means tofu/terraform just
     # brought state into agreement with the configured infrastructure
     # — by definition, drift is zero right now. Reset drift_status to
