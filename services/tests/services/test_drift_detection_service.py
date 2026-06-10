@@ -348,6 +348,125 @@ class TestHandleDriftRunCompleted:
         assert mock_publish.call_count == 3
 
 
+class TestCreateDriftRunVcs:
+    """Drift detection on VCS-connected workspaces must download via the
+    VCSArchiveCache / git_fetch pipeline — same as a normal VCS-poll
+    run — NOT through the raw `download_archive` provider API.
+
+    Production incident: pre-v0.35.1 the raw API path was masked
+    because drift rarely fired (the wide _is_workspace_busy gate
+    skipped almost every workspace). v0.35.1 narrowed the gate, drift
+    started firing on every drift-enabled workspace, and the raw
+    GitHub tarball (wrapped in a top-level `<owner>-<repo>-<sha>/`
+    directory) made the runner's `chdir /workspace` land outside the
+    repo content — every drift run errored with `Given variables file
+    envs/<...>.tfvars does not exist`. The VCSArchiveCache pipeline
+    produces a clean, root-level tarball that matches what regular
+    VCS-poll runs use.
+
+    # Code ↔ Tests contract (CLAUDE.md): regression test pins the
+    # function's archive-acquisition path. Widening _is_runner_busy
+    # without also pinning this would reopen the same incident.
+    """
+
+    @patch(
+        "terrapod.services.drift_detection_service.run_service.queue_run", new_callable=AsyncMock
+    )
+    @patch(
+        "terrapod.services.drift_detection_service.run_service.create_run", new_callable=AsyncMock
+    )
+    @patch(
+        "terrapod.services.drift_detection_service.run_service.mark_configuration_uploaded",
+        new_callable=AsyncMock,
+    )
+    @patch(
+        "terrapod.services.drift_detection_service.run_service.create_configuration_version",
+        new_callable=AsyncMock,
+    )
+    @patch("terrapod.services.vcs_poller._stream_cv_upload_from_cache", new_callable=AsyncMock)
+    @patch(
+        "terrapod.services.vcs_archive_cache.VCSArchiveCache.get_or_fetch", new_callable=AsyncMock
+    )
+    @patch("terrapod.services.vcs_poller._get_branch_sha", new_callable=AsyncMock)
+    @patch("terrapod.services.vcs_poller._resolve_branch", new_callable=AsyncMock)
+    @patch("terrapod.services.vcs_poller._parse_repo_url")
+    async def test_uses_vcs_archive_cache_not_raw_download(
+        self,
+        mock_parse,
+        mock_resolve,
+        mock_sha,
+        mock_fetch,
+        mock_upload,
+        mock_cv,
+        mock_mark,
+        mock_create,
+        mock_queue,
+    ):
+        """`_create_drift_run_vcs` MUST call `VCSArchiveCache.get_or_fetch`
+        and `_stream_cv_upload_from_cache`. It MUST NOT call the raw
+        `download_archive` provider API.
+        """
+        from terrapod.services.drift_detection_service import _create_drift_run_vcs
+
+        ws = _mock_workspace(
+            vcs_connection_id=uuid.uuid4(),
+            vcs_repo_url="https://github.com/example/repo",
+        )
+
+        conn = MagicMock()
+        conn.status = "active"
+
+        cv = MagicMock()
+        cv.id = uuid.uuid4()
+
+        mock_db = AsyncMock()
+        mock_db.get = AsyncMock(return_value=conn)
+        mock_parse.return_value = ("example", "repo")
+        mock_resolve.return_value = "main"
+        mock_sha.return_value = "deadbeef"
+        mock_fetch.return_value = "vcs-cache/example/repo/deadbeef.tar.gz"
+        mock_cv.return_value = cv
+        mock_mark.return_value = cv
+        mock_create.return_value = MagicMock()
+        mock_queue.return_value = MagicMock()
+
+        await _create_drift_run_vcs(mock_db, ws)
+
+        # The contract: the VCSArchiveCache pipeline was used.
+        mock_fetch.assert_awaited_once()
+        # paths=None — drift fetches the whole repo, same as a normal
+        # VCS-poll apply that lacks trigger prefixes.
+        _, fetch_kwargs = mock_fetch.call_args
+        assert fetch_kwargs.get("paths") is None
+        # And the streaming upload helper from vcs_poller was called.
+        mock_upload.assert_awaited_once()
+
+    async def test_raw_download_archive_not_referenced(self):
+        """Belt-and-braces source-introspection: the drift_detection
+        module must not import `_download_archive` from `vcs_poller`.
+        Importing it would re-enable the broken path even if the
+        active code path is correct.
+        """
+        import inspect
+
+        from terrapod.services import drift_detection_service
+
+        src = inspect.getsource(drift_detection_service)
+        # The forbidden import is `from terrapod.services.vcs_poller
+        # import (..., _download_archive, ...)`. The function name
+        # might appear in comments; we only care that it isn't
+        # imported.
+        for line in src.splitlines():
+            line = line.strip()
+            if line.startswith("#"):
+                continue
+            assert "_download_archive" not in line, (
+                f"drift detection must not reference _download_archive "
+                f"(the raw GitHub tarball path with wrapping directory). "
+                f"Offending line: {line!r}"
+            )
+
+
 class TestCreateDriftRunNonVcs:
     """Drift detection on non-VCS workspaces must plan against the CV from
     the workspace's latest successful apply — i.e. the bytes that produced

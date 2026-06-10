@@ -25,8 +25,6 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db_session
 from terrapod.logging_config import get_logger
 from terrapod.services import run_service
-from terrapod.storage import get_storage
-from terrapod.storage.keys import config_version_key
 
 logger = get_logger(__name__)
 
@@ -97,14 +95,30 @@ async def _create_drift_run_vcs(
 ) -> Run | None:
     """Create a drift detection run for a VCS-connected workspace.
 
-    Downloads the archive from VCS, creates a ConfigurationVersion,
-    and queues a plan-only drift run.
+    Goes through the same VCSArchiveCache / git_fetch pipeline that the
+    regular VCS-poll path uses (`_stream_cv_upload_from_cache`) — NOT
+    the raw `download_archive` provider API. The raw API returns a
+    tarball wrapped in a top-level `<owner>-<repo>-<sha>/` directory;
+    the runner's `chdir /workspace` after extraction lands one level
+    above the actual repo content, and any `var-files` referenced from
+    the workspace's settings (e.g. `envs/prod-us2.tfvars`) resolve as
+    missing. Pre-v0.35.1 this latent bug was masked because drift
+    detection rarely fired (the `_is_workspace_busy` gate was so wide
+    it skipped almost everything); when v0.35.1 narrowed the gate to
+    `RUNNER_BUSY_STATES`, drift started running on every drift-enabled
+    workspace and tripped on this immediately — every drift run errored
+    with `Given variables file <path> does not exist`.
+
+    Using `VCSArchiveCache.get_or_fetch` produces a clean, root-level
+    tarball identical to what regular VCS-poll runs use, so the runner
+    init step behaves the same as on a normal apply.
     """
+    from terrapod.services.vcs_archive_cache import VCSArchiveCache
     from terrapod.services.vcs_poller import (
-        _download_archive,
         _get_branch_sha,
         _parse_repo_url,
         _resolve_branch,
+        _stream_cv_upload_from_cache,
     )
 
     conn = await db.get(VCSConnection, ws.vcs_connection_id)
@@ -131,10 +145,19 @@ async def _create_drift_run_vcs(
     if not sha:
         return None
 
+    cache = VCSArchiveCache()
     try:
-        archive = await _download_archive(conn, owner, repo, sha)
+        # `paths=None` fetches the whole repo. Drift detection has no
+        # narrowing context (no trigger_prefixes equivalent for the
+        # drift-check-fires-on-its-own path); the full repo matches
+        # what a normal VCS-poll apply would have used. The cache is
+        # keyed by (conn, sha, paths) so other concurrent paths
+        # narrowing the same sha don't share this entry.
+        cache_storage_key = await cache.get_or_fetch(conn, owner, repo, sha, paths=None)
     except Exception as e:
-        logger.error("Failed to download archive for drift check", workspace=ws.name, error=str(e))
+        logger.error(
+            "Failed to fetch repo archive for drift check", workspace=ws.name, error=str(e)
+        )
         return None
 
     cv = await run_service.create_configuration_version(
@@ -146,9 +169,15 @@ async def _create_drift_run_vcs(
     )
     await db.flush()
 
-    storage = get_storage()
-    key = config_version_key(str(ws.id), str(cv.id))
-    await storage.put(key, archive, content_type="application/x-tar")
+    try:
+        await _stream_cv_upload_from_cache(cache_storage_key, ws.id, cv.id)
+    except Exception as e:
+        logger.error(
+            "Failed to materialise cached archive for drift CV",
+            workspace=ws.name,
+            error=str(e),
+        )
+        return None
 
     cv = await run_service.mark_configuration_uploaded(db, cv)
 
