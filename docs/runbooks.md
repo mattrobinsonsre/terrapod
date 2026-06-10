@@ -78,6 +78,35 @@ A run is marked "stale" by the reconciler when it has been in `planning` or `app
 
 ---
 
+## Drift Run Exceeded Max Duration
+
+A drift detection run was errored by the reconciler because it spent longer than `runners.driftMaxDurationSeconds` (default: 30 min) in `planning`. Distinct from the generic stale timeout — the listener and runner pod were both healthy; the underlying `tofu plan` was simply taking too long for a background plan-only check.
+
+### Symptoms
+
+- Workspace's Drifted/Errored badge in the workspace list shows `drift-status: errored`
+- The linked drift run's `error_message` reads `Drift run exceeded max duration (1800s)`
+- Listener and runner pods for the drift run were healthy at the time of failure (no `stale` or `launch-timeout` message)
+
+### Diagnosis
+
+The typical underlying cause is a refresh path that talks to a rate-limited upstream — e.g. the `integrations/github` provider refreshing dozens of `github_repository` / `github_branch_protection` resources, or a Vault provider reading a long secret list. Confirm by looking at the run's plan log: if the last activity is a `Refreshing state...` line and no `Plan: ...` summary, the plan was wedged in refresh, not the drift cap itself misbehaving.
+
+### Resolution
+
+Two reasonable options depending on whether the slow refresh is expected:
+
+1. **Slow plan is expected** — raise the cap. `runners.driftMaxDurationSeconds: 3600` (or higher) in Helm values, then `helm upgrade`. Set to `0` to disable the cap entirely.
+2. **Slow plan is not expected** — investigate the refresh path itself. Common fixes: shrink the workspace by splitting it; configure a stricter provider page-size; add a provider-level cache (e.g. github_repository data sources reading the same repo from multiple resources).
+
+### Verification
+
+- A new drift cycle completes within the cap
+- `drift-status` returns to `no_drift` (or `drifted` if there's real drift to report)
+- The Errored badge clears on the workspace list
+
+---
+
 ## Runner OOM-Killed (#430)
 
 A runner Job was killed by Kubernetes because its container exceeded its memory limit (`2 × workspace.resource_memory`). This usually shows up after a provider schema grows or a workspace acquires a lot more managed resources than it had when `resource_memory` was first set.

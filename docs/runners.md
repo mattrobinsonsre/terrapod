@@ -160,6 +160,7 @@ All runner Jobs inherit the following settings from `runners.*` in Helm values:
 | `runners.tokenTTLSeconds` | `3600` | Runner token TTL (1 hour) |
 | `runners.maxTokenTTLSeconds` | `7200` | Maximum runner token TTL (2 hours) |
 | `runners.staleTimeoutSeconds` | `3600` | Mark run as errored if no Job status after this long |
+| `runners.driftMaxDurationSeconds` | `1800` | Max time a drift run may spend in `planning` before the reconciler errors it. Independent of `staleTimeoutSeconds` (which fires on dead listeners) — this one fires on terraform legitimately running too long for a background plan-only check. Set to `0` to disable |
 
 ### Per-Workspace Resources
 

@@ -358,6 +358,7 @@ The following read-only attributes are included in workspace responses when drif
 |---|---|---|
 | `drift-last-checked-at` | string (RFC3339) or null | Timestamp of the last completed drift detection check |
 | `drift-status` | string | Current drift status: `""` (never checked), `"no_drift"`, `"drifted"`, or `"errored"` |
+| `drift-latest-run-id` | string (run-…) or null | ID of the drift run that produced the current `drift-status`. Lets the workspace-list UI link the badge straight to the run that explains the status. Cleared on a successful (non-drift) apply because the previous drift run is no longer the canonical link. Null when drift detection has never run or when the column predates v0.35.3 |
 
 ### Lifecycle Attributes (Autodiscovery)
 
