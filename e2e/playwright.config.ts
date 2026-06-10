@@ -83,5 +83,15 @@ export default defineConfig({
       testMatch: 'variable-sets.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
+    {
+      name: 'runs',
+      testMatch: 'runs.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
+      name: 'ai-summary',
+      testMatch: 'ai-summary.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
   ],
 });

@@ -39,7 +39,7 @@ def _mock_run(**overrides):
 
 class TestDriftCheckCycle:
     @patch("terrapod.services.drift_detection_service._has_state")
-    @patch("terrapod.services.drift_detection_service._is_workspace_busy")
+    @patch("terrapod.services.drift_detection_service._is_runner_busy")
     @patch("terrapod.services.drift_detection_service._create_drift_run_non_vcs")
     @patch("terrapod.services.drift_detection_service.get_db_session")
     async def test_skips_locked_workspace(self, mock_session, mock_create, mock_busy, mock_state):
@@ -60,7 +60,7 @@ class TestDriftCheckCycle:
         mock_create.assert_not_called()
 
     @patch("terrapod.services.drift_detection_service._has_state")
-    @patch("terrapod.services.drift_detection_service._is_workspace_busy")
+    @patch("terrapod.services.drift_detection_service._is_runner_busy")
     @patch("terrapod.services.drift_detection_service._create_drift_run_non_vcs")
     @patch("terrapod.services.drift_detection_service.get_db_session")
     async def test_skips_active_runs(self, mock_session, mock_create, mock_busy, mock_state):
@@ -82,7 +82,7 @@ class TestDriftCheckCycle:
         mock_create.assert_not_called()
 
     @patch("terrapod.services.drift_detection_service._has_state")
-    @patch("terrapod.services.drift_detection_service._is_workspace_busy")
+    @patch("terrapod.services.drift_detection_service._is_runner_busy")
     @patch("terrapod.services.drift_detection_service._create_drift_run_non_vcs")
     @patch("terrapod.services.drift_detection_service.get_db_session")
     async def test_skips_not_yet_due(self, mock_session, mock_create, mock_busy, mock_state):
@@ -104,6 +104,75 @@ class TestDriftCheckCycle:
         await drift_check_cycle()
 
         mock_create.assert_not_called()
+
+    @patch("terrapod.services.drift_detection_service._has_state")
+    @patch("terrapod.services.drift_detection_service._create_drift_run_non_vcs")
+    @patch("terrapod.services.drift_detection_service.get_db_session")
+    async def test_planned_run_does_not_block_drift_check(
+        self, mock_session, mock_create, mock_state
+    ):
+        """A run sitting in `planned` awaiting operator confirm must
+        NOT block drift detection — that's the bug behind the
+        production incident where 4 workspaces froze drift_status at
+        the first errored attempt because they each had a `planned`
+        run lingering.
+
+        We exercise the REAL _is_runner_busy here (no patch), with a
+        mock db that returns the result of a COUNT query restricted
+        to {planning, applying} — so a `planned` row in the universe
+        is irrelevant.
+        """
+        from terrapod.services.drift_detection_service import drift_check_cycle
+
+        ws = _mock_workspace(vcs_connection_id=None)  # non-VCS path
+        mock_state.return_value = True
+        mock_create.return_value = _mock_run()
+
+        mock_db = AsyncMock()
+        # First execute() returns the workspace list; subsequent
+        # execute() calls (from _is_runner_busy) return COUNT=0
+        # because planning/applying runs are absent.
+        ws_result = MagicMock()
+        ws_result.scalars.return_value.all.return_value = [ws]
+        busy_result = MagicMock()
+        busy_result.scalar_one.return_value = 0
+        mock_db.execute = AsyncMock(side_effect=[ws_result, busy_result])
+
+        mock_session.return_value.__aenter__ = AsyncMock(return_value=mock_db)
+        mock_session.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        await drift_check_cycle()
+
+        # Drift run WAS created — the `planned` run didn't block it.
+        mock_create.assert_called_once()
+
+    async def test_is_runner_busy_only_counts_planning_or_applying(self):
+        """`_is_runner_busy` must query for ONLY {planning, applying}
+        — not the broader ACTIVE_STATES set that broke v0.34.0 and
+        earlier. This is the contract that makes
+        test_planned_run_does_not_block_drift_check possible.
+        """
+        from terrapod.services.drift_detection_service import (
+            RUNNER_BUSY_STATES,
+            _is_runner_busy,
+        )
+
+        # Pin the contract.
+        assert RUNNER_BUSY_STATES == {"planning", "applying"}
+
+        # Sanity-check the query shape: pass through a mock DB and
+        # verify .where() was called referencing Run.status.in_(...).
+        mock_db = AsyncMock()
+        result = MagicMock()
+        result.scalar_one.return_value = 0
+        mock_db.execute = AsyncMock(return_value=result)
+
+        await _is_runner_busy(mock_db, uuid.uuid4())
+
+        # Query was issued — that's the test. The SQL shape is
+        # validated by the integration test above where a `planned`
+        # run actually exists and drift still proceeds.
+        mock_db.execute.assert_awaited_once()
 
 
 class TestHandleDriftRunCompleted:

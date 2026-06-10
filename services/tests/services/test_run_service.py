@@ -120,6 +120,7 @@ def _mock_run(**kwargs):
     run.plan_only = kwargs.get("plan_only", False)
     run.listener_id = kwargs.get("listener_id", None)
     run.locked = kwargs.get("locked", False)
+    run.source = kwargs.get("source", "tfe-api")
     return run
 
 
@@ -187,6 +188,104 @@ class TestTransitionRun:
         )
         result = await transition_run(db, run, "applied")
         assert result.apply_finished_at is not None
+
+    @patch("terrapod.services.run_service.fire_run_triggers", new_callable=AsyncMock)
+    async def test_applied_resets_drift_status_when_enabled(self, mock_fire):
+        """A successful non-speculative apply means state == reality.
+        Reset drift_status to "no_drift" and advance
+        drift_last_checked_at so a previously errored / drifted
+        workspace clears its Health Issues banner the moment the
+        operator applies.
+
+        This is the second half of the production-incident fix:
+        even with the planned-doesn't-block-drift fix landed, a
+        stale "errored" drift_status would persist until the next
+        drift check fired and overwrote it — which on the affected
+        deployment was 24h away. Resetting on apply makes the UX
+        responsive.
+        """
+        db = AsyncMock(spec=AsyncSession)
+        ws = MagicMock()
+        ws.drift_detection_enabled = True
+        ws.drift_status = "errored"
+        ws.drift_last_checked_at = None
+        db.get = AsyncMock(return_value=ws)
+
+        run = _mock_run(
+            status="applying",
+            source="tfe-api",
+            plan_only=False,
+            apply_started_at=datetime.now(UTC),
+        )
+        await transition_run(db, run, "applied")
+
+        assert ws.drift_status == "no_drift"
+        assert ws.drift_last_checked_at is not None
+
+    @patch("terrapod.services.run_service.fire_run_triggers", new_callable=AsyncMock)
+    async def test_applied_does_not_touch_drift_for_drift_detection_run(self, mock_fire):
+        """Drift detection runs have their own status writer
+        (`handle_drift_run_completed`). Don't double-write here.
+        """
+        db = AsyncMock(spec=AsyncSession)
+        ws = MagicMock()
+        ws.drift_detection_enabled = True
+        ws.drift_status = "drifted"
+        db.get = AsyncMock(return_value=ws)
+
+        run = _mock_run(
+            status="applying",
+            source="drift-detection",
+            plan_only=False,
+            apply_started_at=datetime.now(UTC),
+        )
+        await transition_run(db, run, "applied")
+
+        assert ws.drift_status == "drifted"  # untouched
+
+    @patch("terrapod.services.run_service.fire_run_triggers", new_callable=AsyncMock)
+    async def test_applied_does_not_touch_drift_for_plan_only(self, mock_fire):
+        """plan_only runs don't change infrastructure, so they
+        don't imply state == reality. Don't reset drift_status.
+        """
+        db = AsyncMock(spec=AsyncSession)
+        ws = MagicMock()
+        ws.drift_detection_enabled = True
+        ws.drift_status = "errored"
+        db.get = AsyncMock(return_value=ws)
+
+        run = _mock_run(
+            status="applying",
+            source="tfe-api",
+            plan_only=True,
+            apply_started_at=datetime.now(UTC),
+        )
+        await transition_run(db, run, "applied")
+
+        assert ws.drift_status == "errored"  # untouched
+
+    @patch("terrapod.services.run_service.fire_run_triggers", new_callable=AsyncMock)
+    async def test_applied_skips_drift_reset_when_feature_disabled(self, mock_fire):
+        """If the workspace doesn't use drift detection, don't
+        write to the column at all — cheap branch.
+        """
+        db = AsyncMock(spec=AsyncSession)
+        ws = MagicMock()
+        ws.drift_detection_enabled = False
+        ws.drift_status = ""
+        ws.drift_last_checked_at = None
+        db.get = AsyncMock(return_value=ws)
+
+        run = _mock_run(
+            status="applying",
+            source="tfe-api",
+            plan_only=False,
+            apply_started_at=datetime.now(UTC),
+        )
+        await transition_run(db, run, "applied")
+
+        assert ws.drift_status == ""
+        assert ws.drift_last_checked_at is None
 
     async def test_error_message_stored(self):
         db = AsyncMock(spec=AsyncSession)

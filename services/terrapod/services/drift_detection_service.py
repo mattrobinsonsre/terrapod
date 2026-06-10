@@ -30,18 +30,43 @@ from terrapod.storage.keys import config_version_key
 
 logger = get_logger(__name__)
 
-# States that indicate a run is still in progress
-ACTIVE_STATES = {"pending", "queued", "planning", "planned", "confirmed", "applying"}
+# Drift checks should skip workspaces where terraform is actively
+# running — a second concurrent plan against the same state could
+# observe inconsistent intermediate state and produce a false drift
+# signal. But "active" for that purpose is narrower than "non-terminal":
+# {planning, applying} are actively consuming a runner slot;
+# everything else (pending lock-acquire, queued for pickup, planned
+# awaiting confirm, confirmed awaiting transition) is either
+# instantaneous (pending, confirmed) or waits indefinitely on an
+# external trigger (planned awaits operator confirm/discard) and
+# does not conflict with a plan-only drift run on its own CV.
+#
+# This was previously a {pending, queued, planning, planned,
+# confirmed, applying} set, which made any workspace with a `planned`
+# run sitting awaiting confirmation skip drift forever — the
+# operator-visible status column shows the LATEST run (applied) so
+# the workspace looks healthy but `drift_status` quietly froze at
+# the first errored attempt (production incident: four workspaces
+# stuck for 1-7 weeks without a drift retry).
+RUNNER_BUSY_STATES = {"planning", "applying"}
 
 
-async def _is_workspace_busy(db: AsyncSession, workspace_id: uuid.UUID) -> bool:
-    """Check if a workspace has any active (non-terminal) runs."""
+async def _is_runner_busy(db: AsyncSession, workspace_id: uuid.UUID) -> bool:
+    """Workspace has a run that's actively executing on a runner.
+
+    True only when terraform is mid-plan or mid-apply for this
+    workspace — running a parallel drift check then would produce a
+    racy/inconsistent observation. Runs in `planned` (awaiting
+    confirm/discard) or `confirmed` (awaiting applying transition)
+    do NOT count: they don't hold the runner, and a plan-only drift
+    run on its own CV doesn't conflict with them.
+    """
     result = await db.execute(
         select(func.count())
         .select_from(Run)
         .where(
             Run.workspace_id == workspace_id,
-            Run.status.in_(ACTIVE_STATES),
+            Run.status.in_(RUNNER_BUSY_STATES),
         )
     )
     return result.scalar_one() > 0
@@ -220,9 +245,16 @@ async def drift_check_cycle() -> None:
                     logger.debug("Skipping drift check: workspace locked", workspace=ws.name)
                     continue
 
-                # Skip workspaces with active runs
-                if await _is_workspace_busy(db, ws.id):
-                    logger.debug("Skipping drift check: active run", workspace=ws.name)
+                # Skip workspaces that are actively running terraform.
+                # NOT "any non-terminal run" — `planned` runs awaiting
+                # operator confirm can sit indefinitely and would have
+                # blocked drift forever (production incident on the
+                # mgmt deployment: workspaces with a `planned` run
+                # awaiting confirm froze drift_status at the first
+                # errored attempt; status column showed "applied" so
+                # the issue was invisible until Health Issues lit up).
+                if await _is_runner_busy(db, ws.id):
+                    logger.debug("Skipping drift check: runner busy", workspace=ws.name)
                     continue
 
                 # Skip workspaces with no state

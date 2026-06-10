@@ -443,6 +443,23 @@ async def transition_run(
     if target_status == "applied" and not run.plan_only:
         await fire_run_triggers(db, run.workspace_id)
 
+    # A successful non-speculative apply means tofu/terraform just
+    # brought state into agreement with the configured infrastructure
+    # — by definition, drift is zero right now. Reset drift_status to
+    # "no_drift" (clearing any stale "errored" / "drifted" from a
+    # prior check) AND advance drift_last_checked_at to the apply
+    # time so the next periodic drift check fires after the configured
+    # interval rather than racing immediately. Skips drift-detection
+    # runs (they have their own status writer in
+    # drift_detection_service.handle_drift_run_completed) and is
+    # gated on drift_detection_enabled so the write is cheap on
+    # workspaces that don't use the feature.
+    if target_status == "applied" and not run.plan_only and run.source != "drift-detection":
+        ws = await db.get(Workspace, run.workspace_id)
+        if ws is not None and ws.drift_detection_enabled:
+            ws.drift_status = "no_drift"
+            ws.drift_last_checked_at = now_utc()
+
     # #314: a successful opt-in autodiscovery destroy archives the
     # workspace (soft-delete; retained for audit). Literal source
     # compare avoids importing the lifecycle service (it imports us).

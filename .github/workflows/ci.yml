@@ -224,13 +224,34 @@ jobs:
 
   # ── Python Test ────────────────────────────────────────
   python-test:
-    name: Python Test
+    # Sharded by directory so each shard gets its own Postgres /
+    # Redis / LocalStack stack via docker-compose.test.yml. Integration
+    # tests hit a real DB and are race-prone under pytest-xdist within
+    # one job; runner-level shards avoid that.
+    #
+    # Slice 1 — fast unit-ish (mock-based; no DB)
+    # Slice 2 — services + api (mock-based; the bulk)
+    # Slice 3 — integration (real Postgres; the slowest 12s tests live here)
+    #
+    # On a v0.35.0 main-run reference: combined 310s serial →
+    # split slowest-shard ~75s (integration), others sub-60s.
+    name: Python Test (${{ matrix.slice.name }})
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        slice:
+          - name: unit
+            paths: tests/auth tests/runner tests/storage tests/test_logging_config.py
+          - name: services-api
+            paths: tests/services tests/api
+          - name: integration
+            paths: tests/integration
     steps:
       - uses: actions/checkout@v6
-      - run: scripts/test.sh python
+      - run: scripts/test.sh python -- ${{ matrix.slice.paths }}
 
   # ── Dependency Audit (Python) ─────────────────────────
   python-audit:
@@ -471,13 +492,24 @@ jobs:
 
   # ── E2E Tests (Playwright) ─────────────────────────────
   e2e-test:
-    name: E2E Tests
+    # Sharded across 4 GitHub runners using Playwright's built-in
+    # --shard=k/N. Each shard boots its own docker-compose stack
+    # (~30s overhead) so they're independent; the suite divides into
+    # roughly equal chunks. As the suite grows past the existing 11
+    # spec files (adding runs.spec.ts + ai-summary.spec.ts here, plus
+    # whatever lands next) the shard count keeps the critical path
+    # roughly flat.
+    name: E2E Tests (${{ matrix.shard }}/${{ strategy.job-total }})
     needs: [prepare, build-images]
     if: |
       always()
       && needs.build-images.result == 'success'
       && needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     # Whole-job upper bound. Default is GitHub's 360 min, which lets a
     # wedged step run for six hours before anyone notices. 15 min covers
     # a cold-runner worst-case (image pull + stack boot + test suite)
@@ -565,7 +597,7 @@ jobs:
             -e CI=true \
             -e HOME=/tmp \
             mcr.microsoft.com/playwright:v1.58.2-noble \
-            sh -c "npm ci --ignore-scripts && npx playwright test"
+            sh -c "npm ci --ignore-scripts && npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}"
         # Playwright has per-test timeouts of its own; this is the
         # outer safety net. npm ci inside the container is ~10 s for
         # this tree (only @playwright/test + typescript).
@@ -575,7 +607,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shard }}
           path: e2e/playwright-report/
           retention-days: 14
 
