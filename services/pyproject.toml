@@ -74,6 +74,13 @@ litellm = ">=1.87,<2.0"
 pytest = "^9.0.2"
 pytest-asyncio = "^1.3.0"
 pytest-cov = "^7.0.0"
+# Parallel test runner. CI Python Test shards (unit, services-api)
+# use `-n auto` to spread across runner vCPUs; integration shard
+# stays serial because its session-scoped Postgres fixture would
+# race under workers. Local `make test` doesn't enable it by
+# default — `pytest` itself in the test container still runs
+# serial unless `-n` is passed.
+pytest-xdist = "^3.6.0"
 ruff = "^0.15.0"
 mypy = ">=1.14,<3.0"
 

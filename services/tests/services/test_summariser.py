@@ -1070,6 +1070,11 @@ class TestNoStateLeakage:
     Same invariant applies to the upcoming follow-up chat path (#463) —
     the assertions inspect the whole `summariser` module so any new
     code path that pulls state in will fail here.
+
+    # Code ↔ Tests contract: "hard invariant" tier.
+    # See CLAUDE.md → "Code ↔ Tests Contract" → Contract Rules.
+    # Lives in services-api shard (`tests/services/`); runs serial-safe
+    # under pytest-xdist via the `_source()` reflection (no side effects).
     """
 
     @staticmethod

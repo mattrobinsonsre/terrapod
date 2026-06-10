@@ -54,6 +54,15 @@ RUNNER_BUSY_STATES = {"planning", "applying"}
 async def _is_runner_busy(db: AsyncSession, workspace_id: uuid.UUID) -> bool:
     """Workspace has a run that's actively executing on a runner.
 
+    NOTE — Code ↔ Tests contract (CLAUDE.md): the precise membership of
+    RUNNER_BUSY_STATES is pinned by
+    `tests/services/test_drift_detection_service.py::TestDriftCheckCycle::
+    test_is_runner_busy_only_counts_planning_or_applying`. Widening this
+    set (e.g. re-adding `planned`) reintroduces the production incident
+    where workspaces with stale `planned` peers froze drift forever.
+    Narrow it deliberately — and update both the source comment AND the
+    regression test together.
+
     True only when terraform is mid-plan or mid-apply for this
     workspace — running a parallel drift check then would produce a
     racy/inconsistent observation. Runs in `planned` (awaiting

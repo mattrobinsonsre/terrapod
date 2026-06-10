@@ -9,7 +9,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 3 : 2,
+  // CI workers bumped from 3 → 4 to fill the 2-shard runner better
+  // (each shard runs ~half the suite; saturating both vCPUs gives a
+  // larger per-shard wall-clock reduction than adding more shards).
+  workers: process.env.CI ? 4 : 2,
   reporter: process.env.CI
     ? [['html', { open: 'never' }], ['github']]
     : [['html', { open: 'on-failure' }]],

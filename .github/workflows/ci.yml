@@ -243,15 +243,27 @@ jobs:
       fail-fast: false
       matrix:
         slice:
+          # pytest-xdist `-n auto` is enabled for the two mock-heavy
+          # shards. Local bench (Apple M-series; CI ~50-60% of this):
+          #   unit         90s serial → 13s parallel (1495 → 492 tests)
+          #   services-api 138s serial → 30s parallel
+          # The integration shard stays serial — its
+          # session-scoped Postgres table-creation fixture races
+          # under xdist workers (each worker would try to create
+          # the same tables) and the suite is small enough that
+          # serial is fine.
           - name: unit
             paths: tests/auth tests/runner tests/storage tests/test_logging_config.py
+            pytest_args: -n auto
           - name: services-api
             paths: tests/services tests/api
+            pytest_args: -n auto
           - name: integration
             paths: tests/integration
+            pytest_args: ""
     steps:
       - uses: actions/checkout@v6
-      - run: scripts/test.sh python -- ${{ matrix.slice.paths }}
+      - run: scripts/test.sh python -- ${{ matrix.slice.pytest_args }} ${{ matrix.slice.paths }}
 
   # ── Dependency Audit (Python) ─────────────────────────
   python-audit:
@@ -492,13 +504,12 @@ jobs:
 
   # ── E2E Tests (Playwright) ─────────────────────────────
   e2e-test:
-    # Sharded across 4 GitHub runners using Playwright's built-in
+    # Sharded across 2 GitHub runners using Playwright's built-in
     # --shard=k/N. Each shard boots its own docker-compose stack
-    # (~30s overhead) so they're independent; the suite divides into
-    # roughly equal chunks. As the suite grows past the existing 11
-    # spec files (adding runs.spec.ts + ai-summary.spec.ts here, plus
-    # whatever lands next) the shard count keeps the critical path
-    # roughly flat.
+    # (~30s overhead) so they're independent. We initially tried 4
+    # shards but the per-shard boot cost dominated — 4 shards × 30s
+    # in parallel wasted 90s vs 60s for 2 shards. As the suite grows
+    # past the current 13 spec files, revisit shard count.
     name: E2E Tests (${{ matrix.shard }}/${{ strategy.job-total }})
     needs: [prepare, build-images]
     if: |
@@ -509,7 +520,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2]
     # Whole-job upper bound. Default is GitHub's 360 min, which lets a
     # wedged step run for six hours before anyone notices. 15 min covers
     # a cold-runner worst-case (image pull + stack boot + test suite)
