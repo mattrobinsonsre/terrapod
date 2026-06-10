@@ -74,9 +74,17 @@ test.describe('Workspaces', () => {
 
     // Wait for save to complete (Edit button re-appears)
     await expect(page.locator('button:has-text("Edit")')).toBeVisible({ timeout: 10_000 });
+
+    // Reload and verify the toggle changed
+    await page.reload();
+
+    // Click Edit again to check the value
+    await page.click('button:has-text("Edit")');
+    const isAfter = await page.locator('input[type="checkbox"]').first().isChecked();
+    expect(isAfter).not.toBe(wasBefore);
   });
 
-  test('drift-ignore-rules editor adds, persists, and removes a rule', async ({ page, request }) => {
+  test('drift-ignore-rules editor adds, persists, and removes a rule', async ({ page }) => {
     // #482 — verify the workspace settings drift-ignore-rules editor
     // round-trips through the API. Failure cases the spec catches:
     //   - rule not added to the array on Enter / "Add" click
@@ -126,13 +134,5 @@ test.describe('Workspaces', () => {
     await expect(page.locator('button:has-text("Edit")')).toBeVisible({ timeout: 10_000 });
     await page.reload();
     await expect(page.locator(`code:has-text("${rule}")`)).not.toBeVisible();
-
-    // Reload and verify the toggle changed
-    await page.reload();
-
-    // Click Edit again to check the value
-    await page.click('button:has-text("Edit")');
-    const isAfter = await page.locator('input[type="checkbox"]').first().isChecked();
-    expect(isAfter).not.toBe(wasBefore);
   });
 });
