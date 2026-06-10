@@ -31,6 +31,13 @@ Each entry is a single string of the form:
 * `[*]` (inside literal brackets) matches any one bracketed index —
   `[0]`, `["foo"]`, `["bar/baz"]`. Use this when you want "any index"
   without accidentally matching surrounding text.
+* **Numeric block indices are optional.** HCL nested blocks serialize
+  as single-element lists in plan JSON, so an attribute path arrives
+  as `config[0].tls_client_config[0].ca_data`. Write the rule the way
+  it reads in HCL — `config.tls_client_config.ca_data` — and it
+  matches the indexed shape automatically. (String-key `for_each`
+  indices like `["prod"]` are NOT optional — they're semantically
+  meaningful, so a bare rule won't span every instance.)
 
 ## Examples
 

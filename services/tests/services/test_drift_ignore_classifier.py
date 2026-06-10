@@ -98,6 +98,69 @@ class TestRuleMatching:
         assert still_drifted is True  # rule's `*` only crosses one segment
 
 
+class TestHclBlockListShape:
+    """HCL nested blocks serialize as single-element lists in `tofu show
+    -json`. A natural attribute-path rule must match the indexed shape.
+
+    This is the exact shape that the v0.36.0 pre-release live smoke
+    surfaced: `module.eks[0].argocd_cluster.eks` reports a change at
+    config[0].tls_client_config[0].ca_data, and the operator's rule
+    `...config.tls_client_config.ca_data` (no indices) must still match.
+    Synthetic plan — no production data.
+    """
+
+    def test_block_indices_optional_in_rule(self):
+        plan = _update_plan(
+            "module.eks[0].argocd_cluster.eks",
+            {"config": [{"tls_client_config": [{"ca_data": "OLD"}]}]},
+            {"config": [{"tls_client_config": [{"ca_data": "NEW"}]}]},
+        )
+        # Operator writes the natural HCL path with no [0] block indices.
+        rule = "module.eks*.argocd_cluster.*.config.tls_client_config.ca_data"
+        still_drifted, suppressed = classify_drift(plan, [rule])
+        assert still_drifted is False, (
+            "Rule without explicit block indices must match the "
+            "plan-JSON single-element-list block shape"
+        )
+        assert suppressed[0]["address"] == "module.eks[0].argocd_cluster.eks"
+
+    def test_legacy_module_variant_same_rule(self):
+        plan = _update_plan(
+            "module.eks_legacy[0].argocd_cluster.eks[0]",
+            {"config": [{"tls_client_config": [{"ca_data": "OLD"}]}]},
+            {"config": [{"tls_client_config": [{"ca_data": "NEW"}]}]},
+        )
+        rule = "module.eks*.argocd_cluster.*.config.tls_client_config.ca_data"
+        still_drifted, _ = classify_drift(plan, [rule])
+        assert still_drifted is False
+
+    def test_explicit_bracket_star_also_works(self):
+        """Operators who DO write `config[*]` get the same result —
+        the index-tolerant fallback doesn't break explicit brackets."""
+        plan = _update_plan(
+            "module.eks[0].argocd_cluster.eks",
+            {"config": [{"tls_client_config": [{"ca_data": "OLD"}]}]},
+            {"config": [{"tls_client_config": [{"ca_data": "NEW"}]}]},
+        )
+        rule = "module.eks*.argocd_cluster.*.config[*].tls_client_config[*].ca_data"
+        still_drifted, _ = classify_drift(plan, [rule])
+        assert still_drifted is False
+
+    def test_string_key_index_not_stripped(self):
+        """Numeric block indices are stripped for matching; string-key
+        (for_each) indices are NOT, so a bare rule can't over-match
+        across for_each instances."""
+        plan = _update_plan(
+            'aws_instance.web["prod"]',
+            {"ami": "ami-old"},
+            {"ami": "ami-new"},
+        )
+        # Rule without the ["prod"] key must NOT match — the key is
+        # semantically meaningful and stays in the candidate.
+        still_drifted, _ = classify_drift(plan, ["aws_instance.web.ami"])
+        assert still_drifted is True
+
+
 class TestWholeResourceRules:
     def test_bare_address_matches_any_attribute(self):
         plan = _update_plan(

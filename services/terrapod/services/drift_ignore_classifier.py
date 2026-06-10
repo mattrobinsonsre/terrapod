@@ -80,6 +80,12 @@ logger = get_logger(__name__)
 # drift.
 _DRIFT_ACTIONS = frozenset({"create", "update", "delete", "replace"})
 
+# Matches a numeric block index like `[0]`, `[12]`. Used to produce an
+# index-tolerant candidate so a natural attribute-path rule matches the
+# plan-JSON block-list shape. String-key indices (`["prod"]`) are NOT
+# matched by this — they stay in the candidate.
+_NUMERIC_INDEX_RE = re.compile(r"\[\d+\]")
+
 
 def _rule_to_regex(rule: str) -> re.Pattern[str]:
     """Translate a glob rule into a compiled regex.
@@ -254,8 +260,20 @@ def _path_is_ignored(
     # Per-attribute action: match against `<address>.<diff_path>` or
     # the bare address (for "whole resource" rule shape).
     candidate = f"{address}.{diff_path}" if diff_path else address
+    # HCL nested blocks serialize as single-element lists in `tofu show
+    # -json` output, so a block path like `config.tls_client_config.
+    # ca_data` arrives as `config[0].tls_client_config[0].ca_data`. No
+    # operator thinks in those terms — they write the attribute path the
+    # way it reads in HCL. So we ALSO test the rule against a variant of
+    # the candidate with numeric block indices stripped, letting a bare
+    # `config.tls_client_config.ca_data` rule match the indexed path.
+    # Only NUMERIC `[N]` indices are stripped; string keys (`["prod"]`,
+    # for_each / map indices) stay because they're semantically
+    # meaningful — a rule shouldn't accidentally span every for_each
+    # instance.
+    deindexed = _NUMERIC_INDEX_RE.sub("", candidate)
     for rule_str, regex in rules:
-        if regex.fullmatch(candidate) or regex.fullmatch(address):
+        if regex.fullmatch(candidate) or regex.fullmatch(deindexed) or regex.fullmatch(address):
             return True, rule_str
     return False, None
 
