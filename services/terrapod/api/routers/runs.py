@@ -335,18 +335,31 @@ async def _fetch_vcs_config(
     # is fine here — the in-process single-flight only matters when multiple
     # workspaces poll the same SHA concurrently.
     #
-    # No path narrowing — always fetch the whole repo. Sparse-checkout cone
-    # mode includes parent dirs of the cone but NOT siblings, so narrowing by
-    # `working_directory` silently drops sibling directories the terraform
-    # code references via relative module sources (`module "auth0" {
-    # source = "../auth0" }`). The narrowing saved a marginal amount of
-    # bandwidth on one-shot UI-triggered fetches and broke correctness on any
-    # multi-directory layout (#477 — sls-local errored every drift run with
-    # `Unable to evaluate directory symlink: lstat ../auth0`). The VCS-poll
-    # path keeps its narrowing because it shares the cached tarball across
-    # the cycle's workspaces; one-shot fetches don't benefit from that.
+    # Path narrowing: pass this workspace's own `working_directory ∪
+    # trigger_prefixes`. Cross-workspace coalescing isn't useful here
+    # (one request, one workspace), so we don't bother computing a wider
+    # union. If another caller fetched the same SHA with a different path
+    # set, that's a different cache entry — content-addressed by paths_hash.
+    #
+    # If the workspace's terraform crosses directory boundaries via relative
+    # module sources (`module "auth0" { source = "../auth0" }`), the operator
+    # MUST declare the referenced paths in `trigger_prefixes` — sparse-checkout
+    # cone mode includes parent directories but not siblings, so without an
+    # explicit prefix the runner would `lstat ../foo: no such file`. This
+    # contract is consistent with the VCS-poll path's `_compute_paths_unions`,
+    # so a workspace that works under VCS poll also works here. See #478 /
+    # #480 for the history (v0.35.3 briefly forced whole-repo here as a
+    # blanket fix; v0.35.4 reverted that and put the responsibility back on
+    # the workspace declaration).
+    fetch_paths: list[str] = []
+    if ws.working_directory:
+        fetch_paths.append(ws.working_directory.strip("/ "))
+    if ws.trigger_prefixes:
+        fetch_paths.extend(p.strip("/ ") for p in ws.trigger_prefixes if p)
+    fetch_paths = [p for p in fetch_paths if p]
+
     cache = VCSArchiveCache()
-    cache_storage_key = await cache.get_or_fetch(conn, owner, repo, sha, paths=None)
+    cache_storage_key = await cache.get_or_fetch(conn, owner, repo, sha, paths=fetch_paths or None)
 
     cv = await run_service.create_configuration_version(
         db, workspace_id=ws.id, source="vcs", auto_queue_runs=False

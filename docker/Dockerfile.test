@@ -44,6 +44,13 @@ RUN poetry config virtualenvs.create false \
 COPY services/terrapod ./terrapod
 COPY services/tests ./tests
 
+# Source for the API↔SDK↔provider contract test (tests/test_api_sdk_contract.py).
+# The test reads these files as raw text — no Go build is performed in the
+# Python image. Kept narrow (.go files only) so the image stays slim.
+COPY go-terrapod/*.go ./go-terrapod/
+COPY provider/internal/resources/workspace/*.go ./provider/internal/resources/workspace/
+COPY provider/internal/datasources/workspace/*.go ./provider/internal/datasources/workspace/
+
 # Storage data directory for tests
 RUN mkdir -p /var/lib/terrapod/storage
 

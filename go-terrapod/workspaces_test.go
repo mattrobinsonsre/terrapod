@@ -368,6 +368,85 @@ func TestWorkspaceFromResource_DriftFields(t *testing.T) {
 	}
 }
 
+// TestWorkspaceFromResource_ContractParity pins the read-side of the
+// API↔SDK contract for workspace attributes that were silently missing
+// before #480. Adding a new server attribute → extending the SDK
+// `Workspace` struct + this fixture is the path that keeps the
+// contract enforceable: if the server attribute is later renamed and
+// the SDK isn't updated to match, this test goes red.
+func TestWorkspaceFromResource_ContractParity(t *testing.T) {
+	body := `{"data": {
+	  "id": "ws-aaa",
+	  "type": "workspaces",
+	  "attributes": {
+	    "name": "api",
+	    "trigger-prefixes": ["terraform/auth0", "terraform/shared"],
+	    "drift-latest-run-id": "run-019eb151-4faf-71a9-9f1a-9841e8c993aa",
+	    "state-diverged": true,
+	    "lifecycle-state": "pending_deletion",
+	    "lifecycle-reason": "directory 'accounts/x' removed on 'main'",
+	    "vcs-last-polled-at": "2026-06-10T11:50:00Z",
+	    "vcs-last-error": "github app token expired",
+	    "vcs-last-error-at": "2026-06-10T11:45:00Z",
+	    "agent-pool-name": "mai-dev-us1",
+	    "vcs-connection-name": "markupai-github"
+	  }
+	}}`
+	ws, err := parseWorkspace([]byte(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ws.TriggerPrefixes) != 2 || ws.TriggerPrefixes[0] != "terraform/auth0" {
+		t.Errorf("TriggerPrefixes = %v", ws.TriggerPrefixes)
+	}
+	if ws.DriftLatestRunID != "run-019eb151-4faf-71a9-9f1a-9841e8c993aa" {
+		t.Errorf("DriftLatestRunID = %q", ws.DriftLatestRunID)
+	}
+	if !ws.StateDiverged {
+		t.Error("StateDiverged should be true")
+	}
+	if ws.LifecycleState != "pending_deletion" || ws.LifecycleReason == "" {
+		t.Errorf("lifecycle fields: state=%q reason=%q", ws.LifecycleState, ws.LifecycleReason)
+	}
+	if ws.VCSLastPolledAt == "" || ws.VCSLastError == "" || ws.VCSLastErrorAt == "" {
+		t.Errorf("vcs-poll status fields: polled=%q err=%q errAt=%q",
+			ws.VCSLastPolledAt, ws.VCSLastError, ws.VCSLastErrorAt)
+	}
+	if ws.AgentPoolName != "mai-dev-us1" || ws.VCSConnectionName != "markupai-github" {
+		t.Errorf("derived names: pool=%q conn=%q", ws.AgentPoolName, ws.VCSConnectionName)
+	}
+}
+
+// TestWorkspaceCreate_TriggerPrefixes_Wire pins the write-side: when a
+// caller supplies TriggerPrefixes on CreateWorkspaceRequest, the SDK
+// MUST marshal it into the JSON:API attributes block as
+// `trigger-prefixes`. Was silently dropped before #480.
+func TestWorkspaceCreate_TriggerPrefixes_Wire(t *testing.T) {
+	var receivedBody []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"id":"ws-new","type":"workspaces","attributes":{"name":"x","trigger-prefixes":["a","b"]}}}`))
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.CreateWorkspace(context.Background(), CreateWorkspaceRequest{
+		Name:            "x",
+		ExecutionMode:   "agent",
+		TriggerPrefixes: []string{"a", "b"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(receivedBody), `"trigger-prefixes":["a","b"]`) {
+		t.Errorf("trigger-prefixes missing from request body: %s", receivedBody)
+	}
+}
+
 func TestWorkspaceFromResource_VCSConnectionRelationship(t *testing.T) {
 	body := `{"data": {
 	  "id": "ws-aaa",

@@ -41,10 +41,40 @@ type Workspace struct {
 	Locked                        bool              `json:"locked"`
 	Labels                        map[string]string `json:"labels,omitempty"`
 	VarFiles                      []string          `json:"var-files,omitempty"`
+	TriggerPrefixes               []string          `json:"trigger-prefixes,omitempty"`
 	DriftDetectionEnabled         bool              `json:"drift-detection-enabled"`
 	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
 	DriftStatus                   string            `json:"drift-status,omitempty"`
 	DriftLastCheckedAt            string            `json:"drift-last-checked-at,omitempty"`
+	// DriftLatestRunID is the ID (prefixed `run-…`) of the drift run that
+	// produced the current DriftStatus, or "" when drift has never run or
+	// was just cleared by a successful apply. Lets consumers link the
+	// status badge to the actual run.
+	DriftLatestRunID string `json:"drift-latest-run-id,omitempty"`
+	// StateDiverged is set when an apply Job succeeded but uploading the
+	// resulting state to Terrapod failed — the workspace's recorded state
+	// is now out of sync with reality.
+	StateDiverged bool `json:"state-diverged"`
+	// LifecycleState tracks autodiscovery-managed workspaces:
+	// "active" | "pending_deletion" | "archived".
+	LifecycleState string `json:"lifecycle-state,omitempty"`
+	// LifecycleReason is a human-readable explanation of LifecycleState
+	// (e.g. "directory 'accounts/x' removed on 'main'"). Empty for active.
+	LifecycleReason string `json:"lifecycle-reason,omitempty"`
+	// VCSLastPolledAt is the timestamp of the most recent successful VCS
+	// poll cycle for this workspace.
+	VCSLastPolledAt string `json:"vcs-last-polled-at,omitempty"`
+	// VCSLastError is the last error from a VCS poll attempt (auth
+	// failure, repo gone, etc.). Empty when the last poll succeeded.
+	VCSLastError string `json:"vcs-last-error,omitempty"`
+	// VCSLastErrorAt is the timestamp of VCSLastError.
+	VCSLastErrorAt string `json:"vcs-last-error-at,omitempty"`
+	// AgentPoolName is the human-readable name of the assigned agent
+	// pool, server-derived from AgentPoolID. Empty when no pool is set.
+	AgentPoolName string `json:"agent-pool-name,omitempty"`
+	// VCSConnectionName is the human-readable name of the assigned VCS
+	// connection, server-derived from VCSConnectionID. Empty when none.
+	VCSConnectionName string `json:"vcs-connection-name,omitempty"`
 	// AISummaryMode is the three-state per-workspace override (#401):
 	//   "default"  → follow the deployment-wide ai_summary.enabled flag
 	//   "enabled"  → always summarise (no-op when global is off)
@@ -83,6 +113,7 @@ type CreateWorkspaceRequest struct {
 	OwnerEmail                    string             `json:"owner-email,omitempty"`
 	Labels                        map[string]string  `json:"labels,omitempty"`
 	VarFiles                      []string           `json:"var-files,omitempty"`
+	TriggerPrefixes               []string           `json:"trigger-prefixes,omitempty"`
 	DriftDetectionEnabled         *bool              `json:"drift-detection-enabled,omitempty"`
 	DriftDetectionIntervalSeconds *int64             `json:"drift-detection-interval-seconds,omitempty"`
 	// AISummaryMode is the three-state per-workspace override (#401):
@@ -121,6 +152,7 @@ type UpdateWorkspaceRequest struct {
 	AutoMergeStrategy             string            `json:"auto-merge-strategy,omitempty"`
 	Labels                        map[string]string `json:"labels,omitempty"`
 	VarFiles                      []string          `json:"var-files,omitempty"`
+	TriggerPrefixes               []string          `json:"trigger-prefixes,omitempty"`
 	DriftDetectionEnabled         *bool             `json:"drift-detection-enabled,omitempty"`
 	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
 	// AISummaryMode see CreateWorkspaceRequest. On UPDATE, empty string
@@ -326,6 +358,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.VarFiles != nil {
 		attrs["var-files"] = req.VarFiles
 	}
+	if req.TriggerPrefixes != nil {
+		attrs["trigger-prefixes"] = req.TriggerPrefixes
+	}
 	if req.DriftDetectionEnabled != nil {
 		attrs["drift-detection-enabled"] = *req.DriftDetectionEnabled
 	}
@@ -396,6 +431,9 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.VarFiles != nil {
 		attrs["var-files"] = req.VarFiles
 	}
+	if req.TriggerPrefixes != nil {
+		attrs["trigger-prefixes"] = req.TriggerPrefixes
+	}
 	if req.DriftDetectionEnabled != nil {
 		attrs["drift-detection-enabled"] = *req.DriftDetectionEnabled
 	}
@@ -463,9 +501,19 @@ func workspaceFromResource(res *Resource) *Workspace {
 		Locked:                GetBoolAttr(res, "locked"),
 		Labels:                GetMapAttr(res, "labels"),
 		VarFiles:              GetListAttr(res, "var-files"),
+		TriggerPrefixes:       GetListAttr(res, "trigger-prefixes"),
 		DriftDetectionEnabled: GetBoolAttr(res, "drift-detection-enabled"),
 		DriftStatus:           GetStringAttr(res, "drift-status"),
 		DriftLastCheckedAt:    GetStringAttr(res, "drift-last-checked-at"),
+		DriftLatestRunID:      GetStringAttr(res, "drift-latest-run-id"),
+		StateDiverged:         GetBoolAttr(res, "state-diverged"),
+		LifecycleState:        GetStringAttr(res, "lifecycle-state"),
+		LifecycleReason:       GetStringAttr(res, "lifecycle-reason"),
+		VCSLastPolledAt:       GetStringAttr(res, "vcs-last-polled-at"),
+		VCSLastError:          GetStringAttr(res, "vcs-last-error"),
+		VCSLastErrorAt:        GetStringAttr(res, "vcs-last-error-at"),
+		AgentPoolName:         GetStringAttr(res, "agent-pool-name"),
+		VCSConnectionName:     GetStringAttr(res, "vcs-connection-name"),
 		AISummaryMode:         GetStringAttr(res, "ai-summary-mode"),
 		AISummaryContext:      GetStringAttr(res, "ai-summary-context"),
 		CreatedAt:             GetStringAttr(res, "created-at"),

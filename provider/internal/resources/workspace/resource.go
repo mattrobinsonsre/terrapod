@@ -160,6 +160,11 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Optional:    true,
 				ElementType: types.StringType,
 			},
+			"trigger_prefixes": schema.ListAttribute{
+				Description: "Repo-root-relative directories to include in the sparse VCS fetch in addition to `working_directory`. Required when the workspace's terraform crosses directory boundaries via relative module sources (`module \"foo\" { source = \"../foo\" }`) — sparse-checkout cone mode includes parents of the listed directories but NOT siblings, so the referenced sibling must be declared here or the runner will error with `Unable to evaluate directory symlink`.",
+				Optional:    true,
+				ElementType: types.StringType,
+			},
 			"drift_detection_enabled": schema.BoolAttribute{
 				Description: "Enable drift detection for this workspace. Defaults to true for VCS-connected workspaces, false otherwise.",
 				Optional:    true,
@@ -211,11 +216,47 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"drift_status": schema.StringAttribute{
-				Description: "Current drift status.",
+				Description: "Current drift status: \"\" (never checked), \"no_drift\", \"drifted\", or \"errored\".",
 				Computed:    true,
 			},
 			"drift_last_checked_at": schema.StringAttribute{
 				Description: "Timestamp of the last drift check.",
+				Computed:    true,
+			},
+			"drift_latest_run_id": schema.StringAttribute{
+				Description: "ID of the drift run that produced the current `drift_status`, prefixed `run-…`. Empty when drift has never run or when cleared by a successful apply.",
+				Computed:    true,
+			},
+			"state_diverged": schema.BoolAttribute{
+				Description: "True when an apply Job succeeded but uploading the resulting state to Terrapod failed; the recorded state is out of sync with reality.",
+				Computed:    true,
+			},
+			"lifecycle_state": schema.StringAttribute{
+				Description: "Autodiscovery lifecycle state for managed workspaces: \"active\", \"pending_deletion\", or \"archived\".",
+				Computed:    true,
+			},
+			"lifecycle_reason": schema.StringAttribute{
+				Description: "Human-readable explanation of `lifecycle_state`. Empty for active workspaces.",
+				Computed:    true,
+			},
+			"vcs_last_polled_at": schema.StringAttribute{
+				Description: "Timestamp of the most recent successful VCS poll cycle.",
+				Computed:    true,
+			},
+			"vcs_last_error": schema.StringAttribute{
+				Description: "Most recent VCS poll error message. Empty when the last poll succeeded.",
+				Computed:    true,
+			},
+			"vcs_last_error_at": schema.StringAttribute{
+				Description: "Timestamp of `vcs_last_error`.",
+				Computed:    true,
+			},
+			"agent_pool_name": schema.StringAttribute{
+				Description: "Human-readable name of the assigned agent pool, server-derived from `agent_pool_id`.",
+				Computed:    true,
+			},
+			"vcs_connection_name": schema.StringAttribute{
+				Description: "Human-readable name of the assigned VCS connection, server-derived from `vcs_connection_id`.",
 				Computed:    true,
 			},
 			"locked": schema.BoolAttribute{
@@ -469,6 +510,13 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		}
 		req.VarFiles = varFiles
 	}
+	if !m.TriggerPrefixes.IsNull() && !m.TriggerPrefixes.IsUnknown() {
+		triggerPrefixes := []string{}
+		for _, v := range m.TriggerPrefixes.Elements() {
+			triggerPrefixes = append(triggerPrefixes, v.(types.String).ValueString())
+		}
+		req.TriggerPrefixes = triggerPrefixes
+	}
 	if !m.DriftDetectionEnabled.IsNull() && !m.DriftDetectionEnabled.IsUnknown() {
 		v := m.DriftDetectionEnabled.ValueBool()
 		req.DriftDetectionEnabled = &v
@@ -556,6 +604,13 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		}
 		req.VarFiles = varFiles
 	}
+	if !m.TriggerPrefixes.IsNull() && !m.TriggerPrefixes.IsUnknown() {
+		triggerPrefixes := []string{}
+		for _, v := range m.TriggerPrefixes.Elements() {
+			triggerPrefixes = append(triggerPrefixes, v.(types.String).ValueString())
+		}
+		req.TriggerPrefixes = triggerPrefixes
+	}
 	if !m.DriftDetectionEnabled.IsNull() && !m.DriftDetectionEnabled.IsUnknown() {
 		v := m.DriftDetectionEnabled.ValueBool()
 		req.DriftDetectionEnabled = &v
@@ -641,6 +696,52 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	} else {
 		m.DriftLastCheckedAt = types.StringNull()
 	}
+	if ws.DriftLatestRunID != "" {
+		m.DriftLatestRunID = types.StringValue(ws.DriftLatestRunID)
+	} else {
+		m.DriftLatestRunID = types.StringNull()
+	}
+
+	// State + lifecycle + VCS poll status — read-only fields the server
+	// surfaces for diagnostics and operator UX. Empty-string from the
+	// SDK becomes Terraform null so a fresh workspace doesn't show
+	// "empty string" values in the state diff.
+	m.StateDiverged = types.BoolValue(ws.StateDiverged)
+	if ws.LifecycleState != "" {
+		m.LifecycleState = types.StringValue(ws.LifecycleState)
+	} else {
+		m.LifecycleState = types.StringNull()
+	}
+	if ws.LifecycleReason != "" {
+		m.LifecycleReason = types.StringValue(ws.LifecycleReason)
+	} else {
+		m.LifecycleReason = types.StringNull()
+	}
+	if ws.VCSLastPolledAt != "" {
+		m.VCSLastPolledAt = types.StringValue(ws.VCSLastPolledAt)
+	} else {
+		m.VCSLastPolledAt = types.StringNull()
+	}
+	if ws.VCSLastError != "" {
+		m.VCSLastError = types.StringValue(ws.VCSLastError)
+	} else {
+		m.VCSLastError = types.StringNull()
+	}
+	if ws.VCSLastErrorAt != "" {
+		m.VCSLastErrorAt = types.StringValue(ws.VCSLastErrorAt)
+	} else {
+		m.VCSLastErrorAt = types.StringNull()
+	}
+	if ws.AgentPoolName != "" {
+		m.AgentPoolName = types.StringValue(ws.AgentPoolName)
+	} else {
+		m.AgentPoolName = types.StringNull()
+	}
+	if ws.VCSConnectionName != "" {
+		m.VCSConnectionName = types.StringValue(ws.VCSConnectionName)
+	} else {
+		m.VCSConnectionName = types.StringNull()
+	}
 
 	// AI plan summary (#401). The server always returns a concrete
 	// value for `ai-summary-mode` (defaulting to "default"); the
@@ -660,6 +761,18 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		m.VarFiles = val
 	} else {
 		m.VarFiles = types.ListNull(types.StringType)
+	}
+
+	// Trigger prefixes — repo paths beyond `working_directory` that must
+	// land in the sparse-checkout fetch (typically because the workspace's
+	// terraform references siblings via `module ... { source = "../foo" }`
+	// — sparse cone mode includes parents but not siblings).
+	if len(ws.TriggerPrefixes) > 0 {
+		val, d := types.ListValueFrom(ctx, types.StringType, ws.TriggerPrefixes)
+		diags.Append(d...)
+		m.TriggerPrefixes = val
+	} else {
+		m.TriggerPrefixes = types.ListNull(types.StringType)
 	}
 
 	// Labels
