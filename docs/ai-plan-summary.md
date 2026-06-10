@@ -247,6 +247,85 @@ A plan **does NOT** get a summary when:
 In every case, run lifecycle is unaffected — the feature is best-effort
 and never blocks plan or apply.
 
+## What gets sent to the model
+
+A full audit of the assembled prompt for both `plan_summary` and
+`failure_analysis` kinds — and, by extension, every follow-up chat
+turn, which reuses the same prefix (#463).
+
+**System message** (the cacheable prefix's first block):
+- The skill prompt (`PLAN_SUMMARY_SKILL_PROMPT` or
+  `FAILURE_ANALYSIS_SKILL_PROMPT` from `summariser_prompt.py`) —
+  describes the task, output schema, and tone.
+- `ai_summary.context.prompt_prefix` (operator-set, optional) —
+  prepended to the skill prompt.
+- `ai_summary.context.prompt_suffix` (operator-set, optional) —
+  appended.
+
+**Initial user message** (the cacheable prefix's second block; this is
+the bulk of the request):
+- `FLEET_CONTEXT` — `ai_summary.context.fleet_context` from Helm
+  values. Deployment-wide facts (free-form prose).
+- `WORKSPACE_CONTEXT` — the workspace's `ai_summary_context` column
+  (set via the workspace settings UI). Per-workspace facts.
+- `STATE_DIVERGED` block — only on `failure_analysis` runs where the
+  workspace is flagged `state_diverged`. Tells the model real
+  infrastructure may have been mutated by a partial apply but
+  Terrapod's recorded state no longer reflects it.
+- `PLAN_JSON` (for `plan_summary`) — the structured plan JSON
+  output by the runner, cleaned (`prior_state` stripped, no-op
+  resource_changes pruned, drift partitioned, etc. — see
+  `_clean_plan_json_bytes`). Capped at
+  `ai_summary.plan_json_max_bytes` (default 500 KB).
+- `PLAN_LOG` / `APPLY_LOG` (for `failure_analysis`) — the raw text
+  of the run log. Tail-truncated when over `plan_json_max_bytes`.
+- `CODE_DIFF` — unified `git diff --no-index` of `*.tf` / `*.tfvars`
+  between this run's config version and the previously-applied
+  config version. Empty when there's no prior CV (first run, or
+  GC'd). Capped at `ai_summary.code_diff_max_bytes` (default 100 KB).
+- `CODE_CONTEXT` — concatenated `.tf` files from this run's
+  config-version tarball. Capped at
+  `ai_summary.code_context_max_bytes` (default 200 KB).
+- Tool-call instruction (initial-summary path only) — "Now call
+  the `submit_plan_summary` tool exactly once with your structured
+  answer."
+
+**Follow-up turns** (chat) — appended AFTER the cacheable prefix:
+- The assistant's initial structured summary as plain text (just
+  the `description` — risk factors are NOT replayed in chat
+  history to keep token cost down).
+- Every prior user / assistant turn from `plan_summary_messages`,
+  in chronological order.
+- The new user turn.
+
+### What is NEVER sent
+
+- **State files.** Neither current state nor any historical state
+  version. `_gather_inputs` reads from the config-version tarball
+  (HCL source) and the plan JSON (which has its embedded
+  `prior_state` snapshot stripped before it leaves the API).
+  `TestNoStateLeakage` in `tests/services/test_summariser.py` pins
+  this invariant by introspection — the module physically does not
+  import `StateVersion` or any state-key helper. The same invariant
+  holds on the chat path: it reuses the same `_gather_inputs` +
+  `render_prompt` flow.
+- **Sensitive workspace variables.** Workspace variables and
+  variable-set variables are injected at runtime into the runner
+  Job; the summariser code path never reads from the `variables`
+  table. `sensitive=True` values are also masked in API responses
+  and not stored in plaintext logs.
+- **Secrets in any other table.** The summariser only touches
+  `runs`, `workspaces`, `plan_summaries`, `plan_summary_messages`,
+  and object storage at `config/*` (CV tarball) + `plans/*` (plan
+  log / plan JSON / plan-artifacts).
+- **API tokens, runner tokens, session tokens.** None of the auth
+  surfaces feed the summariser inputs.
+
+If you customise the prompt via `prompt_prefix`, `prompt_suffix`,
+`fleet_context`, or per-workspace `ai_summary_context`, anything
+you put in those fields **does** reach the model. Don't paste
+secrets into them.
+
 ## How it works under the hood
 
 1. A run reaches a terminal state (`planned` → `plan_summary` kind,
