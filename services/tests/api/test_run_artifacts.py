@@ -26,11 +26,14 @@ def _runner_user(run_id: uuid.UUID) -> AuthenticatedUser:
     )
 
 
-def _mock_run(run_id=None, ws_id=None):
+def _mock_run(run_id=None, ws_id=None, is_drift_detection=False):
     run = MagicMock()
     run.id = run_id or uuid.uuid4()
     run.workspace_id = ws_id or uuid.uuid4()
     run.created_by = "matt@example.com"
+    # Default False so the AI-summary tests see exactly one enqueue; the
+    # drift-reclassify path (#482) is opt-in per test via True.
+    run.is_drift_detection = is_drift_detection
     return run
 
 
@@ -340,6 +343,76 @@ class TestUploadPlanJsonOutput:
         mock_settings.ai_summary.enabled = False
         run_id = uuid.uuid4()
         run = _mock_run(run_id=run_id)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=b'{"resource_changes":[]}',
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        mock_enq.assert_not_called()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    @patch("terrapod.api.routers.run_artifacts.settings")
+    @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
+    async def test_reenqueues_drift_completion_for_drift_run(
+        self, mock_enq, mock_settings, mock_get_storage, *_mocks
+    ):
+        """A drift-detection run must re-fire drift_run_completed AFTER the
+        plan JSON lands (#482). handle_drift_run_completed first runs on
+        the planned transition — before this upload — when has_json_output
+        is still False, so the ignore-rule classifier can't read the plan
+        and conservatively leaves drift_status='drifted'. Re-enqueuing here
+        lets it re-run with the JSON available and flip to no_drift. Was
+        the v0.36.1 fix.
+        """
+        mock_settings.ai_summary.enabled = False  # isolate the drift enqueue
+        run_id = uuid.uuid4()
+        ws_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id, ws_id=ws_id, is_drift_detection=True)
+        mock_db = AsyncMock()
+        mock_db.get.return_value = run
+        mock_get_storage.return_value = AsyncMock()
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/plan-json-output",
+                content=b'{"resource_changes":[]}',
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 204
+        mock_enq.assert_awaited_once()
+        args, kwargs = mock_enq.call_args
+        assert args[0] == "drift_run_completed"
+        assert args[1] == {"run_id": str(run_id), "workspace_id": str(ws_id)}
+        # Distinct dedup key from the transition-time enqueue (drift:{id})
+        # so this re-trigger isn't swallowed by the 60s dedup window.
+        assert kwargs.get("dedup_key") == f"drift_postjson:{run_id}"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    @patch("terrapod.api.routers.run_artifacts.settings")
+    @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
+    async def test_no_drift_reenqueue_for_normal_run(
+        self, mock_enq, mock_settings, mock_get_storage, *_mocks
+    ):
+        """A normal (non-drift) run must NOT re-enqueue drift_run_completed."""
+        mock_settings.ai_summary.enabled = False
+        run_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id, is_drift_detection=False)
         mock_db = AsyncMock()
         mock_db.get.return_value = run
         mock_get_storage.return_value = AsyncMock()

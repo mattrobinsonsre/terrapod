@@ -316,6 +316,32 @@ async def upload_plan_json_output(
         except Exception as e:
             logger.debug("Failed to enqueue ai_plan_summary after upload", error=str(e))
 
+    # Drift-ignore classifier (#482) — same race as the AI summariser.
+    # `handle_drift_run_completed` fires from run_service.transition_run
+    # on the `planned` transition, which the runner POSTs BEFORE
+    # uploading plan-json-output. So when a workspace has
+    # `drift_ignore_rules` configured, that first pass finds
+    # `has_json_output == False`, can't fetch the plan to classify, and
+    # conservatively leaves drift_status = "drifted". Re-enqueue the
+    # completion handler now that the JSON is committed; it re-runs with
+    # `has_json_output == True` and the classifier flips drift_status to
+    # "no_drift" when every change matches a rule. Distinct dedup key so
+    # this re-trigger isn't swallowed by the transition-time enqueue's
+    # `drift:{run_id}` dedup window. Only drift runs need this; normal
+    # runs don't touch drift_status.
+    if run.is_drift_detection:
+        try:
+            from terrapod.services.scheduler import enqueue_trigger
+
+            await enqueue_trigger(
+                "drift_run_completed",
+                {"run_id": str(run.id), "workspace_id": str(run.workspace_id)},
+                dedup_key=f"drift_postjson:{run.id}",
+                dedup_ttl=300,
+            )
+        except Exception as e:
+            logger.debug("Failed to re-enqueue drift completion after upload", error=str(e))
+
     return Response(status_code=204)
 
 
