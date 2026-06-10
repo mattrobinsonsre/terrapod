@@ -167,8 +167,15 @@ Drift detection uses the [distributed scheduler](architecture.md) — only one A
 
 ---
 
+## Suppressing Known-Noisy Attributes
+
+Some workspaces show persistent drift on attributes that change as a normal lifecycle event (provider-rotated serving certs, IAM trust-policy ordering) or that are deliberately co-managed by external systems (HPA-driven `replicas`, autoscaler-driven `desired_capacity`). Per-workspace **drift ignore rules** subtract those attributes from the drift signal without changing apply semantics. See [Drift Ignore Rules](drift-ignore-rules.md).
+
+---
+
 ## See Also
 
+- [Drift Ignore Rules](drift-ignore-rules.md) — suppress known-noisy attributes from the drift signal
 - [Notifications](notifications.md) — configure alerts for drift detection events
 - [Architecture](architecture.md) — scheduler and background task system
 - [API Reference](api-reference.md) — workspace API with drift detection fields

@@ -93,8 +93,8 @@ Set via the API, the Terraform provider, or the workspace settings UI:
 ### Terraform provider
 
 ```hcl
-resource "terrapod_workspace" "tf_aws_core" {
-  name = "tf-aws-core-prod-eu1"
+resource "terrapod_workspace" "platform" {
+  name = "platform-prod"
   # …
   drift_ignore_rules = [
     "module.eks*.argocd_cluster.*.config.tls_client_config.ca_data",
