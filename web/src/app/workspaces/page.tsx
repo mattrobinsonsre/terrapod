@@ -52,6 +52,7 @@ interface Workspace {
     'agent-pool-name': string | null
     'drift-detection-enabled': boolean
     'drift-status': string
+    'drift-latest-run-id': string | null
     'state-diverged': boolean
     'vcs-last-error': string | null
     'health-conditions': HealthCondition[]

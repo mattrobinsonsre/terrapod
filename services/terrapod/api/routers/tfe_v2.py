@@ -611,6 +611,9 @@ def _workspace_json(
                 "drift-detection-interval-seconds": ws.drift_detection_interval_seconds,
                 "drift-last-checked-at": _rfc3339(ws.drift_last_checked_at),
                 "drift-status": ws.drift_status,
+                "drift-latest-run-id": (
+                    f"run-{ws.drift_latest_run_id}" if ws.drift_latest_run_id else None
+                ),
                 "state-diverged": ws.state_diverged,
                 "lifecycle-state": ws.lifecycle_state,
                 "lifecycle-reason": ws.lifecycle_reason,

@@ -20,6 +20,7 @@ data:
     token_ttl_seconds: {{ .Values.runners.tokenTTLSeconds }}
     max_token_ttl_seconds: {{ .Values.runners.maxTokenTTLSeconds }}
     stale_timeout_seconds: {{ .Values.runners.staleTimeoutSeconds }}
+    drift_max_duration_seconds: {{ .Values.runners.driftMaxDurationSeconds | default 1800 }}
     {{- with .Values.runners.imagePullSecrets }}
     image_pull_secrets:
       {{- toYaml . | nindent 6 }}

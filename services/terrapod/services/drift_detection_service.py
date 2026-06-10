@@ -366,6 +366,12 @@ async def handle_drift_run_completed(payload: dict) -> None:
         else:
             return
 
+        # Pin the run that produced this status so the workspace-list UI can
+        # link the badge to it. Updated for every status the badge can show
+        # (drifted / no_drift / errored) — that way the Errored badge also
+        # links to the drift run that produced the error, not to whichever
+        # earlier drift run set drift_latest_run_id last.
+        ws.drift_latest_run_id = run.id
         ws.drift_last_checked_at = now_utc()
         await db.commit()
 

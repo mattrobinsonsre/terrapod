@@ -459,6 +459,11 @@ async def transition_run(
         if ws is not None and ws.drift_detection_enabled:
             ws.drift_status = "no_drift"
             ws.drift_last_checked_at = now_utc()
+            # Apply just reconciled state to the desired config — the previous
+            # drift run is no longer the canonical "explain the current
+            # status" link. Clear it so the workspace-list badge falls back
+            # to the no-link state until the next drift run completes.
+            ws.drift_latest_run_id = None
 
     # #314: a successful opt-in autodiscovery destroy archives the
     # workspace (soft-delete; retained for audit). Literal source

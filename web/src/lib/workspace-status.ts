@@ -59,6 +59,7 @@ interface ResolveInput {
     'state-diverged': boolean
     'vcs-last-error': string | null
     'drift-status': string
+    'drift-latest-run-id'?: string | null
     'latest-run': {
       id: string
       status: string
@@ -99,7 +100,13 @@ export function resolveStatus(ws: ResolveInput): ResolvedStatus {
   }
   if (a['state-diverged']) return { def: STATUS_BY_FILTER.get('state-diverged') ?? null, runId: null }
   if (a['vcs-last-error']) return { def: STATUS_BY_FILTER.get('vcs-error') ?? null, runId: null }
-  if (a['drift-status'] === 'drifted') return { def: STATUS_BY_FILTER.get('drifted') ?? null, runId: null }
+  if (a['drift-status'] === 'drifted') {
+    // Drift status links to the drift run that produced it when one exists,
+    // so clicking the badge takes the operator straight to the plan output
+    // instead of forcing them to hunt through the runs list. Falls back to
+    // null (no link) for legacy rows where the column was never populated.
+    return { def: STATUS_BY_FILTER.get('drifted') ?? null, runId: a['drift-latest-run-id'] ?? null }
+  }
   if (!run) return { def: null, runId: null }
   // plan-only `planned` is a successful read of the world, not an
   // awaiting-confirm signal.

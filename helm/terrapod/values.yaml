@@ -716,6 +716,15 @@ runners:
   tokenTTLSeconds: 3600         # Runner token TTL (default 1 hour)
   maxTokenTTLSeconds: 7200      # Runner token max TTL (default 2 hours)
   staleTimeoutSeconds: 3600     # Seconds before a run with no Job status is marked errored
+  # Maximum wall-clock seconds a drift-detection run may spend in `planning`
+  # before the reconciler errors it out. Independent of staleTimeoutSeconds:
+  # that one fires on listeners going dark; this one fires on terraform
+  # legitimately running too long for a background drift check (e.g. a
+  # github-provider state refresh that takes hours on a workspace with
+  # hundreds of rate-limited reads). Drift runs are plan-only and
+  # background-priority — a 30-minute cap is a generous SLO for "tell me
+  # if there's drift". Set to 0 to disable the cap.
+  driftMaxDurationSeconds: 1800
 
   # Maximum size in bytes of the plan-phase workspace-diff tarball that
   # the runner uploads at end of plan and downloads at start of apply.

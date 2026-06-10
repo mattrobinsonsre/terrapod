@@ -341,6 +341,13 @@ class Workspace(Base):
     drift_status: Mapped[str] = mapped_column(
         String(20), nullable=False, default=""
     )  # "", "no_drift", "drifted", "errored"
+    # The run that produced the current `drift_status`. Lets the workspace-list
+    # UI link the Drifted / Errored badge straight to the run, instead of the
+    # operator hunting through the runs list. Plain nullable UUID, no FK — a
+    # later artifact-retention sweep may delete the run row, and we don't want
+    # that to break workspace deletion via cascade. The UI handles a 404 on the
+    # click-through gracefully.
+    drift_latest_run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
 
     # State divergence — set when an apply Job succeeds but state upload fails
     state_diverged: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")

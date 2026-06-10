@@ -85,6 +85,22 @@ class RunnerConfig(BaseModel):
             "failure signal, whereas a long-running Job with no status is not."
         ),
     )
+    drift_max_duration_seconds: int = Field(
+        default=1800,
+        description=(
+            "Maximum wall-clock seconds a drift-detection run may spend in "
+            "`planning` before the reconciler errors it out and frees the "
+            "workspace for the next drift cycle. Distinct from stale_timeout: "
+            "stale_timeout protects against listeners that stop reporting; "
+            "this protects against terraform legitimately running for hours "
+            "(e.g. a github provider refresh on a workspace with hundreds of "
+            "rate-limited reads) and blocking drift indefinitely for that "
+            "workspace. Drift runs are background-priority and plan-only — "
+            "a 30 min cap is a generous SLO for 'just tell me if there's "
+            "drift'. Set higher for deployments with genuinely large plans "
+            "you still want drift on; set to 0 to disable the cap."
+        ),
+    )
 
 
 def load_runner_config(path: str = "/etc/terrapod/runners.yaml") -> RunnerConfig:

@@ -126,6 +126,7 @@
         "tokenTTLSeconds": { "type": "integer", "minimum": 1 },
         "maxTokenTTLSeconds": { "type": "integer", "minimum": 1 },
         "staleTimeoutSeconds": { "type": "integer", "minimum": 60 },
+        "driftMaxDurationSeconds": { "type": "integer", "minimum": 0 },
         "planArtifactsMaxBytes": { "type": "integer", "minimum": 10240 },
         "serviceAccount": { "$ref": "#/$defs/serviceAccountSpec" },
         "azureWorkloadIdentity": { "type": "boolean" }

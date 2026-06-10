@@ -283,6 +283,32 @@ async def _check_stale(db: AsyncSession, run: Run) -> None:
         return
 
     cfg = load_runner_config()
+    now = datetime.now(UTC)
+
+    # Drift-detection runs get a separate, tighter cap regardless of whether
+    # they're actively reporting status. Background-priority + plan-only +
+    # auto-scheduled = an upper bound that says "if drift hasn't decided in
+    # 30 min, we want the slot back". Without it, a single workspace with
+    # a multi-hour github-provider refresh (terrapod-config: ~30 rate-limited
+    # API reads) blocks drift on that workspace indefinitely and the operator
+    # never sees a clear "this drift run timed out" signal. Set to 0 to
+    # disable. Checked BEFORE the generic stale/launch timeouts so a
+    # drift run that's stale AND over-cap is reported as "drift cap exceeded"
+    # (the more actionable failure mode).
+    if run.is_drift_detection and run.status == "planning" and cfg.drift_max_duration_seconds > 0:
+        cap = timedelta(seconds=cfg.drift_max_duration_seconds)
+        if now - phase_start > cap:
+            await _handle_failed(
+                db, run, f"Drift run exceeded max duration ({cfg.drift_max_duration_seconds}s)"
+            )
+            logger.warning(
+                "Drift run errored: max duration exceeded",
+                run_id=str(run.id),
+                duration_seconds=int((now - phase_start).total_seconds()),
+                cap_seconds=cfg.drift_max_duration_seconds,
+            )
+            return
+
     if run.job_name is None:
         timeout = timedelta(seconds=cfg.launch_timeout_seconds)
         message_prefix = "Run stuck pre-launch"
@@ -290,7 +316,6 @@ async def _check_stale(db: AsyncSession, run: Run) -> None:
         timeout = timedelta(seconds=cfg.stale_timeout_seconds)
         message_prefix = "Run stale"
 
-    now = datetime.now(UTC)
     if now - phase_start > timeout:
         await _handle_failed(db, run, f"{message_prefix} — no progress for >{timeout}")
         if run.job_name is None:

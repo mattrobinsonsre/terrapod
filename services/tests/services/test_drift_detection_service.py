@@ -13,6 +13,7 @@ def _mock_workspace(**overrides):
     ws.drift_detection_interval_seconds = overrides.get("drift_detection_interval_seconds", 86400)
     ws.drift_last_checked_at = overrides.get("drift_last_checked_at", None)
     ws.drift_status = overrides.get("drift_status", "")
+    ws.drift_latest_run_id = overrides.get("drift_latest_run_id", None)
     ws.locked = overrides.get("locked", False)
     ws.vcs_connection_id = overrides.get("vcs_connection_id", None)
     ws.vcs_repo_url = overrides.get("vcs_repo_url", "")
@@ -202,6 +203,8 @@ class TestHandleDriftRunCompleted:
         )
 
         assert ws.drift_status == "drifted"
+        # Links the workspace-list badge to the run that produced this status.
+        assert ws.drift_latest_run_id == run.id
         mock_notif.assert_called_once()
 
     @patch("terrapod.services.drift_detection_service._enqueue_drift_notification")
@@ -230,6 +233,7 @@ class TestHandleDriftRunCompleted:
         )
 
         assert ws.drift_status == "no_drift"
+        assert ws.drift_latest_run_id == run.id
         mock_notif.assert_not_called()
 
     @patch("terrapod.services.drift_detection_service._enqueue_drift_notification")
@@ -256,6 +260,9 @@ class TestHandleDriftRunCompleted:
         )
 
         assert ws.drift_status == "errored"
+        # Errored badge must link to the drift run that produced the error
+        # so the operator can click straight to the plan log.
+        assert ws.drift_latest_run_id == run.id
         mock_notif.assert_not_called()
 
     @patch("terrapod.services.drift_detection_service._enqueue_drift_notification")
@@ -283,6 +290,9 @@ class TestHandleDriftRunCompleted:
         )
 
         assert ws.drift_status == original_status
+        # Canceled drift runs MUST NOT overwrite drift_latest_run_id —
+        # the previous run is still what "explains" the current badge.
+        assert ws.drift_latest_run_id is None
 
     @patch("terrapod.services.drift_detection_service._enqueue_drift_notification")
     @patch("terrapod.services.drift_detection_service.get_db_session")
