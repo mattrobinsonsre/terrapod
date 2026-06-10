@@ -215,102 +215,85 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			// Read-only computed attrs all carry `UseStateForUnknown` so a
-			// PATCH on any other attribute doesn't make Terraform mark
-			// these as `(known after apply)` in the plan diff. They're
-			// still refreshed on every Read; the plan modifier just
-			// stops the framework from speculatively unsetting them
-			// when an unrelated field is changing. The values DO
-			// legitimately drift server-side (drift cycles complete,
-			// VCS polls run, autodiscovery moves workspaces through
-			// lifecycle states) — those updates land via Read and
-			// surface as the next plan's diff. Without these modifiers
-			// every plan that touches any workspace produces ~10 lines
-			// of "no_drift -> (known after apply)" noise that obscures
-			// the actual change.
+			// `UseStateForUnknown` ONLY belongs on Computed-only attrs
+			// whose value definitely does NOT change as a side effect of
+			// the apply. v0.35.5 applied it everywhere and broke apply
+			// on every workspace because the server-volatile timestamps
+			// (updated_at ticks on every PATCH; vcs_last_polled_at ticks
+			// on every poll cycle) produced plan-vs-apply-time mismatches
+			// → terraform-plugin-framework's consistency check aborted.
+			//
+			// Safe-for-UseStateForUnknown set (each field's invariant):
+			//   created_at         — immutable after creation
+			//   owner_email        — only the platform admin can change; PATCH never does
+			//   agent_pool_name    — only changes when agent_pool_id changes (caller's PATCH)
+			//   vcs_connection_name — only changes when vcs_connection_id changes
+			//   state_diverged     — only set/cleared by a state upload pathway; not by PATCH
+			//
+			// Server-volatile set (NO UseStateForUnknown — plan will
+			// honestly show `(known after apply)`; the diff noise is the
+			// right answer because the value can legitimately change
+			// between plan and apply):
+			//   updated_at, vcs_last_polled_at, vcs_last_error,
+			//   vcs_last_error_at, drift_status, drift_last_checked_at,
+			//   drift_latest_run_id, lifecycle_state, lifecycle_reason,
+			//   locked
 			"drift_status": schema.StringAttribute{
-				Description: "Current drift status: \"\" (never checked), \"no_drift\", \"drifted\", or \"errored\".",
+				Description: "Current drift status: \"\" (never checked), \"no_drift\", \"drifted\", or \"errored\". Server-volatile — updates when a drift run completes.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"drift_last_checked_at": schema.StringAttribute{
-				Description: "Timestamp of the last drift check.",
+				Description: "Timestamp of the last drift check. Server-volatile.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"drift_latest_run_id": schema.StringAttribute{
-				Description: "ID of the drift run that produced the current `drift_status`, prefixed `run-…`. Empty when drift has never run or when cleared by a successful apply.",
+				Description: "ID of the drift run that produced the current `drift_status`, prefixed `run-…`. Empty when drift has never run or when cleared by a successful apply. Server-volatile.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"state_diverged": schema.BoolAttribute{
-				Description: "True when an apply Job succeeded but uploading the resulting state to Terrapod failed; the recorded state is out of sync with reality.",
+				Description: "True when an apply Job succeeded but uploading the resulting state to Terrapod failed; the recorded state is out of sync with reality. Stable across PATCHes — only the state-upload pathway changes this.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"lifecycle_state": schema.StringAttribute{
-				Description: "Autodiscovery lifecycle state for managed workspaces: \"active\", \"pending_deletion\", or \"archived\".",
+				Description: "Autodiscovery lifecycle state for managed workspaces: \"active\", \"pending_deletion\", or \"archived\". Server-volatile — autodiscovery lifecycle reconciler can move this between plan and apply.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"lifecycle_reason": schema.StringAttribute{
-				Description: "Human-readable explanation of `lifecycle_state`. Empty for active workspaces.",
+				Description: "Human-readable explanation of `lifecycle_state`. Empty for active workspaces. Server-volatile.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"vcs_last_polled_at": schema.StringAttribute{
-				Description: "Timestamp of the most recent successful VCS poll cycle.",
+				Description: "Timestamp of the most recent successful VCS poll cycle. Server-volatile — VCS poller writes this every `vcs.poll_interval_seconds` (default 60s).",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"vcs_last_error": schema.StringAttribute{
-				Description: "Most recent VCS poll error message. Empty when the last poll succeeded.",
+				Description: "Most recent VCS poll error message. Empty when the last poll succeeded. Server-volatile.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"vcs_last_error_at": schema.StringAttribute{
-				Description: "Timestamp of `vcs_last_error`.",
+				Description: "Timestamp of `vcs_last_error`. Server-volatile.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"agent_pool_name": schema.StringAttribute{
-				Description: "Human-readable name of the assigned agent pool, server-derived from `agent_pool_id`.",
+				Description: "Human-readable name of the assigned agent pool, server-derived from `agent_pool_id`. Only changes when `agent_pool_id` changes.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"vcs_connection_name": schema.StringAttribute{
-				Description: "Human-readable name of the assigned VCS connection, server-derived from `vcs_connection_id`.",
+				Description: "Human-readable name of the assigned VCS connection, server-derived from `vcs_connection_id`. Only changes when `vcs_connection_id` changes.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"locked": schema.BoolAttribute{
-				Description: "Whether the workspace is locked.",
+				Description: "Whether the workspace is locked. Server-volatile — operators can lock/unlock via the API outside of Terraform.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"created_at": schema.StringAttribute{
 				Description: "Creation timestamp.",
@@ -320,11 +303,8 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				},
 			},
 			"updated_at": schema.StringAttribute{
-				Description: "Last update timestamp.",
+				Description: "Last update timestamp. Server-volatile — ticks on every PATCH and on every server-side write (drift detection, VCS poll, lifecycle reconciler).",
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 		},
 	}
@@ -807,34 +787,52 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 	m.AISummaryContext = types.StringValue(ws.AISummaryContext)
 
 	// Var files — same null-vs-empty rule as trigger_prefixes above.
-	// API always returns `[]`, so we always materialise a typed list.
-	vfVal, vfDiag := types.ListValueFrom(ctx, types.StringType, ws.VarFiles)
-	diags.Append(vfDiag...)
-	m.VarFiles = vfVal
+	if m.VarFiles.IsNull() && len(ws.VarFiles) == 0 {
+		m.VarFiles = types.ListNull(types.StringType)
+	} else {
+		vfVal, vfDiag := types.ListValueFrom(ctx, types.StringType, ws.VarFiles)
+		diags.Append(vfDiag...)
+		m.VarFiles = vfVal
+	}
 
 	// Trigger prefixes — repo paths beyond `working_directory` that must
-	// land in the sparse-checkout fetch (typically because the workspace's
-	// terraform references siblings via `module ... { source = "../foo" }`
-	// — sparse cone mode includes parents but not siblings).
+	// land in the sparse-checkout fetch.
 	//
-	// Always materialise as a typed list (empty when nil/empty), never
-	// null. The API consistently returns `[]` (never absent), and an
-	// HCL caller that declares `trigger_prefixes = []` produces a
-	// non-null empty list at plan time — flipping to null on Read
-	// triggers terraform-plugin-framework's "Provider produced
-	// inconsistent result after apply" check. This was v0.35.4's apply
-	// bug on terrapod-config (#481).
-	tpVal, tpDiag := types.ListValueFrom(ctx, types.StringType, ws.TriggerPrefixes)
-	diags.Append(tpDiag...)
-	m.TriggerPrefixes = tpVal
+	// The null-vs-empty-list ambiguity is the most-bitten edge in the
+	// terraform-plugin-framework Optional list pattern, and we've been
+	// burned by both directions:
+	//
+	// - v0.35.4: Read coerced `[]` to null. A caller that declared
+	//   `trigger_prefixes = []` got plan=[] / apply=null mismatch.
+	// - v0.35.5: Read coerced null to `[]`. A caller that OMITTED the
+	//   field got plan=null / apply=[] mismatch on the very first
+	//   apply against the new provider.
+	//
+	// Right answer: respect what the prior state holds. The framework
+	// passes the prior state into this function via `m`, so checking
+	// `m.TriggerPrefixes.IsNull()` BEFORE we overwrite it lets us
+	// preserve null when the caller's config + prior state were both
+	// null and the API just returned its default empty list. Only
+	// materialise as `[]` when the prior state already had a non-null
+	// list (or when the API returned a populated list).
+	if m.TriggerPrefixes.IsNull() && len(ws.TriggerPrefixes) == 0 {
+		// prior null + server empty → preserve null (caller omitted it)
+		m.TriggerPrefixes = types.ListNull(types.StringType)
+	} else {
+		tpVal, tpDiag := types.ListValueFrom(ctx, types.StringType, ws.TriggerPrefixes)
+		diags.Append(tpDiag...)
+		m.TriggerPrefixes = tpVal
+	}
 
-	// Labels
-	if len(ws.Labels) > 0 {
+	// Labels — same null-vs-empty-map rule as trigger_prefixes above.
+	// `len(nil-map) == 0` so an empty server map collapses to the
+	// preserve-null branch when prior state was null.
+	if m.Labels.IsNull() && len(ws.Labels) == 0 {
+		m.Labels = types.MapNull(types.StringType)
+	} else {
 		val, d := types.MapValueFrom(ctx, types.StringType, ws.Labels)
 		diags.Append(d...)
 		m.Labels = val
-	} else {
-		m.Labels = types.MapNull(types.StringType)
 	}
 	return diags
 }
