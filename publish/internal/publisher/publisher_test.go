@@ -36,13 +36,13 @@ func TestPublishProviderUploadOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	entity, err := openpgp.NewEntity("awsmai", "", "security@example.test", nil)
+	entity, err := openpgp.NewEntity("example", "", "security@example.test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	err = PublishProvider(context.Background(), c, ProviderInput{
-		Name:       "awsmai",
+		Name:       "example",
 		Version:    "1.0.0",
 		SigningKey: entity,
 		Binaries:   map[string][]byte{"linux/arm64": []byte("bin")},
@@ -59,7 +59,7 @@ func TestPublishProviderUploadOrder(t *testing.T) {
 	if order[2] != "platform:linux/arm64" {
 		t.Errorf("platform path = %s", order[2])
 	}
-	if !strings.Contains(manifestBody, "terraform-provider-awsmai_1.0.0_linux_arm64.zip") {
+	if !strings.Contains(manifestBody, "terraform-provider-example_1.0.0_linux_arm64.zip") {
 		t.Errorf("manifest missing canonical filename: %q", manifestBody)
 	}
 }
@@ -68,7 +68,7 @@ func TestPublishProviderNoBinaries(t *testing.T) {
 	c, _ := terrapod.NewClient(terrapod.Options{BaseURL: "http://x", Token: "t"})
 	entity, _ := openpgp.NewEntity("x", "", "x@x.test", nil)
 	err := PublishProvider(context.Background(), c, ProviderInput{
-		Name: "awsmai", Version: "1.0.0", SigningKey: entity, Binaries: nil,
+		Name: "example", Version: "1.0.0", SigningKey: entity, Binaries: nil,
 	}, nil)
 	if err == nil {
 		t.Fatal("expected error for no binaries")

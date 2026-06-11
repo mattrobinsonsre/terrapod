@@ -15,7 +15,7 @@ import (
 func providerCmd(args []string) int {
 	fs := flag.NewFlagSet("provider", flag.ContinueOnError)
 	host := fs.String("host", "", "Terrapod hostname (required)")
-	name := fs.String("name", "", "provider name, e.g. awsmai (required)")
+	name := fs.String("name", "", "provider name, e.g. example (required)")
 	version := fs.String("version", "", "version, e.g. 1.0.0 (no leading v) (required)")
 	keyPath := fs.String("signing-key", "", "path to ASCII-armored private signing key (required)")
 	keyPass := fs.String("signing-key-passphrase", "",

@@ -9,7 +9,7 @@ import (
 
 func testEntity(t *testing.T) *openpgp.Entity {
 	t.Helper()
-	e, err := openpgp.NewEntity("awsmai test", "", "security@example.test", nil)
+	e, err := openpgp.NewEntity("example test", "", "security@example.test", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -18,7 +18,7 @@ func testEntity(t *testing.T) *openpgp.Entity {
 
 func TestDetachSignVerifies(t *testing.T) {
 	e := testEntity(t)
-	data := []byte("abc123  terraform-provider-awsmai_1.0.0_linux_arm64.zip\n")
+	data := []byte("abc123  terraform-provider-example_1.0.0_linux_arm64.zip\n")
 	sig, err := DetachSign(e, data)
 	if err != nil {
 		t.Fatal(err)

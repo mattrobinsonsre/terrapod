@@ -45,13 +45,13 @@ func newPublishFixture(t *testing.T, status int) (*Client, *capturedReq) {
 
 func TestUploadProviderSHASUMS(t *testing.T) {
 	c, cap := newPublishFixture(t, http.StatusOK)
-	if err := c.UploadProviderSHASUMS(t.Context(), "awsmai", "1.0.0", []byte("sums")); err != nil {
+	if err := c.UploadProviderSHASUMS(t.Context(), "example", "1.0.0", []byte("sums")); err != nil {
 		t.Fatal(err)
 	}
 	if cap.method != http.MethodPut {
 		t.Errorf("method = %s", cap.method)
 	}
-	if cap.path != "/api/terrapod/v1/registry-providers/private/default/awsmai/versions/1.0.0/shasums" {
+	if cap.path != "/api/terrapod/v1/registry-providers/private/default/example/versions/1.0.0/shasums" {
 		t.Errorf("path = %s", cap.path)
 	}
 	if string(cap.body) != "sums" {
@@ -61,17 +61,17 @@ func TestUploadProviderSHASUMS(t *testing.T) {
 
 func TestUploadProviderSignaturePath(t *testing.T) {
 	c, cap := newPublishFixture(t, http.StatusOK)
-	if err := c.UploadProviderSignature(t.Context(), "awsmai", "1.0.0", []byte("sig")); err != nil {
+	if err := c.UploadProviderSignature(t.Context(), "example", "1.0.0", []byte("sig")); err != nil {
 		t.Fatal(err)
 	}
-	if cap.path != "/api/terrapod/v1/registry-providers/private/default/awsmai/versions/1.0.0/shasums.sig" {
+	if cap.path != "/api/terrapod/v1/registry-providers/private/default/example/versions/1.0.0/shasums.sig" {
 		t.Errorf("path = %s", cap.path)
 	}
 }
 
 func TestUploadProviderSignatureRejected(t *testing.T) {
 	c, _ := newPublishFixture(t, http.StatusUnprocessableEntity)
-	err := c.UploadProviderSignature(t.Context(), "awsmai", "1.0.0", []byte("badsig"))
+	err := c.UploadProviderSignature(t.Context(), "example", "1.0.0", []byte("badsig"))
 	if !IsValidation(err) {
 		t.Fatalf("expected ValidationError, got %v", err)
 	}
@@ -80,10 +80,10 @@ func TestUploadProviderSignatureRejected(t *testing.T) {
 func TestUploadProviderPlatform(t *testing.T) {
 	c, cap := newPublishFixture(t, http.StatusOK)
 	zip := []byte("PK\x03\x04zip")
-	if err := c.UploadProviderPlatform(t.Context(), "awsmai", "1.0.0", "linux", "arm64", zip); err != nil {
+	if err := c.UploadProviderPlatform(t.Context(), "example", "1.0.0", "linux", "arm64", zip); err != nil {
 		t.Fatal(err)
 	}
-	if cap.path != "/api/terrapod/v1/registry-providers/private/default/awsmai/versions/1.0.0/platforms/linux/arm64" {
+	if cap.path != "/api/terrapod/v1/registry-providers/private/default/example/versions/1.0.0/platforms/linux/arm64" {
 		t.Errorf("path = %s", cap.path)
 	}
 	if string(cap.body) != string(zip) {
@@ -93,7 +93,7 @@ func TestUploadProviderPlatform(t *testing.T) {
 
 func TestUploadProviderPlatformMismatchRejected(t *testing.T) {
 	c, _ := newPublishFixture(t, http.StatusUnprocessableEntity)
-	err := c.UploadProviderPlatform(t.Context(), "awsmai", "1.0.0", "linux", "arm64", []byte("x"))
+	err := c.UploadProviderPlatform(t.Context(), "example", "1.0.0", "linux", "arm64", []byte("x"))
 	if !IsValidation(err) {
 		t.Fatalf("expected ValidationError, got %v", err)
 	}

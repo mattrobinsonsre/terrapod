@@ -35,7 +35,7 @@ from terrapod.services.registry_provider_service import (
 
 # One RSA keypair for the whole module — keygen is the slow part (~1-3s).
 _KEY = pgpy.PGPKey.new(PubKeyAlgorithm.RSAEncryptOrSign, 2048)
-_UID = pgpy.PGPUID.new("awsmai test", email="security@example.test")
+_UID = pgpy.PGPUID.new("example test", email="security@example.test")
 _KEY.add_uid(
     _UID,
     usage={KeyFlags.Sign},
@@ -87,14 +87,14 @@ class TestStoreAndVerifyProviderSig:
         mock_get_version.return_value = version
         mock_get_key.return_value = _registered_key()
 
-        manifest = _manifest("terraform-provider-awsmai_1.0.0_linux_arm64.zip", "a" * 64)
+        manifest = _manifest("terraform-provider-example_1.0.0_linux_arm64.zip", "a" * 64)
         sig = _detached_sig(manifest)
 
         storage = AsyncMock()
         storage.get.return_value = manifest
 
         result = await store_and_verify_provider_sig(
-            AsyncMock(), storage, "default", "awsmai", "1.0.0", sig
+            AsyncMock(), storage, "default", "example", "1.0.0", sig
         )
 
         assert result.shasums_sig_uploaded is True
@@ -125,7 +125,7 @@ class TestStoreAndVerifyProviderSig:
 
         with pytest.raises(PublishValidationError):
             await store_and_verify_provider_sig(
-                AsyncMock(), storage, "default", "awsmai", "1.0.0", sig
+                AsyncMock(), storage, "default", "example", "1.0.0", sig
             )
 
     @pytest.mark.asyncio
@@ -151,7 +151,7 @@ class TestStoreAndVerifyProviderSig:
 
         with pytest.raises(PublishValidationError):
             await store_and_verify_provider_sig(
-                AsyncMock(), storage, "default", "awsmai", "1.0.0", _detached_sig(manifest)
+                AsyncMock(), storage, "default", "example", "1.0.0", _detached_sig(manifest)
             )
 
     @pytest.mark.asyncio
@@ -170,7 +170,7 @@ class TestStoreAndVerifyProviderSig:
 
         with pytest.raises(PublishValidationError):
             await store_and_verify_provider_sig(
-                AsyncMock(), storage, "default", "awsmai", "1.0.0", b"sig"
+                AsyncMock(), storage, "default", "example", "1.0.0", b"sig"
             )
 
 
@@ -201,7 +201,7 @@ class TestRecordProviderBinary:
 
         body = b"zip-bytes"
         sha = hashlib.sha256(body).hexdigest()
-        filename = "terraform-provider-awsmai_1.0.0_linux_arm64.zip"
+        filename = "terraform-provider-example_1.0.0_linux_arm64.zip"
         storage = AsyncMock()
         storage.get.return_value = _manifest(filename, sha)
 
@@ -213,7 +213,7 @@ class TestRecordProviderBinary:
                 AsyncMock(),
                 storage,
                 "default",
-                "awsmai",
+                "example",
                 "1.0.0",
                 "linux",
                 "arm64",
@@ -239,7 +239,7 @@ class TestRecordProviderBinary:
     ) -> None:
         mock_get_provider.return_value = MagicMock(id="prov")
         mock_get_version.return_value = MagicMock(shasums_sig_uploaded=True)
-        filename = "terraform-provider-awsmai_1.0.0_linux_arm64.zip"
+        filename = "terraform-provider-example_1.0.0_linux_arm64.zip"
         storage = AsyncMock()
         storage.get.return_value = _manifest(filename, "b" * 64)  # signed sha differs
 
@@ -248,7 +248,7 @@ class TestRecordProviderBinary:
                 AsyncMock(),
                 storage,
                 "default",
-                "awsmai",
+                "example",
                 "1.0.0",
                 "linux",
                 "arch",
@@ -274,7 +274,7 @@ class TestRecordProviderBinary:
                 AsyncMock(),
                 AsyncMock(),
                 "default",
-                "awsmai",
+                "example",
                 "1.0.0",
                 "linux",
                 "arm64",
@@ -300,7 +300,7 @@ class TestStoreProviderShasums:
         storage = AsyncMock()
 
         result = await store_provider_shasums(
-            AsyncMock(), storage, "default", "awsmai", "1.0.0", b"sha  file.zip\n"
+            AsyncMock(), storage, "default", "example", "1.0.0", b"sha  file.zip\n"
         )
 
         assert result.shasums_uploaded is True

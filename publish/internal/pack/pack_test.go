@@ -15,7 +15,7 @@ import (
 
 func TestProviderZipLayout(t *testing.T) {
 	bin := []byte("the binary")
-	z, err := ProviderZip("awsmai", "1.0.0", "linux", bin)
+	z, err := ProviderZip("example", "1.0.0", "linux", bin)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +27,7 @@ func TestProviderZipLayout(t *testing.T) {
 		t.Fatalf("want 1 entry, got %d", len(zr.File))
 	}
 	f := zr.File[0]
-	if f.Name != "terraform-provider-awsmai_v1.0.0" {
+	if f.Name != "terraform-provider-example_v1.0.0" {
 		t.Errorf("inner name = %s", f.Name)
 	}
 	if f.Mode()&0o100 == 0 {
@@ -42,9 +42,9 @@ func TestProviderZipLayout(t *testing.T) {
 }
 
 func TestProviderZipWindowsExe(t *testing.T) {
-	z, _ := ProviderZip("awsmai", "1.0.0", "windows", []byte("x"))
+	z, _ := ProviderZip("example", "1.0.0", "windows", []byte("x"))
 	zr, _ := zip.NewReader(bytes.NewReader(z), int64(len(z)))
-	if zr.File[0].Name != "terraform-provider-awsmai_v1.0.0.exe" {
+	if zr.File[0].Name != "terraform-provider-example_v1.0.0.exe" {
 		t.Errorf("windows inner name = %s", zr.File[0].Name)
 	}
 }

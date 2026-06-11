@@ -34,7 +34,7 @@ PROV_BASE = "/api/terrapod/v1/registry-providers/private/default"
 
 def _new_key() -> pgpy.PGPKey:
     key = pgpy.PGPKey.new(PubKeyAlgorithm.RSAEncryptOrSign, 2048)
-    uid = pgpy.PGPUID.new("awsmai", email="security@example.test")
+    uid = pgpy.PGPUID.new("example", email="security@example.test")
     key.add_uid(
         uid,
         usage={KeyFlags.Sign},
@@ -59,7 +59,7 @@ async def _register(client, app) -> str:
         json={
             "data": {
                 "type": "registry-providers",
-                "attributes": {"name": "awsmai", "labels": {}},
+                "attributes": {"name": "example", "labels": {}},
             }
         },
         headers=AUTH,
@@ -81,7 +81,7 @@ async def _register(client, app) -> str:
 
 def _artifacts(version: str, body: bytes) -> tuple[bytes, str, str]:
     sha = hashlib.sha256(body).hexdigest()
-    filename = f"terraform-provider-awsmai_{version}_linux_arm64.zip"
+    filename = f"terraform-provider-example_{version}_linux_arm64.zip"
     manifest = f"{sha}  {filename}\n".encode()
     return manifest, filename, sha
 
@@ -94,7 +94,7 @@ class TestProviderPublishDownload:
         manifest, filename, sha = _artifacts(version, zip_bytes)
         sig = bytes(_KEY.sign(manifest))
 
-        base = f"{PROV_BASE}/awsmai/versions/{version}"
+        base = f"{PROV_BASE}/example/versions/{version}"
         assert (
             await client.put(f"{base}/shasums", content=manifest, headers=AUTH)
         ).status_code == 200
@@ -106,7 +106,7 @@ class TestProviderPublishDownload:
 
         # CLI download (terraform init) must be complete + installable.
         r = await client.get(
-            f"/api/v2/registry/providers/default/awsmai/{version}/download/linux/arm64",
+            f"/api/v2/registry/providers/default/example/{version}/download/linux/arm64",
             headers=AUTH,
         )
         assert r.status_code == 200, r.text
@@ -122,7 +122,7 @@ class TestProviderPublishDownload:
         version = "2.0.0"
         zip_bytes = b"zip"
         manifest, _, _ = _artifacts(version, zip_bytes)
-        base = f"{PROV_BASE}/awsmai/versions/{version}"
+        base = f"{PROV_BASE}/example/versions/{version}"
         assert (
             await client.put(f"{base}/shasums", content=manifest, headers=AUTH)
         ).status_code == 200
@@ -134,7 +134,7 @@ class TestProviderPublishDownload:
         await _register(client, app)
         version = "3.0.0"
         manifest, _, _ = _artifacts(version, b"zip")
-        base = f"{PROV_BASE}/awsmai/versions/{version}"
+        base = f"{PROV_BASE}/example/versions/{version}"
         assert (
             await client.put(f"{base}/shasums", content=manifest, headers=AUTH)
         ).status_code == 200
@@ -149,7 +149,7 @@ class TestProviderPublishDownload:
         # Manifest commits to one sha; we upload different bytes.
         manifest, _, _ = _artifacts(version, b"the-signed-bytes")
         sig = bytes(_KEY.sign(manifest))
-        base = f"{PROV_BASE}/awsmai/versions/{version}"
+        base = f"{PROV_BASE}/example/versions/{version}"
         assert (
             await client.put(f"{base}/shasums", content=manifest, headers=AUTH)
         ).status_code == 200
