@@ -797,7 +797,8 @@ jobs:
   #                      artifact for release-finalize to upload.
   #   release-provider — GoReleaser provider, append mode.
   #   release-migrate  — GoReleaser migrate, append mode.
-  #   release-finalize — joins all four; sets real title + release notes
+  #   release-publish  — GoReleaser terrapod-publish, append mode.
+  #   release-finalize — joins all five; sets real title + release notes
   #                      and uploads the workflow artifact from
   #                      release-images.
   #
@@ -1050,6 +1051,7 @@ jobs:
       && needs.release-images.result == 'success'
       && needs.release-provider.result == 'success'
       && needs.release-migrate.result == 'success'
+      && needs.release-publish.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -1134,11 +1136,11 @@ jobs:
   # ── Cleanup Tag on Failure ─────────────────────────────
   cleanup-tag:
     name: Cleanup Tag
-    needs: [prepare, build-images, scan-images, create-manifests, release-create, release-images, release-provider, release-migrate, release-finalize]
+    needs: [prepare, build-images, scan-images, create-manifests, release-create, release-images, release-provider, release-migrate, release-publish, release-finalize]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
-      && (needs.build-images.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-finalize.result == 'failure')
+      && (needs.build-images.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-publish.result == 'failure' || needs.release-finalize.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write
