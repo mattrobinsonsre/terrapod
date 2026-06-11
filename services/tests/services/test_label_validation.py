@@ -111,7 +111,7 @@ class TestReservedKeys:
         labels = {
             "env": "prod",
             "team": "platform",
-            "repo": "tf-aws-core",
+            "repo": "infra-core",
             "scope": "core",
             "region": "eu-west-1",
             "managed-by": "terrapod-provider",

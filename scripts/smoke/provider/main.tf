@@ -111,7 +111,7 @@ resource "terrapod_role" "smoke" {
 # the smoke doesn't need a second user to exist.
 variable "smoke_email" {
   type    = string
-  default = "matt.robinson@acrolinx.com"
+  default = "admin@example.com"
 }
 
 resource "terrapod_role_assignment" "smoke" {

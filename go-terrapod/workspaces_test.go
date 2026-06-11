@@ -388,8 +388,8 @@ func TestWorkspaceFromResource_ContractParity(t *testing.T) {
 	    "vcs-last-polled-at": "2026-06-10T11:50:00Z",
 	    "vcs-last-error": "github app token expired",
 	    "vcs-last-error-at": "2026-06-10T11:45:00Z",
-	    "agent-pool-name": "mai-dev-us1",
-	    "vcs-connection-name": "markupai-github"
+	    "agent-pool-name": "dev-pool-1",
+	    "vcs-connection-name": "example-github"
 	  }
 	}}`
 	ws, err := parseWorkspace([]byte(body))
@@ -412,7 +412,7 @@ func TestWorkspaceFromResource_ContractParity(t *testing.T) {
 		t.Errorf("vcs-poll status fields: polled=%q err=%q errAt=%q",
 			ws.VCSLastPolledAt, ws.VCSLastError, ws.VCSLastErrorAt)
 	}
-	if ws.AgentPoolName != "mai-dev-us1" || ws.VCSConnectionName != "markupai-github" {
+	if ws.AgentPoolName != "dev-pool-1" || ws.VCSConnectionName != "example-github" {
 		t.Errorf("derived names: pool=%q conn=%q", ws.AgentPoolName, ws.VCSConnectionName)
 	}
 }

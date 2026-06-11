@@ -19,7 +19,7 @@ class TestValidateOwnerEmail:
         "email",
         [
             "user@example.com",
-            "matt.robinson@acrolinx.com",
+            "admin@example.com",
             "first.last+tag@subdomain.example.co.uk",
             "a@b.c",
             "MixedCase@Example.ORG",

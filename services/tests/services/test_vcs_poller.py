@@ -636,7 +636,7 @@ class TestPollCycleParallel:
         parsed (owner, repo) exactly matches the webhook's repo.
 
         Workspaces for a different repo — even one whose URL is a suffix
-        of the target (wrapper/markupai/scalable-language-servers), or a
+        of the target (wrapper/example-org/example-repo), or a
         different host — must NOT be polled.
         """
         import uuid
@@ -653,12 +653,12 @@ class TestPollCycleParallel:
         suffix_collision = uuid.uuid4()
 
         rows = [
-            (matched_https, "https://github.com/markupai/scalable-language-servers", "github"),
-            (matched_ssh, "git@github.com:markupai/scalable-language-servers.git", "github"),
-            (other_repo, "https://github.com/markupai/other-repo", "github"),
+            (matched_https, "https://github.com/example-org/example-repo", "github"),
+            (matched_ssh, "git@github.com:example-org/example-repo.git", "github"),
+            (other_repo, "https://github.com/example-org/other-repo", "github"),
             (
                 suffix_collision,
-                "https://github.com/wrapper/markupai/scalable-language-servers",
+                "https://github.com/wrapper/example-org/example-repo",
                 "github",
             ),
         ]
@@ -689,7 +689,7 @@ class TestPollCycleParallel:
                 return_value={},
             ),
         ):
-            await handle_immediate_poll({"repo": "markupai/scalable-language-servers"})
+            await handle_immediate_poll({"repo": "example-org/example-repo"})
 
         # Only the two exact-match workspaces were polled.
         assert sorted(polled) == sorted([matched_https, matched_ssh])

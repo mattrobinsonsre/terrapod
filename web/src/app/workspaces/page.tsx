@@ -154,7 +154,7 @@ function WorkspacesPageInner() {
   // Sync the input to the URL whenever the parsed filter changes — debounced.
   //
   // Each `router.replace` triggers a Next.js RSC prefetch for the new URL.
-  // Firing per-keystroke (e.g. typing "repo:tf-data-pipelines") cascades
+  // Firing per-keystroke (e.g. typing "repo:data-pipelines") cascades
   // ~20 prefetches in a few hundred ms, overwhelms Next's dev server with
   // 503s, and can leave the address bar stuck on an early keystroke when
   // a later prefetch wins the race. We debounce to a single replace once

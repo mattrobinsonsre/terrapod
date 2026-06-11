@@ -567,7 +567,7 @@ class TestWorkspaceTagBindings:
     @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
     async def test_returns_labels_as_bindings(self, mock_resolve, *mocks):
         mock_resolve.return_value = "read"
-        ws = _mock_workspace(labels={"repo": "tf-aws-core", "env": "dev"})
+        ws = _mock_workspace(labels={"repo": "infra-core", "env": "dev"})
         app, mock_db = _make_app(_user())
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = ws
@@ -579,7 +579,7 @@ class TestWorkspaceTagBindings:
         items = resp.json()["data"]
         # Same key/value pairs, regardless of ordering
         assert {(i["attributes"]["key"], i["attributes"]["value"]) for i in items} == {
-            ("repo", "tf-aws-core"),
+            ("repo", "infra-core"),
             ("env", "dev"),
         }
         assert all(i["type"] == "tag-bindings" for i in items)
@@ -634,7 +634,7 @@ class TestWorkspaceTagBindings:
     async def test_effective_tag_bindings_mirrors_workspace_bindings(self, mock_resolve, *mocks):
         # Terrapod has no project hierarchy, so effective bindings == workspace bindings
         mock_resolve.return_value = "read"
-        ws = _mock_workspace(labels={"repo": "tf-aws-core"})
+        ws = _mock_workspace(labels={"repo": "infra-core"})
         app, mock_db = _make_app(_user())
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = ws
@@ -650,7 +650,7 @@ class TestWorkspaceTagBindings:
             {
                 "id": f"{ws.id}:repo",
                 "type": "effective-tag-bindings",
-                "attributes": {"key": "repo", "value": "tf-aws-core"},
+                "attributes": {"key": "repo", "value": "infra-core"},
             }
         ]
 

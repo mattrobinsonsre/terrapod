@@ -208,7 +208,7 @@ class TestSupersededRunComment:
         ws.id = ws_id
         ws.name = "terrapod-config"
         ws.vcs_connection_id = conn_id
-        ws.vcs_repo_url = "https://github.com/markupai/terrapod-config"
+        ws.vcs_repo_url = "https://github.com/example-org/terrapod-config"
 
         conn = MagicMock()
         conn.provider = "github"
@@ -243,7 +243,7 @@ class TestSupersededRunComment:
             ),
             patch(
                 "terrapod.services.vcs_status_dispatcher.github_service.parse_repo_url",
-                return_value=("markupai", "terrapod-config"),
+                return_value=("example-org", "terrapod-config"),
             ),
             patch(
                 "terrapod.services.vcs_status_dispatcher.github_service.create_commit_status",
@@ -296,7 +296,7 @@ class TestSupersededRunComment:
         ws.id = ws_id
         ws.name = "terrapod-config"
         ws.vcs_connection_id = conn_id
-        ws.vcs_repo_url = "https://github.com/markupai/terrapod-config"
+        ws.vcs_repo_url = "https://github.com/example-org/terrapod-config"
 
         conn = MagicMock()
         conn.provider = "github"
@@ -343,7 +343,7 @@ class TestSupersededRunComment:
             ),
             patch(
                 "terrapod.services.vcs_status_dispatcher.github_service.parse_repo_url",
-                return_value=("markupai", "terrapod-config"),
+                return_value=("example-org", "terrapod-config"),
             ),
             patch(
                 "terrapod.services.vcs_status_dispatcher.github_service.create_commit_status",
@@ -432,7 +432,7 @@ class TestFindOrCreateCommentRaceFix:
         conn = MagicMock(spec=VCSConnection)
         conn.provider = "github"
         ws_id = "11111111-1111-1111-1111-111111111111"
-        owner, repo, pr_number = "markupai", "terrapod-config", 31
+        owner, repo, pr_number = "example-org", "terrapod-config", 31
 
         fake_redis = _FakeRedis()
 
