@@ -1419,7 +1419,7 @@ GET  /api/terrapod/v1/registry-modules
 POST /api/terrapod/v1/registry-modules
 GET  /api/terrapod/v1/registry-modules/private/default/{name}/{provider}
 DELETE /api/terrapod/v1/registry-modules/private/default/{name}/{provider}
-POST /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/versions
+PUT  /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/versions/{version}/upload
 DELETE /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/versions/{version}
 ```
 
@@ -1447,9 +1447,27 @@ All module responses (show and list) include a `permissions` object:
 }
 ```
 
-### Version Upload
+### Version Upload (Streamed)
 
-Create a version, then upload the tarball to the presigned URL returned in the response.
+```
+PUT /api/terrapod/v1/registry-modules/private/default/{name}/{provider}/versions/{version}/upload
+```
+
+A single streamed `PUT` of the gzipped module source tarball. The version
+is created **implicitly on upload** — there is no separate create step and
+no presigned URL. The server extracts the module interface (inputs and
+outputs) and triggers impact runs on any linked workspaces (see
+[Module Impact Analysis](#registry----modules) and the workspace-links
+section below).
+
+**Required permission:** `write` on the module (the owner has `admin`).
+
+**Tooling:** the [`terrapod-publish`](registry-publishing.md) CLI packages
+the source directory and performs this upload.
+
+> **Removed in the client-signed model:** the previous
+> `POST .../versions` create-then-upload-to-presigned-URL flow has been
+> **removed** in favour of the single streamed `PUT` above.
 
 ### Workspace Links (Module Impact Analysis)
 
@@ -1474,6 +1492,11 @@ GET /api/v2/registry/providers/{namespace}/{type}/versions
 GET /api/v2/registry/providers/{namespace}/{type}/{version}/download/{os}/{arch}
 ```
 
+The download response advertises the **publisher's own** GPG public key
+in `signing_keys.gpg_public_keys`. Terrapod never re-signs a provider — the
+signature `terraform init` verifies is the one the publisher produced at
+publish time (see [Publishing a Version](#publishing-a-version-client-signed)).
+
 ### TFE V2 Management API
 
 ```
@@ -1481,11 +1504,52 @@ GET  /api/terrapod/v1/registry-providers
 POST /api/terrapod/v1/registry-providers
 GET  /api/terrapod/v1/registry-providers/private/default/{name}
 DELETE /api/terrapod/v1/registry-providers/private/default/{name}
-POST /api/terrapod/v1/registry-providers/private/default/{name}/versions
 GET  /api/terrapod/v1/registry-providers/private/default/{name}/versions
 DELETE /api/terrapod/v1/registry-providers/private/default/{name}/versions/{version}
-POST /api/terrapod/v1/registry-providers/private/default/{name}/versions/{version}/platforms
 ```
+
+### Publishing a Version (Client-Signed)
+
+Provider publishing is **client-signed, direct, and streamed**. The
+publisher computes `SHA256SUMS` over the platform zips and GPG-signs it
+with its own key; the server verifies that signature against a
+**registered** GPG public key and never re-signs. The version is created
+**implicitly on the first upload** — there is no separate create-version
+or finalize step.
+
+Uploads must happen in this exact order:
+
+```
+PUT /api/terrapod/v1/registry-providers/private/default/{name}/versions/{version}/shasums
+PUT /api/terrapod/v1/registry-providers/private/default/{name}/versions/{version}/shasums.sig
+PUT /api/terrapod/v1/registry-providers/private/default/{name}/versions/{version}/platforms/{os}/{arch}
+```
+
+1. **`PUT .../shasums`** — the raw `SHA256SUMS` manifest (one
+   `{sha}  {zipname}` line per platform).
+2. **`PUT .../shasums.sig`** — the detached GPG signature over the
+   manifest. **The server verifies it against a registered GPG key here
+   (the trust gate).** Returns **422** if the key isn't registered or the
+   signature doesn't verify. Binaries are refused until this succeeds.
+3. **`PUT .../platforms/{os}/{arch}`** (one per platform) — each zip is
+   streamed to disk and its SHA checked against the signed manifest.
+   Returns **422** on a SHA mismatch, or if the signature has not yet been
+   verified.
+
+**Required permission:** `write` on the provider (the owner has `admin`).
+
+**Tooling:** the [`terrapod-publish`](registry-publishing.md) CLI performs
+these three uploads (in order) and does all packaging, hashing, and GPG
+signing client-side. The server never re-signs — the
+[download response](#cli-protocol-for-terraform-init) advertises the
+publisher's own public key in `signing_keys.gpg_public_keys`.
+
+> **Removed in the client-signed model:** the previous presigned-URL
+> flow — `POST .../versions` (create version) and
+> `POST .../versions/{version}/platforms` (create platform, returning a
+> presigned upload URL) — has been **removed**. There is no
+> server-side re-signing and no presigned-URL or finalize step for
+> provider versions. Use the three streamed `PUT` endpoints above.
 
 ### Update Provider
 
@@ -1519,6 +1583,11 @@ POST   /api/terrapod/v1/gpg-keys
 GET    /api/terrapod/v1/gpg-keys/{namespace}/{key_id}
 DELETE /api/terrapod/v1/gpg-keys/{namespace}/{key_id}
 ```
+
+The **public** key registered here is the trust anchor for client-signed
+provider publishing: `PUT .../shasums.sig` is verified against it. Register
+a key before publishing a provider (or use the `terrapod_gpg_key` provider
+resource). See [Publishing to the Private Registry](registry-publishing.md).
 
 ---
 

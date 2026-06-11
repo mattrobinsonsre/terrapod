@@ -100,6 +100,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Runners](runners.md) | Custom runner images, private registries, Job configuration |
 | [Cloud Credentials](cloud-credentials.md) | AWS IRSA, GCP WIF, Azure WI setup |
 | [Registry](registry.md) | Private module/provider registry, caching layers |
+| [Registry Publishing](registry-publishing.md) | Publishing providers/modules with the `terrapod-publish` CLI and the client-signed publish protocol |
 | [Monitoring](monitoring.md) | Prometheus metrics, scraping, recommended alerts |
 | [Deployment](deployment.md) | Production Helm deployment, storage backends, scaling |
 | [Split-networking deployments](deployment-network-isolation.md) | Three-Ingress model: management / webhook / internal agent path, with split-hostname runner config |

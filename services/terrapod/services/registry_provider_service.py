@@ -1,11 +1,13 @@
 """Service layer for private provider registry operations.
 
-Handles CRUD for registry providers, versions, and platforms, with presigned
-URL generation for binary upload/download via object storage.
+Handles CRUD for registry providers plus the client-signed publish path:
+store the SHA256SUMS manifest, verify its detached signature against a
+registered GPG key (the trust gate), then accept per-platform binaries that
+match the signed manifest. The server never re-signs; downloads are served
+via presigned GET URLs.
 """
 
 import asyncio
-import hashlib
 import uuid
 
 from sqlalchemy import select
@@ -24,9 +26,28 @@ from terrapod.storage.keys import (
     provider_shasums_key,
     provider_shasums_sig_key,
 )
-from terrapod.storage.protocol import ObjectStore, PresignedURL
+from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
+
+
+class PublishValidationError(Exception):
+    """A client-signed publish step failed validation.
+
+    The router maps this to HTTP 422 so a bad / untrusted / mismatched
+    upload is rejected loudly at publish time rather than silently at
+    `tofu init`.
+    """
+
+
+def _parse_shasums(data: bytes) -> dict[str, str]:
+    """Parse a SHA256SUMS manifest into ``{filename: lowercase-sha}``."""
+    out: dict[str, str] = {}
+    for line in data.decode("utf-8", "replace").splitlines():
+        parts = line.split()
+        if len(parts) >= 2:
+            out[parts[-1]] = parts[0].lower()
+    return out
 
 
 # --- Provider CRUD ---
@@ -103,36 +124,91 @@ async def delete_provider(
 # --- Version CRUD ---
 
 
-async def create_provider_version(
+async def store_provider_shasums(
     db: AsyncSession,
     storage: ObjectStore,
-    provider_id: uuid.UUID,
+    namespace: str,
+    name: str,
     version: str,
-    gpg_key_id: uuid.UUID | None = None,
-    protocols: list[str] | None = None,
-) -> tuple[RegistryProviderVersion, PresignedURL, PresignedURL]:
-    """Create a provider version and return upload URLs for shasums + sig."""
-    result = await db.execute(select(RegistryProvider).where(RegistryProvider.id == provider_id))
-    provider = result.scalars().first()
+    data: bytes,
+) -> RegistryProviderVersion:
+    """Store a client-supplied SHA256SUMS manifest (first publish step).
+
+    Upserts the version row and persists the manifest verbatim. The
+    manifest is NOT trusted until its detached signature is uploaded and
+    verified by store_and_verify_provider_sig — binary uploads are gated
+    on that.
+    """
+    provider = await get_provider(db, namespace, name)
     if provider is None:
-        raise ValueError(f"Provider {provider_id} not found")
+        raise ValueError(f"Provider {namespace}/{name} not found")
 
-    prov_version = RegistryProviderVersion(
-        provider_id=provider_id,
-        version=version,
-        gpg_key_id=gpg_key_id,
-        protocols=protocols or ["5.0"],
-    )
-    db.add(prov_version)
+    prov_version = await upsert_provider_version(db, provider.id, version)
+    key = provider_shasums_key(namespace, name, version)
+    await storage.put(key, data, "text/plain")
+    prov_version.shasums_uploaded = True
     await db.flush()
+    return prov_version
 
-    # Generate presigned upload URLs for shasums files
-    shasums_key = provider_shasums_key(provider.namespace, provider.name, version)
-    sig_key = provider_shasums_sig_key(provider.namespace, provider.name, version)
-    shasums_url = await storage.presigned_put_url(shasums_key, content_type="text/plain")
-    sig_url = await storage.presigned_put_url(sig_key, content_type="application/octet-stream")
 
-    return prov_version, shasums_url, sig_url
+async def store_and_verify_provider_sig(
+    db: AsyncSession,
+    storage: ObjectStore,
+    namespace: str,
+    name: str,
+    version: str,
+    sig_bytes: bytes,
+) -> RegistryProviderVersion:
+    """Verify + store the detached SHA256SUMS signature — the trust gate.
+
+    Reads back the previously-uploaded SHA256SUMS, confirms the detached
+    signature was produced by a *registered* GPG key, and verifies it
+    cryptographically over the manifest bytes. On success the signing key
+    is linked to the version so the CLI download response advertises it as
+    a signing key. Raises PublishValidationError (-> HTTP 422) on any
+    failure, so binaries are never accepted under an untrusted manifest.
+    The server never re-signs — the client owns the signature.
+    """
+    from terrapod.services.gpg_key_service import (
+        extract_signature_key_id,
+        get_gpg_key_by_key_id,
+        verify_detached_signature,
+    )
+
+    provider = await get_provider(db, namespace, name)
+    if provider is None:
+        raise ValueError(f"Provider {namespace}/{name} not found")
+    prov_version = await get_provider_version(db, provider.id, version)
+    if prov_version is None:
+        raise PublishValidationError("upload SHA256SUMS before its signature")
+
+    shasums_key = provider_shasums_key(namespace, name, version)
+    try:
+        shasums_bytes = await storage.get(shasums_key)
+    except Exception as exc:
+        raise PublishValidationError("SHA256SUMS must be uploaded before its signature") from exc
+
+    key_id = await extract_signature_key_id(sig_bytes)
+    if not key_id:
+        raise PublishValidationError("could not parse a key ID from the signature")
+
+    gpg_key = await get_gpg_key_by_key_id(db, key_id)
+    if gpg_key is None:
+        raise PublishValidationError(
+            f"signature key {key_id} is not registered; add it via /api/terrapod/v1/gpg-keys first"
+        )
+
+    if not await verify_detached_signature(gpg_key.ascii_armor, shasums_bytes, sig_bytes):
+        raise PublishValidationError(
+            f"SHA256SUMS signature failed verification against registered key {key_id}"
+        )
+
+    sig_key = provider_shasums_sig_key(namespace, name, version)
+    await storage.put(sig_key, sig_bytes, "application/pgp-signature")
+    prov_version.gpg_key_id = gpg_key.id
+    prov_version.shasums_sig_uploaded = True
+    await db.flush()
+    return prov_version
 
 
 async def list_provider_versions(
@@ -191,47 +267,74 @@ async def delete_provider_version(
 # --- Platform CRUD ---
 
 
-async def create_provider_platform(
+async def record_provider_binary(
     db: AsyncSession,
     storage: ObjectStore,
-    version_id: uuid.UUID,
+    namespace: str,
+    name: str,
+    version: str,
     os_: str,
     arch: str,
+    *,
+    sha256: str,
     filename: str,
-) -> tuple[RegistryProviderPlatform, PresignedURL]:
-    """Create a platform entry and return an upload URL for the binary."""
-    # Look up the version to get provider info for storage key
-    result = await db.execute(
-        select(RegistryProviderVersion)
-        .where(RegistryProviderVersion.id == version_id)
-        .options(selectinload(RegistryProviderVersion.provider))
-    )
-    prov_version = result.scalars().first()
+    tmp_path: str,
+) -> RegistryProviderPlatform:
+    """Validate a streamed provider binary against the signed manifest, then store it.
+
+    Preconditions (PublishValidationError -> HTTP 422):
+      - the version's SHA256SUMS.sig is already verified (trust established);
+      - the uploaded zip's filename appears in SHA256SUMS;
+      - the uploaded zip's sha matches the signed manifest entry.
+
+    Only then is the validated tempfile streamed from the PVC into object
+    storage and the platform row marked uploaded. The server never re-signs
+    — the client owns the manifest and signature.
+    """
+    provider = await get_provider(db, namespace, name)
+    if provider is None:
+        raise ValueError(f"Provider {namespace}/{name} not found")
+    prov_version = await get_provider_version(db, provider.id, version)
     if prov_version is None:
-        raise ValueError(f"Provider version {version_id} not found")
+        raise PublishValidationError(
+            "upload and verify SHA256SUMS + SHA256SUMS.sig before uploading binaries"
+        )
+    if not prov_version.shasums_sig_uploaded:
+        raise PublishValidationError(
+            "upload and verify SHA256SUMS + SHA256SUMS.sig before uploading binaries"
+        )
 
-    provider = prov_version.provider
+    shasums_bytes = await storage.get(provider_shasums_key(namespace, name, version))
+    sums = _parse_shasums(shasums_bytes)
+    expected = sums.get(filename)
+    if expected is None:
+        raise PublishValidationError(f"{filename} is not listed in the signed SHA256SUMS")
+    if expected != sha256.lower():
+        raise PublishValidationError(
+            f"{filename}: uploaded sha {sha256.lower()} does not match signed manifest {expected}"
+        )
 
-    platform = RegistryProviderPlatform(
-        version_id=version_id,
-        os=os_,
-        arch=arch,
-        filename=filename,
-        upload_status="pending",
-    )
-    db.add(platform)
+    # Stream the validated tempfile into object storage (constant memory).
+    key = provider_binary_key(namespace, name, version, os_, arch)
+
+    async def _chunks():
+        with open(tmp_path, "rb") as src:  # noqa: ASYNC230 -- bounded reads off the PVC
+            while True:
+                buf = await asyncio.to_thread(src.read, 1024 * 1024)
+                if not buf:
+                    break
+                yield buf
+
+    await storage.put_stream(key, _chunks(), content_type="application/zip")
+
+    platform = await upsert_provider_platform(db, prov_version.id, os_, arch)
+    platform.shasum = sha256.lower()
+    platform.filename = filename
+    platform.upload_status = "uploaded"
+    # The terraform h1 dirhash is computed lazily by the mirror on first
+    # read (memory-safe for large archives); not eagerly computed here.
     await db.flush()
-
-    key = provider_binary_key(
-        provider.namespace,
-        provider.name,
-        prov_version.version,
-        os_,
-        arch,
-    )
-    upload_url = await storage.presigned_put_url(key, content_type="application/zip")
-
-    return platform, upload_url
+    return platform
 
 
 async def list_provider_platforms(
@@ -317,7 +420,10 @@ async def get_provider_download_info(
         )
     )
     platform = result.scalars().first()
-    if platform is None:
+    if platform is None or platform.upload_status != "uploaded":
+        # Hide platforms whose binary hasn't been validated + stored yet, so
+        # the CLI download path agrees with the version-list path (which also
+        # filters on upload_status) — never serve a half-published platform.
         return None
 
     # Generate presigned URLs
@@ -415,132 +521,6 @@ async def upsert_provider_platform(
     )
     db.add(platform)
     await db.flush()
-    return platform
-
-
-async def regenerate_shasums(
-    db: AsyncSession,
-    storage: ObjectStore,
-    namespace: str,
-    name: str,
-    version_id: uuid.UUID,
-    version_str: str,
-) -> None:
-    """Regenerate SHA256SUMS from all uploaded platforms, sign, and link GPG key."""
-    from terrapod.services.gpg_key_service import get_or_create_signing_key, sign_data
-
-    result = await db.execute(
-        select(RegistryProviderPlatform)
-        .where(
-            RegistryProviderPlatform.version_id == version_id,
-            RegistryProviderPlatform.upload_status == "uploaded",
-        )
-        .order_by(RegistryProviderPlatform.os, RegistryProviderPlatform.arch)
-    )
-    platforms = list(result.scalars().all())
-
-    lines = []
-    for p in platforms:
-        if p.shasum and p.filename:
-            lines.append(f"{p.shasum}  {p.filename}")
-
-    content = "\n".join(lines) + "\n" if lines else ""
-    content_bytes = content.encode()
-    shasums_k = provider_shasums_key(namespace, name, version_str)
-    await storage.put(shasums_k, content_bytes, "text/plain")
-
-    # Look up the version record
-    ver_result = await db.execute(
-        select(RegistryProviderVersion).where(RegistryProviderVersion.id == version_id)
-    )
-    prov_version = ver_result.scalars().first()
-    if prov_version is None:
-        return
-
-    prov_version.shasums_uploaded = True
-
-    # Sign SHA256SUMS and store the detached signature
-    if content_bytes:
-        try:
-            gpg_key, private_armor = await get_or_create_signing_key(db)
-            sig_bytes = await sign_data(private_armor, content_bytes)
-            sig_k = provider_shasums_sig_key(namespace, name, version_str)
-            await storage.put(sig_k, sig_bytes, "application/pgp-signature")
-            prov_version.shasums_sig_uploaded = True
-            prov_version.gpg_key_id = gpg_key.id
-            logger.info(
-                "SHA256SUMS signed",
-                provider=f"{namespace}/{name}",
-                version=version_str,
-                gpg_key_id=gpg_key.key_id,
-            )
-        except Exception:
-            logger.warning(
-                "Failed to sign SHA256SUMS, provider will work without signatures",
-                provider=f"{namespace}/{name}",
-                version=version_str,
-                exc_info=True,
-            )
-
-    await db.flush()
-
-
-async def upload_provider_binary(
-    db: AsyncSession,
-    storage: ObjectStore,
-    namespace: str,
-    name: str,
-    version_str: str,
-    os_: str,
-    arch: str,
-    data: bytes,
-) -> RegistryProviderPlatform:
-    """Upload a provider binary directly. Upserts version + platform, stores binary."""
-    provider = await get_provider(db, namespace, name)
-    if provider is None:
-        raise ValueError(f"Provider {namespace}/{name} not found")
-
-    prov_version = await upsert_provider_version(db, provider.id, version_str)
-    platform = await upsert_provider_platform(db, prov_version.id, os_, arch)
-
-    # Compute SHA-256
-    sha256 = hashlib.sha256(data).hexdigest()
-
-    # Store binary
-    filename = f"terraform-provider-{name}_{version_str}_{os_}_{arch}.zip"
-    key = provider_binary_key(namespace, name, version_str, os_, arch)
-    await storage.put(key, data, "application/zip")
-
-    # Update platform record
-    platform.shasum = sha256
-    platform.filename = filename
-    platform.upload_status = "uploaded"
-
-    # Eagerly compute the terraform/tofu h1 dirhash from the uploaded
-    # archive so the mirror's Tier-0 lookup can serve it without a
-    # lazy backfill on the first download. Best-effort — h1 compute
-    # failure (corrupt zip, etc.) is logged but doesn't fail the
-    # upload; the lazy backfill in `_serve_from_registry` will retry
-    # on the next read.
-    try:
-        from terrapod.services.provider_cache_service import _compute_h1_from_zip_bytes
-
-        h1 = await asyncio.to_thread(_compute_h1_from_zip_bytes, data)
-        platform.h1_hash = h1.removeprefix("h1:")
-    except Exception:
-        logger.warning(
-            "Eager h1 compute failed at provider upload; will lazy-backfill on first read",
-            provider=f"{namespace}/{name}",
-            version=version_str,
-            platform=f"{os_}_{arch}",
-            exc_info=True,
-        )
-
-    await db.flush()
-
-    # Regenerate SHA256SUMS for this version
-    await regenerate_shasums(db, storage, namespace, name, prov_version.id, version_str)
-
     return platform
 
 

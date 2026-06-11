@@ -255,6 +255,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [API Reference](docs/api-reference.md) | All API endpoints with examples |
 | [Deployment](docs/deployment.md) | Production Helm deployment, storage backends, scaling |
 | [Registry](docs/registry.md) | Private module/provider registry, caching layers |
+| [Registry Publishing](docs/registry-publishing.md) | Publishing providers/modules with `terrapod-publish` and the client-signed publish protocol |
 | [VCS Integration](docs/vcs-integration.md) | GitHub and GitLab setup, polling, webhooks |
 | [Policies (OPA)](docs/policies.md) | Rego policy authoring, advisory vs mandatory enforcement, label-based scoping, admin override |
 | [Autodiscovery](docs/autodiscovery.md) | Atlantis-style monorepo workspace autodiscovery |

@@ -81,6 +81,48 @@ async def sign_data(private_key_armor: str, data: bytes) -> bytes:
     return await asyncio.to_thread(_sign_data_sync, private_key_armor, data)
 
 
+def _extract_signature_key_id_sync(sig_bytes: bytes) -> str | None:
+    try:
+        sig = pgpy.PGPSignature.from_blob(sig_bytes)
+        signer = sig.signer
+        if not signer:
+            return None
+        return signer.replace(" ", "")[-16:].upper()
+    except Exception:
+        return None
+
+
+async def extract_signature_key_id(sig_bytes: bytes) -> str | None:
+    """Read the issuer key ID out of a detached OpenPGP signature.
+
+    Returns the 16-char key ID of the key that produced the signature, or
+    None if the blob is not a parseable signature. Used to look up which
+    registered GPG key a provider publisher signed SHA256SUMS with.
+    """
+    return await asyncio.to_thread(_extract_signature_key_id_sync, sig_bytes)
+
+
+def _verify_detached_signature_sync(public_key_armor: str, data: bytes, sig_bytes: bytes) -> bool:
+    try:
+        pub, _ = pgpy.PGPKey.from_blob(public_key_armor)
+        sig = pgpy.PGPSignature.from_blob(sig_bytes)
+        return bool(pub.verify(data, sig))
+    except Exception:
+        return False
+
+
+async def verify_detached_signature(public_key_armor: str, data: bytes, sig_bytes: bytes) -> bool:
+    """Verify a detached binary signature over ``data`` with a public key.
+
+    Returns True only if the signature is valid for the given bytes under
+    the given ASCII-armored public key. Any parse/verify failure returns
+    False (never raises) so callers can map it cleanly to HTTP 422.
+    """
+    return await asyncio.to_thread(
+        _verify_detached_signature_sync, public_key_armor, data, sig_bytes
+    )
+
+
 def _derive_public_key_sync(private_key_armor: str) -> str:
     key, _ = pgpy.PGPKey.from_blob(private_key_armor)
     if not key.is_public:
