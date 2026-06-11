@@ -193,6 +193,73 @@ def test_code_diff_described_in_skill_prompt():
     assert "resource_drift" in system
 
 
+# ── drift_detection framing ──────────────────────────────────────────────
+
+
+def test_drift_detection_block_renders_in_user_message():
+    """A drift-detection run frames the plan as a drift report, not a
+    proposal. The user message must carry the DRIFT_DETECTION marker so
+    the model switches framing.
+    """
+    _, user = render_prompt(
+        kind="plan_summary",
+        fleet_context="",
+        workspace_context="",
+        primary_input='{"resource_changes":[]}',
+        primary_input_label="PLAN_JSON",
+        primary_input_lang="json",
+        code_context_truncated="",
+        drift_detection=True,
+    )
+    assert "DRIFT_DETECTION: true" in user
+
+
+def test_drift_detection_block_omitted_by_default():
+    _, user = render_prompt(
+        kind="plan_summary",
+        fleet_context="",
+        workspace_context="",
+        primary_input="{}",
+        primary_input_label="PLAN_JSON",
+        primary_input_lang="json",
+        code_context_truncated="",
+    )
+    assert "DRIFT_DETECTION: true" not in user
+
+
+def test_drift_detection_block_only_for_plan_summary():
+    """The flag is a plan-summary concept. A failure-analysis render must
+    not emit the drift block even if the flag is passed (a drift run that
+    errored is analysed as a failure, not summarised as drift).
+    """
+    _, user = render_prompt(
+        kind="failure_analysis",
+        fleet_context="",
+        workspace_context="",
+        primary_input="Error: boom",
+        primary_input_label="PLAN_LOG",
+        primary_input_lang="text",
+        code_context_truncated="",
+        drift_detection=True,
+    )
+    assert "DRIFT_DETECTION: true" not in user
+
+
+def test_drift_detection_described_in_plan_summary_skill():
+    """The plan-summary skill prompt must teach the model what a
+    drift-detection run is and how to frame it — otherwise the marker in
+    the user message is undefined noise.
+    """
+    skill = PLAN_SUMMARY_SKILL_PROMPT
+    assert "DRIFT_DETECTION" in skill
+    assert "drift-detection run" in skill
+    # The model must be told NOT to call it a speculative/proposed change.
+    assert "speculative" in skill
+    # The success case ("no drift") must be spelled out so the model
+    # doesn't return an empty/confused answer on a clean drift run.
+    assert "No drift detected" in skill
+
+
 def test_plan_summary_skill_forbids_empty_risk_factors_at_elevated_level():
     """The prompt MUST state that an empty risk_factors array is
     permitted only when risk_level == "low". The JSON Schema can't

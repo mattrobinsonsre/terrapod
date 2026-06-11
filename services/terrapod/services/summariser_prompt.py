@@ -145,6 +145,10 @@ You will receive these inputs in the user message:
     resource_changes or CODE_DIFF. May be absent.
   • FLEET_CONTEXT — deployment-wide notes from the operator. May be empty.
   • WORKSPACE_CONTEXT — workspace-specific notes. May be empty.
+  • DRIFT_DETECTION (when set) — flags that this run is a scheduled
+    drift-detection check, not a response to a configuration change.
+    It changes how you frame the whole summary — see the drift-detection
+    rule below.
 
 You submit your answer by calling the `submit_plan_summary` tool
 exactly once. The tool's parameters carry the schema; the provider
@@ -191,6 +195,39 @@ CRITICAL — drift is NOT the apply change set:
       MUST NOT list them as `risk_factors`. The resource is
       already gone (or changed) in reality; this plan does not
       touch it.
+
+CRITICAL — a drift-detection run is a DETECTION report, not a proposal:
+
+  When DRIFT_DETECTION is set in the user message, this run was queued
+  automatically by Terrapod's scheduled drift checker — NOT by a code
+  change, a pull request, or an operator. It is plan-only; no apply
+  will follow. Its sole purpose is to report whether live
+  infrastructure has drifted from its recorded state. Frame the ENTIRE
+  summary that way:
+
+    • `resource_changes` here are NOT proposed feature changes. The
+      configuration did not change (CODE_DIFF is normally empty). Each
+      entry is the corrective action a future reconciling apply WOULD
+      take to undo an out-of-band change — i.e. it is describing
+      DRIFT. Report it as a finding about what changed in the live
+      world: "`aws_s3_bucket.logs` has drifted — bucket versioning was
+      disabled out-of-band; the recorded configuration expects it
+      enabled." Do NOT phrase it as "this plan will disable
+      versioning" — the run is detecting the drift, not causing it.
+    • Lead `description` with WHAT drifted and the likely nature of the
+      out-of-band change (manual console edit, another tool, an
+      external controller). If nothing drifted (no informative
+      `resource_changes`), say so plainly — "No drift detected; live
+      infrastructure matches recorded state." That is the success case
+      for a drift run, not an empty answer.
+    • `risk_factors` rate the operational significance of the drift
+      (is recorded state now wrong? has a security control been
+      silently disabled? would the next real apply revert a needed
+      manual fix?), not the routineness of a config change.
+    • Never call a drift-detection run "speculative", a "proposed
+      change", or something "for review/merge" — there is no proposal
+      and no PR. It is a scheduled health check that found (or did not
+      find) drift.
 
 CRITICAL — `risk_level` and `risk_factors` are paired, not independent:
 
@@ -357,6 +394,7 @@ def render_prompt(
     prompt_prefix: str = "",
     prompt_suffix: str = "",
     state_diverged: bool = False,
+    drift_detection: bool = False,
 ) -> tuple[str, str]:
     """Render the system + user messages for the Chat Completions request.
 
@@ -401,6 +439,14 @@ def render_prompt(
             "(the runner could not upload post-apply state to Terrapod; "
             "real infrastructure may have been mutated by the partial "
             "apply but Terrapod's recorded state no longer reflects it.)"
+        )
+    if drift_detection and kind == "plan_summary":
+        user_parts.append(
+            "DRIFT_DETECTION: true\n"
+            "(scheduled drift-detection run — plan-only, no apply will "
+            "follow. resource_changes describe drift between recorded "
+            "state and live infrastructure, not proposed configuration "
+            "changes. Frame the summary as drift findings.)"
         )
     user_parts.append(f"{primary_input_label}:\n```{primary_input_lang}\n{primary_input}\n```")
     if code_diff.strip():

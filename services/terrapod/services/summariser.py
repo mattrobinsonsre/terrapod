@@ -1111,6 +1111,7 @@ async def handle_ai_plan_summary(payload: dict) -> None:
             prompt_prefix=cfg.context.prompt_prefix,
             prompt_suffix=cfg.context.prompt_suffix,
             state_diverged=bool(ws.state_diverged),
+            drift_detection=bool(run.is_drift_detection),
         )
 
         try:
