@@ -260,7 +260,8 @@ class TestCreateConsumer:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission")
-    async def test_create_happy_path(self, mock_resolve, *_):
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_create_happy_path(self, mock_publish, mock_resolve, *_):
         """Admin on producer → 201, and the response JSON carries the
         producer + consumer names (i.e. the row's relationships actually
         get populated)."""
@@ -309,6 +310,12 @@ class TestCreateConsumer:
         assert body["data"]["type"] == "remote-state-consumers"
         attrs = body["data"]["attributes"]
         assert attrs["producer-workspace-name"] == "producer"
+        # SSE: both producer + consumer channels get remote_state_consumer_change.
+        assert {c.args[1] for c in mock_publish.await_args_list} == {"remote_state_consumer_change"}
+        assert {c.args[0] for c in mock_publish.await_args_list} == {
+            str(producer.id),
+            str(consumer.id),
+        }
         assert attrs["consumer-workspace-name"] == "consumer"
         # Relationship ids are present and prefixed
         rels = body["data"]["relationships"]

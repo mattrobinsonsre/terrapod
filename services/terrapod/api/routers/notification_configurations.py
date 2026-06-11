@@ -158,6 +158,10 @@ async def create_notification_configuration(
     await db.refresh(nc, attribute_names=["workspace"])
     await db.commit()
 
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(ws.id), "workspace_notification_change")
+
     logger.info(
         "Notification configuration created",
         nc_id=str(nc.id),
@@ -256,6 +260,10 @@ async def update_notification_configuration(
     # Reload for serialization
     await db.refresh(nc, attribute_names=["workspace"])
 
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(nc.workspace_id), "workspace_notification_change")
+
     logger.info("Notification configuration updated", nc_id=str(nc.id))
 
     return JSONResponse(content={"data": _nc_json(nc)})
@@ -271,8 +279,14 @@ async def delete_notification_configuration(
     nc = await _get_nc(nc_id, db)
     await _require_ws_permission(nc.workspace, "admin", user, db)
 
+    nc_ws_id = str(nc.workspace_id)
+
     await db.delete(nc)
     await db.commit()
+
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(nc_ws_id, "workspace_notification_change")
 
     logger.info("Notification configuration deleted", nc_id=nc_id)
 

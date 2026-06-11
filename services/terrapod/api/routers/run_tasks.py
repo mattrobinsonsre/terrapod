@@ -225,6 +225,10 @@ async def create_run_task(
     await db.refresh(rt, attribute_names=["workspace"])
     await db.commit()
 
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(ws.id), "workspace_run_task_change")
+
     logger.info("Run task created", task_id=str(rt.id), workspace=ws.name, stage=stage)
 
     return JSONResponse(content={"data": _run_task_json(rt)}, status_code=201)
@@ -315,6 +319,10 @@ async def update_run_task(
     await db.commit()
     await db.refresh(rt, attribute_names=["workspace"])
 
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(rt.workspace_id), "workspace_run_task_change")
+
     logger.info("Run task updated", task_id=str(rt.id))
 
     return JSONResponse(content={"data": _run_task_json(rt)})
@@ -330,8 +338,14 @@ async def delete_run_task(
     rt = await _get_run_task(rt_id, db)
     await _require_ws_permission(rt.workspace, "admin", user, db)
 
+    rt_ws_id = str(rt.workspace_id)
+
     await db.delete(rt)
     await db.commit()
+
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(rt_ws_id, "workspace_run_task_change")
 
     logger.info("Run task deleted", task_id=rt_id)
 

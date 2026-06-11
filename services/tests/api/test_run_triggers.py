@@ -67,7 +67,8 @@ class TestCreateRunTrigger:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.run_triggers.resolve_workspace_permission")
-    async def test_create_run_trigger(self, mock_resolve, *mocks):
+    @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
+    async def test_create_run_trigger(self, mock_publish, mock_resolve, *mocks):
         """Happy path: create a run trigger → 201."""
         mock_resolve.return_value = "admin"
         dest_ws = _mock_workspace(name="dest")
@@ -111,6 +112,12 @@ class TestCreateRunTrigger:
             )
         assert resp.status_code == 201
         assert resp.json()["data"]["type"] == "run-triggers"
+        # SSE: both the destination and source workspace channels get a
+        # run_trigger_change event so inbound + outbound edges appear live.
+        published = {c.args[1] for c in mock_publish.await_args_list}
+        assert published == {"run_trigger_change"}
+        published_ids = {c.args[0] for c in mock_publish.await_args_list}
+        assert {str(dest_ws.id), str(source_ws.id)} == published_ids
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

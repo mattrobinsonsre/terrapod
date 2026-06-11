@@ -11,6 +11,7 @@ import { SortableHeader } from '@/components/sortable-header'
 import { LabelsEditor } from '@/components/labels-editor'
 import { HealthConditions } from '@/components/health-conditions'
 import { PlanSummaryBadges } from '@/components/plan-summary-badges'
+import { WorkspacePicker } from '@/components/workspace-picker'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
@@ -369,7 +370,7 @@ function WorkspaceDetailContent() {
   const [rscOutbound, setRscOutbound] = useState<RemoteStateEdge[]>([])
   const [rscInbound, setRscInbound] = useState<RemoteStateEdge[]>([])
   const [rscLoading, setRscLoading] = useState(false)
-  const [rscAddName, setRscAddName] = useState('')
+  const [rscAddingId, setRscAddingId] = useState('')
   const [rscAdding, setRscAdding] = useState(false)
 
   // Run Triggers — cross-workspace apply-fires-plan dependency edges
@@ -384,7 +385,7 @@ function WorkspaceDetailContent() {
   const [trgInbound, setTrgInbound] = useState<RunTriggerEdge[]>([])
   const [trgOutbound, setTrgOutbound] = useState<RunTriggerEdge[]>([])
   const [trgLoading, setTrgLoading] = useState(false)
-  const [trgAddName, setTrgAddName] = useState('')
+  const [trgAddingId, setTrgAddingId] = useState('')
   const [trgAdding, setTrgAdding] = useState(false)
 
   // Notifications
@@ -537,8 +538,15 @@ function WorkspaceDetailContent() {
   // Real-time workspace events via SSE (run status, lock/unlock, state, settings)
   useRunEvents(workspaceId, useCallback((event) => {
     loadWorkspace()
+    const ev = event.event
+    const reconnect = ev === 'reconnect'
     if (activeTab === 'runs') loadRuns()
-    if (activeTab === 'state' && (event.event === 'state_version_created' || event.event === 'reconnect')) loadStateVersions()
+    if (activeTab === 'state' && (ev === 'state_version_created' || reconnect)) loadStateVersions()
+    if (activeTab === 'variables' && (ev === 'workspace_variable_change' || reconnect)) loadVariables()
+    if (activeTab === 'notifications' && (ev === 'workspace_notification_change' || reconnect)) loadNotifications()
+    if (activeTab === 'run-tasks' && (ev === 'workspace_run_task_change' || reconnect)) loadRunTasks()
+    if (activeTab === 'run-triggers' && (ev === 'run_trigger_change' || reconnect)) loadRunTriggers()
+    if (activeTab === 'sharing' && (ev === 'remote_state_consumer_change' || reconnect)) loadRemoteStateConsumers()
   }, [activeTab, loadRuns, loadWorkspace]))
 
   async function loadVariables() {
@@ -713,20 +721,11 @@ function WorkspaceDetailContent() {
     }
   }
 
-  async function addRemoteStateConsumer() {
-    const name = rscAddName.trim()
-    if (!name) return
+  async function addRemoteStateConsumer(consumerId: string) {
+    if (!consumerId) return
+    setRscAddingId(consumerId)
     setRscAdding(true)
     try {
-      // Resolve consumer workspace name → id via the by-name endpoint.
-      const lookup = await apiFetch(`/api/v2/organizations/default/workspaces/${encodeURIComponent(name)}`)
-      if (!lookup.ok) {
-        throw new Error(lookup.status === 404 ? `Workspace "${name}" not found` : 'Failed to resolve consumer workspace')
-      }
-      const wsBody = await lookup.json()
-      const consumerId = wsBody.data?.id
-      if (!consumerId) throw new Error('Workspace lookup returned no id')
-
       const res = await apiFetch(
         `/api/terrapod/v1/workspaces/${workspaceId}/remote-state-consumers`,
         {
@@ -741,12 +740,12 @@ function WorkspaceDetailContent() {
         const err = await res.json().catch(() => ({ detail: 'Failed to authorize consumer' }))
         throw new Error(err.detail || 'Failed to authorize consumer')
       }
-      setRscAddName('')
       await loadRemoteStateConsumers()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to authorize consumer')
     } finally {
       setRscAdding(false)
+      setRscAddingId('')
     }
   }
 
@@ -795,19 +794,11 @@ function WorkspaceDetailContent() {
     }
   }
 
-  async function addRunTrigger() {
-    const name = trgAddName.trim()
-    if (!name) return
+  async function addRunTrigger(sourceId: string) {
+    if (!sourceId) return
+    setTrgAddingId(sourceId)
     setTrgAdding(true)
     try {
-      const lookup = await apiFetch(`/api/v2/organizations/default/workspaces/${encodeURIComponent(name)}`)
-      if (!lookup.ok) {
-        throw new Error(lookup.status === 404 ? `Workspace "${name}" not found` : 'Failed to resolve source workspace')
-      }
-      const wsBody = await lookup.json()
-      const sourceId = wsBody.data?.id
-      if (!sourceId) throw new Error('Workspace lookup returned no id')
-
       const res = await apiFetch(
         `/api/terrapod/v1/workspaces/${workspaceId}/run-triggers`,
         {
@@ -822,12 +813,12 @@ function WorkspaceDetailContent() {
         const err = await res.json().catch(() => ({ detail: 'Failed to add run trigger' }))
         throw new Error(err.detail || 'Failed to add run trigger')
       }
-      setTrgAddName('')
       await loadRunTriggers()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add run trigger')
     } finally {
       setTrgAdding(false)
+      setTrgAddingId('')
     }
   }
 
@@ -3343,26 +3334,15 @@ function WorkspaceDetailContent() {
               )}
 
               {perms['can-update'] && (
-                <form
-                  onSubmit={(e) => { e.preventDefault(); addRunTrigger() }}
-                  className="mt-3 flex items-center gap-2"
-                >
-                  <input
-                    type="text"
-                    value={trgAddName}
-                    onChange={(e) => setTrgAddName(e.target.value)}
-                    placeholder="Add source workspace by name"
-                    className="flex-1 rounded border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500"
+                <div className="mt-3" data-testid="run-trigger-picker">
+                  <WorkspacePicker
+                    placeholder="Search workspaces to add as a source…"
+                    excludeIds={[workspaceId, ...trgInbound.map((e) => e.sourceableId)]}
+                    busyId={trgAddingId}
                     disabled={trgAdding}
+                    onSelect={(ws) => addRunTrigger(ws.id)}
                   />
-                  <button
-                    type="submit"
-                    disabled={trgAdding || !trgAddName.trim()}
-                    className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {trgAdding ? 'Adding…' : 'Add'}
-                  </button>
-                </form>
+                </div>
               )}
             </div>
 
@@ -3435,26 +3415,15 @@ function WorkspaceDetailContent() {
               )}
 
               {perms['can-update'] && (
-                <form
-                  onSubmit={(e) => { e.preventDefault(); addRemoteStateConsumer() }}
-                  className="mt-3 flex items-center gap-2"
-                >
-                  <input
-                    type="text"
-                    value={rscAddName}
-                    onChange={(e) => setRscAddName(e.target.value)}
-                    placeholder="Authorize consumer workspace by name"
-                    className="flex-1 rounded border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500"
+                <div className="mt-3" data-testid="remote-state-consumer-picker">
+                  <WorkspacePicker
+                    placeholder="Search workspaces to authorize as a consumer…"
+                    excludeIds={[workspaceId, ...rscOutbound.map((e) => e.consumerId)]}
+                    busyId={rscAddingId}
                     disabled={rscAdding}
+                    onSelect={(ws) => addRemoteStateConsumer(ws.id)}
                   />
-                  <button
-                    type="submit"
-                    disabled={rscAdding || !rscAddName.trim()}
-                    className="rounded bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {rscAdding ? 'Authorizing…' : 'Authorize'}
-                  </button>
-                </form>
+                </div>
               )}
             </div>
 

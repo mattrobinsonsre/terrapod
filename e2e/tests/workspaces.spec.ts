@@ -49,6 +49,39 @@ test.describe('Workspaces', () => {
     await expect(page.getByRole('button', { name: 'Notifications' })).toBeVisible();
   });
 
+  test('run-triggers tab uses a searchable workspace picker', async ({ page }) => {
+    const src = `e2e-trg-src-${Date.now()}`;
+    const dest = `e2e-trg-dest-${Date.now()}`;
+
+    for (const name of [src, dest]) {
+      await page.goto('/workspaces');
+      await page.click('button:has-text("New Workspace")');
+      await page.fill('input[placeholder*="workspace"]', name);
+      await page.click('button:has-text("Create Workspace")');
+      await expect(page.locator(`text=${name}`).first()).toBeVisible({ timeout: 10_000 });
+    }
+
+    // Open the destination workspace's Run Triggers tab
+    await page.goto('/workspaces');
+    await page.click(`text=${dest}`);
+    await page.getByRole('button', { name: 'Run Triggers' }).click();
+
+    // The picker is a search box + clickable list — NOT a free-text name input
+    // (a typo can't 404 any more). Filter to the source, then click to add.
+    const search = page.locator('input[placeholder*="Search workspaces to add"]');
+    await expect(search).toBeVisible();
+    await search.fill(src);
+
+    const srcButton = page.getByRole('button', { name: src });
+    await expect(srcButton).toBeVisible({ timeout: 10_000 });
+    await srcButton.click();
+
+    // The inbound edge appears live (id-based add → refetch), with a Remove control
+    await expect(page.getByRole('button', { name: 'Remove' }).first()).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
   test('workspace settings can be updated', async ({ page }) => {
     // Create a workspace
     const wsName = `e2e-settings-${Date.now()}`;

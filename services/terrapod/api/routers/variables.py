@@ -140,6 +140,10 @@ async def create_workspace_var(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(ws.id), "workspace_variable_change")
+
     return JSONResponse(content={"data": _var_json(var)}, status_code=201)
 
 
@@ -181,6 +185,10 @@ async def update_workspace_var(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(ws.id), "workspace_variable_change")
+
     return JSONResponse(content={"data": _var_json(var)})
 
 
@@ -206,6 +214,10 @@ async def delete_workspace_var(
 
     await variable_service.delete_variable(db, var)
     await db.commit()
+
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(ws.id), "workspace_variable_change")
 
 
 # ── Variable Sets ────────────────────────────────────────────────────────

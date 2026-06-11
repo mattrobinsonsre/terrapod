@@ -707,8 +707,13 @@ Server-Sent Events stream for real-time workspace updates. The stream emits even
 | `workspace_lock_change` | Workspace is locked or unlocked (includes `locked` boolean) |
 | `workspace_updated` | Workspace settings are modified |
 | `state_version_created` | New state version is uploaded |
+| `workspace_variable_change` | A workspace variable is created, updated, or deleted |
+| `workspace_notification_change` | A notification configuration is created, updated, or deleted |
+| `workspace_run_task_change` | A run task is created, updated, or deleted |
+| `run_trigger_change` | A run trigger to/from this workspace is added or removed (published to **both** the source and destination workspace channels, so inbound edges appear live) |
+| `remote_state_consumer_change` | A remote-state consumer grant to/from this workspace is added or removed (published to **both** the producer and consumer channels) |
 
-The stream sends `: keepalive` comments every ~1 second. Events are JSON-encoded in `data:` fields.
+The stream sends `: keepalive` comments every ~1 second. Events are JSON-encoded in `data:` fields. The web UI workspace detail page re-fetches the active tab on receipt of its corresponding event.
 
 **Required permission:** `read` on the workspace.
 

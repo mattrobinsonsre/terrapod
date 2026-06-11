@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Upload, FolderOpen, GitBranch, Link2, Plus, Trash2, Search } from 'lucide-react'
+import { Upload, FolderOpen, GitBranch, Link2, Plus, Trash2 } from 'lucide-react'
 import * as Dialog from '@radix-ui/react-dialog'
 import NavBar from '@/components/nav-bar'
+import { WorkspacePicker } from '@/components/workspace-picker'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
@@ -199,8 +200,6 @@ export default function ModuleDetailPage() {
   }
   const [workspaceLinks, setWorkspaceLinks] = useState<WorkspaceLink[]>([])
   const [showLinkPicker, setShowLinkPicker] = useState(false)
-  const [wsSearchQuery, setWsSearchQuery] = useState('')
-  const [wsSearchResults, setWsSearchResults] = useState<{ id: string; name: string }[]>([])
   const [linkingWs, setLinkingWs] = useState('')
 
   useEffect(() => {
@@ -289,28 +288,6 @@ export default function ModuleDetailPage() {
     }
   }
 
-  async function searchWorkspaces(query: string) {
-    try {
-      const res = await apiFetch('/api/v2/organizations/default/workspaces')
-      if (res.ok) {
-        const data = await res.json()
-        const all = (data.data || []).map((ws: { id: string; attributes: { name: string } }) => ({
-          id: ws.id,
-          name: ws.attributes.name,
-        }))
-        const linked = new Set(workspaceLinks.map(l => l.attributes['workspace-id']))
-        const filtered = all.filter(
-          (ws: { id: string; name: string }) =>
-            !linked.has(ws.id) &&
-            (!query || ws.name.toLowerCase().includes(query.toLowerCase()))
-        )
-        setWsSearchResults(filtered.slice(0, 20))
-      }
-    } catch {
-      // ignore
-    }
-  }
-
   async function handleLinkWorkspace(wsId: string) {
     setLinkingWs(wsId)
     setError('')
@@ -330,7 +307,6 @@ export default function ModuleDetailPage() {
         throw new Error(data.detail || `Link failed (${res.status})`)
       }
       setShowLinkPicker(false)
-      setWsSearchQuery('')
       await loadWorkspaceLinks()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to link workspace')
@@ -751,7 +727,7 @@ export default function ModuleDetailPage() {
                     <h3 className="text-sm font-medium text-slate-300">Linked Workspaces</h3>
                   </div>
                   <button
-                    onClick={() => { setShowLinkPicker(!showLinkPicker); if (!showLinkPicker) searchWorkspaces('') }}
+                    onClick={() => setShowLinkPicker(!showLinkPicker)}
                     className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1"
                   >
                     <Plus size={12} />
@@ -764,32 +740,13 @@ export default function ModuleDetailPage() {
                 </p>
 
                 {showLinkPicker && (
-                  <div className="mb-3 p-3 bg-slate-900/50 rounded-lg border border-slate-700/30">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Search size={14} className="text-slate-400" />
-                      <input
-                        type="text"
-                        value={wsSearchQuery}
-                        onChange={(e) => { setWsSearchQuery(e.target.value); searchWorkspaces(e.target.value) }}
-                        placeholder="Search workspaces..."
-                        className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                      />
-                    </div>
-                    <div className="max-h-40 overflow-y-auto space-y-1">
-                      {wsSearchResults.length === 0 ? (
-                        <p className="text-xs text-slate-500 py-2 text-center">No workspaces found</p>
-                      ) : wsSearchResults.map(ws => (
-                        <button
-                          key={ws.id}
-                          onClick={() => handleLinkWorkspace(ws.id)}
-                          disabled={linkingWs === ws.id}
-                          className="w-full text-left px-2 py-1.5 rounded text-sm text-slate-300 hover:bg-slate-700/50 transition-colors disabled:opacity-50"
-                        >
-                          {ws.name}
-                          {linkingWs === ws.id && <span className="text-xs text-slate-500 ml-2">Linking...</span>}
-                        </button>
-                      ))}
-                    </div>
+                  <div className="mb-3">
+                    <WorkspacePicker
+                      placeholder="Search workspaces to link…"
+                      excludeIds={workspaceLinks.map((l) => l.attributes['workspace-id'])}
+                      busyId={linkingWs}
+                      onSelect={(ws) => handleLinkWorkspace(ws.id)}
+                    />
                   </div>
                 )}
 
