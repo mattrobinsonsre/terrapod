@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { Suspense, useEffect, useRef, useState, useCallback, useMemo, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
@@ -129,6 +129,28 @@ function WorkspacesPageInner() {
     }
   }, [labelMenuOpen, labelMenuKey])
 
+  // Inline filter typeahead — AWS-style faceted suggestions popped under the
+  // free-text input as you type, while still letting you type anything. The
+  // dropdown suggests `key:value` labels, `status:…`, label keys (to drill),
+  // and matching workspace names; clicking one inserts the chip.
+  const [suggestOpen, setSuggestOpen] = useState(false)
+  // -1 = nothing highlighted. A suggestion is only applied on an explicit
+  // pick (click, or arrow-key to highlight + Enter); a bare Enter keeps the
+  // free text the user typed.
+  const [suggestIndex, setSuggestIndex] = useState(-1)
+  const filterInputRef = useRef<HTMLInputElement>(null)
+  const suggestWrapRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!suggestOpen) return
+    const onClick = (e: MouseEvent) => {
+      if (suggestWrapRef.current && !suggestWrapRef.current.contains(e.target as Node)) {
+        setSuggestOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [suggestOpen])
+
   // Sync the input to the URL whenever the parsed filter changes — debounced.
   //
   // Each `router.replace` triggers a Next.js RSC prefetch for the new URL.
@@ -239,6 +261,103 @@ function WorkspacesPageInner() {
     () => Array.from(labelIndex.keys()).sort(),
     [labelIndex],
   )
+
+  // The token being typed = text after the last space (filter tokens are
+  // space-separated). Suggestions are computed against just that token, so
+  // earlier chips in the box are left untouched.
+  const currentToken = useMemo(() => {
+    const parts = filterInput.split(' ')
+    return parts[parts.length - 1]
+  }, [filterInput])
+
+  interface FilterSuggestion {
+    kind: 'label' | 'label-key' | 'status' | 'name'
+    insert: string
+    display: string
+    hint: string
+    count?: number
+    dot?: string
+  }
+
+  const suggestions = useMemo<FilterSuggestion[]>(() => {
+    const tok = currentToken.trim()
+    if (!tok) return []
+    const lower = tok.toLowerCase()
+    const out: FilterSuggestion[] = []
+    const sepIdx = tok.search(/[:=]/)
+    if (sepIdx >= 0) {
+      // `key:partial` → suggest values for that key.
+      const key = tok.slice(0, sepIdx)
+      const partial = tok.slice(sepIdx + 1).toLowerCase()
+      if (key === 'status') {
+        for (const s of WORKSPACE_STATUSES) {
+          if (!partial || s.filter.toLowerCase().includes(partial) || s.label.toLowerCase().includes(partial))
+            out.push({ kind: 'status', insert: `status:${s.filter}`, display: `status:${s.filter}`, hint: 'status', dot: s.dot, count: statusCounts[s.filter] || 0 })
+        }
+      } else {
+        const values = labelIndex.get(key)
+        if (values) {
+          for (const [v, c] of values) {
+            if (!partial || v.toLowerCase().includes(partial))
+              out.push({ kind: 'label', insert: `${key}:${v}`, display: `${key}:${v}`, hint: 'label', count: c })
+          }
+        }
+      }
+    } else {
+      // Bare token → match label keys (drill), key:value pairs, statuses, names.
+      for (const k of sortedLabelKeys) {
+        if (k.toLowerCase().includes(lower))
+          out.push({ kind: 'label-key', insert: `${k}:`, display: `${k}:`, hint: 'label key' })
+      }
+      for (const k of sortedLabelKeys) {
+        for (const [v, c] of labelIndex.get(k)!) {
+          if (v.toLowerCase().includes(lower) || k.toLowerCase().includes(lower))
+            out.push({ kind: 'label', insert: `${k}:${v}`, display: `${k}:${v}`, hint: 'label', count: c })
+        }
+      }
+      for (const s of WORKSPACE_STATUSES) {
+        if (s.filter.toLowerCase().includes(lower) || s.label.toLowerCase().includes(lower))
+          out.push({ kind: 'status', insert: `status:${s.filter}`, display: `status:${s.filter}`, hint: 'status', dot: s.dot, count: statusCounts[s.filter] || 0 })
+      }
+      for (const ws of workspaces) {
+        const n = ws.attributes.name
+        if (n.toLowerCase().includes(lower))
+          out.push({ kind: 'name', insert: n, display: n, hint: 'name' })
+      }
+    }
+    // Dedup by inserted text; cap so the menu stays usable.
+    const seen = new Set<string>()
+    return out.filter(s => (seen.has(s.insert) ? false : (seen.add(s.insert), true))).slice(0, 12)
+  }, [currentToken, sortedLabelKeys, labelIndex, statusCounts, workspaces])
+
+  function applyFilterSuggestion(s: FilterSuggestion) {
+    const parts = filterInput.split(' ')
+    parts[parts.length - 1] = s.insert
+    // A label-key suggestion (`env:`) leaves the cursor mid-token so you keep
+    // typing/picking the value; everything else completes the chip + a space.
+    const drill = s.kind === 'label-key'
+    setFilterInput(parts.join(' ') + (drill ? '' : ' '))
+    setSuggestIndex(-1)
+    setSuggestOpen(drill)
+    filterInputRef.current?.focus()
+  }
+
+  function onFilterKeyDown(e: ReactKeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowDown' && (!suggestOpen || suggestions.length === 0)) {
+      if (currentToken.trim()) { setSuggestOpen(true); setSuggestIndex(0) }
+      return
+    }
+    if (!suggestOpen || suggestions.length === 0) return
+    if (e.key === 'ArrowDown') { e.preventDefault(); setSuggestIndex(i => (i + 1) % suggestions.length) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setSuggestIndex(i => (i <= 0 ? suggestions.length - 1 : i - 1)) }
+    else if (e.key === 'Enter') {
+      // Apply ONLY a suggestion the user explicitly highlighted with the
+      // arrow keys. A bare Enter (nothing highlighted) keeps the typed text.
+      if (suggestIndex >= 0) { e.preventDefault(); applyFilterSuggestion(suggestions[suggestIndex]); }
+      else setSuggestOpen(false)
+    }
+    else if (e.key === 'Escape') { e.preventDefault(); setSuggestOpen(false) }
+  }
 
   const badgeColors: Record<string, string> = {
     amber: 'bg-amber-900/50 text-amber-300',
@@ -599,14 +718,60 @@ function WorkspacesPageInner() {
           return (
             <div className="mb-4">
               <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={filterInput}
-                  onChange={e => setFilterInput(e.target.value)}
-                  placeholder='Filter by name, label, or status — e.g. "eu1", "env:prod", "status:errored"'
-                  aria-label="Filter workspaces"
-                  className="flex-1 px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/50 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500"
-                />
+                <div className="relative flex-1" ref={suggestWrapRef}>
+                  <input
+                    type="text"
+                    value={filterInput}
+                    onChange={e => { setFilterInput(e.target.value); setSuggestOpen(true); setSuggestIndex(-1) }}
+                    onFocus={() => { if (currentToken.trim()) setSuggestOpen(true) }}
+                    onKeyDown={onFilterKeyDown}
+                    ref={filterInputRef}
+                    placeholder='Filter by name, label, or status — e.g. "eu1", "env:prod", "status:errored"'
+                    aria-label="Filter workspaces"
+                    role="combobox"
+                    aria-expanded={suggestOpen && suggestions.length > 0}
+                    aria-autocomplete="list"
+                    autoComplete="off"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/50 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-brand-500"
+                  />
+                  {suggestOpen && suggestions.length > 0 && (
+                    <div
+                      role="listbox"
+                      data-testid="filter-suggestions"
+                      className="absolute left-0 right-0 z-20 mt-1 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-72 overflow-y-auto"
+                    >
+                      {suggestions.map((s, i) => (
+                        <button
+                          key={`${s.kind}:${s.insert}`}
+                          type="button"
+                          role="option"
+                          aria-selected={i === suggestIndex}
+                          // onMouseDown (not onClick) so it fires before the input blur closes the menu.
+                          // Clicking applies THIS suggestion directly (independent of the
+                          // keyboard-highlight index), so a hover never hijacks a bare Enter.
+                          onMouseDown={e => { e.preventDefault(); applyFilterSuggestion(s) }}
+                          className={
+                            'w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors text-left border-l-2 ' +
+                            (i === suggestIndex
+                              ? 'bg-brand-600/40 text-white border-brand-300 font-semibold ring-1 ring-inset ring-brand-400/60'
+                              : 'border-transparent text-slate-300 hover:bg-slate-700/40')
+                          }
+                        >
+                          {s.dot ? (
+                            <span className={'w-1.5 h-1.5 rounded-full ' + s.dot} />
+                          ) : (
+                            <span className="w-1.5" />
+                          )}
+                          <span className="flex-1 font-mono text-xs">{s.display}</span>
+                          {typeof s.count === 'number' && (
+                            <span className="text-[10px] text-slate-500">{s.count}</span>
+                          )}
+                          <span className="text-[10px] uppercase tracking-wide text-slate-500">{s.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {/* Status dropdown — single entry point for all status presets.
                     Picks any combination via toggle; the existing chips below
                     show what's active and let the user remove individually. */}

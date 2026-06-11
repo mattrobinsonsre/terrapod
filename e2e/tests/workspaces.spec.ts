@@ -82,6 +82,53 @@ test.describe('Workspaces', () => {
     });
   });
 
+  test('workspace filter typeahead: bare Enter keeps free text; explicit pick applies a suggestion', async ({
+    page,
+  }) => {
+    const wsName = `e2e-flt-${Date.now()}`;
+
+    await page.goto('/workspaces');
+    await page.click('button:has-text("New Workspace")');
+    await page.fill('input[placeholder*="workspace"]', wsName);
+    await page.click('button:has-text("Create Workspace")');
+    await expect(page.locator(`text=${wsName}`).first()).toBeVisible({ timeout: 10_000 });
+
+    const filter = page.locator('input[aria-label="Filter workspaces"]');
+    await expect(filter).toBeVisible();
+    const menu = page.locator('[data-testid="filter-suggestions"]');
+
+    // Typing the (unique) name surfaces a typeahead suggestion for it.
+    await filter.click();
+    await filter.pressSequentially(wsName);
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('option', { name: wsName })).toBeVisible();
+
+    // Bare Enter with nothing highlighted must KEEP the free text — it must not
+    // auto-apply the suggestion (the regression this guards: a single suggestion
+    // under the cursor used to be applied on a plain Enter).
+    await page.keyboard.press('Enter');
+    await expect(filter).toHaveValue(wsName);
+    await expect(menu).toBeHidden();
+
+    // Reopen the menu by clearing + retyping (a bare Enter leaves the input
+    // focused but closed, and refocusing an already-focused input fires no new
+    // focus event). Arrow-highlight + Enter applies the suggestion — a
+    // completed chip is the typed text plus a trailing space.
+    await filter.fill('');
+    await filter.pressSequentially(wsName);
+    await expect(menu).toBeVisible();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await expect(filter).toHaveValue(`${wsName} `);
+
+    // A mouse click on a suggestion applies it the same way.
+    await filter.fill('');
+    await filter.pressSequentially(wsName);
+    await expect(menu).toBeVisible();
+    await menu.getByRole('option', { name: wsName }).click();
+    await expect(filter).toHaveValue(`${wsName} `);
+  });
+
   test('workspace settings can be updated', async ({ page }) => {
     // Create a workspace
     const wsName = `e2e-settings-${Date.now()}`;
