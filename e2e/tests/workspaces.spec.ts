@@ -110,9 +110,12 @@ test.describe('Workspaces', () => {
     await expect(filter).toHaveValue(wsName);
     await expect(menu).toBeHidden();
 
-    // Re-focus reopens the menu; arrow-highlight + Enter applies it. A completed
-    // chip is the typed text plus a trailing space (ready for the next token).
-    await filter.click();
+    // Reopen the menu by clearing + retyping (a bare Enter leaves the input
+    // focused but closed, and refocusing an already-focused input fires no new
+    // focus event). Arrow-highlight + Enter applies the suggestion — a
+    // completed chip is the typed text plus a trailing space.
+    await filter.fill('');
+    await filter.pressSequentially(wsName);
     await expect(menu).toBeVisible();
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
