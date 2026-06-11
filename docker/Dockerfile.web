@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Terrapod Web UI Dockerfile
 # Builds the Next.js application
 #
@@ -13,8 +14,10 @@ WORKDIR /app
 # Copy package files
 COPY web/package.json web/package-lock.json* ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies. The BuildKit cache mount persists npm's download cache
+# across CI runs so `npm ci` is fast even when the layer must re-run (e.g. a
+# changed lockfile); it's build-time only and not part of any image layer.
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 # Copy source code
 COPY web/ .
@@ -23,9 +26,12 @@ COPY web/ .
 # which writes .next/, next-env.d.ts, etc.)
 RUN chown -R 1001:1001 /app
 
-# Build the application
+# Build the application. The BuildKit cache mount persists Next.js's
+# incremental build cache (.next/cache) across builds — the layer that always
+# re-runs when source changes — turning a full recompile into an incremental
+# one. Build-time only; not copied into the runtime image.
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 # Production image — standalone mode (minimal, no full node_modules)
 FROM node:26-alpine
