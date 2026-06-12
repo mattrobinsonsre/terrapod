@@ -48,8 +48,8 @@ from terrapod.redis.client import get_redis_client
 router = APIRouter(tags=["tokens"])
 logger = get_logger(__name__)
 
-# Kinds a user may create / re-tag in Phase 1. service_detached (admin-only,
-# absolute scope) is gated until the scoped-resolution phase lands.
+# Kinds anyone may create / re-tag bound to themselves. service_detached is
+# admin-only and handled separately (unbound, admin-pinned absolute scope).
 _CREATABLE_KINDS = {"interactive", "service_bound"}
 _ALL_KINDS = {"interactive", "service_bound", "service_detached"}
 _TOKEN_ROLES_PREFIX = "tp:token_roles:"
@@ -79,11 +79,12 @@ class CreateTokenRequest(BaseModel):
 
 
 class PatchTokenRequest(BaseModel):
-    """JSON:API request for re-tagging a token's kind."""
+    """JSON:API request for re-tagging a token's kind (and pinned roles on convert)."""
 
     class Data(BaseModel):
         class Attributes(BaseModel):
             kind: str
+            pinned_roles: list[str] | None = None
 
         type: str = "authentication-tokens"
         attributes: Attributes
@@ -138,8 +139,8 @@ async def create_user_token(
 
     The user_id in the path must match the authenticated user (or admin).
     Anyone may create `interactive` or `service_bound` tokens (bound to
-    themselves). `service_detached` is admin-only and not yet creatable
-    (gated until the scoped-resolution phase).
+    themselves). `service_detached` is admin-only and unbound — the admin
+    pins its absolute scope.
     """
     if user_id != _username(user) and not _is_admin(user):
         raise HTTPException(
@@ -148,22 +149,32 @@ async def create_user_token(
         )
 
     kind = body.data.attributes.kind
-    if kind == "service_detached":
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Detached service tokens are not yet available",
-        )
-    if kind not in _CREATABLE_KINDS:
+    if kind not in _ALL_KINDS:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Invalid token kind: {kind}",
         )
 
-    pinned = body.data.attributes.pinned_roles if kind == "service_bound" else None
+    if kind == "service_detached":
+        # Detached tokens are admin-only and unbound (no owner); the admin
+        # pins the absolute scope. Effective-admin is kind-attenuated.
+        if "admin" not in effective_platform_roles(user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Detached service tokens are admin-only",
+            )
+        bound_to = None
+        pinned = body.data.attributes.pinned_roles or []
+    elif kind == "service_bound":
+        bound_to = user.email
+        pinned = body.data.attributes.pinned_roles
+    else:  # interactive
+        bound_to = user.email
+        pinned = None
 
     api_token, raw_token = await create_api_token(
         db=db,
-        bound_to=user.email,
+        bound_to=bound_to,
         created_by=user.email,
         kind=kind,
         description=body.data.attributes.description,
@@ -284,10 +295,11 @@ async def retag_token(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Re-tag a token's kind between interactive and service_bound.
+    """Re-tag a token's kind.
 
-    Owner or admin. Converting to/from service_detached is admin-only and
-    not yet supported (scoped-resolution phase).
+    interactive <-> service_bound is owner-or-admin. Converting to/from
+    service_detached is admin-only: TO detached unbinds the token and pins
+    the supplied absolute scope; FROM detached binds it to the acting admin.
     """
     api_token = await get_token_by_id(db, token_id)
     if api_token is None:
@@ -297,20 +309,42 @@ async def retag_token(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     new_kind = body.data.attributes.kind
-    if new_kind == "service_detached" or api_token.kind == "service_detached":
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Converting to/from detached is not yet available",
-        )
-    if new_kind not in _CREATABLE_KINDS:
+    if new_kind not in _ALL_KINDS:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Invalid token kind: {new_kind}",
         )
 
-    api_token.kind = new_kind
+    if (new_kind == "service_detached" or api_token.kind == "service_detached") and (
+        "admin" not in effective_platform_roles(user)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Converting to/from detached is admin-only",
+        )
+
+    affected = {api_token.bound_to}
+    if new_kind == "service_detached":
+        api_token.kind = "service_detached"
+        api_token.bound_to = None
+        api_token.pinned_roles = body.data.attributes.pinned_roles or []
+    else:
+        api_token.kind = new_kind
+        if api_token.bound_to is None:  # coming from detached → bind to the acting admin
+            api_token.bound_to = user.email
+        if new_kind == "interactive":
+            api_token.pinned_roles = None
+        elif body.data.attributes.pinned_roles is not None:
+            api_token.pinned_roles = body.data.attributes.pinned_roles
+    affected.add(api_token.bound_to)
+
     await db.commit()
     await db.refresh(api_token)
+    # Bust cached role resolution for any affected identity (#495 B3).
+    redis = get_redis_client()
+    for email in affected:
+        if email:
+            await redis.delete(f"{_TOKEN_ROLES_PREFIX}{email}")
     return JSONResponse(content={"data": _token_to_jsonapi(api_token)})
 
 

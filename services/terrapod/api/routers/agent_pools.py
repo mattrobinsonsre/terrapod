@@ -240,8 +240,7 @@ async def _require_pool_permission(
     """
     perm = await resolve_pool_permission_for(
         db,
-        user_email=user.email,
-        user_roles=user.roles,
+        user,
         pool_name=pool.name,
         pool_labels=pool.labels or {},
         owner_email=pool.owner_email or "",
@@ -269,8 +268,7 @@ async def list_pools(
     for p in pools:
         perm = await resolve_pool_permission_for(
             db,
-            user_email=user.email,
-            user_roles=user.roles,
+            user,
             pool_name=p.name,
             pool_labels=p.labels or {},
             owner_email=p.owner_email or "",
@@ -362,8 +360,7 @@ async def update_pool(
         if new_labels != (pool.labels or {}) or new_owner != pool.owner_email:
             new_perm = await resolve_pool_permission_for(
                 db,
-                user_email=user.email,
-                user_roles=user.roles,
+                user,
                 pool_name=attrs.get("name") or pool.name,
                 pool_labels=new_labels,
                 owner_email=new_owner or "",

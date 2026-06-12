@@ -387,7 +387,7 @@ async def account_details(
                 "attributes": {
                     "username": username,
                     "email": user.email,
-                    "is-service-account": user.auth_method == "api_token",
+                    "is-service-account": user.kind in ("service_bound", "service_detached"),
                     "avatar-url": "",
                     "v2-only": False,
                     "permissions": {
@@ -922,8 +922,7 @@ async def create_workspace(
             raise HTTPException(status_code=404, detail="Agent pool not found")
         pool_perm = await resolve_pool_permission_for(
             db,
-            user_email=user.email,
-            user_roles=user.roles,
+            user,
             pool_name=target_pool.name,
             pool_labels=target_pool.labels or {},
             owner_email=target_pool.owner_email or "",
@@ -1436,8 +1435,7 @@ async def update_workspace(
                 raise HTTPException(status_code=404, detail="Agent pool not found")
             pool_perm = await resolve_pool_permission_for(
                 db,
-                user_email=user.email,
-                user_roles=user.roles,
+                user,
                 pool_name=target_pool.name,
                 pool_labels=target_pool.labels or {},
                 owner_email=target_pool.owner_email or "",
