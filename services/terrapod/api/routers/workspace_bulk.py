@@ -29,7 +29,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.api.dependencies import AuthenticatedUser, require_admin
+from terrapod.api.dependencies import AuthenticatedUser, effective_platform_roles, require_admin
 from terrapod.api.labels import validate_labels
 from terrapod.db.models import (
     AgentPool,
@@ -220,7 +220,7 @@ async def _validate_update(
                     raise HTTPException(status_code=422, detail="agent-pool-id not found")
                 # Assigning a pool requires pool `write` (platform admin bypass) —
                 # mirrors the single-workspace rule.
-                if "admin" not in user.roles:
+                if "admin" not in effective_platform_roles(user):
                     perm = await pool_rbac_service.resolve_pool_permission(
                         db, user.email, user.roles, pool.name, pool.labels, pool.owner_email
                     )

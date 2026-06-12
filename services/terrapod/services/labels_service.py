@@ -62,14 +62,15 @@ async def _readable_workspaces(db: AsyncSession, user: AuthenticatedUser) -> lis
     result = await db.execute(select(Workspace).order_by(Workspace.name))
     workspaces = list(result.scalars().all())
     preloaded = await workspace_rbac_service.fetch_custom_roles(db, user.roles)
+    token_preloaded = await workspace_rbac_service.fetch_custom_roles(db, user.pinned_roles or [])
     out: list[Workspace] = []
     for ws in workspaces:
-        perm = await workspace_rbac_service.resolve_workspace_permission(
+        perm = await workspace_rbac_service.resolve_workspace_permission_for(
             db,
-            user_email=user.email,
-            user_roles=user.roles,
-            workspace=ws,
+            user,
+            ws,
             preloaded_roles=preloaded,
+            token_preloaded_roles=token_preloaded,
         )
         if perm is not None:
             out.append(ws)
@@ -80,16 +81,17 @@ async def _readable_pools(db: AsyncSession, user: AuthenticatedUser) -> list[Age
     result = await db.execute(select(AgentPool).order_by(AgentPool.name))
     pools = list(result.scalars().all())
     preloaded = await pool_rbac_service.fetch_custom_roles(db, user.roles)
+    token_preloaded = await pool_rbac_service.fetch_custom_roles(db, user.pinned_roles or [])
     out: list[AgentPool] = []
     for p in pools:
-        perm = await pool_rbac_service.resolve_pool_permission(
+        perm = await pool_rbac_service.resolve_pool_permission_for(
             db,
-            user_email=user.email,
-            user_roles=user.roles,
+            user,
             pool_name=p.name,
             pool_labels=p.labels or {},
             owner_email=p.owner_email or "",
             preloaded_roles=preloaded,
+            token_preloaded_roles=token_preloaded,
         )
         if perm is not None:
             out.append(p)
@@ -100,16 +102,17 @@ async def _readable_modules(db: AsyncSession, user: AuthenticatedUser) -> list[R
     result = await db.execute(select(RegistryModule).order_by(RegistryModule.name))
     modules = list(result.scalars().all())
     preloaded = await registry_rbac_service.fetch_custom_roles(db, user.roles)
+    token_preloaded = await registry_rbac_service.fetch_custom_roles(db, user.pinned_roles or [])
     out: list[RegistryModule] = []
     for m in modules:
-        perm = await registry_rbac_service.resolve_registry_permission(
+        perm = await registry_rbac_service.resolve_registry_permission_for(
             db,
-            user_email=user.email,
-            user_roles=user.roles,
+            user,
             resource_name=m.name,
             resource_labels=m.labels or {},
             owner_email=m.owner_email or "",
             preloaded_roles=preloaded,
+            token_preloaded_roles=token_preloaded,
         )
         if perm is not None:
             out.append(m)
@@ -120,16 +123,17 @@ async def _readable_providers(db: AsyncSession, user: AuthenticatedUser) -> list
     result = await db.execute(select(RegistryProvider).order_by(RegistryProvider.name))
     providers = list(result.scalars().all())
     preloaded = await registry_rbac_service.fetch_custom_roles(db, user.roles)
+    token_preloaded = await registry_rbac_service.fetch_custom_roles(db, user.pinned_roles or [])
     out: list[RegistryProvider] = []
     for p in providers:
-        perm = await registry_rbac_service.resolve_registry_permission(
+        perm = await registry_rbac_service.resolve_registry_permission_for(
             db,
-            user_email=user.email,
-            user_roles=user.roles,
+            user,
             resource_name=p.name,
             resource_labels=p.labels or {},
             owner_email=p.owner_email or "",
             preloaded_roles=preloaded,
+            token_preloaded_roles=token_preloaded,
         )
         if perm is not None:
             out.append(p)

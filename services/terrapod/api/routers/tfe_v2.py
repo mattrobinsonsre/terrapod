@@ -48,6 +48,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.dependencies import (
     DEFAULT_ORG,
     AuthenticatedUser,
+    effective_platform_roles,
     get_current_user,
     require_non_runner,
 )
@@ -390,7 +391,7 @@ async def account_details(
                     "avatar-url": "",
                     "v2-only": False,
                     "permissions": {
-                        "can-create-organizations": "admin" in user.roles,
+                        "can-create-organizations": "admin" in effective_platform_roles(user),
                         "can-change-email": False,
                         "can-change-username": False,
                     },
@@ -424,13 +425,13 @@ async def show_organization(
                     "created-at": "2025-01-01T00:00:00.000Z",
                     "email": "",
                     "permissions": {
-                        "can-update": "admin" in user.roles,
+                        "can-update": "admin" in effective_platform_roles(user),
                         "can-destroy": False,
                         "can-access-via-teams": False,
                         "can-create-module": True,
                         "can-create-team": False,
                         "can-create-workspace": True,
-                        "can-manage-users": "admin" in user.roles,
+                        "can-manage-users": "admin" in effective_platform_roles(user),
                         "can-manage-subscription": False,
                         "can-manage-sso": False,
                         "can-update-oauth": False,
@@ -439,7 +440,7 @@ async def show_organization(
                         "can-update-api-token": True,
                         "can-traverse": True,
                         "can-start-trial": False,
-                        "can-update-agent-pools": "admin" in user.roles,
+                        "can-update-agent-pools": "admin" in effective_platform_roles(user),
                         "can-manage-tags": True,
                         "can-manage-varsets": True,
                         "can-read-varsets": True,
@@ -1271,7 +1272,7 @@ async def update_workspace(
 
     # owner-email can only be changed by platform admin
     if "owner-email" in attrs:
-        if "admin" not in user.roles:
+        if "admin" not in effective_platform_roles(user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only platform admins can change workspace owner",
@@ -1383,7 +1384,7 @@ async def update_workspace(
         if (
             new_labels != (ws.labels or {})
             and not attrs.get("force")
-            and "admin" not in user.roles
+            and "admin" not in effective_platform_roles(user)
             and ws.owner_email != user.email
         ):
             old_labels = ws.labels

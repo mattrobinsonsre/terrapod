@@ -42,7 +42,12 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_non_runner
+from terrapod.api.dependencies import (
+    AuthenticatedUser,
+    effective_platform_roles,
+    get_current_user,
+    require_non_runner,
+)
 from terrapod.api.labels import validate_labels
 from terrapod.config import settings
 from terrapod.db.session import get_db
@@ -406,7 +411,7 @@ async def update_provider_endpoint(
     attrs = body.get("data", {}).get("attributes", {})
 
     if "owner-email" in attrs:
-        if "admin" not in user.roles:
+        if "admin" not in effective_platform_roles(user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only platform admins can change owner",
@@ -421,7 +426,7 @@ async def update_provider_endpoint(
         if (
             new_labels != (provider.labels or {})
             and not attrs.get("force")
-            and "admin" not in user.roles
+            and "admin" not in effective_platform_roles(user)
             and provider.owner_email != user.email
         ):
             new_perm = await resolve_registry_permission_for(

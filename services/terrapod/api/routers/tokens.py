@@ -28,7 +28,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.dependencies import AuthenticatedUser, effective_platform_roles, get_current_user
 from terrapod.auth.api_tokens import (
     create_api_token,
     get_token_by_id,
@@ -120,7 +120,7 @@ def _token_to_jsonapi(token, raw_value: str | None = None) -> dict:  # type: ign
 
 
 def _is_admin(user: AuthenticatedUser) -> bool:
-    return "admin" in user.roles
+    return "admin" in effective_platform_roles(user)
 
 
 def _username(user: AuthenticatedUser) -> str:

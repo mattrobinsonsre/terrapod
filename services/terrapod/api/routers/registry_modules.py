@@ -32,7 +32,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_non_runner
+from terrapod.api.dependencies import (
+    AuthenticatedUser,
+    effective_platform_roles,
+    get_current_user,
+    require_non_runner,
+)
 from terrapod.api.labels import validate_labels
 from terrapod.db.models import ModuleWorkspaceLink, RegistryModuleVersion, Workspace
 from terrapod.db.session import get_db
@@ -464,7 +469,7 @@ async def update_module_endpoint(
     attrs = body.get("data", {}).get("attributes", {})
 
     if "owner-email" in attrs:
-        if "admin" not in user.roles:
+        if "admin" not in effective_platform_roles(user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only platform admins can change owner",
@@ -479,7 +484,7 @@ async def update_module_endpoint(
         if (
             new_labels != (module.labels or {})
             and not attrs.get("force")
-            and "admin" not in user.roles
+            and "admin" not in effective_platform_roles(user)
             and module.owner_email != user.email
         ):
             new_perm = await resolve_registry_permission_for(
