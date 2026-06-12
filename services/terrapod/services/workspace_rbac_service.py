@@ -7,6 +7,8 @@ Permission hierarchy: read < plan < write < admin
 Resolution order: platform admin > audit > owner > label RBAC > everyone > none
 """
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +16,9 @@ from terrapod.auth.builtin_roles import BUILTIN_ROLE_NAMES
 from terrapod.db.models import Role, Workspace
 from terrapod.logging_config import get_logger
 from terrapod.services.rbac_service import matches_labels, merge_labels
+
+if TYPE_CHECKING:
+    from terrapod.api.dependencies import AuthenticatedUser
 
 logger = get_logger(__name__)
 
@@ -50,6 +55,7 @@ async def resolve_workspace_permission(
     workspace: Workspace,
     *,
     preloaded_roles: list[Role] | None = None,
+    apply_everyone_floor: bool = True,
 ) -> str | None:
     """Returns the highest permission level for a user on a workspace, or None.
 
@@ -121,10 +127,67 @@ async def resolve_workspace_permission(
                 ):
                     best = perm
 
-    # 5. 'everyone' role: if workspace has label access=everyone, grant read
+    # 5. 'everyone' role: if workspace has label access=everyone, grant read.
+    # Suppressed (apply_everyone_floor=False) when resolving a token's own
+    # pinned scope, so a zero-scope service token does not inherit read on
+    # every access:everyone resource (#495 — the floor is label-gated, so
+    # dropping `everyone` from the role list alone would not suppress it).
     resource_labels = workspace.labels or {}
-    if resource_labels.get("access") == "everyone":
+    if apply_everyone_floor and resource_labels.get("access") == "everyone":
         if best is None:
             best = "read"
 
     return best
+
+
+def min_workspace_permission(a: str | None, b: str | None) -> str | None:
+    """Lower of two workspace permission levels (None = no access; None dominates)."""
+    if a is None or b is None:
+        return None
+    return a if PERMISSION_HIERARCHY[a] <= PERMISSION_HIERARCHY[b] else b
+
+
+async def resolve_workspace_permission_for(
+    db: AsyncSession,
+    user: "AuthenticatedUser",
+    workspace: Workspace,
+    *,
+    preloaded_roles: list[Role] | None = None,
+    token_preloaded_roles: list[Role] | None = None,
+) -> str | None:
+    """Kind-aware workspace permission for an authenticated principal (#495).
+
+    - interactive       -> resolve(user's live roles)
+    - service_bound     -> min(user_effective, token_effective)
+    - service_detached  -> token_effective only
+
+    ``token_effective`` resolves the token's pinned roles with no owner
+    identity (empty email) and the everyone-floor suppressed. Pass the per-side
+    ``fetch_custom_roles`` results as ``preloaded_roles`` (owner) and
+    ``token_preloaded_roles`` (pinned) for loop callers; None for a single
+    resolve.
+    """
+    if user.kind == "service_detached":
+        return await resolve_workspace_permission(
+            db,
+            "",
+            user.pinned_roles or [],
+            workspace,
+            preloaded_roles=token_preloaded_roles,
+            apply_everyone_floor=False,
+        )
+
+    user_eff = await resolve_workspace_permission(
+        db, user.email, user.roles, workspace, preloaded_roles=preloaded_roles
+    )
+    if user.kind == "service_bound":
+        token_eff = await resolve_workspace_permission(
+            db,
+            "",
+            user.pinned_roles or [],
+            workspace,
+            preloaded_roles=token_preloaded_roles,
+            apply_everyone_floor=False,
+        )
+        return min_workspace_permission(user_eff, token_eff)
+    return user_eff

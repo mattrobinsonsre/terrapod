@@ -53,10 +53,33 @@ class AuthenticatedUser:
 
     email: str
     display_name: str | None
-    roles: list[str]
+    roles: list[str]  # the principal's UN-attenuated live roles (user_effective input)
     provider_name: str
     auth_method: str  # "session", "api_token", or "runner_token"
     run_id: str | None = None  # Set only for runner_token auth
+    # Token kind (#495). For service tokens, `roles` stays the owner's live
+    # roles and `pinned_roles` carries the token's own scope; the per-resource
+    # min()/detached resolution happens in the resolve_*_for() wrappers, and
+    # the kind-attenuated platform-role view is computed by effective_platform_roles().
+    kind: str = "interactive"
+    pinned_roles: list[str] | None = None
+
+
+def effective_platform_roles(user: AuthenticatedUser) -> set[str]:
+    """Kind-attenuated platform-role set for name-based admin/audit gates (#495).
+
+    interactive -> the principal's live roles; service_bound -> live ∩ pinned;
+    service_detached -> pinned only. This is a DERIVED view used only by
+    platform gates (require_admin etc. + the inline "admin"/"audit" checks);
+    it is NEVER substituted for `user.roles`, which the per-resource min()
+    needs un-attenuated.
+    """
+    roles = set(user.roles)
+    if user.kind == "service_detached":
+        return set(user.pinned_roles or [])
+    if user.kind == "service_bound":
+        return roles & set(user.pinned_roles or [])
+    return roles
 
 
 async def _resolve_user_roles(db: AsyncSession, email: str) -> list[str]:
@@ -144,6 +167,8 @@ async def get_current_user(
                 roles=roles,
                 provider_name="api_token",
                 auth_method="api_token",
+                kind=api_token.kind,
+                pinned_roles=api_token.pinned_roles,
             )
 
         # Try session (Redis lookup)
@@ -228,6 +253,8 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
                 roles=roles,
                 provider_name="api_token",
                 auth_method="api_token",
+                kind=api_token.kind,
+                pinned_roles=api_token.pinned_roles,
             )
 
     # Try session (Redis only — no DB needed)
@@ -386,8 +413,8 @@ async def get_current_session(
 async def require_admin(
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> AuthenticatedUser:
-    """Dependency to require admin role."""
-    if "admin" not in user.roles:
+    """Dependency to require admin role (kind-attenuated for service tokens)."""
+    if "admin" not in effective_platform_roles(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",
@@ -398,8 +425,8 @@ async def require_admin(
 async def require_admin_or_audit(
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> AuthenticatedUser:
-    """Dependency to require admin or audit role."""
-    if not ({"admin", "audit"} & set(user.roles)):
+    """Dependency to require admin or audit role (kind-attenuated for service tokens)."""
+    if not ({"admin", "audit"} & effective_platform_roles(user)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin or audit access required",
