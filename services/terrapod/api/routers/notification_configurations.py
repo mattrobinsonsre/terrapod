@@ -33,7 +33,10 @@ from terrapod.services.notification_service import (
     deliver_notification,
     record_delivery_response,
 )
-from terrapod.services.workspace_rbac_service import has_permission, resolve_workspace_permission
+from terrapod.services.workspace_rbac_service import (
+    has_permission,
+    resolve_workspace_permission_for,
+)
 
 router = APIRouter(tags=["notification-configurations"])
 logger = get_logger(__name__)
@@ -87,7 +90,7 @@ async def _get_workspace(workspace_id: str, db: AsyncSession) -> Workspace:
 async def _require_ws_permission(
     ws: Workspace, required: str, user: AuthenticatedUser, db: AsyncSession
 ) -> None:
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, required):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

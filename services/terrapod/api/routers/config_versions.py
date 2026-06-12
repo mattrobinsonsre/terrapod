@@ -34,7 +34,10 @@ from terrapod.db.models import ConfigurationVersion, Run, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import cv_diff_service, run_service
-from terrapod.services.workspace_rbac_service import has_permission, resolve_workspace_permission
+from terrapod.services.workspace_rbac_service import (
+    has_permission,
+    resolve_workspace_permission_for,
+)
 from terrapod.storage import get_storage
 from terrapod.storage.keys import config_version_key
 from terrapod.storage.protocol import ObjectNotFoundError
@@ -110,7 +113,7 @@ async def create_configuration_version(
 ) -> JSONResponse:
     """Create a configuration version. Requires write on workspace."""
     ws = await _get_workspace(workspace_id, db)
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, "write"):
         raise HTTPException(status_code=403, detail="Requires write permission on workspace")
 
@@ -157,7 +160,7 @@ async def list_configuration_versions(
     RBAC: requires `read` on the workspace.
     """
     ws = await _get_workspace(workspace_id, db)
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, "read"):
         raise HTTPException(status_code=404, detail="Workspace not found")
 
@@ -237,7 +240,7 @@ async def download_configuration_version(
     if ws is None:
         # Workspace deleted out from under us — treat as gone.
         raise HTTPException(status_code=404, detail="Configuration version not found")
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, "read"):
         raise HTTPException(status_code=404, detail="Configuration version not found")
 
@@ -294,7 +297,7 @@ async def mint_download_ticket(
     ws = await db.get(Workspace, cv.workspace_id)
     if ws is None:
         raise HTTPException(status_code=404, detail="Configuration version not found")
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, "read"):
         raise HTTPException(status_code=404, detail="Configuration version not found")
 
@@ -440,7 +443,7 @@ async def diff_configuration_versions(
     ws = await db.get(Workspace, from_cv.workspace_id)
     if ws is None:
         raise HTTPException(status_code=404, detail="Configuration version not found")
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, "read"):
         raise HTTPException(status_code=404, detail="Configuration version not found")
 

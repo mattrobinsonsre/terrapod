@@ -38,7 +38,10 @@ from terrapod.services.run_task_service import (
     resolve_stage,
     verify_callback_token,
 )
-from terrapod.services.workspace_rbac_service import has_permission, resolve_workspace_permission
+from terrapod.services.workspace_rbac_service import (
+    has_permission,
+    resolve_workspace_permission_for,
+)
 
 router = APIRouter(prefix="/api/v2", tags=["run-tasks"])
 
@@ -153,7 +156,7 @@ async def _get_workspace(workspace_id: str, db: AsyncSession) -> Workspace:
 async def _require_ws_permission(
     ws: Workspace, required: str, user: AuthenticatedUser, db: AsyncSession
 ) -> None:
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, required):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -371,7 +374,7 @@ async def list_task_stages(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, "read"):
         raise HTTPException(status_code=403, detail="Requires read permission on workspace")
 
@@ -402,7 +405,7 @@ async def show_task_stage(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, "read"):
         raise HTTPException(status_code=403, detail="Requires read permission on workspace")
 
@@ -431,7 +434,7 @@ async def override_task_stage(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, "admin"):
         raise HTTPException(status_code=403, detail="Requires admin permission on workspace")
 

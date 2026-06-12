@@ -34,7 +34,10 @@ from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.db.models import Workspace, WorkspaceRemoteStateConsumer
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services.workspace_rbac_service import has_permission, resolve_workspace_permission
+from terrapod.services.workspace_rbac_service import (
+    has_permission,
+    resolve_workspace_permission_for,
+)
 
 router = APIRouter(tags=["remote-state-consumers"])
 logger = get_logger(__name__)
@@ -97,7 +100,7 @@ async def _get_workspace(workspace_id: str, db: AsyncSession) -> Workspace:
 async def _require_ws_permission(
     ws: Workspace, required: str, user: AuthenticatedUser, db: AsyncSession
 ) -> None:
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, required):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

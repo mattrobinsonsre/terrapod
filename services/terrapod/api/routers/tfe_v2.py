@@ -67,7 +67,7 @@ from terrapod.services.pool_rbac_service import has_pool_permission, resolve_poo
 from terrapod.services.workspace_rbac_service import (
     PERMISSION_HIERARCHY,
     has_permission,
-    resolve_workspace_permission,
+    resolve_workspace_permission_for,
 )
 from terrapod.storage import get_storage
 from terrapod.storage.keys import state_index_key, state_key
@@ -828,7 +828,7 @@ async def list_workspaces(
     # Filter to workspaces user has at least read access to
     visible = []
     for ws in workspaces:
-        perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+        perm = await resolve_workspace_permission_for(db, user, ws)
         if perm is not None:
             visible.append(_workspace_json(ws, perm, latest_run=latest_runs.get(ws.id))["data"])
 
@@ -851,7 +851,7 @@ async def show_workspace(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if perm is None:
         # Runner-token consumers can resolve the producer workspace by name
         # so the OpenTofu `remote` backend's first hop (workspace lookup) in
@@ -1004,7 +1004,7 @@ async def _require_ws_permission(
 ) -> tuple[Workspace, str]:
     """Load workspace and check permission. Returns (workspace, effective_permission)."""
     ws = await _get_workspace_by_id(workspace_id, db)
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, required):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1101,7 +1101,7 @@ async def show_workspace_by_id(
     state-read endpoints further down.
     """
     ws = await _get_workspace_by_id(workspace_id, db)
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, "read"):
         if await _runner_state_read_allowed(db, user, ws):
             perm = "read"
@@ -1388,7 +1388,7 @@ async def update_workspace(
         ):
             old_labels = ws.labels
             ws.labels = new_labels
-            new_perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+            new_perm = await resolve_workspace_permission_for(db, user, ws)
             ws.labels = old_labels  # revert before deciding
             if new_perm is None or PERMISSION_HIERARCHY.get(
                 new_perm, -1
@@ -1593,7 +1593,7 @@ async def current_state_version(
     """
     ws = await _get_workspace_by_id(workspace_id, db)
     if not await _runner_state_read_allowed(db, user, ws):
-        perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+        perm = await resolve_workspace_permission_for(db, user, ws)
         if not has_permission(perm, "read"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1638,7 +1638,7 @@ async def download_state(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     if not await _runner_state_read_allowed(db, user, ws):
-        perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+        perm = await resolve_workspace_permission_for(db, user, ws)
         if not has_permission(perm, "plan"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1783,7 +1783,7 @@ async def show_state_version(
     # Check read permission on workspace
     ws = await db.get(Workspace, sv.workspace_id)
     if ws is not None:
-        perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+        perm = await resolve_workspace_permission_for(db, user, ws)
         if perm is None:
             raise HTTPException(status_code=404, detail="State version not found")
 
@@ -2039,7 +2039,7 @@ async def unlock_workspace(
 ) -> JSONResponse:
     """Unlock a workspace. Plan for own lock, admin for force-unlock."""
     ws = await _get_workspace_by_id(workspace_id, db)
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
 
     # Check: at minimum plan permission required
     if not has_permission(perm, "plan"):

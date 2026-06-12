@@ -57,7 +57,10 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service, run_service
-from terrapod.services.workspace_rbac_service import has_permission, resolve_workspace_permission
+from terrapod.services.workspace_rbac_service import (
+    has_permission,
+    resolve_workspace_permission_for,
+)
 from terrapod.storage import get_storage
 from terrapod.storage.keys import apply_log_key, plan_json_output_key, plan_log_key
 from terrapod.storage.protocol import ObjectNotFoundError
@@ -268,7 +271,7 @@ async def _require_run_ws_permission(
     ws = await db.get(Workspace, run.workspace_id)
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, required):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -409,7 +412,7 @@ async def create_run(
 
     # Check permission: plan-only requires plan, apply requires write
     required = "plan" if plan_only else "write"
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, required):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -546,7 +549,7 @@ async def list_workspace_runs(
 ) -> JSONResponse:
     """List runs for a workspace. Requires read."""
     ws = await _get_workspace(workspace_id, db)
-    perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+    perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, "read"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1326,7 +1329,7 @@ async def run_events_stream(
 
     async with get_db_session() as db:
         ws = await _get_workspace(workspace_id, db)
-        perm = await resolve_workspace_permission(db, user.email, user.roles, ws)
+        perm = await resolve_workspace_permission_for(db, user, ws)
         if not has_permission(perm, "read"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
