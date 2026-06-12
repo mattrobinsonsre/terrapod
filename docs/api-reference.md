@@ -2094,23 +2094,79 @@ DELETE /api/terrapod/v1/role-assignments/{provider}/{email}/{role}
 
 ## Authentication Tokens
 
+Authentication tokens come in three **kinds** (`kind` attribute):
+
+| Kind | Who creates | Effective permissions | Bound to |
+|---|---|---|---|
+| `interactive` | anyone (default) | the owner's full live roles | the owner |
+| `service_bound` | anyone | **intersection** of the token's `pinned-roles` and the owner's live roles, per resource | the owner — and the token is **rejected if the owner hasn't logged in within `auth.bound_token_idle_days`** (default 7) |
+| `service_detached` | admins only | the token's `pinned-roles` as an **absolute** scope | nobody (unbound) — survives any single person leaving |
+
+A `service_bound` token can never exceed its owner's access (the intersection caps it) and stops working when the owner is offboarded — see [authentication.md](authentication.md) and the offboarding runbook in [runbooks.md](runbooks.md). `service_detached` is the path for critical machine-to-machine automation.
+
+**Response attributes**: `description`, `kind`, `bound-to` (null for detached), `created-by`, `pinned-roles` (service tokens only; null for interactive), `token-type`, `created-at`, `rotated-at`, `last-used-at`, `expires-at`, `lifespan-hours`, and `token` (the raw secret — present only in create/rotate responses). Service tokens always carry an expiry, capped by `auth.service_token_max_ttl_hours` (default 8760 / 1 year).
+
 ### Create Token
 
 ```
 POST /api/terrapod/v1/users/{user_id}/authentication-tokens
 ```
 
-### List Tokens
+Request attributes: `description`, `kind` (default `interactive`), `lifespan_hours`, `pinned_roles` (service kinds). `service_detached` is admin-only (`403` otherwise) and is created unbound regardless of `{user_id}`.
+
+### List Own Tokens
 
 ```
 GET /api/terrapod/v1/users/{user_id}/authentication-tokens
 ```
+
+Never includes detached tokens (they are unbound).
+
+### List All Tokens (admin)
+
+```
+GET /api/terrapod/v1/admin/authentication-tokens[?kind={kind}]
+```
+
+Admin-only. Optional `kind` filter (`interactive` / `service_bound` / `service_detached`); a valid-but-empty kind returns `[]`, not an error.
 
 ### Show Token
 
 ```
 GET /api/terrapod/v1/authentication-tokens/{id}
 ```
+
+### Re-tag Token (change kind)
+
+```
+PATCH /api/terrapod/v1/authentication-tokens/{id}
+```
+
+`interactive` ↔ `service_bound` is owner-or-admin. Converting **to/from** `service_detached` is admin-only and unbinds/rebinds the token. Request attributes: `kind`, `pinned_roles`.
+
+### Rotate Token
+
+```
+POST /api/terrapod/v1/authentication-tokens/{id}/actions/rotate
+```
+
+Mints a fresh secret (returned once in `token`) and resets the expiry clock; the old secret stops working immediately. Surfaced as a "Rotate" action on service tokens in the UI.
+
+### List Expiring Service Tokens
+
+```
+GET /api/terrapod/v1/authentication-tokens/expiring
+```
+
+Service tokens within `auth.token_expiry_warning_days` (default 14) of expiry, **scoped to the caller**: own bound service tokens for everyone, plus all detached tokens for admins. Drives the in-app expiry banner — no user is warned about another user's bound tokens.
+
+### Revoke All Tokens for a User (admin)
+
+```
+POST /api/terrapod/v1/admin/authentication-tokens/actions/revoke-all
+```
+
+Admin-only urgent-offboarding lever. Body `{"email": "..."}`; revokes every token bound to that identity and returns `{"data": {"email": ..., "revoked": N}}`. Detached tokens are unbound and unaffected.
 
 ### Delete Token
 

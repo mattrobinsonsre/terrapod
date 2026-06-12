@@ -929,3 +929,57 @@ service=terrapod-api logger=terrapod.services.vcs_status_dispatcher
 - Errored rows stop accumulating: `SELECT count(*) FROM plan_summaries WHERE status='errored' AND created_at > now() - interval '15 minutes';` returns 0.
 - The run-detail UI panel renders summaries with `status='ready'` (after re-enable + a new plan).
 - If you emergency-disabled, no `plan_summaries` row appears for new runs and the UI panel doesn't render at all.
+
+---
+
+## Offboarding a User — Revoking Their Tokens
+
+When a person leaves or must be cut off from Terrapod, their **personal (`interactive`) and `service_bound`** API tokens must stop working. There are two layers — an automatic one and an immediate one.
+
+### Symptoms / Trigger
+
+- A user account is disabled at the IdP, or HR/security requests immediate revocation.
+- You need to confirm that an ex-user's CI/automation tokens can no longer authenticate.
+
+### Diagnosis
+
+1. **List the user's bound tokens** (admin):
+   ```bash
+   curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+     "https://<terrapod>/api/terrapod/v1/admin/authentication-tokens" \
+   | jq '.data[] | select(.attributes."bound-to"=="<email>") | {id, kind, "expires-at": .attributes."expires-at"}'
+   ```
+2. **Check their last login** — bound tokens are auto-rejected after the idle window:
+   ```bash
+   # The Redis marker that arms the idle guard (TTL = auth.bound_token_idle_days)
+   redis-cli --scan --pattern 'tp:user_seen:<email>'
+   ```
+   If the key is **absent**, the user is already past the idle window and all their bound tokens are already being rejected.
+
+### Resolution
+
+**Automatic (no action needed):** a `service_bound`/`interactive` token is rejected once its owner hasn't logged in for `auth.bound_token_idle_days` (default 7). Disabling the user at the IdP — so they can no longer complete SSO — is sufficient for the token to lapse within that window. This is the "they can't use a token weeks after offboarding" guarantee, and it requires no operator cleanup.
+
+**Immediate (urgent cut-off):** when you can't wait out the idle window, revoke every token bound to the identity in one call:
+
+```bash
+curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  "https://<terrapod>/api/terrapod/v1/admin/authentication-tokens/actions/revoke-all" \
+  -d '{"email": "<email>"}'
+# -> {"data": {"email": "<email>", "revoked": N}}
+```
+
+This deletes all bound tokens immediately and busts the user's cached role resolution. **Detached (`service_detached`) tokens are unbound and are intentionally NOT affected** — they belong to automation, not the person. If the leaver was the only human who knew a detached token's secret, **rotate** that token instead:
+
+```bash
+curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "https://<terrapod>/api/terrapod/v1/authentication-tokens/<token-id>/actions/rotate"
+```
+
+### Verification
+
+- `revoke-all` returned a `revoked` count matching the diagnosis list.
+- Re-running the diagnosis list query returns no tokens for the email.
+- An attempt to use one of the revoked tokens returns `401`.
+- For the idle path: with the `tp:user_seen:<email>` key absent, a previously-working bound token now returns `401`.

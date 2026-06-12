@@ -82,7 +82,7 @@ See [Architecture](architecture.md) for the full breakdown.
 |---|---|
 | [Getting Started](getting-started.md) | Local development setup, first workspace, first plan/apply |
 | [Architecture](architecture.md) | System components, storage, runners, auth flows |
-| [Authentication](authentication.md) | Local auth, OIDC, SAML, terraform login, API tokens |
+| [Authentication](authentication.md) | Local auth, OIDC, SAML, terraform login, API tokens, scoped service tokens (bound/detached) + offboarding idle guard |
 | [RBAC](rbac.md) | Permission model, label-based access control, custom roles |
 | [VCS Integration](vcs-integration.md) | GitHub and GitLab setup, polling, webhooks |
 | [VCS Workflows](vcs-workflows.md) | merge_then_apply (default) vs apply_then_merge (Atlantis-style, opt-in) |

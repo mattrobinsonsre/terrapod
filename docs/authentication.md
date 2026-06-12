@@ -336,6 +336,46 @@ Example: `abc123def456.tpod.ghijklmnopqrstuvwxyz0123456789`
 - Max lifetime enforced via `auth.api_token_max_ttl_hours` config
 - Changing the max TTL retroactively affects all existing tokens
 
+### Token Kinds — Personal vs Service Tokens
+
+Every token has a **kind** that determines how its permissions are resolved:
+
+| Kind | Who can create | Effective permissions | Bound to | Best for |
+|---|---|---|---|---|
+| **`interactive`** (default) | anyone | the owner's full live roles | the owner | a person's CLI / `terraform login` token |
+| **`service_bound`** | anyone | the **intersection** of the token's pinned roles and the owner's live roles, resolved per resource | the owner | scoped automation that should never outlive the person who made it |
+| **`service_detached`** | **admins only** | the token's pinned roles as an **absolute** scope | nobody (unbound) | critical machine-to-machine automation that must survive any one person leaving |
+
+The intersection for `service_bound` is the key safety property: you can pin a token to a subset of your roles, but it can never grant more than you currently have. Pick the pinned roles from your own roles in the create form; the UI filters to exactly that set.
+
+`service_detached` tokens are the supported path for long-lived, business-critical automation. Because they are unbound and admin-managed, they don't break when an individual is offboarded — but they also don't inherit anyone's live permissions, so their pinned scope is the whole story. Keep it minimal.
+
+#### Offboarding safety — the idle-login guard
+
+A **`service_bound`** (or `interactive`) token is **rejected if its owner hasn't successfully logged in within `auth.bound_token_idle_days`** (default 7). Terrapod records the last successful login per user in Redis (`tp:user_seen:{email}`); once that window lapses, every token bound to the user stops authenticating until they log in again.
+
+This means a user who is cut off from SSO (account disabled at the IdP) automatically loses their bound tokens within a week — without any cleanup action — closing the "ex-employee's CI token still works weeks later" gap. For an **immediate** cut-off, use the [revoke-all offboarding runbook](runbooks.md). Critical M2M automation should use **`service_detached`** tokens (admin-managed, exempt from the idle guard) so it isn't affected by any individual's login activity.
+
+```yaml
+api:
+  config:
+    auth:
+      bound_token_idle_days: 7            # reject bound tokens after this idle window (0 = disabled)
+      service_token_max_ttl_hours: 8760   # hard cap on service-token lifespan (always expires)
+      token_expiry_warning_days: 14       # in-app expiry banner lead time
+```
+
+### Rotating a Service Token
+
+Rotate a token to swap its secret without re-wiring its identity or scope:
+
+```zsh
+curl -X POST https://terrapod.example.com/api/terrapod/v1/authentication-tokens/{token-id}/actions/rotate \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN"
+```
+
+The response carries the new secret in `attributes.token` (shown once); the old secret stops working immediately and the expiry clock resets. In the UI this is the **Rotate** action on each service token.
+
 ### Creating Tokens via API
 
 ```zsh
@@ -353,6 +393,26 @@ curl -X POST https://terrapod.example.com/api/terrapod/v1/users/{user_id}/authen
 ```
 
 The response includes the raw token value in `attributes.token`. Store it securely -- it cannot be retrieved again.
+
+To create a **detached** service token (admin only) scoped to specific roles:
+
+```zsh
+curl -X POST https://terrapod.example.com/api/terrapod/v1/users/{admin_user}/authentication-tokens \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN" \
+  -H "Content-Type: application/vnd.api+json" \
+  -d '{
+    "data": {
+      "type": "authentication-tokens",
+      "attributes": {
+        "description": "prod deploy pipeline",
+        "kind": "service_detached",
+        "pinned_roles": ["prod-deployer"]
+      }
+    }
+  }'
+```
+
+The token comes back with `"bound-to": null` and the pinned roles as its absolute scope. For a `service_bound` token, set `"kind": "service_bound"` and pick `pinned_roles` from your own roles (the effective scope is the intersection with your live access).
 
 ### Creating Tokens via Web UI
 
