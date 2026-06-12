@@ -8,6 +8,8 @@ Permission hierarchy: read < write < admin
 Resolution order: platform admin > audit > owner > label RBAC > everyone > none
 """
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +17,9 @@ from terrapod.auth.builtin_roles import BUILTIN_ROLE_NAMES
 from terrapod.db.models import Role
 from terrapod.logging_config import get_logger
 from terrapod.services.rbac_service import matches_labels, merge_labels
+
+if TYPE_CHECKING:
+    from terrapod.api.dependencies import AuthenticatedUser
 
 logger = get_logger(__name__)
 
@@ -65,6 +70,7 @@ async def resolve_registry_permission(
     auth_method: str = "",
     *,
     preloaded_roles: list[Role] | None = None,
+    apply_everyone_floor: bool = True,
 ) -> str | None:
     """Returns highest permission level (read/write/admin), or None.
 
@@ -139,9 +145,73 @@ async def resolve_registry_permission(
                 ) > REGISTRY_PERMISSION_HIERARCHY.get(best, -1):
                     best = registry_perm
 
-    # 6. 'everyone' role: if resource has label access=everyone, grant read
-    if resource_labels.get("access") == "everyone":
+    # 6. 'everyone' role: if resource has label access=everyone, grant read.
+    # Suppressed for token-scope resolution (apply_everyone_floor=False, #495).
+    if apply_everyone_floor and resource_labels.get("access") == "everyone":
         if best is None:
             best = "read"
 
     return best
+
+
+def min_registry_permission(a: str | None, b: str | None) -> str | None:
+    """Lower of two registry permission levels (None = no access; None dominates)."""
+    if a is None or b is None:
+        return None
+    return a if REGISTRY_PERMISSION_HIERARCHY[a] <= REGISTRY_PERMISSION_HIERARCHY[b] else b
+
+
+async def resolve_registry_permission_for(
+    db: AsyncSession,
+    user: "AuthenticatedUser",
+    resource_name: str,
+    resource_labels: dict,
+    owner_email: str,
+    *,
+    preloaded_roles: list[Role] | None = None,
+    token_preloaded_roles: list[Role] | None = None,
+) -> str | None:
+    """Kind-aware registry permission (#495).
+
+    interactive -> resolve(user roles, real auth_method); service_bound ->
+    min(user, token); service_detached -> token scope only. Token-side
+    resolution uses no owner identity, no runner floor, and the everyone-floor
+    suppressed.
+    """
+    if user.kind == "service_detached":
+        return await resolve_registry_permission(
+            db,
+            "",
+            user.pinned_roles or [],
+            resource_name,
+            resource_labels,
+            owner_email,
+            auth_method="",
+            preloaded_roles=token_preloaded_roles,
+            apply_everyone_floor=False,
+        )
+
+    user_eff = await resolve_registry_permission(
+        db,
+        user.email,
+        user.roles,
+        resource_name,
+        resource_labels,
+        owner_email,
+        auth_method=user.auth_method,
+        preloaded_roles=preloaded_roles,
+    )
+    if user.kind == "service_bound":
+        token_eff = await resolve_registry_permission(
+            db,
+            "",
+            user.pinned_roles or [],
+            resource_name,
+            resource_labels,
+            owner_email,
+            auth_method="",
+            preloaded_roles=token_preloaded_roles,
+            apply_everyone_floor=False,
+        )
+        return min_registry_permission(user_eff, token_eff)
+    return user_eff

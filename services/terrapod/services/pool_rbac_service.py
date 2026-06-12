@@ -10,6 +10,8 @@ Resolution order: platform admin > audit > owner > label RBAC > everyone > none
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +19,9 @@ from terrapod.auth.builtin_roles import BUILTIN_ROLE_NAMES
 from terrapod.db.models import Role
 from terrapod.logging_config import get_logger
 from terrapod.services.rbac_service import matches_labels, merge_labels
+
+if TYPE_CHECKING:
+    from terrapod.api.dependencies import AuthenticatedUser
 
 logger = get_logger(__name__)
 
@@ -57,6 +62,7 @@ async def resolve_pool_permission(
     owner_email: str | None,
     *,
     preloaded_roles: list[Role] | None = None,
+    apply_everyone_floor: bool = True,
 ) -> str | None:
     """Returns highest permission level (read/write/admin), or None.
 
@@ -125,9 +131,68 @@ async def resolve_pool_permission(
                 ) > POOL_PERMISSION_HIERARCHY.get(best, -1):
                     best = pool_perm
 
-    # 5. 'everyone' role: if pool has label access=everyone, grant read
-    if pool_labels.get("access") == "everyone":
+    # 5. 'everyone' role: if pool has label access=everyone, grant read.
+    # Suppressed for token-scope resolution (apply_everyone_floor=False, #495).
+    if apply_everyone_floor and pool_labels.get("access") == "everyone":
         if best is None:
             best = "read"
 
     return best
+
+
+def min_pool_permission(a: str | None, b: str | None) -> str | None:
+    """Lower of two pool permission levels (None = no access; None dominates)."""
+    if a is None or b is None:
+        return None
+    return a if POOL_PERMISSION_HIERARCHY[a] <= POOL_PERMISSION_HIERARCHY[b] else b
+
+
+async def resolve_pool_permission_for(
+    db: AsyncSession,
+    user: AuthenticatedUser,
+    pool_name: str,
+    pool_labels: dict,
+    owner_email: str | None,
+    *,
+    preloaded_roles: list[Role] | None = None,
+    token_preloaded_roles: list[Role] | None = None,
+) -> str | None:
+    """Kind-aware pool permission (#495).
+
+    interactive -> resolve(user roles); service_bound -> min(user, token);
+    service_detached -> token scope only (pinned roles, no owner, floor off).
+    """
+    if user.kind == "service_detached":
+        return await resolve_pool_permission(
+            db,
+            "",
+            user.pinned_roles or [],
+            pool_name,
+            pool_labels,
+            owner_email,
+            preloaded_roles=token_preloaded_roles,
+            apply_everyone_floor=False,
+        )
+
+    user_eff = await resolve_pool_permission(
+        db,
+        user.email,
+        user.roles,
+        pool_name,
+        pool_labels,
+        owner_email,
+        preloaded_roles=preloaded_roles,
+    )
+    if user.kind == "service_bound":
+        token_eff = await resolve_pool_permission(
+            db,
+            "",
+            user.pinned_roles or [],
+            pool_name,
+            pool_labels,
+            owner_email,
+            preloaded_roles=token_preloaded_roles,
+            apply_everyone_floor=False,
+        )
+        return min_pool_permission(user_eff, token_eff)
+    return user_eff
