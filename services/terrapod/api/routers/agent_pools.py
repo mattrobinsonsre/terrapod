@@ -46,7 +46,7 @@ from terrapod.services.pool_rbac_service import (
     POOL_PERMISSION_HIERARCHY,
     fetch_custom_roles,
     has_pool_permission,
-    resolve_pool_permission,
+    resolve_pool_permission_for,
 )
 
 router = APIRouter(tags=["agent-pools"])
@@ -237,7 +237,7 @@ async def _require_pool_permission(
     Returns the effective permission. Raises 404 if no access, 403 if
     insufficient.
     """
-    perm = await resolve_pool_permission(
+    perm = await resolve_pool_permission_for(
         db,
         user_email=user.email,
         user_roles=user.roles,
@@ -266,7 +266,7 @@ async def list_pools(
     custom_roles = await fetch_custom_roles(db, user.roles)
     result = []
     for p in pools:
-        perm = await resolve_pool_permission(
+        perm = await resolve_pool_permission_for(
             db,
             user_email=user.email,
             user_roles=user.roles,
@@ -359,7 +359,7 @@ async def update_pool(
         new_labels = labels_arg if labels_arg is not _UNSET else (pool.labels or {})
         new_owner = (owner_arg or None) if owner_arg is not _UNSET else pool.owner_email
         if new_labels != (pool.labels or {}) or new_owner != pool.owner_email:
-            new_perm = await resolve_pool_permission(
+            new_perm = await resolve_pool_permission_for(
                 db,
                 user_email=user.email,
                 user_roles=user.roles,

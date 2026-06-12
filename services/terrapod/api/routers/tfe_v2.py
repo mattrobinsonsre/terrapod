@@ -63,7 +63,7 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service as _agent_pool_service
-from terrapod.services.pool_rbac_service import has_pool_permission, resolve_pool_permission
+from terrapod.services.pool_rbac_service import has_pool_permission, resolve_pool_permission_for
 from terrapod.services.workspace_rbac_service import (
     PERMISSION_HIERARCHY,
     has_permission,
@@ -919,7 +919,7 @@ async def create_workspace(
         target_pool = await _agent_pool_service.get_pool(db, agent_pool_id)
         if target_pool is None:
             raise HTTPException(status_code=404, detail="Agent pool not found")
-        pool_perm = await resolve_pool_permission(
+        pool_perm = await resolve_pool_permission_for(
             db,
             user_email=user.email,
             user_roles=user.roles,
@@ -1433,7 +1433,7 @@ async def update_workspace(
             target_pool = await _agent_pool_service.get_pool(db, new_pool_id)
             if target_pool is None:
                 raise HTTPException(status_code=404, detail="Agent pool not found")
-            pool_perm = await resolve_pool_permission(
+            pool_perm = await resolve_pool_permission_for(
                 db,
                 user_email=user.email,
                 user_roles=user.roles,

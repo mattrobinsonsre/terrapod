@@ -72,7 +72,7 @@ from terrapod.services.registry_provider_service import (
 from terrapod.services.registry_rbac_service import (
     REGISTRY_PERMISSION_HIERARCHY,
     has_registry_permission,
-    resolve_registry_permission,
+    resolve_registry_permission_for,
 )
 from terrapod.storage import get_storage
 from terrapod.storage.protocol import ObjectStore
@@ -175,14 +175,12 @@ async def _require_provider_permission(
     required: str,
 ) -> None:
     """Check registry permission on a provider or raise 403."""
-    perm = await resolve_registry_permission(
+    perm = await resolve_registry_permission_for(
         db,
-        user.email,
-        user.roles,
+        user,
         provider.name,
         provider.labels or {},
         provider.owner_email,
-        auth_method=user.auth_method,
     )
     if not has_registry_permission(perm, required):
         raise HTTPException(
@@ -215,14 +213,12 @@ async def list_provider_versions_cli(
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
-    perm = await resolve_registry_permission(
+    perm = await resolve_registry_permission_for(
         db,
-        user.email,
-        user.roles,
+        user,
         provider.name,
         provider.labels or {},
         provider.owner_email,
-        auth_method=user.auth_method,
     )
     if not has_registry_permission(perm, "read"):
         raise HTTPException(status_code=404, detail="Provider not found")
@@ -271,14 +267,12 @@ async def download_provider_cli(
 
     provider = await get_provider(db, namespace, name)
     if provider is not None:
-        perm = await resolve_registry_permission(
+        perm = await resolve_registry_permission_for(
             db,
-            user.email,
-            user.roles,
+            user,
             provider.name,
             provider.labels or {},
             provider.owner_email,
-            auth_method=user.auth_method,
         )
         if not has_registry_permission(perm, "read"):
             raise HTTPException(status_code=404, detail="Provider platform not found")
@@ -326,14 +320,12 @@ async def list_providers_endpoint(
     providers = await list_providers(db)
     visible = []
     for p in providers:
-        perm = await resolve_registry_permission(
+        perm = await resolve_registry_permission_for(
             db,
-            user.email,
-            user.roles,
+            user,
             p.name,
             p.labels or {},
             p.owner_email,
-            auth_method=user.auth_method,
         )
         if perm is not None:
             visible.append(_provider_to_jsonapi(p, perm))
@@ -351,14 +343,12 @@ async def show_provider_endpoint(
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
-    perm = await resolve_registry_permission(
+    perm = await resolve_registry_permission_for(
         db,
-        user.email,
-        user.roles,
+        user,
         provider.name,
         provider.labels or {},
         provider.owner_email,
-        auth_method=user.auth_method,
     )
     if not has_registry_permission(perm, "read"):
         raise HTTPException(status_code=404, detail="Provider not found")
@@ -400,14 +390,12 @@ async def update_provider_endpoint(
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
-    perm = await resolve_registry_permission(
+    perm = await resolve_registry_permission_for(
         db,
-        user.email,
-        user.roles,
+        user,
         provider.name,
         provider.labels or {},
         provider.owner_email,
-        auth_method=user.auth_method,
     )
     if not has_registry_permission(perm, "admin"):
         raise HTTPException(
@@ -436,14 +424,12 @@ async def update_provider_endpoint(
             and "admin" not in user.roles
             and provider.owner_email != user.email
         ):
-            new_perm = await resolve_registry_permission(
+            new_perm = await resolve_registry_permission_for(
                 db,
-                user.email,
-                user.roles,
+                user,
                 provider.name,
                 new_labels,
                 provider.owner_email,
-                auth_method=user.auth_method,
             )
             if new_perm is None or REGISTRY_PERMISSION_HIERARCHY.get(
                 new_perm, -1
@@ -581,14 +567,12 @@ async def list_provider_versions_endpoint(
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
-    perm = await resolve_registry_permission(
+    perm = await resolve_registry_permission_for(
         db,
-        user.email,
-        user.roles,
+        user,
         provider.name,
         provider.labels or {},
         provider.owner_email,
-        auth_method=user.auth_method,
     )
     if not has_registry_permission(perm, "read"):
         raise HTTPException(status_code=404, detail="Provider not found")
@@ -635,14 +619,12 @@ async def list_provider_platforms_endpoint(
     if provider is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
-    perm = await resolve_registry_permission(
+    perm = await resolve_registry_permission_for(
         db,
-        user.email,
-        user.roles,
+        user,
         provider.name,
         provider.labels or {},
         provider.owner_email,
-        auth_method=user.auth_method,
     )
     if not has_registry_permission(perm, "read"):
         raise HTTPException(status_code=404, detail="Provider not found")
