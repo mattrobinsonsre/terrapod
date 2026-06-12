@@ -91,6 +91,8 @@ async def test_create_service_bound(mock_create, *_):
     assert attrs["kind"] == "service_bound"
     assert attrs["token"] == "raw.tpod.secret"
     assert attrs["bound-to"] == "dev@example.com"
+    # The pinned scope is surfaced so the tokens UI can display it (#495).
+    assert attrs["pinned-roles"] == ["plan-only"]
 
 
 @_app_patched

@@ -103,6 +103,10 @@ def _token_to_jsonapi(token, raw_value: str | None = None) -> dict:  # type: ign
         "kind": token.kind,
         "bound-to": token.bound_to,
         "created-by": token.created_by,
+        # The token's pinned scope (service tokens). Null for interactive
+        # tokens. The tokens UI surfaces this so an operator can see exactly
+        # what a service token is scoped to.
+        "pinned-roles": token.pinned_roles,
         # token-type retained for response back-compat (superseded by kind).
         "token-type": token.token_type,
         "created-at": _rfc3339(token.created_at),
