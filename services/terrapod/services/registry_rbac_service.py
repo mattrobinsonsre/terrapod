@@ -25,15 +25,6 @@ logger = get_logger(__name__)
 
 REGISTRY_PERMISSION_HIERARCHY = {"read": 0, "write": 1, "admin": 2}
 
-# Map workspace_permission values to registry permission levels.
-# "plan" has no meaning for registry resources → maps to "read".
-_WS_PERM_TO_REGISTRY = {
-    "read": "read",
-    "plan": "read",
-    "write": "write",
-    "admin": "admin",
-}
-
 
 def has_registry_permission(effective: str | None, required: str) -> bool:
     """Check if effective permission meets the required level."""
@@ -79,7 +70,7 @@ async def resolve_registry_permission(
     2. Platform audit → read
     3. Runner token → read (runners must download modules/providers to execute)
     4. Resource owner → admin
-    5. Label-based RBAC (custom roles) → mapped workspace_permission
+    5. Label-based RBAC (custom roles) → role.registry_permission
     6. 'everyone' role with access: everyone label → read
     7. Default → None (no access)
 
@@ -139,7 +130,8 @@ async def resolve_registry_permission(
                 matched = True
 
             if matched:
-                registry_perm = _WS_PERM_TO_REGISTRY.get(role.workspace_permission, "read")
+                # Dedicated registry level, independent of workspace_permission.
+                registry_perm = role.registry_permission
                 if best is None or REGISTRY_PERMISSION_HIERARCHY.get(
                     registry_perm, -1
                 ) > REGISTRY_PERMISSION_HIERARCHY.get(best, -1):

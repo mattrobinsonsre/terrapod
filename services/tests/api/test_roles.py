@@ -28,7 +28,7 @@ def _user(email="admin@example.com", roles=None):
     )
 
 
-def _mock_role(name="dev-team", ws_perm="read"):
+def _mock_role(name="dev-team", ws_perm="read", reg_perm="read"):
     role = MagicMock()
     role.name = name
     role.description = "A custom role"
@@ -38,6 +38,7 @@ def _mock_role(name="dev-team", ws_perm="read"):
     role.deny_names = []
     role.workspace_permission = ws_perm
     role.pool_permission = "read"
+    role.registry_permission = reg_perm
     role.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     role.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
     return role
@@ -293,6 +294,84 @@ class TestCreateRole:
                 headers=_AUTH,
             )
         assert resp.status_code == 422
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_with_registry_permission(self, *mocks):
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/roles",
+                json={
+                    "data": {
+                        "name": "registry-publish-role",
+                        "attributes": {
+                            "workspace-permission": "read",
+                            "registry-permission": "write",
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201
+        assert resp.json()["data"]["attributes"]["registry-permission"] == "write"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_invalid_registry_permission_rejected(self, *mocks):
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/roles",
+                json={
+                    "data": {
+                        "name": "bad-registry",
+                        "attributes": {
+                            "workspace-permission": "read",
+                            "registry-permission": "superadmin",
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_list_includes_registry_permission(self, *mocks):
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        role = _mock_role("reg-role", reg_perm="write")
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [role]
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get("/api/terrapod/v1/roles", headers=_AUTH)
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        custom_entry = next(r for r in data if r["name"] == "reg-role")
+        assert custom_entry["attributes"]["registry-permission"] == "write"
+        # Built-in admin should have registry-permission: admin
+        admin_entry = next(r for r in data if r["name"] == "admin")
+        assert admin_entry["attributes"]["registry-permission"] == "admin"
+        # Built-in audit/everyone get registry read
+        audit_entry = next(r for r in data if r["name"] == "audit")
+        assert audit_entry["attributes"]["registry-permission"] == "read"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

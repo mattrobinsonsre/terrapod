@@ -25,13 +25,17 @@ test.describe('Roles & Assignments', () => {
 
     await page.fill('#r-name', roleName);
     await page.selectOption('#r-perm', 'write');
+    // Registry permission is its own field, independent of workspace (#registry-permission).
+    await page.selectOption('#r-registry-perm', 'write');
     await page.fill('#r-desc', 'E2E test role');
 
     // Submit button says "Create Role"
     await page.click('button[type="submit"]:has-text("Create Role")');
 
-    // Role should appear in the list
-    await expect(page.locator(`h3:has-text("${roleName}")`)).toBeVisible({ timeout: 10_000 });
+    // Role should appear in the list, carrying the registry badge.
+    const card = page.locator(`div:has(h3:has-text("${roleName}"))`).first();
+    await expect(card.locator(`h3:has-text("${roleName}")`)).toBeVisible({ timeout: 10_000 });
+    await expect(card.locator('text=registry: write')).toBeVisible();
   });
 
   test('create assignment on assignments tab', async ({ page }) => {

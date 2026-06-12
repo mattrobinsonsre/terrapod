@@ -21,6 +21,7 @@ interface Role {
     'built-in': boolean
     'workspace-permission': string | null
     'pool-permission': string | null
+    'registry-permission': string | null
     'allow-labels': Record<string, string>
     'allow-names': string[]
     'deny-labels': Record<string, string>
@@ -66,6 +67,7 @@ export default function RolesPage() {
   const [roleAllowNames, setRoleAllowNames] = useState('')
   const [roleDenyLabels, setRoleDenyLabels] = useState('')
   const [rolePoolPermission, setRolePoolPermission] = useState('read')
+  const [roleRegistryPermission, setRoleRegistryPermission] = useState('read')
   const [roleDenyNames, setRoleDenyNames] = useState('')
   const [creatingRole, setCreatingRole] = useState(false)
 
@@ -77,6 +79,7 @@ export default function RolesPage() {
   const [editRoleAllowNames, setEditRoleAllowNames] = useState('')
   const [editRoleDenyLabels, setEditRoleDenyLabels] = useState('')
   const [editRolePoolPermission, setEditRolePoolPermission] = useState('read')
+  const [editRoleRegistryPermission, setEditRoleRegistryPermission] = useState('read')
   const [editRoleDenyNames, setEditRoleDenyNames] = useState('')
   const [savingRole, setSavingRole] = useState(false)
 
@@ -179,6 +182,7 @@ export default function RolesPage() {
         description: roleDesc,
         'workspace-permission': rolePermission,
         'pool-permission': rolePoolPermission,
+        'registry-permission': roleRegistryPermission,
       }
       if (roleAllowLabels.trim()) attrs['allow-labels'] = parseLabels(roleAllowLabels)
       if (roleAllowNames.trim()) attrs['allow-names'] = roleAllowNames.split(',').map((s) => s.trim()).filter(Boolean)
@@ -199,6 +203,7 @@ export default function RolesPage() {
       setRoleDesc('')
       setRolePermission('read')
       setRolePoolPermission('read')
+      setRoleRegistryPermission('read')
       setRoleAllowLabels('')
       setRoleAllowNames('')
       setRoleDenyLabels('')
@@ -217,6 +222,7 @@ export default function RolesPage() {
     setEditRoleDesc(role.attributes.description || '')
     setEditRolePermission(role.attributes['workspace-permission'] || 'read')
     setEditRolePoolPermission(role.attributes['pool-permission'] || 'read')
+    setEditRoleRegistryPermission(role.attributes['registry-permission'] || 'read')
     setEditRoleAllowLabels(formatLabels(role.attributes['allow-labels'] || {}))
     setEditRoleAllowNames((role.attributes['allow-names'] || []).join(', '))
     setEditRoleDenyLabels(formatLabels(role.attributes['deny-labels'] || {}))
@@ -233,6 +239,7 @@ export default function RolesPage() {
         description: editRoleDesc,
         'workspace-permission': editRolePermission,
         'pool-permission': editRolePoolPermission,
+        'registry-permission': editRoleRegistryPermission,
         'allow-labels': parseLabels(editRoleAllowLabels),
         'allow-names': editRoleAllowNames.split(',').map((s) => s.trim()).filter(Boolean),
         'deny-labels': parseLabels(editRoleDenyLabels),
@@ -417,6 +424,15 @@ export default function RolesPage() {
                       <option value="admin">admin</option>
                     </select>
                   </div>
+                  <div>
+                    <label htmlFor="r-registry-perm" className="block text-sm font-medium text-slate-300 mb-1">Registry Permission</label>
+                    <select id="r-registry-perm" value={roleRegistryPermission} onChange={(e) => setRoleRegistryPermission(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                      <option value="read">read</option>
+                      <option value="write">write</option>
+                      <option value="admin">admin</option>
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <label htmlFor="r-desc" className="block text-sm font-medium text-slate-300 mb-1">Description</label>
@@ -500,6 +516,15 @@ export default function RolesPage() {
                               </select>
                             </div>
                             <div>
+                              <label className="block text-xs text-slate-500 mb-1">Registry Permission</label>
+                              <select value={editRoleRegistryPermission} onChange={(e) => setEditRoleRegistryPermission(e.target.value)}
+                                className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                                <option value="read">read</option>
+                                <option value="write">write</option>
+                                <option value="admin">admin</option>
+                              </select>
+                            </div>
+                            <div>
                               <label className="block text-xs text-slate-500 mb-1">Allow Labels</label>
                               <input type="text" value={editRoleAllowLabels} onChange={(e) => setEditRoleAllowLabels(e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
@@ -537,6 +562,11 @@ export default function RolesPage() {
                               {a['pool-permission'] && a['pool-permission'] !== 'read' && (
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${permissionBadge(a['pool-permission'])}`}>
                                   pool: {a['pool-permission']}
+                                </span>
+                              )}
+                              {a['registry-permission'] && a['registry-permission'] !== 'read' && (
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${permissionBadge(a['registry-permission'])}`}>
+                                  registry: {a['registry-permission']}
                                 </span>
                               )}
                             </div>

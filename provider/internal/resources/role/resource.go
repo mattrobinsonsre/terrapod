@@ -48,6 +48,7 @@ type roleModel struct {
 	DenyNames           types.List   `tfsdk:"deny_names"`
 	WorkspacePermission types.String `tfsdk:"workspace_permission"`
 	PoolPermission      types.String `tfsdk:"pool_permission"`
+	RegistryPermission  types.String `tfsdk:"registry_permission"`
 
 	BuiltIn   types.Bool   `tfsdk:"built_in"`
 	CreatedAt types.String `tfsdk:"created_at"`
@@ -115,6 +116,14 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			},
 			"pool_permission": schema.StringAttribute{
 				Description: "Agent pool permission level: read, write, or admin. Defaults to read.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"registry_permission": schema.StringAttribute{
+				Description: "Registry permission level for modules and providers: read, write, or admin. Defaults to read.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -253,6 +262,9 @@ func buildCreateRoleRequest(m *roleModel) terrapod.CreateRoleRequest {
 	if !m.PoolPermission.IsNull() && !m.PoolPermission.IsUnknown() {
 		req.PoolPermission = m.PoolPermission.ValueString()
 	}
+	if !m.RegistryPermission.IsNull() && !m.RegistryPermission.IsUnknown() {
+		req.RegistryPermission = m.RegistryPermission.ValueString()
+	}
 	if !m.Description.IsNull() {
 		req.Description = m.Description.ValueString()
 	}
@@ -281,6 +293,9 @@ func buildUpdateRoleRequest(m *roleModel) terrapod.UpdateRoleRequest {
 	}
 	if !m.PoolPermission.IsNull() && !m.PoolPermission.IsUnknown() {
 		req.PoolPermission = m.PoolPermission.ValueString()
+	}
+	if !m.RegistryPermission.IsNull() && !m.RegistryPermission.IsUnknown() {
+		req.RegistryPermission = m.RegistryPermission.ValueString()
 	}
 	if !m.Description.IsNull() && !m.Description.IsUnknown() {
 		d := m.Description.ValueString()
@@ -312,6 +327,11 @@ func readRoleFromSDK(ctx context.Context, role *terrapod.Role, m *roleModel) dia
 		m.PoolPermission = types.StringValue(role.PoolPermission)
 	} else {
 		m.PoolPermission = types.StringValue("read")
+	}
+	if role.RegistryPermission != "" {
+		m.RegistryPermission = types.StringValue(role.RegistryPermission)
+	} else {
+		m.RegistryPermission = types.StringValue("read")
 	}
 
 	m.BuiltIn = types.BoolValue(role.BuiltIn)

@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.services.registry_rbac_service import (
-    _WS_PERM_TO_REGISTRY,
     REGISTRY_PERMISSION_HIERARCHY,
     has_registry_permission,
     resolve_registry_permission,
@@ -45,23 +44,6 @@ class TestHasRegistryPermission:
                 assert has_registry_permission(effective, required) is expected
 
 
-# ── Permission mapping ─────────────────────────────────────────────────
-
-
-class TestPermissionMapping:
-    def test_read_maps_to_read(self):
-        assert _WS_PERM_TO_REGISTRY["read"] == "read"
-
-    def test_plan_maps_to_read(self):
-        assert _WS_PERM_TO_REGISTRY["plan"] == "read"
-
-    def test_write_maps_to_write(self):
-        assert _WS_PERM_TO_REGISTRY["write"] == "write"
-
-    def test_admin_maps_to_admin(self):
-        assert _WS_PERM_TO_REGISTRY["admin"] == "admin"
-
-
 # ── resolve_registry_permission ────────────────────────────────────────
 
 
@@ -73,9 +55,13 @@ def _mock_db_with_roles(roles=None):
     return db
 
 
+_WS_TO_REG = {"read": "read", "plan": "read", "write": "write", "admin": "admin"}
+
+
 def _mock_role(
     name,
     workspace_permission="read",
+    registry_permission=None,
     allow_labels=None,
     allow_names=None,
     deny_labels=None,
@@ -84,6 +70,10 @@ def _mock_role(
     role = MagicMock()
     role.name = name
     role.workspace_permission = workspace_permission
+    # Default registry level to mirror workspace_permission unless set explicitly.
+    role.registry_permission = (
+        registry_permission if registry_permission is not None else _WS_TO_REG[workspace_permission]
+    )
     role.allow_labels = allow_labels or {}
     role.allow_names = allow_names or []
     role.deny_labels = deny_labels or {}
@@ -117,7 +107,7 @@ class TestResolveRegistryPermission:
     async def test_custom_role_label_match(self):
         role = _mock_role(
             "mod-team",
-            workspace_permission="write",
+            registry_permission="write",
             allow_labels={"team": ["platform"]},
         )
         db = _mock_db_with_roles([role])
@@ -126,11 +116,13 @@ class TestResolveRegistryPermission:
         )
         assert result == "write"
 
-    async def test_plan_permission_maps_to_read(self):
-        """A role with workspace_permission='plan' grants registry 'read'."""
+    async def test_uses_registry_permission_not_workspace(self):
+        """The registry level is the role's registry_permission, independent of
+        workspace_permission (the old derive-from-workspace mapping is gone)."""
         role = _mock_role(
             "plan-role",
-            workspace_permission="plan",
+            workspace_permission="admin",
+            registry_permission="read",
             allow_names=["my-module"],
         )
         db = _mock_db_with_roles([role])

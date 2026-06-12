@@ -103,6 +103,9 @@ class Role(Base):
     pool_permission: Mapped[str] = mapped_column(
         String(20), nullable=False, default="read", server_default="read"
     )  # read, write, admin
+    registry_permission: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="read", server_default="read"
+    )  # read, write, admin — modules + providers share this
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False

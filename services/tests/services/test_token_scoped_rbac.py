@@ -44,11 +44,19 @@ def _workspace(*, name="ws-1", labels=None, owner_email=None):
     return ws
 
 
-def _role(*, name, workspace_permission="read", pool_permission="read", allow_names=None):
+def _role(
+    *,
+    name,
+    workspace_permission="read",
+    pool_permission="read",
+    registry_permission="read",
+    allow_names=None,
+):
     role = MagicMock()
     role.name = name
     role.workspace_permission = workspace_permission
     role.pool_permission = pool_permission
+    role.registry_permission = registry_permission
     role.allow_labels = {}
     role.allow_names = allow_names or []
     role.deny_labels = {}
@@ -232,7 +240,7 @@ class TestPoolAndRegistryForResolution:
         assert perm == "write"
 
     async def test_registry_detached_pinned_only(self):
-        writer = _role(name="mod-writer", workspace_permission="write", allow_names=["mod-1"])
+        writer = _role(name="mod-writer", registry_permission="write", allow_names=["mod-1"])
         db = _db_with_roles([writer])
         u = _user(email="", roles=[], kind="service_detached", pinned=["mod-writer"])
         perm = await registry_rbac_service.resolve_registry_permission_for(

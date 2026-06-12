@@ -24,7 +24,7 @@ func newRoleFixture(t *testing.T) (*Client, *[]byte) {
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"name":"sre","type":"roles","attributes":{
 			  "description":"SRE team",
-			  "workspace-permission":"admin","pool-permission":"admin",
+			  "workspace-permission":"admin","pool-permission":"admin","registry-permission":"write",
 			  "allow-labels":{"team":"sre"},"allow-names":["prod-*"],
 			  "deny-labels":{},"deny-names":[],
 			  "built-in":false
@@ -65,6 +65,7 @@ func TestCreateRole_FullShape(t *testing.T) {
 		Description:         "SRE team",
 		WorkspacePermission: "admin",
 		PoolPermission:      "admin",
+		RegistryPermission:  "write",
 		AllowLabels:         map[string]string{"team": "sre"},
 		AllowNames:          []string{"prod-*"},
 	})
@@ -73,6 +74,9 @@ func TestCreateRole_FullShape(t *testing.T) {
 	}
 	if r.Name != "sre" || r.AllowLabels["team"] != "sre" || r.WorkspacePermission != "admin" {
 		t.Errorf("role: %+v", r)
+	}
+	if r.RegistryPermission != "write" {
+		t.Errorf("registry-permission not parsed: %+v", r)
 	}
 	// Body shape — "name" at data level, attributes contain the rest.
 	var req struct {
@@ -88,6 +92,9 @@ func TestCreateRole_FullShape(t *testing.T) {
 	}
 	if req.Data.Attributes["workspace-permission"] != "admin" {
 		t.Errorf("workspace-permission missing: %+v", req.Data.Attributes)
+	}
+	if req.Data.Attributes["registry-permission"] != "write" {
+		t.Errorf("registry-permission not sent: %+v", req.Data.Attributes)
 	}
 }
 

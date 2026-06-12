@@ -2019,6 +2019,8 @@ POST /api/terrapod/v1/roles
       "name": "developer",
       "description": "Development workspace access",
       "workspace-permission": "write",
+      "pool-permission": "read",
+      "registry-permission": "read",
       "allow-labels": {"env": "dev"},
       "allow-names": [],
       "deny-labels": {},
@@ -2027,6 +2029,8 @@ POST /api/terrapod/v1/roles
   }
 }
 ```
+
+A role carries three independent permission scalars: `workspace-permission` (`read`/`plan`/`write`/`admin`), `pool-permission` (`read`/`write`/`admin`), and `registry-permission` (`read`/`write`/`admin`, covering both modules and providers). All default to `read`. `registry-permission` is independent of `workspace-permission`, so a role can grant registry write (e.g. provider-publish CI) without any workspace access.
 
 **Required permission:** Platform `admin`.
 

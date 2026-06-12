@@ -29,9 +29,11 @@ Modules and providers use a similar three-level hierarchy (no "plan" concept):
 | **write** | read + create versions, upload artifacts |
 | **admin** | write + update/delete module/provider, change labels |
 
-A role's `workspace_permission` maps to registry permissions: `plan` maps to `read`.
+Each custom role has its own `registry_permission` field (default: `read`), **independent of `workspace_permission`** — so a role can grant registry write (e.g. for provider-publish CI) without granting any workspace access. Modules and providers share this single field. Resolution order mirrors workspaces (platform admin → audit → owner → label RBAC → `access: everyone` floor → none).
 
-**Runner tokens** receive implicit `read` access to all registry modules and providers. This allows runner Jobs to download modules and providers during `terraform init` without requiring explicit label-based permissions on each registry resource.
+> Earlier versions derived the registry level from `workspace_permission`. That mapping was removed in favour of the dedicated field; on upgrade, every existing role's `registry_permission` is backfilled from its `workspace_permission` (read/plan→read, write→write, admin→admin), so no role's effective access changes.
+
+**Runner tokens** receive implicit `read` access to all registry modules and providers, regardless of any role's `registry_permission`. This is resolved from the runner's auth method (not its roles), so runner Jobs can download modules and providers during `terraform init` without explicit label-based permissions on each registry resource.
 
 ### Pool Permission Levels
 
