@@ -42,9 +42,11 @@ def run(script: str, *, env: dict[str, str] | None = None) -> None:
     # prep) before plan/apply. Source is the workspace's TP_SETUP_SCRIPT
     # field, only writable by users with workspace `admin`; the runner's
     # auth boundary, not subprocess flags, is what gates this.
-    result = subprocess.run(  # noqa: S602  # nosemgrep: python.lang.security.audit.subprocess-shell-true.subprocess-shell-true
+    result = subprocess.run(  # noqa: S602
         script,
-        shell=True,
+        # Semgrep matches this rule on the shell=True argument, so the
+        # suppression must sit on this line (not the subprocess.run() line).
+        shell=True,  # nosemgrep: python.lang.security.audit.subprocess-shell-true.subprocess-shell-true
         check=False,
         env=env,
     )

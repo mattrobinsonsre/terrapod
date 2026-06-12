@@ -100,8 +100,6 @@ async def _apply_drift_ignore_rules(run: Run, rules: list[str]) -> str:
     `"drifted"` so a runtime hiccup never *silences* drift the
     operator intended to surface.
     """
-    import json
-
     from terrapod.services.drift_ignore_classifier import classify_drift
     from terrapod.storage import get_storage
     from terrapod.storage.keys import plan_json_output_key
