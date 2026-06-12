@@ -94,15 +94,16 @@ async def test_create_service_bound(mock_create, *_):
 
 
 @_app_patched
-async def test_create_detached_gated_422(*_):
-    app = _make_app(_user(roles=["admin"]))
+async def test_create_detached_non_admin_403(*_):
+    # Detached tokens are admin-only and unbound; a non-admin is refused.
+    app = _make_app(_user())  # no admin role
     async with _client(app) as c:
         r = await c.post(
             "/api/terrapod/v1/users/dev/authentication-tokens",
             json={"data": {"attributes": {"kind": "service_detached"}}},
             headers={"Authorization": "Bearer x"},
         )
-    assert r.status_code == 422
+    assert r.status_code == 403
 
 
 @_app_patched
@@ -224,16 +225,18 @@ async def test_expiring_caller_scoped(mock_expiring, *_):
 
 @_app_patched
 @patch("terrapod.api.routers.tokens.get_token_by_id")
-async def test_retag_to_detached_gated_422(mock_get, *_):
+async def test_retag_to_detached_non_admin_403(mock_get, *_):
+    # Converting a token TO detached is admin-only — even the token's own
+    # owner can't self-promote it to an unbound detached token.
     mock_get.return_value = _token_mock(kind="interactive", bound_to="dev@example.com")
-    app = _make_app(_user(roles=["admin"]))
+    app = _make_app(_user())  # owner of the token, but not admin
     async with _client(app) as c:
         r = await c.patch(
             "/api/terrapod/v1/authentication-tokens/at-svc",
             json={"data": {"attributes": {"kind": "service_detached"}}},
             headers={"Authorization": "Bearer x"},
         )
-    assert r.status_code == 422
+    assert r.status_code == 403
 
 
 def test_no_token_path_under_api_v2():

@@ -72,7 +72,7 @@ class TestListVariables:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.variables.variable_service.list_variables")
-    @patch("terrapod.api.routers.variables.resolve_workspace_permission")
+    @patch("terrapod.api.routers.variables.resolve_workspace_permission_for")
     async def test_list_with_read_perm(self, mock_resolve, mock_list, *mocks):
         mock_resolve.return_value = "read"
         ws = _mock_workspace()
@@ -96,7 +96,7 @@ class TestListVariables:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.variables.variable_service.list_variables")
-    @patch("terrapod.api.routers.variables.resolve_workspace_permission")
+    @patch("terrapod.api.routers.variables.resolve_workspace_permission_for")
     async def test_sensitive_values_masked(self, mock_resolve, mock_list, *mocks):
         mock_resolve.return_value = "read"
         ws = _mock_workspace()
@@ -117,7 +117,7 @@ class TestListVariables:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.variables.resolve_workspace_permission")
+    @patch("terrapod.api.routers.variables.resolve_workspace_permission_for")
     async def test_list_no_permission_returns_403(self, mock_resolve, *mocks):
         mock_resolve.return_value = None
         ws = _mock_workspace()
@@ -139,7 +139,7 @@ class TestCreateVariable:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.variables.variable_service.create_variable")
-    @patch("terrapod.api.routers.variables.resolve_workspace_permission")
+    @patch("terrapod.api.routers.variables.resolve_workspace_permission_for")
     async def test_create_with_write_perm(self, mock_resolve, mock_create, *mocks):
         mock_resolve.return_value = "write"
         ws = _mock_workspace()
@@ -170,7 +170,7 @@ class TestCreateVariable:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.variables.resolve_workspace_permission")
+    @patch("terrapod.api.routers.variables.resolve_workspace_permission_for")
     async def test_create_missing_key_returns_422(self, mock_resolve, *mocks):
         mock_resolve.return_value = "write"
         ws = _mock_workspace()
@@ -190,7 +190,7 @@ class TestCreateVariable:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.variables.resolve_workspace_permission")
+    @patch("terrapod.api.routers.variables.resolve_workspace_permission_for")
     async def test_create_read_only_returns_403(self, mock_resolve, *mocks):
         mock_resolve.return_value = "read"
         ws = _mock_workspace()
@@ -211,7 +211,7 @@ class TestCreateVariable:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.variables.variable_service.create_variable")
-    @patch("terrapod.api.routers.variables.resolve_workspace_permission")
+    @patch("terrapod.api.routers.variables.resolve_workspace_permission_for")
     async def test_create_encryption_error_returns_422(self, mock_resolve, mock_create, *mocks):
         mock_resolve.return_value = "write"
         mock_create.side_effect = ValueError("encryption not configured")
@@ -239,7 +239,7 @@ class TestUpdateVariable:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.variables.variable_service.update_variable")
     @patch("terrapod.api.routers.variables.variable_service.get_variable")
-    @patch("terrapod.api.routers.variables.resolve_workspace_permission")
+    @patch("terrapod.api.routers.variables.resolve_workspace_permission_for")
     async def test_update_with_write_perm(self, mock_resolve, mock_get, mock_update, *mocks):
         mock_resolve.return_value = "write"
         ws = _mock_workspace()
@@ -264,7 +264,7 @@ class TestUpdateVariable:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.variables.variable_service.get_variable")
-    @patch("terrapod.api.routers.variables.resolve_workspace_permission")
+    @patch("terrapod.api.routers.variables.resolve_workspace_permission_for")
     async def test_update_not_found_returns_404(self, mock_resolve, mock_get, *mocks):
         mock_resolve.return_value = "write"
         mock_get.return_value = None
@@ -292,7 +292,7 @@ class TestDeleteVariable:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.variables.variable_service.delete_variable")
     @patch("terrapod.api.routers.variables.variable_service.get_variable")
-    @patch("terrapod.api.routers.variables.resolve_workspace_permission")
+    @patch("terrapod.api.routers.variables.resolve_workspace_permission_for")
     async def test_delete_with_write_perm(self, mock_resolve, mock_get, mock_delete, *mocks):
         mock_resolve.return_value = "write"
         ws = _mock_workspace()

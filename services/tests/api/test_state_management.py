@@ -82,7 +82,7 @@ class TestDeleteStateVersion:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
     @patch("terrapod.api.routers.state_management.get_storage")
-    @patch("terrapod.api.routers.state_management.resolve_workspace_permission")
+    @patch("terrapod.api.routers.state_management.resolve_workspace_permission_for")
     async def test_delete_non_current_state_version(
         self,
         mock_resolve,
@@ -126,7 +126,7 @@ class TestDeleteStateVersion:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.state_management.resolve_workspace_permission")
+    @patch("terrapod.api.routers.state_management.resolve_workspace_permission_for")
     async def test_delete_current_state_version_rejected(
         self,
         mock_resolve,
@@ -162,7 +162,7 @@ class TestDeleteStateVersion:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.state_management.resolve_workspace_permission")
+    @patch("terrapod.api.routers.state_management.resolve_workspace_permission_for")
     async def test_delete_state_requires_admin(
         self,
         mock_resolve,
@@ -203,7 +203,7 @@ class TestRollbackStateVersion:
     @patch("terrapod.api.metrics.STATE_VERSIONS_CREATED")
     @patch("terrapod.api.routers.tfe_v2._state_version_json")
     @patch("terrapod.api.routers.state_management.get_storage")
-    @patch("terrapod.api.routers.state_management.resolve_workspace_permission")
+    @patch("terrapod.api.routers.state_management.resolve_workspace_permission_for")
     async def test_rollback_creates_new_version(
         self,
         mock_resolve,
@@ -255,7 +255,7 @@ class TestRollbackStateVersion:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.state_management.get_storage")
-    @patch("terrapod.api.routers.state_management.resolve_workspace_permission")
+    @patch("terrapod.api.routers.state_management.resolve_workspace_permission_for")
     async def test_rollback_missing_storage_returns_404(
         self,
         mock_resolve,
@@ -301,7 +301,7 @@ class TestUploadState:
     @patch("terrapod.api.metrics.STATE_VERSIONS_CREATED")
     @patch("terrapod.api.routers.tfe_v2._state_version_json")
     @patch("terrapod.api.routers.state_management.get_storage")
-    @patch("terrapod.api.routers.state_management.resolve_workspace_permission")
+    @patch("terrapod.api.routers.state_management.resolve_workspace_permission_for")
     @patch("terrapod.api.routers.tfe_v2._get_workspace_by_id")
     async def test_upload_state_manual(
         self,
@@ -350,7 +350,7 @@ class TestUploadState:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.state_management.resolve_workspace_permission")
+    @patch("terrapod.api.routers.state_management.resolve_workspace_permission_for")
     @patch("terrapod.api.routers.tfe_v2._get_workspace_by_id")
     async def test_upload_state_requires_write(
         self,
@@ -381,7 +381,7 @@ class TestUploadState:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.state_management.resolve_workspace_permission")
+    @patch("terrapod.api.routers.state_management.resolve_workspace_permission_for")
     @patch("terrapod.api.routers.tfe_v2._get_workspace_by_id")
     async def test_upload_invalid_json_returns_400(
         self,
@@ -478,7 +478,7 @@ class TestRunDetailStateVersion:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_show_run_includes_state_version(
         self,

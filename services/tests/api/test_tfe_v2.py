@@ -102,12 +102,15 @@ class TestAccountDetails:
     async def test_account_details_api_token_is_service_account(
         self, mock_init_db, mock_init_redis, mock_init_storage
     ):
+        # A service-kind token (service_bound/service_detached) is a service
+        # account; an interactive token (terraform login) is not (#495).
         user = AuthenticatedUser(
             email="bot@example.com",
             display_name=None,
             roles=[],
             provider_name="api_token",
             auth_method="api_token",
+            kind="service_bound",
         )
         app = _make_app_with_auth(user)
 

@@ -160,7 +160,7 @@ class TestShowWorkspace:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_show_by_name(self, mock_resolve, *mocks):
         mock_resolve.return_value = "read"
         ws = _mock_workspace(name="test-ws")
@@ -183,7 +183,7 @@ class TestShowWorkspace:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_show_no_permission_returns_404(self, mock_resolve, *mocks):
         """TFE behavior: workspace invisible (404) when no permission, not 403."""
         mock_resolve.return_value = None
@@ -224,7 +224,7 @@ class TestShowWorkspaceById:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_show_by_id_with_read(self, mock_resolve, *mocks):
         mock_resolve.return_value = "read"
         ws = _mock_workspace()
@@ -245,7 +245,7 @@ class TestShowWorkspaceById:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_show_by_id_no_permission_returns_403(self, mock_resolve, *mocks):
         mock_resolve.return_value = None
         ws = _mock_workspace()
@@ -266,7 +266,7 @@ class TestUpdateWorkspace:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_update_requires_admin(self, mock_resolve, *mocks):
         mock_resolve.return_value = "write"  # not admin
         ws = _mock_workspace()
@@ -286,7 +286,7 @@ class TestUpdateWorkspace:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_update_owner_requires_platform_admin(self, mock_resolve, *mocks):
         """owner-email change requires platform admin, not just workspace admin."""
         mock_resolve.return_value = "admin"
@@ -314,7 +314,7 @@ class TestDeleteWorkspace:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_delete_with_admin_returns_204(self, mock_resolve, *mocks):
         mock_resolve.return_value = "admin"
         ws = _mock_workspace()
@@ -330,7 +330,7 @@ class TestDeleteWorkspace:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_delete_without_admin_returns_403(self, mock_resolve, *mocks):
         mock_resolve.return_value = "write"
         ws = _mock_workspace()
@@ -351,7 +351,7 @@ class TestLockWorkspace:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_lock_with_plan_permission(self, mock_resolve, *mocks):
         mock_resolve.return_value = "plan"
         ws = _mock_workspace(locked=False)
@@ -372,7 +372,7 @@ class TestLockWorkspace:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_lock_already_locked_returns_409(self, mock_resolve, *mocks):
         mock_resolve.return_value = "plan"
         ws = _mock_workspace(locked=True, lock_id="lock-other@test.com")
@@ -391,7 +391,7 @@ class TestLockWorkspace:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_lock_read_only_returns_403(self, mock_resolve, *mocks):
         mock_resolve.return_value = "read"
         ws = _mock_workspace()
@@ -412,7 +412,7 @@ class TestUnlockWorkspace:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_unlock_own_lock(self, mock_resolve, *mocks):
         mock_resolve.return_value = "plan"
         ws = _mock_workspace(locked=True, lock_id="lock-test@example.com")
@@ -433,7 +433,7 @@ class TestUnlockWorkspace:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_force_unlock_requires_admin(self, mock_resolve, *mocks):
         """Non-admin with plan perm can't force-unlock another user's lock."""
         mock_resolve.return_value = "plan"
@@ -453,7 +453,7 @@ class TestUnlockWorkspace:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_admin_can_force_unlock(self, mock_resolve, *mocks):
         mock_resolve.return_value = "admin"
         ws = _mock_workspace(locked=True, lock_id="lock-other@test.com")
@@ -478,7 +478,7 @@ class TestPermissionsBlock:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_read_user_permissions(self, mock_resolve, *mocks):
         """Read permission: can read, but not update/destroy/queue."""
         mock_resolve.return_value = "read"
@@ -504,7 +504,7 @@ class TestPermissionsBlock:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_admin_user_permissions(self, mock_resolve, *mocks):
         mock_resolve.return_value = "admin"
         ws = _mock_workspace()
@@ -564,7 +564,7 @@ class TestWorkspaceTagBindings:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_returns_labels_as_bindings(self, mock_resolve, *mocks):
         mock_resolve.return_value = "read"
         ws = _mock_workspace(labels={"repo": "infra-core", "env": "dev"})
@@ -593,7 +593,7 @@ class TestWorkspaceTagBindings:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_empty_labels_returns_empty_array(self, mock_resolve, *mocks):
         mock_resolve.return_value = "read"
         ws = _mock_workspace(labels={})
@@ -612,7 +612,7 @@ class TestWorkspaceTagBindings:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_no_permission_blocks_access(self, mock_resolve, *mocks):
         mock_resolve.return_value = None
         ws = _mock_workspace()
@@ -630,7 +630,7 @@ class TestWorkspaceTagBindings:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_effective_tag_bindings_mirrors_workspace_bindings(self, mock_resolve, *mocks):
         # Terrapod has no project hierarchy, so effective bindings == workspace bindings
         mock_resolve.return_value = "read"
@@ -764,7 +764,7 @@ class TestVcsWorkflowAttributes:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_default_workspace_serializes_default_workflow(self, mock_resolve, *_mocks):
         """Default-mode regression: an existing workspace serializes with the
         new attributes at default values. Frontend / providers must see the
@@ -790,7 +790,7 @@ class TestVcsWorkflowAttributes:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_invalid_workflow_value_rejected(self, mock_resolve, *_mocks):
         mock_resolve.return_value = "admin"
         ws = _mock_workspace()
@@ -812,7 +812,7 @@ class TestVcsWorkflowAttributes:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_apply_then_merge_requires_vcs_connection(self, mock_resolve, *_mocks):
         mock_resolve.return_value = "admin"
         ws = _mock_workspace()  # no VCS connection
@@ -833,7 +833,7 @@ class TestVcsWorkflowAttributes:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_apply_then_merge_incompatible_with_auto_apply(self, mock_resolve, *_mocks):
         mock_resolve.return_value = "admin"
         ws = _mock_workspace(auto_apply=True)
@@ -855,7 +855,7 @@ class TestVcsWorkflowAttributes:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_combined_flip_off_auto_apply_and_into_apply_then_merge_succeeds(
         self, mock_resolve, *_mocks
     ):
@@ -892,7 +892,7 @@ class TestVcsWorkflowAttributes:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_workflow_flip_blocked_by_active_pr_runs(self, mock_resolve, *_mocks):
         """Q4 of the design: cannot flip vcs-workflow with PR runs in flight.
         Operator must cancel/discard them first."""
@@ -922,7 +922,7 @@ class TestVcsWorkflowAttributes:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_invalid_auto_merge_strategy_rejected(self, mock_resolve, *_mocks):
         mock_resolve.return_value = "admin"
         ws = _mock_workspace()
@@ -943,7 +943,7 @@ class TestVcsWorkflowAttributes:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_auto_merge_toggle_persists(self, mock_resolve, *_mocks):
         mock_resolve.return_value = "admin"
         ws = _mock_workspace()

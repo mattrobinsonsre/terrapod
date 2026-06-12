@@ -99,7 +99,7 @@ class TestCreateRunTask:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission")
+    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission_for")
     async def test_create(self, mock_resolve, *mocks):
         """Create run task → 201."""
         mock_resolve.return_value = "admin"
@@ -134,7 +134,7 @@ class TestCreateRunTask:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission")
+    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission_for")
     async def test_create_invalid_stage(self, mock_resolve, *mocks):
         """Invalid stage → 422."""
         mock_resolve.return_value = "admin"
@@ -166,7 +166,7 @@ class TestCreateRunTask:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission")
+    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission_for")
     async def test_create_requires_admin(self, mock_resolve, *mocks):
         """Write permission → 403."""
         mock_resolve.return_value = "write"
@@ -197,7 +197,7 @@ class TestCreateRunTask:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission")
+    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission_for")
     async def test_create_missing_url(self, mock_resolve, *mocks):
         """Missing url → 422."""
         mock_resolve.return_value = "admin"
@@ -233,7 +233,7 @@ class TestListRunTasks:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission")
+    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission_for")
     async def test_list(self, mock_resolve, *mocks):
         """List returns tasks. Read permission sufficient."""
         mock_resolve.return_value = "read"
@@ -265,7 +265,7 @@ class TestShowRunTask:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission")
+    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission_for")
     async def test_show(self, mock_resolve, *mocks):
         mock_resolve.return_value = "read"
         rt = _mock_run_task()
@@ -310,7 +310,7 @@ class TestUpdateRunTask:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission")
+    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission_for")
     async def test_update_name(self, mock_resolve, *mocks):
         """PATCH updates name → 200."""
         mock_resolve.return_value = "admin"
@@ -338,7 +338,7 @@ class TestUpdateRunTask:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission")
+    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission_for")
     async def test_update_requires_admin(self, mock_resolve, *mocks):
         """Write permission → 403."""
         mock_resolve.return_value = "write"
@@ -365,7 +365,7 @@ class TestDeleteRunTask:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission")
+    @patch("terrapod.api.routers.run_tasks.resolve_workspace_permission_for")
     async def test_delete(self, mock_resolve, *mocks):
         """Admin can delete → 204."""
         mock_resolve.return_value = "admin"

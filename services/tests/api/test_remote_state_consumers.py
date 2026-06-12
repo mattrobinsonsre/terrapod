@@ -154,7 +154,7 @@ class TestRunnerAuthzWiring:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     @patch("terrapod.api.routers.tfe_v2._get_workspace_by_id", new_callable=AsyncMock)
     @patch("terrapod.api.routers.tfe_v2._runner_state_read_allowed", new_callable=AsyncMock)
     async def test_current_state_version_grants_when_helper_returns_true(
@@ -192,7 +192,7 @@ class TestRunnerAuthzWiring:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     @patch("terrapod.api.routers.tfe_v2._get_workspace_by_id", new_callable=AsyncMock)
     @patch("terrapod.api.routers.tfe_v2._runner_state_read_allowed", new_callable=AsyncMock)
     async def test_current_state_version_falls_through_and_denies_runner(
@@ -221,7 +221,7 @@ class TestRunnerAuthzWiring:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     @patch("terrapod.api.routers.tfe_v2._runner_state_read_allowed", new_callable=AsyncMock)
     async def test_download_state_falls_through_and_denies_runner(self, m_helper, m_resolve, *_):
         """Same wiring guarantee for the download endpoint — helper
@@ -259,7 +259,7 @@ class TestCreateConsumer:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
     @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
     async def test_create_happy_path(self, mock_publish, mock_resolve, *_):
         """Admin on producer → 201, and the response JSON carries the
@@ -325,7 +325,7 @@ class TestCreateConsumer:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
     async def test_create_requires_producer_admin(self, mock_resolve, *_):
         """Read on producer is not enough — mutation requires admin."""
         mock_resolve.return_value = "read"
@@ -349,7 +349,7 @@ class TestCreateConsumer:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
     async def test_create_self_reference_rejected(self, mock_resolve, *_):
         """A workspace listing itself is meaningless (already reads own state)."""
         mock_resolve.return_value = "admin"
@@ -370,7 +370,7 @@ class TestCreateConsumer:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
     async def test_create_duplicate_rejected(self, mock_resolve, *_):
         mock_resolve.return_value = "admin"
         producer = _mock_ws(name="producer")
@@ -399,7 +399,7 @@ class TestListConsumers:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
     async def test_list_outbound_default(self, mock_resolve, *_):
         """No filter ⇒ outbound (workspaces I share to)."""
         mock_resolve.return_value = "read"
@@ -422,7 +422,7 @@ class TestListConsumers:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
     async def test_list_invalid_filter_rejected(self, mock_resolve, *_):
         mock_resolve.return_value = "read"
         producer = _mock_ws()
@@ -444,7 +444,7 @@ class TestDeleteConsumer:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
     async def test_delete_happy(self, mock_resolve, *_):
         """Admin on producer → 204."""
         mock_resolve.return_value = "admin"
@@ -467,7 +467,7 @@ class TestDeleteConsumer:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
     async def test_delete_requires_producer_admin(self, mock_resolve, *_):
         """A consumer (or any non-admin) cannot revoke their own grant
         — only the producer's admin may delete an edge."""

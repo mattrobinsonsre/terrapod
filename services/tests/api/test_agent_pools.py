@@ -213,7 +213,7 @@ class TestListPoolsRBAC:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.list_pools", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     @patch(
@@ -250,7 +250,7 @@ class TestListPoolsRBAC:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.list_pools", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     @patch(
@@ -287,7 +287,7 @@ class TestPoolStatus:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.list_pools", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     @patch(
@@ -321,7 +321,7 @@ class TestPoolStatus:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.list_pools", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     @patch(
@@ -349,7 +349,7 @@ class TestPoolStatus:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_show_pool_includes_status(
@@ -443,7 +443,7 @@ class TestDerivePoolStatus:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.list_pools", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     @patch(
@@ -485,7 +485,7 @@ class TestListListenersReplicaCount:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_listeners_carry_replica_count(
@@ -526,7 +526,7 @@ class TestListListenersReplicaCount:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_replica_count_omitted_when_listener_does_not_track_pods(
@@ -565,7 +565,7 @@ class TestListListenersReplicaCount:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_replica_count_included_for_mixed_listeners(
@@ -608,7 +608,7 @@ class TestShowPoolRBAC:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_show_pool_with_read(
@@ -637,7 +637,7 @@ class TestShowPoolRBAC:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_show_pool_no_access_returns_404(self, mock_resolve, mock_get_pool, *mocks):
@@ -733,7 +733,7 @@ class TestUpdatePoolRBAC:
     @patch("terrapod.services.agent_pool_service.update_pool", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_update_pool_with_labels(self, mock_resolve, mock_get_pool, mock_update, *mocks):
@@ -768,7 +768,7 @@ class TestUpdatePoolRBAC:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_update_pool_write_only_returns_403(self, mock_resolve, mock_get_pool, *mocks):
@@ -803,7 +803,7 @@ class TestDeletePoolRBAC:
     )
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_delete_pool_with_admin(
@@ -829,7 +829,7 @@ class TestDeletePoolRBAC:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_delete_pool_no_access_returns_404(self, mock_resolve, mock_get_pool, *mocks):
@@ -856,7 +856,7 @@ class TestTokenEndpointRBAC:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_list_tokens_read_only_returns_403(self, mock_resolve, mock_get_pool, *mocks):
@@ -880,7 +880,7 @@ class TestTokenEndpointRBAC:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_create_token_read_only_returns_403(self, mock_resolve, mock_get_pool, *mocks):
@@ -910,7 +910,7 @@ class TestUpdatePoolSelfLockout:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_label_change_reducing_access_returns_409(
@@ -942,7 +942,7 @@ class TestUpdatePoolSelfLockout:
     @patch("terrapod.services.agent_pool_service.update_pool", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_force_bypasses_lockout_check(
@@ -975,7 +975,7 @@ class TestUpdatePoolSelfLockout:
     @patch("terrapod.services.agent_pool_service.update_pool", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_platform_admin_immune_to_lockout(
@@ -1016,7 +1016,7 @@ class TestDeleteListenerRBAC:
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_listener")
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_delete_listener_with_pool_admin(
@@ -1043,7 +1043,7 @@ class TestDeleteListenerRBAC:
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_listener")
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission",
+        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
         new_callable=AsyncMock,
     )
     async def test_delete_listener_read_only_returns_403(

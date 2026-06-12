@@ -127,7 +127,7 @@ class TestGetPlanSummary:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
     async def test_returns_summary_when_present(self, mock_resolve, *mocks):
         mock_resolve.return_value = "read"
         run = _mock_run()
@@ -159,7 +159,7 @@ class TestGetPlanSummary:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
     async def test_returns_404_when_no_summary(self, mock_resolve, *mocks):
         mock_resolve.return_value = "read"
         run = _mock_run()
@@ -182,7 +182,7 @@ class TestGetPlanSummary:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
     async def test_plan_response_includes_ai_summary_url(self, mock_resolve, *mocks):
         """GET /plans/{id} advertises the ai-summary-url even when no row exists yet."""
         mock_resolve.return_value = "read"
@@ -208,7 +208,7 @@ class TestGetPlanSummary:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
     async def test_plan_response_omits_ai_summary_url_when_disabled(self, mock_resolve, *mocks):
         """AI globally disabled → plan response carries no ai-summary-url
         so the UI doesn't fetch /plan-summary and waste a round-trip
@@ -240,7 +240,7 @@ class TestWorkspaceAISummaryFields:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_get_includes_ai_summary_fields(self, mock_resolve, *mocks):
         mock_resolve.return_value = "read"
         ws = _mock_workspace(ai_summary_mode="enabled", ai_summary_context="vault prod")
@@ -263,7 +263,7 @@ class TestWorkspaceAISummaryFields:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_patch_accepts_valid_mode(self, mock_resolve, *mocks):
         mock_resolve.return_value = "admin"
         ws = _mock_workspace()
@@ -294,7 +294,7 @@ class TestWorkspaceAISummaryFields:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_patch_rejects_invalid_mode(self, mock_resolve, *mocks):
         mock_resolve.return_value = "admin"
         ws = _mock_workspace()
@@ -315,7 +315,7 @@ class TestWorkspaceAISummaryFields:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_patch_rejects_oversize_context(self, mock_resolve, *mocks):
         mock_resolve.return_value = "admin"
         ws = _mock_workspace()
@@ -336,7 +336,7 @@ class TestWorkspaceAISummaryFields:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
     async def test_patch_rejects_non_string_context(self, mock_resolve, *mocks):
         mock_resolve.return_value = "admin"
         ws = _mock_workspace()
@@ -367,7 +367,7 @@ class TestRegeneratePlanSummary:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
     @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
     async def test_regenerate_planned_run_returns_202_and_enqueues(
         self, mock_enq, mock_resolve, *_mocks
@@ -417,7 +417,7 @@ class TestRegeneratePlanSummary:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
     @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
     async def test_regenerate_plan_phase_errored_picks_failure_analysis(
         self, mock_enq, mock_resolve, *_mocks
@@ -456,7 +456,7 @@ class TestRegeneratePlanSummary:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
     @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
     async def test_regenerate_apply_phase_errored_picks_failure_analysis(
         self, mock_enq, mock_resolve, *_mocks
@@ -499,7 +499,7 @@ class TestRegeneratePlanSummary:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
     @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
     async def test_regenerate_409_when_no_summary_kind_applies(
         self, mock_enq, mock_resolve, *_mocks
@@ -558,7 +558,7 @@ class TestRegeneratePlanSummary:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
     @patch("terrapod.services.scheduler.enqueue_trigger", new_callable=AsyncMock)
     async def test_regenerate_403_when_no_workspace_read(self, mock_enq, mock_resolve, *_mocks):
         """No workspace read → 403 (the permission helper raises)."""
