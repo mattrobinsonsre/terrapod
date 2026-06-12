@@ -16,9 +16,22 @@ test.describe('API Tokens', () => {
     // Submit button inside form says "Create"
     await page.click('button[type="submit"]:has-text("Create")');
 
-    // Success banner should show the raw token (shared by create + rotate).
+    // Success banner appears (shared by create + rotate).
     await expect(page.locator('text=Token ready')).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator('code')).toBeVisible();
+    const code = page.locator('code').first();
+    await expect(code).toBeVisible();
+
+    // The secret is masked by default — the raw value (…tpod…) is not shown.
+    await expect(code).not.toContainText('tpod');
+    // Show reveals it; Hide masks it again.
+    await page.click('button:has-text("Show")');
+    await expect(code).toContainText('.tpod.');
+    await page.click('button:has-text("Hide")');
+    await expect(code).not.toContainText('tpod');
+
+    // The banner can be dismissed.
+    await page.click('button[aria-label="Dismiss token"]');
+    await expect(page.locator('text=Token ready')).not.toBeVisible();
   });
 
   test('new token appears in table with a Kind column', async ({ page }) => {
