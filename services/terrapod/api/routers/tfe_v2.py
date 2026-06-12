@@ -1694,7 +1694,6 @@ def _request_base_url(request: Request | None) -> str:
         proto = request.headers.get("x-forwarded-proto") or request.url.scheme
         candidate = xfh.split(",", 1)[0].strip()
         if _is_safe_host(candidate) and _is_safe_scheme(proto):
-            # nosemgrep: python.flask.security.audit.directly-returned-format-string.directly-returned-format-string
             return f"{proto}://{candidate}"  # both parts validated above
         return fallback
     host = request.headers.get("host")
@@ -1704,7 +1703,6 @@ def _request_base_url(request: Request | None) -> str:
         # so the scheme reflects what FastAPI saw on the wire.
         scheme = request.url.scheme
         if _is_safe_scheme(scheme):
-            # nosemgrep: python.flask.security.audit.directly-returned-format-string.directly-returned-format-string
             return f"{scheme}://{host}"  # both parts validated above
     return fallback
 
