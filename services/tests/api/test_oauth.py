@@ -184,6 +184,10 @@ class TestOAuthToken:
         data = response.json()
         assert data["access_token"] == "raw-token.tpod.secret"
         assert data["token_type"] == "bearer"
+        # terraform login mints a SHORT-LIVED token, not a max-lifetime one:
+        # the lifespan comes from auth.login_token_ttl_hours (default 12h).
+        assert mock_create_token.call_args.kwargs["kind"] == "interactive"
+        assert mock_create_token.call_args.kwargs["lifespan_hours"] == 12
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

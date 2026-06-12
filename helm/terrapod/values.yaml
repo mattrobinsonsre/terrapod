@@ -161,7 +161,10 @@ api:
       callback_base_url: ""
 
       session_ttl_hours: 12
-      api_token_max_ttl_hours: 8760  # 1 year; 0 = no limit
+      api_token_max_ttl_hours: 8760  # 1 year; upper bound on any token. 0 = no limit
+      # Lifespan of the token minted by `terraform login` — short-lived per-session
+      # CLI credentials, distinct from the max cap above. 0 falls back to the cap.
+      login_token_ttl_hours: 12
       # Service tokens (#495): separate (always-expiring) cap; warning lead time;
       # and the bound-token idle-login window (ON by default; 0 disables).
       service_token_max_ttl_hours: 8760

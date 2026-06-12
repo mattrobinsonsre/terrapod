@@ -507,6 +507,7 @@
             "callback_base_url": { "type": "string" },
             "session_ttl_hours": { "type": "integer", "minimum": 1 },
             "api_token_max_ttl_hours": { "type": "integer", "minimum": 0 },
+            "login_token_ttl_hours": { "type": "integer", "minimum": 0 },
             "service_token_max_ttl_hours": { "type": "integer", "minimum": 0 },
             "token_expiry_warning_days": { "type": "integer", "minimum": 0 },
             "bound_token_idle_days": { "type": "integer", "minimum": 0 },

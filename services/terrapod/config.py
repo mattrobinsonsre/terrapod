@@ -320,6 +320,13 @@ class AuthConfig(BaseSettings):
         "of the tp:user_seen marker. 0 disables idle rejection. Detached tokens are exempt (#495). "
         "ON by default — convert existing automation tokens to detached before upgrade.",
     )
+    login_token_ttl_hours: int = Field(
+        default=12,
+        description="Lifespan in hours of the API token minted by `terraform login` (default: 12). "
+        "These are short-lived interactive credentials for a human's CLI session, distinct from the "
+        "api_token_max_ttl_hours cap (which is the upper bound on any token). Still clamped to that "
+        "cap. 0 = no per-login lifespan (falls back to the cap).",
+    )
     require_external_sso_for_roles: list[str] = Field(
         default_factory=list,
         description="Roles that require external SSO login (excludes local provider)",

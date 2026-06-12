@@ -23,6 +23,7 @@ from terrapod.auth.auth_state import (
     generate_state,
     store_auth_state,
 )
+from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
@@ -149,14 +150,18 @@ async def oauth_token(
             detail="PKCE verification failed",
         )
 
-    # Create a long-lived interactive API token (terraform login). Bound to
-    # the authenticating identity; created_by is the same identity.
+    # Create a short-lived interactive API token (terraform login). Bound to
+    # the authenticating identity; created_by is the same identity. The
+    # lifespan comes from auth.login_token_ttl_hours (default 12h) — these are
+    # per-session CLI credentials, not max-lifetime tokens. 0 falls back to the
+    # api_token_max_ttl_hours cap. create_api_token clamps to that cap either way.
     api_token, raw_token = await create_api_token(
         db=db,
         bound_to=auth_code.email,
         created_by=auth_code.email,
         kind="interactive",
         description=f"terraform login ({auth_code.provider_name})",
+        lifespan_hours=settings.auth.login_token_ttl_hours or None,
     )
     await db.commit()
 

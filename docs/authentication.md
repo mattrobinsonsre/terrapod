@@ -279,6 +279,8 @@ The `terraform login` command uses OAuth2 Authorization Code with PKCE to obtain
 6. Terraform exchanges the code for an API token via `POST /oauth/token`
 7. The token is stored in `~/.terraform.d/credentials.tfrc.json`
 
+The token minted by `terraform login` is **short-lived** — its lifespan is `auth.login_token_ttl_hours` (default **12 hours**), so it expires at the end of a working session rather than living for the full `api_token_max_ttl_hours` cap. Re-run `terraform login` to get a fresh one. For long-lived automation, create a dedicated token (a [service token](#token-kinds--personal-vs-service-tokens) for scoped/M2M use) rather than relying on a login token.
+
 ### Prerequisites
 
 The `callback_base_url` must be set to the externally-reachable URL of the Terrapod instance:
@@ -437,16 +439,20 @@ curl -X DELETE https://terrapod.example.com/api/terrapod/v1/authentication-token
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
-### Max TTL Configuration
+### Token Lifespan Configuration
 
 ```yaml
 api:
   config:
     auth:
-      api_token_max_ttl_hours: 8760  # 1 year (default). Set 0 for no limit
+      api_token_max_ttl_hours: 8760  # upper bound on ANY token. 1 year default; 0 = no limit
+      login_token_ttl_hours: 12      # lifespan of `terraform login` tokens; 0 = fall back to the cap
 ```
 
-The TTL is computed at validation time as `created_at + max_ttl`. Tokens older than this are rejected.
+- **`api_token_max_ttl_hours`** is the hard *cap* — the maximum lifetime any token may have. It's computed at validation time as `(rotated_at or created_at) + max_ttl`, so changing it retroactively re-dates every existing token. `0` removes the cap.
+- **`login_token_ttl_hours`** is the *actual* lifespan handed to the short-lived token that `terraform login` mints (default 12h). It's clamped to the cap. Set `0` to give login tokens no explicit lifespan (they then fall back to the cap — the old behaviour).
+
+A token created with an explicit `lifespan_hours` (e.g. via the API or the create form) expires at `created_at + min(lifespan_hours, cap)`; one created without (a bare `terraform login` before this setting existed) expires at the cap.
 
 ---
 
