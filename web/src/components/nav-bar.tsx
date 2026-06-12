@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Users, Shield, Server, Variable, FileText, BookOpen, Code, LogOut, Menu, X, Tags, Compass, Wrench, ScrollText } from 'lucide-react'
 import { clearAuth, isAdmin, isAdminOrAudit } from '@/lib/auth'
 import { SessionExpiryBanner } from '@/components/session-expiry-banner'
+import { TokenExpiryBanner } from '@/components/token-expiry-banner'
 
 function NavLink({
   href,
@@ -131,6 +132,7 @@ export default function NavBar() {
   return (
     <>
       <SessionExpiryBanner />
+      <TokenExpiryBanner />
       <nav className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="px-4 sm:px-6 lg:px-8">
           {/* Desktop nav */}
