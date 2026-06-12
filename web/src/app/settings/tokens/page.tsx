@@ -286,12 +286,25 @@ export default function TokensPage() {
     })
   }
 
-  function expiryColor(iso: string | null): string {
+  // A token minted by `terraform login` / `tofu login` — the server always
+  // sets this exact description prefix on the OAuth token-exchange (#502).
+  // These are intentionally short-lived (login_token_ttl_hours, default 12h),
+  // so an imminent expiry is by design, not a foot-gun worth warning about.
+  // Every other token — including manually-created personal tokens — keeps the
+  // amber "nearing expiry" warning.
+  function isLoginToken(tok: Token): boolean {
+    return (
+      tok.attributes.kind === 'interactive' &&
+      (tok.attributes.description || '').startsWith('terraform login')
+    )
+  }
+
+  function expiryColor(iso: string | null, isLogin: boolean): string {
     if (!iso) return 'text-slate-400'
     const now = Date.now()
     const expires = new Date(iso).getTime()
     if (expires <= now) return 'text-red-400'
-    if (expires - now < 30 * 24 * 60 * 60 * 1000) return 'text-amber-400'
+    if (!isLogin && expires - now < 30 * 24 * 60 * 60 * 1000) return 'text-amber-400'
     return 'text-slate-400'
   }
 
@@ -565,7 +578,7 @@ export default function TokensPage() {
                       <td className="px-4 py-3 text-slate-400 text-xs">
                         {formatDate(tok.attributes['last-used-at'])}
                       </td>
-                      <td className={`px-4 py-3 text-xs ${expiryColor(tok.attributes['expires-at'])}`}>
+                      <td className={`px-4 py-3 text-xs ${expiryColor(tok.attributes['expires-at'], isLoginToken(tok))}`}>
                         {formatDate(tok.attributes['expires-at'])}
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
