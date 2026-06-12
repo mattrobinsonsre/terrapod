@@ -41,7 +41,7 @@ class TestGetCurrentUser:
     ):
         """If token matches an API token, session is not checked."""
         mock_token = MagicMock()
-        mock_token.user_email = "bot@example.com"
+        mock_token.bound_to = "bot@example.com"
         mock_validate_token.return_value = mock_token
 
         request = _mock_request()

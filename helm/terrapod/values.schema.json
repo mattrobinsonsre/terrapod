@@ -507,6 +507,9 @@
             "callback_base_url": { "type": "string" },
             "session_ttl_hours": { "type": "integer", "minimum": 1 },
             "api_token_max_ttl_hours": { "type": "integer", "minimum": 0 },
+            "service_token_max_ttl_hours": { "type": "integer", "minimum": 0 },
+            "token_expiry_warning_days": { "type": "integer", "minimum": 0 },
+            "bound_token_idle_days": { "type": "integer", "minimum": 0 },
             "require_external_sso_for_roles": {
               "type": "array",
               "items": { "type": "string" }

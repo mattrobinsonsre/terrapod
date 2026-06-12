@@ -75,6 +75,10 @@ api:
       local_enabled: true
       callback_base_url: "https://terrapod.local"
       session_ttl_hours: 12
+      # Disable bound-token idle-login rejection in local dev (#495): otherwise
+      # a curl/CLI token stops working 7 days after the last interactive login,
+      # which is noise for local testing. Production keeps the default (7).
+      bound_token_idle_days: 0
 
     # AI plan-summary (#401) — Bedrock Converse via LiteLLM. The
     # terrapod-testing IAM user's static keys (delivered via the

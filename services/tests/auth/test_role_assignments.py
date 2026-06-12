@@ -26,9 +26,10 @@ class TestProcessLogin:
             raw_claims={"groups": ["terrapod:dev", "terrapod:viewer"]},
         )
 
+    @patch("terrapod.services.sso_service.mark_user_seen")
     @patch("terrapod.services.sso_service.record_recent_user")
     async def test_sso_login_merges_groups_and_internal_roles(
-        self, mock_record, mock_db, sso_identity
+        self, mock_record, mock_mark, mock_db, sso_identity
     ):
         """Groups from IDP + internal assignments are merged and deduplicated."""
         mock_record.return_value = None
@@ -55,8 +56,11 @@ class TestProcessLogin:
         assert "dev" in result.roles
         assert "viewer" in result.roles
 
+    @patch("terrapod.services.sso_service.mark_user_seen")
     @patch("terrapod.services.sso_service.record_recent_user")
-    async def test_sso_login_with_claims_mapping(self, mock_record, mock_db, sso_identity):
+    async def test_sso_login_with_claims_mapping(
+        self, mock_record, mock_mark, mock_db, sso_identity
+    ):
         """Claims-to-roles mapping adds additional roles."""
         from terrapod.config import ClaimsToRolesMapping
 
@@ -122,11 +126,16 @@ class TestProcessLogin:
         with pytest.raises(ValueError, match="disabled"):
             await process_login(db=mock_db, identity=identity, claims_rules=[])
 
+    @patch("terrapod.services.sso_service.mark_user_seen")
     @patch("terrapod.services.sso_service.record_recent_user")
     async def test_record_recent_user_failure_does_not_break_login(
-        self, mock_record, mock_db, sso_identity
+        self, mock_record, mock_mark, mock_db, sso_identity
     ):
-        """record_recent_user failure is swallowed — login still succeeds."""
+        """record_recent_user failure is swallowed — login still succeeds.
+
+        mark_user_seen is mocked: it is load-bearing (set outside the
+        best-effort block) so it is NOT swallowed in production.
+        """
         mock_record.side_effect = Exception("Redis down")
 
         role_result = MagicMock()

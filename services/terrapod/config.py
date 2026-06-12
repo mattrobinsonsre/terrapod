@@ -299,8 +299,26 @@ class AuthConfig(BaseSettings):
     )
     api_token_max_ttl_hours: int = Field(
         default=8760,
-        description="Maximum API token lifetime in hours (default: 8760 = 1 year). "
-        "0 = no limit. Computed at validation time as created_at + this value.",
+        description="Maximum interactive API token lifetime in hours (default: 8760 = 1 year). "
+        "0 = no limit. Expiry = (rotated_at or created_at) + this value.",
+    )
+    service_token_max_ttl_hours: int = Field(
+        default=8760,
+        description="Maximum service-token (service_bound/service_detached) lifetime in hours "
+        "(default: 8760 = 1 year). Separate from the interactive cap. Service tokens ALWAYS "
+        "expire: this is never treated as unbounded even if set to 0 (#495).",
+    )
+    token_expiry_warning_days: int = Field(
+        default=14,
+        description="How many days ahead to surface in-app warnings for service tokens nearing "
+        "expiry (#495).",
+    )
+    bound_token_idle_days: int = Field(
+        default=7,
+        description="Idle-login window in days for user-bound tokens (interactive + service_bound): "
+        "a bound token is rejected if its owner has not logged in within this window. Also the TTL "
+        "of the tp:user_seen marker. 0 disables idle rejection. Detached tokens are exempt (#495). "
+        "ON by default — convert existing automation tokens to detached before upgrade.",
     )
     require_external_sso_for_roles: list[str] = Field(
         default_factory=list,

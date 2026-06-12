@@ -162,6 +162,11 @@ api:
 
       session_ttl_hours: 12
       api_token_max_ttl_hours: 8760  # 1 year; 0 = no limit
+      # Service tokens (#495): separate (always-expiring) cap; warning lead time;
+      # and the bound-token idle-login window (ON by default; 0 disables).
+      service_token_max_ttl_hours: 8760
+      token_expiry_warning_days: 14
+      bound_token_idle_days: 7
       require_external_sso_for_roles: []
 
       # ── SSO / Identity Providers ──────────────────────────────────────

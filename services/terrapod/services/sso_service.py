@@ -17,9 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.metrics import AUTH_LOGIN
 from terrapod.auth.claims_mapper import map_claims_to_roles
-from terrapod.auth.recent_users import record_recent_user
+from terrapod.auth.recent_users import mark_user_seen, record_recent_user
 from terrapod.auth.sso import AuthenticatedIdentity
-from terrapod.config import ClaimsToRolesMapping
+from terrapod.config import ClaimsToRolesMapping, settings
 from terrapod.db.models import PlatformRoleAssignment, RoleAssignment, User
 from terrapod.logging_config import get_logger
 
@@ -102,6 +102,12 @@ async def process_login(
     all_roles = sorted(roles)
 
     await db.commit()
+
+    # Refresh the idle-login marker (#495). This is load-bearing for auth —
+    # a user-bound token is rejected once this marker expires — so it is NOT
+    # in the best-effort block below: a Redis failure here should surface
+    # rather than silently let tokens die within the idle window later.
+    await mark_user_seen(identity.email, settings.auth.bound_token_idle_days * 86400)
 
     # Record recent user in Redis (fire-and-forget, don't block login)
     try:

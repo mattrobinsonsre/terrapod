@@ -1,24 +1,29 @@
-"""TFE V2 API token CRUD endpoints.
+"""Terrapod-native API token CRUD + service-token management (#495).
 
-Implements the authentication-tokens endpoints in JSON:API format
-compatible with the TFE V2 API.
+JSON:API-shaped token management. Terrapod-native surface — mounted ONLY
+under /api/terrapod/v1/ (the CLI mints tokens via the /oauth flow, never
+here). Do NOT move any of this to /api/v2/ or tfe_v2.py.
 
-UX CONTRACT: Token endpoints are consumed by the web frontend:
-  - web/src/app/settings/tokens/page.tsx (token CRUD)
-  Changes to response shapes, attribute names, or status codes here MUST be
-  matched by corresponding updates to that frontend page.
+UX CONTRACT: consumed by the web frontend
+  - web/src/app/settings/tokens/page.tsx
+Changes to response shapes, attribute names, or status codes here MUST be
+matched by corresponding updates to that page.
 
 Endpoints:
-    POST   /api/terrapod/v1/users/:user_id/authentication-tokens — create user token
-    GET    /api/terrapod/v1/users/:user_id/authentication-tokens — list user tokens
-    GET    /api/terrapod/v1/admin/authentication-tokens — list all tokens (admin only)
-    GET    /api/terrapod/v1/authentication-tokens/:id — show token (value is null)
-    DELETE /api/terrapod/v1/authentication-tokens/:id — revoke token
+    POST   /users/:user_id/authentication-tokens                  — create token
+    GET    /users/:user_id/authentication-tokens                  — list user tokens
+    GET    /admin/authentication-tokens                           — list all (admin) [?kind=]
+    POST   /admin/authentication-tokens/actions/revoke-all        — revoke all for a user (admin)
+    GET    /authentication-tokens/expiring                        — caller-scoped expiring service tokens
+    GET    /authentication-tokens/:id                             — show token (value null)
+    PATCH  /authentication-tokens/:id                             — re-tag kind (interactive<->service_bound)
+    POST   /authentication-tokens/:id/actions/rotate              — rotate secret + reset expiry
+    DELETE /authentication-tokens/:id                             — revoke token
 """
 
-from datetime import timedelta
+from datetime import UTC
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,15 +33,33 @@ from terrapod.auth.api_tokens import (
     create_api_token,
     get_token_by_id,
     list_all_tokens,
+    list_expiring_service_tokens,
     list_user_tokens,
+    revoke_all_for_user,
     revoke_token,
+    rotate_token,
+    token_expires_at,
 )
 from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.redis.client import get_redis_client
 
 router = APIRouter(tags=["tokens"])
 logger = get_logger(__name__)
+
+# Kinds a user may create / re-tag in Phase 1. service_detached (admin-only,
+# absolute scope) is gated until the scoped-resolution phase lands.
+_CREATABLE_KINDS = {"interactive", "service_bound"}
+_ALL_KINDS = {"interactive", "service_bound", "service_detached"}
+_TOKEN_ROLES_PREFIX = "tp:token_roles:"
+
+
+def _rfc3339(dt) -> str | None:  # type: ignore[no-untyped-def]
+    """RFC3339 with a trailing Z (not +00:00) — go-tfe/contract compatible."""
+    if dt is None:
+        return None
+    return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 class CreateTokenRequest(BaseModel):
@@ -46,6 +69,8 @@ class CreateTokenRequest(BaseModel):
         class Attributes(BaseModel):
             description: str = ""
             lifespan_hours: int | None = None
+            kind: str = "interactive"
+            pinned_roles: list[str] | None = None
 
         type: str = "authentication-tokens"
         attributes: Attributes = Attributes()
@@ -53,24 +78,38 @@ class CreateTokenRequest(BaseModel):
     data: Data = Data()
 
 
+class PatchTokenRequest(BaseModel):
+    """JSON:API request for re-tagging a token's kind."""
+
+    class Data(BaseModel):
+        class Attributes(BaseModel):
+            kind: str
+
+        type: str = "authentication-tokens"
+        attributes: Attributes
+
+    data: Data
+
+
+class RevokeAllRequest(BaseModel):
+    email: str
+
+
 def _token_to_jsonapi(token, raw_value: str | None = None) -> dict:  # type: ignore[no-untyped-def]
     """Convert an APIToken model to JSON:API format."""
-    # Compute expiry from per-token lifespan or global max
-    effective_ttl = token.lifespan_hours or settings.auth.api_token_max_ttl_hours
-    if effective_ttl > 0 and token.created_at:
-        expires_at = (token.created_at + timedelta(hours=effective_ttl)).isoformat()
-    else:
-        expires_at = None
-
     attributes: dict = {
         "description": token.description,
+        "kind": token.kind,
+        "bound-to": token.bound_to,
+        "created-by": token.created_by,
+        # token-type retained for response back-compat (superseded by kind).
         "token-type": token.token_type,
-        "created-by": token.user_email,
-        "created-at": token.created_at.isoformat() if token.created_at else None,
-        "last-used-at": token.last_used_at.isoformat() if token.last_used_at else None,
-        "expires-at": expires_at,
+        "created-at": _rfc3339(token.created_at),
+        "rotated-at": _rfc3339(token.rotated_at),
+        "last-used-at": _rfc3339(token.last_used_at),
+        "expires-at": _rfc3339(token_expires_at(token)),
         "lifespan-hours": token.lifespan_hours,
-        # The raw token value is only included at creation time
+        # The raw token value is only included at creation/rotation time.
         "token": raw_value,
     }
     return {
@@ -78,6 +117,14 @@ def _token_to_jsonapi(token, raw_value: str | None = None) -> dict:  # type: ign
         "type": "authentication-tokens",
         "attributes": attributes,
     }
+
+
+def _is_admin(user: AuthenticatedUser) -> bool:
+    return "admin" in user.roles
+
+
+def _username(user: AuthenticatedUser) -> str:
+    return user.email.split("@")[0] if user.email else ""
 
 
 @router.post("/users/{user_id}/authentication-tokens")
@@ -90,21 +137,38 @@ async def create_user_token(
     """Create an authentication token for a user.
 
     The user_id in the path must match the authenticated user (or admin).
+    Anyone may create `interactive` or `service_bound` tokens (bound to
+    themselves). `service_detached` is admin-only and not yet creatable
+    (gated until the scoped-resolution phase).
     """
-    # user_id is the username (email prefix) — match against current user
-    username = user.email.split("@")[0] if user.email else ""
-    if user_id != username and "admin" not in user.roles:
+    if user_id != _username(user) and not _is_admin(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot create tokens for other users",
         )
 
+    kind = body.data.attributes.kind
+    if kind == "service_detached":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Detached service tokens are not yet available",
+        )
+    if kind not in _CREATABLE_KINDS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid token kind: {kind}",
+        )
+
+    pinned = body.data.attributes.pinned_roles if kind == "service_bound" else None
+
     api_token, raw_token = await create_api_token(
         db=db,
-        user_email=user.email,
+        bound_to=user.email,
+        created_by=user.email,
+        kind=kind,
         description=body.data.attributes.description,
-        token_type="user",
         lifespan_hours=body.data.attributes.lifespan_hours,
+        pinned_roles=pinned,
     )
 
     return JSONResponse(
@@ -119,36 +183,81 @@ async def list_user_tokens_endpoint(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """List authentication tokens for a user."""
-    username = user.email.split("@")[0] if user.email else ""
-    if user_id != username and "admin" not in user.roles:
+    """List a user's own tokens (never includes detached tokens)."""
+    if user_id != _username(user) and not _is_admin(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot list tokens for other users",
         )
 
     tokens = await list_user_tokens(db, user.email)
-    return JSONResponse(
-        content={"data": [_token_to_jsonapi(t) for t in tokens]},
-    )
+    return JSONResponse(content={"data": [_token_to_jsonapi(t) for t in tokens]})
 
 
 @router.get("/admin/authentication-tokens")
 async def list_all_tokens_endpoint(
+    kind: str | None = Query(default=None),
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """List all authentication tokens across all users (admin only)."""
-    if "admin" not in user.roles:
+    """List all authentication tokens across all users (admin only).
+
+    Optional ``?kind=`` filter. A valid-but-unpopulated kind (e.g.
+    service_detached before it exists) returns an empty set, not an error.
+    """
+    if not _is_admin(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    if kind is not None and kind not in _ALL_KINDS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid token kind: {kind}",
+        )
+
+    tokens = await list_all_tokens(db, kind=kind)
+    return JSONResponse(content={"data": [_token_to_jsonapi(t) for t in tokens]})
+
+
+@router.post("/admin/authentication-tokens/actions/revoke-all")
+async def revoke_all_tokens_for_user(
+    body: RevokeAllRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Revoke every token bound to an identity — urgent offboarding (admin only)."""
+    if not _is_admin(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",
         )
 
-    tokens = await list_all_tokens(db)
-    return JSONResponse(
-        content={"data": [_token_to_jsonapi(t) for t in tokens]},
+    count = await revoke_all_for_user(db, body.email)
+    await db.commit()
+    # Bust the cached role resolution for the now-token-less identity.
+    await get_redis_client().delete(f"{_TOKEN_ROLES_PREFIX}{body.email}")
+
+    return JSONResponse(content={"data": {"email": body.email, "revoked": count}})
+
+
+@router.get("/authentication-tokens/expiring")
+async def list_expiring_tokens(
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Service tokens nearing expiry, scoped to the caller (#495).
+
+    Own ``service_bound`` for everyone; plus all ``service_detached`` for
+    admins. Drives the in-app nav-bar/login warnings.
+    """
+    tokens = await list_expiring_service_tokens(
+        db,
+        caller_email=user.email,
+        is_admin=_is_admin(user),
+        within_days=settings.auth.token_expiry_warning_days,
     )
+    return JSONResponse(content={"data": [_token_to_jsonapi(t) for t in tokens]})
 
 
 @router.get("/authentication-tokens/{token_id}")
@@ -160,21 +269,71 @@ async def show_token(
     """Show an authentication token (value is null — only available at creation)."""
     api_token = await get_token_by_id(db, token_id)
     if api_token is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
+
+    if api_token.bound_to != user.email and not _is_admin(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    return JSONResponse(content={"data": _token_to_jsonapi(api_token)})
+
+
+@router.patch("/authentication-tokens/{token_id}")
+async def retag_token(
+    token_id: str,
+    body: PatchTokenRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Re-tag a token's kind between interactive and service_bound.
+
+    Owner or admin. Converting to/from service_detached is admin-only and
+    not yet supported (scoped-resolution phase).
+    """
+    api_token = await get_token_by_id(db, token_id)
+    if api_token is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
+
+    if api_token.bound_to != user.email and not _is_admin(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    new_kind = body.data.attributes.kind
+    if new_kind == "service_detached" or api_token.kind == "service_detached":
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Token not found",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Converting to/from detached is not yet available",
+        )
+    if new_kind not in _CREATABLE_KINDS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid token kind: {new_kind}",
         )
 
-    # Only the token owner or admin can view
-    if api_token.user_email != user.email and "admin" not in user.roles:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
-        )
+    api_token.kind = new_kind
+    await db.commit()
+    await db.refresh(api_token)
+    return JSONResponse(content={"data": _token_to_jsonapi(api_token)})
 
-    return JSONResponse(
-        content={"data": _token_to_jsonapi(api_token)},
-    )
+
+@router.post("/authentication-tokens/{token_id}/actions/rotate")
+async def rotate_token_endpoint(
+    token_id: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Rotate a token's secret + reset its expiry clock (owner or admin)."""
+    api_token = await get_token_by_id(db, token_id)
+    if api_token is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
+
+    if api_token.bound_to != user.email and not _is_admin(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    rotated = await rotate_token(db, token_id)
+    assert rotated is not None  # just fetched it above
+    token, raw_token = rotated
+    await db.commit()
+
+    return JSONResponse(content={"data": _token_to_jsonapi(token, raw_value=raw_token)})
 
 
 @router.delete("/authentication-tokens/{token_id}")
@@ -183,24 +342,14 @@ async def delete_token(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Revoke (delete) an authentication token."""
+    """Revoke (delete) an authentication token (owner or admin)."""
     api_token = await get_token_by_id(db, token_id)
     if api_token is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Token not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
 
-    # Only the token owner or admin can revoke
-    if api_token.user_email != user.email and "admin" not in user.roles:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
-        )
+    if api_token.bound_to != user.email and not _is_admin(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     await revoke_token(db, token_id)
 
-    return JSONResponse(
-        status_code=status.HTTP_204_NO_CONTENT,
-        content=None,
-    )
+    return JSONResponse(status_code=status.HTTP_204_NO_CONTENT, content=None)

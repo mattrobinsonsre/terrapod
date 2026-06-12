@@ -161,17 +161,31 @@ class APIToken(Base):
     id: Mapped[str] = mapped_column(String(63), primary_key=True)  # "at-{uuid7}"
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     description: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    user_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    token_type: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="user"
-    )  # "user", "organization"
+    # Token kind (#495): interactive (terraform login / UI), service_bound
+    # (user-bound automation; perms = min(pinned, owner live)), service_detached
+    # (admin-managed M2M; absolute pinned perms; exempt from idle-login rejection).
+    kind: Mapped[str] = mapped_column(String(20), nullable=False, default="interactive")
+    # Owning identity. NULL <=> detached (no user binding). Bare email string,
+    # NOT an FK: SSO users have no `users` row (sso_service: "SSO users are NOT
+    # stored in the users table"), so an FK would reject their tokens. Integrity
+    # via live role-intersection + idle-login window + local is_active check.
+    bound_to: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # The minter (audit). Always set, even for detached (its only creator record).
+    created_by: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    # Token's own pinned role set (service tokens). Resolved through label-RBAC.
+    pinned_roles: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    # Legacy TFE-shaped field, superseded by `kind`. Retained (unread) for
+    # response back-compat; dropped in a later release.
+    token_type: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
+    # Set by the rotate action; expiry basis = rotated_at or created_at.
+    rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     lifespan_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    __table_args__ = (Index("ix_api_tokens_user_email", "user_email"),)
+    __table_args__ = (Index("ix_api_tokens_bound_to", "bound_to"),)
 
 
 class AgentPool(Base):

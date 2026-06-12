@@ -149,12 +149,14 @@ async def oauth_token(
             detail="PKCE verification failed",
         )
 
-    # Create a long-lived API token (no expiry by default)
+    # Create a long-lived interactive API token (terraform login). Bound to
+    # the authenticating identity; created_by is the same identity.
     api_token, raw_token = await create_api_token(
         db=db,
-        user_email=auth_code.email,
+        bound_to=auth_code.email,
+        created_by=auth_code.email,
+        kind="interactive",
         description=f"terraform login ({auth_code.provider_name})",
-        token_type="user",
     )
     await db.commit()
 

@@ -17,6 +17,36 @@ logger = get_logger(__name__)
 RECENT_USER_PREFIX = "tp:recent_user:"
 RECENT_USER_TTL = 604800  # 7 days in seconds
 
+# Provider-agnostic "last interactive login" marker, keyed by email only
+# (#495). Distinct from RECENT_USER (which is provider-scoped, for admin
+# autocomplete): this one is load-bearing for auth — a user-bound token is
+# rejected once this marker has expired (the owner hasn't logged in within
+# the idle window). Set on every login in `process_login`; its TTL is the
+# configured idle window. Single-key GET/SET only — never pipelined across
+# prefixes (cluster cross-slot rule).
+USER_SEEN_PREFIX = "tp:user_seen:"
+
+
+async def mark_user_seen(email: str, ttl_seconds: int) -> None:
+    """Refresh the idle-login marker for an identity (#495).
+
+    Called on every interactive login. `ttl_seconds` is the idle window
+    (``bound_token_idle_days`` × 86400). A non-positive TTL means idle
+    rejection is disabled, so there's nothing to mark.
+    """
+    if ttl_seconds <= 0 or not email:
+        return
+    redis = get_redis_client()
+    await redis.set(f"{USER_SEEN_PREFIX}{email}", "1", ex=ttl_seconds)
+
+
+async def user_seen_within_window(email: str) -> bool:
+    """True if the identity has logged in within the idle window (#495)."""
+    if not email:
+        return False
+    redis = get_redis_client()
+    return (await redis.get(f"{USER_SEEN_PREFIX}{email}")) is not None
+
 
 @dataclass
 class RecentUser:

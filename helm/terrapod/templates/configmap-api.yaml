@@ -90,6 +90,11 @@ data:
       {{- end }}
       session_ttl_hours: {{ .Values.api.config.auth.session_ttl_hours | default 12 }}
       api_token_max_ttl_hours: {{ .Values.api.config.auth.api_token_max_ttl_hours | default 8760 }}
+      {{- /* Rendered directly (no `| default`): 0 is meaningful for these and
+             Helm's `default` would silently rewrite a configured 0 to the default. */}}
+      service_token_max_ttl_hours: {{ .Values.api.config.auth.service_token_max_ttl_hours }}
+      token_expiry_warning_days: {{ .Values.api.config.auth.token_expiry_warning_days }}
+      bound_token_idle_days: {{ .Values.api.config.auth.bound_token_idle_days }}
       {{- if .Values.api.config.auth.require_external_sso_for_roles }}
       require_external_sso_for_roles:
         {{- range .Values.api.config.auth.require_external_sso_for_roles }}

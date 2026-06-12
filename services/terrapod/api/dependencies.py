@@ -134,7 +134,7 @@ async def get_current_user(
         api_token = await validate_api_token(db, token)
         if api_token is not None:
             # Resolve roles from DB (cached in Redis for 60s)
-            email = api_token.user_email or ""
+            email = api_token.bound_to or ""
             roles = await _resolve_user_roles(db, email) if email else []
 
             request.state.user_email = email  # for audit middleware
@@ -219,7 +219,7 @@ async def authenticate_request(request: Request) -> AuthenticatedUser:
     async with get_db_session() as db:
         api_token = await validate_api_token(db, token)
         if api_token is not None:
-            email = api_token.user_email or ""
+            email = api_token.bound_to or ""
             roles = await _resolve_user_roles(db, email) if email else []
             request.state.user_email = email
             return AuthenticatedUser(
