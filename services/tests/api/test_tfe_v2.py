@@ -163,6 +163,7 @@ class TestTokenCRUD:
         mock_token.kind = "interactive"
         mock_token.bound_to = "test@example.com"
         mock_token.created_by = "test@example.com"
+        mock_token.pinned_roles = None
         mock_token.created_at = datetime(2026, 1, 1, tzinfo=UTC)
         mock_token.rotated_at = None
         mock_token.last_used_at = None
@@ -217,6 +218,7 @@ class TestTokenCRUD:
         mock_token.kind = "interactive"
         mock_token.bound_to = "test@example.com"
         mock_token.created_by = "test@example.com"
+        mock_token.pinned_roles = None
         mock_token.created_at = datetime(2026, 1, 1, tzinfo=UTC)
         mock_token.rotated_at = None
         mock_token.last_used_at = None
