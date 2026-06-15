@@ -270,18 +270,64 @@ def _resource_change_is_informative(r: object) -> bool:
     return any(a not in ("no-op", "read") for a in actions)
 
 
-def _extract_tf_files_to_dir(tarball: bytes, target: pathlib.Path) -> int:
+def _tfvars_is_loaded(member_name: str, var_files: set[str]) -> bool:
+    """Whether a ``.tfvars`` file in the CV tarball is actually loaded by
+    this workspace.
+
+    terraform/tofu auto-load ``terraform.tfvars`` and ``*.auto.tfvars``
+    regardless; every other ``.tfvars`` is loaded ONLY when passed via
+    ``-var-file`` (the workspace's ``var_files``). In a monorepo a single
+    repo holds one ``.tfvars`` per environment, but each workspace loads
+    only its own — so the *other* environments' var-files must be excluded
+    from CODE_DIFF, or an unrelated env's change inflates this workspace's
+    risk (the model rates the diff it's shown).
+
+    When ``var_files`` is empty the workspace declares no explicit
+    var-files, so we can't tell which non-auto tfvars matter — keep the
+    pre-existing behaviour and include them all rather than risk dropping a
+    file the workspace does use.
+
+    Matching is rooting-robust: a ``var_files`` entry is relative to the
+    workspace ``working_directory`` while the tarball may be rooted at the
+    repo (or vice-versa), so we accept an exact match, a path-suffix match
+    in either direction, and a basename match (env var-file names are
+    unique in practice, e.g. ``stg-us1.tfvars`` vs ``prod-us1.tfvars``).
+    """
+    base = member_name.rsplit("/", 1)[-1]
+    if base == "terraform.tfvars" or base.endswith(".auto.tfvars"):
+        return True
+    if not var_files:
+        return True
+    if member_name in var_files:
+        return True
+    if any(member_name.endswith("/" + vf) or vf.endswith("/" + member_name) for vf in var_files):
+        return True
+    return base in {vf.rsplit("/", 1)[-1] for vf in var_files}
+
+
+def _extract_tf_files_to_dir(
+    tarball: bytes, target: pathlib.Path, var_files: set[str] | None = None
+) -> int:
     """Extract *.tf / *.tfvars files from a config-version tarball.
+
+    ``.tf`` files always apply and are always written. ``.tfvars`` files
+    are filtered to those the workspace actually loads (see
+    :func:`_tfvars_is_loaded`) so a monorepo's other-environment var-files
+    don't pollute CODE_DIFF.
 
     Returns the number of files written. Defends against zip-slip via
     member-name normalisation; skips entries whose path escapes target.
     """
+    vf = var_files or set()
     written = 0
     with tarfile.open(fileobj=io.BytesIO(tarball), mode="r:gz") as tar:
         for member in tar:
             if not member.isfile():
                 continue
-            if not (member.name.endswith(".tf") or member.name.endswith(".tfvars")):
+            if member.name.endswith(".tfvars"):
+                if not _tfvars_is_loaded(member.name, vf):
+                    continue
+            elif not member.name.endswith(".tf"):
                 continue
             safe = pathlib.PurePosixPath(member.name).as_posix()
             if safe.startswith("/") or ".." in safe.split("/"):
@@ -296,7 +342,12 @@ def _extract_tf_files_to_dir(tarball: bytes, target: pathlib.Path) -> int:
     return written
 
 
-def _build_code_diff(prev_tarball: bytes | None, cur_tarball: bytes, max_bytes: int) -> str:
+def _build_code_diff(
+    prev_tarball: bytes | None,
+    cur_tarball: bytes,
+    max_bytes: int,
+    var_files: set[str] | None = None,
+) -> str:
     """Return a unified diff of *.tf / *.tfvars between two CV tarballs.
 
     Returns "" when:
@@ -322,8 +373,8 @@ def _build_code_diff(prev_tarball: bytes | None, cur_tarball: bytes, max_bytes: 
         prev_dir.mkdir()
         cur_dir.mkdir()
         try:
-            prev_n = _extract_tf_files_to_dir(prev_tarball, prev_dir)
-            cur_n = _extract_tf_files_to_dir(cur_tarball, cur_dir)
+            prev_n = _extract_tf_files_to_dir(prev_tarball, prev_dir, var_files)
+            cur_n = _extract_tf_files_to_dir(cur_tarball, cur_dir, var_files)
         except tarfile.TarError as e:
             logger.debug("CODE_DIFF: tarball extract failed", error=str(e))
             return ""
@@ -398,14 +449,18 @@ async def _find_previously_applied_cv_id(
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
-async def _gather_inputs(db: AsyncSession, run: Run, kind: str) -> tuple[str, str, str, str, str]:
+async def _gather_inputs(
+    db: AsyncSession, run: Run, kind: str, var_files: set[str] | None = None
+) -> tuple[str, str, str, str, str]:
     """Return ``(primary_input, primary_label, primary_lang, code_context, code_diff)``.
 
     primary_input is the (cleaned) plan JSON for ``plan_summary`` or
     the plan log for ``failure_analysis``. code_context is the
     concatenated current .tf source. code_diff is a unified diff of
     *.tf / *.tfvars between this run's CV and the previously-applied
-    CV (when both tarballs are available).
+    CV (when both tarballs are available), with ``.tfvars`` scoped to the
+    var-files this workspace actually loads (``var_files``) so a monorepo's
+    other-environment var-files don't pollute the diff.
     """
     storage = get_storage()
     cfg = settings.ai_summary
@@ -482,7 +537,11 @@ async def _gather_inputs(db: AsyncSession, run: Run, kind: str) -> tuple[str, st
             if prev_tarball is not None:
                 try:
                     code_diff = await asyncio.to_thread(
-                        _build_code_diff, prev_tarball, cur_tarball, cfg.code_diff_max_bytes
+                        _build_code_diff,
+                        prev_tarball,
+                        cur_tarball,
+                        cfg.code_diff_max_bytes,
+                        var_files,
                     )
                 except Exception as e:
                     logger.debug("Failed to build code_diff", error=str(e))
@@ -1086,7 +1145,9 @@ async def handle_ai_plan_summary(payload: dict) -> None:
             await _emit_summary_event("plan_summary_skipped", ws.id, run_id)
             return
 
-        primary, label, lang, code_context, code_diff = await _gather_inputs(db, run, kind)
+        primary, label, lang, code_context, code_diff = await _gather_inputs(
+            db, run, kind, set(ws.var_files or [])
+        )
         if not primary:
             await _upsert_summary(
                 db,
@@ -1461,8 +1522,12 @@ async def post_followup(
     await db.flush()
 
     # Build the cacheable prefix — SAME inputs the initial summary
-    # used, so the provider's prompt cache serves the prefix hit.
-    primary, label, lang, code_context, code_diff = await _gather_inputs(db, run, plan_summary.kind)
+    # used, so the provider's prompt cache serves the prefix hit. That
+    # includes the var-file scoping of CODE_DIFF — pass the same
+    # var_files or the prefix diverges and the cache misses.
+    primary, label, lang, code_context, code_diff = await _gather_inputs(
+        db, run, plan_summary.kind, set(workspace.var_files or [])
+    )
     if not primary:
         # The CV/log was GC'd or never existed. Record an errored
         # assistant row so the transcript is uniform, commit, surface.

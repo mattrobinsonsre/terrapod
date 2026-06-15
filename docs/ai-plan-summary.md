@@ -283,6 +283,14 @@ the bulk of the request):
   between this run's config version and the previously-applied
   config version. Empty when there's no prior CV (first run, or
   GC'd). Capped at `ai_summary.code_diff_max_bytes` (default 100 KB).
+  `.tfvars` files are **scoped to the var-files this workspace loads**
+  (its `var_files`, plus auto-loaded `terraform.tfvars` / `*.auto.tfvars`).
+  In a monorepo one repo holds one var-file per environment but each
+  workspace loads only its own; without this scoping a change to
+  `envs/prod-us1.tfvars` would appear in the `stg-us1` workspace's diff
+  and inflate its risk even though that workspace's plan has no changes.
+  When a workspace declares no `var_files`, all `.tfvars` are included
+  (no signal to scope by).
 - `CODE_CONTEXT` — concatenated `.tf` files from this run's
   config-version tarball. Capped at
   `ai_summary.code_context_max_bytes` (default 200 KB).

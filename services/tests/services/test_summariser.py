@@ -134,6 +134,66 @@ def test_extract_tf_sources_returns_empty_on_corrupt_tarball():
     assert summariser._extract_tf_sources(b"not a tarball", 100) == ""
 
 
+# ── CODE_DIFF var-file scoping ───────────────────────────────────────────
+
+
+def test_tfvars_is_loaded_auto_loaded_always_included():
+    # terraform.tfvars and *.auto.tfvars are auto-loaded regardless of var_files
+    assert summariser._tfvars_is_loaded("terraform.tfvars", set()) is True
+    assert summariser._tfvars_is_loaded("foo.auto.tfvars", {"envs/stg.tfvars"}) is True
+    assert summariser._tfvars_is_loaded("a/b/terraform.tfvars", {"envs/stg.tfvars"}) is True
+
+
+def test_tfvars_is_loaded_empty_var_files_includes_all():
+    # No declared var-files → can't tell, keep pre-existing include-all behaviour
+    assert summariser._tfvars_is_loaded("envs/prod-us1.tfvars", set()) is True
+
+
+def test_tfvars_is_loaded_matches_declared_var_file_and_excludes_others():
+    vf = {"envs/stg-us1.tfvars"}
+    assert summariser._tfvars_is_loaded("envs/stg-us1.tfvars", vf) is True
+    # Other environments' var-files are NOT loaded by this workspace
+    assert summariser._tfvars_is_loaded("envs/prod-us1.tfvars", vf) is False
+    assert summariser._tfvars_is_loaded("envs/dev-us1.tfvars", vf) is False
+
+
+def test_tfvars_is_loaded_rooting_robust_suffix_and_basename():
+    # var_file relative to working_directory; tarball rooted at repo (or v.v.)
+    assert summariser._tfvars_is_loaded("terraform/envs/stg.tfvars", {"envs/stg.tfvars"}) is True
+    # basename fallback (env var-file names are unique in practice)
+    assert summariser._tfvars_is_loaded("stg-us1.tfvars", {"envs/stg-us1.tfvars"}) is True
+
+
+def test_extract_tf_files_scopes_tfvars_to_var_files(tmp_path):
+    tarball = _build_tarball(
+        {
+            "main.tf": b'resource "aws_db_instance" "x" {}',
+            "envs/stg-us1.tfvars": b'engine_version = "16.11"',
+            "envs/prod-us1.tfvars": b'engine_version = "16.13"',
+            "envs/dev-us1.tfvars": b'engine_version = "16.11"',
+        }
+    )
+    n = summariser._extract_tf_files_to_dir(tarball, tmp_path, {"envs/stg-us1.tfvars"})
+    written = {p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*") if p.is_file()}
+    assert n == 2
+    assert written == {"main.tf", "envs/stg-us1.tfvars"}
+    # The other environments' var-files — the source of the false risk — are gone
+    assert "envs/prod-us1.tfvars" not in written
+    assert "envs/dev-us1.tfvars" not in written
+
+
+def test_extract_tf_files_no_var_files_keeps_all_tfvars(tmp_path):
+    tarball = _build_tarball(
+        {
+            "main.tf": b"x",
+            "envs/stg.tfvars": b"a",
+            "envs/prod.tfvars": b"b",
+        }
+    )
+    n = summariser._extract_tf_files_to_dir(tarball, tmp_path, set())
+    assert n == 3  # no var_files declared → include-all (no regression)
+
+
 # ── JSON parsing ─────────────────────────────────────────────────────────
 
 
