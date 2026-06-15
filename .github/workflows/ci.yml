@@ -290,7 +290,7 @@ jobs:
           # the same tables) and the suite is small enough that
           # serial is fine.
           - name: unit
-            paths: tests/auth tests/runner tests/storage tests/test_logging_config.py
+            paths: tests/auth tests/runner tests/storage tests/test_logging_config.py tests/test_dependency_pins.py
             pytest_args: -n auto
           - name: services-api
             paths: tests/services tests/api
