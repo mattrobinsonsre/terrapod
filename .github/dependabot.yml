@@ -8,6 +8,13 @@ updates:
     labels: [dependencies, python]
     commit-message:
       prefix: "deps(python):"
+    ignore:
+      # fastapi 0.137 pulls starlette 1.x (major) — it refactors
+      # include_router (the new _IncludedRouter matcher) and shifts
+      # several Starlette behaviours. Hold until a dedicated migration
+      # PR with a full smoke pass; revisit then.
+      - dependency-name: fastapi
+        versions: [">=0.137"]
 
   - package-ecosystem: npm
     directory: /web
@@ -21,6 +28,11 @@ updates:
       # eslint-plugin-react (via eslint-config-next) doesn't support ESLint 10 yet
       - dependency-name: eslint
         versions: [">=10"]
+      # @zxcvbn-ts/language-common v4 ships compressed dictionaries that
+      # require @zxcvbn-ts/core@4 + @zxcvbn-ts/dictionary-compression;
+      # core is pinned at ^3.0.4. Hold until the coordinated v4 upgrade.
+      - dependency-name: "@zxcvbn-ts/language-common"
+        versions: [">=4"]
 
   - package-ecosystem: docker
     directory: /docker
