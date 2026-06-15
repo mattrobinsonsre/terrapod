@@ -28,10 +28,13 @@ updates:
       # eslint-plugin-react (via eslint-config-next) doesn't support ESLint 10 yet
       - dependency-name: eslint
         versions: [">=10"]
-      # @zxcvbn-ts/language-common v4 ships compressed dictionaries that
-      # require @zxcvbn-ts/core@4 + @zxcvbn-ts/dictionary-compression;
-      # core is pinned at ^3.0.4. Hold until the coordinated v4 upgrade.
-      - dependency-name: "@zxcvbn-ts/language-common"
+      # The @zxcvbn-ts v4 line ships compressed dictionaries and must move
+      # as a SET (core + language-common + dictionary-compression) with
+      # code changes in admin/users; core is pinned at ^3.0.4. Ignore the
+      # whole scope at v4 — a per-package ignore just lets dependabot
+      # propose the other halves separately (it split this into
+      # language-common and core PRs). Lift when doing the coordinated v4 upgrade.
+      - dependency-name: "@zxcvbn-ts/*"
         versions: [">=4"]
 
   - package-ecosystem: docker
