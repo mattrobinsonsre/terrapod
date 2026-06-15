@@ -53,6 +53,25 @@ def test_render_failure_analysis_uses_failure_skill():
     assert "PLAN_LOG" in user
 
 
+def test_plan_summary_prompt_grounds_risk_in_plan_not_code_diff():
+    """Risk must be grounded in PLAN_JSON; CODE_DIFF is explanatory only.
+
+    Regression: in a shared monorepo, a PR editing one environment's
+    var-file appeared in every other environment's CODE_DIFF, so the
+    model rated an otherwise-empty plan as elevated risk off the diff.
+    The durable fix is the prompt rule that risk tracks the plan, not the
+    diff — assert that rule is present so it can't be silently dropped.
+    """
+    prompt = PLAN_SUMMARY_SKILL_PROMPT
+    # The grounding rule and its empty-plan corollary.
+    assert "grounded in PLAN_JSON" in prompt
+    assert "SOLELY" in prompt
+    assert "no informative `resource_changes`" in prompt
+    # CODE_DIFF explicitly demoted to background-only, not a risk source.
+    assert "BACKGROUND ONLY" in prompt
+    assert "never derive what-changes — or risk — from it" in prompt.lower()
+
+
 def test_render_unknown_kind_raises():
     with pytest.raises(ValueError):
         render_prompt(

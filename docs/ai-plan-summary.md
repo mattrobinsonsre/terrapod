@@ -283,9 +283,20 @@ the bulk of the request):
   between this run's config version and the previously-applied
   config version. Empty when there's no prior CV (first run, or
   GC'd). Capped at `ai_summary.code_diff_max_bytes` (default 100 KB).
+  **Background only.** The prompt grounds `risk_level` strictly in
+  `PLAN_JSON` (terraform's authoritative statement of what *this*
+  workspace changes — it already resolved which var-files load,
+  rendered templates, and evaluated modules); `CODE_DIFF` and
+  `CODE_CONTEXT` are there to help the model *explain* a planned
+  change, and may never raise risk above what the plan justifies. So
+  in a shared monorepo, a PR that edits one environment's var-file
+  shows up in every other environment's `CODE_DIFF` but those
+  workspaces plan no changes and are rated low risk. An empty plan is
+  always low risk regardless of how large the diff is.
 - `CODE_CONTEXT` — concatenated `.tf` files from this run's
   config-version tarball. Capped at
-  `ai_summary.code_context_max_bytes` (default 200 KB).
+  `ai_summary.code_context_max_bytes` (default 200 KB). Background
+  only, like `CODE_DIFF` — never a risk source.
 - Tool-call instruction (initial-summary path only) — "Now call
   the `submit_plan_summary` tool exactly once with your structured
   answer."

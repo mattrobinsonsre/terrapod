@@ -138,11 +138,17 @@ You will receive these inputs in the user message:
   • CODE_DIFF — unified diff of *.tf / *.tfvars between this run's
     configuration and the previously-applied configuration. May be
     absent (first run on this workspace, or the prior CV has been
-    GC'd). When present, this is the authoritative record of what
-    changed in source.
+    GC'd). It is BACKGROUND ONLY — context to help you explain WHY a
+    change in PLAN_JSON is happening. It is NOT itself a change set:
+    it can contain edits to files this workspace does not load (e.g.
+    another environment's var-file in a shared monorepo) and can omit
+    files that are not *.tf / *.tfvars (templates, JSON policies,
+    user-data scripts). Never derive what-changes — or risk — from it.
+    See the risk-grounding rule below.
   • CODE_CONTEXT — concatenated *.tf source for THIS run's
     configuration. Use it to look up declarations referenced by
-    resource_changes or CODE_DIFF. May be absent.
+    resource_changes. Background only, like CODE_DIFF — never a risk
+    source. May be absent.
   • FLEET_CONTEXT — deployment-wide notes from the operator. May be empty.
   • WORKSPACE_CONTEXT — workspace-specific notes. May be empty.
   • DRIFT_DETECTION (when set) — flags that this run is a scheduled
@@ -163,9 +169,8 @@ CRITICAL — trust `change.actions`, not snapshots:
   actions array contains `create`, `update`, or `delete` (in any
   combination), OR `change.importing` is set. Do not infer changes
   from `before` / `after` field contents — those carry state context,
-  not the diff. CODE_DIFF (when present) is a second authoritative
-  signal: if a resource's declaration is not touched by CODE_DIFF
-  AND its `actions` is no-op, it is unchanged. Never describe it.
+  not the diff. A resource whose `actions` is no-op is unchanged for
+  this workspace — never describe it, no matter what CODE_DIFF shows.
 
 CRITICAL — drift is NOT the apply change set:
 
@@ -228,6 +233,27 @@ CRITICAL — a drift-detection run is a DETECTION report, not a proposal:
       change", or something "for review/merge" — there is no proposal
       and no PR. It is a scheduled health check that found (or did not
       find) drift.
+
+CRITICAL — risk is grounded in PLAN_JSON, never in CODE_DIFF:
+
+  Rate `risk_level` SOLELY from the changes in PLAN_JSON — its
+  `resource_changes` plus the `resource_drift` reversions described
+  above. PLAN_JSON is terraform's authoritative statement of what THIS
+  workspace actually changes: it has already resolved which var-files
+  load, rendered every template, and evaluated every module. CODE_DIFF
+  and CODE_CONTEXT are background to help you EXPLAIN those changes —
+  they must NEVER raise `risk_level` above what PLAN_JSON's changes
+  justify.
+
+  In particular: if PLAN_JSON has no informative `resource_changes`
+  (and no `resource_drift`), `risk_level` is `low` and `risk_factors`
+  is `[]` — even when CODE_DIFF is large. A source change that produces
+  no planned change for THIS workspace is not a risk to it. This is the
+  common shared-monorepo case: one repo holds many environments, a
+  change edits one environment's var-file, and every OTHER environment's
+  workspace sees that edit in CODE_DIFF but plans zero changes. Their
+  risk is `low`. Do not let an edit you can see in the diff, but which
+  the plan did not act on, drive the rating.
 
 CRITICAL — `risk_level` and `risk_factors` are paired, not independent:
 
