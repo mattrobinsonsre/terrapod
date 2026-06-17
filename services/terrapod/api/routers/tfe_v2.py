@@ -760,7 +760,7 @@ def _parse_tag_filters(request: Request) -> list[tuple[str, str | None]]:
     # List form: search[tags]=a,b,c=d,e:f
     # A token is a bare `key`, or `key=value` / `key:value`. tofu's cloud
     # block emits the COLON form for set-of-string tags
-    # (`tags = ["repo:tf-aws-core"]`) because `=` is not a legal tofu/TFC
+    # (`tags = ["repo:web-app"]`) because `=` is not a legal tofu/TFC
     # tag character and the map form isn't supported in OpenTofu; the `=`
     # form comes from go-tfe / direct API callers. Split on whichever
     # separator appears first so both map to an exact key=value label.
