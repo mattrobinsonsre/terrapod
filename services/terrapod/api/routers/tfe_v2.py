@@ -736,12 +736,16 @@ def _parse_tag_filters(request: Request) -> list[tuple[str, str | None]]:
     The terraform/tofu CLI's `cloud { workspaces { tags = ... } }` block emits two
     query-parameter shapes depending on whether `tags` is a list or a map:
 
-      - list form  `tags = ["core", "env=prod"]`
-            -> `?search[tags]=core,env=prod`
-            (each comma-separated token is either a bare key or `key=value`)
+      - list form  `tags = ["core", "env:prod"]`
+            -> `?search[tags]=core,env:prod`
+            (each comma-separated token is a bare key, `key:value`, or
+            `key=value`; OpenTofu emits the colon form for set-of-string
+            tags since `=` isn't a legal tag character)
 
       - map form   `tags = { env = "prod" }`
             -> `?filter[tagged][0][key]=env&filter[tagged][0][value]=prod`
+            (Terraform 1.10+ only; OpenTofu rejects map tags, so the colon
+            list form above is the portable way to select by key+value)
 
     Terrapod doesn't have a separate "tags" concept on workspaces; instead each
     tag is matched against `Workspace.labels` (which is also the source of
@@ -753,16 +757,25 @@ def _parse_tag_filters(request: Request) -> list[tuple[str, str | None]]:
     """
     filters: list[tuple[str, str | None]] = []
 
-    # List form: search[tags]=a,b,c=d
+    # List form: search[tags]=a,b,c=d,e:f
+    # A token is a bare `key`, or `key=value` / `key:value`. tofu's cloud
+    # block emits the COLON form for set-of-string tags
+    # (`tags = ["repo:tf-aws-core"]`) because `=` is not a legal tofu/TFC
+    # tag character and the map form isn't supported in OpenTofu; the `=`
+    # form comes from go-tfe / direct API callers. Split on whichever
+    # separator appears first so both map to an exact key=value label.
     raw_tags = request.query_params.get("search[tags]", "")
     if raw_tags:
         for token in raw_tags.split(","):
             token = token.strip()
             if not token:
                 continue
-            if "=" in token:
-                k, v = token.split("=", 1)
-                filters.append((k.strip(), v.strip()))
+            sep_positions = [token.find(c) for c in (":", "=") if c in token]
+            if sep_positions:
+                i = min(sep_positions)
+                k, v = token[:i].strip(), token[i + 1 :].strip()
+                if k:
+                    filters.append((k, v))
             else:
                 filters.append((token, None))
 

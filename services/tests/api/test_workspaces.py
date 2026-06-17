@@ -691,6 +691,34 @@ class TestParseTagFilters:
         out = _parse_tag_filters(self._req("search%5Btags%5D=env=prod,team=platform"))
         assert out == [("env", "prod"), ("team", "platform")]
 
+    def test_list_form_colon_key_value(self):
+        from terrapod.api.routers.tfe_v2 import _parse_tag_filters
+
+        # OpenTofu's cloud block emits `key:value` for set-of-string tags
+        # (`tags = ["repo:tf-aws-core"]`) — map tags aren't supported there.
+        out = _parse_tag_filters(self._req("search%5Btags%5D=repo:tf-aws-core"))
+        assert out == [("repo", "tf-aws-core")]
+
+    def test_list_form_colon_value_with_hyphens(self):
+        from terrapod.api.routers.tfe_v2 import _parse_tag_filters
+
+        # Only the FIRST separator splits — values keep their hyphens/etc.
+        out = _parse_tag_filters(self._req("search%5Btags%5D=env:us-east-1,team:platform"))
+        assert out == [("env", "us-east-1"), ("team", "platform")]
+
+    def test_list_form_mixed_colon_equals_and_bare(self):
+        from terrapod.api.routers.tfe_v2 import _parse_tag_filters
+
+        # Colon, equals, and bare tokens coexist; earliest separator wins.
+        out = _parse_tag_filters(self._req("search%5Btags%5D=core,repo:tf-aws-core,env=prod"))
+        assert out == [("core", None), ("repo", "tf-aws-core"), ("env", "prod")]
+
+    def test_list_form_colon_empty_key_skipped(self):
+        from terrapod.api.routers.tfe_v2 import _parse_tag_filters
+
+        out = _parse_tag_filters(self._req("search%5Btags%5D=:orphanvalue,core"))
+        assert out == [("core", None)]
+
     def test_list_form_mixed(self):
         from terrapod.api.routers.tfe_v2 import _parse_tag_filters
 

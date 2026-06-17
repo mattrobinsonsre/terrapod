@@ -201,7 +201,7 @@ terrapod-migrate rewrite --state-file migration-state.json --source-dir ~/code/a
 against each repo (locally cloned, on the operator's own machine). The
 tool walks the directory tree and mechanically rewrites:
 
-- `terraform { cloud { hostname = "app.terraform.io", organization = "acme" ... } }` blocks → Terrapod hostname + `"default"` organization. Both `workspaces { name = "..." }` and `workspaces { tags = [...] }` forms are supported — only `hostname` and `organization` change; the workspace selection inside stays as-is (Terrapod's `tfe_v2` endpoint accepts the same `tags = [...]` syntax and translates internally).
+- `terraform { cloud { hostname = "app.terraform.io", organization = "acme" ... } }` blocks → Terrapod hostname + `"default"` organization. Both `workspaces { name = "..." }` and `workspaces { tags = [...] }` forms are supported — only `hostname` and `organization` change; the workspace selection inside stays as-is (Terrapod's `tfe_v2` endpoint accepts the same `tags = [...]` syntax and translates internally). Tags are matched against workspace **labels**: a bare tag (`"core"`) matches any workspace with that label key, and a `key:value` tag (`"repo:tf-aws-core"`) matches that exact label. Use the colon form to select by key+value — OpenTofu rejects the Terraform 1.10+ map form (`tags = { repo = "..." }`), so `tags = ["repo:tf-aws-core"]` is the portable equivalent.
 - `terraform { backend "remote" { hostname = "app.terraform.io", organization = "acme" ... } }` blocks → same destination as `cloud {}`.
 - `source = "app.terraform.io/acme/<module>"` private-module references → `"<terrapod-host>/default/<module>"`.
 
