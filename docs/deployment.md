@@ -218,7 +218,7 @@ The chart ships with a `values.schema.json` that validates all values at `helm i
 
 | Value | Default | Description |
 |---|---|---|
-| `web.enabled` | `false` | Enable web UI deployment |
+| `web.enabled` | `true` | Enable web UI deployment (the BFF ingress entry point) |
 | `web.replicas` | `2` | Number of web replicas |
 | `web.image.repository` | `ghcr.io/mattrobinsonsre/terrapod-web` | Web Docker image |
 | `web.resources.requests.cpu` | `100m` | CPU request |

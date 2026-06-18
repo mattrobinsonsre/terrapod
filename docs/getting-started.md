@@ -1,6 +1,8 @@
 # Getting Started
 
-This guide walks through setting up Terrapod locally, creating your first workspace, and running your first plan and apply against it.
+This guide deploys Terrapod onto a Kubernetes cluster with the Helm chart, then creates your first workspace and runs your first plan and apply against it.
+
+> Terrapod runs **only on Kubernetes** — the runner uses the Jobs API to schedule plan/apply executions. You don't need a managed cloud cluster; a single-node [k3s](https://k3s.io/) VM works. If you instead want to run Terrapod **from source** for development, see [Local Development](local-development.md).
 
 > **OpenTofu is the recommended execution backend.** Terrapod supports both [OpenTofu](https://opentofu.org/) (`tofu`) and Terraform (`terraform`) as execution backends. OpenTofu is recommended because it is open-source under the MPL-2.0 license. All CLI examples in this guide use `tofu`, but `terraform` commands work identically.
 
@@ -8,88 +10,85 @@ This guide walks through setting up Terrapod locally, creating your first worksp
 
 ## Prerequisites
 
-### Required Software
+| Need | Notes |
+|---|---|
+| A Kubernetes cluster (1.27+) | Any conformant cluster. No cluster? Spin up [k3s](https://k3s.io/) on a single VM (below). |
+| Helm 3.x | `brew install helm` |
+| PostgreSQL 14+ and Redis 7+ | **External** — the chart does not bundle them. Provide a connection URL for each (a managed service, or run them on the cluster/VM). See [Deployment → Database Setup](deployment.md#database-setup). |
+| Storage | Defaults to a PVC-backed filesystem (no extra setup). For S3/Azure/GCS see [Deployment → Storage Backend Setup](deployment.md#storage-backend-setup). |
+| `tofu` (recommended) or `terraform` | Infrastructure CLI — [opentofu.org](https://opentofu.org/) or [terraform.io](https://www.terraform.io/). |
 
-| Tool | Purpose | Install |
-|---|---|---|
-| Docker | Container runtime | [docker.com](https://www.docker.com/) |
-| Kubernetes cluster | Local K8s (any of the below) | See below |
-| Tilt | Local K8s dev environment | `brew install tilt` |
-| mkcert | Local TLS certificates | `brew install mkcert` |
-| tofu (recommended) or terraform | Infrastructure CLI | [opentofu.org](https://opentofu.org/) (recommended) or [terraform.io](https://www.terraform.io/) |
+### Don't have a cluster? Use k3s
 
-### Supported Local Kubernetes Clusters
+[k3s](https://k3s.io/) is a fully conformant single-binary Kubernetes that runs on one VM (~512 MB RAM) and ships with an ingress controller (Traefik) and local-path storage:
 
-Any of these will work:
-- [Rancher Desktop](https://rancherdesktop.io/)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (with Kubernetes enabled)
-- [minikube](https://minikube.sigs.k8s.io/)
-- [kind](https://kind.sigs.k8s.io/)
-- [OrbStack](https://orbstack.dev/)
-- [colima](https://github.com/abiosoft/colima)
+```zsh
+curl -sfL https://get.k3s.io | sh -          # single-node cluster
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+```
+
+Run PostgreSQL and Redis as managed services or on a separate VM so your data survives cluster recreation.
 
 ---
 
-## Local Development Setup
+## Deploy Terrapod
 
-### Step 1: Install mkcert and create local CA
+Terrapod is published to GitHub Container Registry as an OCI Helm chart at `oci://ghcr.io/mattrobinsonsre/terrapod`.
 
-```zsh
-brew install mkcert
-mkcert -install
-```
-
-This installs a local Certificate Authority into your system trust store so that `https://terrapod.local` is trusted by your browser and the terraform CLI.
-
-### Step 2: Add hosts entry
+Pick a hostname and install:
 
 ```zsh
-sudo sh -c 'echo "127.0.0.1 terrapod.local" >> /etc/hosts'
+export TERRAPOD_HOST=terrapod.example.com
+
+helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
+  --namespace terrapod --create-namespace \
+  --set ingress.enabled=true \
+  --set ingress.hostname="$TERRAPOD_HOST" \
+  --set ingress.className=traefik \
+  --set postgresql.url="postgresql+asyncpg://terrapod:PASSWORD@PGHOST:5432/terrapod" \
+  --set redis.url="redis://REDISHOST:6379" \
+  --set bootstrap.adminEmail="admin@example.com" \
+  --set bootstrap.adminPassword="change-me-now"
 ```
 
-### Step 3: Start Terrapod
+What the defaults give you: filesystem storage on a PVC, local password auth enabled, a pre-install migrations job, and a post-install bootstrap job that creates the admin user from `bootstrap.adminEmail` / `bootstrap.adminPassword`. Set `ingress.className` to your cluster's ingress controller (`traefik` on k3s, often `nginx` on managed clusters). Pin a version with `--version X.Y.Z`.
+
+> For production, put the admin password in a Kubernetes Secret (`bootstrap.existingSecret`) rather than on the command line, terminate TLS at the ingress (e.g. cert-manager), and set `api.config.external_url` so outbound links (VCS status, notifications) are correct. The full value reference — storage backends, external DB, SSO, scaling, TLS, runners — is in [Deployment](deployment.md), and [Production Checklist](production-checklist.md) covers hardening.
+
+Watch it come up:
 
 ```zsh
-make dev
+kubectl -n terrapod get pods -w
 ```
 
-This runs `tilt up --port 10352` which:
+### Access
 
-1. Creates the `terrapod` namespace
-2. Generates TLS certificates via mkcert
-3. Deploys PostgreSQL and Redis in-cluster
-4. Builds the API and web Docker images
-5. Runs database migrations (Alembic)
-6. Bootstraps the initial admin user
-7. Deploys the API server, web UI, and runner listener
+Point your hostname's DNS at the ingress controller's external IP (on k3s, the VM's IP — Traefik listens on ports 80/443). For a quick local test you can add a hosts entry instead:
 
-Open the Tilt UI at http://localhost:10352 to monitor the deployment.
+```zsh
+sudo sh -c 'echo "<INGRESS_IP> terrapod.example.com" >> /etc/hosts'
+```
 
-### Step 4: Access Terrapod
+Then open `https://terrapod.example.com` and log in with the bootstrap admin email + password.
 
-Open https://terrapod.local in your browser.
+> TLS: the ingress expects a certificate by default (`ingress.tls=true`). For a quick HTTP-only evaluation, add `--set ingress.tls=false`; for real TLS see [Deployment → Ingress](deployment.md#ingress).
+>
+> No DNS available at all? Port-forward the web service for a quick look: `kubectl -n terrapod port-forward svc/terrapod-web 8080:3000`, then open `http://localhost:8080`.
 
-![Login](images/login.png)
+### Get an API token
 
-The bootstrap job creates an initial admin user. The default credentials are `admin` / `admin` (configured in `values-local.yaml`). Check the Tilt logs for the `terrapod-bootstrap-1` resource to confirm.
-
-### Step 5: Get an API Token
-
-After logging in to the web UI, navigate to **Settings > API Tokens** and create a new token. Copy the token value -- it is only shown once.
-
-![API Tokens](images/api-tokens.png)
+In the web UI, go to **Settings → API Tokens**, create a token, and copy the value (shown once):
 
 ```zsh
 export TERRAPOD_TOKEN="<your-token-value>"
 ```
 
-Alternatively, use `terraform login`:
+Or let the CLI mint one for you via the browser login flow:
 
 ```zsh
-terraform login terrapod.local
+tofu login terrapod.example.com
 ```
-
-This opens a browser window, authenticates via the configured identity provider, and stores the token automatically.
 
 ---
 
@@ -98,7 +97,7 @@ This opens a browser window, authenticates via the configured identity provider,
 ### Via the API
 
 ```zsh
-curl -s -X POST https://terrapod.local/api/v2/organizations/default/workspaces \
+curl -s -X POST https://terrapod.example.com/api/v2/organizations/default/workspaces \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -134,7 +133,7 @@ Create a configuration that uses Terrapod as its backend:
 # main.tf
 terraform {
   cloud {
-    hostname     = "terrapod.local"
+    hostname     = "terrapod.example.com"
     organization = "default"
 
     workspaces {
@@ -165,11 +164,13 @@ If you'd rather select a workspace at run time (typical when a single repo backs
 
 ```hcl
 workspaces {
-  tags = ["network"]                 # any workspace whose labels include "network"
-  # or, for an exact match:
-  tags = { repo = "aws-infra" }
+  tags = ["network"]                 # any workspace with the label key "network"
+  # or, for an exact key:value match:
+  tags = ["repo:aws-infra"]          # workspaces whose `repo` label is `aws-infra`
 }
 ```
+
+> OpenTofu only accepts the **set-of-strings** `tags` form, so use the `key:value` string above for an exact match. The Terraform 1.10+ **map** form (`tags = { repo = "aws-infra" }`) is rejected by `tofu` at config validation with `set of string required`.
 
 Then pick a specific workspace per invocation:
 
@@ -182,7 +183,7 @@ tofu workspace select network-staging
 If you have not already run `tofu login`:
 
 ```zsh
-tofu login terrapod.local
+tofu login terrapod.example.com
 ```
 
 Then initialize:
@@ -239,7 +240,7 @@ Agent workspaces support two workflows depending on whether VCS is connected:
 1. Set the workspace execution mode to `agent`:
 
 ```zsh
-curl -X PATCH https://terrapod.local/api/v2/workspaces/ws-{id} \
+curl -X PATCH https://terrapod.example.com/api/v2/workspaces/ws-{id} \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -256,7 +257,7 @@ curl -X PATCH https://terrapod.local/api/v2/workspaces/ws-{id} \
 
 ```zsh
 # Create configuration version
-CV_RESPONSE=$(curl -s -X POST https://terrapod.local/api/v2/workspaces/ws-{id}/configuration-versions \
+CV_RESPONSE=$(curl -s -X POST https://terrapod.example.com/api/v2/workspaces/ws-{id}/configuration-versions \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{"data": {"type": "configuration-versions", "attributes": {"auto-queue-runs": true}}}')
@@ -274,7 +275,7 @@ curl -X PUT "$UPLOAD_URL" \
 3. A run is automatically queued (plan-only). Monitor it:
 
 ```zsh
-curl -s https://terrapod.local/api/v2/workspaces/ws-{id}/runs \
+curl -s https://terrapod.example.com/api/v2/workspaces/ws-{id}/runs \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" | jq '.data[0].attributes.status'
 ```
 
@@ -289,7 +290,7 @@ Variables can be set per-workspace via the API or web UI.
 ### Terraform Variables
 
 ```zsh
-curl -X POST https://terrapod.local/api/v2/workspaces/ws-{id}/vars \
+curl -X POST https://terrapod.example.com/api/v2/workspaces/ws-{id}/vars \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -309,7 +310,7 @@ curl -X POST https://terrapod.local/api/v2/workspaces/ws-{id}/vars \
 ### Environment Variables
 
 ```zsh
-curl -X POST https://terrapod.local/api/v2/workspaces/ws-{id}/vars \
+curl -X POST https://terrapod.example.com/api/v2/workspaces/ws-{id}/vars \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -330,7 +331,7 @@ curl -X POST https://terrapod.local/api/v2/workspaces/ws-{id}/vars \
 Set `"sensitive": true` for secrets. The value is protected by database encryption-at-rest and never returned in API responses:
 
 ```zsh
-curl -X POST https://terrapod.local/api/v2/workspaces/ws-{id}/vars \
+curl -X POST https://terrapod.example.com/api/v2/workspaces/ws-{id}/vars \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -363,7 +364,7 @@ For managing variables across multiple workspaces, see variable sets (admin-only
 1. Create the module:
 
 ```zsh
-curl -X POST https://terrapod.local/api/terrapod/v1/registry-modules \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-modules \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -380,7 +381,7 @@ curl -X POST https://terrapod.local/api/terrapod/v1/registry-modules \
 2. Create a version:
 
 ```zsh
-curl -X POST https://terrapod.local/api/terrapod/v1/registry-modules/private/default/vpc/aws/versions \
+curl -X POST https://terrapod.example.com/api/terrapod/v1/registry-modules/private/default/vpc/aws/versions \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -399,7 +400,7 @@ curl -X POST https://terrapod.local/api/terrapod/v1/registry-modules/private/def
 
 ```hcl
 module "vpc" {
-  source  = "terrapod.local/default/vpc/aws"
+  source  = "terrapod.example.com/default/vpc/aws"
   version = "1.0.0"
 }
 ```
@@ -419,25 +420,19 @@ See [vcs-integration.md](vcs-integration.md) for detailed setup instructions.
 
 ---
 
-## Running Tests and Linting
-
-All tests run in Docker -- no local Python or Node.js install needed:
+## Uninstall
 
 ```zsh
-make test         # Run pytest with LocalStack for S3 testing
-make lint         # Run ruff check + format check + mypy
-make test-down    # Tear down test containers
+helm uninstall terrapod --namespace terrapod
 ```
 
----
+PersistentVolumeClaims (filesystem storage, ephemeral runner scratch) are not
+removed by `helm uninstall` — delete them explicitly if you want to reclaim the
+storage, and drop the namespace with `kubectl delete namespace terrapod`.
 
-## Stopping the Dev Environment
-
-```zsh
-make dev-down
-```
-
-This stops all Tilt-managed resources and cleans up the namespace.
+> Building and testing Terrapod from source — Tilt, live-reload, `make test` —
+> is covered in [Local Development](local-development.md). You don't need any of
+> that to run Terrapod.
 
 ---
 

@@ -41,14 +41,21 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
 ## Quick Start
 
+Deploy onto any Kubernetes cluster (or a single-node [k3s](https://k3s.io/) VM) with the Helm chart:
+
 ```zsh
-# Prerequisites: Docker, local K8s cluster, Tilt, mkcert
-brew install mkcert && mkcert -install
-sudo sh -c 'echo "127.0.0.1 terrapod.local" >> /etc/hosts'
-make dev
+helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
+  --namespace terrapod --create-namespace \
+  --set ingress.enabled=true \
+  --set ingress.hostname="terrapod.example.com" \
+  --set ingress.className=traefik \
+  --set postgresql.url="postgresql+asyncpg://terrapod:PASSWORD@PGHOST:5432/terrapod" \
+  --set redis.url="redis://REDISHOST:6379" \
+  --set bootstrap.adminEmail="admin@example.com" \
+  --set bootstrap.adminPassword="change-me-now"
 ```
 
-Open `https://terrapod.local` in your browser. See [Getting Started](getting-started.md) for the full walkthrough.
+PostgreSQL and Redis are external (not bundled). See [Getting Started](getting-started.md) for the full walkthrough, or [Local Development](local-development.md) if you want to run Terrapod from source.
 
 ---
 
@@ -80,7 +87,8 @@ See [Architecture](architecture.md) for the full breakdown.
 
 | Guide | Description |
 |---|---|
-| [Getting Started](getting-started.md) | Local development setup, first workspace, first plan/apply |
+| [Getting Started](getting-started.md) | Deploy the Helm chart on Kubernetes (or k3s), first workspace, first plan/apply |
+| [Local Development](local-development.md) | Run Terrapod from source with Tilt (contributors only) |
 | [Architecture](architecture.md) | System components, storage, runners, auth flows |
 | [Authentication](authentication.md) | Local auth, OIDC, SAML, terraform login, API tokens, scoped service tokens (bound/detached) + offboarding idle guard |
 | [RBAC](rbac.md) | Permission model, label-based access control, custom roles |

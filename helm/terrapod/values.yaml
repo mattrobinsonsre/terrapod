@@ -546,8 +546,11 @@ api:
     annotations: {}
 
 # ── Web UI (Next.js) ──────────────────────────────────────────────────────────
+# The web frontend is the BFF (Backend-For-Frontend): all browser, CLI, and
+# listener traffic enters through it and is proxied to the API. The Ingress
+# routes here, so it is enabled by default alongside the API and listener.
 web:
-  enabled: false
+  enabled: true
 
   replicas: 2
 

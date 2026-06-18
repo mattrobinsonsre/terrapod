@@ -50,6 +50,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Local Development: local-development.md
   - Architecture: architecture.md
   - Features:
       - VCS Integration: vcs-integration.md
