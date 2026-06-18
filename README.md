@@ -139,35 +139,39 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
 ## Quick Start
 
+Terrapod runs **only on Kubernetes** (the runner uses the Jobs API). Deploy it onto any cluster — or a single-node [k3s](https://k3s.io/) VM — with the Helm chart.
+
 ### Prerequisites
 
-- A local Kubernetes cluster (Rancher Desktop, Docker Desktop, minikube, kind, or OrbStack)
-- [Tilt](https://tilt.dev/) installed
-- [mkcert](https://github.com/FiloSottile/mkcert) for local TLS
+- A Kubernetes cluster (1.27+). No cluster? `curl -sfL https://get.k3s.io | sh -` gives you one on a single VM, with an ingress controller (Traefik) and storage included.
+- Helm 3.x
+- **External** PostgreSQL 14+ and Redis 7+ (the chart does not bundle them) — a managed service or run them on the cluster/VM.
 
-### Setup
+### Deploy
 
 ```zsh
-# Install mkcert and create local CA
-brew install mkcert && mkcert -install
-
-# Add hosts entry
-sudo sh -c 'echo "127.0.0.1 terrapod.local" >> /etc/hosts'
-
-# Start Terrapod
-make dev
+helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
+  --namespace terrapod --create-namespace \
+  --set ingress.enabled=true \
+  --set ingress.hostname="terrapod.example.com" \
+  --set ingress.className=traefik \
+  --set postgresql.url="postgresql+asyncpg://terrapod:PASSWORD@PGHOST:5432/terrapod" \
+  --set redis.url="redis://REDISHOST:6379" \
+  --set bootstrap.adminEmail="admin@example.com" \
+  --set bootstrap.adminPassword="change-me-now"
 ```
 
-Tilt starts on port 10352. Open https://terrapod.local in your browser.
+Defaults give you filesystem storage on a PVC, local password auth, the migrations job, and a bootstrap admin user. Point your hostname's DNS at the ingress controller, then open `https://terrapod.example.com` and log in. (For a quick HTTP-only look, add `--set ingress.tls=false`.)
+
+Object storage options: S3, Azure Blob, GCS, or the default PVC-backed filesystem.
 
 ### Create Your First Workspace
 
 ```zsh
-# Login (default admin credentials from bootstrap)
+# Create an API token in the UI (Settings → API Tokens), or: tofu login terrapod.example.com
 export TERRAPOD_TOKEN="<your-api-token>"
 
-# Create a workspace
-curl -X POST https://terrapod.local/api/v2/organizations/default/workspaces \
+curl -X POST https://terrapod.example.com/api/v2/organizations/default/workspaces \
   -H "Authorization: Bearer $TERRAPOD_TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -186,7 +190,7 @@ curl -X POST https://terrapod.local/api/v2/organizations/default/workspaces \
 # main.tf
 terraform {
   cloud {
-    hostname     = "terrapod.local"
+    hostname     = "terrapod.example.com"
     organization = "default"
 
     workspaces {
@@ -197,36 +201,13 @@ terraform {
 ```
 
 ```zsh
-tofu login terrapod.local
+tofu login terrapod.example.com
 tofu init
 tofu plan
 tofu apply
 ```
 
-For detailed instructions, see [docs/getting-started.md](docs/getting-started.md).
-
----
-
-## Production Deployment
-
-Terrapod is deployed via Helm chart on Kubernetes. Images and chart are published to GHCR.
-
-```zsh
-helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
-  --namespace terrapod \
-  --create-namespace \
-  --set ingress.enabled=true \
-  --set ingress.hostname=terrapod.example.com \
-  --set postgresql.url="postgresql+asyncpg://user:pass@db:5432/terrapod" \
-  --set redis.url="redis://redis:6379"
-```
-
-Required infrastructure:
-- **PostgreSQL** (v14+) for relational data
-- **Redis** (v7+) for sessions, locks, and listener heartbeats
-- **Object storage** (S3, Azure Blob, GCS, or PVC-backed filesystem)
-
-See [docs/deployment.md](docs/deployment.md) for the full production deployment guide.
+For the full walkthrough (k3s bootstrap, DNS/ingress, agent mode, variables, registry) see [docs/getting-started.md](docs/getting-started.md). For the complete production deployment guide — storage backends, external DB, SSO, scaling, TLS — see [docs/deployment.md](docs/deployment.md). To run Terrapod **from source** as a contributor, see [docs/local-development.md](docs/local-development.md).
 
 ---
 
@@ -249,7 +230,8 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | Document | Description |
 |---|---|
 | [Architecture](docs/architecture.md) | System components, BFF pattern, storage, runners, auth flows |
-| [Getting Started](docs/getting-started.md) | Local development setup, first workspace, first plan/apply |
+| [Getting Started](docs/getting-started.md) | Deploy the Helm chart on Kubernetes (or k3s), first workspace, first plan/apply |
+| [Local Development](docs/local-development.md) | Run Terrapod from source with Tilt (contributors only) |
 | [Authentication](docs/authentication.md) | Local auth, OIDC, SAML, terraform login, API tokens |
 | [RBAC](docs/rbac.md) | Permission model, label-based access control, custom roles |
 | [API Reference](docs/api-reference.md) | All API endpoints with examples |
