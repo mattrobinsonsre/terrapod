@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
+import { SensitiveValueInput } from '@/components/sensitive-value-input'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { usePollingInterval } from '@/lib/use-polling-interval'
@@ -514,7 +515,7 @@ export default function VariableSetDetailPage() {
                   </div>
                   <div>
                     <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">Value</label>
-                    <textarea id="var-val" value={varValue} onChange={(e) => setVarValue(e.target.value)} placeholder="us-east-1"
+                    <SensitiveValueInput id="var-val" value={varValue} onChange={setVarValue} sensitive={varSensitive} placeholder="us-east-1"
                       rows={2} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" />
                   </div>
                   <div>
@@ -569,7 +570,8 @@ export default function VariableSetDetailPage() {
                               className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500" />
                           </td>
                           <td className="px-4 py-3">
-                            <textarea value={editVarValue} onChange={(e) => setEditVarValue(e.target.value)}
+                            <SensitiveValueInput value={editVarValue} onChange={setEditVarValue}
+                              sensitive={editVarSensitive}
                               placeholder={editVarSensitive ? 'Enter new value' : ''}
                               rows={2}
                               className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500 resize-y" />

@@ -97,3 +97,21 @@ body {
     opacity: 1;
   }
 }
+
+/* Cross-browser secret masking. `-webkit-text-security` only works in
+   Chromium/WebKit (not Firefox), so we mask by swapping in a font whose
+   every glyph is a disc — works in all browsers and keeps the real value
+   editable (multi-line, paste-safe) in the underlying input/textarea.
+   Apply `.text-masked` to mask; remove it to reveal. Font: text-security
+   (noppa/text-security), vendored at /public/fonts. */
+@font-face {
+  font-family: "text-security-disc";
+  src: url("/fonts/text-security-disc.woff2") format("woff2");
+  font-display: block;
+}
+
+.text-masked {
+  font-family: "text-security-disc" !important;
+  /* Keep dots evenly spaced regardless of the field's normal font. */
+  letter-spacing: 0.05em;
+}

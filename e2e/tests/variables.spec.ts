@@ -63,6 +63,27 @@ test.describe('Variables', () => {
     await expect(row.locator('text=***')).toBeVisible();
   });
 
+  test('sensitive variable value is masked on entry, revealable', async ({ page }) => {
+    await page.goto(`/workspaces/${workspaceId}?tab=variables`);
+
+    await page.click('button:has-text("Add Variable")');
+    const valField = page.locator('#var-val');
+    await valField.fill('shoulder-surf-me');
+
+    // Not sensitive yet -> value shown normally (no masking class).
+    await expect(valField).not.toHaveClass(/text-masked/);
+
+    // Mark sensitive -> the entry field masks (cross-browser disc font).
+    await page.locator('label:has-text("Sensitive") input[type="checkbox"]').check();
+    await expect(valField).toHaveClass(/text-masked/);
+
+    // Show toggle reveals it; hiding masks again.
+    await page.click('button[aria-label="Show value"]');
+    await expect(valField).not.toHaveClass(/text-masked/);
+    await page.click('button[aria-label="Hide value"]');
+    await expect(valField).toHaveClass(/text-masked/);
+  });
+
   test('delete variable removes it from list', async ({ page }) => {
     const varKey = `DELETE_e2e_${Date.now()}`;
 
