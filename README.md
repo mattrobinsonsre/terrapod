@@ -313,17 +313,37 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 
 ## Comparison with Alternatives
 
-| Project | What it does | Gap vs full TFE replacement |
+| Project | What it does | Position relative to Terrapod |
 |---|---|---|
-| [OpenTofu](https://opentofu.org/) | Open-source Terraform fork (CLI) | CLI only -- no collaboration platform |
+| [Terrakube](https://terrakube.io/) | Open-source TFC/TFE replacement | **Closest peer** -- comparable full-platform scope (see below) |
+| [OpenTofu](https://opentofu.org/) | Open-source Terraform fork (CLI) | CLI only -- no collaboration platform; Terrapod runs it as an engine |
 | [Atlantis](https://www.runatlantis.io/) | PR-based plan/apply automation | No UI, no state management, no registry, no RBAC |
 | [Digger](https://digger.dev/) | CI-native Terraform orchestration | Runs inside CI; no standalone platform |
 | [Terrateam](https://terrateam.io/) | GitHub-integrated TF automation | GitHub-coupled; limited community edition |
 | [Spacelift](https://spacelift.io/) | Commercial TF management platform | Not open source |
 
-Terrapod is the only open-source project that covers the full TFE surface: state management, agent execution, private registry, RBAC, VCS integration, drift detection, OPA policy enforcement, and a production-grade UI -- all in a single self-hosted Kubernetes deployment.
+### Terrakube
 
-Terrapod is a single, self-hosted platform covering the full TFE surface (state + runs + registry + governance + UI + API) under a copyleft (GPLv3) license.
+[Terrakube](https://terrakube.io/) is the closest open-source alternative and the project most worth comparing against. It is **also** a full self-hosted Terraform Cloud / Enterprise replacement: it implements the same `cloud {}` / `backend "remote"` TFE V2 API that Terrapod targets, and ships organizations, a private module + provider registry with GPG-signed provider publishing, granular RBAC, VCS integration (GitHub/GitLab/Bitbucket/Azure DevOps), dynamic provider credentials (AWS/GCP/Azure workload identity), OPA policy checks, and ephemeral Kubernetes-Job executors. It is Apache-2.0, built on Java/Spring Boot + Angular, with an established community and a frequent release cadence. **If you are choosing a Terraform platform today, evaluate Terrakube alongside Terrapod** -- on the core surface the two are at rough parity, and Terrakube is the more mature project.
+
+**Where Terrakube is ahead of Terrapod:**
+
+- **Multi-organization tenancy** with teams -- Terrapod is single-org by deliberate design.
+- **Maturity**: longer track record, larger community, more permissive (Apache-2.0) license. Terrapod is newer and, today, single-maintainer.
+
+**Where Terrapod is genuinely differentiated** (verified against Terrakube's current docs). The first three share one theme -- Terrapod is built for restricted-network, multi-cluster, low-upstream-dependency topologies:
+
+- **Firewall-friendly cross-cluster execution.** Terrapod runners connect *outbound* to the control plane over SSE and create Jobs locally; the API holds no inbound reach and no Kubernetes access into the execution cluster. Terrakube's API connects *into* the executor (it must be exposed via ingress, with Redis reachable), so isolated / NAT'd / outbound-only execution clusters aren't supported the same way.
+- **Polling-first VCS** -- Terrapod polls VCS over outbound HTTPS (webhooks optional); Terrakube is webhook-only and needs inbound webhook delivery.
+- **Pull-through provider mirror + terraform/tofu binary cache** -- runners have zero direct upstream dependency; Terrakube ships only a local plugin cache.
+- **Monorepo autodiscovery** -- Atlantis-style auto-creation of workspaces from glob-matched directories on PRs (Terrakube has directory filtering, but not auto-creation).
+- **Run tasks** -- pre/post-plan external webhook validation hooks (not present in Terrakube).
+- **In-platform AI** -- plan summaries, failure analysis, and chat (Terrakube offers only an external MCP server).
+- Additionally: first-class OPA **policy sets** with mandatory/advisory enforcement, native multi-channel **notifications** (Slack/email/webhook), and cross-workspace **run triggers**.
+
+Net: Terrapod is not a "better general TFE replacement" -- Terrakube wins on maturity and multi-tenancy. Terrapod's defensible niche is **restricted-network, multi-cluster execution** (outbound-only runners, polling VCS, self-contained caching) with an AI-assisted review layer. Pick on that basis.
+
+Licensing: Terrapod is **GPLv3** (strong copyleft); Terrakube is **Apache-2.0** (permissive) -- relevant if you intend to redistribute a modified platform.
 
 ---
 
