@@ -7,12 +7,13 @@ the rest of the orchestrator and reconcile Terragrunt with Terrapod's
 local-backend + state-via-API model:
 
   tg-wrapper  — used as the orchestrator's `binary`. `tg-wrapper <subcmd> …`
-                execs `terragrunt --tf-path=<tf-wrapper> <subcmd> …`, so every
-                existing `[binary, "init"/"plan"/"apply"/"show", …]` call site
-                works unchanged.
-  tf-wrapper  — passed to terragrunt via `--tf-path`. Terragrunt invokes it as
-                the terraform binary from inside its working dir
-                (`.terragrunt-cache/<hash>/<module>/`). Before exec'ing the real
+                execs `terragrunt <subcmd> …` with `TG_TF_PATH=<tf-wrapper>`,
+                so every existing `[binary, "init"/"plan"/"apply"/"show", …]`
+                call site works unchanged. (The env var is used, not the
+                --tf-path flag, which Terragrunt 1.0 rejects as a global flag.)
+  tf-wrapper  — what Terragrunt runs as the terraform binary (via TG_TF_PATH).
+                Terragrunt invokes it from inside its working dir
+                (`.terragrunt-cache/<hash>/<hash>/`). Before exec'ing the real
                 tofu/terraform it drops `zzzz_terrapod_backend_override.tf`
                 (`terraform { backend "local" {} }`) into that dir. tofu/tofu
                 override files ALWAYS replace the backend block, so the local
@@ -25,9 +26,7 @@ The runner image is bash-free (#167), so both wrappers are Python.
 
 from __future__ import annotations
 
-import json
 import stat
-import subprocess
 from pathlib import Path
 
 import httpx
@@ -133,13 +132,17 @@ def write_wrappers(
         "    pass\n"
         "os.execv(REAL, [REAL, *sys.argv[1:]])\n"
     )
-    # tg-wrapper: terragrunt with --tf-path pinned to the tf-wrapper.
+    # tg-wrapper: terragrunt with the tf-wrapper pinned via TG_TF_PATH. The env
+    # var (not the --tf-path flag) is used deliberately: Terragrunt 1.0's CLI
+    # redesign rejects --tf-path as a global flag, but TG_TF_PATH is honored
+    # regardless of CLI structure.
     tg_src = (
         "#!/usr/bin/env python3\n"
         "import os, sys\n"
         f"TG = {str(terragrunt_bin)!r}\n"
         f"TF_WRAPPER = {str(tf_wrapper)!r}\n"
-        "os.execv(TG, [TG, '--tf-path', TF_WRAPPER, *sys.argv[1:]])\n"
+        "os.environ['TG_TF_PATH'] = TF_WRAPPER\n"
+        "os.execv(TG, [TG, *sys.argv[1:]])\n"
     )
     for path, src in ((tf_wrapper, tf_src), (tg_wrapper, tg_src)):
         path.write_text(src)
@@ -148,42 +151,31 @@ def write_wrappers(
     return tg_wrapper
 
 
-def resolve_working_dir(tg_wrapper: Path | str, *, cwd: str | None = None) -> Path | None:
-    """Resolve Terragrunt's actual tofu working dir via `terragrunt-info`.
+def resolve_working_dir(unit_dir: Path | str) -> Path:
+    """Resolve Terragrunt's actual tofu working dir after init.
 
-    With `terraform { source = … }`, Terragrunt runs tofu inside
-    `.terragrunt-cache/<hash>/<module>/` rather than the unit dir, so the
-    local state file lands there. `terragrunt terragrunt-info` reports the
-    `WorkingDir` as JSON. Returns the resolved path, or None if it can't be
-    determined (caller falls back to the unit dir).
+    With `terraform { source = … }`, Terragrunt copies the module into
+    `<unit>/.terragrunt-cache/<hash>/<hash>/` and runs tofu THERE, so the local
+    state lands in that dir rather than the unit dir. We discover it by the
+    override marker the tf-wrapper drops on every tofu invocation (unique to
+    us) — robust, and version-proof now that `terragrunt-info` was removed in
+    Terragrunt 1.0. In-place units (no `source`) have no cache; tofu runs in
+    the unit dir, which we return as the fallback.
+
+    Returns the directory the runner should treat as the working dir for state
+    capture + the `!= local` backstop.
     """
-    try:
-        proc = subprocess.run(  # noqa: S603 — argv is operator-controlled wrapper
-            [str(tg_wrapper), "terragrunt-info"],
-            check=False,
-            capture_output=True,
-            timeout=60,
-            cwd=cwd,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        logger.warning("terragrunt-info failed", err=str(exc))
-        return None
-    if proc.returncode != 0:
-        logger.warning(
-            "terragrunt-info returned non-zero",
-            rc=proc.returncode,
-            stderr=proc.stderr[:300].decode("utf-8", errors="replace"),
-        )
-        return None
-    try:
-        info = json.loads(proc.stdout.decode("utf-8", errors="replace"))
-    except (json.JSONDecodeError, ValueError) as exc:
-        logger.warning("terragrunt-info JSON parse failed", err=str(exc))
-        return None
-    work = info.get("WorkingDir")
-    if not work:
-        return None
-    p = Path(work)
-    if not p.is_absolute() and cwd:
-        p = Path(cwd) / p
-    return p if p.is_dir() else None
+    unit = Path(unit_dir)
+    cache = unit / ".terragrunt-cache"
+    if cache.is_dir():
+        # The marker is dropped wherever tofu actually ran. Ignore copies that
+        # happen to live under a `.terraform/` subdir; prefer the shallowest
+        # real working dir.
+        candidates = [
+            m.parent for m in cache.rglob(_OVERRIDE_NAME) if ".terraform" not in m.parent.parts
+        ]
+        if candidates:
+            candidates.sort(key=lambda p: len(p.parts))
+            logger.info("resolved terragrunt working dir", work_dir=str(candidates[0]))
+            return candidates[0]
+    return unit

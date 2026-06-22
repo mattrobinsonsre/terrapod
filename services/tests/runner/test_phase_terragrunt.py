@@ -78,15 +78,16 @@ def test_tf_wrapper_honors_chdir_flag(tmp_path: Path) -> None:
     assert not (launch_cwd / _OVERRIDE_NAME).exists()
 
 
-def test_tg_wrapper_invokes_terragrunt_with_tf_path(tmp_path: Path) -> None:
+def test_tg_wrapper_pins_tf_path_via_env_and_forwards_argv(tmp_path: Path) -> None:
+    # Terragrunt 1.0 rejects --tf-path as a global flag, so the tg-wrapper pins
+    # the tf-wrapper via the TG_TF_PATH env var and forwards argv unchanged.
     bin_dir = tmp_path / "bin"
-    # Fake 'terragrunt' that records its argv so we can assert --tf-path wiring.
-    record = tmp_path / "tg_argv.txt"
+    record = tmp_path / "tg.txt"
     fake_tg = tmp_path / "fake-terragrunt"
     fake_tg.write_text(
         "#!/usr/bin/env python3\n"
-        "import sys\n"
-        f"open({str(record)!r}, 'w').write(' '.join(sys.argv[1:]))\n"
+        "import os, sys\n"
+        f"open({str(record)!r}, 'w').write(os.environ.get('TG_TF_PATH','') + '|' + ' '.join(sys.argv[1:]))\n"
     )
     fake_tg.chmod(0o755)
 
@@ -99,6 +100,31 @@ def test_tg_wrapper_invokes_terragrunt_with_tf_path(tmp_path: Path) -> None:
         check=True,
         timeout=30,
     )
-    argv = record.read_text()
-    # terragrunt was called with --tf-path=<tf-wrapper> then the subcommand.
-    assert argv == f"--tf-path {tf_wrapper} plan -input=false"
+    tg_tf_path, _, argv = record.read_text().partition("|")
+    assert tg_tf_path == str(tf_wrapper)  # TG_TF_PATH points at the tf-wrapper
+    assert argv == "plan -input=false"  # argv forwarded unchanged (no --tf-path)
+
+
+def test_resolve_working_dir_finds_cache_dir_by_marker(tmp_path: Path) -> None:
+    from terrapod.runner.phases.terragrunt import resolve_working_dir
+
+    unit = tmp_path / "unit"
+    # Simulate the terragrunt cache layout after init: the tf-wrapper dropped
+    # the override marker in the real working dir (plus a copy under .terraform
+    # that must be ignored).
+    work = unit / ".terragrunt-cache" / "aaaa" / "bbbb"
+    work.mkdir(parents=True)
+    (work / _OVERRIDE_NAME).write_text("x")
+    (work / ".terraform").mkdir()
+    (work / ".terraform" / _OVERRIDE_NAME).write_text("x")  # decoy
+    assert resolve_working_dir(unit) == work
+
+
+def test_resolve_working_dir_falls_back_to_unit_for_in_place(tmp_path: Path) -> None:
+    # In-place units (no `source`) have no .terragrunt-cache; tofu runs in the
+    # unit dir, so that's the working dir.
+    from terrapod.runner.phases.terragrunt import resolve_working_dir
+
+    unit = tmp_path / "inplace"
+    unit.mkdir()
+    assert resolve_working_dir(unit) == unit
