@@ -37,6 +37,12 @@ class RunnerConfig:
     backend: Literal["terraform", "tofu"]
     version: str
 
+    # Terragrunt (#534): when enabled, the runner invokes `terragrunt` wrapping
+    # the cached tofu/terraform binary (via --tf-path). version is partial,
+    # resolved against the binary cache like `version`.
+    terragrunt_enabled: bool
+    terragrunt_version: str
+
     # Workspace context
     workspace_id: str
     working_dir: str
@@ -107,6 +113,8 @@ class RunnerConfig:
             phase=e.get("TP_PHASE", "plan"),  # type: ignore[arg-type]
             backend=e.get("TP_BACKEND", "tofu"),  # type: ignore[arg-type]
             version=e.get("TP_VERSION", ""),
+            terragrunt_enabled=_bool("TP_TERRAGRUNT_ENABLED"),
+            terragrunt_version=e.get("TP_TERRAGRUNT_VERSION", ""),
             workspace_id=e.get("TP_WORKSPACE_ID", ""),
             working_dir=e.get("TP_WORKING_DIR", ""),
             target_addrs=_json_list("TP_TARGET_ADDRS"),

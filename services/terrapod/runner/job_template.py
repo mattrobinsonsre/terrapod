@@ -49,6 +49,8 @@ def build_job_spec(
     timeout_minutes: int = 60,
     terraform_version: str = "",
     execution_backend: str = "",
+    terragrunt_enabled: bool = False,
+    terragrunt_version: str = "",
     namespace: str = "",
     plan_only: bool = False,
     var_files: list[str] | None = None,
@@ -131,6 +133,13 @@ def build_job_spec(
     backend = execution_backend or runner_config.default_execution_backend
     container_env.append({"name": "TP_VERSION", "value": version})
     container_env.append({"name": "TP_BACKEND", "value": backend})
+    # Terragrunt (#534): the runner wraps tofu/terraform with terragrunt when
+    # enabled. Version is partial (e.g. "1.0") — the binary cache resolves it.
+    if terragrunt_enabled:
+        container_env.append({"name": "TP_TERRAGRUNT_ENABLED", "value": "true"})
+        container_env.append(
+            {"name": "TP_TERRAGRUNT_VERSION", "value": terragrunt_version or "1.0"}
+        )
     if plan_only:
         container_env.append({"name": "TP_PLAN_ONLY", "value": "true"})
     if var_files:

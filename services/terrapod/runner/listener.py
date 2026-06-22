@@ -639,6 +639,8 @@ class RunnerListener:
             resource_memory=attrs.get("resource-memory", "2Gi"),
             terraform_version=attrs.get("terraform-version", ""),
             execution_backend=attrs.get("execution-backend", "tofu"),
+            terragrunt_enabled=attrs.get("terragrunt-enabled", False),
+            terragrunt_version=attrs.get("terragrunt-version", ""),
             plan_only=attrs.get("plan-only", False),
             var_files=attrs.get("var-files", []),
             target_addrs=attrs.get("target-addrs"),

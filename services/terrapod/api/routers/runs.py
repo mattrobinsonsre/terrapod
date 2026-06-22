@@ -130,6 +130,8 @@ def _run_json(
                 "source": run.source,
                 "execution-backend": run.execution_backend,
                 "terraform-version": run.terraform_version,
+                "terragrunt-enabled": run.terragrunt_enabled,
+                "terragrunt-version": run.terragrunt_version,
                 "resource-cpu": run.resource_cpu,
                 "resource-memory": run.resource_memory,
                 # Runner resource profile + OOM detection (#430). All
