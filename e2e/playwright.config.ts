@@ -99,5 +99,12 @@ export default defineConfig({
       testMatch: 'ai-summary.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
+    {
+      // RBAC negatives set their own per-role storageState (user/audit) inside
+      // the spec via test.use(), so no project-level storageState here.
+      name: 'rbac-negatives',
+      testMatch: 'rbac-negatives.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
 });

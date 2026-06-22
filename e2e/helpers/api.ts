@@ -7,6 +7,17 @@ import { createHash, randomBytes } from 'crypto';
 const API_URL = process.env.API_URL || 'http://localhost:8000';
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 
+/**
+ * A process-unique, human-readable suffix for test resources. Within a shard
+ * the workers share ONE stack/DB, so every test MUST name its resources
+ * uniquely to avoid collisions — see the Code ↔ E2E Tests Contract in
+ * CLAUDE.md. Combines a timestamp with random bytes so even same-millisecond
+ * calls across workers don't collide.
+ */
+export function uniqueName(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`;
+}
+
 function generatePKCE() {
   const verifier = randomBytes(32).toString('base64url');
   const challenge = createHash('sha256').update(verifier).digest('base64url');
@@ -96,6 +107,36 @@ export async function createUser(
   if (!res.ok && res.status !== 409) {
     const body = await res.text();
     throw new Error(`Create user failed: ${res.status} ${body}`);
+  }
+}
+
+/**
+ * Set the platform/custom roles for a (provider, email) pair. Replaces any
+ * existing assignments. Used in global setup to grant the audit user the
+ * read-only `audit` role for RBAC negative tests.
+ */
+export async function setRoleAssignments(
+  adminToken: string,
+  email: string,
+  roles: string[],
+  providerName = 'local',
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/terrapod/v1/role-assignments`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/vnd.api+json',
+      Authorization: `Bearer ${adminToken}`,
+    },
+    body: JSON.stringify({
+      data: {
+        type: 'role-assignments',
+        attributes: { 'provider-name': providerName, email, roles },
+      },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Set role assignments failed for ${email}: ${res.status} ${body}`);
   }
 }
 
