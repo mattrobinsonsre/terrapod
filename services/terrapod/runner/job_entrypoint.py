@@ -48,6 +48,7 @@ from terrapod.runner.phases import (
     plan_apply,
     resource_profile,
     setup_script,
+    terragrunt,
     tf_args,
     uploads,
     working_dir,
@@ -500,6 +501,17 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     binary_path = download_binary(cfg)
     binary = str(binary_path)
 
+    # 1b. Terragrunt (#534): wrap the cached tofu/terraform with terragrunt so
+    # every phase that invokes `binary` actually runs terragrunt. The tg-wrapper
+    # execs terragrunt with TG_TF_PATH pinned to the tf-wrapper, which drops the
+    # local-backend override into the tofu working dir (so Terrapod still owns
+    # state). Agent-mode MVP supports IN-PLACE units only (working dir == unit
+    # dir); source-redirected units are detected + refused after init below.
+    if cfg.terragrunt_enabled:
+        tg_bin = terragrunt.download_terragrunt(cfg)
+        binary = str(terragrunt.write_wrappers(terragrunt_bin=tg_bin, real_tf_bin=binary_path))
+        log.info("terragrunt enabled", tg_wrapper=binary)
+
     # 2. Configuration tarball.
     work_dir.mkdir(parents=True, exist_ok=True)
     config_result = download_configuration(cfg, work_dir=work_dir)
@@ -561,6 +573,23 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
         _flush_stdio()
         return exc.exit_code
     _flush_stdio()
+
+    # 9b. Terragrunt: agent-mode MVP supports in-place units (tofu runs in the
+    # unit dir). A source-redirected unit makes terragrunt run tofu inside a
+    # `.terragrunt-cache` subdir, where downloaded state was NOT placed —
+    # refuse loudly rather than plan against empty state (which would propose
+    # recreating everything). CLI-driven mode (cloud block) handles source
+    # units; that's the documented path for them.
+    if cfg.terragrunt_enabled:
+        tg_work = terragrunt.resolve_working_dir(cwd)
+        if tg_work != cwd:
+            log.error(
+                "terragrunt source-redirected unit is not supported in agent mode "
+                "(MVP is in-place units). Use a unit without `terraform { source }`, "
+                "or run it CLI-driven with a cloud block.",
+                work_dir=str(tg_work),
+            )
+            return 1
 
     # 10. Backend backstop.
     try:
