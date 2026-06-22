@@ -34,7 +34,7 @@ jobs:
       is_pr: ${{ steps.meta.outputs.is_pr }}
       version: ${{ steps.meta.outputs.version }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Compute metadata
         id: meta
@@ -89,7 +89,7 @@ jobs:
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - run: scripts/lint.sh python
 
   # ── Frontend Lint ─────────────────────────────────────
@@ -103,7 +103,7 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install dependencies
         run: npm ci
       - name: ESLint
@@ -118,7 +118,7 @@ jobs:
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: provider/go.mod
@@ -137,7 +137,7 @@ jobs:
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: provider/go.mod
@@ -156,7 +156,7 @@ jobs:
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: go-terrapod/go.mod
@@ -175,7 +175,7 @@ jobs:
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: go-terrapod/go.mod
@@ -194,7 +194,7 @@ jobs:
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: migrate/go.mod
@@ -213,7 +213,7 @@ jobs:
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: migrate/go.mod
@@ -231,7 +231,7 @@ jobs:
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: publish/go.mod
@@ -250,7 +250,7 @@ jobs:
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: publish/go.mod
@@ -299,7 +299,7 @@ jobs:
             paths: tests/integration
             pytest_args: ""
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - run: scripts/test.sh python -- ${{ matrix.slice.pytest_args }} ${{ matrix.slice.paths }}
 
   # ── Dependency Audit (Python) ─────────────────────────
@@ -310,7 +310,7 @@ jobs:
     runs-on: ubuntu-latest
     container: python:3.13-slim
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install Poetry and export plugin
         run: pip install poetry poetry-plugin-export
       - name: Export requirements
@@ -338,7 +338,7 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install dependencies
         run: npm ci
       - name: Run npm audit
@@ -352,7 +352,7 @@ jobs:
     runs-on: ubuntu-latest
     container: zricethezav/gitleaks:latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Run gitleaks
         run: gitleaks detect --source . --no-git --config .gitleaks.toml
 
@@ -375,7 +375,7 @@ jobs:
           - language: javascript-typescript
             build-mode: none
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -400,7 +400,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Review dependency changes
         uses: actions/dependency-review-action@v5
         with:
@@ -414,7 +414,7 @@ jobs:
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Helm lint (default values)
         run: |
           docker run --rm -v "$PWD:/chart" -w /chart \
@@ -436,7 +436,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Run Semgrep
         run: |
@@ -492,7 +492,7 @@ jobs:
           - image: terrapod-migrations
             dockerfile: docker/Dockerfile.migrations
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -568,7 +568,7 @@ jobs:
       contents: read
       packages: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Branch/tag builds pull the images from GHCR; PR builds load them
       # from the build-images artifacts (no registry push on PRs). Either
@@ -682,7 +682,7 @@ jobs:
       matrix:
         image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # On branch/tag builds the image lives in GHCR — log in and let Trivy
       # pull it. On PRs nothing was pushed; the image arrives as an artifact
@@ -766,7 +766,7 @@ jobs:
       matrix:
         image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Log in to GHCR
         uses: ./.github/actions/ghcr-login
@@ -819,7 +819,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Create empty Release
         env:
@@ -852,7 +852,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install Helm
         uses: azure/setup-helm@v5
@@ -928,7 +928,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -971,7 +971,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -1015,7 +1015,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -1057,7 +1057,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -1146,7 +1146,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Delete tag and release
         env:
