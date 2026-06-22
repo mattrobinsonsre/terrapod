@@ -31,6 +31,8 @@ type workspaceDataSourceModel struct {
 	AutoApply                     types.Bool   `tfsdk:"auto_apply"`
 	ExecutionBackend              types.String `tfsdk:"execution_backend"`
 	TerraformVersion              types.String `tfsdk:"terraform_version"`
+	TerragruntEnabled             types.Bool   `tfsdk:"terragrunt_enabled"`
+	TerragruntVersion             types.String `tfsdk:"terragrunt_version"`
 	WorkingDirectory              types.String `tfsdk:"working_directory"`
 	ResourceCPU                   types.String `tfsdk:"resource_cpu"`
 	ResourceMemory                types.String `tfsdk:"resource_memory"`
@@ -82,6 +84,8 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"auto_apply":                       computedBool("Auto-apply setting."),
 			"execution_backend":                computedString("Execution backend."),
 			"terraform_version":                computedString("Terraform/tofu version."),
+			"terragrunt_enabled":               computedBool("Whether terragrunt wraps tofu/terraform for agent-mode runs."),
+			"terragrunt_version":               computedString("Terragrunt CLI version (when terragrunt_enabled)."),
 			"working_directory":                computedString("Working directory."),
 			"resource_cpu":                     computedString("CPU request."),
 			"resource_memory":                  computedString("Memory request."),
@@ -181,6 +185,8 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	m.AISummaryContext = types.StringValue(terrapod.GetStringAttr(res, "ai-summary-context"))
 
 	setOptionalString(&m.TerraformVersion, terrapod.GetStringAttr(res, "terraform-version"))
+	m.TerragruntEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "terragrunt-enabled"))
+	setOptionalString(&m.TerragruntVersion, terrapod.GetStringAttr(res, "terragrunt-version"))
 	setOptionalString(&m.VCSRepoURL, terrapod.GetStringAttr(res, "vcs-repo-url"))
 	setOptionalString(&m.VCSBranch, terrapod.GetStringAttr(res, "vcs-branch"))
 	setOptionalString(&m.AgentPoolID, terrapod.GetStringAttr(res, "agent-pool-id"))

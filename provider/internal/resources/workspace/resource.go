@@ -90,6 +90,22 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"terragrunt_enabled": schema.BoolAttribute{
+				Description: "Wrap tofu/terraform with terragrunt for agent-mode runs. See https://terrapod.dev for the agent-mode limitations.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"terragrunt_version": schema.StringAttribute{
+				Description: "The terragrunt CLI version to use when terragrunt_enabled is true. Partial versions (e.g. \"1.0\") are resolved by the binary cache. Defaults to \"1.0\".",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"working_directory": schema.StringAttribute{
 				Description: "Working directory relative to the repo root.",
 				Optional:    true,
@@ -502,6 +518,13 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.TerraformVersion.IsNull() && !m.TerraformVersion.IsUnknown() {
 		req.TerraformVersion = m.TerraformVersion.ValueString()
 	}
+	if !m.TerragruntEnabled.IsNull() && !m.TerragruntEnabled.IsUnknown() {
+		v := m.TerragruntEnabled.ValueBool()
+		req.TerragruntEnabled = &v
+	}
+	if !m.TerragruntVersion.IsNull() && !m.TerragruntVersion.IsUnknown() {
+		req.TerragruntVersion = m.TerragruntVersion.ValueString()
+	}
 	if !m.WorkingDirectory.IsNull() && !m.WorkingDirectory.IsUnknown() {
 		req.WorkingDirectory = m.WorkingDirectory.ValueString()
 	}
@@ -602,6 +625,13 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	}
 	if !m.TerraformVersion.IsNull() && !m.TerraformVersion.IsUnknown() {
 		req.TerraformVersion = m.TerraformVersion.ValueString()
+	}
+	if !m.TerragruntEnabled.IsNull() && !m.TerragruntEnabled.IsUnknown() {
+		v := m.TerragruntEnabled.ValueBool()
+		req.TerragruntEnabled = &v
+	}
+	if !m.TerragruntVersion.IsNull() && !m.TerragruntVersion.IsUnknown() {
+		req.TerragruntVersion = m.TerragruntVersion.ValueString()
 	}
 	if !m.WorkingDirectory.IsNull() && !m.WorkingDirectory.IsUnknown() {
 		req.WorkingDirectory = m.WorkingDirectory.ValueString()
@@ -708,6 +738,12 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		m.TerraformVersion = types.StringValue(ws.TerraformVersion)
 	} else {
 		m.TerraformVersion = types.StringNull()
+	}
+	m.TerragruntEnabled = types.BoolValue(ws.TerragruntEnabled)
+	if ws.TerragruntVersion != "" {
+		m.TerragruntVersion = types.StringValue(ws.TerragruntVersion)
+	} else {
+		m.TerragruntVersion = types.StringNull()
 	}
 	if ws.VCSRepoURL != "" {
 		m.VCSRepoURL = types.StringValue(ws.VCSRepoURL)

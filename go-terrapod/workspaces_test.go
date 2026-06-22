@@ -19,15 +19,15 @@ import (
 // look at fields the tests don't set. Keeping fixtures small leaves
 // the tests readable.
 type workspaceFixtureServer struct {
-	t              *testing.T
-	server         *httptest.Server
-	createHandler  http.HandlerFunc
-	readHandler    http.HandlerFunc
-	updateHandler  http.HandlerFunc
-	deleteHandler  http.HandlerFunc
-	listHandler    http.HandlerFunc
-	byNameHandler  http.HandlerFunc
-	lastBody       []byte // captures the last request's body for inspection
+	t             *testing.T
+	server        *httptest.Server
+	createHandler http.HandlerFunc
+	readHandler   http.HandlerFunc
+	updateHandler http.HandlerFunc
+	deleteHandler http.HandlerFunc
+	listHandler   http.HandlerFunc
+	byNameHandler http.HandlerFunc
+	lastBody      []byte // captures the last request's body for inspection
 }
 
 func newWorkspaceFixtureServer(t *testing.T) *workspaceFixtureServer {
@@ -444,6 +444,42 @@ func TestWorkspaceCreate_TriggerPrefixes_Wire(t *testing.T) {
 	}
 	if !strings.Contains(string(receivedBody), `"trigger-prefixes":["a","b"]`) {
 		t.Errorf("trigger-prefixes missing from request body: %s", receivedBody)
+	}
+}
+
+// TestWorkspaceTerragrunt_RoundTrip pins both sides of the terragrunt
+// contract (#534): the write side marshals terragrunt-enabled/-version into
+// the request, and the read side projects them back onto the Workspace.
+func TestWorkspaceTerragrunt_RoundTrip(t *testing.T) {
+	var receivedBody []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"id":"ws-tg","type":"workspaces","attributes":{"name":"tg","terragrunt-enabled":true,"terragrunt-version":"1.0"}}}`))
+	}))
+	defer srv.Close()
+
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	enabled := true
+	ws, err := c.CreateWorkspace(context.Background(), CreateWorkspaceRequest{
+		Name:              "tg",
+		ExecutionMode:     "agent",
+		TerragruntEnabled: &enabled,
+		TerragruntVersion: "1.0",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(receivedBody), `"terragrunt-enabled":true`) ||
+		!strings.Contains(string(receivedBody), `"terragrunt-version":"1.0"`) {
+		t.Errorf("terragrunt fields missing from request body: %s", receivedBody)
+	}
+	if !ws.TerragruntEnabled || ws.TerragruntVersion != "1.0" {
+		t.Errorf("terragrunt not projected: enabled=%v version=%q", ws.TerragruntEnabled, ws.TerragruntVersion)
 	}
 }
 

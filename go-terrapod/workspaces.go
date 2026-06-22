@@ -21,36 +21,41 @@ import (
 // vs. unset). Same logic for any future field where 0 is a legal
 // non-default value.
 type Workspace struct {
-	ID                            string            `json:"id"`
-	Name                          string            `json:"name"`
-	ExecutionMode                 string            `json:"execution-mode"`
-	ExecutionBackend              string            `json:"execution-backend,omitempty"`
-	AutoApply                     bool              `json:"auto-apply"`
-	TerraformVersion              string            `json:"terraform-version,omitempty"`
-	WorkingDirectory              string            `json:"working-directory,omitempty"`
-	ResourceCPU                   string            `json:"resource-cpu,omitempty"`
-	ResourceMemory                string            `json:"resource-memory,omitempty"`
-	VCSRepoURL                    string            `json:"vcs-repo-url,omitempty"`
-	VCSBranch                     string            `json:"vcs-branch,omitempty"`
-	VCSWorkflow                   string            `json:"vcs-workflow,omitempty"`
-	VCSConnectionID               string            `json:"vcs-connection-id,omitempty"` // resolved from `vcs-connection` relationship
-	AgentPoolID                   string            `json:"agent-pool-id,omitempty"`
-	AutoMerge                     bool              `json:"auto-merge"`
-	AutoMergeStrategy             string            `json:"auto-merge-strategy,omitempty"`
-	OwnerEmail                    string            `json:"owner-email,omitempty"`
-	Locked                        bool              `json:"locked"`
-	Labels                        map[string]string `json:"labels,omitempty"`
-	VarFiles                      []string          `json:"var-files,omitempty"`
-	TriggerPrefixes               []string          `json:"trigger-prefixes,omitempty"`
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	ExecutionMode    string `json:"execution-mode"`
+	ExecutionBackend string `json:"execution-backend,omitempty"`
+	AutoApply        bool   `json:"auto-apply"`
+	TerraformVersion string `json:"terraform-version,omitempty"`
+	// TerragruntEnabled wraps tofu/terraform with terragrunt for agent-mode
+	// runs; TerragruntVersion pins the terragrunt CLI version (partial like
+	// "1.0" allowed — the binary cache resolves it). See docs/terragrunt.md.
+	TerragruntEnabled bool              `json:"terragrunt-enabled"`
+	TerragruntVersion string            `json:"terragrunt-version,omitempty"`
+	WorkingDirectory  string            `json:"working-directory,omitempty"`
+	ResourceCPU       string            `json:"resource-cpu,omitempty"`
+	ResourceMemory    string            `json:"resource-memory,omitempty"`
+	VCSRepoURL        string            `json:"vcs-repo-url,omitempty"`
+	VCSBranch         string            `json:"vcs-branch,omitempty"`
+	VCSWorkflow       string            `json:"vcs-workflow,omitempty"`
+	VCSConnectionID   string            `json:"vcs-connection-id,omitempty"` // resolved from `vcs-connection` relationship
+	AgentPoolID       string            `json:"agent-pool-id,omitempty"`
+	AutoMerge         bool              `json:"auto-merge"`
+	AutoMergeStrategy string            `json:"auto-merge-strategy,omitempty"`
+	OwnerEmail        string            `json:"owner-email,omitempty"`
+	Locked            bool              `json:"locked"`
+	Labels            map[string]string `json:"labels,omitempty"`
+	VarFiles          []string          `json:"var-files,omitempty"`
+	TriggerPrefixes   []string          `json:"trigger-prefixes,omitempty"`
 	// DriftIgnoreRules is a list of resource-address-plus-attribute-path
 	// glob patterns suppressed by the drift-result classifier (#482).
 	// Empty list (default) means classic behaviour: every plan diff
 	// counts as drift. See docs/api-reference.md for the rule grammar.
-	DriftIgnoreRules              []string          `json:"drift-ignore-rules,omitempty"`
-	DriftDetectionEnabled         bool              `json:"drift-detection-enabled"`
-	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
-	DriftStatus                   string            `json:"drift-status,omitempty"`
-	DriftLastCheckedAt            string            `json:"drift-last-checked-at,omitempty"`
+	DriftIgnoreRules              []string `json:"drift-ignore-rules,omitempty"`
+	DriftDetectionEnabled         bool     `json:"drift-detection-enabled"`
+	DriftDetectionIntervalSeconds *int64   `json:"drift-detection-interval-seconds,omitempty"`
+	DriftStatus                   string   `json:"drift-status,omitempty"`
+	DriftLastCheckedAt            string   `json:"drift-last-checked-at,omitempty"`
 	// DriftLatestRunID is the ID (prefixed `run-…`) of the drift run that
 	// produced the current DriftStatus, or "" when drift has never run or
 	// was just cleared by a successful apply. Lets consumers link the
@@ -100,28 +105,30 @@ type Workspace struct {
 // than a free-form map so callers get type safety and the Terrapod
 // schema stays singular-sourced in this file.
 type CreateWorkspaceRequest struct {
-	Name                          string             `json:"name"`
-	ExecutionMode                 string             `json:"execution-mode,omitempty"`
-	ExecutionBackend              string             `json:"execution-backend,omitempty"`
-	AutoApply                     *bool              `json:"auto-apply,omitempty"`
-	TerraformVersion              string             `json:"terraform-version,omitempty"`
-	WorkingDirectory              string             `json:"working-directory,omitempty"`
-	ResourceCPU                   string             `json:"resource-cpu,omitempty"`
-	ResourceMemory                string             `json:"resource-memory,omitempty"`
-	VCSRepoURL                    string             `json:"vcs-repo-url,omitempty"`
-	VCSBranch                     string             `json:"vcs-branch,omitempty"`
-	VCSWorkflow                   string             `json:"vcs-workflow,omitempty"`
-	VCSConnectionID               string             `json:"-"` // → relationship, not attribute
-	AgentPoolID                   string             `json:"agent-pool-id,omitempty"`
-	AutoMerge                     *bool              `json:"auto-merge,omitempty"`
-	AutoMergeStrategy             string             `json:"auto-merge-strategy,omitempty"`
-	OwnerEmail                    string             `json:"owner-email,omitempty"`
-	Labels                        map[string]string  `json:"labels,omitempty"`
-	VarFiles                      []string           `json:"var-files,omitempty"`
-	TriggerPrefixes               []string           `json:"trigger-prefixes,omitempty"`
-	DriftIgnoreRules              []string           `json:"drift-ignore-rules,omitempty"`
-	DriftDetectionEnabled         *bool              `json:"drift-detection-enabled,omitempty"`
-	DriftDetectionIntervalSeconds *int64             `json:"drift-detection-interval-seconds,omitempty"`
+	Name                          string            `json:"name"`
+	ExecutionMode                 string            `json:"execution-mode,omitempty"`
+	ExecutionBackend              string            `json:"execution-backend,omitempty"`
+	AutoApply                     *bool             `json:"auto-apply,omitempty"`
+	TerraformVersion              string            `json:"terraform-version,omitempty"`
+	TerragruntEnabled             *bool             `json:"terragrunt-enabled,omitempty"`
+	TerragruntVersion             string            `json:"terragrunt-version,omitempty"`
+	WorkingDirectory              string            `json:"working-directory,omitempty"`
+	ResourceCPU                   string            `json:"resource-cpu,omitempty"`
+	ResourceMemory                string            `json:"resource-memory,omitempty"`
+	VCSRepoURL                    string            `json:"vcs-repo-url,omitempty"`
+	VCSBranch                     string            `json:"vcs-branch,omitempty"`
+	VCSWorkflow                   string            `json:"vcs-workflow,omitempty"`
+	VCSConnectionID               string            `json:"-"` // → relationship, not attribute
+	AgentPoolID                   string            `json:"agent-pool-id,omitempty"`
+	AutoMerge                     *bool             `json:"auto-merge,omitempty"`
+	AutoMergeStrategy             string            `json:"auto-merge-strategy,omitempty"`
+	OwnerEmail                    string            `json:"owner-email,omitempty"`
+	Labels                        map[string]string `json:"labels,omitempty"`
+	VarFiles                      []string          `json:"var-files,omitempty"`
+	TriggerPrefixes               []string          `json:"trigger-prefixes,omitempty"`
+	DriftIgnoreRules              []string          `json:"drift-ignore-rules,omitempty"`
+	DriftDetectionEnabled         *bool             `json:"drift-detection-enabled,omitempty"`
+	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
 	// AISummaryMode is the three-state per-workspace override (#401):
 	// "default" | "enabled" | "disabled". Empty string omits the field
 	// (server-side default applies — "default").
@@ -146,6 +153,8 @@ type UpdateWorkspaceRequest struct {
 	ExecutionBackend              string            `json:"execution-backend,omitempty"`
 	AutoApply                     *bool             `json:"auto-apply,omitempty"`
 	TerraformVersion              string            `json:"terraform-version,omitempty"`
+	TerragruntEnabled             *bool             `json:"terragrunt-enabled,omitempty"`
+	TerragruntVersion             string            `json:"terragrunt-version,omitempty"`
 	WorkingDirectory              string            `json:"working-directory,omitempty"`
 	ResourceCPU                   string            `json:"resource-cpu,omitempty"`
 	ResourceMemory                string            `json:"resource-memory,omitempty"`
@@ -329,6 +338,12 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.TerraformVersion != "" {
 		attrs["terraform-version"] = req.TerraformVersion
 	}
+	if req.TerragruntEnabled != nil {
+		attrs["terragrunt-enabled"] = *req.TerragruntEnabled
+	}
+	if req.TerragruntVersion != "" {
+		attrs["terragrunt-version"] = req.TerragruntVersion
+	}
 	if req.WorkingDirectory != "" {
 		attrs["working-directory"] = req.WorkingDirectory
 	}
@@ -407,6 +422,12 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	}
 	if req.TerraformVersion != "" {
 		attrs["terraform-version"] = req.TerraformVersion
+	}
+	if req.TerragruntEnabled != nil {
+		attrs["terragrunt-enabled"] = *req.TerragruntEnabled
+	}
+	if req.TerragruntVersion != "" {
+		attrs["terragrunt-version"] = req.TerragruntVersion
 	}
 	if req.WorkingDirectory != "" {
 		attrs["working-directory"] = req.WorkingDirectory
@@ -500,6 +521,8 @@ func workspaceFromResource(res *Resource) *Workspace {
 		ExecutionBackend:      GetStringAttr(res, "execution-backend"),
 		AutoApply:             GetBoolAttr(res, "auto-apply"),
 		TerraformVersion:      GetStringAttr(res, "terraform-version"),
+		TerragruntEnabled:     GetBoolAttr(res, "terragrunt-enabled"),
+		TerragruntVersion:     GetStringAttr(res, "terragrunt-version"),
 		WorkingDirectory:      GetStringAttr(res, "working-directory"),
 		ResourceCPU:           GetStringAttr(res, "resource-cpu"),
 		ResourceMemory:        GetStringAttr(res, "resource-memory"),

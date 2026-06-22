@@ -38,6 +38,8 @@ interface WorkspaceAttrs {
   'execution-backend': string
   'auto-apply': boolean
   'terraform-version': string
+  'terragrunt-enabled': boolean
+  'terragrunt-version': string
   'working-directory': string
   locked: boolean
   'resource-cpu': string
@@ -248,6 +250,8 @@ function WorkspaceDetailContent() {
   const [editExecMode, setEditExecMode] = useState('')
   const [editBackend, setEditBackend] = useState('')
   const [editVersion, setEditVersion] = useState('')
+  const [editTerragruntEnabled, setEditTerragruntEnabled] = useState(false)
+  const [editTerragruntVersion, setEditTerragruntVersion] = useState('')
   const [editPoolId, setEditPoolId] = useState<string | null>(null)
   const [editLabels, setEditLabels] = useState<Record<string, string>>({})
   const [editOwner, setEditOwner] = useState('')
@@ -922,6 +926,8 @@ function WorkspaceDetailContent() {
     setEditExecMode(workspace.attributes['execution-mode'])
     setEditBackend(workspace.attributes['execution-backend'] || 'tofu')
     setEditVersion(workspace.attributes['terraform-version'] || '')
+    setEditTerragruntEnabled(workspace.attributes['terragrunt-enabled'] ?? false)
+    setEditTerragruntVersion(workspace.attributes['terragrunt-version'] || '')
     setEditPoolId(workspace.attributes['agent-pool-id'])
     setEditLabels(workspace.attributes.labels || {})
     setEditOwner(workspace.attributes['owner-email'] || '')
@@ -983,6 +989,8 @@ function WorkspaceDetailContent() {
               'execution-mode': editExecMode,
               'execution-backend': editBackend,
               'terraform-version': editVersion,
+              'terragrunt-enabled': editTerragruntEnabled,
+              'terragrunt-version': editTerragruntVersion || '1.0',
               'agent-pool-id': editPoolId,
               'working-directory': editWorkingDir,
               'var-files': editVarFiles,
@@ -1697,6 +1705,25 @@ function WorkspaceDetailContent() {
                     </>
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{attrs['terraform-version'] || 'Default'}</dd>
+                  )}
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">Terragrunt</dt>
+                  {editing ? (
+                    <div className="mt-1 space-y-2">
+                      <label className="flex items-center gap-2">
+                        <input type="checkbox" checked={editTerragruntEnabled} onChange={(e) => setEditTerragruntEnabled(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600" />
+                        <span className="text-sm text-slate-200">{editTerragruntEnabled ? 'Enabled (agent mode)' : 'Disabled'}</span>
+                      </label>
+                      {editTerragruntEnabled && (
+                        <input type="text" value={editTerragruntVersion} onChange={(e) => setEditTerragruntVersion(e.target.value)} placeholder="e.g. 1.0"
+                          pattern="[0-9]+\.[0-9]+(\.[0-9]+)?"
+                          title="Terragrunt version in X.Y or X.Y.Z format (e.g. 1.0)"
+                          className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                      )}
+                    </div>
+                  ) : (
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['terragrunt-enabled'] ? `Enabled (v${attrs['terragrunt-version'] || '1.0'})` : 'Disabled'}</dd>
                   )}
                 </div>
                 <div>

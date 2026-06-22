@@ -341,6 +341,15 @@ Workspaces support the following drift detection attributes (settable on create 
 | `drift-detection-interval-seconds` | integer | `86400` | How often to run drift detection checks (minimum: 3600 seconds / 1 hour) |
 | `drift-ignore-rules` | list[string] | `[]` | Glob-aware patterns silenced by the drift-result classifier (#482). Each rule is a Terraform address optionally suffixed with a dotted attribute path; `*` matches zero or more non-`.` chars (spans `[N]` indices), `[*]` matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys — so use carefully. Max 50 entries, ≤ 500 chars each. Examples: `aws_iam_role.foo.tags.Environment`, `aws_autoscaling_group.workers[*].desired_capacity`, `module.eks*.argocd_cluster.*.config.tls_client_config.ca_data`. Affects drift-detection runs only — regular plan/apply is untouched. See [drift-ignore-rules.md](drift-ignore-rules.md) for the full grammar and recipes |
 
+### Terragrunt Attributes
+
+Workspaces support running agent-mode plans/applies through Terragrunt (settable on create and update). See [terragrunt.md](terragrunt.md) for the full feature description, including the CLI-driven path that needs no configuration.
+
+| Attribute | Type | Default | Description |
+|---|---|---|---|
+| `terragrunt-enabled` | boolean | `false` | Wrap `tofu`/`terraform` with Terragrunt for agent-mode runs. The runner fetches the terragrunt binary from the pull-through binary cache, pins it to the workspace's execution backend via `TG_TF_PATH`, and reconciles the backend to local so Terrapod still owns state |
+| `terragrunt-version` | string | `1.0` | Terragrunt CLI version. Partial versions (e.g. `1.0`) are resolved by the binary cache to the latest matching release; pin an exact `x.y.z` for reproducibility |
+
 ### AI Plan Summary Attributes
 
 Workspaces carry two attributes that govern the optional AI plan-summary feature (settable on create and update). When the feature is globally disabled at the deployment level (`api.config.ai_summary.enabled: false`), these fields are stored but inert — no calls are made. See [docs/ai-plan-summary.md](ai-plan-summary.md) for the full operator guide.

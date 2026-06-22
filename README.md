@@ -31,7 +31,8 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | RBAC | Implemented | Label-based role system with hierarchical workspace permissions (read/plan/write/admin) |
 | Private Module Registry | Implemented | Publish, version, and share modules internally |
 | Private Provider Registry | Implemented | Publish, version, and share providers with GPG signing and network mirror caching |
-| Binary Caching | Implemented | Pull-through cache for terraform/tofu CLI binaries |
+| Binary Caching | Implemented | Pull-through cache for terraform/tofu/terragrunt CLI binaries |
+| **Terragrunt** | **Implemented** | **Per-workspace Terragrunt support for agent-mode runs — a `terragrunt_enabled` flag + pinned version, pull-through binary cache for the terragrunt CLI, and transparent local-backend reconciliation so Terrapod still owns state. CLI-driven runs work with zero extra config. See [docs/terragrunt.md](docs/terragrunt.md).** |
 | Agent Pools | Implemented | Named groups of runner listeners; join token → certificate exchange for auth |
 | CLI-Driven Runs | Implemented | `terraform plan` / `apply` via cloud backend (both `terraform` and `tofu` verified) |
 | TFE V2 API | Implemented | JSON:API surface compatible with `go-tfe` / `terraform login` |
@@ -322,6 +323,8 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 | [Spacelift](https://spacelift.io/) | Commercial TF management platform | Not open source |
 
 Terrapod is the only open-source project that covers the full TFE surface: state management, agent execution, private registry, RBAC, VCS integration, drift detection, OPA policy enforcement, and a production-grade UI -- all in a single self-hosted Kubernetes deployment.
+
+It also natively supports **Terragrunt** -- something TFE/HCP Terraform never did and most alternatives leave to your CI glue. A per-workspace flag wraps the run in `terragrunt` while Terrapod keeps owning state, locking, and the run lifecycle. See [docs/terragrunt.md](docs/terragrunt.md).
 
 Terrapod is a single, self-hosted platform covering the full TFE surface (state + runs + registry + governance + UI + API) under a copyleft (GPLv3) license.
 

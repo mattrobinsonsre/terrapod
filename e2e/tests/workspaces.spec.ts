@@ -164,6 +164,45 @@ test.describe('Workspaces', () => {
     expect(isAfter).not.toBe(wasBefore);
   });
 
+  test('terragrunt toggle + version persists through settings (#534)', async ({ page }) => {
+    // Enabling terragrunt reveals a version input; both must round-trip the
+    // workspace PATCH and re-render on reload. Failure modes this catches:
+    //   - terragrunt-enabled missing from the PATCH body
+    //   - the version field not shown when enabled / not saved
+    //   - the read view not reflecting the saved state
+    const wsName = `e2e-terragrunt-${Date.now()}`;
+
+    await page.goto('/workspaces');
+    await page.click('button:has-text("New Workspace")');
+    await page.fill('input[placeholder*="workspace"]', wsName);
+    await page.click('button:has-text("Create Workspace")');
+    await page.click(`text=${wsName}`);
+
+    // Read view: terragrunt starts Disabled.
+    await expect(page.getByText('Terragrunt')).toBeVisible();
+    await expect(page.getByText('Disabled', { exact: false }).first()).toBeVisible();
+
+    await page.click('button:has-text("Edit")');
+
+    // The Terragrunt checkbox sits beside its "Disabled/Enabled (agent mode)"
+    // label — scope to that row to avoid the auto-apply checkbox.
+    const tgRow = page.locator('div', { hasText: /^Terragrunt/ }).last();
+    const tgToggle = tgRow.getByRole('checkbox');
+    await tgToggle.check();
+
+    // Version input appears only once enabled.
+    const tgVersion = tgRow.getByPlaceholder('e.g. 1.0');
+    await expect(tgVersion).toBeVisible();
+    await tgVersion.fill('1.0');
+
+    await page.click('button:has-text("Save")');
+    await expect(page.locator('button:has-text("Edit")')).toBeVisible({ timeout: 10_000 });
+
+    // Reload: the read view must show Enabled (v1.0).
+    await page.reload();
+    await expect(page.getByText('Enabled (v1.0)')).toBeVisible({ timeout: 10_000 });
+  });
+
   test('drift-ignore-rules editor adds, persists, and removes a rule', async ({ page }) => {
     // #482 — verify the workspace settings drift-ignore-rules editor
     // round-trips through the API. Failure cases the spec catches:
