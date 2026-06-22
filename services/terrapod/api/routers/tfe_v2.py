@@ -1998,7 +1998,13 @@ async def upload_json_state_content(
     (same as /content — go-tfe uses presigned-style uploads).
     For now we accept and discard it.
     """
-    await request.body()  # consume the body
+    # Drain the body via the stream without buffering it. The JSON state
+    # representation is as large as the raw state (tens of MB for big
+    # workspaces); `await request.body()` would allocate the whole thing in
+    # the worker heap just to throw it away (CLAUDE.md #14). We must still
+    # consume the body so the connection isn't left half-read.
+    async for _chunk in request.stream():
+        pass
     return Response(status_code=200)
 
 
