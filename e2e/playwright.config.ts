@@ -9,12 +9,15 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  // CI workers bumped from 3 → 4 to fill the 2-shard runner better
-  // (each shard runs ~half the suite; saturating both vCPUs gives a
-  // larger per-shard wall-clock reduction than adding more shards).
-  workers: process.env.CI ? 4 : 2,
+  // 2 workers per shard in CI: with the suite sharded across many runners,
+  // each shard runs few tests, so keeping workers low avoids oversubscribing
+  // the 2-vCPU runner while a shard boots its own stack. Tune with shard count.
+  workers: process.env.CI ? 2 : 2,
+  // CI: each shard emits a `blob` report (auto-named per shard under
+  // e2e/blob-report/); the `e2e-report` CI job merges them into one HTML
+  // report. `github` gives inline annotations per shard. Local: HTML on failure.
   reporter: process.env.CI
-    ? [['html', { open: 'never' }], ['github']]
+    ? [['blob'], ['github']]
     : [['html', { open: 'on-failure' }]],
 
   globalSetup: './global-setup.ts',

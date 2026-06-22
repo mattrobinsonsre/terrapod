@@ -3,8 +3,9 @@
 import json
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import and_, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from terrapod.api.metrics import (
     RUN_APPLY_DURATION,
@@ -270,6 +271,110 @@ def can_transition(current: str, target: str) -> bool:
     return target in VALID_TRANSITIONS.get(current, set())
 
 
+# ── Auto-discard of superseded runs ────────────────────────────────────────
+#
+# A workspace can accumulate more than one un-applied run: a `planned` run
+# sits awaiting confirmation (holding the workspace lock), and newer pushes /
+# CLI / UI runs queue up behind it. The newest run reflects the current
+# desired state, so the older un-applied ones are stale and should be
+# auto-discarded — both to declutter and, crucially, to release the lock the
+# stale `planned` run holds so the newest run can actually dispatch.
+#
+# States in which an older run is safe to auto-supersede. Deliberately
+# EXCLUDES in-flight execution (`planning`, `confirmed`, `applying`,
+# `canceling`): those are either actively running a Job or carry a committed
+# apply intent and must finish on their own terms — never auto-discarded out
+# from under a running plan/apply.
+_SUPERSEDEABLE_STATES = frozenset({"pending", "queued", "planned"})
+
+
+def _is_supersedeable_kind(run: Run) -> bool:
+    """True for apply-capable runs that represent the workspace's desired state.
+
+    These are the "plan+apply" runs that mutate state and are serialized one at
+    a time per workspace. Excludes:
+      - plan-only runs (speculative / CLI `plan` — never apply, safe to run
+        concurrently, so they are neither superseded nor superseders);
+      - drift-detection runs (detection-only);
+      - speculative PR/MR runs (plan-only anyway; the VCS poller already cancels
+        stale ones per-PR on a new commit).
+    """
+    return not run.plan_only and not run.is_drift_detection and run.vcs_pull_request_number is None
+
+
+async def _has_newer_live_run(db: AsyncSession, run: Run) -> bool:
+    """Whether a strictly-newer eligible full run is still live (non-terminal)
+    on the same workspace — i.e. `run` has itself been superseded."""
+    newer = await db.scalar(
+        select(Run.id)
+        .where(
+            Run.workspace_id == run.workspace_id,
+            Run.id != run.id,
+            Run.plan_only.is_(False),
+            Run.is_drift_detection.is_(False),
+            Run.vcs_pull_request_number.is_(None),
+            Run.created_at > run.created_at,
+            Run.status.notin_(list(TERMINAL_STATES)),
+        )
+        .limit(1)
+    )
+    return newer is not None
+
+
+async def supersede_stale_runs(db: AsyncSession, newer: Run) -> int:
+    """Auto-discard older un-applied full runs made stale by ``newer``.
+
+    Finds strictly-older eligible runs on the same workspace that are still
+    waiting (`pending`/`queued`) or unconfirmed (`planned`) and resolves them:
+    `planned` → `discarded`, `pending`/`queued` → `canceled`. Discarding the
+    stale `planned` run releases the workspace lock so ``newer`` can dispatch.
+
+    Returns the number of runs superseded. No-op for ineligible ``newer``
+    (drift / speculative PR runs).
+    """
+    if not _is_supersedeable_kind(newer):
+        return 0
+
+    result = await db.execute(
+        select(Run).where(
+            Run.workspace_id == newer.workspace_id,
+            Run.id != newer.id,
+            Run.status.in_(list(_SUPERSEDEABLE_STATES)),
+            Run.plan_only.is_(False),
+            Run.is_drift_detection.is_(False),
+            Run.vcs_pull_request_number.is_(None),
+            Run.created_at < newer.created_at,
+        )
+    )
+    superseded = 0
+    for old in result.scalars().all():
+        reason = f"Superseded by run {str(newer.id)[:8]}"
+        old.message = reason
+        try:
+            if old.status == "planned":
+                await discard_run(db, old)
+            else:  # pending / queued
+                await cancel_run(db, old, force=True)
+            superseded += 1
+        except ValueError:
+            # The run changed state under us (e.g. it just dispatched).
+            # Leave it — the normal lifecycle or the next supersede pass
+            # handles it. Never let a cleanup race break run creation.
+            logger.warning(
+                "Skipped superseding run in unexpected state",
+                run_id=str(old.id),
+                status=old.status,
+            )
+    if superseded:
+        logger.info(
+            "Superseded stale runs",
+            workspace_id=str(newer.workspace_id),
+            newer_run=str(newer.id),
+            count=superseded,
+        )
+    return superseded
+
+
 async def create_run(
     db: AsyncSession,
     workspace: Workspace,
@@ -438,6 +543,16 @@ async def transition_run(
     # Notify listeners when a run becomes claimable
     if target_status in ("queued", "confirmed") and run.pool_id:
         await _publish_run_available(run)
+
+    # Auto-discard superseded runs. When a full run becomes claimable
+    # (`queued`), discard older un-applied full runs on the same workspace
+    # that it supersedes — releasing the lock a stale `planned` run holds so
+    # this run can dispatch. (The mirror "planning race" case — a run that
+    # finishes planning only to find a newer run already waiting — is handled
+    # at the end of complete_plan, once the run has fully settled into
+    # `planned`, to avoid mutating it mid-transition.)
+    if target_status == "queued":
+        await supersede_stale_runs(db, run)
 
     # Fire run triggers when a non-speculative run completes apply
     if target_status == "applied" and not run.plan_only:
@@ -622,7 +737,27 @@ async def complete_plan(
         return run
 
     if run.auto_apply and not run.plan_only:
-        run = await transition_run(db, run, "confirmed")
+        # Respect a manual workspace lock even on auto-apply: leave the run
+        # `planned` for a human to apply after unlocking, rather than
+        # auto-applying past the operator's lock.
+        locked_ws = await db.get(Workspace, run.workspace_id)
+        if locked_ws is None or not locked_ws.locked:
+            run = await transition_run(db, run, "confirmed")
+
+    # Born-superseded (planning race): a run that settled into `planned`
+    # awaiting confirmation, only to find a newer full run already waiting,
+    # was superseded while it planned — the queued-time supersede couldn't
+    # see it while it was still `planning`. Discard it now so the newer run
+    # can take the workspace lock. Only applies to a run still sitting in
+    # `planned` (not one that auto-applied or short-circuited to applied).
+    if (
+        run.status == "planned"
+        and _is_supersedeable_kind(run)
+        and await _has_newer_live_run(db, run)
+    ):
+        run = await discard_run(db, run)
+        logger.info("Plan superseded by newer run — discarded", run_id=str(run.id))
+        return run
 
     logger.info("Plan succeeded", run_id=str(run.id))
     return run
@@ -918,6 +1053,13 @@ async def confirm_run(db: AsyncSession, run: Run) -> Run:
     """
     if run.status != "planned":
         raise ValueError(f"Can only confirm runs in 'planned' status, got '{run.status}'")
+    # Manual lock blocks apply — a locked workspace must not start an apply.
+    # (Surfaces as 409 via the router's ValueError handler.)
+    workspace = await db.get(Workspace, run.workspace_id)
+    if workspace is not None and workspace.locked:
+        raise ValueError(
+            f'workspace is locked (lock ID: "{workspace.lock_id}") — unlock before applying'
+        )
     await _check_mergeability_or_block(db, run)
     return await transition_run(db, run, "confirmed")
 
@@ -1155,15 +1297,47 @@ async def claim_next_run(
         ("queued", "plan", "planning"),
         ("confirmed", "apply", "applying"),
     ]:
+        conditions = [Run.status == target_status, Run.pool_id == pool_id]
+
+        # Per-workspace serialization + manual-lock gate, applied only when
+        # STARTING a plan (queued → planning). An apply-capable (plan+apply)
+        # run may not start if its workspace is manually locked OR already has
+        # another apply-capable run in flight — only one mutating run executes
+        # per workspace at a time. Plan-only runs (speculative / CLI `plan`,
+        # drift) never mutate state, so they bypass the gate and run
+        # concurrently. The apply phase is the continuation of an
+        # already-serialized run, so it is not re-gated here.
+        if target_status == "queued":
+            other = aliased(Run)
+            in_flight = (
+                select(other.id)
+                .where(
+                    other.workspace_id == Run.workspace_id,
+                    other.id != Run.id,
+                    other.plan_only.is_(False),
+                    other.is_drift_detection.is_(False),
+                    other.status.in_(["planning", "planned", "confirmed", "applying", "canceling"]),
+                )
+                .exists()
+            )
+            ws_locked = (
+                select(Workspace.id)
+                .where(Workspace.id == Run.workspace_id, Workspace.locked.is_(True))
+                .exists()
+            )
+            conditions.append(
+                or_(
+                    Run.plan_only.is_(True),
+                    and_(not_(ws_locked), not_(in_flight)),
+                )
+            )
+
         query = (
             select(Run)
-            .where(
-                Run.status == target_status,
-                Run.pool_id == pool_id,
-            )
+            .where(*conditions)
             .order_by(Run.created_at.asc())
             .limit(1)
-            .with_for_update(skip_locked=True)
+            .with_for_update(skip_locked=True, of=Run)
         )
 
         result = await db.execute(query)

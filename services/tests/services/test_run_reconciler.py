@@ -168,6 +168,9 @@ class TestHandleSucceeded:
         self, mock_transition, mock_stage, mock_persist
     ):
         db = AsyncMock()
+        # Auto-apply respects a manual lock — return an unlocked workspace so
+        # the auto-confirm proceeds.
+        db.get.return_value = MagicMock(locked=False)
         run = _mock_run(status="planning", auto_apply=True)
         mock_stage.return_value = None
         # First call returns planned run, second returns confirmed
@@ -180,6 +183,28 @@ class TestHandleSucceeded:
         assert mock_transition.call_count == 2
         assert mock_transition.call_args_list[0].args[2] == "planned"
         assert mock_transition.call_args_list[1].args[2] == "confirmed"
+
+    @patch(_PERSIST_PATCH, new_callable=AsyncMock)
+    @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)
+    @patch("terrapod.services.run_service.transition_run", new_callable=AsyncMock)
+    async def test_auto_apply_blocked_by_manual_lock_stays_planned(
+        self, mock_transition, mock_stage, mock_persist
+    ):
+        """A manually locked workspace must not auto-apply: the run settles in
+        `planned` (one transition) and is NOT auto-confirmed."""
+        db = AsyncMock()
+        db.get.return_value = MagicMock(locked=True)  # workspace is locked
+        db.scalar.return_value = None  # no newer run (isolate the lock behaviour)
+        run = _mock_run(status="planning", auto_apply=True)
+        mock_stage.return_value = None
+        planned_run = _mock_run(status="planned", auto_apply=True, plan_only=False)
+        mock_transition.side_effect = [planned_run]
+
+        await _handle_succeeded(db, run)
+
+        # Only the planned transition fired — no auto-confirm past the lock.
+        assert mock_transition.call_count == 1
+        assert mock_transition.call_args_list[0].args[2] == "planned"
 
     @patch(_PERSIST_PATCH, new_callable=AsyncMock)
     @patch("terrapod.services.run_task_service.create_task_stage", new_callable=AsyncMock)

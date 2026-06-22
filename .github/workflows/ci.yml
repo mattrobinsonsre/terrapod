@@ -426,6 +426,42 @@ jobs:
             alpine/helm:3.17.2 \
             lint helm/terrapod --values helm/terrapod/values.yaml --values helm/terrapod/values-local.yaml
 
+  # ── Helm Smoke (render assertions) ─────────────────────
+  # Catches broken chart DEFAULTS that `helm lint` does not — e.g. a stock
+  # install that renders no working stack because a component default is off.
+  # (Directly targets the web.enabled=false class of bug that shipped a
+  # non-working chart: lint passed, but `helm install` produced no web/Ingress.)
+  helm-smoke:
+    name: Helm Smoke
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Stock install renders a working stack (web + Ingress + bootstrap)
+        run: |
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            template terrapod helm/terrapod \
+              --namespace terrapod \
+              --set ingress.enabled=true \
+              --set ingress.hostname=terrapod.example.com \
+              --set ingress.className=traefik \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 \
+              --set bootstrap.adminEmail=admin@example.com \
+              --set bootstrap.adminPassword=changeme)
+          echo "$out" | grep -q "kind: Ingress" || { echo "FAIL: stock install rendered no Ingress"; exit 1; }
+          echo "$out" | grep -q "app.kubernetes.io/component: web" || { echo "FAIL: web Deployment not rendered (broken default?)"; exit 1; }
+          echo "$out" | grep -q "app.kubernetes.io/component: bootstrap" || { echo "FAIL: bootstrap Job not rendered"; exit 1; }
+          echo "Stock install renders web + Ingress + bootstrap OK"
+      - name: Local dev values render
+        run: |
+          docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            template terrapod helm/terrapod \
+              --values helm/terrapod/values.yaml \
+              --values helm/terrapod/values-local.yaml > /dev/null
+          echo "values-local renders OK"
+
   # ── SAST (Semgrep) ─────────────────────────────────────
   sast:
     name: SAST
@@ -467,18 +503,24 @@ jobs:
           category: semgrep
 
   # ── Build Images ───────────────────────────────────────
-  build-images:
-    name: Build ${{ matrix.image }} (${{ matrix.arch }})
+  # Built per-arch in SEPARATE jobs (not one arch×image matrix) so the
+  # latency-sensitive consumers can depend on only the arch they need:
+  # e2e-test + scan-images run on amd64 and must NOT wait on the slow arm64
+  # web build. Splitting also gives each arch its own fail-fast scope, so a
+  # failing arm64 leg no longer cancels the amd64 images e2e needs. arm64
+  # still runs (build-validation + release manifests) and is now also
+  # artifacted on PRs so scan-images can scan it.
+  build-images-amd64:
+    name: Build ${{ matrix.image }} (amd64)
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     strategy:
       fail-fast: true
       matrix:
-        arch: [amd64, arm64]
         image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
         include:
           - image: terrapod-api
@@ -508,57 +550,114 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          platforms: linux/${{ matrix.arch }}
-          # On PRs we do NOT push to GHCR. Fork PRs get a read-only
-          # GITHUB_TOKEN (no package:write), so a push fails outright — and
-          # even same-repo PRs gain nothing from a registry round-trip. The
-          # built image is loaded into the local Docker daemon and handed to
-          # the scan/e2e jobs as a workflow artifact instead. Pushes happen
-          # only on branch/tag builds, which run from the main repo and have
-          # the write token. `is_pr` (not fork-status) is the discriminator,
-          # so fork and same-repo PRs take the identical artifact path.
+          platforms: linux/amd64
+          # On PRs we do NOT push to GHCR (fork PRs lack package:write; even
+          # same-repo PRs gain nothing from a round-trip). The image is loaded
+          # into the local daemon and handed to scan/e2e as an artifact.
           push: ${{ needs.prepare.outputs.is_pr != 'true' }}
-          load: ${{ needs.prepare.outputs.is_pr == 'true' && matrix.arch == 'amd64' }}
-          tags: ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-${{ matrix.arch }}
-          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+          load: ${{ needs.prepare.outputs.is_pr == 'true' }}
+          tags: ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64
+          cache-from: type=gha,scope=${{ matrix.image }}-amd64
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-amd64
 
-      # PR builds: persist the loaded image as an artifact for scan/e2e.
-      # amd64 only — that's the arch those jobs consume; the arm64 PR build
-      # is a "does it still build on arm" check and needs no artifact.
       - name: Export image artifact
-        if: needs.prepare.outputs.is_pr == 'true' && matrix.arch == 'amd64'
+        if: needs.prepare.outputs.is_pr == 'true'
         run: |
           docker save "$REGISTRY/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64" \
             | gzip > "/tmp/${{ matrix.image }}-amd64.tar.gz"
 
       - name: Upload image artifact
-        if: needs.prepare.outputs.is_pr == 'true' && matrix.arch == 'amd64'
+        if: needs.prepare.outputs.is_pr == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: image-${{ matrix.image }}-amd64
           path: /tmp/${{ matrix.image }}-amd64.tar.gz
           retention-days: 1
 
+  build-images-arm64:
+    name: Build ${{ matrix.image }} (arm64)
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
+        include:
+          - image: terrapod-api
+            dockerfile: docker/Dockerfile.api
+          - image: terrapod-web
+            dockerfile: docker/Dockerfile.web
+          - image: terrapod-runner
+            dockerfile: docker/Dockerfile.runner
+          - image: terrapod-listener
+            dockerfile: docker/Dockerfile.listener
+          - image: terrapod-migrations
+            dockerfile: docker/Dockerfile.migrations
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/arm64
+          push: ${{ needs.prepare.outputs.is_pr != 'true' }}
+          load: ${{ needs.prepare.outputs.is_pr == 'true' }}
+          tags: ${{ env.REGISTRY }}/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-arm64
+          cache-from: type=gha,scope=${{ matrix.image }}-arm64
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-arm64
+
+      # arm64 is now artifacted on PRs too — scan-images scans it as well.
+      - name: Export image artifact
+        if: needs.prepare.outputs.is_pr == 'true'
+        run: |
+          docker save "$REGISTRY/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-arm64" \
+            | gzip > "/tmp/${{ matrix.image }}-arm64.tar.gz"
+
+      - name: Upload image artifact
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: image-${{ matrix.image }}-arm64
+          path: /tmp/${{ matrix.image }}-arm64.tar.gz
+          retention-days: 1
+
   # ── E2E Tests (Playwright) ─────────────────────────────
   e2e-test:
-    # Sharded across 2 GitHub runners using Playwright's built-in
-    # --shard=k/N. Each shard boots its own docker-compose stack
-    # (~30s overhead) so they're independent. We initially tried 4
-    # shards but the per-shard boot cost dominated — 4 shards × 30s
-    # in parallel wasted 90s vs 60s for 2 shards. As the suite grows
-    # past the current 13 spec files, revisit shard count.
+    # Sharded across N GitHub runners using Playwright's built-in --shard=k/N.
+    # Each shard boots its own docker-compose stack in PARALLEL, so stack-boot
+    # wall-clock is ~constant regardless of shard count — adding shards lowers
+    # the per-shard TEST time without raising boot wall-clock (the cost is
+    # runner-minutes). Grow the `shard:` list as the suite grows so total
+    # wall-clock stays flat. Per-shard blob reports are merged into one HTML
+    # report by the `e2e-report` job.
     name: E2E Tests (${{ matrix.shard }}/${{ strategy.job-total }})
-    needs: [prepare, build-images]
+    # amd64 only — e2e loads the amd64 images and must not wait on the
+    # slower arm64 builds (they run in parallel as a build-validation gate).
+    needs: [prepare, build-images-amd64]
     if: |
       always()
-      && needs.build-images.result == 'success'
+      && needs.build-images-amd64.result == 'success'
       && needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     # Whole-job upper bound. Default is GitHub's 360 min, which lets a
     # wedged step run for six hours before anyone notices. 15 min covers
     # a cold-runner worst-case (image pull + stack boot + test suite)
@@ -571,8 +670,8 @@ jobs:
       - uses: actions/checkout@v6
 
       # Branch/tag builds pull the images from GHCR; PR builds load them
-      # from the build-images artifacts (no registry push on PRs). Either
-      # way the stack runs off the `<image>:local` tags.
+      # from the build-images-amd64 artifacts (no registry push on PRs).
+      # Either way the stack runs off the `<image>:local` tags.
       - name: Log in to GHCR
         if: needs.prepare.outputs.is_pr != 'true'
         uses: ./.github/actions/ghcr-login
@@ -652,25 +751,67 @@ jobs:
         # this tree (only @playwright/test + typescript).
         timeout-minutes: 10
 
-      - name: Upload test report
+      # Per-shard blob report → merged into one HTML report by `e2e-report`.
+      - name: Upload blob report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report-shard-${{ matrix.shard }}
-          path: e2e/playwright-report/
+          name: blob-report-${{ matrix.shard }}
+          path: e2e/blob-report/
           retention-days: 14
+          if-no-files-found: ignore
 
       - name: Tear down
         if: always()
         run: docker compose -f e2e/docker-compose.e2e.yml down -v
 
+  # ── E2E Report (merge shard blob reports) ──────────────
+  # Merges the per-shard Playwright blob reports into a single HTML report,
+  # so a failure across 8 shards is triaged from one artifact. Runs even when
+  # shards fail (always()) — that's exactly when the merged report is needed.
+  e2e-report:
+    name: E2E Report
+    needs: [prepare, e2e-test]
+    if: always() && needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Download blob reports
+        uses: actions/download-artifact@v8
+        with:
+          pattern: blob-report-*
+          path: all-blob-reports
+          merge-multiple: true
+      - name: Merge into HTML report
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/e2e:/work" \
+            -v "${{ github.workspace }}/all-blob-reports:/work/all-blob-reports" \
+            -w /work \
+            -e HOME=/tmp \
+            mcr.microsoft.com/playwright:v1.58.2-noble \
+            sh -c "npm ci --ignore-scripts && npx playwright merge-reports --reporter html ./all-blob-reports"
+      - name: Upload merged HTML report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-html-report
+          path: e2e/playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
   # ── Scan Images (Trivy) ────────────────────────────────
+  # Both architectures are scanned (image × arch matrix): arm64 images ship
+  # in the release manifest too, and arch-specific base layers can differ.
+  # Trivy reads image layers/package DBs without executing the binary, so an
+  # arm64 image scans fine on an amd64 runner.
   scan-images:
-    name: Scan ${{ matrix.image }}
-    needs: [prepare, build-images]
+    name: Scan ${{ matrix.image }} (${{ matrix.arch }})
+    needs: [prepare, build-images-amd64, build-images-arm64]
     if: |
       always()
-      && needs.build-images.result == 'success'
+      && needs.build-images-amd64.result == 'success'
+      && needs.build-images-arm64.result == 'success'
       && needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -680,14 +821,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        arch: [amd64, arm64]
         image: [terrapod-api, terrapod-web, terrapod-runner, terrapod-listener, terrapod-migrations]
     steps:
       - uses: actions/checkout@v6
 
       # On branch/tag builds the image lives in GHCR — log in and let Trivy
-      # pull it. On PRs nothing was pushed; the image arrives as an artifact
-      # from build-images and is loaded into the local daemon below, where
-      # Trivy finds it by the same tag without any registry access.
+      # pull the per-arch tag. On PRs nothing was pushed; the image arrives as
+      # a per-arch artifact from build-images-<arch> and is loaded into the
+      # local daemon below, where Trivy finds it by the same tag.
       - name: Log in to GHCR
         if: needs.prepare.outputs.is_pr != 'true'
         uses: ./.github/actions/ghcr-login
@@ -699,12 +841,12 @@ jobs:
         if: needs.prepare.outputs.is_pr == 'true'
         uses: actions/download-artifact@v8
         with:
-          name: image-${{ matrix.image }}-amd64
+          name: image-${{ matrix.image }}-${{ matrix.arch }}
           path: /tmp
 
       - name: Load image (PR)
         if: needs.prepare.outputs.is_pr == 'true'
-        run: gunzip -c "/tmp/${{ matrix.image }}-amd64.tar.gz" | docker load
+        run: gunzip -c "/tmp/${{ matrix.image }}-${{ matrix.arch }}.tar.gz" | docker load
 
       # Human-readable findings step. Always prints the table of CVEs
       # Trivy would gate on to the action log — so a failure in the
@@ -713,7 +855,7 @@ jobs:
       - name: Trivy findings (table, informational)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64
+          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-${{ matrix.arch }}
           format: table
           severity: HIGH,CRITICAL
           ignore-unfixed: true
@@ -723,9 +865,9 @@ jobs:
       - name: Scan with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-amd64
+          image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-${{ matrix.arch }}
           format: sarif
-          output: trivy-${{ matrix.image }}.sarif
+          output: trivy-${{ matrix.image }}-${{ matrix.arch }}.sarif
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           trivyignores: pentest/trivy/.trivyignore
@@ -736,16 +878,17 @@ jobs:
         if: always()
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: trivy-${{ matrix.image }}.sarif
-          category: trivy-${{ matrix.image }}
+          sarif_file: trivy-${{ matrix.image }}-${{ matrix.arch }}.sarif
+          category: trivy-${{ matrix.image }}-${{ matrix.arch }}
 
   # ── Create Multi-Arch Manifests ────────────────────────
   create-manifests:
     name: Manifest ${{ matrix.image }}
-    needs: [prepare, build-images, python-lint, frontend-lint, python-test, python-audit, npm-audit, secret-scan, codeql, helm-lint, sast, scan-images]
+    needs: [prepare, build-images-amd64, build-images-arm64, python-lint, frontend-lint, python-test, python-audit, npm-audit, secret-scan, codeql, helm-lint, sast, scan-images]
     if: |
       always()
-      && needs.build-images.result == 'success'
+      && needs.build-images-amd64.result == 'success'
+      && needs.build-images-arm64.result == 'success'
       && needs.prepare.outputs.is_pr != 'true'
       && (needs.python-lint.result == 'success' || needs.python-lint.result == 'skipped')
       && (needs.frontend-lint.result == 'success' || needs.frontend-lint.result == 'skipped')
@@ -1137,11 +1280,11 @@ jobs:
   # ── Cleanup Tag on Failure ─────────────────────────────
   cleanup-tag:
     name: Cleanup Tag
-    needs: [prepare, build-images, scan-images, create-manifests, release-create, release-images, release-provider, release-migrate, release-publish, release-finalize]
+    needs: [prepare, build-images-amd64, build-images-arm64, scan-images, create-manifests, release-create, release-images, release-provider, release-migrate, release-publish, release-finalize]
     if: |
       always()
       && needs.prepare.outputs.is_tag == 'true'
-      && (needs.build-images.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-publish.result == 'failure' || needs.release-finalize.result == 'failure')
+      && (needs.build-images-amd64.result == 'failure' || needs.build-images-arm64.result == 'failure' || needs.scan-images.result == 'failure' || needs.create-manifests.result == 'failure' || needs.release-create.result == 'failure' || needs.release-images.result == 'failure' || needs.release-provider.result == 'failure' || needs.release-migrate.result == 'failure' || needs.release-publish.result == 'failure' || needs.release-finalize.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -1181,10 +1324,13 @@ jobs:
       - codeql
       - dependency-review
       - helm-lint
+      - helm-smoke
       - sast
-      - build-images
+      - build-images-amd64
+      - build-images-arm64
       - scan-images
       - e2e-test
+      - e2e-report
       - create-manifests
       - release-create
       - release-images
@@ -1215,10 +1361,13 @@ jobs:
             "${{ needs.codeql.result }}"
             "${{ needs.dependency-review.result }}"
             "${{ needs.helm-lint.result }}"
+            "${{ needs.helm-smoke.result }}"
             "${{ needs.sast.result }}"
-            "${{ needs.build-images.result }}"
+            "${{ needs.build-images-amd64.result }}"
+            "${{ needs.build-images-arm64.result }}"
             "${{ needs.scan-images.result }}"
             "${{ needs.e2e-test.result }}"
+            "${{ needs.e2e-report.result }}"
             "${{ needs.create-manifests.result }}"
             "${{ needs.release-create.result }}"
             "${{ needs.release-images.result }}"

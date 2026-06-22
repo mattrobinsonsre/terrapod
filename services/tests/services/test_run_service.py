@@ -476,6 +476,10 @@ class TestCreateRun:
 class TestConfirmRun:
     async def test_confirms_planned_run(self):
         db = AsyncMock(spec=AsyncSession)
+        # confirm_run checks the workspace lock — return an unlocked one.
+        ws = MagicMock()
+        ws.locked = False
+        db.get.return_value = ws
         run = _mock_run(status="planned")
         result = await confirm_run(db, run)
         assert result.status == "confirmed"
@@ -484,6 +488,16 @@ class TestConfirmRun:
         db = AsyncMock(spec=AsyncSession)
         run = _mock_run(status="queued")
         with pytest.raises(ValueError, match="planned"):
+            await confirm_run(db, run)
+
+    async def test_rejects_when_workspace_locked(self):
+        db = AsyncMock(spec=AsyncSession)
+        ws = MagicMock()
+        ws.locked = True
+        ws.lock_id = "lock-ops@example.com"
+        db.get.return_value = ws
+        run = _mock_run(status="planned")
+        with pytest.raises(ValueError, match="locked"):
             await confirm_run(db, run)
 
 
