@@ -502,14 +502,17 @@ async def upload_configuration(
     if cv.status == "uploaded":
         raise HTTPException(status_code=409, detail="Configuration already uploaded")
 
-    data = await request.body()
-    if not data:
-        raise HTTPException(status_code=422, detail="Upload data is required")
-
-    # Store tarball
+    # Stream the tarball straight to storage — never buffer the whole thing in
+    # the API's RAM. A monorepo configuration tarball can be hundreds of MB;
+    # `await request.body()` here loads it all into one allocation and OOM-kills
+    # the API pod (rule 14). storage.put_stream consumes the request body in
+    # chunks and writes them straight through to the backend.
     storage = get_storage()
     key = config_version_key(str(cv.workspace_id), str(cv.id))
-    await storage.put(key, data, content_type="application/x-tar")
+    meta = await storage.put_stream(key, request.stream(), content_type="application/x-tar")
+    if meta.size_bytes == 0:
+        await storage.delete(key)
+        raise HTTPException(status_code=422, detail="Upload data is required")
 
     # Mark as uploaded
     cv = await run_service.mark_configuration_uploaded(db, cv)
@@ -532,7 +535,7 @@ async def upload_configuration(
     logger.info(
         "Configuration uploaded",
         cv_id=str(cv.id),
-        size=len(data),
+        size=meta.size_bytes,
     )
 
     return Response(status_code=200)

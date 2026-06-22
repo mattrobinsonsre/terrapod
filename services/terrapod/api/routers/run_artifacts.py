@@ -200,10 +200,11 @@ async def upload_plan_log(
     require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
-    body = await request.body()
     storage = get_storage()
     key = plan_log_key(str(run.workspace_id), str(run.id))
-    await storage.put(key, body)
+    # Stream straight to storage — plan logs can be large; never buffer the
+    # whole body in the API's RAM (rule 14).
+    await storage.put_stream(key, request.stream())
     await _publish_log_updated(str(run.workspace_id), str(run.id), "plan")
     return Response(status_code=204)
 
@@ -219,10 +220,10 @@ async def upload_plan_file(
     require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
-    body = await request.body()
     storage = get_storage()
     key = plan_output_key(str(run.workspace_id), str(run.id))
-    await storage.put(key, body)
+    # Stream the (potentially large) binary plan straight to storage (rule 14).
+    await storage.put_stream(key, request.stream())
     return Response(status_code=204)
 
 
@@ -242,10 +243,9 @@ async def upload_lock_file(
     require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
-    body = await request.body()
     storage = get_storage()
     key = lock_file_key(str(run.workspace_id), str(run.id))
-    await storage.put(key, body)
+    await storage.put_stream(key, request.stream())
     return Response(status_code=204)
 
 
@@ -356,10 +356,10 @@ async def upload_apply_log(
     require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
-    body = await request.body()
     storage = get_storage()
     key = apply_log_key(str(run.workspace_id), str(run.id))
-    await storage.put(key, body)
+    # Stream straight to storage — apply logs can be large (rule 14).
+    await storage.put_stream(key, request.stream())
     await _publish_log_updated(str(run.workspace_id), str(run.id), "apply")
     return Response(status_code=204)
 
