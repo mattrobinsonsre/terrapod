@@ -43,6 +43,8 @@ def _mock_workspace(
     ws.auto_apply = auto_apply
     ws.execution_mode = execution_mode
     ws.terraform_version = terraform_version
+    ws.terragrunt_enabled = False
+    ws.terragrunt_version = "1.0"
     ws.working_directory = ""
     ws.locked = locked
     ws.lock_id = lock_id

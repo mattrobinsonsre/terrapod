@@ -644,6 +644,8 @@ def _workspace_json(
                 "operations": ws.execution_mode == "agent",
                 "execution-backend": ws.execution_backend,
                 "terraform-version": ws.terraform_version or "",
+                "terragrunt-enabled": ws.terragrunt_enabled,
+                "terragrunt-version": ws.terragrunt_version or "",
                 "working-directory": ws.working_directory,
                 "locked": ws.locked,
                 "resource-cpu": ws.resource_cpu,
@@ -961,6 +963,8 @@ async def create_workspace(
         auto_apply=attrs.get("auto-apply", False),
         execution_backend=attrs.get("execution-backend", settings.default_execution_backend),
         terraform_version=attrs.get("terraform-version", settings.default_terraform_version),
+        terragrunt_enabled=bool(attrs.get("terragrunt-enabled", False)),
+        terragrunt_version=(attrs.get("terragrunt-version") or "1.0"),
         working_directory=_sanitize_working_directory(attrs.get("working-directory", "")),
         resource_cpu=attrs.get("resource-cpu", "1"),
         resource_memory=attrs.get("resource-memory", "2Gi"),
@@ -1380,6 +1384,12 @@ async def update_workspace(
         ws.execution_backend = backend
     if "terraform-version" in attrs:
         ws.terraform_version = attrs["terraform-version"]
+    if "terragrunt-enabled" in attrs:
+        ws.terragrunt_enabled = bool(attrs["terragrunt-enabled"])
+    if "terragrunt-version" in attrs:
+        # Partial version (e.g. "1.0"), resolved via the binary cache like
+        # terraform-version. Empty falls back to the "1.0" default.
+        ws.terragrunt_version = attrs["terragrunt-version"] or "1.0"
     if "working-directory" in attrs:
         ws.working_directory = _sanitize_working_directory(attrs["working-directory"])
     if "resource-cpu" in attrs:
