@@ -390,9 +390,16 @@ class BinaryCacheConfig(BaseModel):
     enabled: bool = Field(default=True)
     terraform_mirror_url: str = Field(default="https://releases.hashicorp.com/terraform")
     tofu_mirror_url: str = Field(default="https://github.com/opentofu/opentofu/releases/download")
+    terragrunt_mirror_url: str = Field(
+        default="https://github.com/gruntwork-io/terragrunt/releases/download",
+        description="Upstream download base for terragrunt binaries (GitHub releases). "
+        "Terragrunt ships a bare per-platform binary asset (terragrunt_<os>_<arch>), "
+        "not a zip/tarball — the pull-through cache stores it as-is. Only used by "
+        "workspaces with terragrunt enabled.",
+    )
     allow_prerelease: Literal["none", "rc", "beta", "alpha", "dev"] = Field(
         default="none",
-        description="Lowest pre-release tier to accept for terraform/tofu CLI version "
+        description="Lowest pre-release tier to accept for terraform/tofu/terragrunt CLI version "
         "resolution and caching. The value names the LEAST stable tier allowed; every "
         "more-stable tier is also allowed. 'none' (default) permits only GA releases. "
         "'rc' allows release candidates and GA. 'dev' allows everything. "

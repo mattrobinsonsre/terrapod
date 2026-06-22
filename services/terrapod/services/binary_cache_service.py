@@ -23,7 +23,7 @@ from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
 
-VALID_TOOLS = {"terraform", "tofu"}
+VALID_TOOLS = {"terraform", "tofu", "terragrunt"}
 VALID_OS = {"linux", "darwin", "windows", "freebsd", "openbsd", "solaris"}
 VALID_ARCH = {"amd64", "arm64", "arm", "386"}
 
@@ -143,12 +143,18 @@ async def get_or_cache_binary(
 
     if tool == "terraform":
         download_url = _terraform_download_url(version, os_, arch)
+    elif tool == "terragrunt":
+        download_url = _terragrunt_download_url(version, os_, arch)
     else:
         download_url = _tofu_download_url(version, os_, arch)
 
-    # Stream directly to object storage
+    # Stream directly to object storage. terraform/tofu ship a zip; terragrunt
+    # ships a bare per-platform binary, so the stored content type differs.
     key = binary_cache_key(tool, version, os_, arch)
-    shasum, size_bytes = await _fetch_and_store_binary(storage, key, download_url)
+    content_type = "application/octet-stream" if tool == "terragrunt" else "application/zip"
+    shasum, size_bytes = await _fetch_and_store_binary(
+        storage, key, download_url, content_type=content_type
+    )
 
     # Record in database. Two concurrent cache misses for the same
     # (tool, version, os, arch) — typical when two runners spin up
@@ -269,6 +275,8 @@ async def list_available_versions(tool: str) -> list[str]:
 
     if tool == "terraform":
         versions = await _fetch_terraform_versions()
+    elif tool == "terragrunt":
+        versions = await _fetch_terragrunt_versions()
     else:
         versions = await _fetch_tofu_versions()
 
@@ -351,6 +359,31 @@ async def _fetch_tofu_versions() -> list[str]:
     return versions
 
 
+async def _fetch_terragrunt_versions() -> list[str]:
+    """Fetch terragrunt versions from GitHub releases (gruntwork-io/terragrunt).
+
+    Same shape as `_fetch_tofu_versions`: GitHub's `prerelease` flag plus the
+    configured allow_prerelease policy gate which versions are offered.
+    """
+    url = "https://api.github.com/repos/gruntwork-io/terragrunt/releases"
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(url, params={"per_page": 100})
+        resp.raise_for_status()
+        releases = resp.json()
+
+    policy = settings.registry.binary_cache.allow_prerelease
+    versions = []
+    for release in releases:
+        tag = release.get("tag_name", "")
+        version = tag.lstrip("v")
+        if not _is_version_allowed(version, policy):
+            continue
+        parts = version.split("-")[0].split(".")
+        if len(parts) >= 3:
+            versions.append(version)
+    return versions
+
+
 # --- Version Resolution ---
 
 
@@ -394,6 +427,8 @@ async def resolve_version(tool: str, partial_version: str) -> str:
         resolved = await _resolve_terraform_version(partial_version)
     elif tool == "tofu":
         resolved = await _resolve_tofu_version(partial_version)
+    elif tool == "terragrunt":
+        resolved = await _resolve_terragrunt_version(partial_version)
     else:
         return partial_version
 
@@ -480,6 +515,38 @@ async def _resolve_tofu_version(partial: str) -> str:
     return matching[-1]
 
 
+async def _resolve_terragrunt_version(partial: str) -> str:
+    """Resolve partial terragrunt version via GitHub releases (gruntwork-io/terragrunt).
+
+    Mirrors `_resolve_tofu_version`; honors the allow_prerelease policy.
+    """
+    url = "https://api.github.com/repos/gruntwork-io/terragrunt/releases"
+    prefix = f"v{partial}."
+    policy = settings.registry.binary_cache.allow_prerelease
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(url, params={"per_page": 100})
+        resp.raise_for_status()
+        releases = resp.json()
+
+    matching = []
+    for release in releases:
+        tag = release.get("tag_name", "")
+        if not tag.startswith(prefix):
+            continue
+        version = tag.lstrip("v")
+        if not _is_version_allowed(version, policy):
+            continue
+        matching.append(version)
+
+    if not matching:
+        logger.warning("No matching terragrunt version found", partial=partial, policy=policy)
+        return partial
+
+    matching.sort(key=_version_sort_key)
+    return matching[-1]
+
+
 # --- Internal helpers ---
 
 
@@ -515,7 +582,24 @@ def _tofu_download_url(version: str, os_: str, arch: str) -> str:
     return f"{cfg.tofu_mirror_url}/v{version}/{filename}"
 
 
-async def _fetch_and_store_binary(storage: ObjectStore, key: str, url: str) -> tuple[str, int]:
+def _terragrunt_download_url(version: str, os_: str, arch: str) -> str:
+    """Build the upstream download URL for a terragrunt binary.
+
+    Terragrunt releases a bare per-platform binary (not a zip/tarball):
+    `terragrunt_<os>_<arch>` under the GitHub release `v<version>` tag. The
+    os/arch tokens match Terrapod's (linux/darwin/windows × amd64/arm64).
+    """
+    cfg = settings.registry.binary_cache
+    filename = f"terragrunt_{os_}_{arch}"
+    return f"{cfg.terragrunt_mirror_url}/v{version}/{filename}"
+
+
+async def _fetch_and_store_binary(
+    storage: ObjectStore,
+    key: str,
+    url: str,
+    content_type: str = "application/zip",
+) -> tuple[str, int]:
     """Stream a binary from upstream directly into object storage.
 
     Returns (sha256_hex, size_bytes).
@@ -524,5 +608,5 @@ async def _fetch_and_store_binary(storage: ObjectStore, key: str, url: str) -> t
         async with client.stream("GET", url, timeout=300.0) as resp:
             resp.raise_for_status()
             stream = HashingStream(resp)
-            await storage.put_stream(key, stream, content_type="application/zip")
+            await storage.put_stream(key, stream, content_type=content_type)
             return stream.sha256_hex, stream.size

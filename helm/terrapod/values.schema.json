@@ -594,6 +594,7 @@
                 "enabled": { "type": "boolean" },
                 "terraform_mirror_url": { "type": "string" },
                 "tofu_mirror_url": { "type": "string" },
+                "terragrunt_mirror_url": { "type": "string" },
                 "allow_prerelease": {
                   "type": "string",
                   "enum": ["none", "rc", "beta", "alpha", "dev"]

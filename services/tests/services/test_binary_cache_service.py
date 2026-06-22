@@ -228,3 +228,62 @@ class TestConcurrentCacheMissRace:
         url = await get_or_cache_binary(db, storage, "tofu", "1.11.7", "linux", "arm64")
         assert url == "https://example/presigned"
         db.rollback.assert_awaited_once()
+
+
+class TestTerragruntBinary:
+    """Terragrunt is a third pull-through tool. Unlike terraform/tofu it ships
+    a bare per-platform binary (not a zip), so the download URL has no `.zip`
+    suffix and the stored object is octet-stream rather than application/zip.
+    """
+
+    @patch("terrapod.services.binary_cache_service.settings")
+    def test_download_url_is_bare_github_binary(self, mock_settings: MagicMock) -> None:
+        from terrapod.services.binary_cache_service import _terragrunt_download_url
+
+        mock_settings.registry.binary_cache.terragrunt_mirror_url = (
+            "https://github.com/gruntwork-io/terragrunt/releases/download"
+        )
+        url = _terragrunt_download_url("0.67.0", "linux", "amd64")
+        assert url == (
+            "https://github.com/gruntwork-io/terragrunt/releases/download/"
+            "v0.67.0/terragrunt_linux_amd64"
+        )
+        assert not url.endswith(".zip")
+
+    @pytest.mark.asyncio
+    @patch("terrapod.services.binary_cache_service._fetch_and_store_binary", new_callable=AsyncMock)
+    @patch("terrapod.services.binary_cache_service._get_cached", new_callable=AsyncMock)
+    @patch("terrapod.services.binary_cache_service.settings")
+    async def test_cache_miss_fetches_terragrunt_url_as_octet_stream(
+        self,
+        mock_settings: MagicMock,
+        mock_get_cached: AsyncMock,
+        mock_fetch: AsyncMock,
+    ) -> None:
+        mock_settings.registry.binary_cache.allow_prerelease = "none"
+        mock_settings.registry.binary_cache.terragrunt_mirror_url = (
+            "https://github.com/gruntwork-io/terragrunt/releases/download"
+        )
+        mock_get_cached.return_value = None  # cache miss → fetch path
+        mock_fetch.return_value = ("cafef00d" * 8, 45_000_000)
+
+        db = AsyncMock()
+        storage = AsyncMock()
+        presigned = MagicMock()
+        presigned.url = "https://example/presigned"
+        storage.presigned_get_url = AsyncMock(return_value=presigned)
+
+        url = await get_or_cache_binary(db, storage, "terragrunt", "0.67.0", "linux", "amd64")
+        assert url == "https://example/presigned"
+
+        # The fetch used the bare-binary terragrunt URL and stored it as
+        # octet-stream (not the terraform/tofu zip content type).
+        _args, kwargs = mock_fetch.call_args
+        fetched_url = _args[2] if len(_args) > 2 else kwargs.get("url")
+        assert fetched_url.endswith("/v0.67.0/terragrunt_linux_amd64")
+        assert kwargs.get("content_type") == "application/octet-stream"
+
+        # The recorded row is tagged tool=terragrunt.
+        added = db.add.call_args[0][0]
+        assert added.tool == "terragrunt"
+        assert added.version == "0.67.0"
