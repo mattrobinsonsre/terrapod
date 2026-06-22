@@ -321,6 +321,8 @@ POST /api/v2/workspaces/{id}/actions/lock
 
 **Required permission:** `plan` on the workspace.
 
+A manual lock is the CLI/UI state lock **and** an operator gate on applies: while a workspace is locked, apply-capable (plan+apply) runs **will not start** and a confirm (`POST /api/v2/runs/{id}/actions/apply`) returns **409 Conflict**. Auto-apply runs settle in `planned` and wait for an unlock rather than applying. **Plan-only runs (speculative plans, drift checks) are not blocked** — they never mutate state. Returns 409 if the workspace is already locked.
+
 ### Unlock Workspace
 
 ```
@@ -588,6 +590,17 @@ POST /api/v2/runs
 ```
 
 **Required permission:** `plan` for plan-only runs, `write` for apply runs.
+
+#### Run concurrency: serialization & auto-discard
+
+Apply-capable (plan+apply) runs are **serialized per workspace** — only one executes at a time. When a newer apply-capable run is queued for a workspace:
+
+- **Older un-applied apply-capable runs are auto-discarded** so a stale plan can't later apply outdated config: a `planned` run awaiting confirmation transitions to `discarded`, and `pending`/`queued` runs transition to `canceled` (message: `Superseded by run <id>`).
+- An **in-flight** run (`confirmed`/`applying`) is **never** superseded — committed applies finish on their own terms; the newer run waits until it reaches a terminal state.
+
+**Plan-only runs are exempt** — speculative PR plans, CLI `plan`, and drift checks never mutate state, so they run concurrently and neither supersede nor are superseded. (Speculative PR runs are still superseded per-PR by the VCS poller on a new commit.)
+
+This is enforced server-side regardless of run source (VCS, CLI/API, UI), so the same guarantees hold for `terraform`/`tofu` CLI-driven runs as for VCS-driven runs.
 
 #### Configuration version resolution
 
