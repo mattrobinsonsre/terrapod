@@ -7,7 +7,7 @@ test.describe('Audit Log', () => {
 
     // Previous test activity should have generated audit entries.
     // At minimum the table should have at least one row.
-    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('apply method filter narrows results', async ({ page }) => {
@@ -15,7 +15,7 @@ test.describe('Audit Log', () => {
     await expect(page.locator('h1:has-text("Audit Log")')).toBeVisible();
 
     // Wait for initial data
-    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10_000 });
 
     // Record initial row count
     const initialCount = await page.locator('table tbody tr').count();
@@ -25,7 +25,7 @@ test.describe('Audit Log', () => {
     await page.click('button:has-text("Apply Filters")');
 
     // Table should still be visible (there will be POST entries from test setup)
-    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10_000 });
 
     // Every visible action badge should say POST
     const badges = page.locator('table tbody tr td:nth-child(3)');
@@ -37,7 +37,7 @@ test.describe('Audit Log', () => {
 
   test('clear filters restores full list', async ({ page }) => {
     await page.goto('/admin/audit-log');
-    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10_000 });
 
     // Apply a filter first
     await page.selectOption('#f-action', 'DELETE');
@@ -47,7 +47,7 @@ test.describe('Audit Log', () => {
     await page.click('button:has-text("Clear")');
 
     // Table should reload with entries (broader set)
-    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10_000 });
 
     // The method select should be reset (empty / "All" value)
     const val = await page.locator('#f-action').inputValue();

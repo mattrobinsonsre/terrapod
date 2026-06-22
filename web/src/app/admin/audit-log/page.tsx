@@ -86,17 +86,32 @@ export default function AuditLogPage() {
 
   usePollingInterval(!loading, 30_000, loadEntries)
 
-  async function loadEntries() {
+  async function loadEntries(overrides?: {
+    actor?: string
+    resourceType?: string
+    action?: string
+    since?: string
+    until?: string
+    page?: number
+  }) {
     setError('')
     try {
+      // Allow callers (e.g. Clear) to pass freshly-computed filter values so
+      // the fetch doesn't race the async state setters.
+      const actor = overrides?.actor ?? filterActor
+      const resourceType = overrides?.resourceType ?? filterResourceType
+      const action = overrides?.action ?? filterAction
+      const since = overrides?.since ?? filterSince
+      const until = overrides?.until ?? filterUntil
+      const pageNum = overrides?.page ?? page
       const params = new URLSearchParams()
-      params.set('page[number]', String(page))
+      params.set('page[number]', String(pageNum))
       params.set('page[size]', '20')
-      if (filterActor) params.set('filter[actor]', filterActor)
-      if (filterResourceType) params.set('filter[resource-type]', filterResourceType)
-      if (filterAction) params.set('filter[action]', filterAction)
-      if (filterSince) params.set('filter[since]', new Date(filterSince).toISOString())
-      if (filterUntil) params.set('filter[until]', new Date(filterUntil).toISOString())
+      if (actor) params.set('filter[actor]', actor)
+      if (resourceType) params.set('filter[resource-type]', resourceType)
+      if (action) params.set('filter[action]', action)
+      if (since) params.set('filter[since]', new Date(since).toISOString())
+      if (until) params.set('filter[until]', new Date(until).toISOString())
 
       const res = await apiFetch(`/api/terrapod/v1/admin/audit-log?${params.toString()}`)
       if (!res.ok) throw new Error('Failed to load audit log')
@@ -123,8 +138,11 @@ export default function AuditLogPage() {
     setFilterSince('')
     setFilterUntil('')
     setPage(1)
-    // Trigger reload after state update
-    setTimeout(() => loadEntries(), 0)
+    // Reload with the cleared filters EXPLICITLY. The state setters above are
+    // async, so a deferred loadEntries() would close over the pre-clear filter
+    // values and reload the still-filtered (often empty) list — the clear
+    // would appear to do nothing when the prior filter had no matches.
+    loadEntries({ actor: '', resourceType: '', action: '', since: '', until: '', page: 1 })
   }
 
   return (
