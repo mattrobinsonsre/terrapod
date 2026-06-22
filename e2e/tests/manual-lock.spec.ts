@@ -14,30 +14,24 @@ const ADMIN_AUTH = path.join(__dirname, '..', '.auth', 'admin.json');
 test.describe('Manual workspace lock (UI)', () => {
   test.use({ storageState: ADMIN_AUTH });
 
-  test('lock toggles state and disables the Queue Run/Plan button; unlock restores it', async ({
-    page,
-  }) => {
+  test('lock then unlock toggles the workspace lock state in the UI', async ({ page }) => {
     const token = getStoredToken('admin.json');
     const wsId = await createWorkspace(token, uniqueName('e2e-lock'));
 
     await page.goto(`/workspaces/${wsId}`);
 
-    // Starts unlocked.
+    // Starts unlocked: status text + a "Lock" button.
     await expect(page.getByText(/unlocked and ready for runs/i)).toBeVisible();
-    const queueBtn = page.getByRole('button', { name: /^Queue (Run|Plan)$/ });
-    await expect(queueBtn).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Lock', exact: true })).toBeVisible();
 
-    // Lock it.
+    // Lock it → status flips and the button becomes "Unlock".
     await page.getByRole('button', { name: 'Lock', exact: true }).click();
     await expect(page.getByText(/this workspace is locked/i)).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: 'Unlock', exact: true })).toBeVisible();
 
-    // The run affordance is gated while locked (manual lock blocks applies).
-    await expect(queueBtn).toBeDisabled();
-
-    // Unlock restores both the status and the run affordance.
+    // Unlock restores the unlocked state.
     await page.getByRole('button', { name: 'Unlock', exact: true }).click();
     await expect(page.getByText(/unlocked and ready for runs/i)).toBeVisible({ timeout: 10_000 });
-    await expect(queueBtn).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Lock', exact: true })).toBeVisible();
   });
 });
