@@ -106,5 +106,15 @@ export default defineConfig({
       testMatch: 'rbac-negatives.spec.ts',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'manual-lock',
+      testMatch: 'manual-lock.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
+      name: 'sse-live-update',
+      testMatch: 'sse-live-update.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
   ],
 });

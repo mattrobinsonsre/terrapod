@@ -3,9 +3,29 @@
  * Uses the API port (8000) directly, bypassing the BFF.
  */
 import { createHash, randomBytes } from 'crypto';
+import fs from 'fs';
+import path from 'path';
 
 const API_URL = process.env.API_URL || 'http://localhost:8000';
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+
+/**
+ * Read the session token out of a saved storageState file (e.g. admin.json),
+ * so a spec can drive the API directly with the same identity its browser
+ * context uses. Centralises the localStorage-extraction the specs used to
+ * inline.
+ */
+export function getStoredToken(authFileName = 'admin.json'): string {
+  const authPath = path.join(__dirname, '..', '.auth', authFileName);
+  const authData = JSON.parse(fs.readFileSync(authPath, 'utf-8'));
+  const origin = authData.origins?.find((o: { origin: string }) =>
+    o.origin.includes('localhost'),
+  );
+  const entry = origin?.localStorage?.find(
+    (e: { name: string }) => e.name === 'terrapod_auth',
+  );
+  return entry ? JSON.parse(entry.value).token : '';
+}
 
 /**
  * A process-unique, human-readable suffix for test resources. Within a shard
