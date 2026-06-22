@@ -854,6 +854,15 @@ jobs:
       # re-running Trivy locally. exit-code: '0' keeps this informational.
       - name: Trivy findings (table, informational)
         uses: aquasecurity/trivy-action@v0.36.0
+        env:
+          # The per-arch tag (sha-XXX-arm64) is an OCI index whose only child
+          # is the matrix arch. Without this, Trivy defaults to the runner's
+          # platform (linux/amd64) when pulling the image from GHCR on branch/
+          # tag builds and fails with "no child with platform linux/amd64".
+          # (PR builds load the image into the local daemon, so they never hit
+          # the remote-pull default — which is why this only broke on main.)
+          # Trivy reads TRIVY_PLATFORM as the --platform flag.
+          TRIVY_PLATFORM: linux/${{ matrix.arch }}
         with:
           image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-${{ matrix.arch }}
           format: table
@@ -864,6 +873,10 @@ jobs:
 
       - name: Scan with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
+        env:
+          # See the note on the informational step above — pin the pulled
+          # platform to the matrix arch so the arm64 scan resolves its child.
+          TRIVY_PLATFORM: linux/${{ matrix.arch }}
         with:
           image-ref: ghcr.io/mattrobinsonsre/${{ matrix.image }}:sha-${{ needs.prepare.outputs.sha_short }}-${{ matrix.arch }}
           format: sarif
