@@ -86,8 +86,9 @@ def run_plan(
     var_file_args: list[str],
     log_file: str,
     child_grace_seconds: float = 25.0,
+    plan_file: str = "tfplan",
 ) -> PlanResult:
-    argv = build_plan_argv(cfg, binary=binary, var_file_args=var_file_args)
+    argv = build_plan_argv(cfg, binary=binary, var_file_args=var_file_args, plan_file=plan_file)
     logger.info("running plan", binary=binary)
     result = exec_subprocess.run(
         argv,
@@ -111,12 +112,14 @@ def run_apply(
     log_file: str,
     has_plan_file: bool,
     child_grace_seconds: float = 25.0,
+    plan_file: str = "tfplan",
 ) -> int:
     argv = build_apply_argv(
         cfg,
         binary=binary,
         var_file_args=var_file_args,
         has_plan_file=has_plan_file,
+        plan_file=plan_file,
     )
     logger.info("running apply", binary=binary, has_plan_file=has_plan_file)
     result = exec_subprocess.run(

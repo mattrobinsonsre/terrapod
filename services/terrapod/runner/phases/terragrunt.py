@@ -21,11 +21,19 @@ local-backend + state-via-API model:
                 produced — without editing user config. State then lands in the
                 working dir, which `resolve_working_dir` discovers for capture.
 
+Terragrunt copies every unit (with or without `terraform { source }`) into a
+`.terragrunt-cache/<hash>/<hash>/` dir and runs tofu there. The orchestrator
+therefore relocates the downloaded state into that dir after init
+(`relocate_state`) and treats it as the working dir for plan/apply + state
+capture, while the process stays chdir'd to the unit dir so terragrunt finds
+`terragrunt.hcl`.
+
 The runner image is bash-free (#167), so both wrappers are Python.
 """
 
 from __future__ import annotations
 
+import shutil
 import stat
 from pathlib import Path
 
@@ -149,6 +157,28 @@ def write_wrappers(
         path.chmod(path.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
     logger.info("terragrunt wrappers written", tg=str(tg_wrapper), tf=str(tf_wrapper))
     return tg_wrapper
+
+
+def relocate_state(*, src: Path | str, dst: Path | str) -> bool:
+    """Copy the downloaded local state from the unit dir into terragrunt's
+    actual tofu working dir (the `.terragrunt-cache` subdir).
+
+    Terrapod downloads the workspace's current `terraform.tfstate` beside the
+    unit's config BEFORE init (the cache dir doesn't exist yet). Terragrunt then
+    runs tofu inside the cache dir, where it reads/writes state — so without
+    this the plan would see empty state and propose recreating everything, and
+    apply would persist a fork. Copy (not move) so a stale leftover in the unit
+    dir is harmless; overwrite any copy terragrunt itself made during its config
+    download. Returns True if a state file was placed.
+    """
+    src_dir, dst_dir = Path(src), Path(dst)
+    placed = False
+    for name in ("terraform.tfstate", "terraform.tfstate.backup"):
+        s = src_dir / name
+        if s.exists() and s.is_file():
+            shutil.copy2(s, dst_dir / name)
+            placed = True
+    return placed
 
 
 def resolve_working_dir(unit_dir: Path | str) -> Path:

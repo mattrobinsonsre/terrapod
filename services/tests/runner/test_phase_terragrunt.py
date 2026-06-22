@@ -121,10 +121,39 @@ def test_resolve_working_dir_finds_cache_dir_by_marker(tmp_path: Path) -> None:
 
 
 def test_resolve_working_dir_falls_back_to_unit_for_in_place(tmp_path: Path) -> None:
-    # In-place units (no `source`) have no .terragrunt-cache; tofu runs in the
-    # unit dir, so that's the working dir.
+    # If terragrunt ran tofu in place (no .terragrunt-cache marker), the unit
+    # dir IS the working dir, so resolve falls back to it.
     from terrapod.runner.phases.terragrunt import resolve_working_dir
 
     unit = tmp_path / "inplace"
     unit.mkdir()
     assert resolve_working_dir(unit) == unit
+
+
+def test_relocate_state_copies_state_into_cache_dir(tmp_path: Path) -> None:
+    # State is downloaded to the unit dir before init; relocate_state must place
+    # it in terragrunt's actual tofu working dir so plan/apply see real state.
+    from terrapod.runner.phases.terragrunt import relocate_state
+
+    unit = tmp_path / "unit"
+    cache = tmp_path / "unit" / ".terragrunt-cache" / "aaaa" / "bbbb"
+    unit.mkdir()
+    cache.mkdir(parents=True)
+    (unit / "terraform.tfstate").write_text('{"serial": 7}')
+    (unit / "terraform.tfstate.backup").write_text('{"serial": 6}')
+
+    assert relocate_state(src=unit, dst=cache) is True
+    assert (cache / "terraform.tfstate").read_text() == '{"serial": 7}'
+    assert (cache / "terraform.tfstate.backup").read_text() == '{"serial": 6}'
+
+
+def test_relocate_state_returns_false_when_no_state(tmp_path: Path) -> None:
+    # First run: no state downloaded. relocate_state is a no-op returning False.
+    from terrapod.runner.phases.terragrunt import relocate_state
+
+    unit = tmp_path / "unit"
+    cache = tmp_path / "cache"
+    unit.mkdir()
+    cache.mkdir()
+    assert relocate_state(src=unit, dst=cache) is False
+    assert not (cache / "terraform.tfstate").exists()
