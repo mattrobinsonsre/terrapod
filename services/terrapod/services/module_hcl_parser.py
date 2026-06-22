@@ -12,54 +12,74 @@ logger = get_logger(__name__)
 
 
 def extract_module_interface(tarball_bytes: bytes) -> dict:
-    """Parse .tf files from a module tarball and extract variable/output blocks.
+    """Parse .tf files from a module tarball (in-memory) and extract blocks.
 
     Returns {"inputs": [...], "outputs": [...]}.
     Returns {"inputs": [], "outputs": []} on parse failure.
-    """
-    inputs: list[dict] = []
-    outputs: list[dict] = []
 
+    Prefer `extract_module_interface_from_file` for uploads — it streams the
+    tarball from disk rather than holding the whole archive in the heap.
+    """
     try:
-        tf_contents = _read_root_tf_files(tarball_bytes)
-        for content in tf_contents:
-            parsed = _parse_hcl(content)
-            if parsed is None:
-                continue
-            inputs.extend(_extract_variables(parsed))
-            outputs.extend(_extract_outputs(parsed))
+        with tarfile.open(fileobj=io.BytesIO(tarball_bytes), mode="r:gz") as tar:
+            return _interface_from_tar(tar)
     except Exception:
         logger.warning("Failed to extract module interface", exc_info=True)
         return {"inputs": [], "outputs": []}
 
+
+def extract_module_interface_from_file(tarball_path: str) -> dict:
+    """Parse .tf files from a module tarball on disk and extract blocks.
+
+    Opens the tarball by path so `tarfile` streams members from disk — the
+    whole archive is never loaded into the worker heap (CLAUDE.md #14).
+    Returns {"inputs": [...], "outputs": [...]}; {} halves on parse failure.
+    """
+    try:
+        with tarfile.open(tarball_path, mode="r:gz") as tar:
+            return _interface_from_tar(tar)
+    except Exception:
+        logger.warning("Failed to extract module interface", exc_info=True)
+        return {"inputs": [], "outputs": []}
+
+
+def _interface_from_tar(tar: tarfile.TarFile) -> dict:
+    """Extract inputs/outputs from an open module tarball."""
+    inputs: list[dict] = []
+    outputs: list[dict] = []
+    for content in _read_root_tf_files(tar):
+        parsed = _parse_hcl(content)
+        if parsed is None:
+            continue
+        inputs.extend(_extract_variables(parsed))
+        outputs.extend(_extract_outputs(parsed))
     return {"inputs": inputs, "outputs": outputs}
 
 
 _MAX_TF_FILE_BYTES = 5 * 1024 * 1024  # 5 MB per file
 
 
-def _read_root_tf_files(tarball_bytes: bytes) -> list[str]:
-    """Read all .tf files at the root level of the tarball."""
+def _read_root_tf_files(tar: tarfile.TarFile) -> list[str]:
+    """Read all .tf files at the root level of an open tarball."""
     contents = []
-    with tarfile.open(fileobj=io.BytesIO(tarball_bytes), mode="r:gz") as tar:
-        for member in tar.getmembers():
-            if not member.isfile():
-                continue
-            if "/" in member.name:
-                continue
-            if not member.name.endswith(".tf"):
-                continue
-            if member.size > _MAX_TF_FILE_BYTES:
-                logger.warning(
-                    "Skipping oversized .tf file",
-                    file=member.name,
-                    size=member.size,
-                )
-                continue
-            f = tar.extractfile(member)
-            if f is None:
-                continue
-            contents.append(f.read().decode("utf-8", errors="replace"))
+    for member in tar.getmembers():
+        if not member.isfile():
+            continue
+        if "/" in member.name:
+            continue
+        if not member.name.endswith(".tf"):
+            continue
+        if member.size > _MAX_TF_FILE_BYTES:
+            logger.warning(
+                "Skipping oversized .tf file",
+                file=member.name,
+                size=member.size,
+            )
+            continue
+        f = tar.extractfile(member)
+        if f is None:
+            continue
+        contents.append(f.read().decode("utf-8", errors="replace"))
     return contents
 
 

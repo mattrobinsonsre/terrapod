@@ -163,7 +163,10 @@ class TestUploadStateDuplicateSerial:
 
         assert resp.status_code == 204
         mock_db.add.assert_called_once()
-        mock_storage.put.assert_called_once()
+        # State is streamed from a PVC tempfile into storage (CLAUDE.md #14),
+        # never buffered in RAM, so `put_stream` is the call — not `put`.
+        mock_storage.put_stream.assert_called_once()
+        mock_storage.put.assert_not_called()
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -245,10 +248,13 @@ class TestUploadPlanJsonOutput:
             )
 
         assert resp.status_code == 204
-        mock_storage.put.assert_called_once()
-        key, payload = mock_storage.put.call_args.args
+        # Plan JSON is streamed from a PVC tempfile into storage (CLAUDE.md
+        # #14), so `put_stream` carries the canonical key + an async chunk
+        # iterator — not the raw bytes.
+        mock_storage.put_stream.assert_called_once()
+        mock_storage.put.assert_not_called()
+        key = mock_storage.put_stream.call_args.args[0]
         assert key == f"plans/{ws_id}/{run_id}.json-output"
-        assert payload == body
         # Flag flip is the source of truth for `_plan_json` advertising the URL.
         assert run.has_json_output is True
         mock_db.commit.assert_awaited_once()
@@ -512,10 +518,12 @@ class TestLockFile:
             )
 
         assert resp.status_code == 204
-        mock_storage.put.assert_called_once()
-        key, payload = mock_storage.put.call_args.args
+        # Lock file is streamed straight from the request into storage
+        # (CLAUDE.md #14) — `put_stream` with the canonical key, not `put`.
+        mock_storage.put_stream.assert_called_once()
+        mock_storage.put.assert_not_called()
+        key = mock_storage.put_stream.call_args.args[0]
         assert key == f"plans/{ws_id}/{run_id}.terraform.lock.hcl"
-        assert payload == body
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

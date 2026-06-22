@@ -154,9 +154,16 @@ async def upload_module_tarball(
     name: str,
     provider: str,
     version: str,
-    data: bytes,
+    tarball_path: str,
 ) -> RegistryModuleVersion:
-    """Upload a module tarball directly. Upserts version, stores tarball."""
+    """Upload a module tarball directly. Upserts version, stores tarball.
+
+    `tarball_path` is a file on the API pod's ephemeral PVC (the caller
+    streams the request body to it). The tarball is streamed into storage
+    and parsed from disk — never buffered in the worker heap (CLAUDE.md #14).
+    """
+    from terrapod.api.upload_stream import file_chunks
+
     module = await get_module(db, namespace, name, provider)
     if module is None:
         raise ValueError(f"Module {namespace}/{name}/{provider} not found")
@@ -173,7 +180,7 @@ async def upload_module_tarball(
     mod_version = await upsert_module_version(db, module.id, version)
 
     key = module_tarball_key(namespace, name, provider, version)
-    await storage.put(key, data, "application/gzip")
+    await storage.put_stream(key, file_chunks(tarball_path), content_type="application/gzip")
 
     mod_version.upload_status = "uploaded"
 
@@ -182,10 +189,10 @@ async def upload_module_tarball(
     if settings.registry.module_interface.enabled:
         import asyncio
 
-        from terrapod.services.module_hcl_parser import extract_module_interface
+        from terrapod.services.module_hcl_parser import extract_module_interface_from_file
 
         try:
-            interface = await asyncio.to_thread(extract_module_interface, data)
+            interface = await asyncio.to_thread(extract_module_interface_from_file, tarball_path)
             mod_version.inputs = interface["inputs"]
             mod_version.outputs = interface["outputs"]
         except Exception:

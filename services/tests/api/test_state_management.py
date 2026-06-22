@@ -344,7 +344,10 @@ class TestUploadState:
 
         assert resp.status_code == 201
         mock_db.add.assert_called_once()
-        mock_storage.put.assert_called_once()
+        # Manual state upload streams the body to a PVC tempfile, then
+        # `put_stream`s it to storage — never buffers it in RAM (CLAUDE.md #14).
+        mock_storage.put_stream.assert_called_once()
+        mock_storage.put.assert_not_called()
         mock_counter.inc.assert_called_once()
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)

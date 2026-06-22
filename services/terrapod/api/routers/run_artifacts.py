@@ -35,6 +35,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_runner_for_run
+from terrapod.api.upload_stream import file_chunks, stream_to_tempfile
 from terrapod.config import settings
 from terrapod.db.models import Run, StateVersion, Workspace
 from terrapod.db.session import get_db
@@ -62,6 +63,38 @@ async def _get_run(run_id: str, db: AsyncSession) -> Run:
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
     return run
+
+
+def _read_state_metadata(path: str) -> tuple[int, str, str]:
+    """Read (serial, lineage, md5) from a state file on disk.
+
+    Runs in a worker thread (CLAUDE.md #13): the md5 is hashed over the
+    full state and `json.load` parses it, both of which would block the
+    event loop on a multi-MB state if run inline. The file lives on the
+    ephemeral PVC, never in the worker heap.
+    """
+    h = hashlib.md5()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+    with open(path, "rb") as fh:
+        while True:
+            buf = fh.read(1024 * 1024)
+            if not buf:
+                break
+            h.update(buf)
+    with open(path, "rb") as fh:
+        state_data = json.load(fh)
+    serial = state_data.get("serial", 0)
+    lineage = state_data.get("lineage", "")
+    return serial, lineage, h.hexdigest()
+
+
+def _summarize_plan_file(path: str) -> dict | None:
+    """Read a plan-JSON tempfile and summarise it (worker thread).
+
+    `summarize_plan_json` parses the JSON, which would block the event loop
+    on a multi-MB plan; the file lives on the ephemeral PVC, not the heap.
+    """
+    with open(path, "rb") as fh:
+        return summarize_plan_json(fh.read())
 
 
 async def _publish_log_updated(workspace_id: str, run_id: str, phase: str) -> None:
@@ -265,34 +298,55 @@ async def upload_plan_json_output(
     require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
-    body = await request.body()
-    storage = get_storage()
-    key = plan_json_output_key(str(run.workspace_id), str(run.id))
-    # Order matters: write storage first, then flip the flag. If the
-    # commit fails after a successful upload, the artifact is reachable
-    # only via retention sweep — annoying, but better than the reverse,
-    # which would advertise a URL pointing at nothing.
-    await storage.put(key, body)
-    run.has_json_output = True
-    # Parse the plan in a thread so a multi-MB JSON doesn't block the
-    # event loop. A parse failure leaves the count columns null — the
-    # download URL is still served, just no UI summary.
-    summary = await asyncio.to_thread(summarize_plan_json, body)
-    if summary is not None:
-        run.resource_additions = summary["additions"]
-        run.resource_changes = summary["changes"]
-        run.resource_destructions = summary["destructions"]
-        run.resource_replacements = summary["replacements"]
-        run.resource_imports = summary["imports"]
-    else:
-        logger.warning(
-            "plan_json_output.summary_unparseable",
-            run_id=str(run.id),
-            workspace_id=str(run.workspace_id),
-            body_bytes=len(body),
-        )
-    await db.commit()
+    # Stream the plan JSON to a capped tempfile on the ephemeral PVC instead
+    # of buffering it with `await request.body()` — plan JSON can be many MB
+    # and would OOM the API pod on a large plan (CLAUDE.md #14). The summary
+    # parse reads the tempfile back in a worker thread (#13).
+    tmp_path, body_bytes = await stream_to_tempfile(request, suffix=".plan.json")
+    try:
+        storage = get_storage()
+        key = plan_json_output_key(str(run.workspace_id), str(run.id))
+        # Order matters: write storage first, then flip the flag. If the
+        # commit fails after a successful upload, the artifact is reachable
+        # only via retention sweep — annoying, but better than the reverse,
+        # which would advertise a URL pointing at nothing.
+        await storage.put_stream(key, file_chunks(tmp_path), content_type="application/json")
+        run.has_json_output = True
+        # Parse the plan in a thread (reading the tempfile, never the raw
+        # request body) so a multi-MB JSON doesn't block the event loop. A
+        # parse failure leaves the count columns null — the download URL is
+        # still served, just no UI summary.
+        summary = await asyncio.to_thread(_summarize_plan_file, tmp_path)
+        if summary is not None:
+            run.resource_additions = summary["additions"]
+            run.resource_changes = summary["changes"]
+            run.resource_destructions = summary["destructions"]
+            run.resource_replacements = summary["replacements"]
+            run.resource_imports = summary["imports"]
+        else:
+            logger.warning(
+                "plan_json_output.summary_unparseable",
+                run_id=str(run.id),
+                workspace_id=str(run.workspace_id),
+                body_bytes=body_bytes,
+            )
+        await db.commit()
+        return await _enqueue_plan_json_followups(run)
+    finally:
+        try:
+            await asyncio.to_thread(os.unlink, tmp_path)
+        except OSError:
+            pass
 
+
+async def _enqueue_plan_json_followups(run: Run) -> Response:
+    """Fire the AI-summary + drift-completion triggers after plan-JSON lands.
+
+    Split out of `upload_plan_json_output` so the streamed-tempfile
+    try/finally stays compact. Both triggers re-fire here (rather than from
+    `run_service.transition_run`) to close the race where the runner POSTs
+    plan-result before uploading plan-json-output.
+    """
     # AI plan summariser (#401) — enqueue the `plan_summary` kind now
     # that the JSON is actually in storage. Previously this fired from
     # run_service.transition_run on the planned transition, which
@@ -380,19 +434,44 @@ async def upload_state(
     require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
 
-    body = await request.body()
-
-    # Parse state JSON to extract metadata
+    # Stream the state body to a capped tempfile on the ephemeral PVC rather
+    # than buffering it in the worker heap — runner state uploads can be
+    # multi-MB and `await request.body()` would accumulate the whole thing in
+    # RAM, OOM-killing the API pod on a large state (CLAUDE.md #14). Metadata
+    # (serial/lineage/md5) is then read back off the event loop (#13).
+    tmp_path, state_size = await stream_to_tempfile(request, suffix=".state.json")
     try:
-        state_data = json.loads(body)
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise HTTPException(status_code=400, detail="Invalid state JSON") from exc
+        try:
+            serial, lineage, md5 = await asyncio.to_thread(_read_state_metadata, tmp_path)
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise HTTPException(status_code=400, detail="Invalid state JSON") from exc
 
-    serial = state_data.get("serial", 0)
-    lineage = state_data.get("lineage", "")
-    # Hash off the event loop — runner state uploads can be multi-MB
-    md5 = await asyncio.to_thread(lambda: hashlib.md5(body).hexdigest())  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+        return await _persist_runner_state(
+            db, run, run_id, tmp_path, state_size, serial, lineage, md5
+        )
+    finally:
+        try:
+            await asyncio.to_thread(os.unlink, tmp_path)
+        except OSError:
+            pass
 
+
+async def _persist_runner_state(
+    db: AsyncSession,
+    run: Run,
+    run_id: str,
+    tmp_path: str,
+    state_size: int,
+    serial: int,
+    lineage: str,
+    md5: str,
+) -> Response:
+    """Divergence check + StateVersion insert + stream-to-storage for a state upload.
+
+    Split out of `upload_state` so the streamed-tempfile lifecycle (the
+    caller's try/finally) stays small and the parsing/divergence logic reads
+    linearly. The tempfile at `tmp_path` is owned by the caller.
+    """
     # tofu/terraform does NOT bump the state serial when an apply leaves the
     # persisted state byte-identical to the prior state. This happens whenever a
     # resource carries a *perpetual phantom diff* — write-only attributes that are
@@ -444,7 +523,7 @@ async def upload_state(
         serial=serial,
         lineage=lineage,
         md5=md5,
-        state_size=len(body),
+        state_size=state_size,
         run_id=run.id,
         created_by=run.created_by or None,
     )
@@ -458,10 +537,11 @@ async def upload_state(
         await db.rollback()
         raise HTTPException(status_code=409, detail=_existing_serial_msg) from None
 
-    # Store at canonical key (same format used by download_state)
+    # Store at canonical key (same format used by download_state). Stream the
+    # tempfile straight into storage — constant memory, never re-buffered.
     storage = get_storage()
     key = state_key(str(run.workspace_id), str(sv.id))
-    await storage.put(key, body)
+    await storage.put_stream(key, file_chunks(tmp_path), content_type="application/octet-stream")
 
     # Clear state_diverged flag on successful state upload
     ws = await db.get(Workspace, run.workspace_id)

@@ -13,6 +13,7 @@ Endpoints:
 import asyncio
 import hashlib
 import json
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, status
 from fastapi.responses import JSONResponse
@@ -20,6 +21,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.upload_stream import file_chunks, stream_to_tempfile
 from terrapod.db.models import StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -42,6 +44,25 @@ async def _get_state_version(state_version_id: str, db: AsyncSession) -> StateVe
     if sv is None:
         raise HTTPException(status_code=404, detail="State version not found")
     return sv
+
+
+def _read_state_lineage_md5(path: str) -> tuple[str, str]:
+    """Read (lineage, md5) from a state file on disk (worker thread).
+
+    Both the md5 hash and `json.load` would block the event loop on a
+    multi-MB state if run inline (CLAUDE.md #13). The file lives on the
+    ephemeral PVC, not the worker heap (#14).
+    """
+    h = hashlib.md5()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+    with open(path, "rb") as fh:
+        while True:
+            buf = fh.read(1024 * 1024)
+            if not buf:
+                break
+            h.update(buf)
+    with open(path, "rb") as fh:
+        state_data = json.load(fh)
+    return state_data.get("lineage", ""), h.hexdigest()
 
 
 async def _require_sv_workspace_permission(
@@ -234,43 +255,51 @@ async def upload_state_manual(
             detail="Requires write permission on workspace",
         )
 
-    body = await request.body()
-    if not body:
-        raise HTTPException(status_code=400, detail="Empty request body")
-
+    # Stream the state body to a capped tempfile on the ephemeral PVC rather
+    # than buffering it with `await request.body()` — a manually-uploaded
+    # state can be multi-MB and would OOM the API pod (CLAUDE.md #14). The
+    # lineage + md5 are read back off the event loop (#13).
+    tmp_path, state_size = await stream_to_tempfile(request, suffix=".state.json")
     try:
-        state_data = json.loads(body)
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise HTTPException(status_code=400, detail="Invalid state JSON") from exc
+        if state_size == 0:
+            raise HTTPException(status_code=400, detail="Empty request body")
 
-    lineage = state_data.get("lineage", "")
-    # Hash off the event loop — state uploads can be multi-MB
-    md5 = await asyncio.to_thread(lambda: hashlib.md5(body).hexdigest())  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+        try:
+            lineage, md5 = await asyncio.to_thread(_read_state_lineage_md5, tmp_path)
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise HTTPException(status_code=400, detail="Invalid state JSON") from exc
 
-    # Auto-assign serial
-    max_serial_result = await db.execute(
-        select(func.max(StateVersion.serial)).where(StateVersion.workspace_id == ws.id)
-    )
-    max_serial = max_serial_result.scalar_one() or 0
-    new_serial = max_serial + 1
+        # Auto-assign serial
+        max_serial_result = await db.execute(
+            select(func.max(StateVersion.serial)).where(StateVersion.workspace_id == ws.id)
+        )
+        max_serial = max_serial_result.scalar_one() or 0
+        new_serial = max_serial + 1
 
-    sv = StateVersion(
-        workspace_id=ws.id,
-        serial=new_serial,
-        lineage=lineage,
-        md5=md5,
-        state_size=len(body),
-        created_by=user.email,
-    )
-    db.add(sv)
-    await db.flush()
+        sv = StateVersion(
+            workspace_id=ws.id,
+            serial=new_serial,
+            lineage=lineage,
+            md5=md5,
+            state_size=state_size,
+            created_by=user.email,
+        )
+        db.add(sv)
+        await db.flush()
 
-    storage = get_storage()
-    key = state_key(str(ws.id), str(sv.id))
-    await storage.put(key, body)
+        storage = get_storage()
+        key = state_key(str(ws.id), str(sv.id))
+        await storage.put_stream(
+            key, file_chunks(tmp_path), content_type="application/octet-stream"
+        )
 
-    await db.commit()
-    await db.refresh(sv)
+        await db.commit()
+        await db.refresh(sv)
+    finally:
+        try:
+            await asyncio.to_thread(os.unlink, tmp_path)
+        except OSError:
+            pass
 
     logger.info(
         "state_version_uploaded_manually",

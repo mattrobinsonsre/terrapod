@@ -23,6 +23,8 @@ TFE V2 Management:
     DELETE /api/terrapod/v1/registry-modules/private/default/{name}/{prov}/{ver}
 """
 
+import asyncio
+import os
 import uuid as _uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, status
@@ -674,19 +676,33 @@ async def upload_module_version_endpoint(
             detail="Requires write permission on module",
         )
 
-    data = await request.body()
-    if not data:
-        raise HTTPException(status_code=400, detail="Empty request body")
+    # Stream the tarball to a capped tempfile on the ephemeral PVC rather than
+    # buffering it with `await request.body()` — the upload is streamed into
+    # storage and the module interface is parsed from disk, so the archive is
+    # never held in the worker heap (CLAUDE.md #14).
+    from terrapod.api.upload_stream import stream_to_tempfile
 
-    mod_version = await upload_module_tarball(db, storage, "default", name, provider, version, data)
-    await db.commit()
+    tmp_path, size = await stream_to_tempfile(request, suffix=".module.tar.gz")
+    try:
+        if size == 0:
+            raise HTTPException(status_code=400, detail="Empty request body")
+
+        mod_version = await upload_module_tarball(
+            db, storage, "default", name, provider, version, tmp_path
+        )
+        await db.commit()
+    finally:
+        try:
+            await asyncio.to_thread(os.unlink, tmp_path)
+        except OSError:
+            pass
 
     logger.info(
         "Module tarball uploaded",
         module=name,
         provider=provider,
         version=version,
-        size=len(data),
+        size=size,
     )
 
     return JSONResponse(
