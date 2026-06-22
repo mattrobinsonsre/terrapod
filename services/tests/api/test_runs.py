@@ -43,6 +43,8 @@ def _mock_run(
     run.plan_only = plan_only
     run.source = "tfe-api"
     run.terraform_version = "1.11"
+    run.terragrunt_enabled = False
+    run.terragrunt_version = ""
     run.error_message = ""
     run.is_drift_detection = False
     run.has_changes = None

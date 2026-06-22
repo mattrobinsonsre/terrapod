@@ -170,7 +170,8 @@ test.describe('Workspaces', () => {
     //   - terragrunt-enabled missing from the PATCH body
     //   - the version field not shown when enabled / not saved
     //   - the read view not reflecting the saved state
-    const wsName = `e2e-terragrunt-${Date.now()}`;
+    // Name avoids the "terragrunt" substring so locators don't collide with it.
+    const wsName = `e2e-tg-${Date.now()}`;
 
     await page.goto('/workspaces');
     await page.click('button:has-text("New Workspace")');
@@ -178,20 +179,17 @@ test.describe('Workspaces', () => {
     await page.click('button:has-text("Create Workspace")');
     await page.click(`text=${wsName}`);
 
-    // Read view: terragrunt starts Disabled.
-    await expect(page.getByText('Terragrunt')).toBeVisible();
-    await expect(page.getByText('Disabled', { exact: false }).first()).toBeVisible();
+    // The Terragrunt setting lives in a <div> whose <dt> is exactly "Terragrunt";
+    // scope all assertions to that block to avoid the auto-apply row.
+    const tgBlock = page.getByText('Terragrunt', { exact: true }).locator('xpath=..');
+    await expect(tgBlock).toBeVisible();
+    await expect(tgBlock.getByText('Disabled')).toBeVisible(); // read view starts Disabled
 
     await page.click('button:has-text("Edit")');
-
-    // The Terragrunt checkbox sits beside its "Disabled/Enabled (agent mode)"
-    // label — scope to that row to avoid the auto-apply checkbox.
-    const tgRow = page.locator('div', { hasText: /^Terragrunt/ }).last();
-    const tgToggle = tgRow.getByRole('checkbox');
-    await tgToggle.check();
+    await tgBlock.getByRole('checkbox').check();
 
     // Version input appears only once enabled.
-    const tgVersion = tgRow.getByPlaceholder('e.g. 1.0');
+    const tgVersion = tgBlock.getByPlaceholder('e.g. 1.0');
     await expect(tgVersion).toBeVisible();
     await tgVersion.fill('1.0');
 

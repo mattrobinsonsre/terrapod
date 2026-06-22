@@ -31,6 +31,8 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.auto_apply = False
     ws.execution_mode = "agent"
     ws.terraform_version = "1.11"
+    ws.terragrunt_enabled = False
+    ws.terragrunt_version = "1.0"
     ws.working_directory = ""
     ws.locked = False
     ws.lock_id = None
@@ -194,6 +196,8 @@ class TestRunDriftAttributes:
         run.plan_only = True
         run.source = "drift-detection"
         run.terraform_version = "1.11"
+        run.terragrunt_enabled = False
+        run.terragrunt_version = ""
         run.error_message = ""
         run.is_drift_detection = True
         run.has_changes = True
