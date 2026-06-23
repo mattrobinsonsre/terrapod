@@ -417,6 +417,12 @@ async def _materialise(
     # terraform.auto.tfvars.json with proper JSON types.
     nonsensitive_values = {k: v for k, v in effective.items() if k not in sensitive_names}
 
+    # Snapshot only the NON-sensitive resolved inputs onto the workspace.
+    # Sensitive inputs are write-only (like TFE sensitive variables) — they live
+    # only in the encrypted workspace variables, never in this plaintext JSONB
+    # column (which the instance API returns) or the config tarball.
+    ws.catalog_input_values = dict(nonsensitive_values)
+
     # Replace the workspace's variables — a catalog workspace's variable set is
     # wholly catalog-managed (the RBAC clamp blocks user var edits), so a full
     # replace keeps it in lockstep with the wrapper config. Only sensitive
@@ -510,7 +516,8 @@ async def provision_instance(
         owner_email=user_email,
         catalog_item_id=item.id,
         catalog_version_pin=version_pin,  # None = float; explicit pin sticks
-        catalog_input_values=dict(input_values),
+        # catalog_input_values is set by _materialise to the non-sensitive
+        # resolved subset (secrets are write-only and never snapshotted here).
     )
     db.add(ws)
     await db.flush()  # assign ws.id
@@ -563,8 +570,8 @@ async def reconfigure_instance(
         raise CatalogError("Catalog item no longer exists", status_code=409)
 
     ws.catalog_version_pin = version_pin
-    ws.catalog_input_values = dict(input_values)
     ws.auto_apply = auto_apply
+    # catalog_input_values (non-sensitive only) is refreshed inside _materialise.
 
     run = await _materialise(
         db,

@@ -336,7 +336,9 @@ class TestReconfigureInstance:
         mock_del.assert_awaited_once_with(db, old_var)
         assert mock_create_var.await_args.kwargs["key"] == "cidr"
         assert mock_create_var.await_args.kwargs["sensitive"] is True
-        assert ws.catalog_input_values == {"cidr": "10.0.0.0/16"}
+        # The sensitive input is NOT snapshotted in the plaintext input-values
+        # column (write-only, never returned by the instance API).
+        assert ws.catalog_input_values == {}
         assert ws.catalog_version_pin == "1.0.0"
         assert mock_create_run.await_args.kwargs["source"] == "catalog"
         storage.put_stream.assert_awaited_once()
