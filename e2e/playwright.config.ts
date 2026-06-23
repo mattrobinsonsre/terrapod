@@ -111,5 +111,12 @@ export default defineConfig({
       testMatch: 'manual-lock.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
+    {
+      // Catalog admin + browse run as admin; the in-spec RBAC-negative
+      // describe overrides storageState to user.json via test.use().
+      name: 'catalog',
+      testMatch: 'catalog.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
   ],
 });

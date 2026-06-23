@@ -22,6 +22,8 @@ const ADMIN_LINKS = [
   '/admin/variable-sets',
   '/admin/binary-cache',
   '/admin/bulk-update',
+  '/admin/catalog',
+  '/admin/provider-templates',
 ];
 
 test.describe('RBAC — regular user is blocked from admin', () => {

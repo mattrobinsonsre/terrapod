@@ -50,6 +50,9 @@ services:
       TERRAPOD_STORAGE__BACKEND: filesystem
       TERRAPOD_STORAGE__FILESYSTEM__ROOT_DIR: /var/lib/terrapod/storage
       TERRAPOD_RATE_LIMIT__ENABLED: "false"
+      # Service catalog (#535) is off by default; enable it so the catalog UI +
+      # RBAC surfaces are exercised end-to-end.
+      TERRAPOD_CATALOG__ENABLED: "true"
       TERRAPOD_LOG_LEVEL: INFO
       TERRAPOD_JSON_LOGS: "false"
     ports:

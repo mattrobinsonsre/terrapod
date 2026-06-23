@@ -206,6 +206,33 @@ export async function createWorkspace(
 }
 
 /**
+ * Create a registry module via the management API. Returns the bare module
+ * UUID (usable directly as a catalog item's `module-id`).
+ */
+export async function createRegistryModule(
+  token: string,
+  name: string,
+  provider = 'aws',
+): Promise<string> {
+  const res = await fetch(`${API_URL}/api/terrapod/v1/registry-modules`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/vnd.api+json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      data: { type: 'registry-modules', attributes: { name, provider } },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Create registry module failed: ${res.status} ${body}`);
+  }
+  const data = await res.json();
+  return data.data.id as string;
+}
+
+/**
  * Wait for the stack to be healthy by polling the API ping endpoint.
  */
 export async function waitForStack(timeoutMs = 120_000): Promise<void> {

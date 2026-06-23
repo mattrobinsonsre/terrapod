@@ -2043,6 +2043,7 @@ POST /api/terrapod/v1/roles
       "workspace-permission": "write",
       "pool-permission": "read",
       "registry-permission": "read",
+      "catalog-permission": "use",
       "allow-labels": {"env": "dev"},
       "allow-names": [],
       "deny-labels": {},
@@ -2052,7 +2053,7 @@ POST /api/terrapod/v1/roles
 }
 ```
 
-A role carries three independent permission scalars: `workspace-permission` (`read`/`plan`/`write`/`admin`), `pool-permission` (`read`/`write`/`admin`), and `registry-permission` (`read`/`write`/`admin`, covering both modules and providers). All default to `read`. `registry-permission` is independent of `workspace-permission`, so a role can grant registry write (e.g. provider-publish CI) without any workspace access.
+A role carries four independent permission scalars: `workspace-permission` (`read`/`plan`/`write`/`admin`), `pool-permission` (`read`/`write`/`admin`), `registry-permission` (`read`/`write`/`admin`, covering both modules and providers), and `catalog-permission` (`none`/`read`/`use`/`admin`, default `none`). The first three default to `read`; `catalog-permission` defaults to `none` (catalog access is opt-in, with no `everyone` floor). All are independent, so a role can grant registry write (e.g. provider-publish CI) or catalog `use` (self-service provisioning) without any workspace access. See [Service Catalog](service-catalog.md#rbac-the-catalog_permission-axis).
 
 **Required permission:** Platform `admin`.
 
@@ -2788,6 +2789,251 @@ POST /api/terrapod/v1/runs/{run_id}/policy-results
 ```
 
 Records the runner's policy-evaluation outcomes for the run. Persisted via Postgres `ON CONFLICT DO NOTHING` on `(run_id, policy_set_id)` so a retried POST after a transient failure is idempotent. The runner POSTs this **before** posting plan-result, so the API's post-plan gate sees the rows when it queries them. **Required permission:** runner token scoped to this `run_id`.
+
+---
+
+## Service Catalog
+
+No-code self-service provisioning over the private module registry. A *catalog item* blesses a registry module; provisioning it creates an agent-mode, non-VCS, catalog-managed workspace whose configuration is a server-generated wrapper. See [Service Catalog](service-catalog.md) for the full feature doc.
+
+All endpoints below are **gated on `catalog.enabled`** (Helm: `api.config.catalog.enabled`, default `false`). When the catalog is disabled every endpoint returns `404`.
+
+Catalog access is governed by a dedicated role axis, `catalog-permission` (`none`/`read`/`use`/`admin`, default `none`, no `everyone` floor) — see [Roles](#roles).
+
+### Provider Templates
+
+Admin-managed parameterised provider configs rendered into the generated `providers.tf`. **Write** requires platform `admin`; **list/show** require platform `admin` or `audit`.
+
+#### List Provider Templates
+
+```
+GET /api/terrapod/v1/provider-templates
+```
+
+#### Create Provider Template
+
+```
+POST /api/terrapod/v1/provider-templates
+```
+
+**Request body:**
+```json
+{
+  "data": {
+    "type": "provider-templates",
+    "attributes": {
+      "name": "aws-standard",
+      "provider-type": "aws",
+      "body": "provider \"aws\" {\n  region = var.aws_region\n  assume_role { role_arn = var.aws_role_arn }\n}",
+      "parameters": [
+        { "name": "aws_region",   "type": "string", "description": "Target AWS region" },
+        { "name": "aws_role_arn", "type": "string", "description": "Role to assume" }
+      ],
+      "labels": {"team": "platform"}
+    }
+  }
+}
+```
+
+| Attribute | Description |
+|---|---|
+| `name` | Unique display name. |
+| `provider-type` | The provider configured, e.g. `aws`, `google`, `azurerm`. |
+| `body` | HCL provider body referencing `var.*`. Rendered verbatim — no server-side interpolation. |
+| `parameters` | Declared parameters; each becomes a Terraform variable on instances that use this template, surfaced as a provision-form field. |
+| `labels` | For label-based RBAC. |
+
+#### Show / Update / Delete Provider Template
+
+```
+GET    /api/terrapod/v1/provider-templates/{id}
+PATCH  /api/terrapod/v1/provider-templates/{id}
+DELETE /api/terrapod/v1/provider-templates/{id}
+```
+
+### Catalog Items
+
+A blessed designation over a registry module. **Write** (create/update/delete) requires platform `admin`. **List/show** require catalog `read` and are **filtered per item** to those the caller's role matches.
+
+#### List Catalog Items
+
+```
+GET /api/terrapod/v1/catalog-items
+```
+
+Returns only items the caller's `catalog-permission` matches.
+
+#### Create Catalog Item
+
+```
+POST /api/terrapod/v1/catalog-items
+```
+
+**Request body:**
+```json
+{
+  "data": {
+    "type": "catalog-items",
+    "attributes": {
+      "name": "vpc",
+      "display-name": "AWS VPC",
+      "description": "Standard VPC with public and private subnets",
+      "enabled": true,
+      "module-id": "mod-019e0e7b-...",
+      "default-version-pin": "1.4.0",
+      "provider-template-ids": ["ptpl-019e01db-..."],
+      "allowed-agent-pool-ids": ["apool-019e01db-..."],
+      "variable-options": [
+        { "name": "cidr_block", "description": "VPC CIDR", "default": "10.0.0.0/16" },
+        { "name": "name",       "description": "VPC name" }
+      ],
+      "labels": {"team": "platform"}
+    }
+  }
+}
+```
+
+| Attribute | Description |
+|---|---|
+| `name` | Unique slug. |
+| `display-name` | Human-facing name shown in the catalog UI. |
+| `description` | Free text. |
+| `enabled` | When `false`, the item is visible but provisioning is rejected with `409`. |
+| `module-id` | The registry module this item wraps. |
+| `default-version-pin` | Default module-version pin new instances inherit. Omit for **float** (track latest published). |
+| `provider-template-ids` | Provider templates rendered into the generated wrapper. |
+| `allowed-agent-pool-ids` | Pools an instance may bind to. `null` = any pool the provisioner has `write` on. |
+| `variable-options` | Curated options (defaults, descriptions, sensitivity, enum choices) layered over the module's variables. |
+| `labels` | For label-based RBAC (decides which roles see/use the item). |
+
+#### Show / Update / Delete Catalog Item
+
+```
+GET    /api/terrapod/v1/catalog-items/{id}
+PATCH  /api/terrapod/v1/catalog-items/{id}
+DELETE /api/terrapod/v1/catalog-items/{id}
+```
+
+Delete returns `409` while the item has any instances — destroy or migrate them first.
+
+#### Provision Form
+
+```
+GET /api/terrapod/v1/catalog-items/{id}/form
+```
+
+Returns the resolved provision form: `resolved-version` (per the item's version policy) and `fields[]` — one field per resolved input (the module's curated variables plus every parameter from the item's provider templates), with type, description, default, sensitivity, and any enum choices. **Required permission:** catalog `read`.
+
+#### List Item Instances
+
+```
+GET /api/terrapod/v1/catalog-items/{id}/instances
+```
+
+**Required permission:** catalog `read`.
+
+#### Provision an Instance
+
+```
+POST /api/terrapod/v1/catalog-items/{id}/provision
+```
+
+Creates a catalog-managed, agent-mode, non-VCS workspace, materialises the inputs as Terraform variables, generates the wrapper, and queues the first run (source `catalog`).
+
+**Request body:**
+```json
+{
+  "data": {
+    "type": "catalog-instances",
+    "attributes": {
+      "name": "vpc-prod-us-east-1",
+      "agent-pool-id": "apool-019e01db-...",
+      "input-values": { "cidr_block": "10.20.0.0/16", "name": "prod", "aws_region": "us-east-1" },
+      "version-pin": "1.4.0",
+      "auto-apply": false,
+      "labels": {"env": "prod"}
+    }
+  }
+}
+```
+
+| Attribute | Required | Description |
+|---|---|---|
+| `name` | yes | Workspace/instance name. |
+| `agent-pool-id` | yes | Pool the instance binds to. Caller must have pool `write`; pool must be in `allowed-agent-pool-ids` when the item restricts it. |
+| `input-values` | yes | Values for the form fields (module inputs + provider-template parameters). |
+| `version-pin` | no | Pin this instance to a module version. Omit to inherit the item's `default-version-pin` (or float when that is unset). |
+| `auto-apply` | no | Auto-apply runs for this instance. |
+| `labels` | no | Labels on the created workspace. |
+
+**Required permission:** catalog `use` **and** pool `write`.
+
+| Error | When |
+|---|---|
+| `403` | Caller lacks catalog `use`, lacks pool `write`, or the pool is not in the item's `allowed-agent-pool-ids`. |
+| `409` | The item is disabled. |
+| `422` | Missing required inputs, or unknown input keys. |
+
+Returns `201` with the created `catalog-instance` (the instance id is the workspace id).
+
+### Catalog Instances
+
+A provisioned instance, addressed by its workspace id (`wsId`).
+
+#### Show Instance
+
+```
+GET /api/terrapod/v1/catalog-instances/{wsId}
+```
+
+**Required permission:** catalog `read`.
+
+#### Reconfigure Instance
+
+```
+PATCH /api/terrapod/v1/catalog-instances/{wsId}
+```
+
+Update the instance's inputs and/or version pin, regenerate the wrapper, and queue a new run (source `catalog`). This is the only supported way to change a catalog instance's configuration — direct configuration-version uploads and custom-CV runs on a catalog-managed workspace are rejected with `409`.
+
+**Request body:**
+```json
+{
+  "data": {
+    "type": "catalog-instances",
+    "attributes": {
+      "input-values": { "cidr_block": "10.20.0.0/16" },
+      "version-pin": null,
+      "auto-apply": true
+    }
+  }
+}
+```
+
+| Attribute | Description |
+|---|---|
+| `input-values` | Partial or full input update. |
+| `version-pin` | New pin, or `null` to **float** (track latest published module version). |
+| `auto-apply` | Toggle auto-apply for this instance. |
+
+Returns a reference to the queued run. **Required permission:** catalog `use`.
+
+#### Destroy Instance
+
+```
+POST /api/terrapod/v1/catalog-instances/{wsId}/destroy
+```
+
+Queues an `is_destroy` run with source **`catalog-lifecycle`**. On a **successful apply** of that run the workspace is **archived** (soft delete — state is retained). Nothing is hard-deleted.
+
+**Request body** (optional):
+```json
+{ "data": { "type": "catalog-instances", "attributes": { "auto-apply": true } } }
+```
+
+Returns a reference to the queued destroy run. **Required permission:** catalog `use`.
+
+> **Run sources:** catalog runs carry `source = "catalog"` (provision / reconfigure) or `source = "catalog-lifecycle"` (destroy → archive). These appear on the run object alongside the existing sources (`tfe-api`, `vcs`, `drift-detection`, `autodiscovery-lifecycle`, `module-test`, `module-publish`).
 
 ---
 

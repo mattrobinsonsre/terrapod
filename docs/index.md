@@ -22,6 +22,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | **Variables & Secrets** | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets |
 | **RBAC** | Label-based role system with hierarchical workspace permissions (read/plan/write/admin) |
 | **Private Registry** | Publish, version, and share modules and providers internally with pull-through caching |
+| **Service Catalog** | No-code self-service provisioning over the private registry; blessed modules become one-click agent-mode workspaces with provider templates and a dedicated RBAC axis |
 | **Agent Pools** | Named groups of runner listeners; join token → certificate exchange for auth |
 | **SSO (OIDC / SAML)** | Pluggable identity providers (Auth0, Okta, Azure AD, etc.) |
 | **Run Triggers** | Cross-workspace dependency chains -- source apply triggers downstream runs |
@@ -111,6 +112,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Cloud Credentials](cloud-credentials.md) | AWS IRSA, GCP WIF, Azure WI setup |
 | [Registry](registry.md) | Private module/provider registry, caching layers |
 | [Registry Publishing](registry-publishing.md) | Publishing providers/modules with the `terrapod-publish` CLI and the client-signed publish protocol |
+| [Service Catalog](service-catalog.md) | No-code self-service provisioning over the private module registry: blessed catalog items, provider templates, a `catalog_permission` RBAC axis, and a full provision → reconfigure → destroy lifecycle |
 | [Monitoring](monitoring.md) | Prometheus metrics, scraping, recommended alerts |
 | [Deployment](deployment.md) | Production Helm deployment, storage backends, scaling |
 | [Split-networking deployments](deployment-network-isolation.md) | Three-Ingress model: management / webhook / internal agent path, with split-hostname runner config |
