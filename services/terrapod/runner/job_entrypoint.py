@@ -50,6 +50,7 @@ from terrapod.runner.phases import (
     setup_script,
     terragrunt,
     tf_args,
+    tfvars,
     uploads,
     working_dir,
 )
@@ -63,6 +64,9 @@ from terrapod.runner.phases.state import (
 from terrapod.runner.runner_config import RunnerConfig
 
 _DEFAULT_WORK_DIR = Path("/workspace")
+# Per-run vars Secret mount (terraform variable values). Keep in sync with
+# runner/job_template.py (_TFVARS_MOUNT_DIR + _TFVARS_FILENAME).
+_VARS_FILE = Path("/var/run/terrapod/vars/terraform.tfvars.json")
 
 _COMBINED_LOG = Path("/tmp/combined.log")
 _INIT_LOG = Path("/tmp/init.log")
@@ -540,6 +544,21 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     # 4. Chdir into working subdirectory.
     cwd = working_dir.resolve_and_chdir(strip_dir, cfg.working_dir)
     log.info("chdir", cwd=str(cwd))
+
+    # 4b. Render terrapod.auto.tfvars from the mounted vars Secret (if any),
+    # BEFORE init so it's part of the post-init baseline (the plan-artifacts
+    # snapshot won't re-upload it). For terragrunt, cwd is the unit dir whose
+    # contents terragrunt copies into its cache. The file is absent when the
+    # workspace has no terraform variables.
+    if _VARS_FILE.exists():
+        try:
+            import json as _json
+
+            parsed = _json.loads(_VARS_FILE.read_text(encoding="utf-8"))
+            tfvars.write_auto_tfvars(cwd, parsed)
+        except (ValueError, OSError) as exc:
+            log.error("failed to render terraform variables", error=str(exc))
+            return 1
 
     # 5. State download — AFTER chdir so terraform.tfstate lands beside
     # the user's .tf files.

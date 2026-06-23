@@ -329,3 +329,57 @@ class TestAuthSecretNaming:
         prefix_plan = names[0].rsplit("-plan-", 1)[0]
         prefix_apply = names[1].rsplit("-apply-", 1)[0]
         assert prefix_plan == prefix_apply
+
+
+# ── Per-run vars Secret ──────────────────────────────────────────────
+
+
+class TestCreateVarsSecret:
+    """The vars Secret holds all variable values (terraform tfvars blob + env
+    vars), with an ownerReference to the Job (cascade-GC), so values are never
+    plaintext in the Job spec."""
+
+    async def test_builds_secret_with_tfvars_blob_and_env_keys(self, fresh_shutdown_event):
+        listener = _make_listener(fresh_shutdown_event)
+        core_api = MagicMock()
+        with patch("terrapod.runner.job_manager._get_core_api", return_value=core_api):
+            await listener._create_vars_secret(
+                "tprun-r1-plan-vars",
+                "r1",
+                terraform_vars=[
+                    {"key": "cidr", "value": "10.0.0.0/16", "hcl": False},
+                    {"key": "ports", "value": "[80, 443]", "hcl": True},
+                ],
+                env_vars=[{"key": "AWS_SECRET_ACCESS_KEY", "value": "shh"}],
+                job_name="tprun-r1-plan",
+                job_uid="uid-1",
+            )
+        core_api.create_namespaced_secret.assert_called_once()
+        body = core_api.create_namespaced_secret.call_args.kwargs["body"]
+        sd = body.string_data
+        # Env var value is a Secret key.
+        assert sd["AWS_SECRET_ACCESS_KEY"] == "shh"
+        # Terraform vars are a JSON blob preserving hcl.
+        import json as _json
+
+        blob = _json.loads(sd["terraform.tfvars.json"])
+        assert {"key": "ports", "value": "[80, 443]", "hcl": True} in blob
+        # ownerReference back to the Job (cascade GC).
+        owner = body.metadata.owner_references[0]
+        assert owner.kind == "Job" and owner.uid == "uid-1"
+
+    async def test_no_tfvars_key_when_only_env_vars(self, fresh_shutdown_event):
+        listener = _make_listener(fresh_shutdown_event)
+        core_api = MagicMock()
+        with patch("terrapod.runner.job_manager._get_core_api", return_value=core_api):
+            await listener._create_vars_secret(
+                "tprun-r1-plan-vars",
+                "r1",
+                terraform_vars=[],
+                env_vars=[{"key": "FOO", "value": "bar"}],
+                job_name="tprun-r1-plan",
+                job_uid="uid-1",
+            )
+        sd = core_api.create_namespaced_secret.call_args.kwargs["body"].string_data
+        assert "terraform.tfvars.json" not in sd
+        assert sd["FOO"] == "bar"

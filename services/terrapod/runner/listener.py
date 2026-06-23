@@ -616,7 +616,8 @@ class RunnerListener:
 
         env_vars = [{"key": v["key"], "value": v["value"]} for v in attrs.get("env-vars", [])]
         terraform_vars = [
-            {"key": v["key"], "value": v["value"]} for v in attrs.get("terraform-vars", [])
+            {"key": v["key"], "value": v["value"], "hcl": bool(v.get("hcl"))}
+            for v in attrs.get("terraform-vars", [])
         ]
 
         run_short = run_id[:16]
@@ -627,12 +628,19 @@ class RunnerListener:
         # own. Per-phase names mean plan and apply have independent Secrets
         # that GC at their own pace and never collide.
         auth_secret_name = f"tprun-{run_short}-{phase}-auth"
+        # Per-run vars Secret holds ALL workspace variable values (terraform +
+        # env, sensitive and non — handled uniformly). The Job mounts the
+        # terraform vars as a tfvars file and sources env vars via secretKeyRef,
+        # so no variable value is ever plaintext in the Job spec. Per-phase name
+        # mirrors the auth Secret; ownerReference GCs it with the Job.
+        vars_secret_name = f"tprun-{run_short}-{phase}-vars" if (env_vars or terraform_vars) else ""
 
         spec = build_job_spec(
             run_id=run_id,
             phase=phase,
             runner_config=self.runner_config,
             auth_secret_name=auth_secret_name,
+            vars_secret_name=vars_secret_name,
             env_vars=env_vars,
             terraform_vars=terraform_vars,
             resource_cpu=attrs.get("resource-cpu", "1"),
@@ -671,6 +679,17 @@ class RunnerListener:
             logger.error("Failed to create auth secret", run_id=run_id, error=str(e))
             await self._report_launch_failed(run_id, f"Failed to create runner auth Secret: {e}")
             return
+
+        # Create the vars Secret (same ownerReference GC as the auth Secret).
+        if vars_secret_name:
+            try:
+                await self._create_vars_secret(
+                    vars_secret_name, run_id, terraform_vars, env_vars, job_name, job_uid
+                )
+            except Exception as e:
+                logger.error("Failed to create vars secret", run_id=run_id, error=str(e))
+                await self._report_launch_failed(run_id, f"Failed to create variables Secret: {e}")
+                return
 
         # Report Job launched to the API
         try:
@@ -923,6 +942,71 @@ class RunnerListener:
         core_api = _get_core_api()
         core_api.create_namespaced_secret(namespace=namespace, body=secret)
         logger.info("Created auth secret", secret=secret_name, job=job_name)
+
+    async def _create_vars_secret(
+        self,
+        secret_name: str,
+        run_id: str,
+        terraform_vars: list[dict],
+        env_vars: list[dict],
+        job_name: str,
+        job_uid: str,
+    ) -> None:
+        """Create a K8s Secret holding all workspace variable values, with an
+        ownerReference to the Job (cascade-GC'd with it, like the auth Secret).
+
+        Data keys:
+          - `terraform.tfvars.json`: JSON blob [{key, value, hcl}] — mounted as
+            a file; the entrypoint renders terrapod.auto.tfvars from it.
+          - one key per env-category var — sourced via secretKeyRef in the Job.
+
+        Values never appear in the Job spec, so they aren't readable via
+        `kubectl describe job` / etcd.
+        """
+        import json
+
+        from kubernetes import client as k8s_client
+
+        from terrapod.runner.job_manager import _get_core_api
+
+        namespace = os.environ.get("TERRAPOD_RUNNER_NAMESPACE", "terrapod-runners")
+
+        string_data: dict[str, str] = {}
+        if terraform_vars:
+            string_data["terraform.tfvars.json"] = json.dumps(
+                [
+                    {"key": v["key"], "value": v["value"], "hcl": bool(v.get("hcl"))}
+                    for v in terraform_vars
+                ]
+            )
+        for var in env_vars:
+            string_data[var["key"]] = var["value"]
+
+        secret = k8s_client.V1Secret(
+            metadata=k8s_client.V1ObjectMeta(
+                name=secret_name,
+                namespace=namespace,
+                labels={
+                    "app.kubernetes.io/name": "terrapod-runner",
+                    "terrapod.io/run-id": run_id,
+                },
+                owner_references=[
+                    k8s_client.V1OwnerReference(
+                        api_version="batch/v1",
+                        kind="Job",
+                        name=job_name,
+                        uid=job_uid,
+                        block_owner_deletion=True,
+                    )
+                ],
+            ),
+            type="Opaque",
+            string_data=string_data,
+        )
+
+        core_api = _get_core_api()
+        core_api.create_namespaced_secret(namespace=namespace, body=secret)
+        logger.info("Created vars secret", secret=secret_name, job=job_name)
         return secret_name
 
 

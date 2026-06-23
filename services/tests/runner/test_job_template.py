@@ -289,3 +289,63 @@ class TestPublicApiUrl:
         )
         env_names = {e["name"] for e in env}
         assert "TP_PUBLIC_API_URL" not in env_names
+
+
+class TestVarsSecretDelivery:
+    """Workspace variable values are delivered via the per-run vars Secret —
+    terraform vars as a mounted tfvars file, env vars via secretKeyRef — so
+    NOTHING is plaintext in the Job spec (the security contract)."""
+
+    def _spec(self, **kw):
+        from terrapod.runner.job_template import build_job_spec
+
+        return build_job_spec(
+            run_id="abc123def456",
+            phase="plan",
+            runner_config=_runner_config(),
+            auth_secret_name="tprun-abc123def456-plan-auth",
+            **kw,
+        )
+
+    def test_terraform_var_mounts_tfvars_volume_no_plaintext(self):
+        spec = self._spec(
+            env_vars=[],
+            terraform_vars=[{"key": "secret", "value": "s3cr3t", "hcl": False}],
+            vars_secret_name="tprun-abc123def456-plan-vars",
+        )
+        pod = spec["spec"]["template"]["spec"]
+        # Volume + mount present, referencing the vars Secret's tfvars key.
+        vol = next(v for v in pod["volumes"] if v["name"] == "tfvars")
+        assert vol["secret"]["secretName"] == "tprun-abc123def456-plan-vars"
+        assert vol["secret"]["items"][0]["key"] == "terraform.tfvars.json"
+        mount = next(m for m in pod["containers"][0]["volumeMounts"] if m["name"] == "tfvars")
+        assert mount["readOnly"] is True
+        # The secret value never appears as a plaintext env value, and no
+        # TF_VAR_ env is emitted.
+        env = pod["containers"][0]["env"]
+        assert not any(e["name"].startswith("TF_VAR_") for e in env)
+        assert not any(e.get("value") == "s3cr3t" for e in env)
+
+    def test_env_var_via_secret_key_ref_not_plaintext(self):
+        spec = self._spec(
+            env_vars=[{"key": "AWS_SECRET_ACCESS_KEY", "value": "AKIAsecret"}],
+            terraform_vars=[],
+            vars_secret_name="tprun-abc123def456-plan-vars",
+        )
+        env = spec["spec"]["template"]["spec"]["containers"][0]["env"]
+        aws = next(e for e in env if e["name"] == "AWS_SECRET_ACCESS_KEY")
+        # secretKeyRef into the vars Secret, NOT a plaintext value.
+        assert "value" not in aws
+        assert aws["valueFrom"]["secretKeyRef"]["name"] == "tprun-abc123def456-plan-vars"
+        assert aws["valueFrom"]["secretKeyRef"]["key"] == "AWS_SECRET_ACCESS_KEY"
+        # The plaintext value appears nowhere in the spec.
+        assert "AKIAsecret" not in str(spec)
+
+    def test_no_volume_when_no_terraform_vars(self):
+        spec = self._spec(
+            env_vars=[{"key": "FOO", "value": "bar"}],
+            terraform_vars=[],
+            vars_secret_name="tprun-abc123def456-plan-vars",
+        )
+        pod = spec["spec"]["template"]["spec"]
+        assert not any(v["name"] == "tfvars" for v in pod["volumes"])

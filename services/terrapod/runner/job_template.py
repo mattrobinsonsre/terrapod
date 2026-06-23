@@ -9,6 +9,12 @@ from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# Per-run vars Secret (mounted file). Keep in sync with
+# runner/job_entrypoint.py which reads the same path.
+_TFVARS_SECRET_KEY = "terraform.tfvars.json"
+_TFVARS_FILENAME = "terraform.tfvars.json"
+_TFVARS_MOUNT_DIR = "/var/run/terrapod/vars"
+
 
 def _double_resource(value: str) -> str:
     """Double a K8s resource value.
@@ -44,6 +50,7 @@ def build_job_spec(
     auth_secret_name: str,
     env_vars: list[dict[str, str]],
     terraform_vars: list[dict[str, str]],
+    vars_secret_name: str = "",
     resource_cpu: str = "1",
     resource_memory: str = "2Gi",
     timeout_minutes: int = 60,
@@ -69,8 +76,14 @@ def build_job_spec(
         phase: "plan" or "apply".
         runner_config: Global runner config (image, defaults, etc.).
         auth_secret_name: K8s Secret name containing the runner token.
-        env_vars: Workspace env vars [{key, value}].
-        terraform_vars: Terraform vars [{key, value}] → TF_VAR_*.
+        vars_secret_name: K8s Secret holding all workspace variable values
+            (terraform tfvars blob + env vars). When set, env vars are sourced
+            via secretKeyRef and terraform vars are mounted as a file — no
+            variable value is plaintext in the Job spec.
+        env_vars: Workspace env vars [{key, value}] — keys referenced via
+            secretKeyRef into vars_secret_name.
+        terraform_vars: Terraform vars [{key, value, hcl}] — presence triggers
+            the mounted tfvars volume; the entrypoint renders the file.
         resource_cpu: CPU request (e.g. "1", "500m").
         resource_memory: Memory request (e.g. "2Gi", "256Mi").
         timeout_minutes: Job timeout in minutes.
@@ -167,13 +180,26 @@ def build_job_spec(
         }
     )
 
-    # Workspace env vars (category=env)
+    # Workspace env vars (category=env). Values are sourced from the per-run
+    # vars Secret via secretKeyRef — never plaintext in the Job spec, since env
+    # vars can be sensitive and are readable via `kubectl describe` / etcd. The
+    # listener populates the Secret (key = the env var name).
     for var in env_vars:
-        container_env.append({"name": var["key"], "value": var["value"]})
+        if vars_secret_name:
+            container_env.append(
+                {
+                    "name": var["key"],
+                    "valueFrom": {"secretKeyRef": {"name": vars_secret_name, "key": var["key"]}},
+                }
+            )
+        else:
+            container_env.append({"name": var["key"], "value": var["value"]})
 
-    # Terraform vars (category=terraform → TF_VAR_*)
-    for var in terraform_vars:
-        container_env.append({"name": f"TF_VAR_{var['key']}", "value": var["value"]})
+    # Terraform vars (category=terraform) are NOT injected as env vars. They are
+    # delivered as a read-only mounted file from the same per-run Secret (volume
+    # added below) and the entrypoint renders terrapod.auto.tfvars from it. This
+    # keeps sensitive values off the Job spec env and makes complex/object
+    # values round-trip identically on terraform and tofu.
 
     # Extra env vars from runner config (Helm values → runners.extraEnv)
     for extra in runner_config.extra_env:
@@ -311,6 +337,24 @@ def build_job_spec(
             },
         },
     }
+
+    # Per-run vars Secret: mount the terraform variables as a read-only file.
+    # The listener creates the Secret with an ownerReference to this Job, so it
+    # cascade-deletes when the Job is GC'd (same lifecycle as the auth Secret).
+    if vars_secret_name and terraform_vars:
+        pod = job_spec["spec"]["template"]["spec"]
+        pod["volumes"].append(
+            {
+                "name": "tfvars",
+                "secret": {
+                    "secretName": vars_secret_name,
+                    "items": [{"key": _TFVARS_SECRET_KEY, "path": _TFVARS_FILENAME}],
+                },
+            }
+        )
+        pod["containers"][0]["volumeMounts"].append(
+            {"name": "tfvars", "mountPath": _TFVARS_MOUNT_DIR, "readOnly": True}
+        )
 
     # envFrom — inject all keys from Secrets/ConfigMaps as env vars
     if runner_config.extra_env_from:
