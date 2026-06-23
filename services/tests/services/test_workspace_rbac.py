@@ -64,6 +64,9 @@ def _mock_workspace(**kwargs):
     ws.name = kwargs.get("name", "test-ws")
     ws.labels = kwargs.get("labels", {})
     ws.owner_email = kwargs.get("owner_email", "")
+    # Explicit None so MagicMock doesn't auto-return a truthy attribute and trip
+    # the catalog-managed RBAC clamp (#535).
+    ws.catalog_item_id = kwargs.get("catalog_item_id")
     return ws
 
 

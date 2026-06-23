@@ -36,11 +36,14 @@ def _user(*, email="dev@example.com", roles=None, kind="interactive", pinned=Non
     )
 
 
-def _workspace(*, name="ws-1", labels=None, owner_email=None):
+def _workspace(*, name="ws-1", labels=None, owner_email=None, catalog_item_id=None):
     ws = MagicMock()
     ws.name = name
     ws.labels = labels or {}
     ws.owner_email = owner_email
+    # Explicit None so MagicMock doesn't auto-return a truthy attribute and trip
+    # the catalog-managed RBAC clamp (#535).
+    ws.catalog_item_id = catalog_item_id
     return ws
 
 

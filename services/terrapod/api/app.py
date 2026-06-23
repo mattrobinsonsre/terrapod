@@ -703,6 +703,13 @@ def create_application() -> FastAPI:
 
     app.include_router(workspace_bulk_router, prefix=TERRAPOD_PREFIX)
 
+    # Service catalog (#535): provider-template + catalog-item management +
+    # provision flow. The router self-gates on settings.catalog.enabled (404
+    # when disabled), so it is always mounted.
+    from terrapod.api.routers.catalog import router as catalog_router
+
+    app.include_router(catalog_router, prefix=TERRAPOD_PREFIX)
+
     # VCS webhook event receiver — Terrapod-specific.
     from terrapod.api.routers.vcs_events import router as vcs_events_router
 
