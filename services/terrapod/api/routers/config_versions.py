@@ -113,6 +113,19 @@ async def create_configuration_version(
 ) -> JSONResponse:
     """Create a configuration version. Requires write on workspace."""
     ws = await _get_workspace(workspace_id, db)
+    # Config-managed guardrail (#535): catalog-managed workspaces run a
+    # server-generated wrapper config. Direct CV uploads would diverge the
+    # workspace from its catalog item — reject. Re-provisioning goes through
+    # the catalog surface, which generates the CV internally.
+    if ws.catalog_item_id is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This workspace is managed by the service catalog; its configuration "
+                "is generated automatically. Manage it through the catalog, not by "
+                "uploading configuration versions."
+            ),
+        )
     perm = await resolve_workspace_permission_for(db, user, ws)
     if not has_permission(perm, "write"):
         raise HTTPException(status_code=403, detail="Requires write permission on workspace")

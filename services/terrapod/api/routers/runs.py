@@ -403,6 +403,18 @@ async def create_run(
     plan_only = attrs.get("plan-only", False)
     cv_data = relationships.get("configuration-version", {}).get("data", {})
     has_cv = bool(cv_data.get("id", "") if cv_data else "")
+    # Config-managed guardrail (#535): a catalog-managed workspace runs only the
+    # wrapper config the catalog generated for it. A run that pins a different
+    # configuration version would diverge it from its catalog item — reject.
+    # CV-less re-runs (re-plan/re-apply of the generated config) stay allowed.
+    if ws.catalog_item_id is not None and has_cv:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This workspace is managed by the service catalog; runs cannot pin a "
+                "custom configuration version. Manage it through the catalog."
+            ),
+        )
     if ws.execution_mode == "agent" and ws.vcs_connection_id is not None and has_cv:
         if not plan_only:
             raise HTTPException(

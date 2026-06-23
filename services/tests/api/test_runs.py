@@ -87,7 +87,7 @@ def _mock_run(
     return run
 
 
-def _mock_workspace(ws_id=None, name="test-ws"):
+def _mock_workspace(ws_id=None, name="test-ws", catalog_item_id=None):
     ws = MagicMock()
     ws.id = ws_id or uuid.uuid4()
     ws.name = name
@@ -98,6 +98,9 @@ def _mock_workspace(ws_id=None, name="test-ws"):
     ws.vcs_last_polled_at = None
     ws.vcs_last_error = None
     ws.vcs_last_error_at = None
+    # Explicit None so MagicMock doesn't auto-return a truthy attribute and
+    # trip the catalog config-managed guardrail (#535).
+    ws.catalog_item_id = catalog_item_id
     return ws
 
 
@@ -320,6 +323,85 @@ class TestCreateRun:
         assert resp.status_code == 201
         mock_get_cv.assert_awaited_once()
         assert mock_create_run.await_args.kwargs["configuration_version_id"] == cv.id
+
+
+# ── Catalog config-managed guardrail (#535) ────────────────────────────
+
+
+class TestCatalogManagedRunGuard:
+    """A catalog-managed workspace runs only the wrapper config the catalog
+    generated for it — a run pinning a custom CV is rejected (409)."""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    async def test_run_with_cv_on_catalog_ws_rejected(self, mock_resolve, *mocks):
+        mock_resolve.return_value = "admin"
+        ws = _mock_workspace(catalog_item_id=uuid.uuid4())
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        cv_id = uuid.uuid4()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"plan-only": True},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}"}},
+                            "configuration-version": {"data": {"id": f"cv-{cv_id}"}},
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 409
+        assert "service catalog" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.run_service.get_latest_uploaded_cv")
+    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    async def test_cvless_rerun_on_catalog_ws_allowed(
+        self, mock_resolve, mock_get_cv, mock_create_run, mock_queue, *mocks
+    ):
+        """CV-less re-plan/re-apply of the generated config stays allowed."""
+        mock_resolve.return_value = "admin"
+        ws = _mock_workspace(catalog_item_id=uuid.uuid4())  # non-VCS by default
+        cv = MagicMock(id=uuid.uuid4())
+        mock_get_cv.return_value = cv
+        run = _mock_run(ws_id=ws.id, plan_only=True, status="queued")
+        mock_create_run.return_value = run
+        mock_queue.return_value = run
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"plan-only": True},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}", "type": "workspaces"}}
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201
 
 
 # ── Show Run ───────────────────────────────────────────────────────────
