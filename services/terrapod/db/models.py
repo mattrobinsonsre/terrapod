@@ -106,6 +106,12 @@ class Role(Base):
     registry_permission: Mapped[str] = mapped_column(
         String(20), nullable=False, default="read", server_default="read"
     )  # read, write, admin — modules + providers share this
+    # Service Catalog access (#535). Opt-in (default none): read = browse
+    # label-scoped items; use = provision + manage own instances via the
+    # catalog API only; admin = author items/provider-templates + manage all.
+    catalog_permission: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="none", server_default="none"
+    )  # none, read, use, admin
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
@@ -427,6 +433,21 @@ class Workspace(Base):
         nullable=True,
     )
 
+    # Service Catalog provenance (#535). Set when this workspace was
+    # provisioned from a catalog item — the workspace IS the instance. A
+    # workspace is "catalog-managed" iff catalog_item_id is not NULL: such
+    # workspaces are admin-managed (non-admins act on them only through the
+    # catalog API). catalog_version_pin NULL = float (track latest module
+    # version via the module_workspace_link); set = pinned. catalog_input_values
+    # is the (sensitive-redacted) snapshot of the provision form values.
+    catalog_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("catalog_items.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    catalog_version_pin: Mapped[str | None] = mapped_column(String(63), nullable=True)
+    catalog_input_values: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )
@@ -611,6 +632,93 @@ class ModuleWorkspaceLink(Base):
         sa.UniqueConstraint("module_id", "workspace_id", name="uq_module_workspace_links"),
         Index("ix_module_workspace_links_module_id", "module_id"),
         Index("ix_module_workspace_links_workspace_id", "workspace_id"),
+    )
+
+
+class ProviderTemplate(Base):
+    """Admin-managed, parameterized provider configuration for the Service
+    Catalog (#535).
+
+    Managed like a policy set (CRUD + RBAC + audit), authored as code via the
+    Terraform provider. `body` is an HCL `provider "x" { ... }` snippet that
+    references `var.*`; `parameters` declares the inputs (region, account_id,
+    …) the consumer fills at provision. The catalog wrapper renders the body
+    into the generated ROOT module (never into the registry module) and
+    declares the params as root variables — values flow as Terraform variables,
+    so there is no server-side string interpolation.
+    """
+
+    __tablename__ = "provider_templates"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    name: Mapped[str] = mapped_column(String(63), nullable=False)
+    provider_type: Mapped[str] = mapped_column(String(63), nullable=False)  # aws, gcp, azure, …
+    body: Mapped[str] = mapped_column(Text, nullable=False)  # HCL provider block referencing var.*
+    # [{name, type, required, default, sensitive}] — the consumer-supplied params.
+    parameters: Mapped[list[Any]] = mapped_column(JSONB, default=list, nullable=False)
+    labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    owner_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    __table_args__ = (sa.UniqueConstraint("name", name="uq_provider_templates"),)
+
+
+class CatalogItem(Base):
+    """A blessed, version-pinnable designation over a registry module for
+    no-code self-service provisioning (#535).
+
+    NOT a copy of the module — a designation + form-constraint overlay. The
+    provisioning form derives from the module version's extracted interface
+    (RegistryModuleVersion.inputs) plus `variable_options`; provisioning
+    creates an ordinary agent-mode, non-VCS workspace whose config is a
+    server-generated wrapper that calls this module.
+    """
+
+    __tablename__ = "catalog_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    module_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("registry_modules.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # Item-level default pin (NULL = float / track latest; instances may override).
+    default_version_pin: Mapped[str | None] = mapped_column(String(63), nullable=True)
+    name: Mapped[str] = mapped_column(String(90), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # FK lists kept as JSONB (not association tables) — always loaded with the item.
+    provider_template_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list, nullable=False)
+    # NULL/empty = any pool the consumer can use; else scopes the offered pools.
+    allowed_agent_pool_ids: Mapped[list[Any] | None] = mapped_column(JSONB, nullable=True)
+    # Per-variable overlay: [{name, options[], default, required, visibility}].
+    variable_options: Mapped[list[Any]] = mapped_column(JSONB, default=list, nullable=False)
+    labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    owner_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    module: Mapped["RegistryModule"] = relationship(lazy="joined")
+
+    __table_args__ = (
+        sa.UniqueConstraint("name", name="uq_catalog_items"),
+        Index("ix_catalog_items_module_id", "module_id"),
     )
 
 
