@@ -21,6 +21,8 @@ data:
     max_token_ttl_seconds: {{ .Values.runners.maxTokenTTLSeconds }}
     stale_timeout_seconds: {{ .Values.runners.staleTimeoutSeconds }}
     drift_max_duration_seconds: {{ .Values.runners.driftMaxDurationSeconds | default 1800 }}
+    lifecycle_destroy_retries: {{ .Values.runners.lifecycleDestroyRetries | default 2 }}
+    lifecycle_destroy_retry_backoff_seconds: {{ .Values.runners.lifecycleDestroyRetryBackoffSeconds | default 45 }}
     {{- with .Values.runners.imagePullSecrets }}
     image_pull_secrets:
       {{- toYaml . | nindent 6 }}

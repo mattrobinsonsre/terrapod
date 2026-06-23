@@ -230,6 +230,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         description="Drive run state transitions based on Job outcomes",
     )
 
+    # Bounded auto-retry for failed platform-initiated lifecycle destroys
+    # (catalog + autodiscovery). Cheap no-op when there are none; the handler
+    # self-gates to 0 retries / no eligible runs.
+    from terrapod.services.lifecycle_destroy_retry import lifecycle_destroy_retry_cycle
+
+    register_periodic_task(
+        "lifecycle_destroy_retry",
+        interval_seconds=30,
+        handler=lifecycle_destroy_retry_cycle,
+        description="Retry failed catalog/autodiscovery lifecycle destroy runs",
+    )
+
     # Audit log retention (daily)
     async def _audit_retention() -> None:
         from terrapod.services.audit_service import purge_old_entries

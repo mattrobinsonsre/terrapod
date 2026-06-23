@@ -29,7 +29,9 @@ test.describe('Service Catalog — admin + browse (admin session)', () => {
     await page.fill('#pt-body', 'provider "aws" {}');
     await page.click('button[type="submit"]:has-text("Create Template")');
 
-    await expect(page.locator(`text=${name}`)).toBeVisible({ timeout: 10_000 });
+    // Scope to the list row — a page-wide text match also hits the
+    // "Provider template "<name>" created" success banner (strict-mode: 2 elements).
+    await expect(page.locator(`td:has-text("${name}")`)).toBeVisible({ timeout: 10_000 });
   });
 
   test('catalog item: create over a module, browse, render provision panel', async ({ page }) => {
@@ -47,7 +49,8 @@ test.describe('Service Catalog — admin + browse (admin session)', () => {
     // Select the module by its UUID value (robust against label formatting).
     await page.selectOption('#cat-module', moduleId);
     await page.click('button[type="submit"]:has-text("Create Catalog Item")');
-    await expect(page.locator(`text=${itemName}`)).toBeVisible({ timeout: 10_000 });
+    // List row, not a page-wide text match (avoids also hitting the success banner).
+    await expect(page.locator(`td:has-text("${itemName}")`)).toBeVisible({ timeout: 10_000 });
 
     // Browse — the enabled item appears
     await page.goto('/catalog');

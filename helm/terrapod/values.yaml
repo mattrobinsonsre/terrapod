@@ -748,6 +748,18 @@ runners:
   # if there's drift". Set to 0 to disable the cap.
   driftMaxDurationSeconds: 1800
 
+  # Auto-retry for FAILED platform-initiated lifecycle destroys (a catalog
+  # instance destroy or an autodiscovery directory destroy). terraform destroy
+  # is commonly transiently flaky (dependency-release ordering, eventual
+  # consistency, draining LBs / releasing ENIs / emptying buckets); a re-run
+  # usually succeeds and re-running is safe (destroy is incremental). The
+  # workspace is archived only on a SUCCESSFUL destroy, so retries never lose
+  # data — they either succeed and archive or exhaust the cap and stay errored
+  # for an operator. A user's own CLI `terraform destroy` is never retried.
+  # Set lifecycleDestroyRetries to 0 to disable.
+  lifecycleDestroyRetries: 2            # retries after the first failure (3 attempts total)
+  lifecycleDestroyRetryBackoffSeconds: 45  # wait after an error before retrying
+
   # Maximum size in bytes of the plan-phase workspace-diff tarball that
   # the runner uploads at end of plan and downloads at start of apply.
   # That tarball restores files plan generated on disk (data.archive_file
