@@ -1371,7 +1371,7 @@ POST /api/v2/workspaces/{id}/vars
 }
 ```
 
-`category` is either `terraform` (injected as `TF_VAR_{key}`) or `env` (injected as raw env var).
+`category` is either `terraform` or `env`. In agent mode both are delivered to the runner Job via a per-run Kubernetes Secret (never plaintext in the Job spec): `terraform` vars are rendered into a generated `terrapod.auto.tfvars` from a Secret-mounted blob (honouring `hcl`), and `env` vars are injected via `secretKeyRef`. (In local execution mode the CLI handles variables itself.)
 
 **Required permission:** `write` on the workspace.
 

@@ -95,9 +95,13 @@ resource "terrapod_workspace" "tg" {
 ### Variables
 
 Workspace variables resolve server-side exactly as for non-terragrunt agent runs
-and are injected as environment variables. Terragrunt's own `inputs = { … }`
-block is honoured (it becomes `TF_VAR_*` for the run). Precedence between the two
-follows Terraform's normal variable precedence.
+and are delivered via the per-run vars Secret: terraform-category vars as a
+generated `terrapod.auto.tfvars` file (mounted from the Secret) and env-category
+vars via `secretKeyRef` — never plaintext in the Job spec. The generated
+`terrapod.auto.tfvars` is copied into Terragrunt's `.terragrunt-cache` unit and
+read by the underlying tofu/terraform. Terragrunt's own `inputs = { … }` block is
+independent and still honoured (it becomes `TF_VAR_*` for the run). Precedence
+between the two follows Terraform's normal variable precedence.
 
 ### Limitations (current)
 

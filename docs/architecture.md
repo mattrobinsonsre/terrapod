@@ -210,14 +210,16 @@ Terrapod's execution layer follows the Actions Runner Controller (ARC) pattern: 
 5. Listener creates K8s Job in runner namespace
    - Image: terrapod-runner (slim Debian + python + git + opa)
    - Resources: from workspace config (cpu/memory requests + 2x limits)
-   - Env vars: workspace variables + Terraform vars
+   - Terraform vars: mounted tfvars file from the vars Secret (not env)
+   - Env vars: workspace env vars via secretKeyRef (values never in Job spec)
    - TP_AUTH_TOKEN via secretKeyRef (token never in Job spec)
    - Service account: per-pool SA > global runner config SA > K8s default
    - Azure Workload Identity pod label added when `runners.azureWorkloadIdentity: true`
         |
-6. Listener creates K8s Secret (tprun-{run_short}-auth)
-   - Contains the runner token
-   - ownerReference → Job (K8s GC deletes Secret when Job is cleaned up)
+6. Listener creates K8s Secrets (tprun-{run_short}-{phase}-auth + -vars)
+   - auth Secret: the runner token
+   - vars Secret: terraform.tfvars.json blob (mounted) + env var keys (secretKeyRef)
+   - ownerReference → Job (K8s GC deletes both Secrets when Job is cleaned up)
         |
 7. Listener reports Job name/namespace back to API ← LISTENER IS DONE
         |

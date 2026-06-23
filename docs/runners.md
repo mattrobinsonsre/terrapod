@@ -311,7 +311,7 @@ The entrypoint reads the following environment variables (set automatically by t
 | `TP_ALLOW_EMPTY_APPLY` | `true` to allow empty applies |
 | `TP_TERMINATION_GRACE` | Termination grace period in seconds |
 
-Workspace variables (env and terraform) are also injected as environment variables on the Job pod.
+Workspace variables (env and terraform) are NOT passed as plaintext env in the Job spec — they are delivered via the per-run vars Secret described below.
 
 ### Per-phase auth Secret
 
@@ -323,6 +323,22 @@ tprun-<run-short-id>-apply-auth    # apply-phase Job consumes this
 ```
 
 The Job's pod spec references the token via `secretKeyRef` and exposes it as `TP_AUTH_TOKEN` — the raw token never appears in the Job spec, the listener logs, or `kubectl describe` output. The token is scoped to a single `run_id` and the matching phase, so a leaked apply token can't be replayed against an unrelated run or used to download a different workspace's state.
+
+### Per-phase vars Secret
+
+Workspace variable **values** are delivered to the Job through a second per-phase Secret, created and named with the identical `ownerReference`→Job lifecycle as the auth Secret (so it cascade-GCs when the Job's TTL expires; the listener needs only `secrets: create` RBAC, no sweeper):
+
+```
+tprun-<run-short-id>-plan-vars     # plan-phase Job consumes this
+tprun-<run-short-id>-apply-vars    # apply-phase Job consumes this
+```
+
+It holds:
+
+- a `terraform.tfvars.json` blob — every terraform-category variable (sensitive and not), with its `hcl` flag. The Secret is **mounted read-only** at `/var/run/terrapod/vars`; before `init` the runner renders a `terrapod.auto.tfvars` from it (`hcl=true` → raw HCL expression, otherwise → quoted string). A `.auto.tfvars` file parses **identically on terraform and tofu** for any variable type — which is why the runner uses a file rather than `TF_VAR_*` env (the env form diverges across engines for untyped complex values).
+- one key per env-category variable, each injected into the Job container via `secretKeyRef`.
+
+No variable value — sensitive or not — ever appears in the Job spec, the listener logs, or `kubectl describe` output. Sensitive terraform vars are protected by living only in this short-lived, cascade-GC'd Secret (mounted as the tfvars file), not by masking.
 
 ---
 

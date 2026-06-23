@@ -375,6 +375,59 @@ class TestClaimRun:
         _, listener_id = setup
         assert await _claim_run(client, listener_id) is None
 
+    async def test_claim_run_delivers_vars_payload(self, app, client, setup):
+        """next_run returns terraform-vars carrying `hcl` (never `sensitive`) + env-vars.
+
+        The runner consumes `hcl` to render terrapod.auto.tfvars (raw expression
+        vs quoted string). Sensitivity is NOT part of the runner contract — all
+        terraform vars, sensitive or not, are delivered uniformly via the per-run
+        vars Secret — so `sensitive` must not leak into this payload, and the
+        sensitive value IS delivered (the runner needs it; the Secret, not
+        masking, is what protects it).
+        """
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "vars-payload-ws")
+
+        async def _add_var(key, value, category, *, sensitive=False, hcl=False):
+            resp = await client.post(
+                f"/api/v2/workspaces/{ws_id}/vars",
+                json={
+                    "data": {
+                        "type": "vars",
+                        "attributes": {
+                            "key": key,
+                            "value": value,
+                            "category": category,
+                            "sensitive": sensitive,
+                            "hcl": hcl,
+                        },
+                    }
+                },
+                headers=AUTH,
+            )
+            assert resp.status_code == 201, resp.text
+
+        await _add_var("ports", "[80, 443]", "terraform", hcl=True)
+        await _add_var("secret", "s3cr3t", "terraform", sensitive=True)
+        await _add_var("MY_ENV", "envval", "env")
+
+        await _create_run(client, ws_id)
+        result = await _claim_run(client, listener_id)
+        assert result is not None
+        data, _ = result
+
+        tvars = {v["key"]: v for v in data["attributes"]["terraform-vars"]}
+        assert set(tvars) == {"ports", "secret"}
+        for v in tvars.values():
+            assert "hcl" in v
+            assert "sensitive" not in v  # dead field removed
+        assert tvars["ports"]["hcl"] is True
+        assert tvars["secret"]["hcl"] is False
+        assert tvars["secret"]["value"] == "s3cr3t"  # sensitive value delivered
+
+        env = {v["key"]: v for v in data["attributes"]["env-vars"]}
+        assert env["MY_ENV"]["value"] == "envval"
+
 
 class TestPlanOnlyLifecycle:
     async def test_plan_only_full_lifecycle(self, app, client, setup):
