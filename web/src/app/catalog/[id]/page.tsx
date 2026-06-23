@@ -9,7 +9,7 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { LabelsEditor } from '@/components/labels-editor'
-import { getAuthState } from '@/lib/auth'
+import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
 interface CatalogItem {
@@ -104,6 +104,13 @@ export default function CatalogItemPage() {
   const [destroyAutoApply, setDestroyAutoApply] = useState(false)
   const [destroyBusy, setDestroyBusy] = useState(false)
   const [destroyError, setDestroyError] = useState('')
+
+  // Orphan modal state (discouraged escape hatch — abandons infra)
+  const [orphanInstance, setOrphanInstance] = useState<Instance | null>(null)
+  const [orphanConfirm, setOrphanConfirm] = useState('')
+  const [orphanBusy, setOrphanBusy] = useState(false)
+  const [orphanError, setOrphanError] = useState('')
+  const canOrphan = isAdmin()
 
   // Run-result banner after a lifecycle action.
   const [actionResult, setActionResult] = useState('')
@@ -345,6 +352,30 @@ export default function CatalogItemPage() {
     }
   }
 
+  async function handleOrphan() {
+    if (!orphanInstance) return
+    setOrphanBusy(true)
+    setOrphanError('')
+    try {
+      const res = await apiFetch(
+        `/api/terrapod/v1/catalog-instances/${orphanInstance.id}?orphan=true`,
+        { method: 'DELETE' },
+      )
+      if (!res.ok && res.status !== 204) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `Failed to orphan (${res.status})`)
+      }
+      setActionResult(`Orphaned ${orphanInstance.attributes.name} — workspace removed, infrastructure left running (untracked).`)
+      setOrphanInstance(null)
+      setOrphanConfirm('')
+      await loadInstances()
+    } catch (err) {
+      setOrphanError(err instanceof Error ? err.message : 'Failed to orphan')
+    } finally {
+      setOrphanBusy(false)
+    }
+  }
+
   if (loading) {
     return (
       <>
@@ -529,6 +560,9 @@ export default function CatalogItemPage() {
                           <div className="flex justify-end gap-3">
                             <button onClick={() => startReconfigure(inst)} className="text-xs text-brand-400 hover:text-brand-300">Reconfigure</button>
                             <button onClick={() => { setDestroyInstance(inst); setDestroyError(''); setDestroyAutoApply(false) }} className="text-xs text-red-400 hover:text-red-300">Destroy</button>
+                            {canOrphan && (
+                              <button onClick={() => { setOrphanInstance(inst); setOrphanError(''); setOrphanConfirm('') }} className="text-xs text-slate-500 hover:text-slate-300" title="Delete the catalog record without destroying its infrastructure (discouraged)">Orphan…</button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -623,6 +657,39 @@ export default function CatalogItemPage() {
               <button type="button" onClick={() => setDestroyInstance(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">Cancel</button>
               <button type="button" onClick={handleDestroy} disabled={destroyBusy} className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 disabled:bg-red-900 disabled:text-red-400 text-white transition-colors">
                 {destroyBusy ? 'Queuing…' : 'Destroy'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {orphanInstance && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-slate-800 rounded-lg border border-red-900/60 w-full max-w-md p-5">
+            <h3 className="text-lg font-semibold text-slate-100 mb-1">Orphan {orphanInstance.attributes.name}?</h3>
+            <p className="text-sm text-slate-400 mb-3">
+              This deletes the catalog instance record but does <span className="text-amber-300 font-medium">not</span> destroy its infrastructure — the provisioned resources keep running, <span className="text-amber-300 font-medium">untracked and unmanaged</span>. This is discouraged. To reclaim the infrastructure, cancel and use <span className="text-slate-200 font-medium">Destroy</span> instead.
+            </p>
+            {orphanError && <ErrorBanner message={orphanError} />}
+            <label className="block text-xs text-slate-400 mb-1">
+              Type the instance name <span className="text-slate-200 font-mono">{orphanInstance.attributes.name}</span> to confirm:
+            </label>
+            <input
+              type="text"
+              value={orphanConfirm}
+              onChange={(e) => setOrphanConfirm(e.target.value)}
+              className="w-full mb-4 rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-100 focus:ring-1 focus:ring-red-500 focus:border-red-500"
+              placeholder={orphanInstance.attributes.name}
+            />
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => { setOrphanInstance(null); setOrphanConfirm('') }} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">Cancel</button>
+              <button
+                type="button"
+                onClick={handleOrphan}
+                disabled={orphanBusy || orphanConfirm !== orphanInstance.attributes.name}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-700 hover:bg-red-600 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors"
+              >
+                {orphanBusy ? 'Orphaning…' : 'Orphan & abandon infrastructure'}
               </button>
             </div>
           </div>

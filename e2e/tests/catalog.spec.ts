@@ -9,7 +9,10 @@ import { getStoredToken, uniqueName, createRegistryModule } from '../helpers/api
  * (a user with no catalog grant sees an empty catalog even when items exist).
  *
  * The full provision→apply→destroy→archive flow needs a real runner and is
- * covered by the live Tilt smoke (the release F-gate), not here.
+ * covered by the live Tilt smoke (the release F-gate), not here. The
+ * instance-row lifecycle actions (reconfigure / destroy / the admin-gated
+ * Orphan… escape hatch) likewise need a provisioned instance, so they are
+ * exercised in that live smoke rather than this stack.
  */
 
 const USER_AUTH = path.join(__dirname, '..', '.auth', 'user.json');
