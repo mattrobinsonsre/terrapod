@@ -240,7 +240,18 @@ async def _fetch_workspace_config(
     connection or the download fails.
     """
     if not ws.vcs_connection_id or not ws.vcs_repo_url:
-        return None
+        # Module impact analysis is about the MODULE changing (PR or publish) —
+        # the consuming workspace's own VCS status is irrelevant. A non-VCS
+        # consumer (a CLI-driven workspace, or a Service Catalog instance whose
+        # code is a server-generated wrapper, #535) has no VCS to re-fetch, so
+        # reuse its latest uploaded config-version instead of skipping it. The
+        # publish-triggered run re-inits that config (an unpinned module
+        # reference floats to the new version); the PR-speculative run carries
+        # `module_overrides` to swap the PR module tarball by coordinate.
+        # Gating impact on the consumer's VCS silently excluded every non-VCS
+        # consumer of a VCS-linked module — a pre-existing defect.
+        latest = await run_service.get_latest_uploaded_cv(db, ws.id)
+        return latest.id if latest else None
 
     ws_conn = await db.get(VCSConnection, ws.vcs_connection_id)
     if ws_conn is None or ws_conn.status != "active":
