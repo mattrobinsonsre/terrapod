@@ -82,14 +82,13 @@ class TestDeriveForm:
 
 
 class TestRenderWrapper:
-    def test_module_block_untyped_vars_and_tfvars(self):
+    def test_module_block_untyped_vars_value_free(self):
         files = catalog_service.render_wrapper_hcl(
             _module(),
             version="1.2.0",
             var_decls=["cidr", "name", "secret"],
             module_wired=["cidr", "name", "secret"],
             sensitive_names={"secret"},
-            nonsensitive_values={"cidr": "10.0.0.0/16", "name": "vpc1"},
             module_outputs=[{"name": "vpc_id"}],
             provider_templates=[],
         )
@@ -101,42 +100,35 @@ class TestRenderWrapper:
         # Variables are untyped (valid HCL for any module input type).
         assert 'variable "cidr" {}' in main
         assert "type =" not in main
-        # Sensitive var declared sensitive; not in tfvars.
+        # Sensitive var declared sensitive.
         assert 'variable "secret" {\n  sensitive = true\n}' in main
-        # Non-sensitive values land in tfvars.json with real JSON types.
-        import json as _json
-
-        tfvars = _json.loads(files["terraform.auto.tfvars.json"])
-        assert tfvars == {"cidr": "10.0.0.0/16", "name": "vpc1"}
-        assert "secret" not in tfvars
+        # The config version is value-free — no values baked anywhere.
+        assert "terraform.auto.tfvars.json" not in files
+        assert "10.0.0.0/16" not in main
         # outputs re-exported
         assert "value     = module.this.vpc_id" in files["outputs.tf"]
 
-    def test_complex_values_are_json_typed(self):
+    def test_no_tfvars_file_is_ever_emitted(self):
         files = catalog_service.render_wrapper_hcl(
             _module(),
             version="1.0.0",
             var_decls=["ports", "config"],
             module_wired=["ports", "config"],
             sensitive_names=set(),
-            nonsensitive_values={"ports": [80, 443], "config": {"enabled": True}},
             module_outputs=[],
             provider_templates=[],
         )
-        import json as _json
+        # Values are supplied as workspace variables (delivered via the per-run
+        # vars Secret), never baked into the config version.
+        assert not any(name.endswith(".tfvars.json") for name in files)
 
-        tfvars = _json.loads(files["terraform.auto.tfvars.json"])
-        assert tfvars["ports"] == [80, 443]  # list of numbers, not a string
-        assert tfvars["config"] == {"enabled": True}
-
-    def test_floating_version_omits_version_and_empty_tfvars(self):
+    def test_floating_version_omits_version(self):
         files = catalog_service.render_wrapper_hcl(
             _module(),
             version=None,
             var_decls=["secret"],
             module_wired=["secret"],
             sensitive_names={"secret"},
-            nonsensitive_values={},  # all sensitive → no tfvars file
             module_outputs=[],
             provider_templates=[],
         )
@@ -152,7 +144,6 @@ class TestRenderWrapper:
             var_decls=["region"],
             module_wired=[],  # provider param: declared but NOT wired to module
             sensitive_names=set(),
-            nonsensitive_values={"region": "eu-west-1"},
             module_outputs=[],
             provider_templates=[tmpl],
         )
@@ -169,11 +160,35 @@ class TestRenderWrapper:
             var_decls=[],
             module_wired=[],
             sensitive_names=set(),
-            nonsensitive_values={},
             module_outputs=[{"name": "secret", "sensitive": True}],
             provider_templates=[],
         )
         assert "sensitive = true" in files["outputs.tf"]
+
+
+class TestInputVarRepr:
+    """A resolved input value → (workspace-variable value, hcl flag)."""
+
+    def test_string_is_quoted_not_hcl(self):
+        assert catalog_service._input_var_repr("10.0.0.0/16") == ("10.0.0.0/16", False)
+
+    def test_string_that_looks_like_json_stays_string(self):
+        # A literal "[a, b]" must remain a string, not become a list.
+        assert catalog_service._input_var_repr("[a, b]") == ("[a, b]", False)
+
+    def test_list_is_json_hcl(self):
+        assert catalog_service._input_var_repr([80, 443]) == ("[80, 443]", True)
+
+    def test_object_is_json_hcl(self):
+        v, hcl = catalog_service._input_var_repr({"enabled": True})
+        assert hcl is True
+        import json as _json
+
+        assert _json.loads(v) == {"enabled": True}
+
+    def test_number_and_bool_are_hcl(self):
+        assert catalog_service._input_var_repr(8080) == ("8080", True)
+        assert catalog_service._input_var_repr(True) == ("true", True)
 
 
 # ── _build_tarball ─────────────────────────────────────────────────────
@@ -281,11 +296,15 @@ class TestReconfigureInstance:
         ws.id = uuid.uuid4()
         ws.catalog_item_id = uuid.uuid4()
 
-        # A sensitive input so the workspace-variable path (vs tfvars.json) is
-        # exercised.
+        # A sensitive string input and a non-sensitive complex input — both must
+        # become workspace terraform variables (the per-run vars Secret delivers
+        # them; nothing is baked into the config version).
         mv = SimpleNamespace(
             version="1.0.0",
-            inputs=[{"name": "cidr", "type": "string", "required": True, "sensitive": True}],
+            inputs=[
+                {"name": "cidr", "type": "string", "required": True, "sensitive": True},
+                {"name": "ports", "type": "list(number)", "required": False, "sensitive": False},
+            ],
             outputs=[],
         )
         old_var = MagicMock()
@@ -326,19 +345,27 @@ class TestReconfigureInstance:
                 db,
                 user_email="u@test.com",
                 ws=ws,
-                input_values={"cidr": "10.0.0.0/16"},
+                input_values={"cidr": "10.0.0.0/16", "ports": [80, 443]},
                 version_pin="1.0.0",
                 auto_apply=False,
             )
 
         assert result is run
-        # Old variable deleted, the sensitive input recreated as a workspace var.
+        # Old variable deleted; BOTH inputs recreated as workspace terraform vars.
         mock_del.assert_awaited_once_with(db, old_var)
-        assert mock_create_var.await_args.kwargs["key"] == "cidr"
-        assert mock_create_var.await_args.kwargs["sensitive"] is True
-        # The sensitive input is NOT snapshotted in the plaintext input-values
-        # column (write-only, never returned by the instance API).
-        assert ws.catalog_input_values == {}
+        created = {c.kwargs["key"]: c.kwargs for c in mock_create_var.await_args_list}
+        assert set(created) == {"cidr", "ports"}
+        # Sensitive string → sensitive var, quoted (hcl=False).
+        assert created["cidr"]["sensitive"] is True
+        assert created["cidr"]["hcl"] is False
+        assert created["cidr"]["value"] == "10.0.0.0/16"
+        # Non-sensitive complex → hcl var carrying the JSON-encoded value.
+        assert created["ports"]["sensitive"] is False
+        assert created["ports"]["hcl"] is True
+        assert created["ports"]["value"] == "[80, 443]"
+        # Only the NON-sensitive input is snapshotted in the plaintext
+        # input-values column; the sensitive one is write-only.
+        assert ws.catalog_input_values == {"ports": [80, 443]}
         assert ws.catalog_version_pin == "1.0.0"
         assert mock_create_run.await_args.kwargs["source"] == "catalog"
         storage.put_stream.assert_awaited_once()

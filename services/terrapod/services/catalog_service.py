@@ -14,11 +14,13 @@ blessed registry module:
     # providers.tf — each provider template body, verbatim (references var.*)
     output "<name>" { value = module.this.<name> } # re-export
 
-The wrapper is the *code* (uploaded as a ConfigurationVersion); the supplied
-input values are the *data* (workspace Terraform variables → TF_VAR_*). No
-server-side interpolation — params are plain Terraform variables. The workspace
-is marked catalog-managed (``catalog_item_id``), which makes the RBAC clamp and
-config-managed guardrails apply.
+The wrapper is the *code* (uploaded as a ConfigurationVersion, value-free); the
+supplied input values are the *data* — every input, sensitive or not, becomes an
+ordinary workspace Terraform variable, which the runner renders into
+``terrapod.auto.tfvars`` and delivers via the per-run vars Secret (no plaintext
+in the Job spec, #540). No server-side interpolation — params are plain Terraform
+variables. The workspace is marked catalog-managed (``catalog_item_id``), which
+makes the RBAC clamp and config-managed guardrails apply.
 """
 
 import asyncio
@@ -196,7 +198,6 @@ def render_wrapper_hcl(
     var_decls: list[str],
     module_wired: list[str],
     sensitive_names: set[str],
-    nonsensitive_values: dict,
     module_outputs: list[dict],
     provider_templates: list[ProviderTemplate],
 ) -> dict[str, str]:
@@ -204,10 +205,13 @@ def render_wrapper_hcl(
 
     Wrapper root variables are declared **untyped** (`variable "x" {}`) — the
     module interface's `type` string is not reliably valid HCL for complex
-    types (objects/tuples), and the module enforces its own types anyway.
-    Correctly-typed values come from `terraform.auto.tfvars.json` (non-sensitive
-    inputs, JSON-typed) and from sensitive workspace `TF_VAR_*` env vars for the
-    rest; both flow into the `any`-typed wrapper variables structurally.
+    types (objects/tuples), and the module enforces its own types anyway. The
+    config version is purely **structural** (variable decls + the module call +
+    providers + output re-export); it bakes in **no values**. Every input value
+    — sensitive and not — is supplied as an ordinary workspace **terraform
+    variable**, which the runner renders into `terrapod.auto.tfvars` (honouring
+    `hcl`) and delivers via the per-run vars Secret (#540). Those values flow
+    structurally into the `any`-typed wrapper variables.
 
     ``var_decls`` is every wrapper variable (module inputs + provider params);
     ``module_wired`` is the subset passed into the `module "this"` block (module
@@ -239,12 +243,9 @@ def render_wrapper_hcl(
 
     files = {"main.tf": "\n".join(lines)}
 
-    # terraform.auto.tfvars.json — non-sensitive input values as proper JSON
-    # (lists/objects/numbers/bools parse structurally into the `any` variables).
-    if nonsensitive_values:
-        files["terraform.auto.tfvars.json"] = json.dumps(
-            nonsensitive_values, indent=2, sort_keys=True
-        )
+    # No values are baked into the config version — every input is supplied as a
+    # workspace terraform variable (rendered into terrapod.auto.tfvars by the
+    # runner, #540), so the wrapper CV stays purely structural and reusable.
 
     # providers.tf — each provider template body verbatim (references var.*).
     if provider_templates:
@@ -302,6 +303,22 @@ def _build_tarball(files: dict[str, str]) -> bytes:
 
 async def _single_chunk(data: bytes):
     yield data
+
+
+def _input_var_repr(value: object) -> tuple[str, bool]:
+    """Map a resolved input value to ``(variable_value, hcl)`` for storage as a
+    workspace terraform variable.
+
+    Strings render quoted (``hcl=False``); everything else — lists, objects,
+    numbers, bools — is JSON-encoded and rendered as raw HCL (``hcl=True``),
+    because JSON is valid HCL for those types and the runner's tfvars renderer
+    emits ``key = <raw>`` for hcl vars. This reproduces the structural typing the
+    old baked ``terraform.auto.tfvars.json`` gave, but via the per-run vars
+    Secret (#540) instead of the config version.
+    """
+    if isinstance(value, str):
+        return value, False
+    return json.dumps(value), True
 
 
 def _resolve_inputs(
@@ -412,31 +429,33 @@ async def _materialise(
     module_input_names = {i.get("name") for i in module_inputs if i.get("name")}
     module_wired = sorted(n for n in effective if n in module_input_names)
 
-    # Sensitive inputs flow through encrypted workspace TF_VAR_* env vars (never
-    # written to the config tarball); non-sensitive ones go into the wrapper's
-    # terraform.auto.tfvars.json with proper JSON types.
+    # Snapshot only the NON-sensitive resolved inputs onto the workspace for the
+    # instance API to return. Sensitive inputs are write-only (like TFE sensitive
+    # variables) — they live only in the (encrypted-at-rest) workspace variables,
+    # never in this plaintext JSONB column.
     nonsensitive_values = {k: v for k, v in effective.items() if k not in sensitive_names}
-
-    # Snapshot only the NON-sensitive resolved inputs onto the workspace.
-    # Sensitive inputs are write-only (like TFE sensitive variables) — they live
-    # only in the encrypted workspace variables, never in this plaintext JSONB
-    # column (which the instance API returns) or the config tarball.
     ws.catalog_input_values = dict(nonsensitive_values)
 
     # Replace the workspace's variables — a catalog workspace's variable set is
     # wholly catalog-managed (the RBAC clamp blocks user var edits), so a full
-    # replace keeps it in lockstep with the wrapper config. Only sensitive
-    # inputs are stored as workspace variables.
+    # replace keeps it in lockstep with the wrapper config. EVERY input —
+    # sensitive and not — is stored as a workspace terraform variable; the runner
+    # delivers them all via the per-run vars Secret (rendered into
+    # terrapod.auto.tfvars), never plaintext in the Job spec (#540). Non-string
+    # values (lists/objects/numbers/bools) carry hcl=true so they render as raw
+    # HCL — json.dumps emits valid HCL for these; strings render quoted.
     for existing_var in await variable_service.list_variables(db, ws.id):
         await variable_service.delete_variable(db, existing_var)
-    for vname in sorted(sensitive_names & set(effective)):
+    for vname in sorted(effective):
+        var_value, hcl = _input_var_repr(effective[vname])
         await variable_service.create_variable(
             db,
             workspace_id=ws.id,
             key=vname,
-            value=str(effective[vname]),
+            value=var_value,
             category="terraform",
-            sensitive=True,
+            hcl=hcl,
+            sensitive=vname in sensitive_names,
         )
 
     # Generate + upload the wrapper config version.
@@ -446,7 +465,6 @@ async def _materialise(
         var_decls=wired_inputs,
         module_wired=module_wired,
         sensitive_names=sensitive_names,
-        nonsensitive_values=nonsensitive_values,
         module_outputs=module_outputs,
         provider_templates=templates,
     )
