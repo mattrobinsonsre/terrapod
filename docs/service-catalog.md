@@ -174,6 +174,14 @@ provision ──▶ reconfigure ──▶ ... ──▶ destroy ──▶ archiv
 - **Reconfigure** updates an instance's inputs and/or its version pin, regenerates the wrapper, and queues a new run. Source: `catalog`. This is the only supported way to change a catalog instance's configuration (the config clamp blocks the alternatives).
 - **Destroy** queues an `is_destroy` run with source **`catalog-lifecycle`**. On a **successful apply** of that destroy run, the workspace is **archived** — a soft delete: the workspace and its **state are retained** (for audit and possible recovery), but the instance is removed from the active catalog view. Nothing is hard-deleted automatically.
 
+### Destroy, not delete — a catalog instance is never silently orphaned
+
+A catalog instance is something you **provisioned**, so its teardown **reclaims the infrastructure** — unlike a plain workspace, where deleting the workspace record deliberately leaves the real infrastructure running for an operator to manage elsewhere.
+
+- **Destroy (recommended).** `POST /api/terrapod/v1/catalog-instances/{id}/destroy` runs `terraform destroy` and archives the workspace **on a successful apply**. If the destroy fails, the instance stays — the record is never removed while infrastructure might still exist. This is the catalog teardown.
+- **The plain workspace delete is blocked.** `DELETE /api/terrapod/v1/workspaces/{id}` returns **409** for a catalog-managed workspace — deleting it there would silently orphan the provisioned infrastructure. There is no way to orphan a catalog instance by accident.
+- **Orphan (explicit, discouraged escape hatch).** `DELETE /api/terrapod/v1/catalog-instances/{id}?orphan=true` deletes the workspace record and **abandons** the infrastructure (it keeps running, untracked). It requires catalog **`admin`** on the item and the explicit `orphan=true` flag, and is audit-logged. Use it only when the infrastructure is already gone or is owned elsewhere. The Terraform provider's `terrapod_catalog_instance` always **destroys** (reclaims) on `terraform destroy`; there is no orphan-on-destroy mode.
+
 **Deleting a catalog item is blocked (`409`) while it still has instances.** Destroy or migrate the instances first; only then can the item be removed. This prevents orphaning live infrastructure whose definition you've thrown away.
 
 ## Agent pools

@@ -485,3 +485,60 @@ class TestInstanceLifecycle:
                 headers=_AUTH,
             )
         assert resp.status_code == 403
+
+    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_delete_instance_without_orphan_flag_409(self, _db, _redis, _storage, mock_perm):
+        """A catalog instance can't be deleted without either destroying or
+        explicitly orphaning — refuses (409) and never touches the DB."""
+        app, mock_db = _make_app(_user(roles=["everyone"]))
+        ws = _catalog_ws()
+        item = MagicMock(name="vpc", labels={}, owner_email="")
+        mock_db.get = AsyncMock(side_effect=[ws, item])
+        mock_perm.return_value = "admin"
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.delete(f"/api/terrapod/v1/catalog-instances/ws-{ws.id}", headers=_AUTH)
+        assert resp.status_code == 409
+        assert "destroy" in resp.json()["detail"].lower()
+        mock_db.delete.assert_not_called()
+
+    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_orphan_instance_deletes_workspace(self, _db, _redis, _storage, mock_perm):
+        """orphan=true deletes the workspace record (abandoning infra)."""
+        app, mock_db = _make_app(_user(roles=["everyone"]))
+        ws = _catalog_ws()
+        item = MagicMock(name="vpc", labels={}, owner_email="")
+        mock_db.get = AsyncMock(side_effect=[ws, item])
+        mock_perm.return_value = "admin"
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.delete(
+                f"/api/terrapod/v1/catalog-instances/ws-{ws.id}?orphan=true", headers=_AUTH
+            )
+        assert resp.status_code == 204
+        mock_db.delete.assert_awaited_once_with(ws)
+
+    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_orphan_requires_catalog_admin(self, _db, _redis, _storage, mock_perm):
+        """orphan needs catalog admin, not merely 'use'."""
+        app, mock_db = _make_app(_user(roles=["everyone"]))
+        ws = _catalog_ws()
+        item = MagicMock(name="vpc", labels={}, owner_email="")
+        mock_db.get = AsyncMock(side_effect=[ws, item])
+        mock_perm.return_value = "use"  # use is enough to destroy, not to orphan
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.delete(
+                f"/api/terrapod/v1/catalog-instances/ws-{ws.id}?orphan=true", headers=_AUTH
+            )
+        assert resp.status_code == 403
+        mock_db.delete.assert_not_called()

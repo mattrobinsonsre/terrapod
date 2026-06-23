@@ -63,6 +63,8 @@ func newCatalogFixture(t *testing.T) *Client {
 		case r.Method == http.MethodPost && p == "/api/terrapod/v1/catalog-instances/ws-9/destroy":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"run-2","type":"runs","attributes":{"status":"queued","is-destroy":true}}}`))
+		case r.Method == http.MethodDelete && p == "/api/terrapod/v1/catalog-instances/ws-9":
+			w.WriteHeader(http.StatusNoContent)
 
 		default:
 			http.Error(w, "unhandled: "+r.Method+" "+p, http.StatusNotFound)
@@ -169,5 +171,9 @@ func TestCatalogProvisionAndLifecycle(t *testing.T) {
 	drun, err := c.DestroyCatalogInstance(t.Context(), "ws-9", map[string]any{"auto-apply": true})
 	if err != nil || drun.ID != "run-2" || !drun.IsDestroy {
 		t.Fatalf("destroy: %v %+v", err, drun)
+	}
+
+	if err := c.OrphanCatalogInstance(t.Context(), "ws-9"); err != nil {
+		t.Fatalf("orphan: %v", err)
 	}
 }

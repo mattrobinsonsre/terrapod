@@ -53,6 +53,7 @@ def _mock_workspace(
     ws.resource_memory = resource_memory
     ws.agent_pool_id = None
     ws.agent_pool = None
+    ws.catalog_item_id = None
     ws.labels = labels or {}
     ws.owner_email = owner_email
     ws.vcs_connection_id = None
@@ -344,6 +345,27 @@ class TestDeleteWorkspace:
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.delete(f"/api/terrapod/v1/workspaces/ws-{ws.id}", headers=_AUTH)
         assert resp.status_code == 403
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
+    async def test_delete_catalog_workspace_blocked_409(self, mock_resolve, *mocks):
+        """A catalog-managed workspace can't be deleted via the workspace API —
+        that would silently orphan its infra. 409 → use the catalog teardown."""
+        mock_resolve.return_value = "admin"
+        ws = _mock_workspace()
+        ws.catalog_item_id = uuid.uuid4()  # catalog-managed
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.delete(f"/api/terrapod/v1/workspaces/ws-{ws.id}", headers=_AUTH)
+        assert resp.status_code == 409
+        assert "catalog" in resp.json()["detail"].lower()
+        mock_db.delete.assert_not_called()
 
 
 # ── Lock / Unlock ─────────────────────────────────────────────────────

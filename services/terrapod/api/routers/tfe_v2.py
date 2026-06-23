@@ -1557,8 +1557,24 @@ async def delete_workspace(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Delete a workspace and all associated resources. Requires admin."""
+    """Delete a workspace and all associated resources. Requires admin.
+
+    Catalog-managed workspaces are exempt: deleting one here would silently
+    orphan its provisioned infrastructure. Tear a catalog instance down via the
+    catalog surface instead — ``POST /catalog-instances/{id}/destroy`` to reclaim
+    the infrastructure (the recommended path), or the explicit, discouraged
+    ``DELETE /catalog-instances/{id}?orphan=true`` to abandon it.
+    """
     ws, _ = await _require_ws_permission(workspace_id, "admin", user, db)
+    if ws.catalog_item_id is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "This is a catalog-managed workspace; deleting it here would orphan its "
+                "infrastructure. Use the catalog: destroy the instance to reclaim its "
+                "infrastructure, or explicitly orphan it (discouraged)."
+            ),
+        )
     ws_name = ws.name
     await db.delete(ws)
     await db.commit()

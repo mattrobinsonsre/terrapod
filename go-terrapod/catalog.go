@@ -258,6 +258,15 @@ func (c *Client) DestroyCatalogInstance(ctx context.Context, wsID string, attrs 
 	return parseCatalogRunRef(data)
 }
 
+// OrphanCatalogInstance deletes a catalog instance's workspace record WITHOUT
+// destroying its infrastructure — the provisioned resources keep running,
+// untracked. This is the explicit, discouraged escape hatch; the recommended
+// teardown is DestroyCatalogInstance, which reclaims the infrastructure.
+// Requires catalog 'admin' on the originating item.
+func (c *Client) OrphanCatalogInstance(ctx context.Context, wsID string) error {
+	return c.Delete(ctx, "/api/terrapod/v1/catalog-instances/"+url.PathEscape(wsID)+"?orphan=true")
+}
+
 // ── Internal helpers ─────────────────────────────────────────────────
 
 func attrsToMap(res *Resource) map[string]any {

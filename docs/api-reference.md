@@ -3035,6 +3035,14 @@ Returns a reference to the queued destroy run. **Required permission:** catalog 
 
 > **Run sources:** catalog runs carry `source = "catalog"` (provision / reconfigure) or `source = "catalog-lifecycle"` (destroy → archive). These appear on the run object alongside the existing sources (`tfe-api`, `vcs`, `drift-detection`, `autodiscovery-lifecycle`, `module-test`, `module-publish`).
 
+### Orphan Catalog Instance (discouraged)
+
+```
+DELETE /api/terrapod/v1/catalog-instances/{wsId}?orphan=true
+```
+
+Deletes the catalog instance's workspace record **without** destroying its infrastructure — the provisioned resources keep running, untracked. This is the explicit, **discouraged** escape hatch; the recommended teardown is `POST .../destroy`, which reclaims the infrastructure. The `orphan=true` flag is **required** — without it the call returns **409** and points at destroy, so an instance can never be orphaned by accident. The plain `DELETE /workspaces/{id}` also returns **409** for a catalog-managed workspace. **Required permission:** catalog `admin`. Audit-logged. Returns `204`.
+
 ---
 
 ## Common Response Codes

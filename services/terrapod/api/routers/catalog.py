@@ -29,7 +29,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -740,3 +740,47 @@ async def destroy_catalog_instance(
         raise HTTPException(status_code=e.status_code, detail=str(e)) from e
     await db.commit()
     return JSONResponse(content={"data": _run_ref(run)}, status_code=201)
+
+
+@router.delete("/catalog-instances/{ws_id}", status_code=204)
+async def delete_catalog_instance(
+    ws_id: str = Path(...),
+    orphan: bool = Query(False),
+    _: None = Depends(require_catalog_enabled),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Remove a catalog instance.
+
+    Catalog instances are **destroyed**, not deleted-and-orphaned like a plain
+    workspace. The recommended teardown is ``POST .../destroy``, which runs
+    `terraform destroy` and archives the workspace on a successful apply — the
+    infrastructure is reclaimed.
+
+    This endpoint is the explicit, **discouraged** escape hatch: with
+    ``?orphan=true`` it deletes the workspace record and **abandons** the
+    provisioned infrastructure (it keeps running, untracked). Requires catalog
+    ``admin`` on the originating item. Without ``orphan=true`` it refuses (409)
+    and points at destroy — there is no way to orphan a catalog instance by
+    accident.
+    """
+    ws = await _load_instance(db, user, ws_id, required="admin")
+    if not orphan:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Refusing to delete a catalog instance without reclaiming its "
+                "infrastructure. POST .../destroy to destroy and remove it, or pass "
+                "?orphan=true to delete the workspace and abandon its infrastructure "
+                "(discouraged — the infrastructure keeps running, untracked)."
+            ),
+        )
+    ws_name = ws.name
+    await db.delete(ws)
+    await db.commit()
+    logger.warning(
+        "Catalog instance orphaned: workspace deleted, infrastructure abandoned",
+        workspace=ws_name,
+        user=user.email,
+    )
+    return Response(status_code=204)
