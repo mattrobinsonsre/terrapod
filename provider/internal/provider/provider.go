@@ -12,6 +12,7 @@ import (
 
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 	agentPoolDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/agent_pool"
+	catalogInstancesDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/catalog_instances"
 	roleDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/role"
 	userDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/user"
 	vcsConnectionDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/vcs_connection"
@@ -20,9 +21,12 @@ import (
 	agentPoolRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/agent_pool"
 	agentPoolTokenRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/agent_pool_token"
 	autodiscoveryRuleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/autodiscovery_rule"
+	catalogInstanceRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/catalog_instance"
+	catalogItemRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/catalog_item"
 	gpgKeyRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/gpg_key"
 	moduleWorkspaceLinkRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_workspace_link"
 	notificationConfigRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/notification_configuration"
+	providerTemplateRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/provider_template"
 	registryModuleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/registry_module"
 	registryProviderRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/registry_provider"
 	remoteStateConsumerRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/remote_state_consumer"
@@ -138,6 +142,9 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 		agentPoolRes.NewResource,
 		agentPoolTokenRes.NewResource,
 		autodiscoveryRuleRes.NewResource,
+		providerTemplateRes.NewResource,
+		catalogItemRes.NewResource,
+		catalogInstanceRes.NewResource,
 		registryModuleRes.NewResource,
 		registryProviderRes.NewResource,
 		moduleWorkspaceLinkRes.NewResource,
@@ -151,6 +158,7 @@ func (p *terrapodProvider) DataSources(_ context.Context) []func() datasource.Da
 		workspacesDS.NewDataSource,
 		roleDS.NewDataSource,
 		agentPoolDS.NewDataSource,
+		catalogInstancesDS.NewDataSource,
 		vcsConnectionDS.NewDataSource,
 		userDS.NewDataSource,
 	}
