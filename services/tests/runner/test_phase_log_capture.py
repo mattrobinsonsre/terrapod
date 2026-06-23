@@ -73,13 +73,30 @@ class TestLogCapture:
         assert out.exists()
 
     def test_restores_original_writes_on_exit(self, tmp_path) -> None:
+        # Assert the observable contract — writes AFTER the context exits are no
+        # longer tee'd into the combined log — rather than `sys.stdout.write`
+        # method identity. A C stream's `.write` is a built-in method that
+        # yields a fresh wrapper object on every attribute access, so an
+        # identity check is non-deterministic depending on whether pytest's
+        # capture has a Python- or C-level stream installed under xdist.
         out = tmp_path / "combined.log"
-        orig_stdout_write = sys.stdout.write
-        orig_stderr_write = sys.stderr.write
         with log_capture.LogCapture(out):
-            assert sys.stdout.write is not orig_stdout_write
-        assert sys.stdout.write is orig_stdout_write
-        assert sys.stderr.write is orig_stderr_write
+            sys.stdout.write("inside-ctx\n")
+            sys.stdout.flush()
+            sys.stderr.write("inside-ctx-err\n")
+            sys.stderr.flush()
+        size_after_ctx = out.stat().st_size
+
+        # Tee removed: post-context writes must not grow the combined log.
+        sys.stdout.write("outside-ctx\n")
+        sys.stdout.flush()
+        sys.stderr.write("outside-ctx-err\n")
+        sys.stderr.flush()
+
+        assert out.stat().st_size == size_after_ctx
+        body = out.read_bytes()
+        assert b"inside-ctx" in body
+        assert b"outside-ctx" not in body
 
 
 class TestUploadCombinedLog:
