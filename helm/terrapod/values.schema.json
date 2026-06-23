@@ -611,6 +611,14 @@
           }
         },
 
+        "catalog": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
+        },
+
         "vcs": {
           "type": "object",
           "additionalProperties": false,

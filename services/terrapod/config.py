@@ -430,6 +430,18 @@ class RegistryConfig(BaseModel):
     module_interface: ModuleInterfaceConfig = Field(default_factory=ModuleInterfaceConfig)
 
 
+class CatalogConfig(BaseModel):
+    """Service catalog: no-code self-service provisioning over the module
+    registry (#535).
+
+    Off by default — enabling it exposes the catalog RBAC axis, catalog-item
+    and provider-template management, and the provision flow that generates a
+    wrapper config-version onto an ordinary agent-mode workspace.
+    """
+
+    enabled: bool = Field(default=False)
+
+
 # --- VCS Configuration ---
 
 
@@ -1027,6 +1039,9 @@ class Settings(BaseSettings):
 
     # Registry
     registry: RegistryConfig = Field(default_factory=RegistryConfig)
+
+    # Service Catalog
+    catalog: CatalogConfig = Field(default_factory=CatalogConfig)
 
     # VCS
     vcs: VCSConfig = Field(default_factory=VCSConfig)

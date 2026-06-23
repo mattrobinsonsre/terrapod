@@ -67,12 +67,21 @@ async def resolve_workspace_permission(
     5. 'everyone' role with access: everyone label → read
     6. Default → None (no access)
 
+    Catalog-managed workspaces (``catalog_item_id`` set, #535) override this:
+    they are config-managed by the catalog, so no one but a platform admin may
+    act on them *as a workspace*. The provisioner (owner) and any label-RBAC
+    match are clamped to ``read`` — they can view runs/state but cannot edit
+    variables, settings, or queue raw applies. Manage the instance through the
+    catalog surface (update inputs / re-pin / destroy), not the workspace API.
+
     Pass ``preloaded_roles`` (from :func:`fetch_custom_roles`) to skip the
     per-call DB query — useful when resolving permissions for many workspaces.
     """
     role_set = set(user_roles)
+    is_catalog_managed = workspace.catalog_item_id is not None
 
-    # 1. Platform admin bypasses all
+    # 1. Platform admin bypasses all (including the catalog clamp — admins
+    #    manage catalog-managed workspaces directly).
     if "admin" in role_set:
         return "admin"
 
@@ -82,9 +91,13 @@ async def resolve_workspace_permission(
     if "audit" in role_set:
         best = "read"
 
-    # 3. Workspace owner → admin
+    # 3. Workspace owner → admin (catalog-managed: owner/provisioner gets
+    #    read only — see docstring).
     if workspace.owner_email and workspace.owner_email == user_email:
-        return "admin"
+        if is_catalog_managed:
+            best = "read"
+        else:
+            return "admin"
 
     # 4. Label-based RBAC from custom roles
     custom_role_names = role_set - BUILTIN_ROLE_NAMES
@@ -136,6 +149,11 @@ async def resolve_workspace_permission(
     if apply_everyone_floor and resource_labels.get("access") == "everyone":
         if best is None:
             best = "read"
+
+    # Catalog-managed clamp: any non-admin grant (owner, label-RBAC, everyone)
+    # is capped at read. Platform admin already returned "admin" above.
+    if is_catalog_managed and best is not None and PERMISSION_HIERARCHY[best] > 0:
+        best = "read"
 
     return best
 

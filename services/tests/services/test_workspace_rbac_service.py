@@ -11,11 +11,14 @@ from terrapod.services.workspace_rbac_service import (
 )
 
 
-def _make_workspace(*, name="ws-1", labels=None, owner_email=None):
+def _make_workspace(*, name="ws-1", labels=None, owner_email=None, catalog_item_id=None):
     ws = MagicMock()
     ws.name = name
     ws.labels = labels or {}
     ws.owner_email = owner_email
+    # Explicit None so MagicMock doesn't auto-return a truthy attribute and make
+    # every workspace look catalog-managed.
+    ws.catalog_item_id = catalog_item_id
     return ws
 
 
@@ -195,3 +198,55 @@ class TestResolveWorkspacePermission:
             db, "user@test.com", ["audit", "custom-role"], ws
         )
         assert result == "write"
+
+
+class TestCatalogManagedClamp:
+    """Catalog-managed workspaces (#535): no one but a platform admin acts on
+    them as a workspace. Owner/provisioner and label-RBAC grants clamp to read."""
+
+    @pytest.mark.asyncio
+    async def test_platform_admin_still_admin(self):
+        ws = _make_workspace(catalog_item_id="cat-1", owner_email="other@test.com")
+        db = AsyncMock()
+        result = await resolve_workspace_permission(db, "admin@test.com", ["admin"], ws)
+        assert result == "admin"
+
+    @pytest.mark.asyncio
+    async def test_owner_clamped_to_read(self):
+        """The provisioner is set as owner but only gets read on a catalog ws."""
+        ws = _make_workspace(catalog_item_id="cat-1", owner_email="user@test.com")
+        db = _mock_db_with_roles([])
+        result = await resolve_workspace_permission(db, "user@test.com", [], ws)
+        assert result == "read"
+
+    @pytest.mark.asyncio
+    async def test_owner_admin_on_non_catalog_ws(self):
+        """Sanity: same owner gets admin when the workspace is NOT catalog-managed."""
+        ws = _make_workspace(owner_email="user@test.com")
+        db = _mock_db_with_roles([])
+        result = await resolve_workspace_permission(db, "user@test.com", [], ws)
+        assert result == "admin"
+
+    @pytest.mark.asyncio
+    async def test_label_write_role_clamped_to_read(self):
+        """A label-RBAC write grant is capped at read on a catalog workspace."""
+        role = _make_role(workspace_permission="write", allow_labels={"env": ["prod"]})
+        ws = _make_workspace(catalog_item_id="cat-1", labels={"env": "prod"})
+        db = _mock_db_with_roles([role])
+        result = await resolve_workspace_permission(db, "user@test.com", ["custom-role"], ws)
+        assert result == "read"
+
+    @pytest.mark.asyncio
+    async def test_everyone_floor_still_read(self):
+        ws = _make_workspace(catalog_item_id="cat-1", labels={"access": "everyone"})
+        db = _mock_db_with_roles([])
+        result = await resolve_workspace_permission(db, "user@test.com", ["everyone"], ws)
+        assert result == "read"
+
+    @pytest.mark.asyncio
+    async def test_no_grant_still_none(self):
+        """Clamp doesn't manufacture access — a user with no grant gets None."""
+        ws = _make_workspace(catalog_item_id="cat-1", labels={"env": "prod"})
+        db = _mock_db_with_roles([])
+        result = await resolve_workspace_permission(db, "user@test.com", [], ws)
+        assert result is None

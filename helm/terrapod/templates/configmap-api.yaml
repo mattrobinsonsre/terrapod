@@ -190,6 +190,10 @@ data:
         {{- end }}
       {{- end }}
     {{- end }}
+    {{- if .Values.api.config.catalog }}
+    catalog:
+      enabled: {{ .Values.api.config.catalog.enabled | default false }}
+    {{- end }}
     {{- if .Values.api.config.vcs }}
     vcs:
       enabled: {{ .Values.api.config.vcs.enabled }}

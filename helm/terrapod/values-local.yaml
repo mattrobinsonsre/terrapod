@@ -66,6 +66,10 @@ api:
       # before they GA. Production defaults to "none" (GA only).
       binary_cache:
         allow_prerelease: rc
+    # Service catalog on in local dev so the provision flow + catalog RBAC
+    # surface are exercised in Tilt. Production defaults to off.
+    catalog:
+      enabled: true
     # Fast cert renewal cycle for Tilt — listener cert valid for 5min so the
     # full bootstrap → renew → rotate loop is observable in a few minutes
     # instead of an hour. Production stays at the 1h default.
