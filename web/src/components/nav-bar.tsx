@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Users, Shield, Server, Variable, FileText, BookOpen, Code, LogOut, Menu, X, Tags, Compass, Wrench, ScrollText } from 'lucide-react'
+import { Layers, Package, Blocks, Key, Activity, HardDrive, GitBranch, Users, Shield, Server, Variable, FileText, BookOpen, Code, LogOut, Menu, X, Tags, Compass, Wrench, ScrollText, LayoutGrid, Boxes } from 'lucide-react'
 import { clearAuth, isAdmin, isAdminOrAudit } from '@/lib/auth'
 import { SessionExpiryBanner } from '@/components/session-expiry-banner'
 import { TokenExpiryBanner } from '@/components/token-expiry-banner'
@@ -68,6 +68,10 @@ export default function NavBar() {
         <Blocks size={16} />
         Providers
       </NavLink>
+      <NavLink href="/catalog" onClick={closeMenu}>
+        <LayoutGrid size={16} />
+        Catalog
+      </NavLink>
       <NavLink href="/settings/tokens" onClick={closeMenu}>
         <Key size={16} />
         API Tokens
@@ -117,6 +121,14 @@ export default function NavBar() {
           <NavLink href="/admin/bulk-update" onClick={closeMenu}>
             <Wrench size={16} />
             Bulk Update
+          </NavLink>
+          <NavLink href="/admin/catalog" onClick={closeMenu}>
+            <Boxes size={16} />
+            Catalog Admin
+          </NavLink>
+          <NavLink href="/admin/provider-templates" onClick={closeMenu}>
+            <Code size={16} />
+            Provider Templates
           </NavLink>
         </>
       )}
