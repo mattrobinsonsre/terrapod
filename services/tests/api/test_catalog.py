@@ -283,3 +283,145 @@ class TestProvision:
             )
         assert resp.status_code == 403
         assert "agent pool" in resp.json()["detail"]
+
+
+# ── Instance lifecycle (#535 P2) ───────────────────────────────────────
+
+
+def _catalog_ws(catalog_item_id=None):
+    ws = MagicMock()
+    ws.id = uuid.uuid4()
+    ws.catalog_item_id = catalog_item_id or uuid.uuid4()
+    return ws
+
+
+class TestInstanceLifecycle:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_reconfigure_non_catalog_ws_404(self, *mocks):
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        ws = MagicMock()
+        ws.id = uuid.uuid4()
+        ws.catalog_item_id = None  # not catalog-managed
+        mock_db.get = AsyncMock(return_value=ws)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/catalog-instances/ws-{ws.id}",
+                json={"data": {"attributes": {"input-values": {}}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 404
+
+    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_reconfigure_requires_catalog_use(self, _db, _redis, _storage, mock_perm):
+        app, mock_db = _make_app(_user(roles=["everyone"]))
+        ws = _catalog_ws()
+        item = MagicMock()
+        item.name = "vpc"
+        item.labels = {}
+        item.owner_email = ""
+        mock_db.get = AsyncMock(side_effect=[ws, item])
+        mock_perm.return_value = "read"  # read, not use
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/catalog-instances/ws-{ws.id}",
+                json={"data": {"attributes": {"input-values": {"cidr": "10.0.0.0/16"}}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 403
+
+    @patch("terrapod.api.routers.catalog.catalog_service.reconfigure_instance")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_reconfigure_happy_path(self, _db, _redis, _storage, mock_perm, mock_reconfig):
+        app, mock_db = _make_app(_user(roles=["everyone"]))
+        ws = _catalog_ws()
+        item = MagicMock()
+        item.name = "vpc"
+        item.labels = {}
+        item.owner_email = ""
+        mock_db.get = AsyncMock(side_effect=[ws, item])
+        mock_perm.return_value = "use"
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        run.status = "queued"
+        run.is_destroy = False
+        mock_reconfig.return_value = run
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/catalog-instances/ws-{ws.id}",
+                json={
+                    "data": {
+                        "attributes": {
+                            "input-values": {"cidr": "10.0.0.0/16"},
+                            "version-pin": "1.2.0",
+                            "auto-apply": True,
+                        }
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200
+        assert resp.json()["data"]["type"] == "runs"
+        assert mock_reconfig.await_args.kwargs["version_pin"] == "1.2.0"
+        assert mock_reconfig.await_args.kwargs["auto_apply"] is True
+
+    @patch("terrapod.api.routers.catalog.catalog_service.destroy_instance")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_destroy_happy_path(self, _db, _redis, _storage, mock_perm, mock_destroy):
+        app, mock_db = _make_app(_user(roles=["everyone"]))
+        ws = _catalog_ws()
+        item = MagicMock()
+        item.name = "vpc"
+        item.labels = {}
+        item.owner_email = ""
+        mock_db.get = AsyncMock(side_effect=[ws, item])
+        mock_perm.return_value = "use"
+        run = MagicMock()
+        run.id = uuid.uuid4()
+        run.status = "queued"
+        run.is_destroy = True
+        mock_destroy.return_value = run
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/terrapod/v1/catalog-instances/ws-{ws.id}/destroy",
+                json={"data": {"attributes": {"auto-apply": True}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201
+        assert resp.json()["data"]["attributes"]["is-destroy"] is True
+        assert mock_destroy.await_args.kwargs["auto_apply"] is True
+
+    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_destroy_requires_catalog_use(self, _db, _redis, _storage, mock_perm):
+        app, mock_db = _make_app(_user(roles=["everyone"]))
+        ws = _catalog_ws()
+        item = MagicMock()
+        item.name = "vpc"
+        item.labels = {}
+        item.owner_email = ""
+        mock_db.get = AsyncMock(side_effect=[ws, item])
+        mock_perm.return_value = "read"
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/terrapod/v1/catalog-instances/ws-{ws.id}/destroy",
+                json={"data": {"attributes": {}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 403

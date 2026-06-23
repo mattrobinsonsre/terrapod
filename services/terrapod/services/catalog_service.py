@@ -280,45 +280,18 @@ async def _single_chunk(data: bytes):
     yield data
 
 
-async def provision_instance(
-    db: AsyncSession,
-    *,
-    user_email: str,
+def _resolve_inputs(
     item: CatalogItem,
-    name: str,
-    agent_pool_id: uuid.UUID,
+    module_inputs: list[dict],
+    templates: list[ProviderTemplate],
     input_values: dict,
-    version_pin: str | None,
-    auto_apply: bool,
-    labels: dict,
-) -> Workspace:
-    """Create a catalog-managed workspace from a catalog item and queue its run.
+) -> tuple[list[str], dict, set[str], dict[str, str]]:
+    """Validate input_values against the derived form and compute the effective
+    wiring.
 
-    Caller is responsible for the RBAC checks (catalog 'use' on the item, pool
-    'write' on ``agent_pool_id``, and ``agent_pool_id`` ∈ item.allowed pools).
-    This function validates inputs, materialises the workspace + variables + CV
-    + module link, and queues a run. Commits are left to the caller.
+    Returns ``(wired_inputs, effective, sensitive_names, field_types)``. Raises
+    CatalogError on a missing-required or unknown input.
     """
-    module: RegistryModule = item.module
-    if module is None:
-        raise CatalogError("Catalog item has no backing module", status_code=409)
-
-    # Resolve the version (pin > item default > floating-latest).
-    pin = version_pin or item.default_version_pin
-    mv = await _resolve_module_version(db, module.id, pin)
-    if pin and mv is None:
-        raise CatalogError(f"Module {module.name} has no uploaded version {pin}", status_code=422)
-    resolved_version = mv.version if mv else None
-    module_inputs = (mv.inputs if mv else None) or []
-    module_outputs = (mv.outputs if mv else None) or []
-
-    # Load provider templates referenced by the item.
-    templates: list[ProviderTemplate] = []
-    for tid in item.provider_template_ids or []:
-        t = await db.get(ProviderTemplate, uuid.UUID(str(tid)))
-        if t is not None:
-            templates.append(t)
-
     form = derive_form(item, module_inputs, templates)
     field_types = {f["name"]: f["type"] for f in form}
 
@@ -362,30 +335,53 @@ async def provision_instance(
             sensitive_names.add(fname)
     effective.update(hidden_values)
 
-    wired_inputs = sorted(effective.keys())
+    return sorted(effective.keys()), effective, sensitive_names, field_types
 
-    # Workspace name uniqueness.
-    existing = await db.execute(select(Workspace).where(Workspace.name == name))
-    if existing.scalar_one_or_none() is not None:
-        raise CatalogError(f"Workspace '{name}' already exists", status_code=409)
 
-    ws = Workspace(
-        name=name,
-        execution_mode="agent",
-        auto_apply=auto_apply,
-        execution_backend=settings.default_execution_backend,
-        terraform_version=settings.default_terraform_version,
-        agent_pool_id=agent_pool_id,
-        labels=labels or {},
-        owner_email=user_email,
-        catalog_item_id=item.id,
-        catalog_version_pin=version_pin,  # None = float; explicit pin sticks
-        catalog_input_values=dict(input_values),
+async def _materialise(
+    db: AsyncSession,
+    ws: Workspace,
+    item: CatalogItem,
+    *,
+    input_values: dict,
+    version_pin: str | None,
+    auto_apply: bool,
+    message: str,
+    user_email: str,
+):
+    """Render + upload the wrapper config, replace the workspace's variables, and
+    queue a run. Shared by provision (create) and reconfigure (update).
+
+    Returns the queued ``Run``. The caller owns the commit.
+    """
+    module: RegistryModule = item.module
+    if module is None:
+        raise CatalogError("Catalog item has no backing module", status_code=409)
+
+    # Resolve the version (pin > item default > floating-latest).
+    pin = version_pin or item.default_version_pin
+    mv = await _resolve_module_version(db, module.id, pin)
+    if pin and mv is None:
+        raise CatalogError(f"Module {module.name} has no uploaded version {pin}", status_code=422)
+    resolved_version = mv.version if mv else None
+    module_inputs = (mv.inputs if mv else None) or []
+    module_outputs = (mv.outputs if mv else None) or []
+
+    templates: list[ProviderTemplate] = []
+    for tid in item.provider_template_ids or []:
+        t = await db.get(ProviderTemplate, uuid.UUID(str(tid)))
+        if t is not None:
+            templates.append(t)
+
+    wired_inputs, effective, sensitive_names, field_types = _resolve_inputs(
+        item, module_inputs, templates, input_values
     )
-    db.add(ws)
-    await db.flush()  # assign ws.id
 
-    # Workspace variables — every wired input becomes a TF_VAR_* terraform var.
+    # Replace the workspace's variables — a catalog workspace's variable set is
+    # wholly catalog-managed (the RBAC clamp blocks user var edits), so a full
+    # replace keeps it in lockstep with the wrapper config.
+    for existing_var in await variable_service.list_variables(db, ws.id):
+        await variable_service.delete_variable(db, existing_var)
     for vname in wired_inputs:
         await variable_service.create_variable(
             db,
@@ -414,15 +410,10 @@ async def provision_instance(
     await storage.put_stream(key, _single_chunk(tarball), content_type="application/gzip")
     await run_service.mark_configuration_uploaded(db, cv)
 
-    # Link the module → workspace so module-impact analysis fires on it.
-    db.add(ModuleWorkspaceLink(module_id=module.id, workspace_id=ws.id, created_by=user_email))
-    await db.flush()
-
-    # Queue the first run against the generated config.
     run = await run_service.create_run(
         db,
         workspace=ws,
-        message=f"Catalog provision: {item.name}",
+        message=message,
         auto_apply=auto_apply,
         plan_only=False,
         source="catalog",
@@ -430,16 +421,155 @@ async def provision_instance(
         created_by=user_email,
     )
     await run_service.queue_run(db, run)
+    return run
+
+
+async def provision_instance(
+    db: AsyncSession,
+    *,
+    user_email: str,
+    item: CatalogItem,
+    name: str,
+    agent_pool_id: uuid.UUID,
+    input_values: dict,
+    version_pin: str | None,
+    auto_apply: bool,
+    labels: dict,
+) -> Workspace:
+    """Create a catalog-managed workspace from a catalog item and queue its run.
+
+    Caller is responsible for the RBAC checks (catalog 'use' on the item, pool
+    'write' on ``agent_pool_id``, and ``agent_pool_id`` ∈ item.allowed pools).
+    Commits are left to the caller.
+    """
+    module: RegistryModule = item.module
+    if module is None:
+        raise CatalogError("Catalog item has no backing module", status_code=409)
+
+    # Workspace name uniqueness.
+    existing = await db.execute(select(Workspace).where(Workspace.name == name))
+    if existing.scalar_one_or_none() is not None:
+        raise CatalogError(f"Workspace '{name}' already exists", status_code=409)
+
+    ws = Workspace(
+        name=name,
+        execution_mode="agent",
+        auto_apply=auto_apply,
+        execution_backend=settings.default_execution_backend,
+        terraform_version=settings.default_terraform_version,
+        agent_pool_id=agent_pool_id,
+        labels=labels or {},
+        owner_email=user_email,
+        catalog_item_id=item.id,
+        catalog_version_pin=version_pin,  # None = float; explicit pin sticks
+        catalog_input_values=dict(input_values),
+    )
+    db.add(ws)
+    await db.flush()  # assign ws.id
+
+    # Link the module → workspace so module-impact analysis fires on it.
+    db.add(ModuleWorkspaceLink(module_id=module.id, workspace_id=ws.id, created_by=user_email))
+    await db.flush()
+
+    await _materialise(
+        db,
+        ws,
+        item,
+        input_values=input_values,
+        version_pin=version_pin,
+        auto_apply=auto_apply,
+        message=f"Catalog provision: {item.name}",
+        user_email=user_email,
+    )
 
     logger.info(
         "catalog.provisioned",
         workspace_id=str(ws.id),
         catalog_item=item.name,
         module=module.name,
-        version=resolved_version or "floating",
         auto_apply=auto_apply,
     )
     return ws
+
+
+async def reconfigure_instance(
+    db: AsyncSession,
+    *,
+    user_email: str,
+    ws: Workspace,
+    input_values: dict,
+    version_pin: str | None,
+    auto_apply: bool,
+):
+    """Update a catalog instance's inputs and/or version pin, then queue a run.
+
+    Re-renders the wrapper config against the (possibly new) version, replaces
+    the workspace variables, and snapshots the new pin + input values. Caller
+    owns the RBAC check (catalog 'use' on the originating item) and the commit.
+    Returns the queued ``Run``.
+    """
+    if ws.catalog_item_id is None:
+        raise CatalogError("Workspace is not catalog-managed", status_code=409)
+    item = await db.get(CatalogItem, ws.catalog_item_id)
+    if item is None:
+        raise CatalogError("Catalog item no longer exists", status_code=409)
+
+    ws.catalog_version_pin = version_pin
+    ws.catalog_input_values = dict(input_values)
+    ws.auto_apply = auto_apply
+
+    run = await _materialise(
+        db,
+        ws,
+        item,
+        input_values=input_values,
+        version_pin=version_pin,
+        auto_apply=auto_apply,
+        message=f"Catalog reconfigure: {item.name}",
+        user_email=user_email,
+    )
+    logger.info(
+        "catalog.reconfigured",
+        workspace_id=str(ws.id),
+        catalog_item=item.name,
+        auto_apply=auto_apply,
+    )
+    return run
+
+
+async def destroy_instance(
+    db: AsyncSession,
+    *,
+    user_email: str,
+    ws: Workspace,
+    auto_apply: bool,
+):
+    """Queue a destroy run for a catalog instance. On a successful apply the
+    run reconciler archives the workspace (run_service.transition_run keys on
+    ``source == "catalog-lifecycle"``).
+
+    Caller owns the RBAC check (catalog 'use' on the originating item) and the
+    commit. Returns the queued ``Run``.
+    """
+    if ws.catalog_item_id is None:
+        raise CatalogError("Workspace is not catalog-managed", status_code=409)
+
+    # Destroy the latest generated config; without a CV the runner has no code.
+    cv = await run_service.get_latest_uploaded_cv(db, ws.id)
+    run = await run_service.create_run(
+        db,
+        workspace=ws,
+        message="Catalog destroy",
+        is_destroy=True,
+        auto_apply=auto_apply,
+        plan_only=False,
+        source="catalog-lifecycle",
+        configuration_version_id=cv.id if cv else None,
+        created_by=user_email,
+    )
+    await run_service.queue_run(db, run)
+    logger.info("catalog.destroy_queued", workspace_id=str(ws.id), auto_apply=auto_apply)
+    return run
 
 
 # ── CRUD helpers ───────────────────────────────────────────────────────

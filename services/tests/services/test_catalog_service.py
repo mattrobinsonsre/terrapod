@@ -1,13 +1,17 @@
 """Unit tests for catalog_service pure helpers (#535): form derivation, wrapper
-HCL generation, tarball packing, and registry-host resolution."""
+HCL generation, tarball packing, registry-host resolution, and the lifecycle
+orchestration (destroy / reconfigure)."""
 
 import io
 import tarfile
+import uuid
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from terrapod.services import catalog_service
+from terrapod.services.catalog_service import CatalogError
 
 
 def _module(namespace="default", name="vpc", provider="aws"):
@@ -161,3 +165,152 @@ class TestBuildTarball:
 async def test_single_chunk_generator():
     chunks = [c async for c in catalog_service._single_chunk(b"hello")]
     assert chunks == [b"hello"]
+
+
+# ── Lifecycle orchestration ────────────────────────────────────────────
+
+
+class TestDestroyInstance:
+    @pytest.mark.asyncio
+    async def test_creates_destroy_run_with_lifecycle_source(self):
+        ws = MagicMock()
+        ws.id = uuid.uuid4()
+        ws.catalog_item_id = uuid.uuid4()
+        cv = MagicMock(id=uuid.uuid4())
+        run = MagicMock()
+        db = AsyncMock()
+
+        with (
+            patch.object(
+                catalog_service.run_service, "get_latest_uploaded_cv", AsyncMock(return_value=cv)
+            ),
+            patch.object(
+                catalog_service.run_service, "create_run", AsyncMock(return_value=run)
+            ) as mock_create,
+            patch.object(catalog_service.run_service, "queue_run", AsyncMock(return_value=run)),
+        ):
+            result = await catalog_service.destroy_instance(
+                db, user_email="u@test.com", ws=ws, auto_apply=True
+            )
+
+        assert result is run
+        kwargs = mock_create.await_args.kwargs
+        assert kwargs["source"] == "catalog-lifecycle"
+        assert kwargs["is_destroy"] is True
+        assert kwargs["auto_apply"] is True
+        assert kwargs["configuration_version_id"] == cv.id
+
+    @pytest.mark.asyncio
+    async def test_non_catalog_workspace_rejected(self):
+        ws = MagicMock()
+        ws.catalog_item_id = None
+        with pytest.raises(CatalogError) as exc:
+            await catalog_service.destroy_instance(
+                AsyncMock(), user_email="u@test.com", ws=ws, auto_apply=True
+            )
+        assert exc.value.status_code == 409
+
+
+class TestReconfigureInstance:
+    @pytest.mark.asyncio
+    async def test_replaces_vars_and_queues_catalog_run(self):
+        item = MagicMock()
+        item.module = SimpleNamespace(
+            id=uuid.uuid4(), namespace="default", name="vpc", provider="aws"
+        )
+        item.provider_template_ids = []
+        item.variable_options = []
+        item.default_version_pin = None
+
+        ws = MagicMock()
+        ws.id = uuid.uuid4()
+        ws.catalog_item_id = uuid.uuid4()
+
+        mv = SimpleNamespace(
+            version="1.0.0",
+            inputs=[{"name": "cidr", "type": "string", "required": True}],
+            outputs=[],
+        )
+        old_var = MagicMock()
+        cv = MagicMock(id=uuid.uuid4())
+        run = MagicMock()
+
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=item)
+        storage = MagicMock()
+        storage.put_stream = AsyncMock()
+
+        with (
+            patch.object(catalog_service, "_resolve_module_version", AsyncMock(return_value=mv)),
+            patch.object(
+                catalog_service.variable_service,
+                "list_variables",
+                AsyncMock(return_value=[old_var]),
+            ),
+            patch.object(
+                catalog_service.variable_service, "delete_variable", AsyncMock()
+            ) as mock_del,
+            patch.object(
+                catalog_service.variable_service, "create_variable", AsyncMock()
+            ) as mock_create_var,
+            patch.object(
+                catalog_service.run_service,
+                "create_configuration_version",
+                AsyncMock(return_value=cv),
+            ),
+            patch.object(catalog_service.run_service, "mark_configuration_uploaded", AsyncMock()),
+            patch.object(
+                catalog_service.run_service, "create_run", AsyncMock(return_value=run)
+            ) as mock_create_run,
+            patch.object(catalog_service.run_service, "queue_run", AsyncMock(return_value=run)),
+            patch("terrapod.storage.get_storage", return_value=storage),
+        ):
+            result = await catalog_service.reconfigure_instance(
+                db,
+                user_email="u@test.com",
+                ws=ws,
+                input_values={"cidr": "10.0.0.0/16"},
+                version_pin="1.0.0",
+                auto_apply=False,
+            )
+
+        assert result is run
+        # Old variable deleted, new one created, snapshot + pin updated.
+        mock_del.assert_awaited_once_with(db, old_var)
+        assert mock_create_var.await_args.kwargs["key"] == "cidr"
+        assert ws.catalog_input_values == {"cidr": "10.0.0.0/16"}
+        assert ws.catalog_version_pin == "1.0.0"
+        assert mock_create_run.await_args.kwargs["source"] == "catalog"
+        storage.put_stream.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_missing_required_input_rejected(self):
+        item = MagicMock()
+        item.module = SimpleNamespace(
+            id=uuid.uuid4(), namespace="default", name="vpc", provider="aws"
+        )
+        item.provider_template_ids = []
+        item.variable_options = []
+        item.default_version_pin = None
+        ws = MagicMock()
+        ws.id = uuid.uuid4()
+        ws.catalog_item_id = uuid.uuid4()
+        mv = SimpleNamespace(
+            version="1.0.0",
+            inputs=[{"name": "cidr", "type": "string", "required": True}],
+            outputs=[],
+        )
+        db = AsyncMock()
+        db.get = AsyncMock(return_value=item)
+
+        with patch.object(catalog_service, "_resolve_module_version", AsyncMock(return_value=mv)):
+            with pytest.raises(CatalogError) as exc:
+                await catalog_service.reconfigure_instance(
+                    db,
+                    user_email="u@test.com",
+                    ws=ws,
+                    input_values={},  # missing required cidr
+                    version_pin=None,
+                    auto_apply=False,
+                )
+        assert "Missing required" in str(exc.value)

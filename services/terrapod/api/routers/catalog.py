@@ -604,3 +604,132 @@ async def provision_catalog_item(
     await db.commit()
     await db.refresh(ws)
     return JSONResponse(content={"data": _instance_json(ws)}, status_code=201)
+
+
+# ── Catalog instance lifecycle (#535 P2) ───────────────────────────────
+
+
+def _run_ref(run) -> dict:
+    """Minimal run reference returned from lifecycle actions."""
+    return {
+        "id": f"run-{run.id}",
+        "type": "runs",
+        "attributes": {"status": run.status, "is-destroy": run.is_destroy},
+        "links": {"self": f"/api/terrapod/v1/runs/run-{run.id}"},
+    }
+
+
+async def _load_instance(
+    db: AsyncSession, user: AuthenticatedUser, ws_id: str, *, required: str
+) -> Workspace:
+    """Load a catalog instance workspace and enforce `required` catalog
+    permission on its originating item. Lifecycle actions are gated by catalog
+    'use' on the item — NOT by workspace permission (the clamp gives the
+    provisioner read only; the catalog surface is the control plane)."""
+    try:
+        ws = await db.get(Workspace, uuid.UUID(ws_id.removeprefix("ws-")))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail="catalog instance not found") from e
+    if ws is None or ws.catalog_item_id is None:
+        raise HTTPException(status_code=404, detail="catalog instance not found")
+    item = await db.get(CatalogItem, ws.catalog_item_id)
+    if item is None:
+        raise HTTPException(status_code=409, detail="catalog item no longer exists")
+    perm = await resolve_catalog_permission_for(
+        db, user, item.name, item.labels or {}, item.owner_email or ""
+    )
+    if not has_catalog_permission(perm, required):
+        raise HTTPException(status_code=403, detail=f"Requires catalog '{required}' on this item")
+    return ws
+
+
+@router.get("/catalog-instances/{ws_id}")
+async def show_catalog_instance(
+    ws_id: str = Path(...),
+    _: None = Depends(require_catalog_enabled),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    ws = await _load_instance(db, user, ws_id, required="read")
+    attrs = _instance_json(ws)["attributes"]
+    attrs["input-values"] = dict(ws.catalog_input_values or {})
+    return JSONResponse(
+        content={
+            "data": {
+                "id": str(ws.id),
+                "type": "catalog-instances",
+                "attributes": attrs,
+                "links": {"self": f"/api/terrapod/v1/catalog-instances/{ws.id}"},
+            }
+        }
+    )
+
+
+@router.patch("/catalog-instances/{ws_id}")
+async def reconfigure_catalog_instance(
+    ws_id: str = Path(...),
+    body: dict = Body(...),
+    _: None = Depends(require_catalog_enabled),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Update a catalog instance's inputs and/or version pin, then queue a run.
+    Requires catalog 'use' on the originating item. A non-auto-apply run plans
+    and waits for a platform-admin confirm (the clamp blocks 'use' holders from
+    confirming via the workspace API); pass auto-apply to apply directly."""
+    ws = await _load_instance(db, user, ws_id, required="use")
+    attrs = body.get("data", {}).get("attributes", {})
+    input_values = attrs.get("input-values")
+    if input_values is None:
+        input_values = dict(ws.catalog_input_values or {})
+    if not isinstance(input_values, dict):
+        raise HTTPException(status_code=422, detail="input-values must be an object")
+    # version-pin: absent → keep current; null → float; value → pin.
+    if "version-pin" in attrs:
+        vp = attrs["version-pin"]
+        version_pin = str(vp) if vp else None
+    else:
+        version_pin = ws.catalog_version_pin
+    auto_apply = bool(attrs.get("auto-apply", False))
+
+    try:
+        run = await catalog_service.reconfigure_instance(
+            db,
+            user_email=user.email,
+            ws=ws,
+            input_values=input_values,
+            version_pin=version_pin,
+            auto_apply=auto_apply,
+        )
+    except CatalogError as e:
+        await db.rollback()
+        raise HTTPException(status_code=e.status_code, detail=str(e)) from e
+
+    await db.commit()
+    return JSONResponse(content={"data": _run_ref(run)})
+
+
+@router.post("/catalog-instances/{ws_id}/destroy", status_code=201)
+async def destroy_catalog_instance(
+    ws_id: str = Path(...),
+    body: dict = Body(default={}),
+    _: None = Depends(require_catalog_enabled),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Queue a destroy run for a catalog instance. Requires catalog 'use' on the
+    originating item. On a successful apply the workspace is archived. As with
+    reconfigure, a non-auto-apply destroy plans and waits for an admin confirm;
+    pass auto-apply to tear down directly."""
+    ws = await _load_instance(db, user, ws_id, required="use")
+    attrs = body.get("data", {}).get("attributes", {}) if body else {}
+    auto_apply = bool(attrs.get("auto-apply", False))
+    try:
+        run = await catalog_service.destroy_instance(
+            db, user_email=user.email, ws=ws, auto_apply=auto_apply
+        )
+    except CatalogError as e:
+        await db.rollback()
+        raise HTTPException(status_code=e.status_code, detail=str(e)) from e
+    await db.commit()
+    return JSONResponse(content={"data": _run_ref(run)}, status_code=201)

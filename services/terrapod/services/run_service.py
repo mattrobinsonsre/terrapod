@@ -598,19 +598,21 @@ async def transition_run(
             # to the no-link state until the next drift run completes.
             ws.drift_latest_run_id = None
 
-    # #314: a successful opt-in autodiscovery destroy archives the
-    # workspace (soft-delete; retained for audit). Literal source
-    # compare avoids importing the lifecycle service (it imports us).
+    # #314 / #535: a successful opt-in autodiscovery OR catalog destroy
+    # archives the workspace (soft-delete; retained for audit). Literal
+    # source compare avoids importing the lifecycle/catalog services (they
+    # import us).
     if (
         target_status == "applied"
         and run.is_destroy
         and not run.plan_only
-        and run.source == "autodiscovery-lifecycle"
+        and run.source in ("autodiscovery-lifecycle", "catalog-lifecycle")
     ):
         ws = await db.get(Workspace, run.workspace_id)
         if ws is not None and ws.lifecycle_state != "archived":
             ws.lifecycle_state = "archived"
-            ws.lifecycle_reason = "autodiscovery destroy completed — archived"
+            kind = "autodiscovery" if run.source == "autodiscovery-lifecycle" else "catalog"
+            ws.lifecycle_reason = f"{kind} destroy completed — archived"
 
     # Enqueue notification for this status change
     await _enqueue_notification(run, target_status)
