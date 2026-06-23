@@ -30,6 +30,22 @@ RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
     && chmod 0755 /usr/local/bin/opa \
     && /usr/local/bin/opa version
 
+# OpenTofu — so the runner tfvars tests (terrapod.runner.phases.tfvars) parse
+# the generated terrapod.auto.tfvars with a REAL engine in CI rather than
+# skipping. tofu is MPL-licensed (clean to embed); terraform (BSL) is only run
+# locally. The test parametrizes over whichever engines are present.
+ARG OPENTOFU_VERSION=1.12.2
+RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
+    && BASE="https://github.com/opentofu/opentofu/releases/download/v${OPENTOFU_VERSION}" \
+    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/tofu.tar.gz "${BASE}/tofu_${OPENTOFU_VERSION}_linux_${ARCH}.tar.gz" \
+    && curl -fsSL --retry 6 --retry-delay 4 --retry-all-errors -o /tmp/tofu.sums "${BASE}/tofu_${OPENTOFU_VERSION}_SHA256SUMS" \
+    && EXPECTED="$(grep "  tofu_${OPENTOFU_VERSION}_linux_${ARCH}.tar.gz$" /tmp/tofu.sums | cut -d' ' -f1)" \
+    && echo "${EXPECTED}  /tmp/tofu.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/tofu.tar.gz -C /usr/local/bin tofu \
+    && rm /tmp/tofu.tar.gz /tmp/tofu.sums \
+    && chmod 0755 /usr/local/bin/tofu \
+    && /usr/local/bin/tofu version
+
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir poetry==1.8.4
 

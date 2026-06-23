@@ -85,7 +85,10 @@ variable "name"    { type = string }
 variable "ports"   { type = list(number) }
 variable "config"  { type = object({ enabled = bool, timeout = number }) }
 variable "tags"    { type = map(string) }
-variable "secret"  { type = string, sensitive = true }
+variable "secret" {
+  type      = string
+  sensitive = true
+}
 variable "untyped" {}
 output "name"    { value = var.name }
 output "ports"   { value = var.ports }
