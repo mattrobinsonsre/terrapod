@@ -320,7 +320,10 @@ func readCatalogInstanceIntoModel(ctx context.Context, inst *terrapod.CatalogIns
 		m.InputValues = types.MapNull(types.StringType)
 	}
 
-	if pin := attrString(inst.Attributes, "version-pin"); pin != "" {
+	// The instance RESPONSE carries the pin as "catalog-version-pin"
+	// (the bare "version-pin" is an inbound provision/reconfigure attribute
+	// only). Reading the wrong key here caused perpetual plan drift.
+	if pin := attrString(inst.Attributes, "catalog-version-pin"); pin != "" {
 		m.VersionPin = types.StringValue(pin)
 	} else {
 		m.VersionPin = types.StringNull()

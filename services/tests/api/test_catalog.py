@@ -5,10 +5,12 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.routers import catalog as catalog_router
 from terrapod.config import settings
 from terrapod.db.session import get_db
 
@@ -495,7 +497,8 @@ class TestInstanceLifecycle:
         explicitly orphaning — refuses (409) and never touches the DB."""
         app, mock_db = _make_app(_user(roles=["everyone"]))
         ws = _catalog_ws()
-        item = MagicMock(name="vpc", labels={}, owner_email="")
+        item = MagicMock(labels={}, owner_email="")
+        item.name = "vpc"
         mock_db.get = AsyncMock(side_effect=[ws, item])
         mock_perm.return_value = "admin"
 
@@ -513,7 +516,8 @@ class TestInstanceLifecycle:
         """orphan=true deletes the workspace record (abandoning infra)."""
         app, mock_db = _make_app(_user(roles=["everyone"]))
         ws = _catalog_ws()
-        item = MagicMock(name="vpc", labels={}, owner_email="")
+        item = MagicMock(labels={}, owner_email="")
+        item.name = "vpc"
         mock_db.get = AsyncMock(side_effect=[ws, item])
         mock_perm.return_value = "admin"
 
@@ -532,7 +536,8 @@ class TestInstanceLifecycle:
         """orphan needs catalog admin, not merely 'use'."""
         app, mock_db = _make_app(_user(roles=["everyone"]))
         ws = _catalog_ws()
-        item = MagicMock(name="vpc", labels={}, owner_email="")
+        item = MagicMock(labels={}, owner_email="")
+        item.name = "vpc"
         mock_db.get = AsyncMock(side_effect=[ws, item])
         mock_perm.return_value = "use"  # use is enough to destroy, not to orphan
 
@@ -542,3 +547,181 @@ class TestInstanceLifecycle:
             )
         assert resp.status_code == 403
         mock_db.delete.assert_not_called()
+
+
+# ── Variable-options validation (#535 review fixes) ─────────────────────
+
+
+class TestVariableOptionsValidation:
+    """`variable_options` shape is validated at item create/update — malformed
+    entries and hidden-without-default are rejected (else a hidden required
+    input fails opaquely at plan time)."""
+
+    async def test_hidden_without_default_rejected(self):
+        with pytest.raises(HTTPException) as ei:
+            await catalog_router._coerce_item(
+                AsyncMock(),
+                {"variable-options": [{"name": "secret", "hidden": True}]},
+                on_create=False,
+            )
+        assert ei.value.status_code == 422
+        assert "default" in str(ei.value.detail).lower()
+
+    async def test_malformed_entry_rejected(self):
+        with pytest.raises(HTTPException) as ei:
+            await catalog_router._coerce_item(
+                AsyncMock(), {"variable-options": [{"no_name": 1}]}, on_create=False
+            )
+        assert ei.value.status_code == 422
+
+    async def test_options_must_be_list(self):
+        with pytest.raises(HTTPException) as ei:
+            await catalog_router._coerce_item(
+                AsyncMock(),
+                {"variable-options": [{"name": "region", "options": "us-east-1"}]},
+                on_create=False,
+            )
+        assert ei.value.status_code == 422
+
+    async def test_valid_overlay_passes(self):
+        out = await catalog_router._coerce_item(
+            AsyncMock(),
+            {
+                "variable-options": [
+                    {"name": "region", "options": ["a", "b"], "default": "a"},
+                    {"name": "secret", "hidden": True, "default": "x"},
+                ]
+            },
+            on_create=False,
+        )
+        assert len(out["variable_options"]) == 2
+
+
+# ── Management PATCH/DELETE RBAC negatives ──────────────────────────────
+
+
+class TestManagementRBACNegatives:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_update_provider_template_requires_admin(self, *mocks):
+        app, _ = _make_app(_user(roles=["everyone"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                "/api/terrapod/v1/provider-templates/pt-1",
+                json={"data": {"attributes": {"name": "x"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 403
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_delete_provider_template_requires_admin(self, *mocks):
+        app, _ = _make_app(_user(roles=["everyone"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.delete("/api/terrapod/v1/provider-templates/pt-1", headers=_AUTH)
+        assert resp.status_code == 403
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_update_catalog_item_requires_admin(self, *mocks):
+        app, _ = _make_app(_user(roles=["everyone"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                "/api/terrapod/v1/catalog-items/ci-1",
+                json={"data": {"attributes": {"enabled": False}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 403
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_delete_catalog_item_requires_admin(self, *mocks):
+        app, _ = _make_app(_user(roles=["everyone"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.delete("/api/terrapod/v1/catalog-items/ci-1", headers=_AUTH)
+        assert resp.status_code == 403
+
+
+# ── Confirm / discard (catalog-surface, closes the non-auto-apply hole) ──
+
+
+def _planned_run(status="planned", is_destroy=False):
+    run = MagicMock()
+    run.id = uuid.uuid4()
+    run.status = status
+    run.is_destroy = is_destroy
+    return run
+
+
+def _exec_returns(obj):
+    res = MagicMock()
+    res.scalar_one_or_none.return_value = obj
+    return res
+
+
+class TestConfirmDiscard:
+    @patch("terrapod.api.routers.catalog.run_service.confirm_run")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_confirm_planned_run(self, _db, _redis, _storage, mock_perm, mock_confirm):
+        app, mock_db = _make_app(_user(roles=["everyone"]))
+        ws = _catalog_ws()
+        item = MagicMock(labels={}, owner_email="")
+        item.name = "vpc"
+        mock_db.get = AsyncMock(side_effect=[ws, item])
+        mock_perm.return_value = "use"
+        planned = _planned_run()
+        mock_db.execute = AsyncMock(return_value=_exec_returns(planned))
+        mock_confirm.return_value = _planned_run(status="confirmed")
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/terrapod/v1/catalog-instances/ws-{ws.id}/confirm", headers=_AUTH
+            )
+        assert resp.status_code == 200
+        mock_confirm.assert_awaited_once()
+
+    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_confirm_no_planned_run_409(self, _db, _redis, _storage, mock_perm):
+        app, mock_db = _make_app(_user(roles=["everyone"]))
+        ws = _catalog_ws()
+        item = MagicMock(labels={}, owner_email="")
+        item.name = "vpc"
+        mock_db.get = AsyncMock(side_effect=[ws, item])
+        mock_perm.return_value = "use"
+        mock_db.execute = AsyncMock(return_value=_exec_returns(None))  # no run
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/terrapod/v1/catalog-instances/ws-{ws.id}/confirm", headers=_AUTH
+            )
+        assert resp.status_code == 409
+
+    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_reconfigure_archived_instance_409(self, _db, _redis, _storage, mock_perm):
+        """An archived (already-destroyed) instance can't be reconfigured/destroyed."""
+        app, mock_db = _make_app(_user(roles=["everyone"]))
+        ws = _catalog_ws()
+        ws.lifecycle_state = "archived"
+        mock_db.get = AsyncMock(return_value=ws)  # archived check fires before item/perm
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/catalog-instances/ws-{ws.id}",
+                json={"data": {"attributes": {"input-values": {}}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 409
+        assert "archived" in resp.json()["detail"].lower()

@@ -2885,7 +2885,8 @@ POST /api/terrapod/v1/catalog-items
       "allowed-agent-pool-ids": ["apool-019e01db-..."],
       "variable-options": [
         { "name": "cidr_block", "description": "VPC CIDR", "default": "10.0.0.0/16" },
-        { "name": "name",       "description": "VPC name" }
+        { "name": "environment", "options": ["dev", "staging", "prod"] },
+        { "name": "account_id", "hidden": true, "default": "123456789012" }
       ],
       "labels": {"team": "platform"}
     }
@@ -2903,7 +2904,7 @@ POST /api/terrapod/v1/catalog-items
 | `default-version-pin` | Default module-version pin new instances inherit. Omit for **float** (track latest published). |
 | `provider-template-ids` | Provider templates rendered into the generated wrapper. |
 | `allowed-agent-pool-ids` | Pools an instance may bind to. `null` = any pool the provisioner has `write` on. |
-| `variable-options` | Curated options (defaults, descriptions, sensitivity, enum choices) layered over the module's variables. |
+| `variable-options` | Per-input overlay list (one object per input, keyed by `name`) curating the module's variables. Each entry supports: `options` (allow-list, **enforced server-side** — value outside it → `422`, rendered as a dropdown); `default` (preset, still editable); `hidden` (fix the value + remove from the form — **must include a `default`**, and supplying it returns `422`); `sensitive` (masked, stored write-only). Validated at create/update: a malformed entry, non-list `options`, or `hidden` without `default` → `422`. |
 | `labels` | For label-based RBAC (decides which roles see/use the item). |
 
 #### Show / Update / Delete Catalog Item
@@ -3034,6 +3035,15 @@ Queues an `is_destroy` run with source **`catalog-lifecycle`**. On a **successfu
 Returns a reference to the queued destroy run. **Required permission:** catalog `use`.
 
 > **Run sources:** catalog runs carry `source = "catalog"` (provision / reconfigure) or `source = "catalog-lifecycle"` (destroy → archive). These appear on the run object alongside the existing sources (`tfe-api`, `vcs`, `drift-detection`, `autodiscovery-lifecycle`, `module-test`, `module-publish`).
+
+### Confirm / Discard a Catalog Instance Run
+
+```
+POST /api/terrapod/v1/catalog-instances/{wsId}/confirm
+POST /api/terrapod/v1/catalog-instances/{wsId}/discard
+```
+
+Confirm (apply) or discard the instance's pending **planned** run. These are the catalog-surface counterparts of the workspace run API: the catalog-managed workspace clamp gives the provisioner only `read` on the workspace, so a non-auto-apply provision / reconfigure / destroy is confirmed here rather than via `/api/v2/runs/{id}/actions/confirm` (which would require a platform admin). Returns the run reference. `409` if there's no planned run awaiting action. **Required permission:** catalog `use`.
 
 ### Orphan Catalog Instance (discouraged)
 

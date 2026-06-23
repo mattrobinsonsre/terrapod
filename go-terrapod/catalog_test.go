@@ -63,7 +63,17 @@ func newCatalogFixture(t *testing.T) *Client {
 		case r.Method == http.MethodPost && p == "/api/terrapod/v1/catalog-instances/ws-9/destroy":
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"run-2","type":"runs","attributes":{"status":"queued","is-destroy":true}}}`))
+		case r.Method == http.MethodPost && p == "/api/terrapod/v1/catalog-instances/ws-9/confirm":
+			_, _ = w.Write([]byte(`{"data":{"id":"run-1","type":"runs","attributes":{"status":"confirmed","is-destroy":false}}}`))
+		case r.Method == http.MethodPost && p == "/api/terrapod/v1/catalog-instances/ws-9/discard":
+			_, _ = w.Write([]byte(`{"data":{"id":"run-1","type":"runs","attributes":{"status":"discarded","is-destroy":false}}}`))
 		case r.Method == http.MethodDelete && p == "/api/terrapod/v1/catalog-instances/ws-9":
+			// The orphan escape hatch MUST carry ?orphan=true — without it the
+			// server 409s. Assert the SDK actually sends it.
+			if r.URL.RawQuery != "orphan=true" {
+				http.Error(w, "missing orphan=true: "+r.URL.RawQuery, http.StatusConflict)
+				return
+			}
 			w.WriteHeader(http.StatusNoContent)
 
 		default:
@@ -171,6 +181,16 @@ func TestCatalogProvisionAndLifecycle(t *testing.T) {
 	drun, err := c.DestroyCatalogInstance(t.Context(), "ws-9", map[string]any{"auto-apply": true})
 	if err != nil || drun.ID != "run-2" || !drun.IsDestroy {
 		t.Fatalf("destroy: %v %+v", err, drun)
+	}
+
+	crun, err := c.ConfirmCatalogInstanceRun(t.Context(), "ws-9")
+	if err != nil || crun.Status != "confirmed" {
+		t.Fatalf("confirm: %v %+v", err, crun)
+	}
+
+	xrun, err := c.DiscardCatalogInstanceRun(t.Context(), "ws-9")
+	if err != nil || xrun.Status != "discarded" {
+		t.Fatalf("discard: %v %+v", err, xrun)
 	}
 
 	if err := c.OrphanCatalogInstance(t.Context(), "ws-9"); err != nil {

@@ -151,6 +151,29 @@ When an item references this template, `aws_region` and `aws_role_arn` are surfa
 
 A catalog item lists the templates it uses in `provider-template-ids`. Each one's `parameters` are merged into the provision form alongside the module's own inputs.
 
+## Curating inputs — variable options
+
+By default the provision form exposes **every** module input. A catalog item can curate them with `variable-options` — a list of per-input overlays, one object per input you want to change:
+
+```json
+"variable-options": [
+  { "name": "environment", "options": ["dev", "staging", "prod"] },
+  { "name": "instance_type", "default": "t3.small" },
+  { "name": "account_id", "hidden": true, "default": "123456789012" }
+]
+```
+
+Each overlay object keys off the module input `name` and supports:
+
+| Key | Effect |
+|---|---|
+| `options` | Constrain the input to an **allow-list** (rendered as a dropdown). A value outside the list is rejected **server-side** (`422`), not just hidden in the UI — this is a real governance control, not a hint. |
+| `default` | Preset the input's default. The user can still edit it (unless also `hidden`). Useful for org-preferred values. |
+| `hidden` | **Fix the value and remove the input from the form.** A hidden input is wired from its `default` and the provisioner never sees or sets it; attempting to supply it returns `422`. **A `hidden` overlay must include a `default`** — the API rejects `hidden` without one (a hidden, required-by-the-module input with no value fails opaquely at plan time otherwise). |
+| `sensitive` | Mark the input sensitive (masked input field; stored as a sensitive workspace variable, write-only). |
+
+This is how a catalog author pins certain module variables: mark them `hidden` with a fixed `default` and the consumer provisions without ever touching them. Validation runs at item create/update — a malformed overlay, a non-list `options`, or `hidden` without `default` is rejected with `422`.
+
 ## Version model
 
 A catalog item wraps a registry module, and registry modules are versioned. The catalog supports two version strategies:

@@ -194,6 +194,36 @@ class TestInputVarRepr:
 # ── _build_tarball ─────────────────────────────────────────────────────
 
 
+class TestResolveInputsOptions:
+    """`options` (constrained-choice) must be enforced server-side — the form
+    advertises the allow-list, so a value outside it is a governance bypass if
+    only the UI checks it."""
+
+    _MODULE_INPUTS = [{"name": "region", "type": "string", "required": False}]
+
+    def _item(self):
+        return _item(variable_options=[{"name": "region", "options": ["us-east-1", "eu-west-1"]}])
+
+    def test_value_outside_options_rejected(self):
+        with pytest.raises(CatalogError, match="allowed options"):
+            catalog_service._resolve_inputs(
+                self._item(), self._MODULE_INPUTS, [], {"region": "mars-1"}
+            )
+
+    def test_value_in_options_accepted(self):
+        _, effective, _, _ = catalog_service._resolve_inputs(
+            self._item(), self._MODULE_INPUTS, [], {"region": "us-east-1"}
+        )
+        assert effective["region"] == "us-east-1"
+
+    def test_unconstrained_field_accepts_anything(self):
+        # No `options` overlay → no constraint.
+        _, effective, _, _ = catalog_service._resolve_inputs(
+            _item(), self._MODULE_INPUTS, [], {"region": "anywhere"}
+        )
+        assert effective["region"] == "anywhere"
+
+
 class TestBuildTarball:
     def test_packs_files(self):
         data = catalog_service._build_tarball({"main.tf": "content-a", "providers.tf": "content-b"})

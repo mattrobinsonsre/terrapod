@@ -258,6 +258,28 @@ func (c *Client) DestroyCatalogInstance(ctx context.Context, wsID string, attrs 
 	return parseCatalogRunRef(data)
 }
 
+// ConfirmCatalogInstanceRun confirms the instance's pending planned run for
+// apply. This is the catalog-surface confirm — the workspace clamp gives the
+// provisioner only read, so a non-auto-apply provision/reconfigure/destroy is
+// confirmed here rather than via the workspace run API. Requires catalog 'use'.
+func (c *Client) ConfirmCatalogInstanceRun(ctx context.Context, wsID string) (*CatalogRunRef, error) {
+	data, err := c.Post(ctx, "/api/terrapod/v1/catalog-instances/"+url.PathEscape(wsID)+"/confirm", nil)
+	if err != nil {
+		return nil, err
+	}
+	return parseCatalogRunRef(data)
+}
+
+// DiscardCatalogInstanceRun discards the instance's pending planned run.
+// Catalog-surface counterpart of confirm. Requires catalog 'use'.
+func (c *Client) DiscardCatalogInstanceRun(ctx context.Context, wsID string) (*CatalogRunRef, error) {
+	data, err := c.Post(ctx, "/api/terrapod/v1/catalog-instances/"+url.PathEscape(wsID)+"/discard", nil)
+	if err != nil {
+		return nil, err
+	}
+	return parseCatalogRunRef(data)
+}
+
 // OrphanCatalogInstance deletes a catalog instance's workspace record WITHOUT
 // destroying its infrastructure — the provisioned resources keep running,
 // untracked. This is the explicit, discouraged escape hatch; the recommended

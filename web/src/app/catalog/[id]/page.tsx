@@ -114,6 +114,33 @@ export default function CatalogItemPage() {
 
   // Run-result banner after a lifecycle action.
   const [actionResult, setActionResult] = useState('')
+  // A planned (non-auto-applied) run awaiting confirmation. The workspace clamp
+  // gives the provisioner read-only on the workspace, so confirm/discard happen
+  // here on the catalog surface rather than the workspace run API.
+  const [pendingRun, setPendingRun] = useState<{ id: string; name: string } | null>(null)
+  const [pendingBusy, setPendingBusy] = useState(false)
+
+  async function runPending(action: 'confirm' | 'discard') {
+    if (!pendingRun) return
+    setPendingBusy(true)
+    try {
+      const res = await apiFetch(
+        `/api/terrapod/v1/catalog-instances/${pendingRun.id}/${action}`,
+        { method: 'POST' },
+      )
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `Failed to ${action} (${res.status})`)
+      }
+      setActionResult(action === 'confirm' ? 'Run confirmed — applying.' : 'Run discarded.')
+      setPendingRun(null)
+      await loadInstances()
+    } catch (err) {
+      setActionResult(err instanceof Error ? err.message : `Failed to ${action}`)
+    } finally {
+      setPendingBusy(false)
+    }
+  }
 
   const loadInstances = useCallback(async () => {
     try {
@@ -247,14 +274,21 @@ export default function CatalogItemPage() {
       }
       const data = await res.json()
       const newId = data.data?.id
-      if (newId) {
+      const provisionedName = data.data?.attributes?.name || provName
+      if (newId && provAutoApply) {
+        // Auto-apply: navigate to the workspace to watch the run.
         router.push(`/workspaces/${newId}`)
         return
       }
-      // No id returned — refresh instances and reset.
+      // Plan-only provision: the run is planned and the provisioner can't
+      // confirm it via the workspace API (clamp), so offer confirm/discard here.
       setProvName('')
       setProvLabels({})
       await loadInstances()
+      if (newId) {
+        setPendingRun({ id: newId, name: provisionedName })
+        setActionResult(`Provisioned ${provisionedName} — plan is ready for review.`)
+      }
     } catch (err) {
       setProvError(err instanceof Error ? err.message : 'Failed to provision')
     } finally {
@@ -316,6 +350,9 @@ export default function CatalogItemPage() {
       const data = await res.json()
       const status = data.data?.attributes?.status
       setActionResult(`Reconfigure queued — run ${status ? `is ${status}` : 'created'}.`)
+      if (status === 'planned') {
+        setPendingRun({ id: reconfigInstance.id, name: reconfigInstance.attributes.name })
+      }
       setReconfigInstance(null)
       await loadInstances()
     } catch (err) {
@@ -342,6 +379,9 @@ export default function CatalogItemPage() {
       const data = await res.json()
       const status = data.data?.attributes?.status
       setActionResult(`Destroy queued — run ${status ? `is ${status}` : 'created'}.`)
+      if (status === 'planned') {
+        setPendingRun({ id: destroyInstance.id, name: destroyInstance.attributes.name })
+      }
       setDestroyInstance(null)
       setDestroyAutoApply(false)
       await loadInstances()
@@ -416,6 +456,31 @@ export default function CatalogItemPage() {
         {error && <ErrorBanner message={error} />}
         {actionResult && (
           <div className="mb-4 p-3 bg-green-900/30 text-green-400 rounded-lg text-sm border border-green-800/50">{actionResult}</div>
+        )}
+        {pendingRun && (
+          <div className="mb-4 p-3 bg-amber-900/20 text-amber-200 rounded-lg text-sm border border-amber-800/50 flex items-center justify-between gap-3">
+            <span>
+              The run for <span className="font-medium">{pendingRun.name}</span> is planned and waiting for review. Confirm to apply, or discard.
+            </span>
+            <span className="flex gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => runPending('confirm')}
+                disabled={pendingBusy}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors"
+              >
+                {pendingBusy ? 'Working…' : 'Confirm & apply'}
+              </button>
+              <button
+                type="button"
+                onClick={() => runPending('discard')}
+                disabled={pendingBusy}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-slate-100 transition-colors"
+              >
+                Discard
+              </button>
+            </span>
+          </div>
         )}
 
         {a && (

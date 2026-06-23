@@ -983,3 +983,47 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
 - Re-running the diagnosis list query returns no tokens for the email.
 - An attempt to use one of the revoked tokens returns `401`.
 - For the idle path: with the `tp:user_seen:<email>` key absent, a previously-working bound token now returns `401`.
+
+---
+
+## Service Catalog — instance lifecycle incidents
+
+The catalog provisions **and** destroys real infrastructure on behalf of self-service users, so its failure modes touch live infra. A catalog instance is an ordinary agent-mode workspace stamped with `catalog_item_id`; manage it through the catalog surface (`/api/terrapod/v1/catalog-instances/...`), not the raw workspace API (which 409s on catalog workspaces).
+
+### Destroy failed and exhausted its retries (instance stuck `errored`)
+
+**Symptom**: a catalog destroy ran, failed, was auto-retried (`runners.lifecycleDestroyRetries`, default 2), and the instance is still present with its latest run `errored`. The workspace was **not** archived (archive only happens on a *successful* destroy), so no data was lost — the infra may be fully or partially still up.
+
+1. **Find the failing run + reason.** Open the instance's **workspace page** (`/workspaces/{id}`) — run status, plan/apply output, and the AI failure analysis live there. Catalog/UI surfaces show no per-instance run detail; the workspace is where you diagnose.
+   ```bash
+   kubectl logs deploy/terrapod-api --tail=3000 | grep -E "Lifecycle destroy retry|catalog-lifecycle"
+   ```
+   `Lifecycle destroy retry queued attempt=N/M` shows the attempts; `skipped: no uploaded configuration version` means the config version is gone (see below).
+2. **Decide if it's transient.** Most destroy failures are ordering/eventual-consistency (an ENI still attached, a bucket not empty, an LB draining). If so, re-trigger the destroy once the dependency clears: `POST /api/terrapod/v1/catalog-instances/{id}/destroy` with `auto-apply: true` (catalog `use`). On success the workspace archives.
+3. **If it's a real blocker** (a `prevent_destroy` lifecycle, a protected resource, a permission gap), fix the underlying cause, then re-destroy. The retry budget resets each "episode" (consecutive errored lifecycle destroys), so a fresh destroy after a successful intervening run starts clean.
+4. **No config version** (`get_latest_uploaded_cv` is None): the retry intentionally skips (a config-less destroy can't target anything). Re-publish/reconfigure the instance (`PATCH .../catalog-instances/{id}`) to regenerate a config version, then destroy.
+
+**Verification**: `GET /catalog-instances/{id}` 404s or the workspace `lifecycle-state` is `archived`; no further `Lifecycle destroy retry queued` log lines for that workspace.
+
+### Orphaned instance (infra abandoned, untracked)
+
+**Symptom**: someone used the discouraged **Orphan** escape hatch (`DELETE /catalog-instances/{id}?orphan=true`, or the admin-only UI action) — the catalog record is gone but the cloud resources are still running, now unmanaged.
+
+1. **Confirm via audit.** The orphan is audit-logged (`Catalog instance orphaned: workspace deleted, infrastructure abandoned`, with workspace name + actor) and captured by the audit middleware (`/api/terrapod/v1/audit?action=DELETE`).
+2. **Reclaim the infra.** There is no Terrapod state for it anymore — adopt it back under IaC: re-provision the same catalog item (or a plain workspace) and `terraform import` the live resources, or tear it down directly in the cloud console. Prefer `destroy` over `orphan` next time so this doesn't recur.
+
+### Stuck provision (run never progresses)
+
+**Symptom**: a provision returned `201` (instance + workspace created) but the first run sits in `pending`/`queued`/`planning` and never applies.
+
+1. This is an ordinary agent-run stall — follow **[Stale Run](#stale-run-errored-after-timeout)** and **[Listener Offline](#listener-offline)**: check the instance's workspace page for the run, confirm the agent pool (the item's `allowed-agent-pool-ids`) has an online listener, and check `kubectl get jobs -n terrapod-runners`.
+2. **Non-auto-apply provisions wait for confirmation.** If the run is `planned` and waiting, confirm it from the catalog surface (`POST /catalog-instances/{id}/confirm`, catalog `use`) — the workspace clamp means the provisioner can't confirm via the workspace run API.
+3. A common first-provision failure is the **module isn't resolvable** (no uploaded version, or a private registry the runner can't reach) — the workspace's run log shows the `init` error.
+
+### Recover an archived catalog workspace
+
+**Symptom**: an instance was destroyed (archived) and you need its history or state back (e.g. a destroy you regret, or to audit what was provisioned).
+
+- **Archive is a soft delete** — the workspace row, its state versions, and run history are **retained** (`lifecycle_state = "archived"`), only hidden from the active catalog/workspace lists. State and audit are recoverable.
+- To restore visibility, flip `lifecycle_state` back to `active` on the workspace row (DBA action — there is intentionally no API to "un-destroy", since the infra was torn down). The workspace's last state version is still in object storage under its state key.
+- If you need the **infrastructure** back (not just the record), re-provision the catalog item with the same inputs — the wrapper is regenerated deterministically from the item + inputs.

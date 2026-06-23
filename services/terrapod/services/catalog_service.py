@@ -363,6 +363,24 @@ def _resolve_inputs(
     if unknown:
         raise CatalogError(f"Unknown input(s): {', '.join(sorted(unknown))}")
 
+    # Enforce constrained-choice (`options`) allow-lists server-side. The form
+    # advertises them, so a supplied value outside the list is a governance
+    # bypass if only the UI checks it — reject here (422). Compare directly and
+    # by string so a numeric option list still matches a JSON-typed value.
+    bad_choice = []
+    for f in form:
+        opts = f.get("options")
+        fname = f["name"]
+        if not opts or fname not in input_values:
+            continue
+        val = input_values[fname]
+        if str(val).strip() == "":
+            continue
+        if val not in opts and str(val) not in {str(o) for o in opts}:
+            bad_choice.append(fname)
+    if bad_choice:
+        raise CatalogError(f"Value(s) not in the allowed options: {', '.join(sorted(bad_choice))}")
+
     # Effective values: form value or its default; plus hidden fixed values.
     # Module-interface defaults are stored as serialized JSON strings (e.g. a
     # map default is the string "{}", a list is "[80, 443]"), so a default that

@@ -118,7 +118,7 @@ func (d *catalogInstancesDataSource) Read(ctx context.Context, req datasource.Re
 			ID:          types.StringValue(inst.ID),
 			Name:        types.StringValue(name),
 			AgentPoolID: types.StringValue(attrString(inst.Attributes, "agent-pool-id")),
-			VersionPin:  types.StringValue(attrString(inst.Attributes, "version-pin")),
+			VersionPin:  types.StringValue(attrString(inst.Attributes, "catalog-version-pin")),
 		})
 	}
 

@@ -702,7 +702,10 @@ class CatalogItem(Base):
     provider_template_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list, nullable=False)
     # NULL/empty = any pool the consumer can use; else scopes the offered pools.
     allowed_agent_pool_ids: Mapped[list[Any] | None] = mapped_column(JSONB, nullable=True)
-    # Per-variable overlay: [{name, options[], default, required, visibility}].
+    # Per-variable overlay: [{name, options[], default, sensitive, hidden}].
+    # `hidden: true` (with a fixed `default`) removes the input from the
+    # provision form and wires the default; `options` constrains the choice;
+    # `default` presets an editable value.
     variable_options: Mapped[list[Any]] = mapped_column(JSONB, default=list, nullable=False)
     labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     owner_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")

@@ -105,6 +105,15 @@ async def lifecycle_destroy_retry_cycle() -> None:
                 continue
 
             cv = await run_service.get_latest_uploaded_cv(db, ws.id)
+            if cv is None:
+                # No config to destroy against — a config-less destroy run would
+                # just re-error and burn the attempt budget. Leave it for a human.
+                logger.warning(
+                    "Lifecycle destroy retry skipped: no uploaded configuration version",
+                    workspace_id=str(ws.id),
+                    source=run.source,
+                )
+                continue
             retry = await run_service.create_run(
                 db,
                 workspace=ws,
@@ -113,7 +122,7 @@ async def lifecycle_destroy_retry_cycle() -> None:
                 auto_apply=True,
                 plan_only=False,
                 source=run.source,
-                configuration_version_id=cv.id if cv else None,
+                configuration_version_id=cv.id,
                 created_by="system",
             )
             await run_service.queue_run(db, retry)

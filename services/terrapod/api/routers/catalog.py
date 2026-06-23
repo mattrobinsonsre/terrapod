@@ -48,11 +48,12 @@ from terrapod.db.models import (
     CatalogItem,
     ProviderTemplate,
     RegistryModule,
+    Run,
     Workspace,
 )
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import catalog_service
+from terrapod.services import catalog_service, run_service
 from terrapod.services.catalog_rbac_service import (
     has_catalog_permission,
     resolve_catalog_permission_for,
@@ -354,6 +355,33 @@ async def _coerce_item(db: AsyncSession, attrs: dict, *, on_create: bool) -> dic
         vo = attrs["variable-options"]
         if not isinstance(vo, list):
             raise HTTPException(status_code=422, detail="variable-options must be a list")
+        for i, opt in enumerate(vo):
+            if not isinstance(opt, dict) or not str(opt.get("name", "")).strip():
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"variable-options[{i}] must be an object with a non-empty name",
+                )
+            if "options" in opt and not isinstance(opt["options"], list):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"variable-options[{i}].options must be a list",
+                )
+            if "hidden" in opt and not isinstance(opt["hidden"], bool):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"variable-options[{i}].hidden must be a boolean",
+                )
+            # A hidden input is removed from the form, so it MUST carry a fixed
+            # default — otherwise it can neither be supplied nor wired and a
+            # required module input fails opaquely at plan time.
+            if opt.get("hidden") and opt.get("default") is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"variable-options[{i}] ('{opt['name']}') is hidden but has no "
+                        "default — a hidden input must supply a fixed default value"
+                    ),
+                )
         out["variable_options"] = vo
     if "labels" in attrs:
         out["labels"] = validate_labels(attrs["labels"] or {})
@@ -608,7 +636,15 @@ async def provision_catalog_item(
         await db.rollback()
         raise HTTPException(status_code=e.status_code, detail=str(e)) from e
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        # A concurrent provision raced the name-uniqueness SELECT and lost the
+        # workspace unique constraint — surface as 409, not an opaque 500.
+        await db.rollback()
+        raise HTTPException(
+            status_code=409, detail=f"A workspace named '{name}' already exists"
+        ) from e
     await db.refresh(ws)
     return JSONResponse(content={"data": _instance_json(ws)}, status_code=201)
 
@@ -627,18 +663,31 @@ def _run_ref(run) -> dict:
 
 
 async def _load_instance(
-    db: AsyncSession, user: AuthenticatedUser, ws_id: str, *, required: str
+    db: AsyncSession,
+    user: AuthenticatedUser,
+    ws_id: str,
+    *,
+    required: str,
+    active_only: bool = False,
 ) -> Workspace:
     """Load a catalog instance workspace and enforce `required` catalog
     permission on its originating item. Lifecycle actions are gated by catalog
     'use' on the item — NOT by workspace permission (the clamp gives the
-    provisioner read only; the catalog surface is the control plane)."""
+    provisioner read only; the catalog surface is the control plane).
+
+    ``active_only`` rejects (409) an instance that's already been torn down
+    (``lifecycle_state == "archived"``), so reconfigure/destroy can't queue a
+    run against a destroyed instance."""
     try:
         ws = await db.get(Workspace, uuid.UUID(ws_id.removeprefix("ws-")))
     except ValueError as e:
         raise HTTPException(status_code=404, detail="catalog instance not found") from e
     if ws is None or ws.catalog_item_id is None:
         raise HTTPException(status_code=404, detail="catalog instance not found")
+    if active_only and ws.lifecycle_state == "archived":
+        raise HTTPException(
+            status_code=409, detail="catalog instance is archived (already destroyed)"
+        )
     item = await db.get(CatalogItem, ws.catalog_item_id)
     if item is None:
         raise HTTPException(status_code=409, detail="catalog item no longer exists")
@@ -684,7 +733,7 @@ async def reconfigure_catalog_instance(
     Requires catalog 'use' on the originating item. A non-auto-apply run plans
     and waits for a platform-admin confirm (the clamp blocks 'use' holders from
     confirming via the workspace API); pass auto-apply to apply directly."""
-    ws = await _load_instance(db, user, ws_id, required="use")
+    ws = await _load_instance(db, user, ws_id, required="use", active_only=True)
     attrs = body.get("data", {}).get("attributes", {})
     input_values = attrs.get("input-values")
     if input_values is None:
@@ -728,7 +777,7 @@ async def destroy_catalog_instance(
     originating item. On a successful apply the workspace is archived. As with
     reconfigure, a non-auto-apply destroy plans and waits for an admin confirm;
     pass auto-apply to tear down directly."""
-    ws = await _load_instance(db, user, ws_id, required="use")
+    ws = await _load_instance(db, user, ws_id, required="use", active_only=True)
     attrs = body.get("data", {}).get("attributes", {}) if body else {}
     auto_apply = bool(attrs.get("auto-apply", False))
     try:
@@ -740,6 +789,61 @@ async def destroy_catalog_instance(
         raise HTTPException(status_code=e.status_code, detail=str(e)) from e
     await db.commit()
     return JSONResponse(content={"data": _run_ref(run)}, status_code=201)
+
+
+async def _latest_run(db: AsyncSession, workspace_id: uuid.UUID) -> Run | None:
+    result = await db.execute(
+        select(Run).where(Run.workspace_id == workspace_id).order_by(Run.created_at.desc()).limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+@router.post("/catalog-instances/{ws_id}/confirm")
+async def confirm_catalog_instance_run(
+    ws_id: str = Path(...),
+    _: None = Depends(require_catalog_enabled),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Confirm the instance's pending **planned** run for apply. Requires catalog
+    `use`. This is the catalog-surface confirm: the workspace clamp gives the
+    provisioner only `read`, so a non-auto-apply provision/reconfigure/destroy
+    is confirmed here rather than via the workspace run API (which would need a
+    platform admin)."""
+    ws = await _load_instance(db, user, ws_id, required="use")
+    run = await _latest_run(db, ws.id)
+    if run is None or run.status != "planned":
+        raise HTTPException(status_code=409, detail="no planned run awaiting confirmation")
+    try:
+        run = await run_service.confirm_run(db, run)
+    except ValueError as e:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    await db.commit()
+    return JSONResponse(content={"data": _run_ref(run)})
+
+
+@router.post("/catalog-instances/{ws_id}/discard")
+async def discard_catalog_instance_run(
+    ws_id: str = Path(...),
+    _: None = Depends(require_catalog_enabled),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Discard the instance's pending **planned** run. Requires catalog `use`.
+    Catalog-surface counterpart of confirm (the clamp blocks the workspace run
+    API for the provisioner)."""
+    ws = await _load_instance(db, user, ws_id, required="use")
+    run = await _latest_run(db, ws.id)
+    if run is None or run.status != "planned":
+        raise HTTPException(status_code=409, detail="no planned run to discard")
+    try:
+        run = await run_service.discard_run(db, run)
+    except ValueError as e:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    await db.commit()
+    return JSONResponse(content={"data": _run_ref(run)})
 
 
 @router.delete("/catalog-instances/{ws_id}", status_code=204)
