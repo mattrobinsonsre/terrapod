@@ -1415,8 +1415,13 @@ async def next_run(
 
     resolved = await resolve_variables(db, run.workspace_id)
     env_vars = [{"key": v.key, "value": v.value} for v in resolved if v.category == "env"]
+    # `hcl` + `sensitive` are forwarded so the runner can write non-sensitive
+    # vars to a generated terrapod.auto.tfvars (honouring hcl) and keep
+    # sensitive ones as ephemeral TF_VAR_* env. See runner/phases/tfvars.py.
     terraform_vars = [
-        {"key": v.key, "value": v.value} for v in resolved if v.category == "terraform"
+        {"key": v.key, "value": v.value, "hcl": v.hcl, "sensitive": v.sensitive}
+        for v in resolved
+        if v.category == "terraform"
     ]
 
     await db.commit()
