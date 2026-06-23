@@ -192,7 +192,7 @@ data:
     {{- end }}
     {{- if .Values.api.config.catalog }}
     catalog:
-      enabled: {{ .Values.api.config.catalog.enabled | default false }}
+      enabled: {{ .Values.api.config.catalog.enabled }}
     {{- end }}
     {{- if .Values.api.config.vcs }}
     vcs:

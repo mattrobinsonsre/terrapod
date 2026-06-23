@@ -167,6 +167,66 @@ class TestCatalogItemRBAC:
 
 
 class TestProvision:
+    @patch("terrapod.api.routers.catalog.catalog_service.provision_instance")
+    @patch("terrapod.api.routers.catalog.resolve_pool_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.catalog_service.get_catalog_item")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_provision_accepts_apool_prefixed_pool_id(
+        self, _db, _redis, _storage, mock_get, mock_cat, mock_pool, mock_prov
+    ):
+        """Regression (#535 live-smoke): the UI/API emit pool ids as
+        'apool-{uuid}'; the provision endpoint must strip the prefix, not 422."""
+        pool_uuid = uuid.uuid4()
+        item = MagicMock()
+        item.enabled = True
+        item.name = "vpc"
+        item.labels = {}
+        item.owner_email = ""
+        item.allowed_agent_pool_ids = None
+        mock_get.return_value = item
+        mock_cat.return_value = "use"
+        mock_pool.return_value = "write"
+
+        pool = MagicMock()
+        pool.id = pool_uuid
+        pool.name = "p"
+        pool.labels = {}
+        pool.owner_email = None
+        ws = MagicMock()
+        ws.id = uuid.uuid4()
+        ws.name = "smoke"
+        ws.catalog_item_id = uuid.uuid4()
+        ws.catalog_version_pin = None
+        ws.agent_pool_id = pool_uuid
+        ws.owner_email = "u@test.com"
+        ws.labels = {}
+        mock_prov.return_value = ws
+
+        app, mock_db = _make_app(_user(roles=["everyone"]))
+        mock_db.get = AsyncMock(return_value=pool)
+        mock_db.commit = AsyncMock()
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/terrapod/v1/catalog-items/{uuid.uuid4()}/provision",
+                json={
+                    "data": {
+                        "attributes": {
+                            "name": "smoke",
+                            "agent-pool-id": f"apool-{pool_uuid}",
+                        }
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201
+        # The service received the bare UUID (prefix stripped).
+        assert mock_prov.await_args.kwargs["agent_pool_id"] == pool_uuid
+
     @patch("terrapod.api.routers.catalog.catalog_service.get_catalog_item")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

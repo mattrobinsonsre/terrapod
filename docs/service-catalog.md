@@ -61,17 +61,17 @@ Because the wrapper is generated server-side and the workspace is agent-mode + n
 
 ## Enabling the catalog
 
-The catalog is **off by default**. Turn it on with a single Helm value:
+The catalog is **on by default**. The catalog RBAC axis is opt-in (`catalog_permission` defaults to `none`), so enabling the feature does not grant anyone access — no user can browse or provision until granted catalog permission. To hide the surface entirely, set:
 
 ```yaml
 # values.yaml
 api:
   config:
     catalog:
-      enabled: true   # default: false
+      enabled: false   # default: true
 ```
 
-When `catalog.enabled` is `false`, every catalog API endpoint returns `404` and the catalog UI surfaces are hidden. Flipping it on requires no migration — the tables already exist; the feature is purely gated.
+When `catalog.enabled` is `false`, every catalog API endpoint returns `404` and the catalog UI surfaces are hidden. The toggle requires no migration — the tables always exist; the feature is purely gated.
 
 ## RBAC: the `catalog_permission` axis
 

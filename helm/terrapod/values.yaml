@@ -249,12 +249,12 @@ api:
     #   signing_key: ""
 
     # Service Catalog — no-code self-service provisioning over the module
-    # registry. Off by default. Enabling it exposes the catalog RBAC axis,
-    # catalog-item + provider-template management, and the provision flow
-    # (generates a wrapper config-version onto an ordinary agent-mode
-    # workspace). See docs/service-catalog.md.
+    # registry. On by default; the catalog RBAC axis is opt-in (default
+    # `none`), so no user can browse or provision until granted catalog
+    # permission. Set to false to hide the surface entirely (endpoints 404).
+    # See docs/service-catalog.md.
     catalog:
-      enabled: false
+      enabled: true
 
     # VCS Integration
     # VCS connections (GitHub App installations, GitLab tokens) are created

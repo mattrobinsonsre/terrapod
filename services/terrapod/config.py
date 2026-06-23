@@ -434,12 +434,13 @@ class CatalogConfig(BaseModel):
     """Service catalog: no-code self-service provisioning over the module
     registry (#535).
 
-    Off by default — enabling it exposes the catalog RBAC axis, catalog-item
-    and provider-template management, and the provision flow that generates a
-    wrapper config-version onto an ordinary agent-mode workspace.
+    On by default — it exposes the catalog RBAC axis (opt-in, default `none`,
+    so no user gains catalog access until granted), catalog-item and
+    provider-template management, and the provision flow. Set `enabled: false`
+    to hide the surface entirely (endpoints return 404).
     """
 
-    enabled: bool = Field(default=False)
+    enabled: bool = Field(default=True)
 
 
 # --- VCS Configuration ---

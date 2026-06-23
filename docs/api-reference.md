@@ -2796,7 +2796,7 @@ Records the runner's policy-evaluation outcomes for the run. Persisted via Postg
 
 No-code self-service provisioning over the private module registry. A *catalog item* blesses a registry module; provisioning it creates an agent-mode, non-VCS, catalog-managed workspace whose configuration is a server-generated wrapper. See [Service Catalog](service-catalog.md) for the full feature doc.
 
-All endpoints below are **gated on `catalog.enabled`** (Helm: `api.config.catalog.enabled`, default `false`). When the catalog is disabled every endpoint returns `404`.
+All endpoints below are **gated on `catalog.enabled`** (Helm: `api.config.catalog.enabled`, default `true`). When the catalog is disabled every endpoint returns `404`. The `catalog_permission` role axis is opt-in (default `none`), so the feature being enabled grants no access on its own.
 
 Catalog access is governed by a dedicated role axis, `catalog-permission` (`none`/`read`/`use`/`admin`, default `none`, no `everyone` floor) — see [Roles](#roles).
 

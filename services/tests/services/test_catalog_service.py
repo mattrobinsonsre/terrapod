@@ -82,13 +82,15 @@ class TestDeriveForm:
 
 
 class TestRenderWrapper:
-    def test_module_block_and_variables(self):
+    def test_module_block_untyped_vars_and_tfvars(self):
         files = catalog_service.render_wrapper_hcl(
             _module(),
             version="1.2.0",
-            wired_inputs=["cidr", "name"],
+            var_decls=["cidr", "name", "secret"],
+            module_wired=["cidr", "name", "secret"],
+            sensitive_names={"secret"},
+            nonsensitive_values={"cidr": "10.0.0.0/16", "name": "vpc1"},
             module_outputs=[{"name": "vpc_id"}],
-            field_types={"cidr": "string", "name": "string"},
             provider_templates=[],
         )
         main = files["main.tf"]
@@ -96,49 +98,79 @@ class TestRenderWrapper:
         assert 'source = "terrapod.local/default/vpc/aws"' in main
         assert 'version = "1.2.0"' in main
         assert "cidr = var.cidr" in main
-        assert "name = var.name" in main
-        assert 'variable "cidr" {' in main
+        # Variables are untyped (valid HCL for any module input type).
+        assert 'variable "cidr" {}' in main
+        assert "type =" not in main
+        # Sensitive var declared sensitive; not in tfvars.
+        assert 'variable "secret" {\n  sensitive = true\n}' in main
+        # Non-sensitive values land in tfvars.json with real JSON types.
+        import json as _json
+
+        tfvars = _json.loads(files["terraform.auto.tfvars.json"])
+        assert tfvars == {"cidr": "10.0.0.0/16", "name": "vpc1"}
+        assert "secret" not in tfvars
         # outputs re-exported
-        assert "outputs.tf" in files
         assert "value     = module.this.vpc_id" in files["outputs.tf"]
 
-    def test_floating_version_omits_version(self):
-        files = catalog_service.render_wrapper_hcl(
-            _module(),
-            version=None,
-            wired_inputs=["cidr"],
-            module_outputs=[],
-            field_types={"cidr": "string"},
-            provider_templates=[],
-        )
-        assert "version =" not in files["main.tf"]
-        assert "outputs.tf" not in files  # no outputs → no file
-
-    def test_provider_template_rendered(self):
-        tmpl = _tmpl(
-            parameters=[{"name": "region", "type": "string"}],
-            body='provider "aws" {\n  region = var.region\n}',
-        )
+    def test_complex_values_are_json_typed(self):
         files = catalog_service.render_wrapper_hcl(
             _module(),
             version="1.0.0",
-            wired_inputs=[],
+            var_decls=["ports", "config"],
+            module_wired=["ports", "config"],
+            sensitive_names=set(),
+            nonsensitive_values={"ports": [80, 443], "config": {"enabled": True}},
             module_outputs=[],
-            field_types={"region": "string"},
+            provider_templates=[],
+        )
+        import json as _json
+
+        tfvars = _json.loads(files["terraform.auto.tfvars.json"])
+        assert tfvars["ports"] == [80, 443]  # list of numbers, not a string
+        assert tfvars["config"] == {"enabled": True}
+
+    def test_floating_version_omits_version_and_empty_tfvars(self):
+        files = catalog_service.render_wrapper_hcl(
+            _module(),
+            version=None,
+            var_decls=["secret"],
+            module_wired=["secret"],
+            sensitive_names={"secret"},
+            nonsensitive_values={},  # all sensitive → no tfvars file
+            module_outputs=[],
+            provider_templates=[],
+        )
+        assert "version =" not in files["main.tf"]
+        assert "outputs.tf" not in files
+        assert "terraform.auto.tfvars.json" not in files
+
+    def test_provider_template_body_rendered(self):
+        tmpl = _tmpl(body='provider "aws" {\n  region = var.region\n}')
+        files = catalog_service.render_wrapper_hcl(
+            _module(),
+            version="1.0.0",
+            var_decls=["region"],
+            module_wired=[],  # provider param: declared but NOT wired to module
+            sensitive_names=set(),
+            nonsensitive_values={"region": "eu-west-1"},
+            module_outputs=[],
             provider_templates=[tmpl],
         )
-        assert "providers.tf" in files
-        providers = files["providers.tf"]
-        assert 'variable "region" {' in providers
-        assert 'provider "aws" {' in providers
+        assert 'provider "aws" {' in files["providers.tf"]
+        # region is declared in main.tf but not passed into the module block.
+        assert 'variable "region" {}' in files["main.tf"]
+        module_block = files["main.tf"].split('module "this"')[1]
+        assert "region = var.region" not in module_block
 
     def test_sensitive_output_marked(self):
         files = catalog_service.render_wrapper_hcl(
             _module(),
             version="1.0.0",
-            wired_inputs=[],
+            var_decls=[],
+            module_wired=[],
+            sensitive_names=set(),
+            nonsensitive_values={},
             module_outputs=[{"name": "secret", "sensitive": True}],
-            field_types={},
             provider_templates=[],
         )
         assert "sensitive = true" in files["outputs.tf"]
@@ -165,6 +197,29 @@ class TestBuildTarball:
 async def test_single_chunk_generator():
     chunks = [c async for c in catalog_service._single_chunk(b"hello")]
     assert chunks == [b"hello"]
+
+
+class TestCoerceDefault:
+    """Module-interface defaults are serialized JSON strings — decode them back
+    to real typed values (#535 live-smoke bug: a map default "{}" passed through
+    as the string "{}" and failed at plan)."""
+
+    def test_json_map_default(self):
+        assert catalog_service._coerce_default("{}") == {}
+
+    def test_json_list_default(self):
+        assert catalog_service._coerce_default("[80, 443]") == [80, 443]
+
+    def test_json_object_default(self):
+        assert catalog_service._coerce_default('{"enabled": true}') == {"enabled": True}
+
+    def test_non_json_string_passthrough(self):
+        # A plain unquoted string default survives.
+        assert catalog_service._coerce_default("us-east-1") == "us-east-1"
+
+    def test_non_string_passthrough(self):
+        assert catalog_service._coerce_default(42) == 42
+        assert catalog_service._coerce_default(None) is None
 
 
 # ── Lifecycle orchestration ────────────────────────────────────────────
@@ -226,9 +281,11 @@ class TestReconfigureInstance:
         ws.id = uuid.uuid4()
         ws.catalog_item_id = uuid.uuid4()
 
+        # A sensitive input so the workspace-variable path (vs tfvars.json) is
+        # exercised.
         mv = SimpleNamespace(
             version="1.0.0",
-            inputs=[{"name": "cidr", "type": "string", "required": True}],
+            inputs=[{"name": "cidr", "type": "string", "required": True, "sensitive": True}],
             outputs=[],
         )
         old_var = MagicMock()
@@ -275,9 +332,10 @@ class TestReconfigureInstance:
             )
 
         assert result is run
-        # Old variable deleted, new one created, snapshot + pin updated.
+        # Old variable deleted, the sensitive input recreated as a workspace var.
         mock_del.assert_awaited_once_with(db, old_var)
         assert mock_create_var.await_args.kwargs["key"] == "cidr"
+        assert mock_create_var.await_args.kwargs["sensitive"] is True
         assert ws.catalog_input_values == {"cidr": "10.0.0.0/16"}
         assert ws.catalog_version_pin == "1.0.0"
         assert mock_create_run.await_args.kwargs["source"] == "catalog"

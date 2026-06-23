@@ -120,7 +120,7 @@ def _item_json(item: CatalogItem) -> dict:
             "default-version-pin": item.default_version_pin,
             "provider-template-ids": [str(x) for x in (item.provider_template_ids or [])],
             "allowed-agent-pool-ids": (
-                [str(x) for x in item.allowed_agent_pool_ids]
+                [f"apool-{x}" for x in item.allowed_agent_pool_ids]
                 if item.allowed_agent_pool_ids is not None
                 else None
             ),
@@ -142,7 +142,7 @@ def _instance_json(ws: Workspace) -> dict:
             "name": ws.name,
             "catalog-item-id": str(ws.catalog_item_id) if ws.catalog_item_id else None,
             "catalog-version-pin": ws.catalog_version_pin,
-            "agent-pool-id": str(ws.agent_pool_id) if ws.agent_pool_id else None,
+            "agent-pool-id": f"apool-{ws.agent_pool_id}" if ws.agent_pool_id else None,
             "owner-email": ws.owner_email or "",
             "labels": dict(ws.labels or {}),
         },
@@ -331,16 +331,21 @@ async def _coerce_item(db: AsyncSession, attrs: dict, *, on_create: bool) -> dic
         if ids is None:
             out["allowed_agent_pool_ids"] = None
         elif isinstance(ids, list):
+            # The UI/API emit pool ids as "apool-{uuid}" — normalise to bare
+            # UUID strings so the provision-time allow-list compare matches.
+            normalised: list[str] = []
             for pid in ids:
                 try:
-                    pool = await db.get(AgentPool, uuid.UUID(str(pid)))
+                    pool_uuid = uuid.UUID(str(pid).removeprefix("apool-"))
                 except ValueError as e:
                     raise HTTPException(
                         status_code=422, detail=f"agent-pool-id '{pid}' is not a UUID"
                     ) from e
+                pool = await db.get(AgentPool, pool_uuid)
                 if pool is None:
                     raise HTTPException(status_code=422, detail=f"agent pool '{pid}' not found")
-            out["allowed_agent_pool_ids"] = [str(x) for x in ids]
+                normalised.append(str(pool_uuid))
+            out["allowed_agent_pool_ids"] = normalised
         else:
             raise HTTPException(
                 status_code=422, detail="allowed-agent-pool-ids must be a list or null"
@@ -555,7 +560,9 @@ async def provision_catalog_item(
     if not raw_pool:
         raise HTTPException(status_code=422, detail="agent-pool-id is required")
     try:
-        pool_id = uuid.UUID(raw_pool)
+        # The API + UI emit pool ids as "apool-{uuid}" — strip the prefix
+        # before parsing (matches tfe_v2 workspace pool assignment).
+        pool_id = uuid.UUID(raw_pool.removeprefix("apool-"))
     except ValueError as e:
         raise HTTPException(status_code=422, detail="agent-pool-id is not a UUID") from e
     pool = await db.get(AgentPool, pool_id)
