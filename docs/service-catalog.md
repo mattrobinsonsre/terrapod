@@ -91,6 +91,10 @@ Two things to note:
 
 Resolution order mirrors the other axes: platform admin → platform audit (read) → label-based RBAC via `catalog_permission` → none (no `everyone` floor).
 
+### Granting catalog access
+
+`catalog_permission` is set on a **custom role**, exactly like `workspace_permission` / `pool_permission` / `registry_permission` — via the admin **Roles** page, the API (`catalog-permission` attribute on `POST/PATCH /api/terrapod/v1/roles`), the `terrapod_role` provider resource (`catalog_permission`), or `go-terrapod`'s `CatalogPermission` field. Assign the role to a user/group, scope it with the role's allow/deny labels, and that user can browse (`read`) or self-serve (`use`) the matching catalog items. Until a role grants it, only platform `admin` (and an item's owner) can reach the catalog.
+
 ## Catalog-managed workspace guardrails
 
 A workspace created by the catalog is **catalog-managed**, and the catalog owns its configuration and access. Two guardrails enforce this so an instance can't drift away from its catalog definition out of band.

@@ -49,6 +49,7 @@ type roleModel struct {
 	WorkspacePermission types.String `tfsdk:"workspace_permission"`
 	PoolPermission      types.String `tfsdk:"pool_permission"`
 	RegistryPermission  types.String `tfsdk:"registry_permission"`
+	CatalogPermission   types.String `tfsdk:"catalog_permission"`
 
 	BuiltIn   types.Bool   `tfsdk:"built_in"`
 	CreatedAt types.String `tfsdk:"created_at"`
@@ -124,6 +125,14 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			},
 			"registry_permission": schema.StringAttribute{
 				Description: "Registry permission level for modules and providers: read, write, or admin. Defaults to read.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"catalog_permission": schema.StringAttribute{
+				Description: "Service-catalog permission level: none, read, use, or admin. Opt-in (no everyone floor); defaults to none.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -265,6 +274,9 @@ func buildCreateRoleRequest(m *roleModel) terrapod.CreateRoleRequest {
 	if !m.RegistryPermission.IsNull() && !m.RegistryPermission.IsUnknown() {
 		req.RegistryPermission = m.RegistryPermission.ValueString()
 	}
+	if !m.CatalogPermission.IsNull() && !m.CatalogPermission.IsUnknown() {
+		req.CatalogPermission = m.CatalogPermission.ValueString()
+	}
 	if !m.Description.IsNull() {
 		req.Description = m.Description.ValueString()
 	}
@@ -296,6 +308,9 @@ func buildUpdateRoleRequest(m *roleModel) terrapod.UpdateRoleRequest {
 	}
 	if !m.RegistryPermission.IsNull() && !m.RegistryPermission.IsUnknown() {
 		req.RegistryPermission = m.RegistryPermission.ValueString()
+	}
+	if !m.CatalogPermission.IsNull() && !m.CatalogPermission.IsUnknown() {
+		req.CatalogPermission = m.CatalogPermission.ValueString()
 	}
 	if !m.Description.IsNull() && !m.Description.IsUnknown() {
 		d := m.Description.ValueString()
@@ -332,6 +347,11 @@ func readRoleFromSDK(ctx context.Context, role *terrapod.Role, m *roleModel) dia
 		m.RegistryPermission = types.StringValue(role.RegistryPermission)
 	} else {
 		m.RegistryPermission = types.StringValue("read")
+	}
+	if role.CatalogPermission != "" {
+		m.CatalogPermission = types.StringValue(role.CatalogPermission)
+	} else {
+		m.CatalogPermission = types.StringValue("none")
 	}
 
 	m.BuiltIn = types.BoolValue(role.BuiltIn)

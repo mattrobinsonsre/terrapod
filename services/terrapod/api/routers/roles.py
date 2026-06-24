@@ -32,6 +32,9 @@ logger = get_logger(__name__)
 VALID_PERMISSIONS = {"read", "plan", "write", "admin"}
 VALID_POOL_PERMISSIONS = {"read", "write", "admin"}
 VALID_REGISTRY_PERMISSIONS = {"read", "write", "admin"}
+# Catalog access is an opt-in extension: "none" (default) grants nothing, so it
+# is a valid value here (unlike the other axes, which floor at "read").
+VALID_CATALOG_PERMISSIONS = {"none", "read", "use", "admin"}
 
 
 def _rfc3339(dt) -> str:
@@ -53,6 +56,7 @@ def _role_json(role: Role) -> dict:
             "workspace-permission": role.workspace_permission,
             "pool-permission": role.pool_permission,
             "registry-permission": role.registry_permission,
+            "catalog-permission": role.catalog_permission,
             "built-in": False,
             "created-at": _rfc3339(role.created_at),
             "updated-at": _rfc3339(role.updated_at),
@@ -73,6 +77,11 @@ def _builtin_role_json(name: str, info: dict) -> dict:
             "workspace-permission": "admin" if name == "admin" else "read",
             "pool-permission": "admin" if name == "admin" else "read",
             "registry-permission": "admin" if name == "admin" else "read",
+            # Catalog is opt-in with no `everyone` floor: admin → admin,
+            # audit → read, everyone → none (grants nothing).
+            "catalog-permission": (
+                "admin" if name == "admin" else "read" if name == "audit" else "none"
+            ),
             "built-in": True,
             "created-at": "",
             "updated-at": "",
@@ -131,6 +140,10 @@ async def create_role(
     if registry_perm not in VALID_REGISTRY_PERMISSIONS:
         raise HTTPException(status_code=422, detail=f"Invalid registry-permission: {registry_perm}")
 
+    catalog_perm = attrs.get("catalog-permission", "none")
+    if catalog_perm not in VALID_CATALOG_PERMISSIONS:
+        raise HTTPException(status_code=422, detail=f"Invalid catalog-permission: {catalog_perm}")
+
     role = Role(
         name=name,
         description=attrs.get("description", ""),
@@ -141,6 +154,7 @@ async def create_role(
         workspace_permission=ws_perm,
         pool_permission=pool_perm,
         registry_permission=registry_perm,
+        catalog_permission=catalog_perm,
     )
     db.add(role)
     await db.commit()
@@ -214,6 +228,13 @@ async def update_role(
                 status_code=422, detail=f"Invalid registry-permission: {registry_perm}"
             )
         role.registry_permission = registry_perm
+    if "catalog-permission" in attrs:
+        catalog_perm = attrs["catalog-permission"]
+        if catalog_perm not in VALID_CATALOG_PERMISSIONS:
+            raise HTTPException(
+                status_code=422, detail=f"Invalid catalog-permission: {catalog_perm}"
+            )
+        role.catalog_permission = catalog_perm
 
     await db.commit()
     await db.refresh(role)

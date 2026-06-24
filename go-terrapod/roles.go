@@ -28,6 +28,7 @@ type Role struct {
 	WorkspacePermission string `json:"workspace-permission"` // read | plan | write | admin
 	PoolPermission      string `json:"pool-permission,omitempty"`
 	RegistryPermission  string `json:"registry-permission,omitempty"` // read | write | admin (modules + providers)
+	CatalogPermission   string `json:"catalog-permission,omitempty"`  // none | read | use | admin
 
 	BuiltIn   bool   `json:"built-in"`
 	CreatedAt string `json:"created-at,omitempty"`
@@ -51,6 +52,7 @@ type CreateRoleRequest struct {
 	WorkspacePermission string
 	PoolPermission      string
 	RegistryPermission  string
+	CatalogPermission   string
 }
 
 // UpdateRoleRequest is the partial-update shape. Name is immutable.
@@ -68,6 +70,7 @@ type UpdateRoleRequest struct {
 	WorkspacePermission string
 	PoolPermission      string
 	RegistryPermission  string
+	CatalogPermission   string
 }
 
 // CreateRole creates a custom role. Admin required.
@@ -134,6 +137,9 @@ func roleCreateAttrs(req CreateRoleRequest) map[string]any {
 	if req.RegistryPermission != "" {
 		attrs["registry-permission"] = req.RegistryPermission
 	}
+	if req.CatalogPermission != "" {
+		attrs["catalog-permission"] = req.CatalogPermission
+	}
 	if req.Description != "" {
 		attrs["description"] = req.Description
 	}
@@ -156,6 +162,9 @@ func roleUpdateAttrs(req UpdateRoleRequest) map[string]any {
 	}
 	if req.RegistryPermission != "" {
 		attrs["registry-permission"] = req.RegistryPermission
+	}
+	if req.CatalogPermission != "" {
+		attrs["catalog-permission"] = req.CatalogPermission
 	}
 	if req.Description != nil {
 		attrs["description"] = *req.Description
@@ -251,6 +260,7 @@ func roleFromItem(item *roleDataItem) (*Role, error) {
 		WorkspacePermission string            `json:"workspace-permission"`
 		PoolPermission      string            `json:"pool-permission"`
 		RegistryPermission  string            `json:"registry-permission"`
+		CatalogPermission   string            `json:"catalog-permission"`
 		BuiltIn             bool              `json:"built-in"`
 		CreatedAt           string            `json:"created-at"`
 		UpdatedAt           string            `json:"updated-at"`
@@ -270,6 +280,7 @@ func roleFromItem(item *roleDataItem) (*Role, error) {
 		WorkspacePermission: attrs.WorkspacePermission,
 		PoolPermission:      attrs.PoolPermission,
 		RegistryPermission:  attrs.RegistryPermission,
+		CatalogPermission:   attrs.CatalogPermission,
 		BuiltIn:             attrs.BuiltIn,
 		CreatedAt:           attrs.CreatedAt,
 		UpdatedAt:           attrs.UpdatedAt,

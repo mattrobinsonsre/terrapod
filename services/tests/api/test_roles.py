@@ -352,6 +352,88 @@ class TestCreateRole:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
+    async def test_create_with_catalog_permission(self, *mocks):
+        """A custom role can carry catalog-permission so non-admins can be
+        granted catalog use (the v0.42.0 axis was ungrantable via any consumer)."""
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/roles",
+                json={
+                    "data": {
+                        "name": "catalog-user-role",
+                        "attributes": {
+                            "workspace-permission": "read",
+                            "catalog-permission": "use",
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201
+        assert resp.json()["data"]["attributes"]["catalog-permission"] == "use"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_invalid_catalog_permission_rejected(self, *mocks):
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/roles",
+                json={
+                    "data": {
+                        "name": "bad-catalog",
+                        "attributes": {
+                            "workspace-permission": "read",
+                            "catalog-permission": "superuse",
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_defaults_catalog_permission_to_none(self, *mocks):
+        """Omitting catalog-permission defaults to 'none' (opt-in, no floor)."""
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/roles",
+                json={
+                    "data": {
+                        "name": "no-catalog-role",
+                        "attributes": {"workspace-permission": "read"},
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201
+        assert resp.json()["data"]["attributes"]["catalog-permission"] == "none"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
     async def test_list_includes_registry_permission(self, *mocks):
         user = _user(roles=["admin"])
         app, mock_db = _make_app(user)

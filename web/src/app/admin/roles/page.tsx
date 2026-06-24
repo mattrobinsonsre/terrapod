@@ -22,6 +22,7 @@ interface Role {
     'workspace-permission': string | null
     'pool-permission': string | null
     'registry-permission': string | null
+    'catalog-permission': string | null
     'allow-labels': Record<string, string>
     'allow-names': string[]
     'deny-labels': Record<string, string>
@@ -68,6 +69,7 @@ export default function RolesPage() {
   const [roleDenyLabels, setRoleDenyLabels] = useState('')
   const [rolePoolPermission, setRolePoolPermission] = useState('read')
   const [roleRegistryPermission, setRoleRegistryPermission] = useState('read')
+  const [roleCatalogPermission, setRoleCatalogPermission] = useState('none')
   const [roleDenyNames, setRoleDenyNames] = useState('')
   const [creatingRole, setCreatingRole] = useState(false)
 
@@ -80,6 +82,7 @@ export default function RolesPage() {
   const [editRoleDenyLabels, setEditRoleDenyLabels] = useState('')
   const [editRolePoolPermission, setEditRolePoolPermission] = useState('read')
   const [editRoleRegistryPermission, setEditRoleRegistryPermission] = useState('read')
+  const [editRoleCatalogPermission, setEditRoleCatalogPermission] = useState('none')
   const [editRoleDenyNames, setEditRoleDenyNames] = useState('')
   const [savingRole, setSavingRole] = useState(false)
 
@@ -183,6 +186,7 @@ export default function RolesPage() {
         'workspace-permission': rolePermission,
         'pool-permission': rolePoolPermission,
         'registry-permission': roleRegistryPermission,
+        'catalog-permission': roleCatalogPermission,
       }
       if (roleAllowLabels.trim()) attrs['allow-labels'] = parseLabels(roleAllowLabels)
       if (roleAllowNames.trim()) attrs['allow-names'] = roleAllowNames.split(',').map((s) => s.trim()).filter(Boolean)
@@ -204,6 +208,7 @@ export default function RolesPage() {
       setRolePermission('read')
       setRolePoolPermission('read')
       setRoleRegistryPermission('read')
+      setRoleCatalogPermission('none')
       setRoleAllowLabels('')
       setRoleAllowNames('')
       setRoleDenyLabels('')
@@ -223,6 +228,7 @@ export default function RolesPage() {
     setEditRolePermission(role.attributes['workspace-permission'] || 'read')
     setEditRolePoolPermission(role.attributes['pool-permission'] || 'read')
     setEditRoleRegistryPermission(role.attributes['registry-permission'] || 'read')
+    setEditRoleCatalogPermission(role.attributes['catalog-permission'] || 'none')
     setEditRoleAllowLabels(formatLabels(role.attributes['allow-labels'] || {}))
     setEditRoleAllowNames((role.attributes['allow-names'] || []).join(', '))
     setEditRoleDenyLabels(formatLabels(role.attributes['deny-labels'] || {}))
@@ -240,6 +246,7 @@ export default function RolesPage() {
         'workspace-permission': editRolePermission,
         'pool-permission': editRolePoolPermission,
         'registry-permission': editRoleRegistryPermission,
+        'catalog-permission': editRoleCatalogPermission,
         'allow-labels': parseLabels(editRoleAllowLabels),
         'allow-names': editRoleAllowNames.split(',').map((s) => s.trim()).filter(Boolean),
         'deny-labels': parseLabels(editRoleDenyLabels),
@@ -433,6 +440,16 @@ export default function RolesPage() {
                       <option value="admin">admin</option>
                     </select>
                   </div>
+                  <div>
+                    <label htmlFor="r-catalog-perm" className="block text-sm font-medium text-slate-300 mb-1">Catalog Permission</label>
+                    <select id="r-catalog-perm" value={roleCatalogPermission} onChange={(e) => setRoleCatalogPermission(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
+                      <option value="none">none</option>
+                      <option value="read">read</option>
+                      <option value="use">use</option>
+                      <option value="admin">admin</option>
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <label htmlFor="r-desc" className="block text-sm font-medium text-slate-300 mb-1">Description</label>
@@ -525,6 +542,16 @@ export default function RolesPage() {
                               </select>
                             </div>
                             <div>
+                              <label className="block text-xs text-slate-500 mb-1">Catalog Permission</label>
+                              <select value={editRoleCatalogPermission} onChange={(e) => setEditRoleCatalogPermission(e.target.value)}
+                                className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                                <option value="none">none</option>
+                                <option value="read">read</option>
+                                <option value="use">use</option>
+                                <option value="admin">admin</option>
+                              </select>
+                            </div>
+                            <div>
                               <label className="block text-xs text-slate-500 mb-1">Allow Labels</label>
                               <input type="text" value={editRoleAllowLabels} onChange={(e) => setEditRoleAllowLabels(e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
@@ -567,6 +594,11 @@ export default function RolesPage() {
                               {a['registry-permission'] && a['registry-permission'] !== 'read' && (
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${permissionBadge(a['registry-permission'])}`}>
                                   registry: {a['registry-permission']}
+                                </span>
+                              )}
+                              {a['catalog-permission'] && a['catalog-permission'] !== 'none' && (
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${permissionBadge(a['catalog-permission'])}`}>
+                                  catalog: {a['catalog-permission']}
                                 </span>
                               )}
                             </div>
