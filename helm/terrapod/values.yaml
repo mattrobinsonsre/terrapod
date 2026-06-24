@@ -43,6 +43,16 @@ api:
   # command: ["uvicorn", "terrapod.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
   command: []
 
+  # Dedicated HMAC secret for stateless tokens (runner tokens + run-task
+  # callback tokens). When unset, the signing key falls back to
+  # sha256(database_url) — functionally fine, but it couples token-forgery
+  # resistance to the database credentials. Point this at a K8s Secret to
+  # decouple them. Leaving it unset does NOT invalidate in-flight tokens on
+  # upgrade. Inject via secretKeyRef (the key is a secret, never a ConfigMap).
+  tokenSigningKey:
+    existingSecret: ""               # name of a K8s Secret holding the key
+    existingSecretKey: "token_signing_key"  # key within that Secret
+
   # Service configuration
   service:
     type: ClusterIP

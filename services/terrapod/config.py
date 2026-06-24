@@ -1041,6 +1041,18 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Token signing — dedicated secret for stateless HMAC tokens (runner
+    # tokens + run-task callback tokens). When empty, the signing key falls
+    # back to sha256(database_url) for backward compatibility (no in-flight
+    # token is invalidated by upgrading). Set this (Helm: api.tokenSigningKey
+    # / env TERRAPOD_TOKEN_SIGNING_KEY) to decouple token-forgery resistance
+    # from database credentials. See auth/token_signing.py.
+    token_signing_key: str = Field(
+        default="",
+        description="Dedicated HMAC secret for runner + run-task tokens "
+        "(falls back to sha256(database_url) when empty).",
+    )
+
     # Database
     database_url: PostgresDsn = Field(
         default="postgresql+asyncpg://terrapod:terrapod@localhost:5432/terrapod",

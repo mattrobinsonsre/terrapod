@@ -36,6 +36,14 @@
         "autoscaling": { "$ref": "#/$defs/autoscalingSpec" },
         "pdb": { "$ref": "#/$defs/pdbSpec" },
         "config": { "$ref": "#/$defs/apiConfig" },
+        "tokenSigningKey": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingSecret": { "type": "string" },
+            "existingSecretKey": { "type": "string" }
+          }
+        },
         "strategy": { "$ref": "#/$defs/strategySpec" },
         "terminationGracePeriodSeconds": { "type": "integer", "minimum": 0 },
         "preStopSleepSeconds": { "type": "integer", "minimum": 0 },

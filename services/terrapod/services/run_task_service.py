@@ -32,21 +32,15 @@ RESULT_TERMINAL_STATES = frozenset({"passed", "failed", "errored", "unreachable"
 _CALLBACK_TOKEN_TTL = 3600
 
 
-_signing_key: bytes | None = None
-
-
 def _get_signing_key() -> bytes:
-    """Get a stable signing key for callback tokens.
+    """Get the stable HMAC signing key for callback tokens.
 
-    Derives from the database URL as a stable per-deployment secret.
+    Uses the dedicated `token_signing_key` secret when configured, else
+    falls back to `sha256(database_url)` (see auth.token_signing).
     """
-    global _signing_key  # noqa: PLW0603
-    if _signing_key is not None:
-        return _signing_key
-    from terrapod.config import settings
+    from terrapod.auth.token_signing import get_token_signing_key
 
-    _signing_key = hashlib.sha256(str(settings.database_url).encode()).digest()
-    return _signing_key
+    return get_token_signing_key()
 
 
 def generate_callback_token(result_id: uuid.UUID) -> str:

@@ -68,6 +68,13 @@ spec:
                   name: {{ include "terrapod.fullname" . }}-storage
                   key: hmac-secret
                   optional: true
+            {{- if .Values.api.tokenSigningKey.existingSecret }}
+            - name: TERRAPOD_TOKEN_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.tokenSigningKey.existingSecret }}
+                  key: {{ .Values.api.tokenSigningKey.existingSecretKey | default "token_signing_key" }}
+            {{- end }}
             {{- if .Values.postgresql.existingSecret }}
             - name: TERRAPOD_DATABASE_URL
               valueFrom:

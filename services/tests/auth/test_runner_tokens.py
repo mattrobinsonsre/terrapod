@@ -15,18 +15,19 @@ from terrapod.auth.runner_tokens import (
 
 @pytest.fixture(autouse=True)
 def _reset_signing_key():
-    """Reset the module-level signing key cache between tests."""
-    import terrapod.auth.runner_tokens as mod
+    """Reset the shared signing-key cache between tests."""
+    from terrapod.auth import token_signing
 
-    mod._signing_key = None
+    token_signing._reset_cache_for_tests()
     yield
-    mod._signing_key = None
+    token_signing._reset_cache_for_tests()
 
 
 @pytest.fixture
 def _mock_settings():
-    """Patch settings.database_url for deterministic signing key."""
+    """Patch settings for a deterministic signing key (DB-URL fallback path)."""
     with patch("terrapod.config.settings") as mock_settings:
+        mock_settings.token_signing_key = ""
         mock_settings.database_url = "postgresql+asyncpg://test:test@localhost/test"
         yield mock_settings
 

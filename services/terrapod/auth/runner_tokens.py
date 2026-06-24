@@ -12,18 +12,12 @@ import hmac
 import time
 import uuid
 
-_signing_key: bytes | None = None
+from terrapod.auth.token_signing import get_token_signing_key
 
 
 def _get_signing_key() -> bytes:
-    """Get a stable signing key derived from the database URL."""
-    global _signing_key  # noqa: PLW0603
-    if _signing_key is not None:
-        return _signing_key
-    from terrapod.config import settings
-
-    _signing_key = hashlib.sha256(str(settings.database_url).encode()).digest()
-    return _signing_key
+    """Get the stable HMAC signing key (dedicated secret, or DB-URL fallback)."""
+    return get_token_signing_key()
 
 
 def generate_runner_token(run_id: str | uuid.UUID, ttl: int = 3600) -> str:
