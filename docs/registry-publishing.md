@@ -55,7 +55,7 @@ workspaces. See [Module Impact Analysis](registry.md#module-impact-analysis).
 Before the first publish you need three things in place: a registered GPG
 public key, a provider (or module) slot, and an API token. The first two
 are best managed declaratively with the `terrapod` Terraform provider in
-a small `terrapod-config` repo, so they live in version control and can
+a small platform-config repo, so they live in version control and can
 be reviewed — but the equivalent API calls are shown for completeness.
 
 ### 1. Register the publisher's GPG public key
@@ -64,7 +64,7 @@ The server verifies provider signatures against keys you register ahead
 of time. Register the **public** half of the key `terrapod-publish` will
 sign with.
 
-Declaratively (recommended), in your `terrapod-config`:
+Declaratively (recommended), in your platform-config repo:
 
 ```hcl
 resource "terrapod_gpg_key" "publisher" {

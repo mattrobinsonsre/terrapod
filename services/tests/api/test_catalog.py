@@ -649,11 +649,13 @@ class TestManagementRBACNegatives:
 # ── Confirm / discard (catalog-surface, closes the non-auto-apply hole) ──
 
 
-def _planned_run(status="planned", is_destroy=False):
+def _planned_run(status="planned", is_destroy=False, source="catalog", plan_only=False):
     run = MagicMock()
     run.id = uuid.uuid4()
     run.status = status
     run.is_destroy = is_destroy
+    run.source = source
+    run.plan_only = plan_only
     return run
 
 
@@ -725,3 +727,124 @@ class TestConfirmDiscard:
             )
         assert resp.status_code == 409
         assert "archived" in resp.json()["detail"].lower()
+
+
+class TestIsConfirmableCatalogRun:
+    """S2: the catalog confirm/discard endpoints must act ONLY on catalog-
+    initiated, apply-capable, planned runs — never promote a speculative
+    module-impact (`module-test`, plan_only) run to apply. Catalog instances
+    carry a ModuleWorkspaceLink, so such runs CAN land on them."""
+
+    def test_catalog_planned_apply_run_is_confirmable(self):
+        assert catalog_router._is_confirmable_catalog_run(
+            _planned_run(source="catalog", plan_only=False)
+        )
+
+    def test_catalog_lifecycle_destroy_run_is_confirmable(self):
+        assert catalog_router._is_confirmable_catalog_run(
+            _planned_run(source="catalog-lifecycle", plan_only=False)
+        )
+
+    def test_none_is_not_confirmable(self):
+        assert not catalog_router._is_confirmable_catalog_run(None)
+
+    def test_non_planned_is_not_confirmable(self):
+        assert not catalog_router._is_confirmable_catalog_run(
+            _planned_run(status="applied", source="catalog")
+        )
+
+    def test_plan_only_run_is_not_confirmable(self):
+        # A speculative plan must never be promotable to apply via the catalog.
+        assert not catalog_router._is_confirmable_catalog_run(
+            _planned_run(source="catalog", plan_only=True)
+        )
+
+    def test_module_test_source_is_not_confirmable(self):
+        # module-impact analysis queues these on linked (incl. catalog) workspaces.
+        assert not catalog_router._is_confirmable_catalog_run(
+            _planned_run(source="module-test", plan_only=True)
+        )
+
+    def test_module_publish_source_is_not_confirmable(self):
+        # An apply-capable module-publish run is NOT a catalog-initiated change.
+        assert not catalog_router._is_confirmable_catalog_run(
+            _planned_run(source="module-publish", plan_only=False)
+        )
+
+
+class TestConfirmDiscardRunSourceGuard:
+    """S2 at the endpoint layer: a latest run that is a speculative module-test
+    (plan_only, non-catalog source) is rejected 409 by confirm/discard."""
+
+    @patch("terrapod.api.routers.catalog.run_service.confirm_run")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_confirm_rejects_speculative_module_test_run(
+        self, _db, _redis, _storage, mock_perm, mock_confirm
+    ):
+        app, mock_db = _make_app(_user(roles=["everyone"]))
+        ws = _catalog_ws()
+        item = MagicMock(labels={}, owner_email="")
+        item.name = "vpc"
+        mock_db.get = AsyncMock(side_effect=[ws, item])
+        mock_perm.return_value = "use"
+        speculative = _planned_run(source="module-test", plan_only=True)
+        mock_db.execute = AsyncMock(return_value=_exec_returns(speculative))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/terrapod/v1/catalog-instances/ws-{ws.id}/confirm", headers=_AUTH
+            )
+        assert resp.status_code == 409
+        mock_confirm.assert_not_awaited()
+
+
+class TestManagementRenameConflict:
+    """S3: renaming a provider template / catalog item to an existing name
+    surfaces as 409 (IntegrityError handled), not an unhandled 500."""
+
+    @patch("terrapod.api.routers.catalog.catalog_service.get_provider_template")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_provider_template_rename_conflict_409(self, _db, _redis, _storage, mock_get):
+        from sqlalchemy.exc import IntegrityError
+
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        tmpl = MagicMock()
+        mock_get.return_value = tmpl
+        mock_db.commit = AsyncMock(side_effect=IntegrityError("dup", {}, Exception()))
+        mock_db.rollback = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/provider-templates/{uuid.uuid4()}",
+                json={"data": {"attributes": {"name": "taken"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 409
+        mock_db.rollback.assert_awaited()
+
+    @patch("terrapod.api.routers.catalog.catalog_service.get_catalog_item")
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_catalog_item_rename_conflict_409(self, _db, _redis, _storage, mock_get):
+        from sqlalchemy.exc import IntegrityError
+
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        item = MagicMock()
+        mock_get.return_value = item
+        mock_db.commit = AsyncMock(side_effect=IntegrityError("dup", {}, Exception()))
+        mock_db.rollback = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/catalog-items/{uuid.uuid4()}",
+                json={"data": {"attributes": {"name": "taken"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 409
+        mock_db.rollback.assert_awaited()

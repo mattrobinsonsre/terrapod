@@ -254,7 +254,11 @@ async def update_provider_template(
     for k, v in _coerce_template(attrs, on_create=False).items():
         setattr(t, k, v)
     t.updated_at = _now()
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="provider template name already exists") from e
     await db.refresh(t)
     return JSONResponse(content={"data": _template_json(t)})
 
@@ -483,7 +487,11 @@ async def update_catalog_item(
     for k, v in (await _coerce_item(db, attrs, on_create=False)).items():
         setattr(item, k, v)
     item.updated_at = _now()
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="catalog item name already exists") from e
     await db.refresh(item)
     return JSONResponse(content={"data": _item_json(item)})
 
@@ -498,12 +506,12 @@ async def delete_catalog_item(
     item = await catalog_service.get_catalog_item(db, uuid.UUID(item_id))
     if item is None:
         raise HTTPException(status_code=404, detail="catalog item not found")
-    instances = await catalog_service.list_instances(db, item.id)
+    instances = await catalog_service.list_instances(db, item.id, active_only=True)
     if instances:
         raise HTTPException(
             status_code=409,
             detail=(
-                f"catalog item has {len(instances)} provisioned instance(s); "
+                f"catalog item has {len(instances)} active instance(s); "
                 "destroy them before deleting the item"
             ),
         )
@@ -798,6 +806,25 @@ async def _latest_run(db: AsyncSession, workspace_id: uuid.UUID) -> Run | None:
     return result.scalar_one_or_none()
 
 
+# Sources of catalog-initiated apply-capable runs (provision/reconfigure →
+# "catalog", destroy → "catalog-lifecycle"). The confirm/discard endpoints act
+# ONLY on these, never on a speculative module-impact run. Catalog instances
+# carry a ModuleWorkspaceLink, so module-impact analysis can queue a plan-only
+# "module-test" (or full-apply "module-publish") run on them; without this guard
+# a catalog `use` holder could promote a speculative module-test plan to a real
+# apply via confirm.
+_CATALOG_RUN_SOURCES = ("catalog", "catalog-lifecycle")
+
+
+def _is_confirmable_catalog_run(run: Run | None) -> bool:
+    return (
+        run is not None
+        and run.status == "planned"
+        and not run.plan_only
+        and run.source in _CATALOG_RUN_SOURCES
+    )
+
+
 @router.post("/catalog-instances/{ws_id}/confirm")
 async def confirm_catalog_instance_run(
     ws_id: str = Path(...),
@@ -812,7 +839,7 @@ async def confirm_catalog_instance_run(
     platform admin)."""
     ws = await _load_instance(db, user, ws_id, required="use")
     run = await _latest_run(db, ws.id)
-    if run is None or run.status != "planned":
+    if not _is_confirmable_catalog_run(run):
         raise HTTPException(status_code=409, detail="no planned run awaiting confirmation")
     try:
         run = await run_service.confirm_run(db, run)
@@ -835,7 +862,7 @@ async def discard_catalog_instance_run(
     API for the provisioner)."""
     ws = await _load_instance(db, user, ws_id, required="use")
     run = await _latest_run(db, ws.id)
-    if run is None or run.status != "planned":
+    if not _is_confirmable_catalog_run(run):
         raise HTTPException(status_code=409, detail="no planned run to discard")
     try:
         run = await run_service.discard_run(db, run)

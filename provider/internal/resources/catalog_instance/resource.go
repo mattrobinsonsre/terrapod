@@ -39,6 +39,7 @@ package catalog_instance
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -312,8 +313,23 @@ func readCatalogInstanceIntoModel(ctx context.Context, inst *terrapod.CatalogIns
 		m.AgentPoolID = types.StringValue(pool)
 	}
 
-	if vals := attrStringMap(inst.Attributes, "input-values"); len(vals) > 0 {
-		mv, d := types.MapValueFrom(ctx, types.StringType, vals)
+	// Merge the server-returned inputs OVER the prior state rather than
+	// replacing wholesale. The server's input-values deliberately OMIT
+	// sensitive inputs (they're write-only — encrypted at rest, never
+	// round-tripped, like TFE sensitive variables). A wholesale replace would
+	// drop every sensitive key from state, producing a perpetual plan diff and
+	// a needless re-apply each run. So we keep prior-state keys the server
+	// didn't return (the sensitive ones) and overlay the non-sensitive values
+	// the server does report. (Tradeoff: an externally-removed non-sensitive
+	// key isn't detected on refresh — acceptable, since catalog workspaces are
+	// config-managed and their variables are only mutated via reconfigure.)
+	merged := map[string]string{}
+	if !m.InputValues.IsNull() && !m.InputValues.IsUnknown() {
+		diags.Append(m.InputValues.ElementsAs(ctx, &merged, false)...)
+	}
+	maps.Copy(merged, attrStringMap(inst.Attributes, "input-values"))
+	if len(merged) > 0 {
+		mv, d := types.MapValueFrom(ctx, types.StringType, merged)
 		diags.Append(d...)
 		m.InputValues = mv
 	} else {

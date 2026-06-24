@@ -265,9 +265,20 @@ POST   /api/terrapod/v1/catalog-items/{id}/provision # catalog use + pool write
 GET    /api/terrapod/v1/catalog-instances/{wsId}
 PATCH  /api/terrapod/v1/catalog-instances/{wsId}          # reconfigure (catalog use)
 POST   /api/terrapod/v1/catalog-instances/{wsId}/destroy  # destroy (catalog use)
+POST   /api/terrapod/v1/catalog-instances/{wsId}/confirm  # apply a planned run (catalog use)
+POST   /api/terrapod/v1/catalog-instances/{wsId}/discard  # discard a planned run (catalog use)
 ```
 
 Runs created by the catalog carry distinct sources: **`catalog`** for provision and reconfigure runs, and **`catalog-lifecycle`** for the destroy→archive run.
+
+### Confirming a non-auto-apply run
+
+Provision, reconfigure, and destroy accept `auto-apply`. When it is **false**, the resulting run stops at **`planned`** and waits for a human. Because the catalog-managed-workspace clamp grants the provisioner only **read** on the underlying workspace, the run can't be confirmed through the normal workspace run API — instead use the catalog surface:
+
+- `POST /catalog-instances/{wsId}/confirm` — apply the pending planned run (catalog `use`).
+- `POST /catalog-instances/{wsId}/discard` — discard it (catalog `use`).
+
+Both act **only** on a catalog-initiated, apply-capable planned run (`source` ∈ {`catalog`, `catalog-lifecycle`}, not plan-only) — a speculative module-impact plan that happens to be the latest run is never promotable this way. The web UI surfaces these as a pending-run banner on the instance page.
 
 ## Related
 

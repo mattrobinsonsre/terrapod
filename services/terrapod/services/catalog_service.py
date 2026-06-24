@@ -675,10 +675,17 @@ async def list_catalog_items(db: AsyncSession) -> list[CatalogItem]:
     return list(result.scalars().all())
 
 
-async def list_instances(db: AsyncSession, item_id: uuid.UUID) -> list[Workspace]:
-    result = await db.execute(
-        select(Workspace).where(Workspace.catalog_item_id == item_id).order_by(Workspace.name)
-    )
+async def list_instances(
+    db: AsyncSession, item_id: uuid.UUID, *, active_only: bool = False
+) -> list[Workspace]:
+    """List workspaces provisioned from a catalog item. ``active_only`` excludes
+    ``archived`` instances (destroyed-and-reclaimed) — used by the item-delete
+    guard so a successfully-destroyed instance doesn't permanently block deleting
+    its item (the FK is ``ondelete=SET NULL``, so archived rows survive cleanly)."""
+    stmt = select(Workspace).where(Workspace.catalog_item_id == item_id)
+    if active_only:
+        stmt = stmt.where(Workspace.lifecycle_state != "archived")
+    result = await db.execute(stmt.order_by(Workspace.name))
     return list(result.scalars().all())
 
 
