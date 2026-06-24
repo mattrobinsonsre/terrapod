@@ -113,6 +113,46 @@ class TestUpdateVariable:
         await update_variable(db, var, value="v2")
         assert var.version_id == _version_hash("k", "v2", "terraform")
 
+    async def test_downgrade_without_value_clears_secret(self):
+        """sensitive → non-sensitive with no new value must wipe the old value
+        so the previously-hidden secret can't be returned in plaintext."""
+        db = AsyncMock(spec=AsyncSession)
+        var = MagicMock()
+        var.key = "k"
+        var.value = "the-secret"
+        var.sensitive = True
+        var.category = "terraform"
+
+        await update_variable(db, var, sensitive=False)
+        assert var.sensitive is False
+        assert var.value == ""
+        assert var.version_id == _version_hash("k", "", "terraform")
+
+    async def test_downgrade_with_fresh_value_keeps_it(self):
+        """A downgrade that supplies a new value keeps that value (re-submit)."""
+        db = AsyncMock(spec=AsyncSession)
+        var = MagicMock()
+        var.key = "k"
+        var.value = "the-secret"
+        var.sensitive = True
+        var.category = "terraform"
+
+        await update_variable(db, var, value="now-public", sensitive=False)
+        assert var.sensitive is False
+        assert var.value == "now-public"
+
+    async def test_non_sensitive_update_does_not_clear_value(self):
+        """Editing an already-non-sensitive var without a value leaves it intact."""
+        db = AsyncMock(spec=AsyncSession)
+        var = MagicMock()
+        var.key = "k"
+        var.value = "keep-me"
+        var.sensitive = False
+        var.category = "terraform"
+
+        await update_variable(db, var, description="new desc")
+        assert var.value == "keep-me"
+
 
 # ── resolve_variables ──────────────────────────────────────────────────
 

@@ -487,11 +487,20 @@ async def update_varset_var(
         vsv.category = attrs["category"]
     if "hcl" in attrs:
         vsv.hcl = attrs["hcl"]
+    was_sensitive = vsv.sensitive
     if "value" in attrs:
         vsv.value = attrs["value"]
         vsv.version_id = variable_service._version_hash(vsv.key, attrs["value"], vsv.category)
     if "sensitive" in attrs:
         vsv.sensitive = attrs["sensitive"]
+
+    # Security: a sensitive → non-sensitive downgrade must not expose the
+    # previously-hidden value. If no fresh value was supplied in the same
+    # request, clear it so the old secret is never returned in plaintext
+    # (mirrors variable_service.update_variable for workspace vars).
+    if was_sensitive and vsv.sensitive is False and "value" not in attrs:
+        vsv.value = ""
+        vsv.version_id = variable_service._version_hash(vsv.key, "", vsv.category)
 
     await db.commit()
     await db.refresh(vsv)

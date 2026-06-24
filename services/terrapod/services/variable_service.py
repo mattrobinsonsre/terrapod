@@ -84,12 +84,24 @@ async def update_variable(
     if hcl is not None:
         var.hcl = hcl
 
+    was_sensitive = var.sensitive
+
     if value is not None:
         var.value = value
         var.version_id = _version_hash(var.key, value, var.category)
 
     if sensitive is not None:
         var.sensitive = sensitive
+
+    # Security: downgrading a variable from sensitive → non-sensitive would
+    # otherwise return its previously-hidden value in plaintext (the response
+    # masks the value only while `sensitive` is true). A value entered AS a
+    # secret must not become world-readable by flipping a flag. If the caller
+    # didn't supply a fresh value in the same request, clear it so the old
+    # secret is never exposed — the operator must re-enter it.
+    if was_sensitive and sensitive is False and value is None:
+        var.value = ""
+        var.version_id = _version_hash(var.key, "", var.category)
 
     await db.flush()
     return var
