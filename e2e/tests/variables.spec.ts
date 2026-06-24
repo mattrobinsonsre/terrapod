@@ -99,8 +99,9 @@ test.describe('Variables', () => {
     const row = page.locator(`tr:has-text("${varKey}")`);
     await expect(row).toBeVisible({ timeout: 10_000 });
 
-    // Delete it
+    // Delete it — two-click inline confirm (Delete → Confirm)
     await row.locator('button:has-text("Delete")').click();
+    await row.locator('button:has-text("Confirm")').click();
 
     // Should be gone
     await expect(row).not.toBeVisible({ timeout: 10_000 });
