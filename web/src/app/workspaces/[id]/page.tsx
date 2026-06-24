@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
+import { ConnectionStatus } from '@/components/connection-status'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
@@ -542,7 +543,7 @@ function WorkspaceDetailContent() {
   }, [vcsRef])
 
   // Real-time workspace events via SSE (run status, lock/unlock, state, settings)
-  useRunEvents(workspaceId, useCallback((event) => {
+  const { connected: sseConnected } = useRunEvents(workspaceId, useCallback((event) => {
     loadWorkspace()
     const ev = event.event
     const reconnect = ev === 'reconnect'
@@ -1544,6 +1545,7 @@ function WorkspaceDetailContent() {
         <PageHeader
           title={attrs.name}
           description={`${attrs['execution-mode']} execution mode`}
+          actions={<ConnectionStatus connected={sseConnected} />}
         />
 
         {error && <ErrorBanner message={error} />}

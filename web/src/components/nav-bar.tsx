@@ -191,12 +191,16 @@ export default function NavBar() {
                 href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/index.md"
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Documentation"
                 className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
               >
                 <BookOpen size={20} />
               </a>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
+                aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={menuOpen}
+                aria-controls="mobile-nav-menu"
                 className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
               >
                 {menuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -211,7 +215,7 @@ export default function NavBar() {
             </div>
           </div>
           {menuOpen && (
-            <div className="md:hidden flex flex-col gap-1 pb-3">
+            <div id="mobile-nav-menu" className="md:hidden flex flex-col gap-1 pb-3">
               {navLinks}
               <NavLink href="/api-docs" onClick={closeMenu}>
                 <Code size={16} />

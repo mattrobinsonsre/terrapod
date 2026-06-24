@@ -9,6 +9,7 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { LabelsEditor } from '@/components/labels-editor'
+import { Modal } from '@/components/modal'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
@@ -405,7 +406,7 @@ export default function CatalogItemPage() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.detail || `Failed to orphan (${res.status})`)
       }
-      setActionResult(`Orphaned ${orphanInstance.attributes.name} — workspace removed, infrastructure left running (untracked).`)
+      setActionResult(`Orphaned ${orphanInstance.attributes.name} — catalog record deleted; its infrastructure is left running, untracked and unmanaged.`)
       setOrphanInstance(null)
       setOrphanConfirm('')
       await loadInstances()
@@ -533,6 +534,13 @@ export default function CatalogItemPage() {
                     <option key={p.id} value={p.id}>{p.attributes.name}</option>
                   ))}
                 </select>
+                {selectablePools.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-400">
+                    {pools.length === 0
+                      ? 'No agent pools are available to you. You need write access to an agent pool to provision — ask an administrator to grant it.'
+                      : 'None of the agent pools you can access are allowed by this catalog item. Ask an administrator to widen the item’s allowed pools or grant you access to one of them.'}
+                  </p>
+                )}
               </div>
               <div>
                 <label htmlFor="prov-version" className="block text-sm font-medium text-slate-300 mb-1">Version</label>
@@ -576,7 +584,7 @@ export default function CatalogItemPage() {
                 onChange={(e) => setProvAutoApply(e.target.checked)}
                 className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
               />
-              <span className="text-sm text-amber-300">Auto-apply applies changes without review — a brave choice for production.</span>
+              <span className="text-sm text-amber-300">Auto-apply applies changes without a manual review step.</span>
             </label>
 
             <button
@@ -642,8 +650,13 @@ export default function CatalogItemPage() {
 
       {/* Reconfigure modal */}
       {reconfigInstance && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-slate-800 rounded-lg border border-slate-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5">
+        <Modal
+          open
+          onClose={() => setReconfigInstance(null)}
+          title={`Reconfigure ${reconfigInstance.attributes.name}`}
+          panelClassName="bg-slate-800 rounded-lg border border-slate-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5"
+        >
+          <div>
             <h3 className="text-lg font-semibold text-slate-100 mb-1">Reconfigure {reconfigInstance.attributes.name}</h3>
             <p className="text-sm text-slate-400 mb-4">Update inputs and/or version, then queue a run.</p>
             {reconfigError && <ErrorBanner message={reconfigError} />}
@@ -687,7 +700,7 @@ export default function CatalogItemPage() {
                   onChange={(e) => setReconfigAutoApply(e.target.checked)}
                   className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
                 />
-                <span className="text-sm text-amber-300">Auto-apply applies changes without review — a brave choice for production.</span>
+                <span className="text-sm text-amber-300">Auto-apply applies changes without a manual review step.</span>
               </label>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setReconfigInstance(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">Cancel</button>
@@ -697,13 +710,18 @@ export default function CatalogItemPage() {
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Destroy confirm modal */}
       {destroyInstance && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-slate-800 rounded-lg border border-slate-700 w-full max-w-md p-5">
+        <Modal
+          open
+          onClose={() => setDestroyInstance(null)}
+          title={`Destroy ${destroyInstance.attributes.name}`}
+          panelClassName="bg-slate-800 rounded-lg border border-slate-700 w-full max-w-md p-5"
+        >
+          <div>
             <h3 className="text-lg font-semibold text-slate-100 mb-1">Destroy {destroyInstance.attributes.name}?</h3>
             <p className="text-sm text-slate-400 mb-4">
               This queues a destroy run that tears down this instance&apos;s infrastructure. On a successful apply the workspace is archived. This cannot be undone.
@@ -725,12 +743,17 @@ export default function CatalogItemPage() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {orphanInstance && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-slate-800 rounded-lg border border-red-900/60 w-full max-w-md p-5">
+        <Modal
+          open
+          onClose={() => { setOrphanInstance(null); setOrphanConfirm('') }}
+          title={`Orphan ${orphanInstance.attributes.name}`}
+          panelClassName="bg-slate-800 rounded-lg border border-red-900/60 w-full max-w-md p-5"
+        >
+          <div>
             <h3 className="text-lg font-semibold text-slate-100 mb-1">Orphan {orphanInstance.attributes.name}?</h3>
             <p className="text-sm text-slate-400 mb-3">
               This deletes the catalog instance record but does <span className="text-amber-300 font-medium">not</span> destroy its infrastructure — the provisioned resources keep running, <span className="text-amber-300 font-medium">untracked and unmanaged</span>. This is discouraged. To reclaim the infrastructure, cancel and use <span className="text-slate-200 font-medium">Destroy</span> instead.
@@ -758,7 +781,7 @@ export default function CatalogItemPage() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </>
   )

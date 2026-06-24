@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Convert from 'ansi-to-html'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
+import { ConnectionStatus } from '@/components/connection-status'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { PlanSummaryBadges } from '@/components/plan-summary-badges'
@@ -383,7 +384,7 @@ function RunDetailPageInner() {
   }, [router, loadRun])
 
   // Real-time updates via SSE — reload run on status change, refresh logs on log_updated
-  useRunEvents(workspaceId, useCallback((event) => {
+  const { connected: sseConnected } = useRunEvents(workspaceId, useCallback((event) => {
     const bareId = runId.replace(/^run-/, '')
     if (event.event === 'reconnect' || (event.event === 'run_status_change' && event.run_id === bareId)) {
       loadRun()
@@ -591,6 +592,7 @@ function RunDetailPageInner() {
           description={attrs.message || `${attrs.source} run`}
           actions={
             <div className="flex items-center gap-2">
+              <ConnectionStatus connected={sseConnected} />
               {attrs['is-destroy'] && (
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-900/50 text-red-300">
                   destroy

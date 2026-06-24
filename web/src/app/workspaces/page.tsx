@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
+import { ConnectionStatus } from '@/components/connection-status'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
@@ -391,7 +392,7 @@ function WorkspacesPageInner() {
   // workspaces.length) so the FIRST workspace created from another tab / the
   // CLI / a VCS push live-appears on an empty org instead of requiring a
   // manual refresh — the empty state is exactly where live-update matters most.
-  useWorkspaceListEvents(true, useCallback(() => {
+  const { connected: sseConnected } = useWorkspaceListEvents(true, useCallback(() => {
     loadWorkspaces()
   }, []))
 
@@ -504,12 +505,15 @@ function WorkspacesPageInner() {
           title="Workspaces"
           description="Manage Terraform workspaces, state, and runs"
           actions={
-            <button
-              onClick={() => setShowCreate(!showCreate)}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
-            >
-              {showCreate ? 'Cancel' : 'New Workspace'}
-            </button>
+            <div className="flex items-center gap-3">
+              <ConnectionStatus connected={sseConnected} />
+              <button
+                onClick={() => setShowCreate(!showCreate)}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
+              >
+                {showCreate ? 'Cancel' : 'New Workspace'}
+              </button>
+            </div>
           }
         />
 
