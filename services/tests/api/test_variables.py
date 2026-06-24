@@ -389,3 +389,95 @@ class TestVariableSetCRUD:
                 headers=_AUTH,
             )
         assert resp.status_code == 403
+
+
+def _mock_vsvar(key="db_pass", value="s3cr3t", sensitive=True):
+    v = MagicMock()
+    v.id = uuid.uuid4()
+    v.variable_set_id = uuid.uuid4()
+    v.key = key
+    v.value = value
+    v.sensitive = sensitive
+    v.category = "terraform"
+    v.hcl = False
+    v.description = ""
+    v.version_id = "old-hash"
+    v.created_at = datetime(2026, 1, 1, tzinfo=UTC)
+    v.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
+    return v
+
+
+class TestVarsetVarSensitiveDowngrade:
+    """The varset-var PATCH path must clear a previously-hidden secret when a
+    var is flipped sensitive→non-sensitive without a fresh value (mirrors the
+    workspace-var service-tier rule; the router does it inline)."""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables._get_varset")
+    async def test_downgrade_without_value_clears_secret(self, mock_get_vs, *_mocks):
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        mock_get_vs.return_value = _mock_varset()
+        vsv = _mock_vsvar(sensitive=True, value="s3cr3t")
+        lookup = MagicMock()
+        lookup.scalar_one_or_none.return_value = vsv
+        mock_db.execute = AsyncMock(return_value=lookup)
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/varsets/varset-{uuid.uuid4()}/relationships/vars/var-{vsv.id}",
+                json={"data": {"attributes": {"sensitive": False}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200
+        assert vsv.sensitive is False
+        assert vsv.value == ""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables._get_varset")
+    async def test_downgrade_with_fresh_value_keeps_it(self, mock_get_vs, *_mocks):
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        mock_get_vs.return_value = _mock_varset()
+        vsv = _mock_vsvar(sensitive=True, value="s3cr3t")
+        lookup = MagicMock()
+        lookup.scalar_one_or_none.return_value = vsv
+        mock_db.execute = AsyncMock(return_value=lookup)
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/varsets/varset-{uuid.uuid4()}/relationships/vars/var-{vsv.id}",
+                json={"data": {"attributes": {"sensitive": False, "value": "now-public"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200
+        assert vsv.value == "now-public"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.variables._get_varset")
+    async def test_non_sensitive_edit_keeps_value(self, mock_get_vs, *_mocks):
+        user = _user(roles=["admin"])
+        app, mock_db = _make_app(user)
+        mock_get_vs.return_value = _mock_varset()
+        vsv = _mock_vsvar(sensitive=False, value="keep-me")
+        lookup = MagicMock()
+        lookup.scalar_one_or_none.return_value = vsv
+        mock_db.execute = AsyncMock(return_value=lookup)
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/v2/varsets/varset-{uuid.uuid4()}/relationships/vars/var-{vsv.id}",
+                json={"data": {"attributes": {"description": "new"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200
+        assert vsv.value == "keep-me"

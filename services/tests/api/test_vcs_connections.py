@@ -49,6 +49,7 @@ def _mock_conn(
     github_account_login="example",
     github_account_type="Organization",
     status="active",
+    webhook_secret=None,
 ):
     c = MagicMock()
     c.id = conn_id or uuid.uuid4()
@@ -61,6 +62,7 @@ def _mock_conn(
     c.github_account_login = github_account_login
     c.github_account_type = github_account_type
     c.status = status
+    c.webhook_secret = webhook_secret
     c.created_at = datetime(2026, 5, 9, tzinfo=UTC)
     c.updated_at = datetime(2026, 5, 9, tzinfo=UTC)
     return c
@@ -540,3 +542,108 @@ class TestDeleteConnection:
                 f"/api/terrapod/v1/vcs-connections/vcs-{uuid.uuid4()}", headers=_AUTH
             )
         assert resp.status_code == 404
+
+
+# ── Per-connection webhook secret (write-only) ────────────────────────────
+
+
+class TestWebhookSecret:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_with_secret_sets_flag_and_never_echoes(self, *_mocks):
+        app, db = _make_app(_admin())
+        db.execute = AsyncMock(return_value=_scalar_result(None))  # no dup install
+        db.add = MagicMock()
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        body = {
+            "data": {
+                "attributes": {
+                    "name": "gh-wh",
+                    "provider": "github",
+                    "github-app-id": 1,
+                    "github-installation-id": 2,
+                    "private-key": "-----BEGIN RSA PRIVATE KEY-----\nx\n-----END RSA PRIVATE KEY-----",
+                    "webhook-secret": "my-per-conn-secret",
+                }
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post("/api/terrapod/v1/vcs-connections", json=body, headers=_AUTH)
+        assert resp.status_code == 201, resp.text
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["has-webhook-secret"] is True
+        # The raw value must never be echoed anywhere in the response.
+        assert "webhook-secret" not in attrs
+        assert "my-per-conn-secret" not in resp.text
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_without_secret_flag_false(self, *_mocks):
+        app, db = _make_app(_admin())
+        db.execute = AsyncMock(return_value=_scalar_result(None))
+        db.add = MagicMock()
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+        body = {
+            "data": {
+                "attributes": {
+                    "name": "gh-nowh",
+                    "provider": "github",
+                    "github-app-id": 1,
+                    "github-installation-id": 3,
+                    "private-key": "-----BEGIN RSA PRIVATE KEY-----\nx\n-----END RSA PRIVATE KEY-----",
+                }
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post("/api/terrapod/v1/vcs-connections", json=body, headers=_AUTH)
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["data"]["attributes"]["has-webhook-secret"] is False
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.vcs_connections._get_connection", new_callable=AsyncMock)
+    async def test_patch_rotate_set_clear_omit(self, mock_get, *_mocks):
+        app, db = _make_app(_admin())
+        db.commit = AsyncMock()
+        db.refresh = AsyncMock()
+
+        # Rotate: non-empty value → set.
+        conn = _mock_conn(webhook_secret=None)
+        mock_get.return_value = conn
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/vcs-connections/vcs-{conn.id}",
+                json={"data": {"attributes": {"webhook-secret": "rotated"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+        assert conn.webhook_secret == "rotated"
+
+        # Clear: explicit empty string → None (fall back to global).
+        conn2 = _mock_conn(webhook_secret="existing")
+        mock_get.return_value = conn2
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/vcs-connections/vcs-{conn2.id}",
+                json={"data": {"attributes": {"webhook-secret": ""}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+        assert conn2.webhook_secret is None
+
+        # Omit: key absent → untouched.
+        conn3 = _mock_conn(webhook_secret="keep")
+        mock_get.return_value = conn3
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                f"/api/terrapod/v1/vcs-connections/vcs-{conn3.id}",
+                json={"data": {"attributes": {"name": "renamed"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200, resp.text
+        assert conn3.webhook_secret == "keep"

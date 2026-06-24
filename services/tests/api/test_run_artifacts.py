@@ -264,6 +264,42 @@ class TestUploadStateDuplicateSerial:
         assert resp.status_code == 200
         mock_db.add.assert_not_called()
 
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_existing_serial_different_sha256_is_divergence_409(
+        self, mock_get_storage, *_mocks
+    ):
+        """Same serial but a DIFFERENT sha256 is a genuine divergence — the
+        whole reason for the sha256 column (an md5 collision must not let it
+        slip through as an idempotent no-op). It must 409, not 200."""
+        run_id = uuid.uuid4()
+        ws_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id, ws_id=ws_id)
+
+        state_json = json.dumps({"version": 4, "serial": 8, "lineage": "abc"})
+
+        mock_db = AsyncMock()
+        existing_sv = MagicMock(spec=StateVersion)
+        existing_sv.md5 = "deadbeef"
+        existing_sv.sha256 = "a-different-sha256-than-the-upload"
+        mock_db.get.return_value = run
+        lookup = MagicMock()
+        lookup.scalar_one_or_none.return_value = existing_sv
+        mock_db.execute.return_value = lookup
+        mock_get_storage.return_value = AsyncMock()
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/state",
+                content=state_json,
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+        assert resp.status_code == 409
+        mock_db.add.assert_not_called()
+
 
 # ── upload_plan_json_output (#280) ─────────────────────────────────────
 

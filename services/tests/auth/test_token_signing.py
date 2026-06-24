@@ -20,13 +20,6 @@ def _reset():
     token_signing._reset_cache_for_tests()
 
 
-def _settings(token_key, db_url="postgresql+asyncpg://u:p@h/db"):
-    with patch("terrapod.config.settings") as s:
-        s.token_signing_key = token_key
-        s.database_url = db_url
-        return s
-
-
 def test_empty_key_falls_back_to_database_url():
     """No dedicated secret → key == sha256(database_url) (unchanged behaviour)."""
     db_url = "postgresql+asyncpg://u:p@h/db"

@@ -150,3 +150,38 @@ class TestCreateModuleVersionDuplicate:
         assert resp.status_code == 409
         # No insert was attempted — the pending row never exists.
         db.add.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.registry_modules.create_module_version", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.registry_modules.resolve_registry_permission_for")
+    @patch("terrapod.api.routers.registry_modules.get_module")
+    async def test_concurrent_insert_race_rolls_back_to_409(
+        self, mock_get_module, mock_perm, mock_create, *_mocks
+    ):
+        """If a concurrent create wins between the pre-check and our flush, the
+        IntegrityError is caught, rolled back, and surfaced as 409 (not a 500)."""
+        from sqlalchemy.exc import IntegrityError
+
+        from terrapod.storage import get_storage
+
+        app, db = _make_app()
+        app.dependency_overrides[get_storage] = lambda: AsyncMock()
+        mock_get_module.return_value = _mock_module()
+        mock_perm.return_value = "admin"
+        # Pre-check finds nothing → we proceed; then the flush races and raises.
+        db.execute = AsyncMock(return_value=_scalar_result(None))
+        db.rollback = AsyncMock()
+        mock_create.side_effect = IntegrityError("dup", {}, Exception())
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/registry-modules/private/default/vpc/aws/versions",
+                json={
+                    "data": {"type": "registry-module-versions", "attributes": {"version": "1.0.0"}}
+                },
+            )
+        assert resp.status_code == 409
+        db.rollback.assert_awaited()

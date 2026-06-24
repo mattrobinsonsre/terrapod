@@ -161,7 +161,9 @@ async def create_connection(
         token_value = token
 
     # Optional per-connection webhook secret (GitHub only). Write-only.
-    webhook_secret = (attrs.get("webhook-secret") or "") if provider == "github" else ""
+    # Trimmed to match the PATCH path so a whitespace-only value is treated
+    # as unset rather than stored verbatim.
+    webhook_secret = (attrs.get("webhook-secret") or "").strip() if provider == "github" else ""
 
     conn = VCSConnection(
         id=generate_uuid7(),

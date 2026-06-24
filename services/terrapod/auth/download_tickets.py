@@ -58,18 +58,17 @@ DEFAULT_TTL_SECONDS = 300
 # Hard cap. A caller asking for more is silently clamped.
 MAX_TTL_SECONDS = 1800
 
-_signing_key: bytes | None = None
-
 
 def _get_signing_key() -> bytes:
-    """Get the stable signing key (same key as runner tokens use)."""
-    global _signing_key  # noqa: PLW0603
-    if _signing_key is not None:
-        return _signing_key
-    from terrapod.config import settings
+    """Get the stable HMAC signing key (shared with runner + run-task tokens).
 
-    _signing_key = hashlib.sha256(str(settings.database_url).encode()).digest()
-    return _signing_key
+    Uses the dedicated `token_signing_key` secret when configured, else falls
+    back to `sha256(database_url)` (see auth.token_signing) — so a configured
+    secret decouples download-ticket forgery from the database credentials too.
+    """
+    from terrapod.auth.token_signing import get_token_signing_key
+
+    return get_token_signing_key()
 
 
 def _b64encode(s: str) -> str:

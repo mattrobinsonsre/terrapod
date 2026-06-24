@@ -12,7 +12,6 @@ from unittest.mock import patch
 
 import pytest
 
-from terrapod.auth import download_tickets
 from terrapod.auth.download_tickets import (
     DEFAULT_TTL_SECONDS,
     MAX_TTL_SECONDS,
@@ -23,16 +22,19 @@ from terrapod.auth.download_tickets import (
 
 @pytest.fixture(autouse=True)
 def _reset_signing_key():
-    """Reset the module-level signing key cache between tests."""
-    download_tickets._signing_key = None
+    """Reset the shared signing-key cache between tests."""
+    from terrapod.auth import token_signing
+
+    token_signing._reset_cache_for_tests()
     yield
-    download_tickets._signing_key = None
+    token_signing._reset_cache_for_tests()
 
 
 @pytest.fixture
 def _mock_settings():
-    """Deterministic database_url so the derived key is stable across tests."""
+    """Deterministic key so it's stable across tests (DB-URL fallback path)."""
     with patch("terrapod.config.settings") as mock_settings:
+        mock_settings.token_signing_key = ""
         mock_settings.database_url = "postgresql+asyncpg://test:test@localhost/test"
         yield mock_settings
 
@@ -135,9 +137,11 @@ class TestVerificationFailures:
         assert verify_ticket(ticket) is None
 
     def test_signing_key_change_invalidates_old_tickets(self, _mock_settings):
+        from terrapod.auth import token_signing
+
         ticket = mint_ticket("cv", "abc-123", "u@example.com")
         # Pretend the database password rotated — derived key changes.
-        download_tickets._signing_key = None
+        token_signing._reset_cache_for_tests()
         _mock_settings.database_url = "postgresql+asyncpg://test:OTHER@localhost/test"
         assert verify_ticket(ticket) is None
 
