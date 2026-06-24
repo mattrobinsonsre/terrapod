@@ -65,26 +65,32 @@ async def _get_run(run_id: str, db: AsyncSession) -> Run:
     return run
 
 
-def _read_state_metadata(path: str) -> tuple[int, str, str]:
-    """Read (serial, lineage, md5) from a state file on disk.
+def _read_state_metadata(path: str) -> tuple[int, str, str, str]:
+    """Read (serial, lineage, md5, sha256) from a state file on disk.
 
-    Runs in a worker thread (CLAUDE.md #13): the md5 is hashed over the
-    full state and `json.load` parses it, both of which would block the
+    Runs in a worker thread (CLAUDE.md #13): the hashes are computed over
+    the full state and `json.load` parses it, both of which would block the
     event loop on a multi-MB state if run inline. The file lives on the
     ephemeral PVC, never in the worker heap.
+
+    md5 is kept for the TFE/go-tfe state-version contract; sha256 is the
+    hash used for the divergence equality check (an md5 collision must not
+    suppress a genuine divergence flag). Both are computed in one pass.
     """
-    h = hashlib.md5()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+    h_md5 = hashlib.md5()  # noqa: S324  # nosemgrep: insecure-hash-algorithm-md5
+    h_sha = hashlib.sha256()
     with open(path, "rb") as fh:
         while True:
             buf = fh.read(1024 * 1024)
             if not buf:
                 break
-            h.update(buf)
+            h_md5.update(buf)
+            h_sha.update(buf)
     with open(path, "rb") as fh:
         state_data = json.load(fh)
     serial = state_data.get("serial", 0)
     lineage = state_data.get("lineage", "")
-    return serial, lineage, h.hexdigest()
+    return serial, lineage, h_md5.hexdigest(), h_sha.hexdigest()
 
 
 def _summarize_plan_file(path: str) -> dict | None:
@@ -442,12 +448,12 @@ async def upload_state(
     tmp_path, state_size = await stream_to_tempfile(request, suffix=".state.json")
     try:
         try:
-            serial, lineage, md5 = await asyncio.to_thread(_read_state_metadata, tmp_path)
+            serial, lineage, md5, sha256 = await asyncio.to_thread(_read_state_metadata, tmp_path)
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise HTTPException(status_code=400, detail="Invalid state JSON") from exc
 
         return await _persist_runner_state(
-            db, run, run_id, tmp_path, state_size, serial, lineage, md5
+            db, run, run_id, tmp_path, state_size, serial, lineage, md5, sha256
         )
     finally:
         try:
@@ -465,6 +471,7 @@ async def _persist_runner_state(
     serial: int,
     lineage: str,
     md5: str,
+    sha256: str,
 ) -> Response:
     """Divergence check + StateVersion insert + stream-to-storage for a state upload.
 
@@ -500,7 +507,15 @@ async def _persist_runner_state(
         )
     ).scalar_one_or_none()
     if existing is not None:
-        if existing.md5 == md5:
+        # Prefer the collision-resistant sha256 for the equality check; an md5
+        # collision must not be able to make two distinct states compare equal
+        # and suppress a genuine divergence flag. Fall back to md5 only when the
+        # existing row predates the sha256 column (legacy rows have sha256 == "").
+        if existing.sha256:
+            states_match = existing.sha256 == sha256
+        else:
+            states_match = existing.md5 == md5
+        if states_match:
             # Serial-neutral no-op apply: state is provably identical. Clear any
             # stale divergence flag and return success so the runner does NOT
             # signal state-diverged and the run transitions to applied.
@@ -523,6 +538,7 @@ async def _persist_runner_state(
         serial=serial,
         lineage=lineage,
         md5=md5,
+        sha256=sha256,
         state_size=state_size,
         run_id=run.id,
         created_by=run.created_by or None,

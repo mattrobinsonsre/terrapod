@@ -187,11 +187,15 @@ class TestUploadStateDuplicateSerial:
 
         state_json = json.dumps({"version": 4, "serial": 8, "lineage": "abc"})
         body_md5 = hashlib.md5(state_json.encode()).hexdigest()  # noqa: S324
+        body_sha = hashlib.sha256(state_json.encode()).hexdigest()
 
         mock_db = AsyncMock()
         # The existing state version at serial 8 has the SAME content hash.
+        # The divergence check prefers sha256 (collision-resistant); md5 stays
+        # for the go-tfe contract.
         existing_sv = MagicMock(spec=StateVersion)
         existing_sv.md5 = body_md5
+        existing_sv.sha256 = body_sha
         ws = MagicMock()
         ws.state_diverged = True  # stale flag from a prior mis-fire
         # db.get: first _get_run(Run), then db.get(Workspace) in the no-op branch.
@@ -219,6 +223,46 @@ class TestUploadStateDuplicateSerial:
         # Stale divergence flag cleared.
         assert ws.state_diverged is False
         mock_db.commit.assert_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.run_artifacts.get_storage")
+    async def test_legacy_row_without_sha256_falls_back_to_md5(self, mock_get_storage, *_mocks):
+        """A row written before the sha256 column existed has sha256 == "".
+        The divergence check must fall back to md5 for it (so a pre-upgrade
+        no-op apply is still recognised as idempotent, not flagged diverged)."""
+        import hashlib
+
+        run_id = uuid.uuid4()
+        ws_id = uuid.uuid4()
+        run = _mock_run(run_id=run_id, ws_id=ws_id)
+
+        state_json = json.dumps({"version": 4, "serial": 8, "lineage": "abc"})
+        body_md5 = hashlib.md5(state_json.encode()).hexdigest()  # noqa: S324
+
+        mock_db = AsyncMock()
+        existing_sv = MagicMock(spec=StateVersion)
+        existing_sv.md5 = body_md5
+        existing_sv.sha256 = ""  # legacy row, pre-sha256-column
+        ws = MagicMock()
+        ws.state_diverged = False
+        mock_db.get.side_effect = [run, ws]
+        lookup = MagicMock()
+        lookup.scalar_one_or_none.return_value = existing_sv
+        mock_db.execute.return_value = lookup
+        mock_get_storage.return_value = AsyncMock()
+
+        app = _make_app(_runner_user(run_id), mock_db)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as client:
+            resp = await client.put(
+                f"/api/terrapod/v1/runs/{run.id}/artifacts/state",
+                content=state_json,
+                headers={**_AUTH, "Content-Type": "application/json"},
+            )
+
+        assert resp.status_code == 200
+        mock_db.add.assert_not_called()
 
 
 # ── upload_plan_json_output (#280) ─────────────────────────────────────

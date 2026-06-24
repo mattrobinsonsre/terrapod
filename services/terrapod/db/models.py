@@ -487,7 +487,13 @@ class StateVersion(Base):
     )
     serial: Mapped[int] = mapped_column(Integer, nullable=False)
     lineage: Mapped[str] = mapped_column(String(63), nullable=False, default="")
+    # `md5` is part of the TFE/go-tfe state-version contract and is kept for
+    # compatibility. `sha256` is Terrapod-internal and is the hash used for
+    # the state-divergence equality check (an md5 collision must not be able
+    # to suppress a genuine divergence flag). Nullable/empty for rows written
+    # before the column existed — the divergence check falls back to md5 then.
     md5: Mapped[str] = mapped_column(String(32), nullable=False, default="")
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False, default="", server_default="")
     state_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     run_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
