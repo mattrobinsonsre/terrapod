@@ -32,9 +32,10 @@ producing half-migrated state.
 
 ## Status
 
-The migration tool ships in **v0.27.0**. Until then, this page is a
-forward-looking spec; the relevant subcommands are stubbed in the binary
-with placeholders that exit non-zero.
+Available since **v0.27.0**. The `apply`, `status`, `rewrite`, `verify`,
+`cutover`, and `module` subcommands are fully implemented; `terrapod-migrate`
+ships as a GitHub Release artifact (universal-macOS + linux/windows
+amd64+arm64).
 
 ## Subcommands
 

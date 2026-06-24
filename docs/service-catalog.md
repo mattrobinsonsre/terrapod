@@ -32,7 +32,11 @@ Provisioning a catalog item creates an ordinary **agent-mode, non-VCS workspace*
 The generated configuration is a small, predictable set of files:
 
 ```hcl
-# main.tf  (generated)
+# main.tf  (generated) — the module call plus one root `variable` block per
+# catalog input. The variable declarations are intentionally UNTYPED: the
+# module-interface `type` string isn't reliably valid HCL for complex types
+# (object/tuple), so the wrapper omits it and lets the supplied value carry its
+# own type. Values arrive correctly-typed as workspace terraform variables.
 module "this" {
   source  = "terrapod.example.com/default/vpc/aws"
   version = "1.4.0"          # resolved from the item's version policy / instance pin
@@ -42,9 +46,9 @@ module "this" {
   # ...
 }
 
-# variables.tf  (generated) — a root `variable` block per catalog input
-variable "cidr_block" { type = string }
-variable "name"       { type = string }
+variable "cidr_block" {}
+variable "name" {}
+# a sensitive input adds only the marker:  variable "secret" { sensitive = true }
 
 # providers.tf  (generated) — rendered from the item's provider templates
 provider "aws" {
