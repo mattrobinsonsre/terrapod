@@ -46,6 +46,7 @@ import asyncio
 import datetime as dt
 import io
 import json
+import os
 import pathlib
 import subprocess
 import tarfile
@@ -315,7 +316,14 @@ def _build_code_diff(prev_tarball: bytes | None, cur_tarball: bytes, max_bytes: 
     if max_bytes <= 0 or prev_tarball is None:
         return ""
 
-    with tempfile.TemporaryDirectory(prefix="tp-aisum-diff-") as tmp:
+    # Land the extraction on the CSP-attached PVC when configured (matches
+    # cv_diff_service / vcs_archive_cache / provider_cache_service). Only .tf
+    # /.tfvars text is extracted here, so the small-file exemption applies and
+    # /tmp is acceptable too — but the PVC keeps an unexpectedly large .tf off
+    # the RAM-backed tmpfs.
+    configured = settings.vcs.tmpdir
+    diff_dir = configured if configured and os.path.isdir(configured) else None
+    with tempfile.TemporaryDirectory(prefix="tp-aisum-diff-", dir=diff_dir) as tmp:
         tmp_root = pathlib.Path(tmp)
         prev_dir = tmp_root / "previous"
         cur_dir = tmp_root / "current"

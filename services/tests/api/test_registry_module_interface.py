@@ -118,3 +118,35 @@ class TestModuleInterfaceEndpoint:
                 "/api/terrapod/v1/registry-modules/private/default/vpc/aws/9.9.9/interface"
             )
         assert resp.status_code == 404
+
+
+class TestCreateModuleVersionDuplicate:
+    @pytest.mark.asyncio
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.registry_modules.resolve_registry_permission_for")
+    @patch("terrapod.api.routers.registry_modules.get_module")
+    async def test_duplicate_version_returns_409(self, mock_get_module, mock_perm, *_mocks):
+        """Creating a version that already exists returns a clean 409 (not a
+        500 from an IntegrityError) and does NOT leave a dangling pending row."""
+        from terrapod.storage import get_storage
+
+        app, db = _make_app()
+        app.dependency_overrides[get_storage] = lambda: AsyncMock()
+        module = _mock_module()
+        mock_get_module.return_value = module
+        mock_perm.return_value = "admin"
+        # The pre-check query finds an existing version → 409 before any insert.
+        db.execute = AsyncMock(return_value=_scalar_result(_mock_version()))
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/registry-modules/private/default/vpc/aws/versions",
+                json={
+                    "data": {"type": "registry-module-versions", "attributes": {"version": "1.0.0"}}
+                },
+            )
+        assert resp.status_code == 409
+        # No insert was attempted — the pending row never exists.
+        db.add.assert_not_called()
