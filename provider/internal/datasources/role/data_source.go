@@ -28,7 +28,9 @@ type roleDataSourceModel struct {
 	DenyLabels          types.Map    `tfsdk:"deny_labels"`
 	DenyNames           types.List   `tfsdk:"deny_names"`
 	WorkspacePermission types.String `tfsdk:"workspace_permission"`
+	PoolPermission      types.String `tfsdk:"pool_permission"`
 	RegistryPermission  types.String `tfsdk:"registry_permission"`
+	CatalogPermission   types.String `tfsdk:"catalog_permission"`
 	BuiltIn             types.Bool   `tfsdk:"built_in"`
 	CreatedAt           types.String `tfsdk:"created_at"`
 	UpdatedAt           types.String `tfsdk:"updated_at"`
@@ -53,7 +55,9 @@ func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			"deny_labels":          schema.MapAttribute{Computed: true, ElementType: types.StringType, Description: "Deny labels."},
 			"deny_names":           schema.ListAttribute{Computed: true, ElementType: types.StringType, Description: "Deny name patterns."},
 			"workspace_permission": schema.StringAttribute{Computed: true, Description: "Permission level."},
+			"pool_permission":      schema.StringAttribute{Computed: true, Description: "Agent pool permission level: read, write, or admin."},
 			"registry_permission":  schema.StringAttribute{Computed: true, Description: "Registry (modules + providers) permission level: read, write, or admin."},
+			"catalog_permission":   schema.StringAttribute{Computed: true, Description: "Service-catalog permission level: none, read, use, or admin."},
 			"built_in":             schema.BoolAttribute{Computed: true, Description: "Whether the role is built-in."},
 			"created_at":           schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
 			"updated_at":           schema.StringAttribute{Computed: true, Description: "Update timestamp."},
@@ -98,7 +102,9 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		config.Description = types.StringNull()
 	}
 	config.WorkspacePermission = types.StringValue(role.WorkspacePermission)
+	config.PoolPermission = types.StringValue(role.PoolPermission)
 	config.RegistryPermission = types.StringValue(role.RegistryPermission)
+	config.CatalogPermission = types.StringValue(role.CatalogPermission)
 	config.BuiltIn = types.BoolValue(role.BuiltIn)
 	config.CreatedAt = types.StringValue(role.CreatedAt)
 	config.UpdatedAt = types.StringValue(role.UpdatedAt)

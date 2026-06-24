@@ -192,9 +192,10 @@ class UserUpdateRequest(BaseModel):
 async def _revoke_all_user_access(db: AsyncSession, email: str) -> None:
     """Full offboarding revocation: web sessions, the cached token-role set
     (`tp:token_roles:`, 60s TTL — otherwise a deactivated admin keeps cached
-    admin roles on API-token requests), and every API token bound to the
-    identity (including detached service tokens the idle-active check can't
-    catch). Used by both deactivate and delete so neither leaves a window."""
+    admin roles on API-token requests), and every API token *bound to* the
+    identity (`bound_to == email`). Detached service tokens (`bound_to` NULL)
+    are org-level, not this user's, so they are intentionally left alone. Used
+    by both deactivate and delete so neither leaves a window."""
     from terrapod.api.dependencies import _TOKEN_ROLES_PREFIX
     from terrapod.auth.api_tokens import revoke_all_for_user
     from terrapod.auth.sessions import revoke_all_user_sessions

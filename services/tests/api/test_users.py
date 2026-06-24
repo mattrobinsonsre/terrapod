@@ -84,8 +84,8 @@ class TestRequireAdmin:
 class TestOffboardingRevocation:
     """Deactivating or deleting a user must revoke not just web sessions but the
     cached token-role set AND every API token bound to the identity — otherwise
-    a deactivated admin keeps cached admin roles (60s TTL) on API-token requests
-    and detached service tokens survive offboarding entirely."""
+    a deactivated admin keeps cached admin roles (60s TTL) on API-token requests.
+    (Detached/org-level tokens, bound_to NULL, are intentionally left alone.)"""
 
     @pytest.mark.asyncio
     @patch("terrapod.redis.client.get_redis_client")
