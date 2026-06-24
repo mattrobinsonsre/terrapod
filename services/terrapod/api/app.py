@@ -489,6 +489,28 @@ def create_application() -> FastAPI:
 
         return response
 
+    # Uncaught unique/constraint violations are a CONFLICT, not a server error.
+    # Many create endpoints pre-check then INSERT, which races under multiple
+    # replicas (the SELECT can't see a concurrent uncommitted INSERT); the loser
+    # hits the unique constraint. get_db has already rolled the session back by
+    # the time we get here. Hot paths still catch IntegrityError in-handler for a
+    # specific message (e.g. catalog "name already exists"); this is the net so
+    # the generic case is 409, not 500. Registered before the Exception handler
+    # so the more specific type wins.
+    from sqlalchemy.exc import IntegrityError
+
+    @app.exception_handler(IntegrityError)
+    async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
+        logger.warning(
+            "Integrity constraint violation",
+            path=str(request.url.path),
+            error=str(getattr(exc, "orig", exc)),
+        )
+        return JSONResponse(
+            status_code=409,
+            content={"detail": "Resource already exists or violates a constraint"},
+        )
+
     # Global exception handler
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:

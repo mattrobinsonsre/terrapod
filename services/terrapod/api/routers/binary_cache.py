@@ -26,6 +26,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_admin
+from terrapod.api.serialization import rfc3339
 from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -154,7 +155,7 @@ async def list_cached_binaries_endpoint(
                         "arch": e.arch,
                         "shasum": e.shasum,
                         "download-url": e.download_url,
-                        "cached-at": e.cached_at.isoformat() if e.cached_at else None,
+                        "cached-at": rfc3339(e.cached_at),
                     },
                 }
                 for e in entries
@@ -235,7 +236,7 @@ async def list_cached_providers_endpoint(
                         "os": e.os,
                         "arch": e.arch,
                         "shasum": e.shasum,
-                        "cached-at": e.cached_at.isoformat() if e.cached_at else None,
+                        "cached-at": rfc3339(e.cached_at),
                     },
                 }
                 for e in entries

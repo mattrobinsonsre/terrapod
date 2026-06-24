@@ -49,6 +49,7 @@ from terrapod.api.dependencies import (
     require_non_runner,
 )
 from terrapod.api.labels import validate_labels
+from terrapod.api.serialization import rfc3339
 from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -121,8 +122,8 @@ def _provider_to_jsonapi(provider, effective_permission: str | None = None) -> d
             "namespace": provider.namespace,
             "labels": provider.labels or {},
             "owner-email": provider.owner_email,
-            "created-at": provider.created_at.isoformat() if provider.created_at else None,
-            "updated-at": provider.updated_at.isoformat() if provider.updated_at else None,
+            "created-at": rfc3339(provider.created_at),
+            "updated-at": rfc3339(provider.updated_at),
             "permissions": {
                 "can-update": has_registry_permission(perm, "admin"),
                 "can-destroy": has_registry_permission(perm, "admin"),
@@ -145,7 +146,7 @@ def _version_to_jsonapi(version, upload_links: dict | None = None) -> dict:  # t
             "shasums-uploaded": version.shasums_uploaded,
             "shasums-sig-uploaded": version.shasums_sig_uploaded,
             "platforms": platforms,
-            "created-at": version.created_at.isoformat() if version.created_at else None,
+            "created-at": rfc3339(version.created_at),
         },
     }
     if upload_links:

@@ -28,7 +28,7 @@ def _user(email="admin@example.com", roles=None):
     )
 
 
-def _mock_role(name="dev-team", ws_perm="read", reg_perm="read"):
+def _mock_role(name="dev-team", ws_perm="read", reg_perm="read", catalog_perm="none"):
     role = MagicMock()
     role.name = name
     role.description = "A custom role"
@@ -39,6 +39,7 @@ def _mock_role(name="dev-team", ws_perm="read", reg_perm="read"):
     role.workspace_permission = ws_perm
     role.pool_permission = "read"
     role.registry_permission = reg_perm
+    role.catalog_permission = catalog_perm
     role.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     role.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
     return role
@@ -173,6 +174,31 @@ class TestCreateRole:
                 headers=_AUTH,
             )
         assert resp.status_code == 201
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_concurrent_duplicate_returns_409_not_500(self, *mocks):
+        """The pre-check then INSERT races under multiple replicas; the loser
+        hits the unique constraint. The global IntegrityError handler maps that
+        to 409, not a 500."""
+        from sqlalchemy.exc import IntegrityError
+
+        user = _user(roles=["admin"])
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None  # pre-check sees no row
+        mock_db.execute.return_value = mock_result
+        mock_db.commit = AsyncMock(side_effect=IntegrityError("dup", {}, Exception()))
+        app, _ = _make_app(user, mock_db=mock_db)
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/roles",
+                json={"data": {"name": "racy", "attributes": {"workspace-permission": "read"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 409
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

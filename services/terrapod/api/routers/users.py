@@ -189,6 +189,22 @@ class UserUpdateRequest(BaseModel):
     data: UserUpdateData
 
 
+async def _revoke_all_user_access(db: AsyncSession, email: str) -> None:
+    """Full offboarding revocation: web sessions, the cached token-role set
+    (`tp:token_roles:`, 60s TTL — otherwise a deactivated admin keeps cached
+    admin roles on API-token requests), and every API token bound to the
+    identity (including detached service tokens the idle-active check can't
+    catch). Used by both deactivate and delete so neither leaves a window."""
+    from terrapod.api.dependencies import _TOKEN_ROLES_PREFIX
+    from terrapod.auth.api_tokens import revoke_all_for_user
+    from terrapod.auth.sessions import revoke_all_user_sessions
+    from terrapod.redis.client import get_redis_client
+
+    await revoke_all_user_sessions(email)
+    await get_redis_client().delete(_TOKEN_ROLES_PREFIX + email)
+    await revoke_all_for_user(db, email)
+
+
 @router.patch("/users/{email}")
 async def update_user(
     email: str,
@@ -220,11 +236,8 @@ async def update_user(
     if attrs.is_active is not None:
         target.is_active = attrs.is_active
         if not attrs.is_active:
-            # Revoke all sessions for deactivated user
-            from terrapod.auth.sessions import revoke_all_user_sessions
-
-            await revoke_all_user_sessions(email)
-            logger.info("Deactivated user and revoked sessions", target_email=email, by=user.email)
+            await _revoke_all_user_access(db, email)
+            logger.info("Deactivated user and revoked access", target_email=email, by=user.email)
 
     await db.commit()
     await db.refresh(target)
@@ -237,16 +250,14 @@ async def delete_user(
     user: AuthenticatedUser = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    """Delete a user (admin only). Cascades: revokes sessions, deletes role assignments."""
+    """Delete a user (admin only). Cascades: revokes sessions + token-role cache
+    + API tokens, deletes role assignments."""
     result = await db.execute(select(User).where(User.email == email))
     target = result.scalar_one_or_none()
     if target is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    # Revoke sessions
-    from terrapod.auth.sessions import revoke_all_user_sessions
-
-    await revoke_all_user_sessions(email)
+    await _revoke_all_user_access(db, email)
 
     # Delete role assignments
     await db.execute(delete(RoleAssignment).where(RoleAssignment.email == email))

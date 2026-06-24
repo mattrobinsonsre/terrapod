@@ -11,6 +11,7 @@ Endpoints:
 
 import base64
 import hashlib
+import hmac
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, status
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -199,4 +200,6 @@ def _verify_pkce(code_verifier: str, code_challenge: str, method: str) -> bool:
 
     digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
     computed_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
-    return computed_challenge == code_challenge
+    # Timing-safe — the PKCE challenge is attacker-influenced in the token
+    # exchange; match every other secret comparison in the codebase.
+    return hmac.compare_digest(computed_challenge, code_challenge)

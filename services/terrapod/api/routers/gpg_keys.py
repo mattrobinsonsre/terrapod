@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.api.serialization import rfc3339
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.gpg_key_service import (
@@ -75,8 +76,8 @@ def _gpg_key_to_jsonapi(key) -> dict:  # type: ignore[no-untyped-def]
             "namespace": "default",
             "source": key.source,
             "source-url": key.source_url,
-            "created-at": key.created_at.isoformat() if key.created_at else None,
-            "updated-at": key.updated_at.isoformat() if key.updated_at else None,
+            "created-at": rfc3339(key.created_at),
+            "updated-at": rfc3339(key.updated_at),
         },
     }
 

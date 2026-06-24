@@ -41,6 +41,7 @@ from terrapod.api.dependencies import (
     require_non_runner,
 )
 from terrapod.api.labels import validate_labels
+from terrapod.api.serialization import rfc3339
 from terrapod.db.models import ModuleWorkspaceLink, RegistryModuleVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -162,8 +163,8 @@ def _module_to_jsonapi(module, effective_permission: str | None = None) -> dict:
             "vcs-tag-pattern": module.vcs_tag_pattern,
             "vcs-last-tag": module.vcs_last_tag,
             "version-statuses": versions,
-            "created-at": module.created_at.isoformat() if module.created_at else None,
-            "updated-at": module.updated_at.isoformat() if module.updated_at else None,
+            "created-at": rfc3339(module.created_at),
+            "updated-at": rfc3339(module.updated_at),
             "permissions": {
                 "can-update": has_registry_permission(perm, "admin"),
                 "can-destroy": has_registry_permission(perm, "admin"),
@@ -598,9 +599,7 @@ async def create_module_version_endpoint(
                 "attributes": {
                     "version": mod_version.version,
                     "status": mod_version.upload_status,
-                    "created-at": mod_version.created_at.isoformat()
-                    if mod_version.created_at
-                    else None,
+                    "created-at": rfc3339(mod_version.created_at),
                 },
                 "links": {
                     "upload": upload_url.url,
@@ -714,9 +713,7 @@ async def upload_module_version_endpoint(
                 "attributes": {
                     "version": mod_version.version,
                     "status": mod_version.upload_status,
-                    "created-at": mod_version.created_at.isoformat()
-                    if mod_version.created_at
-                    else None,
+                    "created-at": rfc3339(mod_version.created_at),
                 },
             }
         },
@@ -828,7 +825,7 @@ def _link_to_jsonapi(link: ModuleWorkspaceLink) -> dict:
         "attributes": {
             "workspace-id": f"ws-{link.workspace_id}",
             "workspace-name": ws.name if ws else "",
-            "created-at": link.created_at.isoformat() if link.created_at else None,
+            "created-at": rfc3339(link.created_at),
             "created-by": link.created_by,
         },
     }

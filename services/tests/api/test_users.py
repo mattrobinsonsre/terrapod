@@ -1,5 +1,7 @@
 """Tests for user management endpoints."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from fastapi import HTTPException
 
@@ -77,3 +79,30 @@ class TestRequireAdmin:
         with pytest.raises(HTTPException) as exc_info:
             await require_admin(user=_regular_user())
         assert exc_info.value.status_code == 403
+
+
+class TestOffboardingRevocation:
+    """Deactivating or deleting a user must revoke not just web sessions but the
+    cached token-role set AND every API token bound to the identity — otherwise
+    a deactivated admin keeps cached admin roles (60s TTL) on API-token requests
+    and detached service tokens survive offboarding entirely."""
+
+    @pytest.mark.asyncio
+    @patch("terrapod.redis.client.get_redis_client")
+    @patch("terrapod.auth.sessions.revoke_all_user_sessions", new_callable=AsyncMock)
+    @patch("terrapod.auth.api_tokens.revoke_all_for_user", new_callable=AsyncMock)
+    async def test_revokes_sessions_token_cache_and_api_tokens(
+        self, mock_tokens, mock_sessions, mock_redis
+    ):
+        from terrapod.api.routers import users
+
+        redis = AsyncMock()
+        mock_redis.return_value = redis
+        db = AsyncMock()
+
+        await users._revoke_all_user_access(db, "gone@example.com")
+
+        mock_sessions.assert_awaited_once_with("gone@example.com")
+        mock_tokens.assert_awaited_once_with(db, "gone@example.com")
+        redis.delete.assert_awaited_once()
+        assert "gone@example.com" in redis.delete.call_args.args[0]
