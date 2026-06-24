@@ -23,10 +23,10 @@ type PolicySet struct {
 	// VCS fields (populated when Source == "vcs").
 	// VCSConnectionID includes the "vcs-" prefix (e.g. "vcs-<uuid>"),
 	// matching the format used by VCS connection endpoints.
-	VCSConnectionID string `json:"vcs-connection-id,omitempty"`
-	VCSRepoURL      string `json:"vcs-repo-url,omitempty"`
-	VCSBranch       string `json:"vcs-branch,omitempty"`
-	PolicyPath      string `json:"policy-path,omitempty"`
+	VCSConnectionID  string `json:"vcs-connection-id,omitempty"`
+	VCSRepoURL       string `json:"vcs-repo-url,omitempty"`
+	VCSBranch        string `json:"vcs-branch,omitempty"`
+	PolicyPath       string `json:"policy-path,omitempty"`
 	VCSLastCommitSHA string `json:"vcs-last-commit-sha,omitempty"`
 	VCSLastSyncedAt  string `json:"vcs-last-synced-at,omitempty"`
 	VCSLastError     string `json:"vcs-last-error,omitempty"`
@@ -250,5 +250,106 @@ func policySetFromResource(res *Resource) *PolicySet {
 		VCSLastError:     GetStringAttr(res, "vcs-last-error"),
 		CreatedAt:        GetStringAttr(res, "created-at"),
 		UpdatedAt:        GetStringAttr(res, "updated-at"),
+	}
+}
+
+// ── Individual policies ──────────────────────────────────────────────
+//
+// A Policy is a single .rego document inside an inline (non-VCS) policy
+// set. VCS-sourced sets manage their policies from the linked repository,
+// so Add/Update/Delete on those return a 409 ConflictError.
+
+// Policy is a single Rego policy within a policy set.
+type Policy struct {
+	ID          string `json:"id"`
+	PolicySetID string `json:"policy-set-id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Rego        string `json:"rego"`
+	CreatedAt   string `json:"created-at,omitempty"`
+	UpdatedAt   string `json:"updated-at,omitempty"`
+}
+
+// AddPolicyRequest is the input shape for AddPolicy.
+type AddPolicyRequest struct {
+	Name        string
+	Description string
+	Rego        string
+}
+
+// UpdatePolicyRequest is the partial-update shape for UpdatePolicy.
+type UpdatePolicyRequest struct {
+	Name        *string
+	Description *string
+	Rego        *string
+}
+
+// AddPolicy adds a Rego policy to an inline policy set. The server runs
+// `opa check` on the Rego and returns 422 on a syntax error, 409 if the
+// set already has a policy with that name, and 409 if the set is
+// VCS-sourced.
+func (c *Client) AddPolicy(ctx context.Context, policySetID string, req AddPolicyRequest) (*Policy, error) {
+	attrs := map[string]any{"name": req.Name, "rego": req.Rego}
+	if req.Description != "" {
+		attrs["description"] = req.Description
+	}
+	body, err := MarshalResource("policies", attrs, nil)
+	if err != nil {
+		return nil, fmt.Errorf("marshal add policy: %w", err)
+	}
+	path := fmt.Sprintf("/api/terrapod/v1/policy-sets/%s/policies", url.PathEscape(policySetID))
+	data, err := c.Post(ctx, path, body)
+	if err != nil {
+		return nil, err
+	}
+	return parsePolicy(data)
+}
+
+// UpdatePolicy patches a single policy. A changed Rego is re-validated
+// (422 on syntax error); 409 if the parent set is VCS-sourced.
+func (c *Client) UpdatePolicy(ctx context.Context, policyID string, req UpdatePolicyRequest) (*Policy, error) {
+	attrs := map[string]any{}
+	if req.Name != nil {
+		attrs["name"] = *req.Name
+	}
+	if req.Description != nil {
+		attrs["description"] = *req.Description
+	}
+	if req.Rego != nil {
+		attrs["rego"] = *req.Rego
+	}
+	body, err := MarshalResourceWithID(policyID, "policies", attrs)
+	if err != nil {
+		return nil, fmt.Errorf("marshal update policy: %w", err)
+	}
+	data, err := c.Patch(ctx, "/api/terrapod/v1/policies/"+url.PathEscape(policyID), body)
+	if err != nil {
+		return nil, err
+	}
+	return parsePolicy(data)
+}
+
+// DeletePolicy removes a single policy. 409 if the parent set is VCS-sourced.
+func (c *Client) DeletePolicy(ctx context.Context, policyID string) error {
+	return c.Delete(ctx, "/api/terrapod/v1/policies/"+url.PathEscape(policyID))
+}
+
+func parsePolicy(body []byte) (*Policy, error) {
+	res, err := ParseResource(body)
+	if err != nil {
+		return nil, fmt.Errorf("parse policy response: %w", err)
+	}
+	return policyFromResource(res), nil
+}
+
+func policyFromResource(res *Resource) *Policy {
+	return &Policy{
+		ID:          res.ID,
+		PolicySetID: GetRelationshipID(res, "policy-set"),
+		Name:        GetStringAttr(res, "name"),
+		Description: GetStringAttr(res, "description"),
+		Rego:        GetStringAttr(res, "rego"),
+		CreatedAt:   GetStringAttr(res, "created-at"),
+		UpdatedAt:   GetStringAttr(res, "updated-at"),
 	}
 }

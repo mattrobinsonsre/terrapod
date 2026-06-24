@@ -280,11 +280,11 @@ async def create_module_endpoint(
         try:
             conn_id = _uuid.UUID(attrs.vcs_connection_id.removeprefix("vcs-"))
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail="Invalid vcs_connection_id") from exc
+            raise HTTPException(status_code=422, detail="Invalid vcs_connection_id") from exc
 
         result = await db.execute(sa_select(VCSConnection).where(VCSConnection.id == conn_id))
         if result.scalars().first() is None:
-            raise HTTPException(status_code=400, detail="VCS connection not found")
+            raise HTTPException(status_code=422, detail="VCS connection not found")
         module.vcs_connection_id = conn_id
         module.source = "vcs"
     if attrs.vcs_repo_url:
@@ -532,11 +532,11 @@ async def update_module_endpoint(
             try:
                 conn_id = _uuid.UUID(str(vcs_conn_val).removeprefix("vcs-"))
             except ValueError as exc:
-                raise HTTPException(status_code=400, detail="Invalid vcs_connection_id") from exc
+                raise HTTPException(status_code=422, detail="Invalid vcs_connection_id") from exc
 
             result = await db.execute(sa_select(VCSConnection).where(VCSConnection.id == conn_id))
             if result.scalars().first() is None:
-                raise HTTPException(status_code=400, detail="VCS connection not found")
+                raise HTTPException(status_code=422, detail="VCS connection not found")
             module.vcs_connection_id = conn_id
             module.source = "vcs"
         else:
@@ -777,11 +777,11 @@ async def update_module_vcs_endpoint(
         try:
             conn_id = _uuid.UUID(attrs.vcs_connection_id.removeprefix("vcs-"))
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail="Invalid vcs_connection_id") from exc
+            raise HTTPException(status_code=422, detail="Invalid vcs_connection_id") from exc
 
         result = await db.execute(sa_select(VCSConnection).where(VCSConnection.id == conn_id))
         if result.scalars().first() is None:
-            raise HTTPException(status_code=400, detail="VCS connection not found")
+            raise HTTPException(status_code=422, detail="VCS connection not found")
         module.vcs_connection_id = conn_id
     else:
         module.vcs_connection_id = None
