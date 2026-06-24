@@ -27,6 +27,7 @@ type vcsConnectionDataSourceModel struct {
 	ServerURL            types.String `tfsdk:"server_url"`
 	Status               types.String `tfsdk:"status"`
 	HasToken             types.Bool   `tfsdk:"has_token"`
+	HasWebhookSecret     types.Bool   `tfsdk:"has_webhook_secret"`
 	GithubAppID          types.Int64  `tfsdk:"github_app_id"`
 	GithubInstallationID types.Int64  `tfsdk:"github_installation_id"`
 	GithubAccountLogin   types.String `tfsdk:"github_account_login"`
@@ -53,6 +54,7 @@ func (d *vcsConnectionDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			"server_url":             schema.StringAttribute{Computed: true, Description: "Server URL."},
 			"status":                 schema.StringAttribute{Computed: true, Description: "Connection status."},
 			"has_token":              schema.BoolAttribute{Computed: true, Description: "Whether a token is configured."},
+			"has_webhook_secret":     schema.BoolAttribute{Computed: true, Description: "Whether a per-connection webhook secret is configured."},
 			"github_app_id":          schema.Int64Attribute{Computed: true, Description: "GitHub App ID."},
 			"github_installation_id": schema.Int64Attribute{Computed: true, Description: "GitHub installation ID."},
 			"github_account_login":   schema.StringAttribute{Computed: true, Description: "GitHub account login."},
@@ -104,6 +106,7 @@ func (d *vcsConnectionDataSource) Read(ctx context.Context, req datasource.ReadR
 		config.Provider = types.StringValue(c.Provider)
 		config.Status = types.StringValue(c.Status)
 		config.HasToken = types.BoolValue(c.HasToken)
+		config.HasWebhookSecret = types.BoolValue(c.HasWebhookSecret)
 		config.CreatedAt = types.StringValue(c.CreatedAt)
 		config.UpdatedAt = types.StringValue(c.UpdatedAt)
 

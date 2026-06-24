@@ -64,27 +64,14 @@ async def github_webhook(request: Request) -> Response:
         runs on this PR (#282, hook fast path for the poller's
         _reconcile_closed_pr_sessions)
     """
-    # Check if webhooks are configured
-    if not settings.vcs.github.webhook_secret:
-        raise HTTPException(
-            status_code=404,
-            detail="Webhooks not configured",
-        )
-
     payload = await request.body()
-
-    # Validate signature
-    signature = request.headers.get("X-Hub-Signature-256", "")
-    if not validate_webhook_signature(payload, signature):
-        logger.warning("Invalid webhook signature")
-        raise HTTPException(status_code=401, detail="Invalid signature")
-
-    # Handle ping event (GitHub sends this when webhook is first configured)
     event_type = request.headers.get("X-GitHub-Event", "")
-    if event_type == "ping":
-        logger.info("GitHub webhook ping received")
-        return JSONResponse(content={"message": "pong"})
+    signature = request.headers.get("X-Hub-Signature-256", "")
 
+    # Parse the body first so we can resolve which connection the event is for
+    # (installation.id) and pick that connection's webhook secret. Parsing
+    # untrusted JSON is safe; NO action is taken until the signature is
+    # verified against the resolved secret below.
     try:
         body = json.loads(payload)
     except json.JSONDecodeError:
@@ -92,14 +79,30 @@ async def github_webhook(request: Request) -> Response:
 
     repo = body.get("repository", {})
     full_name = repo.get("full_name", "")
-
-    # Resolve installation.id → VCSConnection. Reject unknown
-    # installations so a webhook from an unrelated installation can't
-    # enqueue work even if it knows the global webhook secret (Q10 in
-    # #282). The poll still serves as the source of truth — this just
-    # closes the noise / abuse vector at the webhook surface.
     installation_id = (body.get("installation") or {}).get("id", 0)
     conn = await _resolve_connection(installation_id)
+
+    # Effective secret: the connection's own webhook secret takes precedence;
+    # otherwise fall back to the global vcs.github.webhook_secret. A
+    # per-connection secret means a webhook from one installation can't be
+    # forged by another that only knows the global secret.
+    effective_secret = (conn.webhook_secret if conn else None) or settings.vcs.github.webhook_secret
+    if not effective_secret:
+        raise HTTPException(status_code=404, detail="Webhooks not configured")
+
+    # Validate signature against the effective secret BEFORE any action.
+    if not validate_webhook_signature(payload, signature, effective_secret):
+        logger.warning("Invalid webhook signature")
+        raise HTTPException(status_code=401, detail="Invalid signature")
+
+    # Handle ping event (GitHub sends this when webhook is first configured)
+    if event_type == "ping":
+        logger.info("GitHub webhook ping received")
+        return JSONResponse(content={"message": "pong"})
+
+    # Reject unknown installations so a webhook from an unrelated installation
+    # can't enqueue work (Q10 in #282). The poll remains the source of truth —
+    # this just closes the noise / abuse vector at the webhook surface.
     if conn is None:
         logger.info(
             "Webhook event for unknown installation",

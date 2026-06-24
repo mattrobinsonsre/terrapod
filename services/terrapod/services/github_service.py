@@ -268,19 +268,24 @@ async def get_installation_token(conn: VCSConnection) -> str:
     return token
 
 
-def validate_webhook_signature(payload: bytes, signature_header: str) -> bool:
-    """Validate GitHub webhook HMAC-SHA256 signature.
+def validate_webhook_signature(
+    payload: bytes, signature_header: str, secret: str | None = None
+) -> bool:
+    """Validate a GitHub webhook HMAC-SHA256 signature.
 
-    Only used when webhooks are enabled (webhook_secret is configured).
+    `secret` is the effective webhook secret to validate against — the
+    per-connection secret when the connection sets one, otherwise the global
+    `vcs.github.webhook_secret`. Falls back to the global secret when not
+    passed (backward-compatible). Returns False if no secret is available.
     """
-    secret = settings.vcs.github.webhook_secret
-    if not secret:
+    effective = secret if secret else settings.vcs.github.webhook_secret
+    if not effective:
         return False
 
     if not signature_header.startswith("sha256="):
         return False
 
-    expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
+    expected = hmac.new(effective.encode(), payload, hashlib.sha256).hexdigest()
     received = signature_header.removeprefix("sha256=")
 
     return hmac.compare_digest(expected, received)

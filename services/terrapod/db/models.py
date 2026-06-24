@@ -985,6 +985,12 @@ class VCSConnection(Base):
         String(20), nullable=False, default=""
     )  # Organization, User (GitHub only)
 
+    # Per-connection webhook HMAC secret (GitHub). Optional: when set it is
+    # used to validate this connection's inbound webhooks, falling back to the
+    # global vcs.github.webhook_secret when null. Write-only via the API and
+    # protected at rest by database encryption (same as `token`).
+    webhook_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="active"
     )  # active, suspended, removed

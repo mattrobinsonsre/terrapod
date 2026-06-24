@@ -24,6 +24,7 @@ interface VCSConnection {
     'github-installation-id': string | null
     'github-account-login': string | null
     'has-token': boolean
+    'has-webhook-secret'?: boolean
     'created-at': string
   }
 }
@@ -46,6 +47,7 @@ export default function VCSConnectionsPage() {
   const [appId, setAppId] = useState('')
   const [installationId, setInstallationId] = useState('')
   const [privateKey, setPrivateKey] = useState('')
+  const [webhookSecret, setWebhookSecret] = useState('')
   const [pemDragOver, setPemDragOver] = useState(false)
   const pemFileRef = useRef<HTMLInputElement>(null)
   // GitLab fields
@@ -59,7 +61,7 @@ export default function VCSConnectionsPage() {
 
   function resetForm() {
     setName(''); setServerUrl(''); setAppId(''); setInstallationId('')
-    setPrivateKey(''); setToken(''); setProvider('github'); setEditId(null)
+    setPrivateKey(''); setToken(''); setWebhookSecret(''); setProvider('github'); setEditId(null)
   }
 
   function startEdit(conn: VCSConnection) {
@@ -76,6 +78,7 @@ export default function VCSConnectionsPage() {
     // Credentials are write-only — never returned. Leave blank = keep.
     setPrivateKey('')
     setToken('')
+    setWebhookSecret('')
     setShowCreate(true)
     setError(''); setSuccess('')
   }
@@ -131,6 +134,8 @@ export default function VCSConnectionsPage() {
         // On edit, credentials are optional — only send when rotating.
         if (privateKey) attrs['private-key'] = privateKey
         else if (!editing) attrs['private-key'] = privateKey
+        // Optional per-connection webhook secret — only send when set/rotating.
+        if (webhookSecret) attrs['webhook-secret'] = webhookSecret
       } else {
         if (token) attrs.token = token
         else if (!editing) attrs.token = token
@@ -284,6 +289,22 @@ export default function VCSConnectionsPage() {
                       if (f) f.text().then(t => setPrivateKey(t))
                     }}
                   />
+                </div>
+                <div>
+                  <label htmlFor="gh-webhook-secret" className="block text-sm font-medium text-slate-300 mb-1">
+                    Webhook Secret <span className="text-slate-500 font-normal">(optional)</span>
+                  </label>
+                  <input id="gh-webhook-secret" type="password" value={webhookSecret}
+                    onChange={(e) => setWebhookSecret(e.target.value)}
+                    placeholder={editId !== null
+                      ? (connections.find((c) => c.id === editId)?.attributes['has-webhook-secret']
+                          ? 'Set — leave blank to keep, enter a new value to rotate'
+                          : 'Leave blank to use the global secret')
+                      : 'Leave blank to use the global webhook secret'}
+                    className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+                  <p className="mt-1 text-xs text-slate-500">
+                    Per-connection HMAC secret for this installation&apos;s webhooks. When unset, the global secret is used.
+                  </p>
                 </div>
               </div>
             ) : (

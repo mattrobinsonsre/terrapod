@@ -25,6 +25,7 @@ type VCSConnection struct {
 	GithubInstallationID int64  `json:"github-installation-id,omitempty"`
 	Status               string `json:"status,omitempty"`
 	HasToken             bool   `json:"has-token"`
+	HasWebhookSecret     bool   `json:"has-webhook-secret"`
 	GithubAccountLogin   string `json:"github-account-login,omitempty"`
 	GithubAccountType    string `json:"github-account-type,omitempty"`
 	CreatedAt            string `json:"created-at,omitempty"`
@@ -42,6 +43,7 @@ type CreateVCSConnectionRequest struct {
 	GithubInstallationID int64
 	PrivateKey           string // GitHub App PEM
 	Token                string // GitLab PAT
+	WebhookSecret        string // GitHub per-connection webhook secret (write-only, optional)
 }
 
 // UpdateVCSConnectionRequest patches a VCS connection — the
@@ -55,6 +57,10 @@ type UpdateVCSConnectionRequest struct {
 	GithubInstallationID *int64
 	PrivateKey           string // pass non-empty to rotate
 	Token                string // pass non-empty to rotate
+	// WebhookSecret rotation: pass a non-empty value to set/rotate, an
+	// explicit empty string to clear (fall back to the global secret), or
+	// leave nil to keep the stored value untouched.
+	WebhookSecret *string
 }
 
 // CreateVCSConnection registers a new VCS connection. Requires
@@ -143,6 +149,9 @@ func vcsConnCreateAttrs(req CreateVCSConnectionRequest) map[string]any {
 	if req.Token != "" {
 		attrs["token"] = req.Token
 	}
+	if req.WebhookSecret != "" {
+		attrs["webhook-secret"] = req.WebhookSecret
+	}
 	return attrs
 }
 
@@ -169,6 +178,11 @@ func vcsConnUpdateAttrs(req UpdateVCSConnectionRequest) map[string]any {
 	if req.Token != "" {
 		attrs["token"] = req.Token
 	}
+	// nil ↦ leave untouched; non-nil (incl. "") ↦ set/clear. The server
+	// treats an explicit empty string as "clear" (fall back to global).
+	if req.WebhookSecret != nil {
+		attrs["webhook-secret"] = *req.WebhookSecret
+	}
 	return attrs
 }
 
@@ -190,6 +204,7 @@ func vcsConnFromResource(res *Resource) *VCSConnection {
 		GithubInstallationID: GetIntAttr(res, "github-installation-id"),
 		Status:               GetStringAttr(res, "status"),
 		HasToken:             GetBoolAttr(res, "has-token"),
+		HasWebhookSecret:     GetBoolAttr(res, "has-webhook-secret"),
 		GithubAccountLogin:   GetStringAttr(res, "github-account-login"),
 		GithubAccountType:    GetStringAttr(res, "github-account-type"),
 		CreatedAt:            GetStringAttr(res, "created-at"),

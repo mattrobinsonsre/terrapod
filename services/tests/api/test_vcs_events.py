@@ -110,3 +110,61 @@ class TestGithubWebhook:
                 headers={"X-GitHub-Event": "push"},
             )
         assert resp.status_code == 400
+
+    @patch("terrapod.api.routers.vcs_events.enqueue_trigger", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.vcs_events._resolve_connection", new_callable=AsyncMock)
+    async def test_per_connection_secret_takes_precedence(
+        self, mock_resolve, mock_enqueue, *_mocks
+    ):
+        """A connection with its own webhook secret validates against THAT
+        secret, not the global one — using the REAL signature validator."""
+        import hashlib
+        import hmac
+
+        conn = MagicMock()
+        conn.webhook_secret = "per-conn-secret"
+        mock_resolve.return_value = conn
+        payload = json.dumps(_PUSH).encode()
+
+        # Signed with the per-connection secret → accepted.
+        good = "sha256=" + hmac.new(b"per-conn-secret", payload, hashlib.sha256).hexdigest()
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/vcs-events/github",
+                content=payload,
+                headers={"X-GitHub-Event": "push", "X-Hub-Signature-256": good},
+            )
+        assert resp.status_code == 200
+
+        # Signed with the GLOBAL secret → rejected, because the per-connection
+        # secret takes precedence and the global signature won't match it.
+        bad = "sha256=" + hmac.new(b"shhh", payload, hashlib.sha256).hexdigest()
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/vcs-events/github",
+                content=payload,
+                headers={"X-GitHub-Event": "push", "X-Hub-Signature-256": bad},
+            )
+        assert resp.status_code == 401
+
+    @patch("terrapod.api.routers.vcs_events.enqueue_trigger", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.vcs_events._resolve_connection", new_callable=AsyncMock)
+    async def test_falls_back_to_global_secret(self, mock_resolve, mock_enqueue, *_mocks):
+        """A connection WITHOUT its own secret validates against the global
+        one (REAL validator)."""
+        import hashlib
+        import hmac
+
+        conn = MagicMock()
+        conn.webhook_secret = None  # no per-connection secret
+        mock_resolve.return_value = conn
+        payload = json.dumps(_PUSH).encode()
+
+        good = "sha256=" + hmac.new(b"shhh", payload, hashlib.sha256).hexdigest()
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/vcs-events/github",
+                content=payload,
+                headers={"X-GitHub-Event": "push", "X-Hub-Signature-256": good},
+            )
+        assert resp.status_code == 200

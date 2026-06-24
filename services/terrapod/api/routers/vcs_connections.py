@@ -60,6 +60,9 @@ def _connection_json(conn: VCSConnection) -> dict:
         attrs["github-installation-id"] = conn.github_installation_id
         attrs["github-account-login"] = conn.github_account_login
         attrs["github-account-type"] = conn.github_account_type
+        # Write-only: surface only whether a per-connection webhook secret is
+        # set, never the value (same pattern as has-token).
+        attrs["has-webhook-secret"] = bool(conn.webhook_secret)
 
     return {
         "id": f"vcs-{conn.id}",
@@ -157,6 +160,9 @@ async def create_connection(
             raise HTTPException(status_code=422, detail="token is required for GitLab connections")
         token_value = token
 
+    # Optional per-connection webhook secret (GitHub only). Write-only.
+    webhook_secret = (attrs.get("webhook-secret") or "") if provider == "github" else ""
+
     conn = VCSConnection(
         id=generate_uuid7(),
         provider=provider,
@@ -168,6 +174,7 @@ async def create_connection(
         github_installation_id=int(attrs.get("github-installation-id", 0)),
         github_account_login=attrs.get("github-account-login", ""),
         github_account_type=attrs.get("github-account-type", ""),
+        webhook_secret=webhook_secret or None,
         status="active",
     )
     db.add(conn)
@@ -267,6 +274,11 @@ async def update_connection(
         new_key = attrs.get("private-key") or ""
         if new_key:
             conn.token = new_key
+        # Webhook-secret rotation (write-only). Supply a non-empty value to
+        # set/rotate; pass an explicit empty string to clear it (fall back to
+        # the global secret); omit the key entirely to leave it untouched.
+        if "webhook-secret" in attrs:
+            conn.webhook_secret = (attrs.get("webhook-secret") or "").strip() or None
     elif conn.provider == "gitlab":
         new_token = attrs.get("token") or ""
         if new_token:

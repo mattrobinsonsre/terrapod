@@ -52,9 +52,11 @@ type vcsConnectionModel struct {
 	GithubInstallationID types.Int64  `tfsdk:"github_installation_id"`
 	PrivateKey           types.String `tfsdk:"private_key"`
 	Token                types.String `tfsdk:"token"`
+	WebhookSecret        types.String `tfsdk:"webhook_secret"`
 
 	Status             types.String `tfsdk:"status"`
 	HasToken           types.Bool   `tfsdk:"has_token"`
+	HasWebhookSecret   types.Bool   `tfsdk:"has_webhook_secret"`
 	GithubAccountLogin types.String `tfsdk:"github_account_login"`
 	GithubAccountType  types.String `tfsdk:"github_account_type"`
 	CreatedAt          types.String `tfsdk:"created_at"`
@@ -138,6 +140,14 @@ func (r *vcsConnectionResource) Schema(_ context.Context, _ resource.SchemaReque
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"webhook_secret": schema.StringAttribute{
+				Description: "Optional per-connection GitHub webhook HMAC secret. Write-only; never returned by the API. When set, this connection's inbound webhooks are validated against it instead of the global secret. Changing this forces a new resource (rotate in-place via the Terrapod CLI / API).",
+				Optional:    true,
+				Sensitive:   true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
 
 			"status": schema.StringAttribute{
 				Description: "The connection status.",
@@ -145,6 +155,10 @@ func (r *vcsConnectionResource) Schema(_ context.Context, _ resource.SchemaReque
 			},
 			"has_token": schema.BoolAttribute{
 				Description: "Whether the connection has a token/key configured.",
+				Computed:    true,
+			},
+			"has_webhook_secret": schema.BoolAttribute{
+				Description: "Whether the connection has a per-connection webhook secret configured.",
 				Computed:    true,
 			},
 			"github_account_login": schema.StringAttribute{
@@ -233,10 +247,12 @@ func (r *vcsConnectionResource) Read(ctx context.Context, req resource.ReadReque
 	// Preserve write-only fields from state — the API never echoes them back.
 	privateKey := state.PrivateKey
 	token := state.Token
+	webhookSecret := state.WebhookSecret
 
 	readVCSConnectionFromSDK(v, &state)
 	state.PrivateKey = privateKey
 	state.Token = token
+	state.WebhookSecret = webhookSecret
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -292,6 +308,9 @@ func buildCreateVCSConnectionRequest(m *vcsConnectionModel) terrapod.CreateVCSCo
 	if !m.Token.IsNull() && !m.Token.IsUnknown() {
 		req.Token = m.Token.ValueString()
 	}
+	if !m.WebhookSecret.IsNull() && !m.WebhookSecret.IsUnknown() {
+		req.WebhookSecret = m.WebhookSecret.ValueString()
+	}
 	return req
 }
 
@@ -321,6 +340,7 @@ func readVCSConnectionFromSDK(v *terrapod.VCSConnection, m *vcsConnectionModel) 
 
 	m.Status = types.StringValue(v.Status)
 	m.HasToken = types.BoolValue(v.HasToken)
+	m.HasWebhookSecret = types.BoolValue(v.HasWebhookSecret)
 
 	if v.GithubAccountLogin != "" {
 		m.GithubAccountLogin = types.StringValue(v.GithubAccountLogin)
