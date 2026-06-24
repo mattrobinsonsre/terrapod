@@ -938,7 +938,11 @@ class CertificateAuthorityModel(Base):
         UUID(as_uuid=True), primary_key=True, default=generate_uuid7
     )
     ca_cert: Mapped[str] = mapped_column(Text, nullable=False)
-    ca_key_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    # The CA private key as a PKCS8 PEM. This is NOT application-encrypted
+    # (the old column name `ca_key_encrypted` was misleading) — at-rest
+    # protection comes from database encryption (RDS/Azure/GCS-managed),
+    # the same model used for sensitive variables and VCS tokens.
+    ca_key_pem: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )

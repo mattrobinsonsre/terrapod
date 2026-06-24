@@ -8,7 +8,6 @@ Handles Terrapod's runner-only certificate needs.
 """
 
 import datetime
-from pathlib import Path
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -23,9 +22,6 @@ logger = get_logger(__name__)
 
 # Module-level CA singleton, initialized in lifespan
 _ca: "CertificateAuthority | None" = None
-
-# Default CA data directory
-CA_DATA_DIR = Path("/var/lib/terrapod/ca")
 
 
 class CertificateAuthority:
@@ -287,7 +283,7 @@ async def init_ca(db: AsyncSession) -> CertificateAuthority:
     if ca_record:
         ca = CertificateAuthority.load(
             ca_record.ca_cert.encode(),
-            ca_record.ca_key_encrypted.encode(),
+            ca_record.ca_key_pem.encode(),
         )
         logger.info(
             "Loaded CA from database",
@@ -301,7 +297,7 @@ async def init_ca(db: AsyncSession) -> CertificateAuthority:
 
         ca_record = CertificateAuthorityModel(
             ca_cert=cert_pem,
-            ca_key_encrypted=key_pem,
+            ca_key_pem=key_pem,
         )
         db.add(ca_record)
         await db.commit()
@@ -311,17 +307,11 @@ async def init_ca(db: AsyncSession) -> CertificateAuthority:
             fingerprint=get_certificate_fingerprint(ca.ca_cert)[:16],
         )
 
-    # Write to filesystem as cache
-    try:
-        CA_DATA_DIR.mkdir(parents=True, exist_ok=True)
-        cert_path = CA_DATA_DIR / "ca.crt"
-        key_path = CA_DATA_DIR / "ca.key"
-        cert_path.write_bytes(serialize_certificate(ca.ca_cert))
-        key_path.write_bytes(serialize_private_key(ca.ca_key))
-        key_path.chmod(0o600)
-    except OSError as e:
-        logger.warning("Failed to write CA cache to filesystem", error=str(e))
-
+    # The database is the single source of truth for the CA, loaded on every
+    # startup. We deliberately do NOT also write the CA *private key* to the
+    # pod filesystem — that cache was never read back (init_ca always loads
+    # from the DB) and writing the private key to disk is needless attack
+    # surface.
     _ca = ca
     return _ca
 
