@@ -118,5 +118,10 @@ export default defineConfig({
       testMatch: 'catalog.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
+    {
+      name: 'sse-live-update',
+      testMatch: 'sse-live-update.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
   ],
 });

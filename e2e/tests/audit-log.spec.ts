@@ -17,22 +17,26 @@ test.describe('Audit Log', () => {
     // Wait for initial data
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10_000 });
 
-    // Record initial row count
-    const initialCount = await page.locator('table tbody tr').count();
-
-    // Apply POST filter — should show fewer or equal rows
+    // Apply the POST filter and wait for the *filtered* response to land before
+    // asserting — otherwise the badge check races the table refresh and reads
+    // the pre-filter (mixed-method) rows, which is what made this test flaky
+    // (#240). Tying the assertion to the request the click triggers makes it
+    // deterministic regardless of CI latency.
     await page.selectOption('#f-action', 'POST');
-    await page.click('button:has-text("Apply Filters")');
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/admin/audit-log') && r.url().includes('action') && r.ok()
+      ),
+      page.click('button:has-text("Apply Filters")'),
+    ]);
 
-    // Table should still be visible (there will be POST entries from test setup)
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 10_000 });
 
-    // Every visible action badge should say POST
-    const badges = page.locator('table tbody tr td:nth-child(3)');
-    const count = await badges.count();
-    for (let i = 0; i < count; i++) {
-      await expect(badges.nth(i)).toContainText('POST');
-    }
+    // Assert there is no surviving row whose action cell is not POST. toHaveCount
+    // auto-retries, so it keeps polling until the table has fully re-rendered
+    // to the filtered set rather than snapshotting it once.
+    const nonPost = page.locator('table tbody tr td:nth-child(3)').filter({ hasNotText: 'POST' });
+    await expect(nonPost).toHaveCount(0, { timeout: 10_000 });
   });
 
   test('clear filters restores full list', async ({ page }) => {

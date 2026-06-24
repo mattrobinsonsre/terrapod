@@ -102,7 +102,11 @@ class TestCreateWorkspace:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    async def test_create_returns_201(self, *mocks):
+    @patch(
+        "terrapod.redis.client.publish_workspace_event",
+        new_callable=AsyncMock,
+    )
+    async def test_create_returns_201(self, mock_publish, *mocks):
         user = _user(roles=["admin"])
         app, mock_db = _make_app(user)
         # No existing workspace
@@ -122,6 +126,11 @@ class TestCreateWorkspace:
         assert data["type"] == "workspaces"
         assert data["attributes"]["name"] == "new-ws"
         assert data["attributes"]["owner-email"] == user.email
+        # The create path broadcasts a workspace_created event so any open
+        # workspace-list page live-updates via SSE (services-tier half of the
+        # SSE contract; the browser half is e2e/tests/sse-live-update.spec.ts).
+        mock_publish.assert_awaited_once()
+        assert mock_publish.await_args.args[1] == "workspace_created"
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

@@ -990,6 +990,15 @@ async def create_workspace(
     await db.refresh(ws)
 
     logger.info("Workspace created", workspace=name, owner=user.email)
+
+    # Broadcast to the workspace-list SSE channel so any open list page
+    # re-fetches and shows the new workspace without a manual reload.
+    # Best-effort (the publisher swallows its own errors) — never blocks
+    # or fails the create.
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(ws.id), "workspace_created")
+
     return JSONResponse(
         content=_workspace_json(ws, "admin"),
         status_code=201,
