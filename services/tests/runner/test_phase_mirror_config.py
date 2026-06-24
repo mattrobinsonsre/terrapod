@@ -61,6 +61,34 @@ class TestWriteTerraformRc:
         assert '"tfe.v2.1"     = "https://api.internal/api/v2/"' in text
         assert '"tfe.v2.2"     = "https://api.internal/api/v2/"' in text
 
+    def test_public_host_redirect_http_internal(self, tmp_path) -> None:
+        """The host{} redirect fires even when the internal API is plain
+        HTTP (the default single-cluster `http://<release>-api:8000`).
+        The runner always reaches the API at TP_API_URL, so an HTTP
+        service override is valid and necessary — without it a
+        generated `source = "<public-host>/..."` falls back to DNS
+        discovery of the public host, which fails in-cluster (e.g. it
+        resolves to loopback in local dev). The provider mirror stays
+        HTTP-gated, but the host{} override is exempt."""
+        out = tmp_path / "terraform.rc"
+        result = mirror_config.write_terraform_rc(
+            api_url="http://terrapod-api:8000",
+            auth_token="tok",
+            public_api_url="https://terrapod.local",
+            config_path=out,
+        )
+        text = out.read_text()
+        assert result.public_host_redirect is True
+        # No provider mirror over HTTP (terraform refuses it).
+        assert result.mirror_configured is False
+        assert "provider_installation" not in text
+        # But the host{} discovery redirect IS written, pointing at the
+        # HTTP internal API.
+        assert 'host "terrapod.local"' in text
+        assert '"modules.v1"   = "http://terrapod-api:8000/api/v2/registry/modules/"' in text
+        assert '"providers.v1" = "http://terrapod-api:8000/api/v2/registry/providers/"' in text
+        assert 'credentials "terrapod.local"' in text
+
     def test_same_public_and_internal_host_no_redirect(self, tmp_path) -> None:
         out = tmp_path / "terraform.rc"
         result = mirror_config.write_terraform_rc(

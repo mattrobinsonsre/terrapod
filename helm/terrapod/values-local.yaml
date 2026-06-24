@@ -53,7 +53,20 @@ api:
       backend: filesystem
       filesystem:
         root_dir: /var/lib/terrapod/storage
-        base_url: "https://terrapod.local"
+        # Internal API host (not the public terrapod.local) so in-cluster
+        # runner Jobs can fetch filesystem-backed presigned URLs — module
+        # tarballs (tofu/terraform fetch these themselves, so they bypass the
+        # runner's own terrapod.local→TP_API_URL rewrite), config versions,
+        # and state. terrapod.local resolves to loopback inside the cluster,
+        # so a public-host presigned URL is unreachable from a runner pod;
+        # this is what unblocks catalog + private-registry-module Tilt smokes.
+        # Tradeoff (local dev only): browser-initiated direct presigned
+        # downloads (e.g. "download raw state") point at this internal host
+        # and won't resolve from a browser — acceptable here since the local
+        # stack's focus is runner/execution testing. Production uses cloud
+        # object storage (S3/Azure/GCS), whose presigned URLs are globally
+        # reachable, so this knob is moot there.
+        base_url: "http://terrapod-api:8000"
     audit:
       retention_days: 90
     registry:

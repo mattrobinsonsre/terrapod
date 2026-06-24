@@ -24,6 +24,19 @@ Three behavioural rules:
      public hostname's service-discovery to the internal host. Both
      hostnames get credentials blocks because terraform matches
      credentials by the source-URL hostname, not the discovery target.
+     This redirect fires regardless of the internal API's scheme: the
+     runner Job always runs in the listener's cluster and reaches the
+     API at the SAME url the listener uses (TP_API_URL), so that url is
+     always runner-reachable — including the default single-cluster
+     `http://<release>-api:8000`. Without the redirect a generated
+     `source = "<public-host>/..."` (e.g. a catalog wrapper or any
+     private-registry module) would fall back to real DNS discovery of
+     the public host, which fails wherever that host isn't resolvable
+     to the right endpoint from inside the cluster (airgapped/split
+     networks, and local dev where it resolves to loopback). The
+     provider network_mirror (rule 1) still requires HTTPS — terraform
+     refuses HTTP mirrors — but a `host{}` service override is exempt
+     from that constraint, so HTTP service URLs are valid here.
 """
 
 from __future__ import annotations
@@ -107,9 +120,7 @@ def write_terraform_rc(
     # matches credentials by source-URL hostname, so we have to write
     # a credentials block for the public host even though the discovery
     # services point back at the internal one.
-    public_host_redirect = bool(
-        public_host and public_host != internal_host and api_url.startswith("https://")
-    )
+    public_host_redirect = bool(public_host and public_host != internal_host)
     if public_host_redirect:
         parts.append(
             f'credentials "{public_host}" {{\n  token = "{auth_token}"\n}}\n'
