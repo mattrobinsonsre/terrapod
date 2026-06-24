@@ -578,6 +578,22 @@ api:
 
 When a push event arrives, the webhook handler validates the HMAC-SHA256 signature and triggers an immediate poll for the affected repository. The poller still does all the work -- the webhook just makes it faster.
 
+### Per-connection webhook secret
+
+The Helm value above sets a single **global** webhook secret used to validate
+every GitHub installation's webhooks. If you connect more than one GitHub
+installation, you can instead set a **per-connection** secret so that one
+installation's secret can't be used to forge another's webhooks.
+
+Set it when creating or editing a VCS connection — in the admin UI
+(*Admin → VCS Connections → Webhook Secret*), via the API as the write-only
+`webhook-secret` attribute, or via the Terraform provider's
+`terrapod_vcs_connection.webhook_secret`. It is never returned by the API
+(`has-webhook-secret` indicates only whether one is set). When a connection
+has its own secret, that connection's webhooks are validated against it; when
+it doesn't, validation falls back to the global secret — so existing
+single-secret deployments are unaffected.
+
 > GitLab webhook support is not yet implemented. GitLab connections use polling only.
 
 ---

@@ -130,8 +130,13 @@ for ad-hoc rewriting without a migration record.
   first-class equivalent. Recorded in the skipped-items report.
 - **`apply_requirements`** (`approved`, `mergeable`, `undiverged`) — no
   direct Terrapod equivalent. Recorded as advisory metadata.
-- **`terragrunt` projects** — Terrapod doesn't run terragrunt. Detected
-  and listed in the skipped-items report.
+- **`terragrunt` projects** — the migration tool does not auto-translate
+  terragrunt-driven Atlantis projects (their `terragrunt.hcl` dependency
+  graphs and `generate` blocks aren't mechanically convertible), so they're
+  detected and listed in the skipped-items report. This is a *migration-tool*
+  limitation, not a runtime one: Terrapod itself runs Terragrunt in agent
+  mode via the `terragrunt_enabled` workspace flag, so a skipped project can
+  be re-created by hand. See [terragrunt.md](terragrunt.md).
 - **PR comment history** — out of scope.
 
 ### Autodiscovery mode (no `atlantis.yaml`)

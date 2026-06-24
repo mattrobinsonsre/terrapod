@@ -21,8 +21,8 @@ my-vpc:
   serial: 42
   updated_at: '2026-03-25T10:30:00Z'
 production-rds:
-  workspace_id: 7fb95e74-6828-4673-c4gd-3d074g77bgb7
-  state_key: state/7fb95e74-6828-4673-c4gd-3d074g77bgb7/9b2c3d4e-5f6a-7890-bcde-f01234567890.tfstate
+  workspace_id: 7fb95e74-6828-4673-a4bd-3d074a77bcb7
+  state_key: state/7fb95e74-6828-4673-a4bd-3d074a77bcb7/9b2c3d4e-5f6a-7890-bcde-f01234567890.tfstate
   serial: 15
   updated_at: '2026-03-24T14:00:00Z'
 ```
@@ -158,3 +158,27 @@ During break-glass recovery with a local backend, there is no state locking. Coo
 ### Index Accuracy
 
 The state index is best-effort — it is updated on every state upload but failures are swallowed to avoid blocking state operations. In rare cases, the index may be slightly out of date. If you cannot find a workspace in the index, state files are stored at `state/<workspace_uuid>/<state_version_uuid>.tfstate` — list the workspace's directory to find the latest file by timestamp.
+
+## Routine Backup & Restore
+
+Break-glass recovery above operates on a **single** workspace's state from
+object storage. For protecting the whole platform, Terrapod has exactly two
+stateful components — back up both:
+
+| Component | Holds | Back up with |
+|---|---|---|
+| **PostgreSQL** | Workspaces, variables (incl. sensitive), runs, configuration-version metadata, registry metadata, roles/assignments, VCS connections, the CA keypair, audit log | Your database's native backup (RDS automated/manual snapshots, Azure Database backups, `pg_dump`, or a continuous-archiving tool like WAL-G/pgBackRest) |
+| **Object storage** | State versions, configuration-version tarballs, plan/apply logs, registry module + provider artifacts, the state index | The cloud provider's bucket-level protection (S3 Versioning + cross-region replication, Azure Blob soft-delete + versioning, GCS Object Versioning), or a periodic bucket sync to a separate account |
+
+Redis holds only ephemeral data (sessions, listener heartbeats, the scheduler's
+distributed locks, SSE channels) — it does **not** need backing up; a fresh
+Redis is fine after a restore.
+
+**Restore order:** restore PostgreSQL first, then point the new deployment at
+the restored object-storage bucket via Helm values. Because every artifact in
+object storage is addressed by the UUIDs recorded in PostgreSQL, a
+point-in-time PostgreSQL snapshot paired with a same-or-later object-storage
+state is self-consistent (extra orphaned objects are harmless). Keep the two
+backups loosely time-aligned to minimise orphans. The CA keypair lives in
+PostgreSQL, so a DB restore re-establishes listener trust without re-issuing
+certificates.

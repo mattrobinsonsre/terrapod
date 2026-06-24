@@ -1771,11 +1771,19 @@ POST /api/terrapod/v1/vcs-connections
       "github-installation-id": 112887490,
       "github-account-login": "my-org",
       "github-account-type": "Organization",
-      "private-key": "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+      "private-key": "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----",
+      "webhook-secret": "optional-per-connection-secret"
     }
   }
 }
 ```
+
+> `webhook-secret` (GitHub, optional) is **write-only** — it is never returned;
+> the response carries `has-webhook-secret` (boolean) instead. When set, this
+> connection's inbound webhooks are validated against it, falling back to the
+> global `vcs.github.webhook_secret` when absent. On `PATCH`, supply a
+> non-empty value to rotate, an explicit empty string to clear, or omit the
+> key to leave it untouched.
 
 **GitLab example:**
 ```json

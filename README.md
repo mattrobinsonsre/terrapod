@@ -240,15 +240,26 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Registry](docs/registry.md) | Private module/provider registry, caching layers |
 | [Registry Publishing](docs/registry-publishing.md) | Publishing providers/modules with `terrapod-publish` and the client-signed publish protocol |
 | [VCS Integration](docs/vcs-integration.md) | GitHub and GitLab setup, polling, webhooks |
+| [VCS Workflows](docs/vcs-workflows.md) | PR/MR comment commands, speculative plans, apply-on-merge |
 | [Policies (OPA)](docs/policies.md) | Rego policy authoring, advisory vs mandatory enforcement, label-based scoping, admin override |
 | [Autodiscovery](docs/autodiscovery.md) | Atlantis-style monorepo workspace autodiscovery |
 | [Drift Detection](docs/drift-detection.md) | Scheduled plan-only runs to detect infrastructure drift |
+| [Drift Ignore Rules](docs/drift-ignore-rules.md) | Suppress known/expected drift by resource address or attribute |
 | [Run Triggers](docs/run-triggers.md) | Cross-workspace dependency chains |
+| [Terragrunt](docs/terragrunt.md) | CLI-driven and agent-mode Terragrunt support |
+| [Remote State](docs/remote-state.md) | State versioning, locking, rollback, the `cloud` backend |
+| [AI Plan Summary](docs/ai-plan-summary.md) | LLM plan summaries, risk assessment, failure analysis, chat |
 | [Notifications](docs/notifications.md) | Webhook, Slack, and email alerts on run events |
 | [Run Tasks](docs/run-tasks.md) | Pre/post-plan webhook hooks for external validation |
 | [Audit Logging](docs/audit-logging.md) | Immutable event log, query API, retention |
+| [Artifact Retention](docs/artifact-retention.md) | Retention + purge of run logs, plans, and config tarballs |
+| [Runners](docs/runners.md) | Agent pools, the listener/runner ARC model, custom runner images |
 | [Cloud Credentials](docs/cloud-credentials.md) | AWS IRSA, GCP WIF, Azure WI setup |
+| [Service Catalog](docs/service-catalog.md) | No-code self-service provisioning over the module registry |
 | [Monitoring](docs/monitoring.md) | Prometheus metrics, scraping, recommended alerts |
+| [Optional Webhook Ingress](docs/deployment-webhook-ingress.md) | Split public webhook ingress so the management plane can stay private |
+| [Security Hardening](docs/security-hardening.md) | Pod hardening defaults, secrets, network posture |
+| [Production Checklist](docs/production-checklist.md) | Pre-go-live checklist for a production deployment |
 | [Disaster Recovery](docs/disaster-recovery.md) | Break-glass state recovery from object storage |
 
 ---

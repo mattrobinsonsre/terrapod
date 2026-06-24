@@ -116,6 +116,29 @@ api:
 
 For production, use [External Secrets Operator](https://external-secrets.io/) to sync secrets from AWS Secrets Manager, Azure Key Vault, or GCP Secret Manager into Kubernetes Secrets automatically.
 
+### Dedicated token signing key
+
+Runner tokens and run-task callback tokens are stateless HMAC tokens. By
+default their signing key is derived from the database URL, which couples
+token-forgery resistance to the database credentials. To decouple them, set a
+dedicated secret via `api.tokenSigningKey` (injected as
+`TERRAPOD_TOKEN_SIGNING_KEY` from a K8s Secret, never a ConfigMap):
+
+```zsh
+kubectl -n terrapod create secret generic terrapod-token-signing \
+  --from-literal=token_signing_key="$(openssl rand -hex 32)"
+```
+
+```yaml
+api:
+  tokenSigningKey:
+    existingSecret: "terrapod-token-signing"
+    existingSecretKey: "token_signing_key"
+```
+
+Leaving it unset keeps the database-URL-derived key, so configuring it later
+does not invalidate any in-flight token.
+
 ## Network Policies
 
 Terrapod ships with NetworkPolicy templates that restrict pod-to-pod and pod-to-external traffic. Enable them:
