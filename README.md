@@ -261,7 +261,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | Database | PostgreSQL |
 | Cache / Sessions | Redis |
 | Object storage | AWS S3, Azure Blob, GCS, or filesystem (native SDKs) |
-| Frontend | Next.js 15 / React 19 / TypeScript / Tailwind CSS / Radix UI |
+| Frontend | Next.js 16 / React 19 / TypeScript / Tailwind CSS / Radix UI |
 | Runner listener | Python (same codebase as API) |
 | Auth | authlib (OIDC), python3-saml (SAML) |
 | Deployment | Helm chart on Kubernetes |

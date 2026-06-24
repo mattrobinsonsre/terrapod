@@ -44,7 +44,7 @@ This document describes the internal architecture of Terrapod, covering system c
 
 | Component | Purpose | Implementation |
 |---|---|---|
-| **Next.js Web** | Single ingress entry point; serves UI pages and proxies API calls | Next.js 15, React 19, Tailwind CSS, Radix UI |
+| **Next.js Web** | Single ingress entry point; serves UI pages and proxies API calls | Next.js 16, React 19, Tailwind CSS, Radix UI |
 | **FastAPI API** | All business logic, TFE V2 API, auth, registry, VCS polling | Python 3.13+, FastAPI, SQLAlchemy async, Pydantic |
 | **Runner Listener** | Receives run events via SSE, creates K8s Jobs, reports status, streams logs | Same Python codebase as API, different entrypoint |
 | **Runner Jobs** | Ephemeral containers that execute `terraform` or `tofu` | Slim Debian image (`python:3.13-slim`) with git/openssh-client/opa; pure-Python orchestrator |
