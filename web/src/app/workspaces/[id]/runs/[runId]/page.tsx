@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Convert from 'ansi-to-html'
@@ -308,7 +308,18 @@ function LogPanel({
   )
 }
 
+// useSearchParams() requires a Suspense boundary or `next build` fails to
+// statically analyse the route (Next 16). Matches the convention used by every
+// other useSearchParams page (login, workspaces, labels, …).
 export default function RunDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <RunDetailPageInner />
+    </Suspense>
+  )
+}
+
+function RunDetailPageInner() {
   const router = useRouter()
   const params = useParams()
   const workspaceId = params.id as string

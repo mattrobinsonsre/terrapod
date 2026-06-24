@@ -539,3 +539,49 @@ class TestCreateDriftRunNonVcs:
 
         assert result is None
         mock_create.assert_not_called()
+
+
+class TestApplyDriftIgnoreRules:
+    """`_apply_drift_ignore_rules` (#482) classifies a drift plan against the
+    workspace's ignore rules. The plan parse + classifier run off the event loop
+    (Rule 13) — these assert the branch outcomes survive that offload, plus the
+    conservative fallbacks."""
+
+    @patch("terrapod.services.drift_ignore_classifier.classify_drift")
+    @patch("terrapod.storage.get_storage")
+    async def test_all_suppressed_is_no_drift(self, mock_storage, mock_classify):
+        from terrapod.services import drift_detection_service as mod
+
+        store = MagicMock()
+        store.get = AsyncMock(return_value=b'{"resource_changes": []}')
+        mock_storage.return_value = store
+        mock_classify.return_value = (False, [{"address": "x"}])  # nothing still drifted
+        run = MagicMock(id=uuid.uuid4(), workspace_id=uuid.uuid4())
+
+        assert await mod._apply_drift_ignore_rules(run, ["ignore_tags"]) == "no_drift"
+        mock_classify.assert_called_once()
+
+    @patch("terrapod.services.drift_ignore_classifier.classify_drift")
+    @patch("terrapod.storage.get_storage")
+    async def test_remaining_change_is_drifted(self, mock_storage, mock_classify):
+        from terrapod.services import drift_detection_service as mod
+
+        store = MagicMock()
+        store.get = AsyncMock(return_value=b'{"resource_changes": [{"address": "y"}]}')
+        mock_storage.return_value = store
+        mock_classify.return_value = (True, [])  # a change survived the rules
+        run = MagicMock(id=uuid.uuid4(), workspace_id=uuid.uuid4())
+
+        assert await mod._apply_drift_ignore_rules(run, ["ignore_tags"]) == "drifted"
+
+    @patch("terrapod.storage.get_storage")
+    async def test_unparseable_plan_falls_back_to_drifted(self, mock_storage):
+        from terrapod.services import drift_detection_service as mod
+
+        store = MagicMock()
+        store.get = AsyncMock(return_value=b"not json{{{")
+        mock_storage.return_value = store
+        run = MagicMock(id=uuid.uuid4(), workspace_id=uuid.uuid4())
+
+        # A runtime hiccup must never SILENCE drift the operator wanted surfaced.
+        assert await mod._apply_drift_ignore_rules(run, ["ignore_tags"]) == "drifted"

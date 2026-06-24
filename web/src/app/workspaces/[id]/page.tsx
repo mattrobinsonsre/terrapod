@@ -419,6 +419,7 @@ function WorkspaceDetailContent() {
   const [rtHmacKey, setRtHmacKey] = useState('')
   const [addingRunTask, setAddingRunTask] = useState(false)
   const [deleteRtId, setDeleteRtId] = useState<string | null>(null)
+  const [deleteVarId, setDeleteVarId] = useState<string | null>(null)
 
   // Sorting for runs tab
   type RunSortKey = 'id' | 'status' | 'type' | 'source' | 'created-by' | 'created-at'
@@ -1226,6 +1227,7 @@ function WorkspaceDetailContent() {
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/vars/${varId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete variable')
+      setDeleteVarId(null)
       await loadVariables()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete variable')
@@ -2440,7 +2442,14 @@ function WorkspaceDetailContent() {
                             <td className="px-4 py-3 text-right">
                               <div className="flex justify-end gap-2">
                                 <button onClick={() => startEditingVar(v)} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
-                                <button onClick={() => handleDeleteVariable(v.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
+                                {deleteVarId === v.id ? (
+                                  <>
+                                    <button onClick={() => setDeleteVarId(null)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
+                                    <button onClick={() => handleDeleteVariable(v.id)} className="text-xs text-red-400 hover:text-red-300">Confirm</button>
+                                  </>
+                                ) : (
+                                  <button onClick={() => setDeleteVarId(v.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
+                                )}
                               </div>
                             </td>
                           )}

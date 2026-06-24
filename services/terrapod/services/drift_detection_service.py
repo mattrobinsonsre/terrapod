@@ -7,6 +7,7 @@ Triggered handler: handle_drift_run_completed() updates workspace drift_status b
 on the run outcome and fires drift_detected notifications when drift is found.
 """
 
+import asyncio
 import json
 import uuid
 
@@ -124,8 +125,12 @@ async def _apply_drift_ignore_rules(run: Run, rules: list[str]) -> str:
         )
         return "drifted"
 
+    # Rule 13: parsing a multi-MB plan JSON and recursing every resource
+    # change in classify_drift is CPU-bound — run both off the event loop so
+    # this handler (driven by the drift_run_completed trigger on an API
+    # replica) never stalls /health while a large plan is classified.
     try:
-        plan = json.loads(raw)
+        plan = await asyncio.to_thread(json.loads, raw)
     except (ValueError, TypeError) as e:
         logger.warning(
             "drift_ignore: plan JSON unparseable; treating as drift",
@@ -135,7 +140,7 @@ async def _apply_drift_ignore_rules(run: Run, rules: list[str]) -> str:
         return "drifted"
 
     try:
-        still_drifted, suppressed = classify_drift(plan, rules)
+        still_drifted, suppressed = await asyncio.to_thread(classify_drift, plan, rules)
     except Exception as e:
         logger.warning(
             "drift_ignore: classifier crashed; treating as drift",

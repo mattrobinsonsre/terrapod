@@ -387,8 +387,11 @@ function WorkspacesPageInner() {
     loadWorkspaces()
   }, [router])
 
-  // Real-time workspace list updates via SSE
-  useWorkspaceListEvents(workspaces.length > 0, useCallback(() => {
+  // Real-time workspace list updates via SSE. Always-on (not gated on
+  // workspaces.length) so the FIRST workspace created from another tab / the
+  // CLI / a VCS push live-appears on an empty org instead of requiring a
+  // manual refresh — the empty state is exactly where live-update matters most.
+  useWorkspaceListEvents(true, useCallback(() => {
     loadWorkspaces()
   }, []))
 
