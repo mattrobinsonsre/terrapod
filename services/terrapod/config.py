@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, Field, PostgresDsn, RedisDsn
+from pydantic import BaseModel, Field, PostgresDsn, RedisDsn, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -1085,6 +1085,15 @@ class RedisConfig(BaseModel):
             "host). Required when auth_mode='aws_iam'."
         ),
     )
+
+    @model_validator(mode="after")
+    def _require_iam_fields(self) -> "RedisConfig":
+        """Fail fast on misconfigured IAM auth instead of an opaque connect error."""
+        if self.auth_mode in ("aws_iam", "gcp_iam", "azure_ad") and not self.username:
+            raise ValueError(f"redis.username is required for auth_mode={self.auth_mode!r}")
+        if self.auth_mode == "aws_iam" and not self.aws_cache_name:
+            raise ValueError("redis.aws_cache_name is required for auth_mode='aws_iam'")
+        return self
 
 
 # --- Main Settings ---

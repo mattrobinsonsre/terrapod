@@ -57,15 +57,16 @@ _azure_state: dict[str, object] = {}
 def strip_url_credentials(redis_url: str) -> str:
     """Drop any userinfo from a redis URL.
 
-    redis-py rejects passing both a URL password and a ``credential_provider``;
-    in IAM mode the provider supplies the username + token, so we strip the
-    URL's userinfo (host/port/path/query/scheme — incl. ``rediss://`` TLS —
-    are preserved).
+    In IAM mode the credential provider supplies the username + token, so we
+    strip the URL's userinfo to avoid it competing with the provider. The
+    scheme (incl. ``rediss://`` TLS), host, port, db-path, and query are
+    preserved; IPv6 host literals stay bracketed.
     """
     parts = urlsplit(str(redis_url))
-    netloc = parts.hostname or ""
-    if parts.port:
-        netloc = f"{netloc}:{parts.port}"
+    host = parts.hostname or ""
+    if ":" in host:  # IPv6 literal — re-bracket so the port stays parseable
+        host = f"[{host}]"
+    netloc = f"{host}:{parts.port}" if parts.port else host
     return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
 
 
@@ -73,6 +74,10 @@ def strip_url_credentials(redis_url: str) -> str:
 
 
 def _aws_signer(region: str):
+    # The RequestSigner holds the session's *refreshable* credentials object
+    # (botocore freezes them at sign time via get_frozen_credentials), so the
+    # cached per-region signer auto-renews across IRSA credential rotation — do
+    # NOT "fix" this by rebuilding the signer each call.
     key = region or "default"
     signer = _aws_signers.get(key)
     if signer is None:

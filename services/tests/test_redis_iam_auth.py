@@ -34,6 +34,29 @@ def test_strip_url_credentials_removes_userinfo():
         iam_auth.strip_url_credentials("rediss://cache.example.com:6379")
         == "rediss://cache.example.com:6379"
     )
+    # Username-only + db-number preserved.
+    assert (
+        iam_auth.strip_url_credentials("rediss://user@cache.example.com:6379/2")
+        == "rediss://cache.example.com:6379/2"
+    )
+
+
+def test_strip_url_credentials_rebrackets_ipv6():
+    # IPv6 literal must stay bracketed or the port can't be parsed.
+    assert (
+        iam_auth.strip_url_credentials("rediss://u:p@[2001:db8::1]:6379/0")
+        == "rediss://[2001:db8::1]:6379/0"
+    )
+
+
+def test_redis_config_requires_username_for_iam():
+    with pytest.raises(ValueError, match="redis.username is required"):
+        RedisConfig(auth_mode="gcp_iam")
+
+
+def test_redis_config_requires_cache_name_for_aws():
+    with pytest.raises(ValueError, match="aws_cache_name is required"):
+        RedisConfig(auth_mode="aws_iam", username="terrapod")
 
 
 def test_mint_aws_elasticache_token_signs_and_strips_scheme(monkeypatch):
@@ -130,7 +153,26 @@ async def test_init_redis_uses_credential_provider_only_for_iam_mode():
                 assert "@" not in from_url.call_args.args[0]
             else:
                 assert "credential_provider" not in kwargs
+                # password mode passes the URL through untouched (userinfo kept).
+                assert from_url.call_args.args[0] == fake_settings.redis_url
         await redis_client.close_redis()
 
     await _check("password", expect_provider=False)
     await _check("aws_iam", expect_provider=True)
+
+
+@pytest.mark.asyncio
+async def test_init_redis_iam_requires_tls():
+    """IAM modes refuse a non-TLS (redis://) URL — tokens never go plaintext."""
+    from terrapod.redis import client as redis_client
+
+    cfg = RedisConfig(auth_mode="aws_iam", username="terrapod", aws_cache_name="c")
+    with (
+        patch.object(redis_client, "settings") as fake_settings,
+        patch.object(redis_client.aioredis, "from_url") as from_url,
+    ):
+        fake_settings.redis = cfg
+        fake_settings.redis_url = "redis://cache.example.com:6379"  # non-TLS
+        with pytest.raises(ValueError, match="requires TLS"):
+            await redis_client.init_redis()
+        from_url.assert_not_called()

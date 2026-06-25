@@ -32,8 +32,16 @@ async def init_redis() -> None:
         # this untouched. TLS (rediss://) is required for IAM Redis auth.
         from terrapod.redis import iam_auth
 
+        stripped_url = iam_auth.strip_url_credentials(settings.redis_url)
+        if not stripped_url.startswith("rediss://"):
+            # IAM tokens are bearer credentials — refuse to send them over a
+            # plaintext connection. (Fail fast at startup, don't leak.)
+            raise ValueError(
+                "Redis cloud-IAM auth requires TLS: set a rediss:// URL "
+                f"(auth_mode={redis_cfg.auth_mode!r} with a non-TLS redis_url)"
+            )
         _redis = aioredis.from_url(
-            iam_auth.strip_url_credentials(settings.redis_url),
+            stripped_url,
             decode_responses=True,
             credential_provider=iam_auth.make_credential_provider(
                 auth_mode=redis_cfg.auth_mode,
