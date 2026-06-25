@@ -4,6 +4,9 @@ Guidance for contributors and AI coding assistants working in the Terrapod
 repository. If you are using an AI assistant (Claude Code, Cursor, Copilot,
 Aider, etc.), point it at this file — it captures the architecture, the
 contracts, the test tiers, and the conventions that keep changes consistent.
+For a quick, machine-friendly map of the whole repo — entry points, the
+codebase layout, the feature catalogue, and how to enable each feature — see
+[`llms.txt`](llms.txt) at the repo root.
 
 New here? Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup and the
 contribution workflow, then come back here for the deeper architecture and
@@ -220,6 +223,19 @@ Playwright's auto-waiting.
   `values.yaml`, update `values.schema.json` to match (it uses
   `additionalProperties: false`, so `helm lint` fails otherwise), and make
   sure the template renders it.
+- **Keep [`llms.txt`](llms.txt) current (it's a first-class deliverable, not an
+  afterthought)** — `llms.txt` is the machine-friendly map AI assistants land on
+  to understand and operate Terrapod. It is only useful if it stays accurate, so
+  treat it like the API↔consumer contract: **a change that adds, renames, or
+  removes a user-visible feature, a doc page, a Helm enable-key, or a top-level
+  entry point MUST update `llms.txt` in the same PR** (and the matching feature
+  tables in `README.md` / `docs/index.md`). The hard rule that file lives by is
+  *no hallucinated endpoints, Helm values, or config keys* — every entry must
+  resolve to something real in the repo, so when the underlying thing moves, the
+  map moves with it. A stale or inaccurate `llms.txt` is a defect: it actively
+  misleads an agent (and the operator it's advising), which is worse than no map
+  at all. If you add a feature and only the deep doc knows about it, an agent
+  pointed at the repo can't discover it — so wire it into `llms.txt` too.
 - **Client operations use bounded backoff/retry by default (hard requirement)**
   — every outbound HTTP call a Terrapod process makes (runner → API result
   POSTs and artifact/state uploads, listener → API status/log/heartbeat, API →

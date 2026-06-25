@@ -1,0 +1,101 @@
+# Terrapod
+
+> Terrapod is a free, open-source **platform** replacement for Terraform Enterprise / HCP Terraform. It provides the collaboration, governance, state management, and UI layer that wraps around `terraform` or `tofu` as pluggable execution backends — it does **not** fork or reimplement the Terraform/OpenTofu engine. It targets TFE V2 API compatibility for the surface the `terraform`/`tofu` CLI and `go-tfe` consume, and is deployed exclusively via a Helm chart on Kubernetes.
+
+This file is a machine-friendly map for AI assistants and LLMs. If you were pointed at this repository (or a clone) to help someone use, operate, or extend Terrapod, read the "Start here" links first, then fan out to the specific doc for the task. **Do not invent endpoints, Helm values, or config keys** — every claim below resolves to a file in this repo; verify against it.
+
+## Start here
+
+- [README.md](README.md): What Terrapod is, the feature list with status, a quick-start, and architecture overview.
+- [AGENTS.md](AGENTS.md): **The canonical guide for contributors and AI assistants** — architecture orientation, the API↔consumer contract, the code↔tests contract, the test tiers, conventions, and the hard invariants. Read this before changing code.
+- [docs/index.md](docs/index.md): The full documentation index (every doc page with a one-line description).
+- [docs/getting-started.md](docs/getting-started.md): Deploy the Helm chart on Kubernetes, create your first workspace, run your first plan/apply.
+- [docs/architecture.md](docs/architecture.md): System components, storage, the ARC-pattern runner/listener model, and auth flows.
+- [docs/api-reference.md](docs/api-reference.md): Every API endpoint with examples (the authoritative API surface).
+- [CONTRIBUTING.md](CONTRIBUTING.md): Setup and the issue → branch → PR contribution workflow.
+
+## Architecture & conventions (hard invariants)
+
+The authoritative source is [AGENTS.md](AGENTS.md). Key invariants an agent must respect when advising or editing:
+
+- **Single organization** — the org name is always the literal `default`; there is no `org_name` column anywhere. Never use `{org}`, `test-org`, etc.
+- **BFF** — all traffic enters through the Next.js frontend, which proxies `/api/*` to the API; the browser never calls the API directly. New SSE endpoints must be added to `web/next.config.js` `headers()` with `Content-Encoding: none`.
+- **No sync work in `async def` handlers** — wrap blocking/CPU work in `asyncio.to_thread`/`run_in_executor` or use async-native libs; prefer plain `def` endpoints when a sync lib is unavoidable.
+- **Multi-replica, no leader election** — all background work uses the Redis-coordinated distributed scheduler (`services/scheduler.py`); never use `asyncio.create_task()` for background work.
+- **RFC3339 timestamps with trailing `Z`** (never `+00:00`) for `go-tfe` compatibility.
+- **Original implementation only** — API *compatibility* with the public TFE V2 spec is the goal; copying HashiCorp implementation code is not.
+- **Substantial API tempfiles go on the attached PVC, not `/tmp`** (which is RAM-backed).
+- **Content hygiene** — no internal/company/cluster identifiers in commits/PRs/code/docs; describe peer OSS projects (e.g. Terrakube) neutrally, never disparagingly.
+
+## Codebase map
+
+| Path | What it is | Language |
+|---|---|---|
+| `services/terrapod/` | API server (FastAPI) **and** the runner listener — one codebase, different entrypoints. Implicit namespace package (no `__init__.py`). Routers in `api/routers/`, business logic in `services/`, storage backends in `storage/`, auth in `auth/`, the runner in `runner/`. | Python 3.13 |
+| `web/` | Next.js frontend + BFF (the single ingress; proxies `/api/*`). | TypeScript / React |
+| `go-terrapod/` | Public canonical Go SDK — the source of truth for the Go-side view of every endpoint. | Go |
+| `provider/` | `terraform-provider-terrapod` — a thin wrapper over go-terrapod. | Go |
+| `migrate/` | `terrapod-migrate` — TFE/HCP + Atlantis migration CLI. | Go |
+| `publish/` | `terrapod-publish` — registry publish CLI (client-signed uploads). | Go |
+| `helm/terrapod/` | The Helm chart (the only supported deployment mechanism); `values.yaml` + `values.schema.json`. | YAML |
+| `alembic/` | Async Alembic database migrations (hash-based revision IDs). | Python |
+| `docs/` | User + operator documentation (this map's targets). | Markdown |
+
+Build/lint/test all run in Docker via `make` (`make test`, `make lint`, `make dev` for the local Tilt stack) — there is no local Python environment.
+
+## Features (what exists, and the doc for each)
+
+- [Workspaces, Remote State & CLI-driven runs](docs/remote-state.md): isolated state/variables/runs; versioned state with locking, rollback; `terraform`/`tofu` via the `cloud` block.
+- [Agent execution & Runners](docs/runners.md): server-side plan/apply on ephemeral K8s Jobs (ARC pattern); custom runner images, Job placement, agent pools.
+- [VCS Integration](docs/vcs-integration.md) and [VCS Workflows](docs/vcs-workflows.md): GitHub App + GitLab token; polling-first with optional webhooks; merge-then-apply vs apply-then-merge.
+- [Workspace Autodiscovery](docs/autodiscovery.md): Atlantis-style monorepo workspace auto-creation from PRs.
+- [RBAC](docs/rbac.md): label-based roles, hierarchical workspace permissions (read/plan/write/admin); no teams.
+- [Authentication](docs/authentication.md): local, OIDC, SAML, `terraform login`, API tokens, scoped service tokens.
+- [Cloud Credentials](docs/cloud-credentials.md): zero static cloud credentials — runs and the platform use K8s workload identity (AWS IRSA, GCP WIF, Azure WI), plus passwordless **database** and **Redis/Valkey** IAM auth.
+- [Private Module & Provider Registry](docs/registry.md) and [Registry Publishing](docs/registry-publishing.md): GPG-signed registry, provider network-mirror + binary caching, `terrapod-publish` CLI.
+- [Service Catalog](docs/service-catalog.md): no-code self-service provisioning over the module registry.
+- [Drift Detection](docs/drift-detection.md) and [Drift Ignore Rules](docs/drift-ignore-rules.md): scheduled plan-only drift checks with a per-workspace noise allowlist.
+- [Run Triggers](docs/run-triggers.md): cross-workspace dependency chains.
+- [Policy-as-Code (OPA)](docs/policies.md): Rego policy sets, advisory/mandatory enforcement, label-scoped.
+- [Run Tasks](docs/run-tasks.md): pre/post-plan external webhook validation hooks.
+- [Notifications](docs/notifications.md): webhook (HMAC), Slack Block Kit, email on run events.
+- [AI Plan Summary](docs/ai-plan-summary.md): LLM change summary + risk + failure analysis, provider-agnostic via LiteLLM (Bedrock/OpenAI/Anthropic/Gemini/vLLM).
+- [Audit Logging](docs/audit-logging.md), [Monitoring](docs/monitoring.md), [Artifact Retention](docs/artifact-retention.md): immutable event log, Prometheus metrics, automated cleanup.
+- [Terragrunt](docs/terragrunt.md): per-workspace Terragrunt support for agent-mode and CLI-driven runs.
+- [Migration](docs/migration.md): move TFE/HCP and Atlantis platforms onto Terrapod with `terrapod-migrate`.
+
+## Enabling features (operator quick-reference)
+
+How each capability is turned on. **Platform-level** features are Helm values under `api.config.*` (see [helm/terrapod/values.yaml](helm/terrapod/values.yaml) and its `values.schema.json`); **per-resource** features are configured per workspace/connection via the API, UI, or the Terraform provider. Always confirm exact keys in the linked doc + `values.yaml`.
+
+| Capability | How to enable | Doc |
+|---|---|---|
+| Cloud-IAM **database** auth | `api.config.database.auth_mode` = `aws_iam` \| `gcp_iam` \| `azure_ad` (default `password`) | [cloud-credentials.md](docs/cloud-credentials.md) |
+| Cloud-IAM **Redis/Valkey** auth | `api.config.redis.auth_mode` = `aws_iam` \| `gcp_iam` \| `azure_ad` (default `password`); requires a `rediss://` URL | [cloud-credentials.md](docs/cloud-credentials.md) |
+| AI plan summary | `api.config.ai_summary.enabled` + provider/model config | [ai-plan-summary.md](docs/ai-plan-summary.md) |
+| Service catalog | `api.config.catalog.enabled` (on by default; the `catalog_permission` RBAC axis is opt-in) | [service-catalog.md](docs/service-catalog.md) |
+| Prometheus metrics | `api.config.metrics.enabled` | [monitoring.md](docs/monitoring.md) |
+| SSO (OIDC/SAML) | `api.config.auth.sso.*` + client secrets via K8s Secret `secretKeyRef` | [authentication.md](docs/authentication.md) |
+| VCS integration | Admin creates a VCS connection, then sets the workspace's `vcs_*` fields | [vcs-integration.md](docs/vcs-integration.md) |
+| Drift detection | Per-workspace setting (enable + interval) via API/UI/provider | [drift-detection.md](docs/drift-detection.md) |
+| Notifications / Run tasks | Per-workspace config via API/UI/provider | [notifications.md](docs/notifications.md), [run-tasks.md](docs/run-tasks.md) |
+| Policy-as-code | Create a policy set, attach to workspaces by label | [policies.md](docs/policies.md) |
+| Autodiscovery | Per-VCS-connection rules (glob patterns + workspace template) | [autodiscovery.md](docs/autodiscovery.md) |
+| Run triggers | Link source→destination workspaces | [run-triggers.md](docs/run-triggers.md) |
+| Agent execution | Create an agent pool + a join token, deploy a runner listener | [runners.md](docs/runners.md) |
+| Terragrunt (agent mode) | Per-workspace `terragrunt_enabled` + pinned version | [terragrunt.md](docs/terragrunt.md) |
+
+## Reference & operations
+
+- [docs/tfe-cli-surface.md](docs/tfe-cli-surface.md): the verified subset of the TFE V2 API the CLI consumes (mounted at `/api/v2/`); everything else is Terrapod-native at `/api/terrapod/v1/`.
+- [docs/deployment.md](docs/deployment.md): production Helm deployment, storage backends, scaling.
+- [docs/deployment-network-isolation.md](docs/deployment-network-isolation.md) and [docs/deployment-webhook-ingress.md](docs/deployment-webhook-ingress.md): split-ingress topologies.
+- [docs/security-hardening.md](docs/security-hardening.md), [docs/production-checklist.md](docs/production-checklist.md), [docs/disaster-recovery.md](docs/disaster-recovery.md): go-live and break-glass.
+- [docs/runbooks.md](docs/runbooks.md): operator runbooks for high-blast-radius surfaces.
+- [docs/local-development.md](docs/local-development.md): run from source with Tilt (contributors).
+
+## Optional
+
+- [docs/registry-publishing.md](docs/registry-publishing.md): the client-signed provider/module publish protocol.
+- [docs/remote-state.md](docs/remote-state.md): cross-workspace `terraform_remote_state` composition.
+- The four Go modules (`go-terrapod/`, `provider/`, `migrate/`, `publish/`) each have their own `go.mod` and package docs.

@@ -19,7 +19,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
 > **Zero static cloud credentials, end to end.** Both the runs and the platform reach cloud APIs through Kubernetes workload identity — AWS IRSA, GCP Workload Identity Federation, Azure Workload Identity — so there are no long-lived access keys to store, leak, or rotate. Credentials are short-lived, auto-rotated, and auditable. See [docs/cloud-credentials.md](docs/cloud-credentials.md).
 
-> **Contributions welcome — including AI-assisted ones.** The platform core is **Python** (FastAPI + async SQLAlchemy), which keeps the contribution barrier low; the consumer ecosystem (Go SDK, Terraform provider, migration/publish CLIs) is **Go**. Pairing with an AI coding assistant? Point it at [AGENTS.md](AGENTS.md) — it carries the architecture, contracts, and conventions. Then read [CONTRIBUTING.md](CONTRIBUTING.md) and [open an issue](https://github.com/mattrobinsonsre/terrapod/issues) to get started.
+> **Contributions welcome — including AI-assisted ones.** The platform core is **Python** (FastAPI + async SQLAlchemy), which keeps the contribution barrier low; the consumer ecosystem (Go SDK, Terraform provider, migration/publish CLIs) is **Go**. Pairing with an AI coding assistant? Point it at [`llms.txt`](llms.txt) (a machine-friendly map of the repo, docs, and how to enable each feature) and [AGENTS.md](AGENTS.md) (architecture, contracts, conventions, and the hard invariants). Then read [CONTRIBUTING.md](CONTRIBUTING.md) and [open an issue](https://github.com/mattrobinsonsre/terrapod/issues) to get started.
 
 ---
 
