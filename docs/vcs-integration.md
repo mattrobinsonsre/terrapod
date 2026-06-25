@@ -39,10 +39,13 @@ Terrapod's background poller checks your VCS providers every 60 seconds (configu
 - **Branch push -> full plan/apply run** -- when a new commit lands on the tracked branch, Terrapod downloads the code and queues a normal run (plan, then apply if auto-apply is on or manually confirmed).
 - **Pull request / merge request -> speculative plan** -- when an open PR/MR targets the tracked branch and has a new head commit, Terrapod queues a plan-only run. The plan shows what _would_ change if the PR were merged, but it can never be applied. A new speculative run is created each time the PR/MR is updated with a new commit.
 
-### Polling-First Design
+### Webhooks are supported — and polling means they're never required
 
-- **No inbound connections required** -- Terrapod only makes outbound HTTPS calls to VCS provider APIs, so it works behind firewalls and NATs without any ingress configuration.
-- **Webhooks are optional** (GitHub only, currently) -- if you want faster feedback (sub-second instead of up to 60s), you can configure GitHub webhooks. The webhook tells the poller to check immediately rather than waiting for the next cycle.
+Terrapod **does support inbound VCS webhooks** for instant triggers, *and* it polls, so it works with or without them. The two are complementary, not either/or:
+
+- **Webhooks are supported** (GitHub today, HMAC-validated at `POST /api/terrapod/v1/vcs-events/github`). Configure one and a push or PR triggers a run within ~a second instead of waiting for the next poll cycle. The webhook simply tells the poller to check *now*. Exposing only the webhook path publicly (so the rest of the platform can stay private) is covered in [Optional webhook ingress](deployment-webhook-ingress.md).
+- **Polling is the resilient default, so webhooks are optional.** Terrapod polls each connected repo over **outbound HTTPS** every `poll_interval_seconds` (default 60). This requires **no inbound connections**, so it works behind firewalls and NATs with zero ingress configuration — and it means **nothing is lost without a webhook**: the same runs are created on the next poll cycle, just up to 60s later. A webhook is a latency optimization, never a dependency.
+- **Why polling-first** — many self-hosted deployments sit in networks where a VCS provider cannot deliver an inbound webhook at all. Polling guarantees the integration works everywhere; webhooks make it faster where inbound delivery is available. (GitLab is polling-only today; a GitLab webhook receiver is not yet implemented, and GitLab repos work fully via polling.)
 
 ### Sparse fetch + caching
 

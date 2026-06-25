@@ -30,7 +30,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | Workspaces | Implemented | Isolate state, variables, and runs per workspace |
 | Remote State Management | Implemented | Versioned state storage with locking, rollback, encryption at rest via CSP services |
 | Agent Execution | Implemented | Plan/apply runs on the server via K8s Job-based runner infrastructure |
-| VCS Integration | Implemented | GitHub (App) and GitLab (access token); polling-first with optional webhooks |
+| VCS Integration | Implemented | GitHub (App) and GitLab (access token); inbound webhooks supported (GitHub, HMAC-validated) for instant triggers, with outbound polling as the resilient default so webhooks are optional, never required |
 | Variables & Secrets | Implemented | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets |
 | RBAC | Implemented | Label-based role system with hierarchical workspace permissions (read/plan/write/admin) |
 | Private Module Registry | Implemented | Publish, version, and share modules internally |
@@ -356,7 +356,7 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 **Where Terrapod is genuinely differentiated** (verified against Terrakube's current docs). The first three share one theme -- Terrapod is built for restricted-network, multi-cluster, low-upstream-dependency topologies:
 
 - **Firewall-friendly cross-cluster execution.** Terrapod runners connect *outbound* to the control plane over SSE and create Jobs locally; the API holds no inbound reach and no Kubernetes access into the execution cluster. Terrakube's API connects *into* the executor (it must be exposed via ingress, with Redis reachable), so isolated / NAT'd / outbound-only execution clusters aren't supported the same way.
-- **Polling-first VCS** -- Terrapod polls VCS over outbound HTTPS (webhooks optional); Terrakube is webhook-only and needs inbound webhook delivery.
+- **Polling-first VCS** -- Terrapod supports inbound webhooks (GitHub) but does not require them: it also polls VCS over outbound HTTPS, so the integration works behind firewalls/NATs with no inbound delivery. Terrakube uses webhook delivery. Different fits for inbound-restricted networks.
 - **Pull-through provider mirror + terraform/tofu binary cache** -- runners have zero direct upstream dependency; Terrakube ships a local plugin cache.
 - **Monorepo autodiscovery** -- Atlantis-style auto-creation of workspaces from glob-matched directories on PRs (Terrakube has directory filtering, but not auto-creation).
 - **Run tasks** -- pre/post-plan external webhook validation hooks (not present in Terrakube).

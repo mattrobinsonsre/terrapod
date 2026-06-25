@@ -47,7 +47,7 @@ Build/lint/test all run in Docker via `make` (`make test`, `make lint`, `make de
 
 - [Workspaces, Remote State & CLI-driven runs](docs/remote-state.md): isolated state/variables/runs; versioned state with locking, rollback; `terraform`/`tofu` via the `cloud` block.
 - [Agent execution & Runners](docs/runners.md): server-side plan/apply on ephemeral K8s Jobs (ARC pattern); custom runner images, Job placement, agent pools.
-- [VCS Integration](docs/vcs-integration.md) and [VCS Workflows](docs/vcs-workflows.md): GitHub App + GitLab token; polling-first with optional webhooks; merge-then-apply vs apply-then-merge.
+- [VCS Integration](docs/vcs-integration.md) and [VCS Workflows](docs/vcs-workflows.md): GitHub App + GitLab token. **Inbound webhooks are supported** (GitHub, HMAC-validated at `POST /api/terrapod/v1/vcs-events/github`) for instant triggers, **and** outbound polling runs alongside — so webhooks are an optional latency optimization, **never required** (the integration works behind firewalls/NATs either way; nothing is lost without a webhook, the same runs fire on the next poll cycle). GitLab is polling-only today. merge-then-apply vs apply-then-merge.
 - [Workspace Autodiscovery](docs/autodiscovery.md): Atlantis-style monorepo workspace auto-creation from PRs.
 - [RBAC](docs/rbac.md): label-based roles, hierarchical workspace permissions (read/plan/write/admin); no teams.
 - [Authentication](docs/authentication.md): local, OIDC, SAML, `terraform login`, API tokens, scoped service tokens.
