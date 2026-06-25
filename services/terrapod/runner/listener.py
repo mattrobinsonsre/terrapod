@@ -963,8 +963,6 @@ class RunnerListener:
         Values never appear in the Job spec, so they aren't readable via
         `kubectl describe job` / etcd.
         """
-        import json
-
         from kubernetes import client as k8s_client
 
         from terrapod.runner.job_manager import _get_core_api

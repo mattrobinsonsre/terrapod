@@ -48,9 +48,9 @@ from terrapod.redis.client import get_redis_client
 router = APIRouter(tags=["tokens"])
 logger = get_logger(__name__)
 
-# Kinds anyone may create / re-tag bound to themselves. service_detached is
-# admin-only and handled separately (unbound, admin-pinned absolute scope).
-_CREATABLE_KINDS = {"interactive", "service_bound"}
+# Valid token kinds. "interactive" and "service_bound" may be created / re-tagged
+# by anyone bound to themselves; "service_detached" is admin-only and handled
+# separately (unbound, admin-pinned absolute scope) — gated inline at create/retag.
 _ALL_KINDS = {"interactive", "service_bound", "service_detached"}
 _TOKEN_ROLES_PREFIX = "tp:token_roles:"
 

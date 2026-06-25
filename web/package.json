@@ -41,6 +41,7 @@
     "typescript": "^6.0.3"
   },
   "overrides": {
-    "postcss": "^8.5.13"
+    "postcss": "^8.5.13",
+    "@babel/core": "^7.29.6"
   }
 }
