@@ -19,6 +19,7 @@ to inline curl flags or JSON bodies.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import httpx
@@ -83,7 +84,19 @@ def _post_json(
     *,
     timeout_seconds: float = 10.0,
     client: httpx.Client | None = None,
+    retries: int = 0,
+    retry_delay_seconds: float = 3.0,
 ) -> tuple[bool, int | None]:
+    """POST JSON to the API; returns (ok, status_code).
+
+    Set ``retries`` > 0 for the authoritative result POSTs (plan-result /
+    apply-result) whose payload drives a state transition. A transient
+    read-timeout or 5xx must not silently drop the result: a lost
+    plan-result left ``has_changes`` unknown, and the workspace was then
+    conservatively flagged drifted (#565). The server-side landing point
+    (`complete_plan`) is idempotent, so re-POSTing is safe. A 4xx is a
+    definitive answer and is never retried.
+    """
     if not cfg.has_api:
         return False, None
     own_client = client is None
@@ -93,15 +106,37 @@ def _post_json(
             headers={"Authorization": f"Bearer {cfg.auth_token}"} if cfg.auth_token else {},
         )
     try:
-        if body is None:
-            resp = client.post(url)
-        else:
-            resp = client.post(url, json=body)
-        ok = 200 <= resp.status_code < 300
-        return ok, resp.status_code
-    except httpx.RequestError as exc:
-        logger.warning("post request failed", url=url, err=str(exc))
-        return False, None
+        attempt = 0
+        while True:
+            try:
+                if body is None:
+                    resp = client.post(url)
+                else:
+                    resp = client.post(url, json=body)
+                ok = 200 <= resp.status_code < 300
+                # Retry only transient server errors (5xx); 2xx/4xx are final.
+                if ok or resp.status_code < 500 or attempt >= retries:
+                    return ok, resp.status_code
+                logger.warning(
+                    "post non-2xx — retrying",
+                    url=url,
+                    status=resp.status_code,
+                    attempt=attempt + 1,
+                    retries=retries,
+                )
+            except httpx.RequestError as exc:
+                if attempt >= retries:
+                    logger.warning("post request failed", url=url, err=str(exc))
+                    return False, None
+                logger.warning(
+                    "post request failed — retrying",
+                    url=url,
+                    err=str(exc),
+                    attempt=attempt + 1,
+                    retries=retries,
+                )
+            attempt += 1
+            time.sleep(retry_delay_seconds)
     finally:
         if own_client:
             client.close()
@@ -290,11 +325,14 @@ def post_plan_result(
     fallback; this just drives the planning→planned transition faster
     when the runner can reach the API directly."""
     url = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/plan-result"
+    # Authoritative has_changes signal — retry so a transient read-timeout
+    # doesn't leave the run's has_changes unknown and falsely flag drift (#565).
     ok, status = _post_json(
         cfg,
         url,
         body={"has_changes": has_changes},
         client=client,
+        retries=3,
     )
     if not ok:
         logger.warning("plan-result POST failed (non-fatal)", status=status)
@@ -309,7 +347,9 @@ def post_apply_result(
     """Apply phase. Best-effort. Drives applying→applied transition
     without the listener round-trip."""
     url = f"{cfg.api_url}/api/terrapod/v1/runs/{cfg.run_id}/apply-result"
-    ok, status = _post_json(cfg, url, body=None, client=client)
+    # Authoritative apply-completion trigger — retry for the same reason as
+    # plan-result (#565); complete_apply is idempotent.
+    ok, status = _post_json(cfg, url, body=None, client=client, retries=3)
     if not ok:
         logger.warning("apply-result POST failed (non-fatal)", status=status)
     return ok

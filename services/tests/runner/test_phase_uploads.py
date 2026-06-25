@@ -174,6 +174,34 @@ class TestRunResults:
         # Empty body — apply-result is a side-effect-only POST.
         assert seen_bodies[0] in (b"", b"null", b"{}")
 
+    def test_plan_result_retries_on_read_timeout(self, monkeypatch) -> None:
+        # #565: a transient read-timeout must not drop the authoritative
+        # has_changes signal (which would leave the run unknown → false drift).
+        monkeypatch.setattr(uploads.time, "sleep", lambda *_a, **_k: None)
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise httpx.ReadTimeout("read timed out", request=request)
+            return httpx.Response(204)
+
+        ok = uploads.post_plan_result(_cfg(), has_changes=False, client=_client(handler))
+        assert ok is True
+        assert calls["n"] == 2  # retried once after the timeout, then succeeded
+
+    def test_plan_result_gives_up_after_retries(self, monkeypatch) -> None:
+        monkeypatch.setattr(uploads.time, "sleep", lambda *_a, **_k: None)
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            raise httpx.ReadTimeout("read timed out", request=request)
+
+        ok = uploads.post_plan_result(_cfg(), has_changes=False, client=_client(handler))
+        assert ok is False
+        assert calls["n"] == 4  # 1 initial attempt + 3 retries, then give up
+
 
 # ── CLI entrypoint ────────────────────────────────────────────────────
 
