@@ -5,8 +5,6 @@ Supports API audience for application-scoped permissions (Auth0, Okta, etc.)
 and /userinfo endpoint for additional claims.
 """
 
-import base64
-import hashlib
 import secrets
 from datetime import UTC, datetime
 from typing import Any
@@ -17,6 +15,7 @@ from authlib.jose import JsonWebKey
 from authlib.jose import jwt as authlib_jwt
 from authlib.jose.errors import JoseError
 
+from terrapod.auth.pkce import s256_challenge
 from terrapod.auth.sso import AuthenticatedIdentity, AuthorizationRequest, SSOConnector
 from terrapod.config import OIDCProviderConfig
 from terrapod.logging_config import get_logger
@@ -27,9 +26,7 @@ logger = get_logger(__name__)
 def _generate_pkce_pair() -> tuple[str, str]:
     """Return (code_verifier, S256 code_challenge) for upstream OIDC PKCE."""
     verifier = secrets.token_urlsafe(64)
-    digest = hashlib.sha256(verifier.encode("ascii")).digest()
-    challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
-    return verifier, challenge
+    return verifier, s256_challenge(verifier)
 
 
 class OIDCConnector(SSOConnector):

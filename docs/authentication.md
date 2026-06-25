@@ -91,6 +91,8 @@ Return session token + redirect URL
 
 Terrapod uses [authlib](https://authlib.org/) for OIDC integration. Any standards-compliant OIDC provider works.
 
+Terrapod sends **S256 PKCE** ([RFC 7636](https://www.rfc-editor.org/rfc/rfc7636)) on the upstream authorization request and token exchange, in addition to the client secret. No configuration is required — it is always on, and providers that don't enforce PKCE simply ignore the extra parameters. This makes Terrapod compatible with IdPs that require PKCE on the authorization-code flow even when a client secret is configured (e.g. Pinniped Supervisor).
+
 ### Auth0 Example
 
 ```yaml
