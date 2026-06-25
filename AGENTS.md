@@ -220,6 +220,19 @@ Playwright's auto-waiting.
   `values.yaml`, update `values.schema.json` to match (it uses
   `additionalProperties: false`, so `helm lint` fails otherwise), and make
   sure the template renders it.
+- **Client operations use bounded backoff/retry by default (hard requirement)**
+  — every outbound HTTP call a Terrapod process makes (runner → API result
+  POSTs and artifact/state uploads, listener → API status/log/heartbeat, API →
+  upstream registries / VCS / binary cache, notification + run-task webhook
+  deliveries) MUST use a bounded retry with backoff. A transient timeout or 5xx
+  must never silently drop the operation — a single un-retried `plan-result`
+  POST once left `has_changes` unknown and falsely flagged a workspace as
+  drifted. Pair it with idempotency: retry is only safe when the server handler
+  is idempotent, so the rule is **make the handler idempotent, then retry** —
+  don't skip the retry because a write isn't idempotent; fix the idempotency.
+  Retry transient failures (timeouts, connection errors, 5xx); a definitive
+  **4xx is final and never retried**. Deliberately best-effort calls (e.g.
+  telemetry) may skip retry but MUST say so in a comment. When in doubt, retry.
 
 ## Content hygiene (hard requirements)
 
