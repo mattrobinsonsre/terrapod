@@ -120,6 +120,15 @@ api:
       pool_timeout: 30         # Seconds to wait for a pool connection
       connect_timeout: 10      # TCP connect timeout in seconds
       command_timeout: 30      # Query timeout in seconds
+      # DB auth (#573): "password" (default — static creds in the DB URL) or a
+      # cloud-IAM mode that mints a short-lived token per connection under the
+      # API's workload identity (no static DB password, TLS required):
+      #   aws_iam   — AWS RDS IAM (IRSA)
+      #   gcp_iam   — GCP Cloud SQL IAM (Workload Identity Federation)
+      #   azure_ad  — Azure Database for PostgreSQL Entra auth (Azure Workload Identity)
+      auth_mode: password
+      aws_iam_region: ""       # AWS region for RDS IAM signing ("" = AWS_REGION env); aws_iam only
+      ssl_mode: ""             # asyncpg TLS mode; forced to >= "require" for any IAM mode
 
     # Default execution backend and version for new workspaces
     default_execution_backend: tofu  # tofu | terraform

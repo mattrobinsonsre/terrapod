@@ -36,6 +36,9 @@ data:
       pool_timeout: {{ .Values.api.config.database.pool_timeout | default 30 }}
       connect_timeout: {{ .Values.api.config.database.connect_timeout | default 10 }}
       command_timeout: {{ .Values.api.config.database.command_timeout | default 30 }}
+      auth_mode: {{ .Values.api.config.database.auth_mode | default "password" | quote }}
+      aws_iam_region: {{ .Values.api.config.database.aws_iam_region | default "" | quote }}
+      ssl_mode: {{ .Values.api.config.database.ssl_mode | default "" | quote }}
     {{- end }}
     storage:
       backend: {{ .Values.api.config.storage.backend | quote }}

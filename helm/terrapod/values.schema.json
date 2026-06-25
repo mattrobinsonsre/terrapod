@@ -448,7 +448,10 @@
             "pool_recycle": { "type": "integer", "minimum": -1 },
             "pool_timeout": { "type": "integer", "minimum": 0 },
             "connect_timeout": { "type": "integer", "minimum": 1 },
-            "command_timeout": { "type": "integer", "minimum": 1 }
+            "command_timeout": { "type": "integer", "minimum": 1 },
+            "auth_mode": { "type": "string", "enum": ["password", "aws_iam", "gcp_iam", "azure_ad"] },
+            "aws_iam_region": { "type": "string" },
+            "ssl_mode": { "type": "string" }
           }
         },
         "default_execution_backend": {

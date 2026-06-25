@@ -480,21 +480,101 @@ Workload identity fails closed and the errors are often opaque. The three most c
 
 Terrapod's API connects to PostgreSQL using the connection string in the `TERRAPOD_DATABASE_URL` environment variable (sourced from a K8s Secret — see [External secret managers](#external-secret-managers-vault-via-eso--vault-agent)).
 
-### Cloud IAM database auth is not practical today (honest gap)
+The auth mode is selected by `api.config.database.auth_mode`. Besides the default static password, every major cloud's managed-PostgreSQL IAM auth is supported — Terrapod mints a short-lived token **per connection** under the API pod's workload identity (the same IRSA / WIF / WI used for object storage), so there is **no static database password**:
 
-Cloud-IAM database authentication — **AWS RDS IAM auth**, **GCP Cloud SQL IAM auth**, and **Azure AD authentication for PostgreSQL** — works by using a short-lived (~15-minute) IAM-issued token *as the database password*. That token must be refreshed before it expires, on every new connection.
+| Mode | What it does | Identity |
+|---|---|---|
+| `password` (default) | The static password embedded in `TERRAPOD_DATABASE_URL`. Fully supported; recommended to source the Secret from a manager (below). | — |
+| `aws_iam` | **AWS RDS IAM auth** — a short-lived (~15-min) IAM token, signed locally per connection. | IRSA |
+| `gcp_iam` | **GCP Cloud SQL IAM auth** — the service account's OAuth2 access token as the DB password. | Workload Identity Federation |
+| `azure_ad` | **Azure Database for PostgreSQL — Microsoft Entra auth** — an Entra access token as the DB password. | Azure Workload Identity |
 
-Terrapod does **not** support this today. The API builds its SQLAlchemy engine **once at startup** from a static `database_url` read from the environment, and there is **no in-process token-refresh hook** on the connection pool. An IAM auth token supplied as the DB password would expire after ~15 minutes and the pool could not mint a fresh one without a pod restart — so the connection would break. Do not configure RDS IAM auth / Cloud SQL IAM auth / Azure AD DB auth against the current release; it will fail once the first token expires.
+In every IAM mode the DB URL carries the **user but no password** (the token is the password), and **TLS is required** (forced to at least `require`; set `ssl_mode: verify-full` for cert verification). The credential libraries cache and refresh tokens near expiry, so the per-connection hook is a fast cached read in steady state. Existing connections persist after a token expires (the token only authenticates the initial handshake), so a fresh token per *new* connection is all that's needed.
 
-### Recommended pattern instead
+### AWS RDS IAM auth (`auth_mode: aws_iam`)
+
+Setup:
+
+1. **Enable IAM auth on the RDS instance** and create the database role as an IAM-authenticated user:
+   ```sql
+   CREATE USER terrapod;
+   GRANT rds_iam TO terrapod;
+   ```
+2. **Grant the API's IRSA role `rds-db:connect`** on that DB user (in addition to its object-storage permissions):
+   ```json
+   {
+     "Effect": "Allow",
+     "Action": "rds-db:connect",
+     "Resource": "arn:aws:rds-db:us-east-1:123456789012:dbuser:db-ABCDEFGHIJKL/terrapod"
+   }
+   ```
+3. **Point the DB URL at the user with no password** (the token is the password) and select the mode. TLS is required for IAM auth and is forced on:
+   ```yaml
+   api:
+     config:
+       database:
+         auth_mode: aws_iam
+         aws_iam_region: ""        # "" = AWS_REGION env (set by IRSA)
+         ssl_mode: verify-full     # require | verify-ca | verify-full (recommended)
+   ```
+   ```
+   # TERRAPOD_DATABASE_URL — user + host, NO password
+   postgresql+asyncpg://terrapod@my-db.abcdef.us-east-1.rds.amazonaws.com:5432/terrapod
+   ```
+
+If the API logs `Database auth: cloud IAM (per-connection token)` at startup and a `SELECT 1` succeeds, it's working. A `PAM authentication failed` / `password authentication failed` error usually means the `rds_iam` grant or the `rds-db:connect` IAM policy resource ARN (DBI resource id + user) doesn't match.
+
+### GCP Cloud SQL IAM auth (`auth_mode: gcp_iam`)
+
+On Cloud SQL for PostgreSQL with IAM authentication enabled, Terrapod uses the API service account's OAuth2 access token (scope `https://www.googleapis.com/auth/sqlservice.login`) as the DB password, refreshed per connection via Application Default Credentials.
+
+Setup:
+
+1. **Enable IAM authentication** on the Cloud SQL instance (`cloudsql.iam_authentication = on`) and add the API's GCP service account as an [IAM database user](https://cloud.google.com/sql/docs/postgres/add-manage-iam-users) — the DB user is the SA email **without** the `.gserviceaccount.com` suffix.
+2. **Grant the SA** the role `roles/cloudsql.instanceUser` (the `cloudsql.instances.login` permission) plus `roles/cloudsql.client`.
+3. **Bind the API's K8s ServiceAccount to that GCP SA via Workload Identity Federation** (the same WIF binding used for GCS — see [GCP](#gcp-workload-identity-federation)).
+4. **Configure the mode** (the DB host is the instance's private IP or a Cloud SQL Auth Proxy sidecar; the user is the truncated SA email, no password):
+   ```yaml
+   api:
+     config:
+       database:
+         auth_mode: gcp_iam
+         ssl_mode: verify-ca        # require | verify-ca | verify-full
+   ```
+   ```
+   # TERRAPOD_DATABASE_URL — IAM DB user (SA email minus the gserviceaccount suffix), NO password
+   postgresql+asyncpg://terrapod-api%40my-project.iam@10.20.0.5:5432/terrapod
+   ```
+
+### Azure Database for PostgreSQL — Microsoft Entra auth (`auth_mode: azure_ad`)
+
+On Azure Database for PostgreSQL (Flexible Server) with Microsoft Entra authentication, Terrapod mints an Entra access token (scope `https://ossrdbms-aad.database.windows.net/.default`) per connection via `DefaultAzureCredential`, using the pod's Azure Workload Identity.
+
+Setup:
+
+1. **Enable Microsoft Entra authentication** on the Flexible Server and set an Entra admin.
+2. **Create a PostgreSQL role for the API's managed identity** — as the Entra admin, run `SELECT * FROM pgaadauth_create_principal('terrapod-api', false, false);` — the DB user is the managed identity's name.
+3. **Bind the API's K8s ServiceAccount to the user-assigned managed identity via Azure Workload Identity** (the same binding used for Blob storage — see [Azure](#azure-workload-identity)); the pod needs the `azure.workload.identity/use: "true"` label.
+4. **Configure the mode** (the user is the managed identity's name; the token is the password):
+   ```yaml
+   api:
+     config:
+       database:
+         auth_mode: azure_ad
+         ssl_mode: require          # Azure requires TLS
+   ```
+   ```
+   # TERRAPOD_DATABASE_URL — Entra DB user, NO password
+   postgresql+asyncpg://terrapod-api@my-server.postgres.database.azure.com:5432/terrapod
+   ```
+
+### Recommended pattern for `auth_mode: password`
 
 Use a **strong static database password**, but keep it out of source and rotate it operationally:
 
 1. Generate a strong password and store it in a K8s Secret (the chart reads `TERRAPOD_DATABASE_URL` via `secretKeyRef` when `postgresql.existingSecret` is set).
 2. Optionally source that Secret from an external secret manager at deploy time — see [External secret managers](#external-secret-managers-vault-via-eso--vault-agent). External Secrets Operator with a Vault backend can render the DB URL Secret from a Vault path, so the password never lives in your Helm values or Git.
 3. Rely on the cloud database's **encryption at rest** (RDS encryption, Cloud SQL encryption, Azure Database encryption) and **network isolation** (private subnets / VPC peering / private endpoints, security groups) so the connection is never exposed publicly.
-
-> **Future enhancement (not available now):** native in-process IAM database auth — a per-connection token provider that mints and refreshes the IAM token on each new pooled connection — is tracked in [#573](https://github.com/mattrobinsonsre/terrapod/issues/573). It is not in the current release. This section will be updated if and when it lands.
 
 ---
 

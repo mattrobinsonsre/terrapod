@@ -8,7 +8,7 @@ Single engine (no read replica for MVP).
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from terrapod.config import settings
@@ -40,6 +40,32 @@ async def init_db() -> None:
             "command_timeout": db_cfg.command_timeout,
         },
     )
+
+    # Cloud-IAM DB auth (#573, opt-in): mint a fresh short-lived token per new
+    # connection via a do_connect listener, overriding the (absent) static
+    # password and forcing TLS. Default auth_mode="password" leaves this untouched.
+    if db_cfg.auth_mode in ("aws_iam", "gcp_iam", "azure_ad"):
+        from terrapod.db import iam_auth
+
+        host, port, user = iam_auth.parse_pg_target(settings.database_url)
+        event.listen(
+            _engine.sync_engine,
+            "do_connect",
+            iam_auth.make_do_connect_handler(
+                auth_mode=db_cfg.auth_mode,
+                host=host,
+                port=port,
+                user=user,
+                region=db_cfg.aws_iam_region,
+                ssl_mode=db_cfg.ssl_mode,
+            ),
+        )
+        logger.info(
+            "Database auth: cloud IAM (per-connection token)",
+            mode=db_cfg.auth_mode,
+            host=host,
+            user=user,
+        )
 
     _async_session_factory = async_sessionmaker(
         _engine,

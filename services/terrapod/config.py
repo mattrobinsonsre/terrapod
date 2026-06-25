@@ -1001,6 +1001,33 @@ class DatabaseConfig(BaseModel):
         default=30,
         description="Seconds to wait for a query to complete",
     )
+    # --- Authentication mode (#573) ---
+    auth_mode: Literal["password", "aws_iam", "gcp_iam", "azure_ad"] = Field(
+        default="password",
+        description=(
+            "Database authentication. 'password' (default) uses the static "
+            "password in database_url — the existing, fully-supported behaviour. "
+            "The cloud-IAM modes mint a short-lived token per connection under the "
+            "API pod's workload identity — no static DB password, TLS required: "
+            "'aws_iam' (AWS RDS IAM, IRSA), 'gcp_iam' (GCP Cloud SQL IAM, WIF), "
+            "'azure_ad' (Azure Database for PostgreSQL Entra auth, Azure WI)."
+        ),
+    )
+    aws_iam_region: str = Field(
+        default="",
+        description=(
+            "AWS region used to sign RDS IAM auth tokens. Empty = botocore default "
+            "resolution (AWS_REGION / AWS_DEFAULT_REGION, set by IRSA). Only used "
+            "when auth_mode='aws_iam'."
+        ),
+    )
+    ssl_mode: str = Field(
+        default="",
+        description=(
+            "asyncpg TLS mode (e.g. 'require', 'verify-full'). Empty = driver "
+            "default. Forced to at least 'require' when auth_mode='aws_iam'."
+        ),
+    )
 
 
 # --- Main Settings ---
