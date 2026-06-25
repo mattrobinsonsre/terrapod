@@ -168,3 +168,199 @@ class TestGithubWebhook:
                 headers={"X-GitHub-Event": "push", "X-Hub-Signature-256": good},
             )
         assert resp.status_code == 200
+
+
+_GL_PUSH = {
+    "project": {
+        "path_with_namespace": "acme/infra",
+        "git_http_url": "https://gitlab.com/acme/infra.git",
+    }
+}
+
+
+@pytest.fixture
+def _gitlab_secret():
+    original = settings.vcs.gitlab.webhook_secret
+    settings.vcs.gitlab.webhook_secret = "glsecret"
+    yield
+    settings.vcs.gitlab.webhook_secret = original
+
+
+@patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+@patch("terrapod.api.app.init_redis")
+@patch("terrapod.api.app.init_db")
+@pytest.mark.usefixtures("_gitlab_secret")
+class TestGitlabWebhook:
+    """GitLab receiver (#590): X-Gitlab-Token secret, not HMAC signature."""
+
+    async def test_not_configured_returns_404(self, *_mocks):
+        settings.vcs.gitlab.webhook_secret = ""  # disable; resolver finds no conn
+        with patch(
+            "terrapod.api.routers.vcs_events._resolve_gitlab_connection",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+                resp = await c.post(
+                    "/api/terrapod/v1/vcs-events/gitlab",
+                    content=json.dumps(_GL_PUSH).encode(),
+                    headers={"X-Gitlab-Event": "Push Hook", "X-Gitlab-Token": "x"},
+                )
+        assert resp.status_code == 404
+
+    @patch("terrapod.api.routers.vcs_events.enqueue_trigger", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.vcs_events._resolve_gitlab_connection", new_callable=AsyncMock)
+    async def test_invalid_token_rejected_401(self, mock_resolve, _enq, *_mocks):
+        conn = MagicMock()
+        conn.webhook_secret = None  # falls back to the global "glsecret"
+        mock_resolve.return_value = conn
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/vcs-events/gitlab",
+                content=json.dumps(_GL_PUSH).encode(),
+                headers={"X-Gitlab-Event": "Push Hook", "X-Gitlab-Token": "wrong"},
+            )
+        assert resp.status_code == 401
+
+    @patch("terrapod.api.routers.vcs_events.enqueue_trigger", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.vcs_events._resolve_gitlab_connection", new_callable=AsyncMock)
+    async def test_valid_push_enqueues_immediate_poll(self, mock_resolve, mock_enqueue, *_mocks):
+        conn = MagicMock()
+        conn.webhook_secret = None  # validate against global "glsecret"
+        mock_resolve.return_value = conn
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/vcs-events/gitlab",
+                content=json.dumps(_GL_PUSH).encode(),
+                headers={"X-Gitlab-Event": "Push Hook", "X-Gitlab-Token": "glsecret"},
+            )
+        assert resp.status_code == 200
+        calls = [(c.args[0], c.args[1]) for c in mock_enqueue.await_args_list]
+        assert ("vcs_immediate_poll", {"repo": "acme/infra", "provider": "gitlab"}) in calls
+
+    @patch("terrapod.api.routers.vcs_events.enqueue_trigger", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.vcs_events._resolve_gitlab_connection", new_callable=AsyncMock)
+    async def test_unknown_project_does_not_enqueue(self, mock_resolve, mock_enqueue, *_mocks):
+        mock_resolve.return_value = None  # no matching connection
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/vcs-events/gitlab",
+                content=json.dumps(_GL_PUSH).encode(),
+                # valid global token so we reach the unknown-project branch
+                headers={"X-Gitlab-Event": "Push Hook", "X-Gitlab-Token": "glsecret"},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["message"] == "unknown project"
+        mock_enqueue.assert_not_awaited()
+
+    @patch("terrapod.api.routers.vcs_events._resolve_gitlab_connection", new_callable=AsyncMock)
+    async def test_malformed_json_returns_400(self, mock_resolve, *_mocks):
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/vcs-events/gitlab",
+                content=b"not json{{{",
+                headers={"X-Gitlab-Event": "Push Hook", "X-Gitlab-Token": "glsecret"},
+            )
+        assert resp.status_code == 400
+
+    @patch("terrapod.api.routers.vcs_events.enqueue_trigger", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.vcs_events._resolve_gitlab_connection", new_callable=AsyncMock)
+    async def test_per_connection_secret_takes_precedence(self, mock_resolve, _enq, *_mocks):
+        conn = MagicMock()
+        conn.webhook_secret = "per-conn"
+        mock_resolve.return_value = conn
+        body = json.dumps(_GL_PUSH).encode()
+        # The per-connection token is accepted.
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            ok = await c.post(
+                "/api/terrapod/v1/vcs-events/gitlab",
+                content=body,
+                headers={"X-Gitlab-Event": "Push Hook", "X-Gitlab-Token": "per-conn"},
+            )
+        assert ok.status_code == 200
+        # The GLOBAL token is rejected — the per-connection secret takes precedence.
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            bad = await c.post(
+                "/api/terrapod/v1/vcs-events/gitlab",
+                content=body,
+                headers={"X-Gitlab-Event": "Push Hook", "X-Gitlab-Token": "glsecret"},
+            )
+        assert bad.status_code == 401
+
+    @patch("terrapod.api.routers.vcs_events.enqueue_trigger", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.vcs_events._resolve_gitlab_connection", new_callable=AsyncMock)
+    async def test_ignored_event_type_does_not_enqueue(self, mock_resolve, mock_enqueue, *_mocks):
+        conn = MagicMock()
+        conn.webhook_secret = None
+        mock_resolve.return_value = conn
+        async with AsyncClient(transport=ASGITransport(app=_app()), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/vcs-events/gitlab",
+                content=json.dumps(_GL_PUSH).encode(),
+                headers={"X-Gitlab-Event": "Note Hook", "X-Gitlab-Token": "glsecret"},
+            )
+        assert resp.status_code == 200
+        mock_enqueue.assert_not_awaited()
+
+
+class TestUrlHost:
+    def test_extracts_host(self):
+        from terrapod.api.routers.vcs_events import _url_host
+
+        assert _url_host("https://gitlab.com/acme/infra.git") == "gitlab.com"
+        assert _url_host("https://gitlab.example.com/g/p") == "gitlab.example.com"
+
+    def test_bare_host_and_empty(self):
+        from terrapod.api.routers.vcs_events import _url_host
+
+        assert _url_host("gitlab.com") == "gitlab.com"
+        assert _url_host("") == ""
+
+
+class TestResolveGitlabConnection:
+    """Host-binds an incoming GitLab webhook to a configured connection."""
+
+    def _db_returning(self, conns):
+        from contextlib import asynccontextmanager
+
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = conns
+        db = MagicMock()
+        db.execute = AsyncMock(return_value=result)
+
+        @asynccontextmanager
+        async def _ctx():
+            yield db
+
+        return _ctx
+
+    async def test_single_host_match_returned(self):
+        from terrapod.api.routers import vcs_events
+
+        conn = MagicMock(server_url="", webhook_secret=None)  # gitlab.com default
+        with patch.object(vcs_events, "get_db_session", self._db_returning([conn])):
+            got = await vcs_events._resolve_gitlab_connection(
+                "https://gitlab.com/acme/infra.git", "tok"
+            )
+        assert got is conn
+
+    async def test_no_host_match_returns_none(self):
+        from terrapod.api.routers import vcs_events
+
+        conn = MagicMock(server_url="https://gitlab.example.com", webhook_secret=None)
+        with patch.object(vcs_events, "get_db_session", self._db_returning([conn])):
+            got = await vcs_events._resolve_gitlab_connection(
+                "https://gitlab.com/acme/infra.git", "tok"
+            )
+        assert got is None
+
+    async def test_multiple_same_host_disambiguated_by_secret(self):
+        from terrapod.api.routers import vcs_events
+
+        a = MagicMock(server_url="", webhook_secret="aaa")
+        b = MagicMock(server_url="", webhook_secret="bbb")
+        with patch.object(vcs_events, "get_db_session", self._db_returning([a, b])):
+            got = await vcs_events._resolve_gitlab_connection(
+                "https://gitlab.com/acme/infra.git", "bbb"
+            )
+        assert got is b

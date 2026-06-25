@@ -480,6 +480,20 @@ class GitHubWebhookConfig(BaseModel):
     )
 
 
+class GitLabWebhookConfig(BaseModel):
+    """GitLab webhook configuration (optional, for faster feedback).
+
+    GitLab does not HMAC-sign the body — it sends the configured secret
+    verbatim in the ``X-Gitlab-Token`` header. This global secret is the
+    fallback when a VCS connection does not set its own ``webhook_secret``.
+    """
+
+    webhook_secret: str = Field(
+        default="",
+        description="Webhook secret matched against the X-Gitlab-Token header (optional)",
+    )
+
+
 class VCSConfig(BaseModel):
     """VCS integration configuration."""
 
@@ -488,6 +502,7 @@ class VCSConfig(BaseModel):
         default=60, description="Polling interval in seconds for VCS changes"
     )
     github: GitHubWebhookConfig = Field(default_factory=GitHubWebhookConfig)
+    gitlab: GitLabWebhookConfig = Field(default_factory=GitLabWebhookConfig)
     tmpdir: str = Field(
         default="/var/lib/terrapod/tmp",
         description=(

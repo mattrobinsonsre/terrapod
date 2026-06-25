@@ -109,6 +109,13 @@ spec:
                   name: {{ .Values.api.config.vcs.github.existingSecret }}
                   key: {{ .Values.api.config.vcs.github.existingSecretKey | default "webhook_secret" }}
             {{- end }}
+            {{- if and .Values.api.config.vcs.gitlab .Values.api.config.vcs.gitlab.existingSecret }}
+            - name: TERRAPOD_VCS__GITLAB__WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.config.vcs.gitlab.existingSecret }}
+                  key: {{ .Values.api.config.vcs.gitlab.existingSecretKey | default "webhook_secret" }}
+            {{- end }}
             {{- with .Values.api.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

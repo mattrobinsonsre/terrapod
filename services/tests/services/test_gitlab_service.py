@@ -4,11 +4,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from terrapod.config import settings
 from terrapod.services.gitlab_service import (
     _api_url,
     _project_path,
     _token,
     parse_repo_url,
+    validate_webhook_token,
 )
 
 
@@ -347,3 +349,31 @@ class TestGitlabRequestRetry:
                 state="success",
                 description="ok",
             )
+
+
+# ── validate_webhook_token (GitLab X-Gitlab-Token, #590) ─────────────
+
+
+class TestValidateWebhookToken:
+    def test_matches_explicit_secret(self):
+        assert validate_webhook_token("s3cret", "s3cret") is True
+
+    def test_mismatch_rejected(self):
+        assert validate_webhook_token("wrong", "s3cret") is False
+
+    def test_no_secret_anywhere_is_false(self):
+        original = settings.vcs.gitlab.webhook_secret
+        settings.vcs.gitlab.webhook_secret = ""
+        try:
+            assert validate_webhook_token("anything", None) is False
+        finally:
+            settings.vcs.gitlab.webhook_secret = original
+
+    def test_falls_back_to_global_secret(self):
+        original = settings.vcs.gitlab.webhook_secret
+        settings.vcs.gitlab.webhook_secret = "global-gl"
+        try:
+            assert validate_webhook_token("global-gl", None) is True
+            assert validate_webhook_token("nope", None) is False
+        finally:
+            settings.vcs.gitlab.webhook_secret = original

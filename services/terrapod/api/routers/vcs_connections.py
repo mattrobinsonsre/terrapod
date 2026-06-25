@@ -160,10 +160,10 @@ async def create_connection(
             raise HTTPException(status_code=422, detail="token is required for GitLab connections")
         token_value = token
 
-    # Optional per-connection webhook secret (GitHub only). Write-only.
-    # Trimmed to match the PATCH path so a whitespace-only value is treated
-    # as unset rather than stored verbatim.
-    webhook_secret = (attrs.get("webhook-secret") or "").strip() if provider == "github" else ""
+    # Optional per-connection webhook secret (GitHub HMAC secret or GitLab
+    # X-Gitlab-Token, #590). Write-only. Trimmed to match the PATCH path so a
+    # whitespace-only value is treated as unset rather than stored verbatim.
+    webhook_secret = (attrs.get("webhook-secret") or "").strip()
 
     conn = VCSConnection(
         id=generate_uuid7(),

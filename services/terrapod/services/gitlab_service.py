@@ -5,10 +5,12 @@ Supports GitLab.com and self-hosted GitLab instances.
 """
 
 import asyncio
+import hmac
 from urllib.parse import quote as url_quote
 
 import httpx
 
+from terrapod.config import settings
 from terrapod.db.models import VCSConnection
 from terrapod.logging_config import get_logger
 from terrapod.services.vcs_provider import (
@@ -22,6 +24,21 @@ from terrapod.services.vcs_provider import (
 logger = get_logger(__name__)
 
 DEFAULT_GITLAB_URL = "https://gitlab.com"
+
+
+def validate_webhook_token(token_header: str, secret: str | None = None) -> bool:
+    """Validate a GitLab webhook ``X-Gitlab-Token`` header.
+
+    Unlike GitHub, GitLab does not HMAC-sign the request body — it sends the
+    configured secret verbatim in the ``X-Gitlab-Token`` header. We compare it
+    against the effective secret (the per-connection ``webhook_secret`` when the
+    connection sets one, otherwise the global ``vcs.gitlab.webhook_secret``)
+    with a timing-safe comparison. Returns False if no secret is available.
+    """
+    effective = secret if secret else settings.vcs.gitlab.webhook_secret
+    if not effective:
+        return False
+    return hmac.compare_digest(token_header.encode(), effective.encode())
 
 
 # Retry tuning — mirrors `github_service._github_request` so VCS-side

@@ -17,7 +17,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | **Workspaces** | Isolate state, variables, and runs per workspace |
 | **Remote State Management** | Versioned state storage with locking, rollback, encryption at rest via CSP services |
 | **Agent Execution** | Plan/apply runs on the server via K8s Job-based runner infrastructure |
-| **VCS Integration** | GitHub (App) and GitLab (access token); inbound webhooks supported (GitHub, HMAC-validated) for instant triggers, plus outbound polling so webhooks are optional, never required |
+| **VCS Integration** | GitHub (App) and GitLab (access token); inbound webhooks supported (GitHub HMAC + GitLab token) for instant triggers, plus outbound polling so webhooks are optional, never required |
 | **VCS Workflows** | Default merge-then-apply (TFE standard) plus opt-in apply-then-merge mode (Atlantis-style: PR comments drive applies, `terrapod apply` from a PR comment, auto-merge after apply) |
 | **Variables & Secrets** | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets |
 | **RBAC** | Label-based role system with hierarchical workspace permissions (read/plan/write/admin) |

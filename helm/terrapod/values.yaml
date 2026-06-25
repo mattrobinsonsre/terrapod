@@ -313,6 +313,13 @@ api:
         # Only needed if GitHub webhooks are enabled for faster feedback.
         existingSecret: ""
         existingSecretKey: "webhook_secret"
+      gitlab:
+        # Optional: K8s Secret containing the global GitLab webhook secret
+        # (matched against the X-Gitlab-Token header). Only needed if GitLab
+        # webhooks are enabled for faster feedback and you aren't setting a
+        # per-connection webhook secret on the VCS connection.
+        existingSecret: ""
+        existingSecretKey: "webhook_secret"
 
     # Audit logging
     audit:
