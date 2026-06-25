@@ -104,7 +104,14 @@ Per-surface verification before you push (lint alone is **not** enough):
    multiple organizations at any level. There is no `org_name` column
    anywhere. The literal organization name is always `default` — in code,
    tests, fixtures, docs, and comments. Never use `{org}`, `<org>`,
-   `test-org`, or any placeholder where the organization is referenced.
+   `test-org`, or any placeholder where the organization is referenced. This
+   is a **deliberate design choice, not a missing feature**: organizations
+   are a SaaS multi-tenancy mechanism, a self-hosted install is already one
+   tenant (the deployment is the tenant boundary — for separate tenants, run
+   an instance per tenant), and it aligns with HashiCorp's own current
+   guidance to minimize organizations and consolidate onto one. Segmentation
+   within a deployment uses label-based RBAC. Full rationale:
+   [`docs/architecture.md` → Why a single organization](docs/architecture.md#why-a-single-organization).
 10. **RFC3339 timestamps** — all datetimes are timezone-aware UTC; the API
     always serialises them as RFC3339 with a trailing `Z` (e.g.
     `2025-01-01T00:00:00Z`), never `+00:00`. Required for `go-tfe`

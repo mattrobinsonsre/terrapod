@@ -156,7 +156,7 @@ resource "null_resource" "hello" {
 
 > Note: The `terraform {}` block syntax is used by both OpenTofu and Terraform. No changes are needed when switching between them.
 
-> **Do not set `project = "..."` in the cloud block.** Terrapod is single-organization and has no project concept — workspaces live directly under the organization. Setting `project` causes `tofu init` to fail with a `422 Projects are not supported` error from the API. Omit the argument.
+> **Do not set `project = "..."` in the cloud block.** Terrapod is single-organization and has no project concept — workspaces live directly under the organization. Setting `project` causes `tofu init` to fail with a `422 Projects are not supported` error from the API. Omit the argument. (Single-org is a deliberate design choice aligned with HashiCorp's current direction — see [Why a single organization](architecture.md#why-a-single-organization).)
 >
 > If you used TFC projects to scope RBAC (e.g. "team X has write on project Y"), Terrapod's [label-based RBAC](rbac.md) covers the same use case and more flexibly: roles match workspaces by label allow/deny rules (e.g. `team: payments` + `env: prod` → `write`), so a workspace can belong to any combination of dimensions instead of a single project. The same labels also drive **filtering in the web UI** — workspace lists, registry modules, and other resources can be filtered by any label key/value, so labels double as the navigation hierarchy projects provided in TFC. See `docs/rbac.md` for examples.
 

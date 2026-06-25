@@ -137,7 +137,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 - **Kubernetes-native** -- deployed exclusively via Helm chart; runner Jobs are ephemeral K8s Jobs
 - **ARC-pattern execution** -- listener creates Jobs on demand (like GitHub Actions Runner Controller)
 - **OpenTofu-first** -- [OpenTofu](https://opentofu.org/) is the recommended execution backend; `terraform` is also supported
-- **Single organization** -- one org per instance; every Terrapod API path that contains an organization segment uses the literal name `default`
+- **Single organization** -- one org per instance (the literal name `default`); a deliberate fit for self-hosted, aligned with HashiCorp's own current guidance to consolidate onto a single org. Need separate tenants? Run an instance per tenant. See [Why a single organization](docs/architecture.md#why-a-single-organization)
 - **Native object storage** -- speaks each cloud provider's native SDK (S3, Azure Blob, GCS) with filesystem fallback for dev
 
 ---
@@ -345,9 +345,12 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 
 [Terrakube](https://terrakube.io/) is the closest open-source alternative and the project most worth comparing against. It is **also** a full self-hosted Terraform Cloud / Enterprise replacement: it implements the same `cloud {}` / `backend "remote"` TFE V2 API that Terrapod targets, and ships organizations, a private module + provider registry with GPG-signed provider publishing, granular RBAC, VCS integration (GitHub/GitLab/Bitbucket/Azure DevOps), dynamic provider credentials (AWS/GCP/Azure workload identity), OPA policy checks, and ephemeral Kubernetes-Job executors. It is Apache-2.0, built on Java/Spring Boot + Angular, with an established community and a frequent release cadence. **If you are choosing a Terraform platform today, evaluate Terrakube alongside Terrapod** -- on the core surface the two are at rough parity, and Terrakube is the more mature project.
 
-**Where Terrakube is ahead of Terrapod:**
+**Where Terrakube differs from Terrapod:**
 
-- **Multi-organization tenancy** with teams -- Terrapod is single-org by deliberate design.
+- **Multi-organization tenancy** with teams. Terrapod is single-org by deliberate design — a choice aligned with [HashiCorp's own current guidance](https://developer.hashicorp.com/validated-patterns/terraform/migrate-terraform-orgs-projects), which now recommends *minimizing* organizations and consolidating onto one (segmenting internally instead). Terrapod's tenant boundary is the deployment: for separate tenants, run an instance per tenant; for segmentation within one company, label-based RBAC covers what projects/teams do. If you specifically need several named organizations behind a single endpoint, Terrakube offers that and Terrapod does not — see [Why a single organization](docs/architecture.md#why-a-single-organization).
+
+**Where Terrakube is more mature:**
+
 - **Maturity**: longer track record, larger community, more permissive (Apache-2.0) license. Terrapod is newer and backed by a small core team.
 
 **Where Terrapod is genuinely differentiated** (verified against Terrakube's current docs). The first three share one theme -- Terrapod is built for restricted-network, multi-cluster, low-upstream-dependency topologies:
@@ -361,7 +364,7 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 - **Native Terragrunt** -- a per-workspace flag wraps agent-mode runs in `terragrunt` (pull-through binary cache, local-backend reconciliation) while Terrapod keeps owning state and the run lifecycle; CLI-driven runs need no config. Something TFE/HCP Terraform never did. See [docs/terragrunt.md](docs/terragrunt.md).
 - Additionally: first-class OPA **policy sets** with mandatory/advisory enforcement, native multi-channel **notifications** (Slack/email/webhook), and cross-workspace **run triggers**.
 
-Net: Terrapod is not a "better general TFE replacement" -- Terrakube wins on maturity and multi-tenancy. Terrapod's defensible niche is **restricted-network, multi-cluster execution** (outbound-only runners, polling VCS, self-contained caching) with an AI-assisted review layer. Pick on that basis.
+Net: Terrapod is not a "better general TFE replacement" -- Terrakube is the more mature project and offers multi-org tenancy for those who want it (Terrapod is deliberately single-org, in line with [HashiCorp's current direction](https://developer.hashicorp.com/validated-patterns/terraform/migrate-terraform-orgs-projects)). Terrapod's defensible niche is **restricted-network, multi-cluster execution** (outbound-only runners, polling VCS, self-contained caching) with an AI-assisted review layer. Pick on that basis.
 
 Licensing: Terrapod is **GPLv3** (strong copyleft); Terrakube is **Apache-2.0** (permissive) -- relevant if you intend to redistribute a modified platform.
 
