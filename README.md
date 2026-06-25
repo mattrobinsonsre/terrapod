@@ -17,6 +17,8 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
 > **Policy-as-code with OPA.** Block applies on policy violations using [Open Policy Agent](https://www.openpolicyagent.org/) and the Rego language — the open-source equivalent of TFE's proprietary Sentinel. Policy sets are scoped to workspaces with the same label-based model as roles, evaluated on the runner against the plan JSON, and gated as `advisory` (warn) or `mandatory` (block). See [docs/policies.md](docs/policies.md).
 
+> **Zero static cloud credentials, end to end.** Both the runs and the platform reach cloud APIs through Kubernetes workload identity — AWS IRSA, GCP Workload Identity Federation, Azure Workload Identity — so there are no long-lived access keys to store, leak, or rotate. Credentials are short-lived, auto-rotated, and auditable. See [docs/cloud-credentials.md](docs/cloud-credentials.md).
+
 > **Contributions welcome — including AI-assisted ones.** The platform core is **Python** (FastAPI + async SQLAlchemy), which keeps the contribution barrier low; the consumer ecosystem (Go SDK, Terraform provider, migration/publish CLIs) is **Go**. Pairing with an AI coding assistant? Point it at [AGENTS.md](AGENTS.md) — it carries the architecture, contracts, and conventions. Then read [CONTRIBUTING.md](CONTRIBUTING.md) and [open an issue](https://github.com/mattrobinsonsre/terrapod/issues) to get started.
 
 ---

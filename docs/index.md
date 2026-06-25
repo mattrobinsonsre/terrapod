@@ -109,7 +109,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Audit Logging](audit-logging.md) | Immutable event log, query API, retention |
 | [Artifact Retention](artifact-retention.md) | Automated cleanup of old state versions, run logs, cache entries |
 | [Runners](runners.md) | Custom runner images, private registries, Job configuration |
-| [Cloud Credentials](cloud-credentials.md) | AWS IRSA, GCP WIF, Azure WI setup |
+| [Cloud Credentials](cloud-credentials.md) | Zero static cloud credentials, end to end — runs and the platform reach cloud APIs via Kubernetes workload identity (AWS IRSA, GCP WIF, Azure WI). Beginner primer, decision tree, troubleshooting, DB-auth + Vault/ESO patterns |
 | [Registry](registry.md) | Private module/provider registry, caching layers |
 | [Registry Publishing](registry-publishing.md) | Publishing providers/modules with the `terrapod-publish` CLI and the client-signed publish protocol |
 | [Service Catalog](service-catalog.md) | No-code self-service provisioning over the private module registry: blessed catalog items, provider templates, a `catalog_permission` RBAC axis, and a full provision → reconfigure → destroy lifecycle |

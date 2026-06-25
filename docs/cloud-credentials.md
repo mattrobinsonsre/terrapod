@@ -1,6 +1,62 @@
 # Cloud Credentials
 
-Terrapod supports dynamic cloud provider credentials via Kubernetes workload identity. Both the API server and runner Jobs authenticate with AWS, GCP, or Azure using ServiceAccount annotations — no static credentials are stored in Terrapod.
+Terrapod reaches cloud APIs — both the platform's own object storage **and** the cloud resources your Terraform manages — using **Kubernetes workload identity**. No long-lived access keys, secrets, or service-account JSON files are stored in Terrapod, in Helm values, or in the database. The platform and every run authenticate with short-lived, automatically-rotated, auditable credentials.
+
+This page is both a primer (if IRSA/WIF/WI are new to you) and a reference (copy-paste bundles per cloud, plus troubleshooting). If you already know workload identity, jump to the [per-cloud bundles](#aws-irsa-setup).
+
+---
+
+## Primer: What is workload identity, and why you want it
+
+A pod that needs to call a cloud API has to prove who it is. The old way was to mount a static credential — an AWS access-key pair, a GCP service-account JSON key, an Azure client secret — into the pod as a file or environment variable. Those credentials are long-lived, easy to leak, hard to rotate, and rarely scoped tightly.
+
+**Workload identity** replaces the static credential with a short-lived token derived from the pod's Kubernetes ServiceAccount (SA). The flow is the same idea on every cloud:
+
+1. The Kubernetes cluster runs an **OIDC provider** that issues a signed token (a JWT) describing the pod's SA — its `sub` claim is `system:serviceaccount:<namespace>:<sa-name>`.
+2. You configure the cloud to **trust** that OIDC provider for a specific SA, and map it to a cloud IAM role/identity.
+3. When the pod calls the cloud, the cloud verifies the SA token against the trust configuration and hands back a **short-lived credential** (typically ~1 hour, auto-refreshed) for the mapped role.
+
+Why this is worth the setup:
+
+- **No static keys** — there is no secret to leak, commit, or rotate. The cluster mints tokens on demand.
+- **Short-lived** — credentials expire in minutes-to-an-hour and refresh transparently; a stolen token is useless quickly.
+- **Auditable** — cloud audit logs show "this SA assumed this role", tying every API call back to a named workload.
+- **Tightly scoped** — each SA maps to its own role, so the API's storage role and a runner's workload role are independent and least-privilege.
+
+Each cloud has its own name for the mechanism:
+
+| Cloud | Mechanism | What the pod gets |
+|---|---|---|
+| **AWS** | IRSA — IAM Roles for Service Accounts | An assumed IAM role via `AssumeRoleWithWebIdentity` |
+| **GCP** | Workload Identity Federation (GKE) | Impersonation of a GCP service account |
+| **Azure** | Workload Identity | A federated token exchanged for a Managed Identity token |
+
+Terraform's `aws`, `google`, and `azurerm` providers all pick these credentials up automatically — there is nothing to configure in your `.tf` code.
+
+### Decision tree: which mechanism do I use?
+
+```
+Where does the pod run?
+│
+├─ Amazon EKS ─────────────► AWS IRSA
+│                            (SA annotation: eks.amazonaws.com/role-arn)
+│
+├─ Google GKE ─────────────► GCP Workload Identity Federation
+│                            (SA annotation: iam.gke.io/gcp-service-account)
+│
+├─ Azure AKS ──────────────► Azure Workload Identity
+│                            (SA annotation: azure.workload.identity/client-id
+│                             + pod label azure.workload.identity/use: "true")
+│
+└─ Self-managed / other ───► Any cluster with a reachable OIDC issuer can
+   Kubernetes                use the matching cloud's federation (e.g. an
+                             on-prem cluster federated to AWS IAM via its
+                             own OIDC discovery URL). The SA-annotation
+                             webhooks above are EKS/GKE/AKS conveniences;
+                             the underlying OIDC federation is portable.
+```
+
+If runs need to reach a **different** cloud or account than the one the cluster lives in, that is still workload identity — you grant the runner SA's role permission to assume a role in the target account (AWS cross-account `sts:AssumeRole`), or federate the cluster's OIDC issuer into the target cloud. Deploy a separate listener Deployment (agent pool) per target where it helps keep roles least-privilege.
 
 ---
 
@@ -17,6 +73,8 @@ In a split deployment topology:
 - **Management cluster** (API + web): only the API SA and its IAM role are needed
 - **Agent clusters** (listeners + runners): only the runner SA and its IAM role are needed
 
+The listener Deployment can also carry its own SA annotations when the listener itself needs cloud access (e.g. object storage). See [Listener ServiceAccount](#listener-serviceaccount).
+
 ---
 
 ## How It Works
@@ -31,6 +89,12 @@ Each cloud provider has a Kubernetes integration that projects short-lived crede
 
 When a pod starts, the cloud provider's mutating admission webhook injects the necessary environment variables and token volumes. Terraform providers (aws, google, azurerm) pick up these credentials automatically.
 
+The platform's object-storage backends are workload-identity-native and hold **no** static keys:
+
+- **AWS S3** — via `aioboto3`, which resolves credentials through the standard AWS credential chain (IRSA web-identity token).
+- **Azure Blob** — via `DefaultAzureCredential`, which resolves the federated Workload Identity token.
+- **GCS** — via Application Default Credentials (Workload Identity Federation on GKE).
+
 ---
 
 ## ServiceAccount Configuration
@@ -44,7 +108,7 @@ api:
   serviceAccount:
     create: true
     annotations:
-      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/terrapod-api-mycluster"
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/terrapod-api-my-cluster"
 ```
 
 ### Runner ServiceAccount
@@ -62,7 +126,7 @@ runners:
     create: true
     name: "terrapod-runner"
     annotations:
-      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/terrapod-runner-mycluster"
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/terrapod-runner-my-cluster"
 ```
 
 The runner SA is only created when `listener.enabled: true` (i.e. on clusters that actually run Jobs).
@@ -75,7 +139,7 @@ For multi-cloud or multi-account setups, deploy separate listener Deployments (a
 
 ### 1. Configure OIDC Provider
 
-Your EKS cluster must have an IAM OIDC provider configured. This is typically set up during cluster creation.
+Your EKS cluster must have an IAM OIDC provider configured. This is typically set up during cluster creation. Note the provider URL — it looks like `oidc.eks.<region>.amazonaws.com/id/EXAMPLE` and appears in the trust policies below.
 
 ### 2. Create IAM Roles
 
@@ -95,7 +159,8 @@ Create separate IAM roles for the API and runner, each with a trust policy scope
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
-          "oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE:sub": "system:serviceaccount:terrapod:terrapod"
+          "oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE:sub": "system:serviceaccount:terrapod:terrapod",
+          "oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE:aud": "sts.amazonaws.com"
         }
       }
     }
@@ -117,7 +182,8 @@ Create separate IAM roles for the API and runner, each with a trust policy scope
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
-          "oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE:sub": "system:serviceaccount:terrapod:terrapod-runner"
+          "oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE:sub": "system:serviceaccount:terrapod:terrapod-runner",
+          "oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE:aud": "sts.amazonaws.com"
         }
       }
     }
@@ -125,22 +191,33 @@ Create separate IAM roles for the API and runner, each with a trust policy scope
 }
 ```
 
-### 3. Configure Helm
+The `:sub` condition pins the role to exactly one SA (`<namespace>:<sa-name>`); the `:aud` condition pins it to the AWS STS audience that IRSA tokens are minted with. Both must match or the assume-role is rejected.
+
+### 3. Configure Helm (`values-aws.yaml`)
+
+A complete copy-paste bundle for an EKS deployment:
 
 ```yaml
-# API SA — object storage access
+# values-aws.yaml
 api:
   serviceAccount:
+    create: true
     annotations:
-      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/terrapod-api-mycluster"
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/terrapod-api-my-cluster"
+  config:
+    storage:
+      # Storage backend uses the API role above — no keys needed
+      backend: s3
+      s3:
+        bucket: terrapod-storage-my-cluster
+        region: eu-west-1
 
-# Runner SA — Terraform workload permissions
 runners:
   serviceAccount:
     create: true
     name: "terrapod-runner"
     annotations:
-      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/terrapod-runner-mycluster"
+      eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/terrapod-runner-my-cluster"
 ```
 
 The EKS mutating webhook automatically injects `AWS_ROLE_ARN` and `AWS_WEB_IDENTITY_TOKEN_FILE` environment variables into pods. No pod labels required.
@@ -153,12 +230,12 @@ If your cluster runs the [ACK IAM controller](https://aws-controllers-k8s.github
 apiVersion: iam.services.k8s.aws/v1alpha1
 kind: Policy
 metadata:
-  name: terrapod-api-mycluster
+  name: terrapod-api-my-cluster
   annotations:
     services.k8s.aws/adoption-policy: "adopt-or-create"
     services.k8s.aws/region: "eu-west-1"
 spec:
-  name: terrapod-api-mycluster
+  name: terrapod-api-my-cluster
   description: "Terrapod API — S3 object storage access"
   policyDocument: |
     {
@@ -167,7 +244,7 @@ spec:
         {
           "Effect": "Allow",
           "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket", "s3:GetBucketLocation"],
-          "Resource": ["arn:aws:s3:::terrapod-storage-mycluster", "arn:aws:s3:::terrapod-storage-mycluster/*"]
+          "Resource": ["arn:aws:s3:::terrapod-storage-my-cluster", "arn:aws:s3:::terrapod-storage-my-cluster/*"]
         }
       ]
     }
@@ -175,12 +252,12 @@ spec:
 apiVersion: iam.services.k8s.aws/v1alpha1
 kind: Role
 metadata:
-  name: terrapod-api-mycluster
+  name: terrapod-api-my-cluster
   annotations:
     services.k8s.aws/adoption-policy: "adopt-or-create"
     services.k8s.aws/region: "eu-west-1"
 spec:
-  name: terrapod-api-mycluster
+  name: terrapod-api-my-cluster
   assumeRolePolicyDocument: |
     {
       "Version": "2012-10-17",
@@ -200,7 +277,7 @@ spec:
       ]
     }
   policies:
-    - "arn:aws:iam::123456789012:policy/terrapod-api-mycluster"
+    - "arn:aws:iam::123456789012:policy/terrapod-api-my-cluster"
 ```
 
 The `adopt-or-create` annotation allows ACK to adopt existing IAM resources or create new ones. See the [ACK IAM controller documentation](https://aws-controllers-k8s.github.io/community/reference/iam/v1alpha1/role/) for full reference.
@@ -248,13 +325,23 @@ gcloud iam service-accounts add-iam-policy-binding \
   --member="serviceAccount:my-project.svc.id.goog[terrapod/terrapod-runner]"
 ```
 
-### 4. Configure Helm
+The `[terrapod/terrapod]` member is `[<namespace>/<k8s-sa-name>]` — it must match the Kubernetes SA exactly.
+
+### 4. Configure Helm (`values-gcp.yaml`)
 
 ```yaml
+# values-gcp.yaml
 api:
   serviceAccount:
+    create: true
     annotations:
       iam.gke.io/gcp-service-account: "terrapod-api@my-project.iam.gserviceaccount.com"
+  config:
+    storage:
+      backend: gcs
+      gcs:
+        bucket: terrapod-storage-my-cluster
+        project_id: my-project
 
 runners:
   serviceAccount:
@@ -287,7 +374,7 @@ az identity federated-credential create \
   --name terrapod-api-fed \
   --identity-name terrapod-api \
   --resource-group my-rg \
-  --issuer "https://oidc.prod-aks.azure.com/tenant-id/" \
+  --issuer "https://westeurope.oic.prod-aks.azure.com/00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111/" \
   --subject "system:serviceaccount:terrapod:terrapod" \
   --audiences "api://AzureADTokenExchange"
 
@@ -295,18 +382,28 @@ az identity federated-credential create \
   --name terrapod-runner-fed \
   --identity-name terrapod-runner \
   --resource-group my-rg \
-  --issuer "https://oidc.prod-aks.azure.com/tenant-id/" \
+  --issuer "https://westeurope.oic.prod-aks.azure.com/00000000-0000-0000-0000-000000000000/11111111-1111-1111-1111-111111111111/" \
   --subject "system:serviceaccount:terrapod:terrapod-runner" \
   --audiences "api://AzureADTokenExchange"
 ```
 
-### 3. Configure Helm
+The `--issuer` is your AKS cluster's OIDC issuer URL (find it with `az aks show -g my-rg -n my-cluster --query oidcIssuerProfile.issuerUrl -o tsv`). The `--subject` must be `system:serviceaccount:<namespace>:<sa-name>` and the `--audiences` must be `api://AzureADTokenExchange`.
+
+### 3. Configure Helm (`values-azure.yaml`)
 
 ```yaml
+# values-azure.yaml
 api:
   serviceAccount:
+    create: true
     annotations:
       azure.workload.identity/client-id: "<api-managed-identity-client-id>"
+  config:
+    storage:
+      backend: azure
+      azure:
+        account_url: "https://mystorageacct.blob.core.windows.net"
+        container: terrapod-storage
 
 runners:
   serviceAccount:
@@ -314,10 +411,10 @@ runners:
     name: "terrapod-runner"
     annotations:
       azure.workload.identity/client-id: "<runner-managed-identity-client-id>"
-  azureWorkloadIdentity: true  # Adds required pod label
+  azureWorkloadIdentity: true  # Adds required pod label to runner Job pods
 ```
 
-Azure Workload Identity requires a pod label (`azure.workload.identity/use: "true"`) in addition to the SA annotation. Setting `runners.azureWorkloadIdentity: true` in Helm values adds this label to all runner Job pods.
+Azure Workload Identity requires a pod label (`azure.workload.identity/use: "true"`) in addition to the SA annotation. Setting `runners.azureWorkloadIdentity: true` in Helm values adds this label to all runner Job pods. (The API pod gets the label from the workload-identity webhook based on the SA annotation.)
 
 ---
 
@@ -336,9 +433,134 @@ listener:
 
 ---
 
+## Troubleshooting: top failure modes
+
+Workload identity fails closed and the errors are often opaque. The three most common causes, with how to diagnose each:
+
+### 1. OIDC `sub` / trust-policy mismatch
+
+**Symptom (AWS):** `AccessDenied` / `Not authorized to perform sts:AssumeRoleWithWebIdentity`. **GCP:** `Permission 'iam.serviceAccounts.getAccessToken' denied`. **Azure:** `AADSTS70021: No matching federated identity record found`.
+
+**Cause:** the `sub` the cluster mints (`system:serviceaccount:<namespace>:<sa-name>`) does not exactly equal the trust-policy / binding / federated-credential subject. A namespace typo, the wrong SA name, or pointing at the namespace default SA instead of the named one all produce this.
+
+**How to diagnose:**
+- Confirm which SA the pod actually uses:
+  `kubectl get pod <pod> -n terrapod -o jsonpath='{.spec.serviceAccountName}'`
+- Confirm the SA carries the annotation:
+  `kubectl get sa <sa-name> -n terrapod -o yaml`
+- Compare character-for-character against the cloud side: the AWS trust-policy `:sub`, the GCP `--member="serviceAccount:<project>.svc.id.goog[<ns>/<sa>]"`, or the Azure `--subject`. The namespace here is `terrapod` and the SA names are `terrapod` (API) / `terrapod-runner` (runner) unless you overrode them.
+
+### 2. Missing or incorrect `audience`
+
+**Symptom:** the assume/exchange is rejected even though the `sub` looks right; AWS reports an audience condition failure, Azure reports the token audience is not accepted.
+
+**Cause:** the projected SA token's `aud` claim doesn't match what the cloud expects. AWS IRSA tokens use audience `sts.amazonaws.com`; Azure Workload Identity uses `api://AzureADTokenExchange`. If you added an explicit `:aud` condition to an AWS trust policy, it must be `sts.amazonaws.com`. On Azure, the federated credential's `--audiences` must be `api://AzureADTokenExchange`.
+
+**How to diagnose:**
+- AWS: check the trust policy's `:aud` condition (if present) reads `sts.amazonaws.com`.
+- Azure: `az identity federated-credential list --identity-name terrapod-api --resource-group my-rg` and confirm `audiences` is `["api://AzureADTokenExchange"]`.
+- Inspect the projected token's audience if needed: `kubectl exec <pod> -n terrapod -- cat /var/run/secrets/...` (path varies by cloud) and decode the JWT's `aud` claim.
+
+### 3. SA ↔ role binding typos
+
+**Symptom:** intermittent or total failure that survives re-deploys; the pod simply never gets credentials and the cloud SDK falls back to "no credentials found".
+
+**Cause:** the annotation value is malformed (wrong account ID, wrong role name, wrong GCP SA email, wrong Azure client-id), or `serviceAccount.create: false` was set while the named SA doesn't actually exist, so the pod runs under the namespace default SA with no annotation at all.
+
+**How to diagnose:**
+- Confirm the SA exists and is the one the pod uses (commands in #1).
+- AWS: verify the role ARN in the annotation resolves — `aws iam get-role --role-name terrapod-api-my-cluster`.
+- GCP: verify the GCP SA email in the annotation exists and the `workloadIdentityUser` binding is present — `gcloud iam service-accounts get-iam-policy terrapod-api@my-project.iam.gserviceaccount.com`.
+- Azure: verify the client-id matches the managed identity — `az identity show --name terrapod-api --resource-group my-rg --query clientId -o tsv`.
+- If the pod has no cloud env vars at all (`kubectl exec <pod> -- env | grep -i -E 'AWS_|AZURE_|GOOGLE_'` is empty), the workload-identity webhook never matched — the SA annotation is missing or the Azure pod label is absent.
+
+---
+
+## Database authentication
+
+Terrapod's API connects to PostgreSQL using the connection string in the `TERRAPOD_DATABASE_URL` environment variable (sourced from a K8s Secret — see [External secret managers](#external-secret-managers-vault-via-eso--vault-agent)).
+
+### Cloud IAM database auth is not practical today (honest gap)
+
+Cloud-IAM database authentication — **AWS RDS IAM auth**, **GCP Cloud SQL IAM auth**, and **Azure AD authentication for PostgreSQL** — works by using a short-lived (~15-minute) IAM-issued token *as the database password*. That token must be refreshed before it expires, on every new connection.
+
+Terrapod does **not** support this today. The API builds its SQLAlchemy engine **once at startup** from a static `database_url` read from the environment, and there is **no in-process token-refresh hook** on the connection pool. An IAM auth token supplied as the DB password would expire after ~15 minutes and the pool could not mint a fresh one without a pod restart — so the connection would break. Do not configure RDS IAM auth / Cloud SQL IAM auth / Azure AD DB auth against the current release; it will fail once the first token expires.
+
+### Recommended pattern instead
+
+Use a **strong static database password**, but keep it out of source and rotate it operationally:
+
+1. Generate a strong password and store it in a K8s Secret (the chart reads `TERRAPOD_DATABASE_URL` via `secretKeyRef` when `postgresql.existingSecret` is set).
+2. Optionally source that Secret from an external secret manager at deploy time — see [External secret managers](#external-secret-managers-vault-via-eso--vault-agent). External Secrets Operator with a Vault backend can render the DB URL Secret from a Vault path, so the password never lives in your Helm values or Git.
+3. Rely on the cloud database's **encryption at rest** (RDS encryption, Cloud SQL encryption, Azure Database encryption) and **network isolation** (private subnets / VPC peering / private endpoints, security groups) so the connection is never exposed publicly.
+
+> **Future enhancement (not available now):** native in-process IAM database auth — a per-connection token provider that mints and refreshes the IAM token on each new pooled connection — is a plausible future addition. It is not in the current release. This section will be updated if and when it lands.
+
+---
+
+## External secret managers (Vault via ESO / Vault Agent)
+
+Terrapod has **no built-in Vault integration** — that is deliberately out of scope. The supported pattern is an **external** secret manager (e.g. HashiCorp Vault) feeding Terrapod's existing Kubernetes Secrets, using either:
+
+- **External Secrets Operator (ESO)** with the Vault backend — ESO syncs a Vault path into a native K8s Secret, which Terrapod then reads via `secretKeyRef`; or
+- **Vault Agent injector** — Vault Agent renders secrets into the pod, which you point the chart's `existingSecret` references at.
+
+### Platform secrets Vault can populate
+
+These platform secrets are read from K8s Secrets / env and can therefore be sourced from Vault via ESO or the Vault Agent injector:
+
+| Secret | How Terrapod reads it | Helm key |
+|---|---|---|
+| **Database URL** | `TERRAPOD_DATABASE_URL` via `secretKeyRef` | `postgresql.existingSecret` / `postgresql.existingSecretKey` (default key `url`) |
+| **Redis URL** | `TERRAPOD_REDIS_URL` via `secretKeyRef` | `redis.existingSecret` / `redis.existingSecretKey` (default key `url`) |
+| **OIDC client secrets** | `TERRAPOD_<NAME>_CLIENT_SECRET` via `secretKeyRef` | `existingSecret` / `existingSecretKey` per OIDC provider entry (default key `client_secret`) |
+| **API token signing key** | `TERRAPOD_TOKEN_SIGNING_KEY` via `secretKeyRef` | `api.tokenSigningKey.existingSecret` / `existingSecretKey` (default key `token_signing_key`) |
+| **GitHub webhook secret** | `TERRAPOD_GITHUB_WEBHOOK_SECRET` via `secretKeyRef` | `api.config.vcs.github.existingSecret` / `existingSecretKey` (default key `webhook_secret`) |
+
+Example ESO `ExternalSecret` rendering the DB URL Secret that the chart then consumes:
+
+```yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: terrapod-postgresql
+  namespace: terrapod
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: vault-backend       # a configured SecretStore/ClusterSecretStore
+    kind: ClusterSecretStore
+  target:
+    name: terrapod-postgresql # the K8s Secret the chart points at
+  data:
+    - secretKey: url          # becomes key `url` in the Secret
+      remoteRef:
+        key: secret/data/terrapod/postgresql
+        property: url
+```
+
+```yaml
+# values.yaml — point the chart at the ESO-rendered Secret
+postgresql:
+  existingSecret: terrapod-postgresql
+  existingSecretKey: url
+```
+
+> **Not Vault-sourceable:** the GitHub App private key lives on the `VCSConnection` database record (created through the API/UI), **not** in a K8s Secret, so Vault/ESO cannot populate it. Protect it via the database's encryption-at-rest instead.
+
+### Vault *dynamic* secrets for runner cloud creds is not wired up today (honest gap)
+
+A common Vault use-case is **dynamic secrets** — a runner fetching short-lived, per-run cloud credentials with something like `vault read aws/creds/my-role` just before `init`. Terrapod's runner does have a setup-script hook (`TP_SETUP_SCRIPT` → an early `/bin/sh -c` step before `init`) that *could* run such a command, **but it is not wired to any configuration surface**: there is no Helm value, no workspace field, and nothing injects `TP_SETUP_SCRIPT` onto the runner Job. So there is **no turnkey way today** to have a run fetch Vault dynamic secrets.
+
+**The supported way for runs to reach cloud APIs is workload identity** (IRSA/WIF/WI on the runner SA), documented above. A configurable runner setup script — the surface that would enable Vault dynamic secrets and other per-run credential fetching — is future work. This section will be updated if and when that configuration surface ships.
+
+---
+
 ## See Also
 
 - [Deployment](deployment.md) — Helm chart configuration
+- [Security Hardening](security-hardening.md) — TLS, secrets management, network policies
 - [Architecture](architecture.md) — runner infrastructure and job template
 - [API Reference](api-reference.md) — agent pool API
 - [ACK IAM Controller](https://aws-controllers-k8s.github.io/community/reference/iam/v1alpha1/role/) — managing IAM resources as Kubernetes objects
+- [External Secrets Operator](https://external-secrets.io/) — syncing Vault (and other) secrets into Kubernetes
