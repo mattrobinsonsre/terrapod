@@ -464,6 +464,16 @@
             "ssl_root_cert": { "type": "string" }
           }
         },
+        "redis": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "auth_mode": { "type": "string", "enum": ["password", "aws_iam", "gcp_iam", "azure_ad"] },
+            "username": { "type": "string" },
+            "aws_iam_region": { "type": "string" },
+            "aws_cache_name": { "type": "string" }
+          }
+        },
         "default_execution_backend": {
           "type": "string",
           "enum": ["tofu", "terraform"]

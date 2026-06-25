@@ -143,6 +143,19 @@ api:
       ssl_mode: ""             # IAM-auth TLS: "" / require (encrypt) | verify-ca | verify-full
       ssl_root_cert: ""        # CA bundle path for verify-ca/verify-full (mount via api.extraVolumes); "" = system CAs
 
+    # Redis/Valkey auth (#579). "password" (default — static auth string in the
+    # Redis URL) or a cloud-IAM mode that mints a short-lived token per
+    # connection under the API's workload identity (no static Redis secret, TLS
+    # rediss:// required):
+    #   aws_iam   — AWS ElastiCache IAM (IRSA; needs elasticache:Connect + aws_cache_name)
+    #   gcp_iam   — GCP Memorystore IAM (Workload Identity Federation)
+    #   azure_ad  — Azure Cache for Redis Entra auth (Azure Workload Identity)
+    redis:
+      auth_mode: password
+      username: ""             # Redis ACL user for IAM (ElastiCache User / IAM user / Entra object id)
+      aws_iam_region: ""       # AWS region for ElastiCache IAM signing; aws_iam only
+      aws_cache_name: ""       # ElastiCache replication-group / serverless cache id (NOT the endpoint host); aws_iam only
+
     # Default execution backend and version for new workspaces
     default_execution_backend: tofu  # tofu | terraform
     default_terraform_version: "1.12"

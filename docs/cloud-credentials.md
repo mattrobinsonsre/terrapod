@@ -610,6 +610,70 @@ Use a **strong static database password**, but keep it out of source and rotate 
 
 ---
 
+## Redis/Valkey authentication
+
+The API connects to Redis/Valkey using the URL in `TERRAPOD_REDIS_URL` (sourced from a K8s Secret). The auth mode is `api.config.redis.auth_mode`; like the database, each cloud's managed Redis/Valkey supports a passwordless token under the API pod's workload identity (the same IRSA / WIF / WI), so no static Redis auth string is needed:
+
+| Mode | What it does | Identity |
+|---|---|---|
+| `password` (default) | The static auth string in `TERRAPOD_REDIS_URL`. Fully supported. | — |
+| `aws_iam` | **AWS ElastiCache IAM auth** — a SigV4-presigned `connect` token, signed locally per connection. | IRSA |
+| `gcp_iam` | **GCP Memorystore IAM auth** — the SA's OAuth2 access token (`cloud-platform` scope). | WIF |
+| `azure_ad` | **Azure Cache for Redis — Microsoft Entra auth** — an Entra token (`redis.azure.com` scope). | Azure WI |
+
+A fresh token is minted per connection via a redis-py credential provider (offloaded to a thread, so the event loop is never blocked), and the token libraries cache + refresh near expiry. **TLS is required** for IAM Redis auth — use a `rediss://` URL. The URL's userinfo is ignored in IAM mode (the token replaces it), so the `TERRAPOD_REDIS_URL` Secret just needs the host/port (and `rediss://`).
+
+### AWS ElastiCache IAM auth (`auth_mode: aws_iam`)
+
+1. **Enable IAM auth on the cache** (Redis OSS 7+ / Valkey, incl. Serverless) and create an [ElastiCache User](https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/auth-iam.html) with **Authentication Mode = IAM**, in a User Group attached to the cache. The user name must match the IAM-authenticated identity.
+2. **Grant the API's IRSA role `elasticache:Connect`** on the cache + user ARNs (in addition to its other permissions).
+3. **Configure the mode** (the username is the ElastiCache User; `aws_cache_name` is the **cache identifier** — the replication-group id or serverless cache name, *not* the endpoint host — used for signing):
+   ```yaml
+   api:
+     config:
+       redis:
+         auth_mode: aws_iam
+         username: terrapod
+         aws_cache_name: terrapod-cache   # replication-group / serverless cache id
+         aws_iam_region: ""               # "" = AWS_REGION env (set by IRSA)
+   ```
+   ```
+   # TERRAPOD_REDIS_URL — TLS, host + port, NO auth string
+   rediss://terrapod-cache-abc123.serverless.us-east-1.cache.amazonaws.com:6379
+   ```
+
+### GCP Memorystore IAM auth (`auth_mode: gcp_iam`)
+
+On Memorystore for Valkey / Redis Cluster with IAM authentication enabled, Terrapod uses the API service account's OAuth2 access token (`cloud-platform` scope) as the Redis password.
+
+1. **Enable IAM authentication** on the instance and grant the API's GCP service account `roles/redis.dbConnectionUser`.
+2. **Bind the API's K8s ServiceAccount to that GCP SA via Workload Identity Federation** (the same binding used for GCS).
+3. **Configure the mode** (the username is the IAM user):
+   ```yaml
+   api:
+     config:
+       redis:
+         auth_mode: gcp_iam
+         username: terrapod-api@my-project.iam.gserviceaccount.com
+   ```
+
+### Azure Cache for Redis — Microsoft Entra auth (`auth_mode: azure_ad`)
+
+On Azure Cache for Redis with Microsoft Entra authentication, Terrapod mints an Entra access token (`https://redis.azure.com/.default`) via `DefaultAzureCredential`, using the pod's Azure Workload Identity.
+
+1. **Enable Entra authentication** on the cache and add the API's managed identity as a Redis user with a data-access policy.
+2. **Bind the API's K8s ServiceAccount to the user-assigned managed identity via Azure Workload Identity** (the same binding used for Blob storage); the pod needs the `azure.workload.identity/use: "true"` label.
+3. **Configure the mode** (the username is the managed identity's **object id**):
+   ```yaml
+   api:
+     config:
+       redis:
+         auth_mode: azure_ad
+         username: 00000000-0000-0000-0000-000000000000   # managed-identity object id
+   ```
+
+---
+
 ## External secret managers (Vault via ESO / Vault Agent)
 
 Terrapod has **no built-in Vault integration** — that is deliberately out of scope. The supported pattern is an **external** secret manager (e.g. HashiCorp Vault) feeding Terrapod's existing Kubernetes Secrets, using either:

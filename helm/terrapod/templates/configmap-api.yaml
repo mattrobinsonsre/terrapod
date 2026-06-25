@@ -45,6 +45,13 @@ data:
       ssl_root_cert: {{ .Values.api.config.database.ssl_root_cert | default "" | quote }}
       {{- end }}
     {{- end }}
+    {{- if .Values.api.config.redis }}
+    redis:
+      auth_mode: {{ .Values.api.config.redis.auth_mode | default "password" | quote }}
+      username: {{ .Values.api.config.redis.username | default "" | quote }}
+      aws_iam_region: {{ .Values.api.config.redis.aws_iam_region | default "" | quote }}
+      aws_cache_name: {{ .Values.api.config.redis.aws_cache_name | default "" | quote }}
+    {{- end }}
     storage:
       backend: {{ .Values.api.config.storage.backend | quote }}
       {{- if eq .Values.api.config.storage.backend "s3" }}

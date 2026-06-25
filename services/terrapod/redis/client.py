@@ -21,10 +21,37 @@ async def init_redis() -> None:
     """Initialize Redis connection pool."""
     global _redis  # noqa: PLW0603
     logger.info("Initializing Redis connection")
-    _redis = aioredis.from_url(
-        str(settings.redis_url),
-        decode_responses=True,
-    )
+
+    redis_cfg = settings.redis
+    if redis_cfg.auth_mode in ("aws_iam", "gcp_iam", "azure_ad"):
+        # Cloud-IAM Redis auth (#579, opt-in): mint a fresh short-lived token per
+        # connection via a redis-py credential provider (token-as-password under
+        # the API pod's workload identity). The URL's userinfo is stripped — the
+        # provider supplies username + token, and redis-py rejects a URL password
+        # alongside a credential_provider. Default auth_mode="password" leaves
+        # this untouched. TLS (rediss://) is required for IAM Redis auth.
+        from terrapod.redis import iam_auth
+
+        _redis = aioredis.from_url(
+            iam_auth.strip_url_credentials(settings.redis_url),
+            decode_responses=True,
+            credential_provider=iam_auth.make_credential_provider(
+                auth_mode=redis_cfg.auth_mode,
+                username=redis_cfg.username,
+                cache_name=redis_cfg.aws_cache_name,
+                region=redis_cfg.aws_iam_region,
+            ),
+        )
+        logger.info(
+            "Redis auth: cloud IAM (per-connection token)",
+            mode=redis_cfg.auth_mode,
+            user=redis_cfg.username,
+        )
+    else:
+        _redis = aioredis.from_url(
+            str(settings.redis_url),
+            decode_responses=True,
+        )
     # Test connection
     await _redis.ping()
     logger.info("Redis connection established")

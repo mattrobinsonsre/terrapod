@@ -1043,6 +1043,50 @@ class DatabaseConfig(BaseModel):
     )
 
 
+class RedisConfig(BaseModel):
+    """Redis/Valkey authentication settings (#579).
+
+    The connection URL itself stays in the top-level ``redis_url``; this block
+    only carries the cloud-IAM auth knobs. Default ``auth_mode='password'`` uses
+    the static auth string in ``redis_url`` and is fully supported.
+    """
+
+    auth_mode: Literal["password", "aws_iam", "gcp_iam", "azure_ad"] = Field(
+        default="password",
+        description=(
+            "Redis authentication. 'password' (default) uses the static auth "
+            "string in redis_url. The cloud-IAM modes mint a short-lived token "
+            "per connection under the API pod's workload identity — no static "
+            "Redis secret, TLS (rediss://) required: 'aws_iam' (AWS ElastiCache "
+            "IAM, IRSA), 'gcp_iam' (GCP Memorystore IAM, WIF), 'azure_ad' (Azure "
+            "Cache for Redis Entra auth, Azure WI)."
+        ),
+    )
+    username: str = Field(
+        default="",
+        description=(
+            "Redis ACL username for IAM auth — the ElastiCache User (AWS), the "
+            "IAM user (GCP), or the Entra principal object id (Azure). Required "
+            "for the cloud-IAM modes; ignored for 'password'."
+        ),
+    )
+    aws_iam_region: str = Field(
+        default="",
+        description=(
+            "AWS region used to sign ElastiCache IAM tokens. Empty = botocore "
+            "default resolution. Only used when auth_mode='aws_iam'."
+        ),
+    )
+    aws_cache_name: str = Field(
+        default="",
+        description=(
+            "ElastiCache cache identifier used for SigV4 signing — the "
+            "replication-group id or serverless cache name (NOT the endpoint "
+            "host). Required when auth_mode='aws_iam'."
+        ),
+    )
+
+
 # --- Main Settings ---
 
 
@@ -1105,6 +1149,7 @@ class Settings(BaseSettings):
         default="redis://localhost:6379",
         description="Redis connection URL",
     )
+    redis: "RedisConfig" = Field(default_factory=lambda: RedisConfig())
 
     # Storage
     storage: StorageConfig = Field(default_factory=StorageConfig)
