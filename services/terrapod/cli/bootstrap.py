@@ -54,6 +54,14 @@ async def bootstrap() -> None:
 
     engine = create_async_engine(database_url, echo=False)
 
+    # Cloud-IAM DB auth (#573): authenticate the same way as the API when an IAM
+    # mode is selected (TP_DB_* env from the Job template). No-op for the default
+    # static-password mode. Without this the Job fails on an IAM-only / password-
+    # less database (the API and migrations Job already do this).
+    from terrapod.db import iam_auth
+
+    iam_auth.register_engine_iam_auth(engine.sync_engine, database_url)
+
     async with engine.begin() as conn:
         await conn.execute(text("SELECT 1"))
         logger.info("Connected to database")

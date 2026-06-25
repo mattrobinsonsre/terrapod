@@ -220,3 +220,39 @@ def make_do_connect_handler(
         cparams["ssl"] = ssl_ctx
 
     return _do_connect
+
+
+def register_engine_iam_auth(sync_engine, database_url: str) -> bool:
+    """Register cloud-IAM ``do_connect`` on an engine from ``TP_DB_*`` env vars.
+
+    Shared by the side jobs that build their own engine outside the API's
+    ``init_db`` — the migrations Job (``alembic/env.py``) and the bootstrap Job
+    (``cli/bootstrap.py``) — so they authenticate the same way as the running
+    app (per-connection token + TLS) when an IAM ``auth_mode`` is selected.
+    Reads ``TP_DB_AUTH_MODE`` / ``TP_DB_AWS_IAM_REGION`` / ``TP_DB_SSL_MODE`` /
+    ``TP_DB_SSL_ROOT_CERT``. Returns ``True`` if a handler was registered;
+    ``False`` (no-op) for the default static-password mode.
+    """
+    import os
+
+    auth_mode = os.environ.get("TP_DB_AUTH_MODE", "password")
+    if auth_mode not in ("aws_iam", "gcp_iam", "azure_ad"):
+        return False
+
+    from sqlalchemy import event
+
+    host, port, user = parse_pg_target(database_url)
+    event.listen(
+        sync_engine,
+        "do_connect",
+        make_do_connect_handler(
+            auth_mode=auth_mode,
+            host=host,
+            port=port,
+            user=user,
+            region=os.environ.get("TP_DB_AWS_IAM_REGION", ""),
+            ssl_mode=os.environ.get("TP_DB_SSL_MODE", ""),
+            ssl_root_cert=os.environ.get("TP_DB_SSL_ROOT_CERT", ""),
+        ),
+    )
+    return True

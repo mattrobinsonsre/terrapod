@@ -198,3 +198,24 @@ async def test_init_db_registers_listener_only_for_iam_mode():
 
     await _check("password", expect_listener=False)
     await _check("aws_iam", expect_listener=True)
+
+
+def test_register_engine_iam_auth_env_gated(monkeypatch):
+    """The shared helper (migrations + bootstrap Jobs) registers do_connect only
+    for an IAM TP_DB_AUTH_MODE, and is a no-op for the default password mode."""
+    import sqlalchemy
+
+    calls = []
+    monkeypatch.setattr(sqlalchemy.event, "listen", lambda *a, **_k: calls.append(a))
+    engine = MagicMock()
+    url = "postgresql+asyncpg://terrapod@db.example.com:5432/terrapod"
+
+    monkeypatch.delenv("TP_DB_AUTH_MODE", raising=False)
+    assert iam_auth.register_engine_iam_auth(engine, url) is False
+    assert calls == []
+
+    monkeypatch.setenv("TP_DB_AUTH_MODE", "aws_iam")
+    assert iam_auth.register_engine_iam_auth(engine, url) is True
+    assert len(calls) == 1
+    assert calls[0][0] is engine  # the sync_engine we passed
+    assert calls[0][1] == "do_connect"

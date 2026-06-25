@@ -4,7 +4,7 @@ import asyncio
 import os
 from logging.config import fileConfig
 
-from sqlalchemy import event, pool
+from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
@@ -55,28 +55,14 @@ async def run_async_migrations() -> None:
     )
 
     # Cloud-IAM DB auth (#573) for the migrations Job: mirror the API's
-    # per-connection token + TLS injection so the Job authenticates the same way
-    # as the running app (the DB role is IAM-only / TLS-required). Config comes
-    # via TP_DB_* env vars set by the migrations Job template. Default
-    # auth_mode="password" leaves the engine untouched.
-    auth_mode = os.environ.get("TP_DB_AUTH_MODE", "password")
-    if auth_mode in ("aws_iam", "gcp_iam", "azure_ad"):
-        from terrapod.db import iam_auth
+    # per-connection token + TLS injection (shared with the bootstrap Job) so the
+    # Job authenticates the same way as the running app when an IAM auth_mode is
+    # set via TP_DB_* env. No-op for the default static-password mode.
+    from terrapod.db import iam_auth
 
-        host, port, user = iam_auth.parse_pg_target(config.get_main_option("sqlalchemy.url") or "")
-        event.listen(
-            connectable.sync_engine,
-            "do_connect",
-            iam_auth.make_do_connect_handler(
-                auth_mode=auth_mode,
-                host=host,
-                port=port,
-                user=user,
-                region=os.environ.get("TP_DB_AWS_IAM_REGION", ""),
-                ssl_mode=os.environ.get("TP_DB_SSL_MODE", ""),
-                ssl_root_cert=os.environ.get("TP_DB_SSL_ROOT_CERT", ""),
-            ),
-        )
+    iam_auth.register_engine_iam_auth(
+        connectable.sync_engine, config.get_main_option("sqlalchemy.url") or ""
+    )
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

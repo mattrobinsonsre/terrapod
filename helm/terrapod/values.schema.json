@@ -259,6 +259,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "enabled": { "type": "boolean" },
         "adminEmail": { "type": "string" },
         "adminPassword": { "type": "string" },
         "existingSecret": { "type": "string" },

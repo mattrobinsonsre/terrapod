@@ -1108,7 +1108,12 @@ migrations:
     pullPolicy: IfNotPresent
 
 # ── Bootstrap (initial admin user + optional pool) ─────────────────────────
+# The bootstrap Job is a post-install hook that idempotently seeds the admin
+# user (+ an optional agent pool). NOTE: ArgoCD runs post-install hooks on
+# every Sync, so on an established deployment (admin already exists) it just
+# re-runs as a no-op — set `enabled: false` to stop it once seeded.
 # bootstrap:
+#   enabled: true      # set false to skip the bootstrap Job (admin already seeded)
 #   adminEmail: admin@example.com
 #   adminPassword: ""  # Required when enabled
 #   existingSecret: ""  # Alternative: reference an existing K8s Secret
