@@ -42,6 +42,7 @@ class TestSSOConnectorABC:
             state="state-123",
         )
         assert req.nonce is None
+        assert req.code_verifier is None
 
     def test_connector_display_name_defaults_to_name(self):
         """SSOConnector.display_name falls back to name."""

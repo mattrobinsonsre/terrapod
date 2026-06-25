@@ -15,11 +15,18 @@ from authlib.jose import JsonWebKey
 from authlib.jose import jwt as authlib_jwt
 from authlib.jose.errors import JoseError
 
+from terrapod.auth.pkce import s256_challenge
 from terrapod.auth.sso import AuthenticatedIdentity, AuthorizationRequest, SSOConnector
 from terrapod.config import OIDCProviderConfig
 from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+def _generate_pkce_pair() -> tuple[str, str]:
+    """Return (code_verifier, S256 code_challenge) for upstream OIDC PKCE."""
+    verifier = secrets.token_urlsafe(64)
+    return verifier, s256_challenge(verifier)
 
 
 class OIDCConnector(SSOConnector):
@@ -80,6 +87,7 @@ class OIDCConnector(SSOConnector):
         discovery = await self._ensure_discovery()
         authorization_endpoint = discovery["authorization_endpoint"]
         nonce = secrets.token_urlsafe(32)
+        code_verifier, code_challenge = _generate_pkce_pair()
 
         params = {
             "response_type": "code",
@@ -88,6 +96,8 @@ class OIDCConnector(SSOConnector):
             "scope": " ".join(self._config.scopes),
             "state": state,
             "nonce": nonce,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
         }
 
         # Include audience if configured (requests API-scoped access token)
@@ -99,6 +109,7 @@ class OIDCConnector(SSOConnector):
             authorize_url=authorize_url,
             state=state,
             nonce=nonce,
+            code_verifier=code_verifier,
         )
 
     async def handle_callback(
@@ -108,6 +119,7 @@ class OIDCConnector(SSOConnector):
     ) -> AuthenticatedIdentity:
         """Exchange authorization code for tokens and extract identity."""
         code = kwargs["code"]
+        code_verifier = kwargs.get("code_verifier")
 
         discovery = await self._ensure_discovery()
         token_endpoint = discovery["token_endpoint"]
@@ -120,6 +132,8 @@ class OIDCConnector(SSOConnector):
             "client_id": self._config.client_id,
             "client_secret": self._config.client_secret,
         }
+        if code_verifier:
+            token_data["code_verifier"] = code_verifier
 
         async with httpx.AsyncClient() as client:
             resp = await client.post(token_endpoint, data=token_data)

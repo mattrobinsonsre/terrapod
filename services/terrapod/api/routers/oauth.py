@@ -9,8 +9,6 @@ Endpoints:
     POST /oauth/token — exchange auth code for API token
 """
 
-import base64
-import hashlib
 import hmac
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, status
@@ -24,6 +22,7 @@ from terrapod.auth.auth_state import (
     generate_state,
     store_auth_state,
 )
+from terrapod.auth.pkce import s256_challenge
 from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -198,8 +197,7 @@ def _verify_pkce(code_verifier: str, code_challenge: str, method: str) -> bool:
     if method != "S256":
         return False
 
-    digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
-    computed_challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+    computed_challenge = s256_challenge(code_verifier)
     # Timing-safe — the PKCE challenge is attacker-influenced in the token
     # exchange; match every other secret comparison in the codebase.
     return hmac.compare_digest(computed_challenge, code_challenge)

@@ -33,6 +33,7 @@ class AuthState:
     code_challenge_method: str
     idp_state: str
     nonce: str | None = None
+    idp_code_verifier: str | None = None
     # "session" for web UI, "api_token" for terraform login
     credential_type: str = "session"
 

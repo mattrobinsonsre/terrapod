@@ -17,6 +17,7 @@ class AuthorizationRequest:
     authorize_url: str
     state: str  # IDP-facing state (not the client-facing state)
     nonce: str | None = None  # OIDC nonce for replay protection
+    code_verifier: str | None = None  # Upstream OIDC PKCE verifier for token exchange
 
 
 @dataclass

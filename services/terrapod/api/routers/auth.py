@@ -175,6 +175,7 @@ async def authorize(
         code_challenge_method=code_challenge_method,
         idp_state=idp_state,
         nonce=auth_request.nonce,
+        idp_code_verifier=auth_request.code_verifier,
     )
     await store_auth_state(auth_state)
 
@@ -360,6 +361,7 @@ async def cli_sso_redirect(
         code_challenge_method=auth_state.code_challenge_method,
         idp_state=idp_state,
         nonce=auth_request.nonce,
+        idp_code_verifier=auth_request.code_verifier,
         credential_type="api_token",
     )
     await store_auth_state(new_state)
@@ -400,6 +402,7 @@ async def callback(
             callback_url=callback_url,
             code=code,
             state=state,
+            code_verifier=auth_state.idp_code_verifier,
         )
     except ValueError as e:
         logger.error("SSO callback failed", provider=auth_state.provider_name, error=str(e))

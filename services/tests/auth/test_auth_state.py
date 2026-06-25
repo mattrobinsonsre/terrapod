@@ -47,6 +47,7 @@ class TestStoreAuthState:
             code_challenge_method="S256",
             idp_state="idp-state-xyz",
             nonce="nonce-456",
+            idp_code_verifier="upstream-verifier",
             credential_type="api_token",
         )
 
@@ -63,6 +64,7 @@ class TestStoreAuthState:
         assert stored_data["provider_name"] == "oidc"
         assert stored_data["credential_type"] == "api_token"
         assert stored_data["nonce"] == "nonce-456"
+        assert stored_data["idp_code_verifier"] == "upstream-verifier"
 
 
 class TestConsumeAuthState:
@@ -84,6 +86,7 @@ class TestConsumeAuthState:
             "code_challenge_method": "S256",
             "idp_state": "idp-state-xyz",
             "nonce": None,
+            "idp_code_verifier": "upstream-verifier",
             "credential_type": "session",
         }
         pipe.execute.return_value = [json.dumps(state_data), 1]
@@ -94,6 +97,7 @@ class TestConsumeAuthState:
         assert result.provider_name == "oidc"
         assert result.client_redirect_uri == "http://localhost:10000/login"
         assert result.code_challenge == "challenge-abc"
+        assert result.idp_code_verifier == "upstream-verifier"
         assert result.credential_type == "session"
 
         # Verify atomic get+delete
