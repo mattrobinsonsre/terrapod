@@ -17,6 +17,8 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
 > **Policy-as-code with OPA.** Block applies on policy violations using [Open Policy Agent](https://www.openpolicyagent.org/) and the Rego language — the open-source equivalent of TFE's proprietary Sentinel. Policy sets are scoped to workspaces with the same label-based model as roles, evaluated on the runner against the plan JSON, and gated as `advisory` (warn) or `mandatory` (block). See [docs/policies.md](docs/policies.md).
 
+> **Contributions welcome — including AI-assisted ones.** The platform core is **Python** (FastAPI + async SQLAlchemy), which keeps the contribution barrier low; the consumer ecosystem (Go SDK, Terraform provider, migration/publish CLIs) is **Go**. Pairing with an AI coding assistant? Point it at [AGENTS.md](AGENTS.md) — it carries the architecture, contracts, and conventions. Then read [CONTRIBUTING.md](CONTRIBUTING.md) and [open an issue](https://github.com/mattrobinsonsre/terrapod/issues) to get started.
+
 ---
 
 ## Key Features
@@ -294,11 +296,14 @@ make images       # Build production Docker images
 
 ### Conventions
 
+- **Issue-first**: every change beyond a trivial tweak starts with a GitHub issue; the PR references it (`closes #N`)
 - **Commits**: conventional commits (`feat:`, `fix:`, `docs:`, `chore:`)
 - **Branches**: feature branches off `main`; never push directly to `main`
 - **API contract**: JSON:API spec; compatibility tested against `go-tfe` client
 - **Migrations**: Alembic with async SQLAlchemy
 - **Local dev**: Tilt with live_update for Python and Node.js hot reload
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow and [AGENTS.md](AGENTS.md) for the architecture, contracts, and conventions (point your AI assistant at it).
 
 ---
 
@@ -341,16 +346,16 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 **Where Terrakube is ahead of Terrapod:**
 
 - **Multi-organization tenancy** with teams -- Terrapod is single-org by deliberate design.
-- **Maturity**: longer track record, larger community, more permissive (Apache-2.0) license. Terrapod is newer and, today, single-maintainer.
+- **Maturity**: longer track record, larger community, more permissive (Apache-2.0) license. Terrapod is newer and backed by a small core team.
 
 **Where Terrapod is genuinely differentiated** (verified against Terrakube's current docs). The first three share one theme -- Terrapod is built for restricted-network, multi-cluster, low-upstream-dependency topologies:
 
 - **Firewall-friendly cross-cluster execution.** Terrapod runners connect *outbound* to the control plane over SSE and create Jobs locally; the API holds no inbound reach and no Kubernetes access into the execution cluster. Terrakube's API connects *into* the executor (it must be exposed via ingress, with Redis reachable), so isolated / NAT'd / outbound-only execution clusters aren't supported the same way.
 - **Polling-first VCS** -- Terrapod polls VCS over outbound HTTPS (webhooks optional); Terrakube is webhook-only and needs inbound webhook delivery.
-- **Pull-through provider mirror + terraform/tofu binary cache** -- runners have zero direct upstream dependency; Terrakube ships only a local plugin cache.
+- **Pull-through provider mirror + terraform/tofu binary cache** -- runners have zero direct upstream dependency; Terrakube ships a local plugin cache.
 - **Monorepo autodiscovery** -- Atlantis-style auto-creation of workspaces from glob-matched directories on PRs (Terrakube has directory filtering, but not auto-creation).
 - **Run tasks** -- pre/post-plan external webhook validation hooks (not present in Terrakube).
-- **In-platform AI** -- plan summaries, failure analysis, and chat (Terrakube offers only an external MCP server).
+- **In-platform AI** -- plan summaries, failure analysis, and chat (Terrakube integrates AI via an external MCP server).
 - **Native Terragrunt** -- a per-workspace flag wraps agent-mode runs in `terragrunt` (pull-through binary cache, local-backend reconciliation) while Terrapod keeps owning state and the run lifecycle; CLI-driven runs need no config. Something TFE/HCP Terraform never did. See [docs/terragrunt.md](docs/terragrunt.md).
 - Additionally: first-class OPA **policy sets** with mandatory/advisory enforcement, native multi-channel **notifications** (Slack/email/webhook), and cross-workspace **run triggers**.
 
@@ -374,12 +379,26 @@ Terrapod is not affiliated with, endorsed by, or a product of HashiCorp, Inc. or
 
 ## Contributing
 
-Contributions are welcome. Please follow these guidelines:
+Contributions are very welcome — including AI-assisted ("vibe") contributions.
+The platform core is Python, which keeps the contribution barrier low.
 
-1. Fork the repository and create a feature branch from `main`
-2. Follow conventional commit format (`feat:`, `fix:`, `docs:`, `chore:`)
-3. Run tests (`make test`) and linting (`make lint`) before submitting
-4. Ensure all CI checks pass
-5. Open a pull request with a clear description of the change
+The short version: **start with an issue** (every change beyond a trivial tweak
+gets one), branch from `main`, run the checks for what you changed (`make test`
+for Python, `npm run build` for the frontend, `helm template …` for Helm), and
+open a PR that references the issue.
 
-For architecture questions or major changes, open an issue first to discuss the approach.
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — setup, the issue-first workflow, and how to open a PR.
+- **[AGENTS.md](AGENTS.md)** — architecture, the API↔consumer and code↔tests contracts, and conventions. If you use an AI coding assistant, point it here.
+
+Browse [`good first issue`](https://github.com/mattrobinsonsre/terrapod/labels/good%20first%20issue)
+and [`help wanted`](https://github.com/mattrobinsonsre/terrapod/labels/help%20wanted)
+for a place to start.
+
+### Team
+
+Terrapod is built and maintained by a small core team with site-reliability and
+platform-engineering backgrounds — a platform built by the kind of people who
+operate it. [@mattrobinsonsre](https://github.com/mattrobinsonsre) currently
+leads the project; [@karl0r](https://github.com/karl0r) and
+[@mhempstock](https://github.com/mhempstock) are maintainers. We'd welcome more
+hands — start by contributing.
