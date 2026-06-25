@@ -58,6 +58,7 @@ async def init_db() -> None:
                 user=user,
                 region=db_cfg.aws_iam_region,
                 ssl_mode=db_cfg.ssl_mode,
+                ssl_root_cert=db_cfg.ssl_root_cert,
             ),
         )
         logger.info(

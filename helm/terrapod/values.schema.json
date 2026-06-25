@@ -44,6 +44,15 @@
             "existingSecretKey": { "type": "string" }
           }
         },
+        "databaseCA": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "inline": { "type": "string" },
+            "existingConfigMap": { "type": "string" },
+            "key": { "type": "string" }
+          }
+        },
         "strategy": { "$ref": "#/$defs/strategySpec" },
         "terminationGracePeriodSeconds": { "type": "integer", "minimum": 0 },
         "preStopSleepSeconds": { "type": "integer", "minimum": 0 },
@@ -451,7 +460,8 @@
             "command_timeout": { "type": "integer", "minimum": 1 },
             "auth_mode": { "type": "string", "enum": ["password", "aws_iam", "gcp_iam", "azure_ad"] },
             "aws_iam_region": { "type": "string" },
-            "ssl_mode": { "type": "string" }
+            "ssl_mode": { "type": "string", "enum": ["", "require", "verify-ca", "verify-full"] },
+            "ssl_root_cert": { "type": "string" }
           }
         },
         "default_execution_backend": {

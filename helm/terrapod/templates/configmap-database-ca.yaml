@@ -1,0 +1,19 @@
+{{- /*
+Database TLS CA bundle (public, non-secret) for cloud-IAM DB auth verify-ca/
+verify-full. Rendered only when api.databaseCA.inline is provided; an
+existingConfigMap is referenced directly instead. The API Deployment mounts this
+at /etc/terrapod/db-ca and the API ConfigMap derives database.ssl_root_cert from
+the mounted path.
+*/ -}}
+{{- if and .Values.api.enabled .Values.api.databaseCA.inline }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "terrapod.fullname" . }}-database-ca
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+data:
+  {{ .Values.api.databaseCA.key | default "ca.pem" }}: |
+{{ .Values.api.databaseCA.inline | indent 4 }}
+{{- end }}

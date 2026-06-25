@@ -1024,8 +1024,21 @@ class DatabaseConfig(BaseModel):
     ssl_mode: str = Field(
         default="",
         description=(
-            "asyncpg TLS mode (e.g. 'require', 'verify-full'). Empty = driver "
-            "default. Forced to at least 'require' when auth_mode='aws_iam'."
+            "TLS mode for cloud-IAM auth: 'require' (encrypt, no cert check — "
+            "the default when empty), 'verify-ca' (verify the server cert chain) "
+            "or 'verify-full' (verify chain + hostname). 'verify-ca'/'verify-full' "
+            "require ssl_root_cert (or a system-trusted CA). Cloud IAM auth always "
+            "uses at least 'require'. Ignored when auth_mode='password'."
+        ),
+    )
+    ssl_root_cert: str = Field(
+        default="",
+        description=(
+            "Path to a CA bundle (PEM) used to verify the database server "
+            "certificate when ssl_mode is 'verify-ca'/'verify-full' (e.g. the AWS "
+            "RDS global-bundle.pem or the Cloud SQL server CA, mounted via "
+            "api.extraVolumes). Empty = the system trust store. Only used by the "
+            "cloud-IAM auth modes."
         ),
     )
 

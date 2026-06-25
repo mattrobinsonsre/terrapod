@@ -53,6 +53,18 @@ api:
     existingSecret: ""               # name of a K8s Secret holding the key
     existingSecretKey: "token_signing_key"  # key within that Secret
 
+  # CA bundle for database TLS server-cert verification, used when
+  # config.database.ssl_mode is "verify-ca"/"verify-full" (cloud-IAM DB auth).
+  # A CA bundle is public, non-secret material, so provide it as a ConfigMap —
+  # either inline (the chart creates the ConfigMap for you) or by referencing an
+  # existing one. The chart mounts it read-only and wires
+  # config.database.ssl_root_cert to the mounted path automatically. Leave unset
+  # for ssl_mode require / a system-trusted CA.
+  databaseCA:
+    inline: ""                       # paste the CA bundle PEM here; the chart creates a ConfigMap for it
+    existingConfigMap: ""            # OR reference an existing ConfigMap holding the CA bundle
+    key: ca.pem                      # key within the ConfigMap (also the mounted filename)
+
   # Service configuration
   service:
     type: ClusterIP
@@ -128,7 +140,8 @@ api:
       #   azure_ad  — Azure Database for PostgreSQL Entra auth (Azure Workload Identity)
       auth_mode: password
       aws_iam_region: ""       # AWS region for RDS IAM signing ("" = AWS_REGION env); aws_iam only
-      ssl_mode: ""             # asyncpg TLS mode; forced to >= "require" for any IAM mode
+      ssl_mode: ""             # IAM-auth TLS: "" / require (encrypt) | verify-ca | verify-full
+      ssl_root_cert: ""        # CA bundle path for verify-ca/verify-full (mount via api.extraVolumes); "" = system CAs
 
     # Default execution backend and version for new workspaces
     default_execution_backend: tofu  # tofu | terraform

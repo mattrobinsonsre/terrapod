@@ -489,7 +489,37 @@ The auth mode is selected by `api.config.database.auth_mode`. Besides the defaul
 | `gcp_iam` | **GCP Cloud SQL IAM auth** — the service account's OAuth2 access token as the DB password. | Workload Identity Federation |
 | `azure_ad` | **Azure Database for PostgreSQL — Microsoft Entra auth** — an Entra access token as the DB password. | Azure Workload Identity |
 
-In every IAM mode the DB URL carries the **user but no password** (the token is the password), and **TLS is required** (forced to at least `require`; set `ssl_mode: verify-full` for cert verification). The credential libraries cache and refresh tokens near expiry, so the per-connection hook is a fast cached read in steady state. Existing connections persist after a token expires (the token only authenticates the initial handshake), so a fresh token per *new* connection is all that's needed.
+In every IAM mode the DB URL carries the **user but no password** (the token is the password), and **TLS is always on**. The credential libraries cache and refresh tokens near expiry; minting is offloaded to a worker thread so it never blocks the API event loop, and a fresh token is supplied per *new* connection. Existing connections persist after a token expires (the token only authenticates the initial handshake).
+
+#### TLS modes (`ssl_mode` + `ssl_root_cert`)
+
+All IAM modes encrypt the connection. `ssl_mode` controls server-certificate verification:
+
+| `ssl_mode` | Behaviour | Needs `ssl_root_cert`? |
+|---|---|---|
+| `` / `require` (default) | Encrypt, but do **not** verify the server certificate. | No |
+| `verify-ca` | Verify the server cert chains to a trusted CA. | Yes (unless the CA is in the system trust store) |
+| `verify-full` | `verify-ca` **plus** hostname match — recommended. | Yes (unless system-trusted) |
+
+`verify-ca`/`verify-full` need the provider's CA bundle (e.g. the AWS RDS [`global-bundle.pem`](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html) or the Cloud SQL server CA). A CA bundle is **public, non-secret** material, so the chart takes it as a ConfigMap via the first-class `api.databaseCA` block — paste it inline (the chart creates the ConfigMap) or reference an existing one. The chart mounts it read-only and wires `database.ssl_root_cert` to the mounted path automatically:
+
+```yaml
+api:
+  databaseCA:
+    # Option 1 — paste the CA inline; the chart creates the ConfigMap:
+    inline: |
+      -----BEGIN CERTIFICATE-----
+      ...the RDS / Cloud SQL CA bundle...
+      -----END CERTIFICATE-----
+    # Option 2 — reference an existing ConfigMap instead of `inline`:
+    #   existingConfigMap: rds-ca-bundle
+    key: ca.pem            # filename to mount (and the ConfigMap key)
+  config:
+    database:
+      ssl_mode: verify-full   # ssl_root_cert is set for you from api.databaseCA
+```
+
+If neither `ssl_root_cert` nor `api.databaseCA` is set, the system CA trust store is used — sufficient for providers whose server cert chains to a public root (e.g. Azure's DigiCert root), but AWS RDS and Cloud SQL use private CAs, so supply the bundle. (Operators with an existing mounting convention can instead set `database.ssl_root_cert` to a path they mount via `api.extraVolumes`; `api.databaseCA` is the recommended path.)
 
 ### AWS RDS IAM auth (`auth_mode: aws_iam`)
 
@@ -515,7 +545,8 @@ Setup:
        database:
          auth_mode: aws_iam
          aws_iam_region: ""        # "" = AWS_REGION env (set by IRSA)
-         ssl_mode: verify-full     # require | verify-ca | verify-full (recommended)
+         ssl_mode: verify-full     # recommended; needs the RDS CA bundle (see TLS modes above)
+         ssl_root_cert: /etc/db-ca/global-bundle.pem
    ```
    ```
    # TERRAPOD_DATABASE_URL — user + host, NO password
@@ -539,7 +570,8 @@ Setup:
      config:
        database:
          auth_mode: gcp_iam
-         ssl_mode: verify-ca        # require | verify-ca | verify-full
+         ssl_mode: verify-ca        # needs the Cloud SQL server CA (see TLS modes above)
+         ssl_root_cert: /etc/db-ca/server-ca.pem
    ```
    ```
    # TERRAPOD_DATABASE_URL — IAM DB user (SA email minus the gserviceaccount suffix), NO password

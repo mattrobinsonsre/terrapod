@@ -39,6 +39,11 @@ data:
       auth_mode: {{ .Values.api.config.database.auth_mode | default "password" | quote }}
       aws_iam_region: {{ .Values.api.config.database.aws_iam_region | default "" | quote }}
       ssl_mode: {{ .Values.api.config.database.ssl_mode | default "" | quote }}
+      {{- if or .Values.api.databaseCA.inline .Values.api.databaseCA.existingConfigMap }}
+      ssl_root_cert: {{ printf "/etc/terrapod/db-ca/%s" (.Values.api.databaseCA.key | default "ca.pem") | quote }}
+      {{- else }}
+      ssl_root_cert: {{ .Values.api.config.database.ssl_root_cert | default "" | quote }}
+      {{- end }}
     {{- end }}
     storage:
       backend: {{ .Values.api.config.storage.backend | quote }}
