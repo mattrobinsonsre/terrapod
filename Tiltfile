@@ -90,6 +90,7 @@ docker_build(
     live_update=[
         sync('./services/terrapod/config.py', '/app/terrapod/config.py'),
         sync('./services/terrapod/logging_config.py', '/app/terrapod/logging_config.py'),
+        sync('./services/terrapod/http_retry.py', '/app/terrapod/http_retry.py'),
         sync('./services/terrapod/runner', '/app/terrapod/runner'),
     ],
 )
@@ -112,6 +113,7 @@ local_resource(
     deps=[
         'docker/Dockerfile.runner',
         'services/pyproject-runner.toml',
+        'services/terrapod/http_retry.py',
         'services/terrapod/runner/__init__.py',
         'services/terrapod/runner/runner_config.py',
         'services/terrapod/runner/download.py',

@@ -71,6 +71,7 @@ async def handle_run_task_call(payload: dict) -> None:
     import httpx
 
     from terrapod.config import settings
+    from terrapod.http_retry import arequest_with_retry
 
     tsr_id_str = payload.get("task_stage_result_id", "")
     if not tsr_id_str:
@@ -154,7 +155,12 @@ async def handle_run_task_call(payload: dict) -> None:
 
         try:
             async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.post(rt.url, content=body_bytes, headers=headers)
+                # Non-idempotent run-task webhook POST: retried only on
+                # connection-not-sent errors, never on read-timeout/5xx — a
+                # delivered run-task call must not be re-POSTed.
+                resp = await arequest_with_retry(
+                    client, "POST", rt.url, content=body_bytes, headers=headers
+                )
 
             if 200 <= resp.status_code < 300:
                 logger.info(

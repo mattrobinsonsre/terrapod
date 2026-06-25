@@ -53,7 +53,7 @@ func newAssignmentFixture(t *testing.T, initial []RoleAssignment) (*Client, *[]b
 			// Drop existing assignments for this identity, then re-add.
 			next := store[:0]
 			for _, a := range store {
-				if !(a.ProviderName == doc.Data.Attributes.ProviderName && a.Email == doc.Data.Attributes.Email) {
+				if a.ProviderName != doc.Data.Attributes.ProviderName || a.Email != doc.Data.Attributes.Email {
 					next = append(next, a)
 				}
 			}
@@ -74,7 +74,7 @@ func newAssignmentFixture(t *testing.T, initial []RoleAssignment) (*Client, *[]b
 			}
 			next := store[:0]
 			for _, a := range store {
-				if !(a.ProviderName == parts[0] && a.Email == parts[1] && a.RoleName == parts[2]) {
+				if a.ProviderName != parts[0] || a.Email != parts[1] || a.RoleName != parts[2] {
 					next = append(next, a)
 				}
 			}

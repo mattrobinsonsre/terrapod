@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.metrics import BINARY_CACHE_REQUESTS
 from terrapod.config import settings
 from terrapod.db.models import CachedBinary
+from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
 from terrapod.services.hashing_stream import HashingStream
 from terrapod.storage.keys import binary_cache_key
@@ -318,7 +319,9 @@ async def _fetch_terraform_versions() -> list[str]:
     """
     url = "https://releases.hashicorp.com/terraform/index.json"
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(url)
+        # Upstream GET — idempotent by method; retried on flaky-upstream
+        # transient failures (connection errors, read-timeouts, 5xx).
+        resp = await arequest_with_retry(client, "GET", url)
         resp.raise_for_status()
         data = resp.json()
 
@@ -342,7 +345,7 @@ async def _fetch_tofu_versions() -> list[str]:
     """
     url = "https://api.github.com/repos/opentofu/opentofu/releases"
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(url, params={"per_page": 100})
+        resp = await arequest_with_retry(client, "GET", url, params={"per_page": 100})
         resp.raise_for_status()
         releases = resp.json()
 
@@ -367,7 +370,7 @@ async def _fetch_terragrunt_versions() -> list[str]:
     """
     url = "https://api.github.com/repos/gruntwork-io/terragrunt/releases"
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(url, params={"per_page": 100})
+        resp = await arequest_with_retry(client, "GET", url, params={"per_page": 100})
         resp.raise_for_status()
         releases = resp.json()
 
@@ -461,7 +464,7 @@ async def _resolve_terraform_version(partial: str) -> str:
     policy = settings.registry.binary_cache.allow_prerelease
 
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(url)
+        resp = await arequest_with_retry(client, "GET", url)
         resp.raise_for_status()
         data = resp.json()
 
@@ -493,7 +496,7 @@ async def _resolve_tofu_version(partial: str) -> str:
     policy = settings.registry.binary_cache.allow_prerelease
 
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(url, params={"per_page": 100})
+        resp = await arequest_with_retry(client, "GET", url, params={"per_page": 100})
         resp.raise_for_status()
         releases = resp.json()
 
@@ -525,7 +528,7 @@ async def _resolve_terragrunt_version(partial: str) -> str:
     policy = settings.registry.binary_cache.allow_prerelease
 
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(url, params={"per_page": 100})
+        resp = await arequest_with_retry(client, "GET", url, params={"per_page": 100})
         resp.raise_for_status()
         releases = resp.json()
 

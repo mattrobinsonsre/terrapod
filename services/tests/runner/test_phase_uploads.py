@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import httpx
 
+from terrapod import http_retry
 from terrapod.runner.phases import uploads
 from terrapod.runner.runner_config import RunnerConfig
 
@@ -130,6 +131,28 @@ class TestUploadState:
         ok = uploads.upload_state(_cfg(), state, client=_client(handler))
         assert ok is False
 
+    def test_state_upload_retries_past_read_timeout_and_succeeds(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        # A state PUT goes to a fixed key (idempotent), so a transient
+        # ReadTimeout must be retried — an un-retried timeout here would
+        # falsely flag the workspace state-diverged. The backoff sleep lives
+        # in http_retry; no-op it so the test doesn't actually wait.
+        monkeypatch.setattr(http_retry.time, "sleep", lambda *_a, **_k: None)
+        state = tmp_path / "terraform.tfstate"
+        state.write_text('{"version":4}')
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise httpx.ReadTimeout("read timed out", request=request)
+            return httpx.Response(200)
+
+        ok = uploads.upload_state(_cfg(), state, client=_client(handler))
+        assert ok is True
+        assert calls["n"] == 2  # retried once after the timeout, then succeeded
+
 
 class TestSignalStateDiverged:
     def test_posts_to_state_diverged_endpoint(self) -> None:
@@ -177,7 +200,8 @@ class TestRunResults:
     def test_plan_result_retries_on_read_timeout(self, monkeypatch) -> None:
         # #565: a transient read-timeout must not drop the authoritative
         # has_changes signal (which would leave the run unknown → false drift).
-        monkeypatch.setattr(uploads.time, "sleep", lambda *_a, **_k: None)
+        # The retry policy (and its backoff sleep) now lives in http_retry.
+        monkeypatch.setattr(http_retry.time, "sleep", lambda *_a, **_k: None)
         calls = {"n": 0}
 
         def handler(request: httpx.Request) -> httpx.Response:
@@ -191,7 +215,7 @@ class TestRunResults:
         assert calls["n"] == 2  # retried once after the timeout, then succeeded
 
     def test_plan_result_gives_up_after_retries(self, monkeypatch) -> None:
-        monkeypatch.setattr(uploads.time, "sleep", lambda *_a, **_k: None)
+        monkeypatch.setattr(http_retry.time, "sleep", lambda *_a, **_k: None)
         calls = {"n": 0}
 
         def handler(request: httpx.Request) -> httpx.Response:
@@ -216,6 +240,9 @@ class TestCliMain:
         monkeypatch.setenv("TP_API_URL", "https://api.example.com")
         monkeypatch.setenv("TP_AUTH_TOKEN", "tok")
         monkeypatch.setenv("TP_RUN_ID", "run-1")
+        # state PUT + state-diverged POST now retry on 5xx; no-op the backoff
+        # sleep so the test doesn't spend real seconds waiting.
+        monkeypatch.setattr(http_retry.time, "sleep", lambda *_a, **_k: None)
 
         # Inject a MockTransport into every httpx.Client the CLI builds
         # by patching the constructor. Capture the REAL Client first to
@@ -238,6 +265,8 @@ class TestCliMain:
         monkeypatch.setenv("TP_API_URL", "https://api.example.com")
         monkeypatch.setenv("TP_AUTH_TOKEN", "tok")
         monkeypatch.setenv("TP_RUN_ID", "run-1")
+        # plan-result POST retries on 5xx; no-op the backoff sleep.
+        monkeypatch.setattr(http_retry.time, "sleep", lambda *_a, **_k: None)
 
         real_client = httpx.Client
 

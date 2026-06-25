@@ -25,6 +25,7 @@ from pathlib import Path
 import httpx
 
 from terrapod.config import settings
+from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
 from terrapod.services.hashing_stream import HashingStream
 from terrapod.storage.keys import (
@@ -213,7 +214,9 @@ async def _fetch_and_cache_shasums(
     filename = f"terraform-provider-terrapod_{version}_SHA256SUMS"
     url = _release_url(version, filename)
     async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as http:
-        resp = await http.get(url)
+        # Upstream GET from GitHub Releases — idempotent by method; retried
+        # on transient connection/read-timeout/5xx failures.
+        resp = await arequest_with_retry(http, "GET", url)
         if resp.status_code != 200:
             logger.warning(
                 "SHA256SUMS not available upstream",
@@ -235,7 +238,7 @@ async def _fetch_and_cache_shasums_sig(
     filename = f"terraform-provider-terrapod_{version}_SHA256SUMS.sig"
     url = _release_url(version, filename)
     async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as http:
-        resp = await http.get(url)
+        resp = await arequest_with_retry(http, "GET", url)
         if resp.status_code != 200:
             logger.debug(
                 "SHA256SUMS.sig not available upstream",

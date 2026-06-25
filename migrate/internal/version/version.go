@@ -85,7 +85,7 @@ func Check(ctx context.Context, targetBase, tool string) error {
 	if err != nil {
 		return fmt.Errorf("fetch %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		return fmt.Errorf("discovery: %s returned %d: %s", url, resp.StatusCode, strings.TrimSpace(string(body)))

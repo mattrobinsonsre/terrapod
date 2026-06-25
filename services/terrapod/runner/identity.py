@@ -544,8 +544,16 @@ class _SecretConflict(Exception):
 async def _call_join(api_url: str, join_token: str, name: str) -> dict:
     import httpx
 
+    from terrapod.http_retry import arequest_with_retry
+
     async with httpx.AsyncClient(base_url=api_url, timeout=30) as client:
-        r = await client.post(
+        # Pool join creates a listener row — leave non-idempotent (default) so a
+        # delivered-but-timed-out join isn't retried into a duplicate registration.
+        # Only a connect-class error (request provably never reached the API) is
+        # retried by the helper.
+        r = await arequest_with_retry(
+            client,
+            "POST",
             "/api/terrapod/v1/agent-pools/join",
             json={"join_token": join_token, "name": name},
         )
@@ -574,6 +582,11 @@ async def _call_renew_with_retries(identity: ListenerIdentity) -> dict | None:
     for attempt in range(3):
         try:
             async with httpx.AsyncClient(base_url=identity.api_url, timeout=30) as client:
+                # This function already owns a bounded retry loop (3 attempts with
+                # backoff + renew-specific dispatch: 429 Retry-After, 401/403 → give
+                # up, 200 → adopt new cert). Don't wrap the call in the shared retry
+                # helper too — that would nest retries (3×3). The outer loop here is
+                # this client call's retry.
                 r = await client.post(
                     f"/api/terrapod/v1/listeners/listener-{identity.listener_id}/renew",
                     headers=headers,

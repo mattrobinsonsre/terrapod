@@ -31,6 +31,7 @@ from terrapod.db.models import (
     RegistryProvider,
     RegistryProviderVersion,
 )
+from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
 from terrapod.services.hashing_stream import HashingStream
@@ -999,7 +1000,9 @@ async def _fetch_upstream_versions(hostname: str, namespace: str, type_: str) ->
     """Fetch available versions from upstream registry."""
     url = f"https://{hostname}/v1/providers/{namespace}/{type_}/versions"
     async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
-        resp = await client.get(url)
+        # Upstream GET — idempotent by method, so the helper retries on
+        # connection errors, read-timeouts, and 5xx from a flaky registry.
+        resp = await arequest_with_retry(client, "GET", url)
         if resp.status_code != 200:
             logger.warning(
                 "Upstream version fetch failed",
@@ -1030,7 +1033,7 @@ async def _fetch_and_cache_upstream_metadata(
     async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
         # Get the list of platforms for this version
         url = f"https://{hostname}/v1/providers/{namespace}/{type_}/versions"
-        resp = await client.get(url)
+        resp = await arequest_with_retry(client, "GET", url)
         if resp.status_code != 200:
             return None
 
@@ -1096,7 +1099,7 @@ async def _fetch_platform_download(
 ) -> dict | None:
     """Fetch download info for a specific platform from upstream."""
     url = f"https://{hostname}/v1/providers/{namespace}/{type_}/{version}/download/{os_}/{arch}"
-    resp = await client.get(url)
+    resp = await arequest_with_retry(client, "GET", url)
     if resp.status_code != 200:
         return None
     return resp.json()

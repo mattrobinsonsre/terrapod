@@ -111,7 +111,7 @@ func TestClient_409Conflict_422Validation_401Auth_403AuthZ(t *testing.T) {
 		t.Run(c.typeName, func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(c.status)
-				_, _ = w.Write([]byte(fmt.Sprintf(`{"errors":[{"status":"%d","detail":"d"}]}`, c.status)))
+				_, _ = fmt.Fprintf(w, `{"errors":[{"status":"%d","detail":"d"}]}`, c.status)
 			}))
 			defer srv.Close()
 			client, _ := NewClient(Options{BaseURL: srv.URL, Token: "t"})
@@ -211,6 +211,73 @@ func TestClient_429Retries(t *testing.T) {
 	})
 	if _, err := c.Get(t.Context(), "/x"); err != nil {
 		t.Errorf("429 should retry: %v", err)
+	}
+}
+
+func TestClient_IdempotentGETRetriesOn5xx(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := calls.Add(1)
+		if n < 2 {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":{}}`))
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Options{
+		BaseURL:    srv.URL,
+		Token:      "t",
+		MaxRetries: 3,
+	})
+	if _, err := c.Get(t.Context(), "/x"); err != nil {
+		t.Fatalf("idempotent GET should retry on 5xx and succeed: %v", err)
+	}
+	if calls.Load() != 2 {
+		t.Errorf("expected 2 calls (one retry), got %d", calls.Load())
+	}
+}
+
+func TestClient_NonIdempotentPOSTDoesNotRetryOn5xx(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte(`{"errors":[{"status":"502","detail":"bad gateway"}]}`))
+	}))
+	defer srv.Close()
+
+	c, _ := NewClient(Options{
+		BaseURL:    srv.URL,
+		Token:      "t",
+		MaxRetries: 3,
+	})
+	// POST is non-idempotent — a 5xx must surface immediately (via
+	// classifyError) without replaying the write.
+	_, err := c.Post(t.Context(), "/x", []byte(`{"create":true}`))
+	if err == nil {
+		t.Fatal("expected an error from the 502 response")
+	}
+	var api *APIError
+	if !errors.As(err, &api) || api.StatusCode != http.StatusBadGateway {
+		t.Errorf("expected *APIError(502) from classifyError, got: %v", err)
+	}
+	if calls.Load() != 1 {
+		t.Errorf("POST must not retry on 5xx: expected 1 call, got %d", calls.Load())
+	}
+}
+
+func TestIsIdempotent(t *testing.T) {
+	cases := map[string]bool{
+		"GET": true, "get": true, "HEAD": true, "OPTIONS": true,
+		"PUT": true, "put": true, "DELETE": true,
+		"POST": false, "post": false, "PATCH": false, "patch": false,
+	}
+	for method, want := range cases {
+		if got := isIdempotent(method); got != want {
+			t.Errorf("isIdempotent(%q) = %v, want %v", method, got, want)
+		}
 	}
 }
 

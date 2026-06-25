@@ -35,7 +35,9 @@ func TestProviderZipLayout(t *testing.T) {
 	}
 	rc, _ := f.Open()
 	got, _ := io.ReadAll(rc)
-	rc.Close()
+	if err := rc.Close(); err != nil {
+		t.Fatal(err)
+	}
 	if string(got) != string(bin) {
 		t.Errorf("content = %q", got)
 	}
@@ -64,11 +66,23 @@ func TestSHA256SUMSFormatAndOrder(t *testing.T) {
 
 func TestTarGzDirRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "main.tf"), []byte("resource {}"), 0o644)
-	os.MkdirAll(filepath.Join(dir, ".git"), 0o755)
-	os.WriteFile(filepath.Join(dir, ".git", "HEAD"), []byte("ref"), 0o644)
-	os.MkdirAll(filepath.Join(dir, "sub"), 0o755)
-	os.WriteFile(filepath.Join(dir, "sub", "vars.tf"), []byte("variable {}"), 0o644)
+	mustWrite := func(name string, data []byte) {
+		t.Helper()
+		if err := os.WriteFile(name, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mustMkdir := func(name string) {
+		t.Helper()
+		if err := os.MkdirAll(name, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mustWrite(filepath.Join(dir, "main.tf"), []byte("resource {}"))
+	mustMkdir(filepath.Join(dir, ".git"))
+	mustWrite(filepath.Join(dir, ".git", "HEAD"), []byte("ref"))
+	mustMkdir(filepath.Join(dir, "sub"))
+	mustWrite(filepath.Join(dir, "sub", "vars.tf"), []byte("variable {}"))
 
 	gz, err := TarGzDir(dir)
 	if err != nil {

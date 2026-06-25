@@ -129,6 +129,12 @@ jobs:
       - name: Build
         run: go build ./...
         working-directory: provider
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+          working-directory: provider
+          args: --config=../.golangci.yml
 
   # ── Provider Test ────────────────────────────────────
   provider-test:
@@ -167,6 +173,12 @@ jobs:
       - name: Build
         run: go build ./...
         working-directory: go-terrapod
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+          working-directory: go-terrapod
+          args: --config=../.golangci.yml
 
   # ── go-terrapod Test ──────────────────────────────────
   go-terrapod-test:
@@ -205,6 +217,12 @@ jobs:
       - name: Build
         run: go build ./...
         working-directory: migrate
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+          working-directory: migrate
+          args: --config=../.golangci.yml
 
   # ── Migrate Test ──────────────────────────────────────
   migrate-test:
@@ -242,6 +260,12 @@ jobs:
       - name: Build
         run: go build ./...
         working-directory: publish
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+          working-directory: publish
+          args: --config=../.golangci.yml
 
   # ── Publish Test ──────────────────────────────────────
   publish-test:

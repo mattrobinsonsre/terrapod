@@ -111,7 +111,7 @@ func Emit(doc *AtlantisYAML, opts EmitOptions) (workspaces []ir.Workspace, skipp
 		// Per-project skipped-items. Each one becomes an entry the
 		// operator reads in the migration report so they know what
 		// they're losing.
-		if p.AutoPlan.Enabled == false && len(p.AutoPlan.WhenModified) == 0 {
+		if !p.AutoPlan.Enabled && len(p.AutoPlan.WhenModified) == 0 {
 			// `autoplan.enabled` defaults to true in Atlantis; the
 			// only way to reach here is an explicit `enabled: false`
 			// AND no `when_modified` glob. Empty AutoPlan struct

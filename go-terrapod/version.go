@@ -33,7 +33,7 @@ var ErrVersionMismatch = errors.New("SDK version does not match Terrapod API ver
 // deployment older than v0.24, or a malformed deployment. Surfaced
 // separately so the operator action ("upgrade the target Terrapod")
 // is distinct from a version-mismatch.
-var ErrVersionUnreported = errors.New("Terrapod did not report a version in .well-known/terraform.json")
+var ErrVersionUnreported = errors.New("version not reported by Terrapod in .well-known/terraform.json")
 
 // versionProbeTimeout caps the discovery GET: generous enough for a
 // healthy API, short enough that a misconfigured target fails fast.
@@ -94,7 +94,7 @@ func (c *Client) VersionCheck(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("fetch %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		return fmt.Errorf("discovery: %s returned %d: %s",

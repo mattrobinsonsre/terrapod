@@ -19,6 +19,32 @@
 
 import { clearAuth, getAuthState, loginRedirectUrl, updateExpiresAt } from '@/lib/auth'
 
+/**
+ * Retry contract (mirrors the backend's method-aware safety rule so we never double-write).
+ *
+ * Bounded exponential backoff: up to MAX_RETRIES extra attempts after the first, with
+ * delays ~300ms → 600ms → 1200ms (capped at BACKOFF_CAP_MS).
+ *
+ *   - Idempotent methods (GET, HEAD, OPTIONS, PUT, DELETE) retry on BOTH a thrown network
+ *     error (fetch rejects with a TypeError) AND a 5xx response.
+ *   - Non-idempotent methods (POST, PATCH) are NOT retried: the browser can't tell whether
+ *     a failed request was delivered, so a retry could double-write. They surface the error.
+ *   - A 4xx is never retried (it's a client-side problem; retrying won't help).
+ *
+ * The retry happens BEFORE the 401 handling: a transient network blip is retried, but a
+ * genuine 401 response still clears auth and redirects.
+ *
+ * Coverage note: the frontend has no unit-test runner (no vitest/jest), so this contract
+ * is exercised via the e2e suite and the Next.js build rather than a dedicated unit test.
+ */
+const MAX_RETRIES = 3
+const BACKOFF_BASE_MS = 300
+const BACKOFF_CAP_MS = 1200
+
+const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE'])
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const auth = getAuthState()
   const headers = new Headers(init?.headers)
@@ -27,7 +53,31 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
     headers.set('Authorization', `Bearer ${auth.token}`)
   }
 
-  const res = await fetch(path, { ...init, headers })
+  const method = (init?.method ?? 'GET').toUpperCase()
+  const idempotent = IDEMPOTENT_METHODS.has(method)
+
+  let res: Response | undefined
+  for (let attempt = 0; ; attempt++) {
+    try {
+      res = await fetch(path, { ...init, headers })
+      // Idempotent methods retry transient 5xx; non-idempotent never do (may have applied).
+      if (idempotent && res.status >= 500 && res.status <= 599 && attempt < MAX_RETRIES) {
+        await sleep(Math.min(BACKOFF_BASE_MS * 2 ** attempt, BACKOFF_CAP_MS))
+        continue
+      }
+      break
+    } catch (err) {
+      // fetch rejects (TypeError) on a network failure. The browser can't tell us whether
+      // the request was never sent or was delivered but the reply was lost — so only retry
+      // IDEMPOTENT methods. A non-idempotent POST/PATCH might have applied server-side, and
+      // retrying could double-write, so it surfaces the error instead of retrying.
+      if (idempotent && attempt < MAX_RETRIES) {
+        await sleep(Math.min(BACKOFF_BASE_MS * 2 ** attempt, BACKOFF_CAP_MS))
+        continue
+      }
+      throw err
+    }
+  }
 
   if (res.status === 401) {
     clearAuth()

@@ -32,6 +32,7 @@ import time
 import httpx
 
 from terrapod.config import load_runner_config
+from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import configure_logging, get_logger
 
 logger = get_logger(__name__)
@@ -365,8 +366,11 @@ class RunnerListener:
         name — but is not guaranteed by every CRI, so non-Helm operators
         running this listener should set POD_NAME explicitly.
         """
-        await self._http_client.post(
+        await arequest_with_retry(
+            self._http_client,
+            "POST",
             f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}/heartbeat",
+            idempotent=True,  # idempotent presence upsert — safe to retry on timeout/5xx
             json={
                 "capacity": self._max_concurrent,
                 "active_runs": self._active_launches,
@@ -572,7 +576,9 @@ class RunnerListener:
         if self._active_launches >= self._max_concurrent:
             return
 
-        response = await self._http_client.get(
+        response = await arequest_with_retry(
+            self._http_client,
+            "GET",
             f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}/runs/next",
             headers=self._auth_headers(),
         )
@@ -693,9 +699,12 @@ class RunnerListener:
 
         # Report Job launched to the API
         try:
-            await self._http_client.post(
+            await arequest_with_retry(
+                self._http_client,
+                "POST",
                 f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}"
                 f"/runs/run-{run_id}/job-launched",
+                idempotent=True,  # idempotent upsert of the run's job_name — safe to retry
                 json={"job_name": job_name, "job_namespace": namespace},
                 headers=self._auth_headers(),
             )
@@ -723,8 +732,11 @@ class RunnerListener:
         report-failure call cascade and break the listener's event loop.
         """
         try:
-            await self._http_client.patch(
+            await arequest_with_retry(
+                self._http_client,
+                "PATCH",
                 f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}/runs/run-{run_id}",
+                idempotent=True,  # idempotent status set (errored) — safe to retry on timeout/5xx
                 json={"status": "errored", "error_message": error_message},
                 headers=self._auth_headers(),
             )
@@ -800,9 +812,12 @@ class RunnerListener:
                 )
 
         try:
-            await self._http_client.post(
+            await arequest_with_retry(
+                self._http_client,
+                "POST",
                 f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}"
                 f"/runs/run-{run_id}/job-status",
+                idempotent=True,  # idempotent status report — safe to retry on timeout/5xx
                 json=body,
                 headers=self._auth_headers(),
             )
@@ -851,7 +866,9 @@ class RunnerListener:
         del logs  # Release the string copy immediately
 
         try:
-            await self._http_client.put(
+            await arequest_with_retry(
+                self._http_client,
+                "PUT",  # PUT is idempotent by spec — retries on all transient failures
                 f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}"
                 f"/runs/run-{run_id}/log-stream",
                 params={"phase": phase},
@@ -893,9 +910,12 @@ class RunnerListener:
 
     async def _get_runner_token(self, run_id: str) -> str:
         """Request a short-lived runner token from the API."""
-        response = await self._http_client.post(
+        response = await arequest_with_retry(
+            self._http_client,
+            "POST",
             f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}"
             f"/runs/run-{run_id}/runner-token",
+            idempotent=True,  # per-run token mint is safe/repeatable — retry on timeout/5xx
             json={},
             headers=self._auth_headers(),
         )

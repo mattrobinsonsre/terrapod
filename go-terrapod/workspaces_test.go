@@ -501,27 +501,23 @@ func TestWorkspaceFromResource_VCSConnectionRelationship(t *testing.T) {
 	}
 }
 
-func TestWorkspaceCreate_RetryOn5xx(t *testing.T) {
-	// Belt-and-braces verification that the workspace-specific path
-	// still picks up Client's 5xx retry. The Client tests cover this
-	// abstractly; this confirms the path the migration tool actually
-	// drives.
+func TestWorkspaceCreate_DoesNotRetryOn5xx(t *testing.T) {
+	// Workspace creation is a POST (non-idempotent), so a 5xx must NOT
+	// be retried — a create that the server already processed but
+	// surfaced as a 5xx would otherwise be duplicated. This confirms the
+	// method-aware retry policy on the path the migration tool drives.
 	var calls int
 	f := newWorkspaceFixtureServer(t)
 	f.createHandler = func(w http.ResponseWriter, r *http.Request) {
 		calls++
-		if calls == 1 {
-			w.WriteHeader(http.StatusBadGateway)
-			return
-		}
-		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(minimalWorkspaceBody("ws-aaa", "api", nil)))
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte(`{"errors":[{"status":"502","detail":"bad gateway"}]}`))
 	}
 	c := f.client()
-	if _, err := c.CreateWorkspace(context.Background(), CreateWorkspaceRequest{Name: "api"}); err != nil {
-		t.Fatalf("retry should recover: %v", err)
+	if _, err := c.CreateWorkspace(context.Background(), CreateWorkspaceRequest{Name: "api"}); err == nil {
+		t.Fatal("expected the 502 to surface (POST must not retry)")
 	}
-	if calls != 2 {
-		t.Errorf("expected 2 calls (1 retry), got %d", calls)
+	if calls != 1 {
+		t.Errorf("POST must not retry on 5xx: expected 1 call, got %d", calls)
 	}
 }

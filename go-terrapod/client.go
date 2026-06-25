@@ -230,13 +230,37 @@ func (c *Client) DeleteWithBody(ctx context.Context, path string, payload []byte
 	return nil
 }
 
-// do is the inner request-with-retry workhorse. Retries on:
+// isIdempotent reports whether an HTTP method is safe to retry. GET,
+// HEAD, OPTIONS, PUT, and DELETE are idempotent per RFC 7231 — replaying
+// them after a timeout or 5xx yields the same server state. POST and
+// PATCH are NOT: a retried POST/PATCH that the server already processed
+// (but whose response was lost to a timeout or surfaced as a 5xx after a
+// partial write) would double-write. The comparison is case-insensitive.
+func isIdempotent(method string) bool {
+	switch strings.ToUpper(method) {
+	case http.MethodGet, http.MethodHead, http.MethodOptions, http.MethodPut, http.MethodDelete:
+		return true
+	default:
+		return false
+	}
+}
+
+// do is the inner request-with-retry workhorse. Retries are
+// method-aware: only idempotent methods (GET/HEAD/OPTIONS/PUT/DELETE)
+// are retried, since replaying a non-idempotent POST/PATCH that the
+// server already processed risks a double-write. For idempotent methods
+// it retries on:
 //   - HTTP 429 (rate-limited) — exponential backoff capped at 4s
 //   - HTTP 5xx — same backoff
 //   - Transient transport errors — net.Error.Timeout() returning true,
 //     or a context.DeadlineExceeded wrap; never on a "connection
 //     refused" or unresolved-host (those are permanent for the
 //     duration of the operator's run)
+//
+// For a non-idempotent method, the first attempt's outcome is returned
+// as-is: a 5xx body comes back with its status and a nil error (so the
+// caller's classifyError still runs), and a transient net error comes
+// back as nil, 0, err.
 //
 // Returns the response body bytes, the HTTP status code, and any error.
 // Body is always populated when err is nil regardless of status, so
@@ -249,7 +273,7 @@ func (c *Client) do(ctx context.Context, method, path string, body []byte) ([]by
 // override the request Content-Type. Used by raw uploads (e.g. state
 // version content) that send non-JSON:API payloads. The Accept header
 // stays application/vnd.api+json because error responses are still
-// JSON:API envelopes.
+// JSON:API envelopes. Retries are method-aware — see do.
 func (c *Client) doWithContentType(ctx context.Context, method, path string, body []byte, contentType string) ([]byte, int, error) {
 	var lastErr error
 	for attempt := 0; attempt <= c.MaxRetries; attempt++ {
@@ -279,7 +303,10 @@ func (c *Client) doWithContentType(ctx context.Context, method, path string, bod
 
 		resp, err := c.HTTPClient.Do(req)
 		if err != nil {
-			if isTransientNetError(err) {
+			// Only retry transient net errors on idempotent methods —
+			// a timed-out POST/PATCH may have already been applied
+			// server-side, so replaying it would double-write.
+			if isTransientNetError(err) && isIdempotent(method) {
 				lastErr = err
 				continue
 			}
@@ -290,7 +317,7 @@ func (c *Client) doWithContentType(ctx context.Context, method, path string, bod
 		if err != nil {
 			return nil, resp.StatusCode, fmt.Errorf("read response: %w", err)
 		}
-		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+		if (resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500) && isIdempotent(method) {
 			lastErr = &APIError{StatusCode: resp.StatusCode, Body: string(respBody)}
 			continue
 		}

@@ -33,9 +33,10 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Only the modules the listener imports: config, logging_config, runner/
+# Only the modules the listener imports: config, logging_config, http_retry, runner/
 COPY services/terrapod/config.py ./terrapod/config.py
 COPY services/terrapod/logging_config.py ./terrapod/logging_config.py
+COPY services/terrapod/http_retry.py ./terrapod/http_retry.py
 COPY services/terrapod/runner/ ./terrapod/runner/
 
 # Create non-root user and data directories

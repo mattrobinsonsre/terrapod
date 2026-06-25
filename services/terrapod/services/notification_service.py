@@ -15,6 +15,7 @@ from email.message import EmailMessage
 import httpx
 
 from terrapod.config import settings
+from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -132,7 +133,13 @@ async def deliver_generic(
 
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(url, content=body_bytes, headers=headers)
+            # Non-idempotent webhook POST: the helper retries ONLY on
+            # connection errors where the request never reached the
+            # endpoint — never on a read-timeout or 5xx, since re-POSTing a
+            # delivered webhook would double-deliver.
+            resp = await arequest_with_retry(
+                client, "POST", url, content=body_bytes, headers=headers
+            )
         return {
             "status": resp.status_code,
             "body": resp.text[:500],
@@ -175,7 +182,11 @@ async def deliver_slack(
 
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(
+            # Non-idempotent webhook POST — retried only on connection-not-sent
+            # errors, never on read-timeout/5xx (avoids a double Slack post).
+            resp = await arequest_with_retry(
+                client,
+                "POST",
                 url,
                 content=json.dumps(slack_payload).encode(),
                 headers={"Content-Type": "application/json"},
