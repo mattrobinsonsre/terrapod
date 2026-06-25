@@ -494,7 +494,7 @@ Use a **strong static database password**, but keep it out of source and rotate 
 2. Optionally source that Secret from an external secret manager at deploy time — see [External secret managers](#external-secret-managers-vault-via-eso--vault-agent). External Secrets Operator with a Vault backend can render the DB URL Secret from a Vault path, so the password never lives in your Helm values or Git.
 3. Rely on the cloud database's **encryption at rest** (RDS encryption, Cloud SQL encryption, Azure Database encryption) and **network isolation** (private subnets / VPC peering / private endpoints, security groups) so the connection is never exposed publicly.
 
-> **Future enhancement (not available now):** native in-process IAM database auth — a per-connection token provider that mints and refreshes the IAM token on each new pooled connection — is a plausible future addition. It is not in the current release. This section will be updated if and when it lands.
+> **Future enhancement (not available now):** native in-process IAM database auth — a per-connection token provider that mints and refreshes the IAM token on each new pooled connection — is tracked in [#573](https://github.com/mattrobinsonsre/terrapod/issues/573). It is not in the current release. This section will be updated if and when it lands.
 
 ---
 
