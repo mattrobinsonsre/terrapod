@@ -215,13 +215,19 @@ bootstrap:
   poolName: dev-pool
   poolToken: "dev-join-token-do-not-use-in-prod"
 
-# Local PostgreSQL (bundled via Tiltfile)
+# Chart-managed PostgreSQL + Redis for local dev (same batteries-included path
+# as the `make eval` quickstart). Postgres keeps a PVC; the chart derives the
+# connection URLs from the in-cluster services, so no url/existingSecret needed.
+# A fixed dev password keeps the embedded DB connectable for dump/restore.
 postgresql:
-  url: "postgresql+asyncpg://terrapod:terrapod@terrapod-postgresql:5432/terrapod"
+  deploy: true
+  embedded:
+    password: terrapod
+    persistence:
+      size: 2Gi
 
-# Local Redis (bundled via Tiltfile)
 redis:
-  url: "redis://terrapod-redis:6379"
+  deploy: true
 
 storage:
   filesystem:

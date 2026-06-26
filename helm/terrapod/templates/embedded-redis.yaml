@@ -1,0 +1,78 @@
+{{- /*
+EMBEDDED REDIS — EVAL / DEV ONLY (gated on redis.deploy).
+
+Single-replica, in-cluster Redis so the chart can run with zero external
+dependencies for local evaluation (`make eval`) and the Tilt dev loop. NOT
+production-grade: one replica, no auth, no persistence, no HA. For production,
+leave redis.deploy=false and provide a managed Redis/Valkey via redis.url /
+redis.existingSecret.
+*/ -}}
+{{- if .Values.redis.deploy }}
+{{- $name := printf "%s-redis" (include "terrapod.fullname" .) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "terrapod.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: redis
+  template:
+    metadata:
+      labels:
+        {{- include "terrapod.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: redis
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: redis
+          image: {{ .Values.redis.embedded.image }}
+          imagePullPolicy: IfNotPresent
+          args: ["--save", "", "--appendonly", "no"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.redis.embedded.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  selector:
+    {{- include "terrapod.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+{{- end }}

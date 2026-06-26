@@ -1,0 +1,61 @@
+# ── Terrapod evaluation profile — batteries-included, ZERO external deps ──────
+#
+# Used by `make eval` (the kind/k3d quickstart) to stand up a complete, throwaway
+# Terrapod in a local cluster: in-cluster Postgres + Redis (deployed by the chart),
+# filesystem object storage, a local admin login, no cloud credentials, no ingress
+# controller (access is via `kubectl port-forward`).
+#
+# THIS IS NOT A PRODUCTION CONFIG. It trades durability and security for a
+# one-command demo: single-replica datastores, no HA, no backups, a known admin
+# password. For production see helm/terrapod/values.yaml and docs/deployment.md.
+#
+# Contract: this file is a first-class consumer of the chart — any chart value /
+# default / schema change must keep `helm template -f values-eval.yaml` rendering
+# AND the eval stack booting (see AGENTS.md). Keep it zero-external-deps: if a new
+# feature defaults to requiring an external dependency, override it OFF here.
+
+fullnameOverride: terrapod
+
+# Chart-deployed datastores (eval/dev only — see postgresql.deploy / redis.deploy).
+postgresql:
+  deploy: true
+redis:
+  deploy: true
+
+# Filesystem object storage is the chart default (api.config.storage.backend);
+# just shrink the PVC for a throwaway cluster (kind/k3d ship a default StorageClass).
+storage:
+  filesystem:
+    persistence:
+      enabled: true
+      size: 2Gi
+
+api:
+  replicas: 1
+  config:
+    # Browser-facing URL via `kubectl port-forward svc/terrapod-web 8080:3000`.
+    external_url: "http://localhost:8080"
+    auth:
+      local_enabled: true
+  # The hardened ephemeral PVC isn't needed for a local eval.
+  ephemeralStorage:
+    enabled: false
+
+web:
+  replicas: 1
+
+# No ingress controller assumed in a throwaway kind/k3d cluster — the quickstart
+# port-forwards the web service instead. (The BFF Service/Deployment still deploy.)
+ingress:
+  enabled: false
+
+# Agent execution (server-side plan/apply on runner Jobs) is OFF for the quickstart
+# to keep the footprint tiny. To try it, create an agent pool + join token and set
+# listener.enabled=true with a runner image.
+listener:
+  enabled: false
+
+# Seed a local admin so you can log in immediately. Eval-only credentials.
+bootstrap:
+  adminEmail: admin@example.com
+  adminPassword: terrapod

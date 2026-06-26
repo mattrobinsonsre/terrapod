@@ -8,6 +8,29 @@ This guide deploys Terrapod onto a Kubernetes cluster with the Helm chart, then 
 
 ---
 
+## Just kicking the tyres? One-command evaluation
+
+To try Terrapod end-to-end on your laptop without provisioning anything, skip
+the rest of this guide and run the evaluation quickstart. It spins up a
+throwaway [kind](https://kind.sigs.k8s.io/) or [k3d](https://k3d.io/) cluster
+and installs a **complete, self-contained stack** — in-cluster PostgreSQL +
+Redis (deployed by the chart), filesystem storage, and a local admin — with no
+cloud account and no external dependencies:
+
+```sh
+make eval          # create a local cluster + install Terrapod, then port-forward
+# → open http://localhost:8080  (login: admin@example.com / terrapod)
+make eval-down     # delete it all
+```
+
+Prerequisites: Docker, `kubectl`, `helm`, and either `kind` or `k3d`. This is an
+**evaluation** profile (single-replica datastores, a known password, no
+HA/backups) — for a real deployment, continue below. Agent execution (server-side
+plan/apply) is off in the eval to keep it small; create an agent pool and set
+`listener.enabled=true` to try it.
+
+---
+
 ## Prerequisites
 
 | Need | Notes |

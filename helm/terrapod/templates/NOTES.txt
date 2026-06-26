@@ -1,4 +1,12 @@
 Terrapod has been installed.
+{{- if or .Values.postgresql.deploy .Values.redis.deploy }}
+
+⚠  EVAL/DEV MODE: this release deploys chart-managed
+{{- if and .Values.postgresql.deploy .Values.redis.deploy }} PostgreSQL and Redis{{ else if .Values.postgresql.deploy }} PostgreSQL{{ else }} Redis{{ end }}
+   (single-replica, no HA, no backups). DO NOT use this for production — set
+   postgresql.deploy / redis.deploy to false and provide a managed datastore via
+   url / existingSecret.
+{{- end }}
 
 {{- if .Values.web.enabled }}
 

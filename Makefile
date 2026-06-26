@@ -57,6 +57,13 @@ dev:                ## Start Tilt development environment (port 10352)
 dev-down:           ## Stop Tilt
 	tilt down --port 10352
 
+# ── Evaluation (one-command kind/k3d quickstart) ─────────
+eval:               ## Stand up a throwaway Terrapod for evaluation (kind/k3d)
+	scripts/eval.sh up
+
+eval-down:          ## Delete the evaluation cluster
+	scripts/eval.sh down
+
 # ── Utility ──────────────────────────────────────────────
 clean:              ## Clean build artifacts
 	rm -rf services/.pytest_cache services/.coverage services/htmlcov

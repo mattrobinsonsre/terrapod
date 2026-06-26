@@ -1,0 +1,151 @@
+{{- /*
+EMBEDDED POSTGRESQL — EVAL / DEV ONLY (gated on postgresql.deploy).
+
+This deploys a single-replica, in-cluster PostgreSQL so the chart can stand up a
+complete stack with zero external dependencies — for local evaluation (the
+`make eval` kind/k3d quickstart) and the Tilt dev loop. It is intentionally NOT
+production-grade: one replica, no HA, no backups, no connection pooling, no
+tuning. For production, leave postgresql.deploy=false and provide a managed
+database via postgresql.url / postgresql.existingSecret.
+
+ORDERING: the migrations Job is a Helm pre-install hook (weight -5), so it runs
+before normal resources. These datastore resources are therefore themselves
+`pre-install` hooks at a LOWER weight (-20) so Helm creates them — and waits for
+Postgres to be ready — before migrations run. They carry no hook-delete-policy,
+so they persist across `helm upgrade` (the DB is stateful); the pre-install-only
+hook simply isn't re-run on upgrade, and the original keeps serving. Teardown is
+`make eval-down` (deletes the whole cluster).
+*/ -}}
+{{- if .Values.postgresql.deploy }}
+{{- $fullname := include "terrapod.fullname" . }}
+{{- $name := printf "%s-postgresql" $fullname }}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace $name }}
+{{- $password := "" }}
+{{- if and $existing $existing.data (hasKey $existing.data "password") }}
+{{- $password = index $existing.data "password" | b64dec }}
+{{- else }}
+{{- $password = .Values.postgresql.embedded.password | default (randAlphaNum 24) }}
+{{- end }}
+{{- $url := printf "postgresql+asyncpg://terrapod:%s@%s:5432/terrapod" $password $name }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-20"
+type: Opaque
+stringData:
+  password: {{ $password | quote }}
+  url: {{ $url | quote }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}-data
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-20"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- with .Values.postgresql.embedded.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.postgresql.embedded.persistence.size | default "1Gi" }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-20"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "terrapod.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgresql
+  template:
+    metadata:
+      labels:
+        {{- include "terrapod.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgresql
+    spec:
+      # Eval/dev datastore: the official postgres image starts as root then
+      # drops to the postgres user, so it is intentionally not run under the
+      # hardened non-root SecurityContext the application pods use.
+      securityContext:
+        fsGroup: 999
+      containers:
+        - name: postgresql
+          image: {{ .Values.postgresql.embedded.image }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_USER
+              value: terrapod
+            - name: POSTGRES_DB
+              value: terrapod
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}
+                  key: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgresql
+              containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "terrapod", "-d", "terrapod"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "terrapod", "-d", "terrapod"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.postgresql.embedded.resources | nindent 12 }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ $name }}-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-20"
+spec:
+  selector:
+    {{- include "terrapod.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: 5432
+{{- end }}

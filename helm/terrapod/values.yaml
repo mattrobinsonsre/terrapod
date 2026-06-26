@@ -1114,6 +1114,13 @@ migrations:
     tag: ""  # Defaults to appVersion
     pullPolicy: IfNotPresent
 
+  # Job retry budget. The migrations Job is a pre-install/pre-upgrade hook; when
+  # the database is co-deployed in the same release (eval/dev embedded Postgres,
+  # postgresql.deploy=true) it may still be starting when the hook first runs, so
+  # the Job retries with exponential backoff until the DB is reachable. Harmless
+  # for an already-up managed database in production.
+  backoffLimit: 10
+
 # ── Bootstrap (initial admin user + optional pool) ─────────────────────────
 # The bootstrap Job is a post-install hook that idempotently seeds the admin
 # user (+ an optional agent pool). NOTE: ArgoCD runs post-install hooks on
@@ -1136,12 +1143,46 @@ postgresql:
   # existingSecret: "terrapod-db-credentials"
   # existingSecretKey: "url"  # key within the Secret (default: url)
 
+  # ── Embedded PostgreSQL — EVAL / DEV ONLY ──────────────────────────────
+  # When true, the chart deploys a single-replica in-cluster PostgreSQL and
+  # wires the API/migrations/bootstrap to it automatically (no url/existingSecret
+  # needed). This exists so the stack can run with ZERO external dependencies
+  # for local evaluation (`make eval`) and the Tilt dev loop. It is NOT
+  # production-grade — one replica, no HA, no backups, no tuning. For production,
+  # keep this false and provide a managed database via url / existingSecret.
+  deploy: false
+  embedded:
+    image: postgres:16-alpine
+    # A fixed password for the embedded DB (eval only). Leave empty to have the
+    # chart generate one (stable across upgrades via a lookup on the Secret).
+    password: ""
+    persistence:
+      size: 1Gi
+      storageClass: ""   # "" = cluster default StorageClass (kind/k3d ship one)
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
 # ── Redis ─────────────────────────────────────────────────────────────────
 # Provide credentials via existingSecret (recommended) or url (dev only).
 redis:
   url: ""
   # existingSecret: "terrapod-redis-credentials"
   # existingSecretKey: "url"  # key within the Secret (default: url)
+
+  # ── Embedded Redis — EVAL / DEV ONLY ───────────────────────────────────
+  # When true, the chart deploys a single-replica in-cluster Redis and points
+  # the API at it automatically. Same caveat as embedded PostgreSQL above:
+  # eval/dev only (no auth, no persistence, no HA). Production should keep this
+  # false and provide a managed Redis/Valkey via url / existingSecret.
+  deploy: false
+  embedded:
+    image: redis:7-alpine
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
 
 # ── Storage ─────────────────────────────────────────────────────────────────
 # Filesystem PVC — only created when storage.backend=filesystem

@@ -485,6 +485,62 @@ jobs:
               --values helm/terrapod/values.yaml \
               --values helm/terrapod/values-local.yaml > /dev/null
           echo "values-local renders OK"
+      - name: Eval values render (embedded Postgres/Redis)
+        run: |
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            template terrapod helm/terrapod \
+              --values helm/terrapod/values-eval.yaml)
+          echo "$out" | grep -q "component: postgresql" || { echo "FAIL: values-eval did not render embedded Postgres"; exit 1; }
+          echo "$out" | grep -q "component: redis" || { echo "FAIL: values-eval did not render embedded Redis"; exit 1; }
+          echo "$out" | grep -q "kind: PersistentVolumeClaim" || { echo "FAIL: embedded Postgres PVC missing"; exit 1; }
+          echo "values-eval renders embedded datastores OK"
+
+  # ── Eval quickstart boot (kind + k3d) ──────────────────
+  # Proves `make eval` actually stands up a complete stack (embedded
+  # Postgres/Redis + migrations + API + web) on a throwaway cluster, on both
+  # supported cluster tools. Uses released images, so it exercises the eval
+  # mechanism + chart, not the PR's app code (that's covered by the test job).
+  helm-eval-boot:
+    name: Eval Boot (${{ matrix.tool }})
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tool: [kind, k3d]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install ${{ matrix.tool }}
+        run: |
+          if [ "${{ matrix.tool }}" = "kind" ]; then
+            curl -fsSLo /usr/local/bin/kind https://kind.sigs.k8s.io/dl/v0.32.0/kind-linux-amd64
+            chmod +x /usr/local/bin/kind
+          else
+            curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/v5.9.0/install.sh | TAG=v5.9.0 bash
+          fi
+      - name: make eval (boot the stack)
+        env:
+          CI: "1"
+          EVAL_NO_PORT_FORWARD: "1"
+          TERRAPOD_VERSION: latest
+        run: scripts/eval.sh up
+      - name: Smoke the running stack
+        run: |
+          ctx=$([ "${{ matrix.tool }}" = "kind" ] && echo kind-terrapod-eval || echo k3d-terrapod-eval)
+          ns=terrapod-eval
+          # helm --wait already gated on readiness; assert the data plane is real:
+          kubectl --context "$ctx" -n "$ns" wait --for=condition=available deploy/terrapod-web --timeout=120s
+          kubectl --context "$ctx" -n "$ns" wait --for=condition=available deploy/terrapod-api --timeout=120s
+          kubectl --context "$ctx" -n "$ns" port-forward svc/terrapod-web 18080:3000 >/dev/null 2>&1 &
+          sleep 6
+          code=$(curl -s -o /dev/null -w '%{http_code}' --retry 8 --retry-delay 3 --retry-all-errors http://localhost:18080/login)
+          echo "GET /login -> $code"
+          [ "$code" = "200" ] || { echo "FAIL: UI did not serve /login"; exit 1; }
+          echo "Eval stack booted + UI served on ${{ matrix.tool }}"
+      - name: Teardown
+        if: always()
+        run: scripts/eval.sh down
 
   # ── SAST (Semgrep) ─────────────────────────────────────
   sast:
@@ -1362,6 +1418,7 @@ jobs:
       - dependency-review
       - helm-lint
       - helm-smoke
+      - helm-eval-boot
       - sast
       - build-images-amd64
       - build-images-arm64
@@ -1399,6 +1456,7 @@ jobs:
             "${{ needs.dependency-review.result }}"
             "${{ needs.helm-lint.result }}"
             "${{ needs.helm-smoke.result }}"
+            "${{ needs.helm-eval-boot.result }}"
             "${{ needs.sast.result }}"
             "${{ needs.build-images-amd64.result }}"
             "${{ needs.build-images-arm64.result }}"

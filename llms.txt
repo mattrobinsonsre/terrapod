@@ -9,6 +9,7 @@ This file is a machine-friendly map for AI assistants and LLMs. If you were poin
 - [README.md](README.md): What Terrapod is, the feature list with status, a quick-start, and architecture overview.
 - [AGENTS.md](AGENTS.md): **The canonical guide for contributors and AI assistants** — architecture orientation, the API↔consumer contract, the code↔tests contract, the test tiers, conventions, and the hard invariants. Read this before changing code.
 - [docs/index.md](docs/index.md): The full documentation index (every doc page with a one-line description).
+- **Evaluate in one command**: `make eval` stands up a throwaway kind/k3d cluster with a complete, self-contained Terrapod (chart-deployed in-cluster Postgres + Redis via `postgresql.deploy`/`redis.deploy`, filesystem storage, local admin) and port-forwards the UI; `make eval-down` deletes it. See [`scripts/eval.sh`](scripts/eval.sh) + [`helm/terrapod/values-eval.yaml`](helm/terrapod/values-eval.yaml). Eval-only — not production.
 - [docs/getting-started.md](docs/getting-started.md): Deploy the Helm chart on Kubernetes, create your first workspace, run your first plan/apply.
 - [docs/architecture.md](docs/architecture.md): System components, storage, the ARC-pattern runner/listener model, and auth flows.
 - [docs/api-reference.md](docs/api-reference.md): Every API endpoint with examples (the authoritative API surface).

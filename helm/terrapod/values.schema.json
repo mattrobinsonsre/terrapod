@@ -251,7 +251,8 @@
       "additionalProperties": false,
       "properties": {
         "enabled": { "type": "boolean" },
-        "image": { "$ref": "#/$defs/imageSpec" }
+        "image": { "$ref": "#/$defs/imageSpec" },
+        "backoffLimit": { "type": "integer", "minimum": 0 }
       }
     },
 
@@ -276,7 +277,25 @@
       "properties": {
         "url": { "type": "string" },
         "existingSecret": { "type": "string" },
-        "existingSecretKey": { "type": "string" }
+        "existingSecretKey": { "type": "string" },
+        "deploy": { "type": "boolean" },
+        "embedded": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "image": { "type": "string" },
+            "password": { "type": "string" },
+            "persistence": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "size": { "type": "string" },
+                "storageClass": { "type": "string" }
+              }
+            },
+            "resources": { "type": "object" }
+          }
+        }
       }
     },
 
@@ -286,7 +305,16 @@
       "properties": {
         "url": { "type": "string" },
         "existingSecret": { "type": "string" },
-        "existingSecretKey": { "type": "string" }
+        "existingSecretKey": { "type": "string" },
+        "deploy": { "type": "boolean" },
+        "embedded": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "image": { "type": "string" },
+            "resources": { "type": "object" }
+          }
+        }
       }
     },
 

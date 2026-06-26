@@ -232,6 +232,19 @@ Playwright's auto-waiting.
   `values.yaml`, update `values.schema.json` to match (it uses
   `additionalProperties: false`, so `helm lint` fails otherwise), and make
   sure the template renders it.
+- **The chart has three first-class value profiles — keep all three working.**
+  `values.yaml` (production defaults), `values-local.yaml` (the Tilt dev loop),
+  and `values-eval.yaml` (the `make eval` kind/k3d quickstart). Any chart value /
+  default / schema change must keep **all three** rendering (`helm lint` +
+  `helm template -f <profile>`) **and** the eval stack booting — the eval-boot CI
+  job (kind + k3d matrix) is what enforces the last part. `values-eval.yaml` must
+  stay **batteries-included / zero-external-deps** (it deploys in-cluster
+  Postgres/Redis via `postgresql.deploy`/`redis.deploy`, filesystem storage, a
+  local admin): if a new feature defaults to *requiring* an external dependency,
+  override it OFF in `values-eval.yaml`, or one-command eval breaks. The embedded
+  `postgresql.deploy`/`redis.deploy` datastores are **eval/dev only** (single
+  replica, no HA/backups) and must stay **off by default** so production is
+  unaffected.
 - **Keep [`llms.txt`](llms.txt) current (it's a first-class deliverable, not an
   afterthought)** — `llms.txt` is the machine-friendly map AI assistants land on
   to understand and operate Terrapod. It is only useful if it stays accurate, so

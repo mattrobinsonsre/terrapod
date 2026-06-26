@@ -339,3 +339,42 @@ primary `ingress`.
 {{- printf "%s://%s" $scheme .Values.internalIngress.hostname -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Embedded-datastore helpers (eval/dev only — see postgresql.deploy / redis.deploy).
+When the chart deploys its own Postgres/Redis, these resolve the connection
+target so consumers (api, migrations, bootstrap) need no manual url/secret.
+*/}}
+
+{{/*
+Name of the Secret holding the database URL: an operator-provided existingSecret
+if set; otherwise the chart-managed embedded secret when postgresql.deploy=true;
+otherwise empty (the consumer falls back to postgresql.url).
+*/}}
+{{- define "terrapod.postgresql.secretName" -}}
+{{- if .Values.postgresql.existingSecret -}}
+{{- .Values.postgresql.existingSecret -}}
+{{- else if .Values.postgresql.deploy -}}
+{{- printf "%s-postgresql" (include "terrapod.fullname" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "terrapod.postgresql.secretKey" -}}
+{{- if .Values.postgresql.existingSecret -}}
+{{- .Values.postgresql.existingSecretKey | default "url" -}}
+{{- else -}}
+url
+{{- end -}}
+{{- end -}}
+
+{{/*
+Effective Redis URL: redis.url if set; otherwise the embedded service when
+redis.deploy=true; otherwise empty.
+*/}}
+{{- define "terrapod.redis.url" -}}
+{{- if .Values.redis.url -}}
+{{- .Values.redis.url -}}
+{{- else if .Values.redis.deploy -}}
+{{- printf "redis://%s-redis:6379" (include "terrapod.fullname" .) -}}
+{{- end -}}
+{{- end -}}

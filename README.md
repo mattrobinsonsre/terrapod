@@ -23,6 +23,31 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
 ---
 
+## ⚡ Quick Evaluation
+
+Try Terrapod end-to-end on your laptop in one command. It spins up a throwaway
+[kind](https://kind.sigs.k8s.io/) or [k3d](https://k3d.io/) cluster and installs
+a complete, self-contained stack — in-cluster PostgreSQL + Redis, filesystem
+storage, a local admin login — with **no cloud account and no external
+dependencies**.
+
+```sh
+make eval          # create a local cluster + install Terrapod, then port-forward
+# → open http://localhost:8080  (login: admin@example.com / terrapod)
+
+make eval-down     # delete the whole thing when you're done
+```
+
+Prerequisites: Docker, `kubectl`, `helm`, and either `kind` or `k3d`. The
+quickstart pulls released images, so the only wait is the image download.
+
+> This is an **evaluation** profile — single-replica in-cluster datastores, a
+> known password, no HA or backups. For a real deployment see
+> [docs/deployment.md](docs/deployment.md); for the design behind the K8s-only
+> stance and how to enable agent execution, see [docs/getting-started.md](docs/getting-started.md).
+
+---
+
 ## Key Features
 
 | Feature | Status | Description |
