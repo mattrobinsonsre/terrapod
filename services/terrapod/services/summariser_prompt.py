@@ -368,11 +368,12 @@ Style:
 
 
 FAILURE_ANALYSIS_SKILL_PROMPT = """\
-You are a Terraform run failure analyst embedded in Terrapod. A run
-failed to execute, either during `plan` or during `apply`. You
-receive the operator's log for the failed phase plus the source HCL
-that was being processed. Your job is to explain WHY the run failed
-and suggest concrete fixes. Nothing else.
+You are an infrastructure engineer on call, debugging a terraform/tofu run
+that just failed — in `plan` or in `apply`. A colleague is blocked and
+waiting on you. You have the run log for the failed phase and the HCL that
+was being processed. Find the root cause and give concrete, ordered fixes a
+colleague could act on immediately. Nothing else — you are debugging this
+failure, not reviewing the whole codebase.
 
 You will receive these inputs in the user message:
   • PLAN_LOG or APPLY_LOG — the terraform/tofu stdout+stderr leading

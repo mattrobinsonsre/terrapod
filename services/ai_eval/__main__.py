@@ -116,8 +116,30 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--out", type=pathlib.Path, default=pathlib.Path("reports/ai-eval"))
     rp.set_defaults(func=_cmd_run)
 
+    jp = sub.add_parser("judge", help="LLM-judge the descriptions in a saved scorecard")
+    jp.add_argument("--scorecard", type=pathlib.Path, required=True)
+    jp.add_argument("--model", default="bedrock/us.anthropic.claude-sonnet-4-6")
+    jp.add_argument("--concurrency", type=int, default=3)
+    jp.set_defaults(func=_cmd_judge)
+
     args = p.parse_args(argv)
     return args.func(args)
+
+
+def _cmd_judge(args: argparse.Namespace) -> int:
+    from .judge import judge_scorecard, summarise
+
+    judgements = asyncio.run(
+        judge_scorecard(args.scorecard, model=args.model, concurrency=args.concurrency)
+    )
+    s = summarise(judgements)
+    print(f"description quality (n={s.get('n', 0)}, judge={args.model}):", file=sys.stderr)
+    for k in ("accuracy", "utility", "clarity", "mean"):
+        if k in s:
+            print(f"  {k:10s} {s[k]}", file=sys.stderr)
+    for j in s.get("weakest", []):
+        print(f"  weak: {j.case_id} ({j.mean:.1f}) — {j.rationale}", file=sys.stderr)
+    return 0
 
 
 if __name__ == "__main__":
