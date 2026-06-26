@@ -287,6 +287,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Service Catalog](docs/service-catalog.md) | No-code self-service provisioning over the module registry |
 | [Monitoring](docs/monitoring.md) | Prometheus metrics, scraping, recommended alerts |
 | [Optional Webhook Ingress](docs/deployment-webhook-ingress.md) | Split public webhook ingress so the management plane can stay private |
+| [Forward Proxy & Custom CA](docs/deployment-proxy.md) | Route all outbound HTTP(S) through a corporate proxy and trust a private/MITM CA, across every component including runner Jobs |
 | [Security Hardening](docs/security-hardening.md) | Pod hardening defaults, secrets, network posture |
 | [Production Checklist](docs/production-checklist.md) | Pre-go-live checklist for a production deployment |
 | [Disaster Recovery](docs/disaster-recovery.md) | Break-glass state recovery from object storage |

@@ -15,6 +15,16 @@ _TFVARS_SECRET_KEY = "terraform.tfvars.json"
 _TFVARS_FILENAME = "terraform.tfvars.json"
 _TFVARS_MOUNT_DIR = "/var/run/terrapod/vars"
 
+# Custom outbound CA trust bundle (#592). The listener ships the raw custom CA
+# into a per-run Secret under this key; an init container merges it with the
+# runner image's own system roots into an emptyDir, and the runner container
+# trusts the merged file. Paths/key mirror the chart's _helpers.tpl so the
+# deployment and Job machinery stay identical.
+_CA_BUNDLE_KEY = "ca-extra.pem"
+_CA_SRC_DIR = "/etc/terrapod-ca-src"
+_CA_MERGED_DIR = "/etc/terrapod-ca"
+_CA_MERGED_FILE = f"{_CA_MERGED_DIR}/ca-bundle.crt"
+
 
 def _double_resource(value: str) -> str:
     """Double a K8s resource value.
@@ -68,6 +78,7 @@ def build_job_spec(
     allow_empty_apply: bool = False,
     is_destroy: bool = False,
     working_directory: str = "",
+    ca_secret_name: str = "",
 ) -> dict:
     """Build a K8s Job spec for a run phase.
 
@@ -200,6 +211,30 @@ def build_job_spec(
     # added below) and the entrypoint renders terrapod.auto.tfvars from it. This
     # keeps sensitive values off the Job spec env and makes complex/object
     # values round-trip identically on terraform and tofu.
+
+    # Forward proxy (#592) — lets `terraform init` reach PUBLIC registry/git
+    # module sources through a corporate proxy. Both upper and lower case: Go
+    # (terraform/tofu, the AWS SDK) reads the UPPER form, while many libraries
+    # read the lower form. no_proxy is pre-resolved by the chart; we do NOT
+    # force the API host into it — in split-cluster the runner→API hop reaches
+    # the public URL and legitimately traverses the proxy.
+    if runner_config.proxy:
+        p = runner_config.proxy
+        for name, value in (
+            ("HTTP_PROXY", p.http_proxy),
+            ("HTTPS_PROXY", p.https_proxy),
+            ("NO_PROXY", p.no_proxy),
+        ):
+            if value:
+                container_env.append({"name": name, "value": value})
+                container_env.append({"name": name.lower(), "value": value})
+
+    # Custom CA trust bundle (#592) — point the runner's TLS stacks at the
+    # init-container-merged bundle (system roots + custom CA). Volumes + init
+    # container are added to the pod spec further down.
+    if ca_secret_name and runner_config.ca_bundle_enabled:
+        for name in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "GIT_SSL_CAINFO"):
+            container_env.append({"name": name, "value": _CA_MERGED_FILE})
 
     # Extra env vars from runner config (Helm values → runners.extraEnv)
     for extra in runner_config.extra_env:
@@ -354,6 +389,55 @@ def build_job_spec(
         )
         pod["containers"][0]["volumeMounts"].append(
             {"name": "tfvars", "mountPath": _TFVARS_MOUNT_DIR, "readOnly": True}
+        )
+
+    # Custom CA trust bundle (#592): mount the per-run CA Secret (raw custom CA,
+    # shipped by the listener from its own mounted source) and an emptyDir for
+    # the merged bundle, plus an init container that concatenates the runner
+    # image's system roots with the custom CA. Runner containers run with
+    # readOnlyRootFilesystem, so the merge MUST land on the writable emptyDir,
+    # not the image's /etc/ssl. Mirrors terrapod.caBundle.initContainer in
+    # _helpers.tpl so deployment and Job behave identically.
+    if ca_secret_name and runner_config.ca_bundle_enabled:
+        pod = job_spec["spec"]["template"]["spec"]
+        pod["volumes"].append(
+            {
+                "name": "ca-src",
+                "secret": {
+                    "secretName": ca_secret_name,
+                    "items": [{"key": _CA_BUNDLE_KEY, "path": _CA_BUNDLE_KEY}],
+                },
+            }
+        )
+        pod["volumes"].append({"name": "ca-merged", "emptyDir": {}})
+        pod["containers"][0]["volumeMounts"].append(
+            {"name": "ca-merged", "mountPath": _CA_MERGED_DIR, "readOnly": True}
+        )
+        pod.setdefault("initContainers", []).append(
+            {
+                "name": "ca-merge",
+                "image": image,
+                "imagePullPolicy": runner_config.image.pull_policy,
+                "command": [
+                    "/bin/sh",
+                    "-c",
+                    f"cat /etc/ssl/certs/ca-certificates.crt {_CA_SRC_DIR}/{_CA_BUNDLE_KEY} "
+                    f"> {_CA_MERGED_FILE}",
+                ],
+                "securityContext": {
+                    "runAsNonRoot": True,
+                    "runAsUser": 1000,
+                    "runAsGroup": 1000,
+                    "readOnlyRootFilesystem": True,
+                    "allowPrivilegeEscalation": False,
+                    "capabilities": {"drop": ["ALL"]},
+                    "seccompProfile": {"type": "RuntimeDefault"},
+                },
+                "volumeMounts": [
+                    {"name": "ca-src", "mountPath": _CA_SRC_DIR, "readOnly": True},
+                    {"name": "ca-merged", "mountPath": _CA_MERGED_DIR},
+                ],
+            }
         )
 
     # envFrom — inject all keys from Secrets/ConfigMaps as env vars

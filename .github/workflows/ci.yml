@@ -494,6 +494,33 @@ jobs:
           echo "$out" | grep -q "component: redis" || { echo "FAIL: values-eval did not render embedded Redis"; exit 1; }
           echo "$out" | grep -q "kind: PersistentVolumeClaim" || { echo "FAIL: embedded Postgres PVC missing"; exit 1; }
           echo "values-eval renders embedded datastores OK"
+      - name: Forward proxy + custom CA bundle render (#592)
+        run: |
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            template terrapod helm/terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 \
+              --set listener.enabled=true \
+              --set listener.joinToken=tok \
+              --set proxy.enabled=true \
+              --set proxy.httpProxy=http://proxy.example.com:3128 \
+              --set proxy.httpsProxy=http://proxy.example.com:3128 \
+              --set caBundle.enabled=true \
+              --set-string caBundle.inline="dummy-ca-pem")
+          # Proxy env reaches API + listener.
+          echo "$out" | grep -q "HTTPS_PROXY" || { echo "FAIL: HTTPS_PROXY not injected"; exit 1; }
+          # The custom CA ConfigMap is created from inline.
+          echo "$out" | grep -q "name: terrapod-ca-bundle" || { echo "FAIL: CA bundle ConfigMap missing"; exit 1; }
+          # API/listener get the merge init container + merged SSL_CERT_FILE.
+          echo "$out" | grep -q "name: ca-merge" || { echo "FAIL: ca-merge init container missing"; exit 1; }
+          echo "$out" | grep -q "/etc/terrapod-ca/ca-bundle.crt" || { echo "FAIL: SSL_CERT_FILE not pointed at merged bundle"; exit 1; }
+          # Web (Node) trusts the raw source via NODE_EXTRA_CA_CERTS.
+          echo "$out" | grep -q "NODE_EXTRA_CA_CERTS" || { echo "FAIL: web NODE_EXTRA_CA_CERTS missing"; exit 1; }
+          # runners.yaml carries the proxy + CA source path for the listener to
+          # forward into runner Jobs.
+          echo "$out" | grep -q "ca_bundle_source_path" || { echo "FAIL: runners.yaml CA source path missing"; exit 1; }
+          echo "$out" | grep -q "http_proxy: \"http://proxy.example.com:3128\"" || { echo "FAIL: runners.yaml proxy missing"; exit 1; }
+          echo "proxy + CA bundle render OK (#592)"
 
   # ── Eval quickstart boot (kind + k3d) ──────────────────
   # Proves `make eval` actually stands up a complete stack (embedded

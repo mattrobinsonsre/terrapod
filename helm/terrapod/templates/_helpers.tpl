@@ -378,3 +378,159 @@ redis.deploy=true; otherwise empty.
 {{- printf "redis://%s-redis:6379" (include "terrapod.fullname" .) -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+─── Egress: forward proxy + custom CA trust (#592) ──────────────────────────
+Helpers shared by every component that makes outbound calls (api, web, listener,
+migrations/bootstrap Jobs, runner Jobs). All take the ROOT context unless noted.
+*/}}
+
+{{/*
+Forward-proxy env vars. Emits BOTH upper- and lower-case HTTP_PROXY/HTTPS_PROXY/
+NO_PROXY when proxy.enabled. no_proxy = cluster-internal defaults + in-cluster
+service names + the operator's proxy.noProxy list. Include inside a container
+`env:` list.
+*/}}
+{{- define "terrapod.proxyEnv" -}}
+{{- if .Values.proxy.enabled -}}
+{{- $fn := include "terrapod.fullname" . -}}
+{{- $defaults := list "localhost" "127.0.0.1" ".svc" ".svc.cluster.local" ".cluster.local" (printf "%s-api" $fn) (printf "%s-web" $fn) (printf "%s-postgresql" $fn) (printf "%s-redis" $fn) -}}
+{{- $no := join "," (concat $defaults (.Values.proxy.noProxy | default (list))) -}}
+- name: HTTP_PROXY
+  value: {{ .Values.proxy.httpProxy | quote }}
+- name: http_proxy
+  value: {{ .Values.proxy.httpProxy | quote }}
+- name: HTTPS_PROXY
+  value: {{ .Values.proxy.httpsProxy | quote }}
+- name: https_proxy
+  value: {{ .Values.proxy.httpsProxy | quote }}
+- name: NO_PROXY
+  value: {{ $no | quote }}
+- name: no_proxy
+  value: {{ $no | quote }}
+{{- end -}}
+{{- end -}}
+
+{{/* True ("true"/"") when a custom outbound CA bundle is configured. */}}
+{{- define "terrapod.caBundle.enabled" -}}
+{{- if and .Values.caBundle.enabled (or .Values.caBundle.inline .Values.caBundle.existingConfigMap .Values.caBundle.existingSecret) -}}true{{- end -}}
+{{- end -}}
+
+{{/* The custom CA filename (key within the ConfigMap/Secret). */}}
+{{- define "terrapod.caBundle.key" -}}
+{{- .Values.caBundle.key | default "ca-extra.pem" -}}
+{{- end -}}
+
+{{/*
+Volumes for the merge components (Python/Go/git): the raw custom CA source
+(ConfigMap or Secret) + an emptyDir for the init-container-merged bundle.
+*/}}
+{{- define "terrapod.caBundle.volumes" -}}
+{{- if eq (include "terrapod.caBundle.enabled" .) "true" }}
+- name: ca-src
+  {{- if .Values.caBundle.existingSecret }}
+  secret:
+    secretName: {{ .Values.caBundle.existingSecret }}
+  {{- else }}
+  configMap:
+    name: {{ .Values.caBundle.existingConfigMap | default (printf "%s-ca-bundle" (include "terrapod.fullname" .)) }}
+  {{- end }}
+- name: ca-merged
+  emptyDir: {}
+{{- end }}
+{{- end -}}
+
+{{/* Volume for web (Node): just the raw custom CA source (no merge). */}}
+{{- define "terrapod.caBundle.volumesNode" -}}
+{{- if eq (include "terrapod.caBundle.enabled" .) "true" }}
+- name: ca-src
+  {{- if .Values.caBundle.existingSecret }}
+  secret:
+    secretName: {{ .Values.caBundle.existingSecret }}
+  {{- else }}
+  configMap:
+    name: {{ .Values.caBundle.existingConfigMap | default (printf "%s-ca-bundle" (include "terrapod.fullname" .)) }}
+  {{- end }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Init container that MERGES the image's system roots with the supplied CA(s) into
+one bundle on the ca-merged emptyDir. Arg: dict "root" $ "image" <image string>.
+*/}}
+{{- define "terrapod.caBundle.initContainer" -}}
+{{- $root := .root -}}
+{{- if eq (include "terrapod.caBundle.enabled" $root) "true" }}
+- name: ca-merge
+  image: {{ .image }}
+  imagePullPolicy: {{ .pullPolicy | default "IfNotPresent" }}
+  command: ["/bin/sh", "-c", "cat /etc/ssl/certs/ca-certificates.crt /etc/terrapod-ca-src/{{ include "terrapod.caBundle.key" $root }} > /etc/terrapod-ca/ca-bundle.crt"]
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: RuntimeDefault
+  volumeMounts:
+    - name: ca-src
+      mountPath: /etc/terrapod-ca-src
+      readOnly: true
+    - name: ca-merged
+      mountPath: /etc/terrapod-ca
+{{- end }}
+{{- end -}}
+
+{{/* Main-container volumeMount for the merged bundle (merge components). */}}
+{{- define "terrapod.caBundle.volumeMounts" -}}
+{{- if eq (include "terrapod.caBundle.enabled" .) "true" }}
+- name: ca-merged
+  mountPath: /etc/terrapod-ca
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{/* Main-container volumeMount for web (Node): the raw CA source. */}}
+{{- define "terrapod.caBundle.volumeMountsNode" -}}
+{{- if eq (include "terrapod.caBundle.enabled" .) "true" }}
+- name: ca-src
+  mountPath: /etc/terrapod-ca-src
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{/*
+Raw-source CA mount for the LISTENER (#592). The listener needs the raw custom
+CA (not just its own merged bundle) so it can ship it into a per-run Secret in
+the runner namespace, where the runner Job merges it with the runner image's
+roots. Same mount as the Node helper; named distinctly so the intent is clear.
+*/}}
+{{- define "terrapod.caBundle.volumeMountsSource" -}}
+{{- if eq (include "terrapod.caBundle.enabled" .) "true" }}
+- name: ca-src
+  mountPath: /etc/terrapod-ca-src
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{/* CA trust env for Python/Go/git/curl components → the merged bundle. */}}
+{{- define "terrapod.caBundle.env" -}}
+{{- if eq (include "terrapod.caBundle.enabled" .) "true" }}
+- name: SSL_CERT_FILE
+  value: /etc/terrapod-ca/ca-bundle.crt
+- name: REQUESTS_CA_BUNDLE
+  value: /etc/terrapod-ca/ca-bundle.crt
+- name: CURL_CA_BUNDLE
+  value: /etc/terrapod-ca/ca-bundle.crt
+- name: GIT_SSL_CAINFO
+  value: /etc/terrapod-ca/ca-bundle.crt
+{{- end }}
+{{- end -}}
+
+{{/* CA trust env for web (Node): NODE_EXTRA_CA_CERTS appends to built-in roots. */}}
+{{- define "terrapod.caBundle.envNode" -}}
+{{- if eq (include "terrapod.caBundle.enabled" .) "true" }}
+- name: NODE_EXTRA_CA_CERTS
+  value: /etc/terrapod-ca-src/{{ include "terrapod.caBundle.key" . }}
+{{- end }}
+{{- end -}}

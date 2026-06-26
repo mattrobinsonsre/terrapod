@@ -36,6 +36,22 @@ class RunnerImageConfig(BaseModel):
     pull_policy: str = Field(default="IfNotPresent")
 
 
+class RunnerProxyConfig(BaseModel):
+    """Forward-proxy settings forwarded into runner Jobs (#592).
+
+    Rendered into runners.yaml from the chart's top-level .Values.proxy. The
+    listener injects these as HTTP(S)_PROXY/NO_PROXY (upper + lower case) env
+    vars on the runner Job so `terraform init` reaches PUBLIC registry/git
+    module sources through a corporate proxy. no_proxy is pre-resolved by the
+    chart (cluster-local defaults + operator list); we do NOT assume the
+    runner→API hop is proxy-exempt — in split-cluster it traverses the proxy.
+    """
+
+    http_proxy: str = Field(default="")
+    https_proxy: str = Field(default="")
+    no_proxy: str = Field(default="")
+
+
 class RunnerConfig(BaseModel):
     """Runner configuration, loaded from /etc/terrapod/runners.yaml.
 
@@ -70,6 +86,23 @@ class RunnerConfig(BaseModel):
     image_pull_secrets: list[str] = Field(default_factory=list)
     extra_env: list[dict] = Field(default_factory=list)
     extra_env_from: list[dict] = Field(default_factory=list)
+    # Forward proxy + custom CA trust bundle (#592). Rendered into runners.yaml
+    # by the chart from top-level .Values.proxy / .Values.caBundle. The listener
+    # forwards these into every runner Job: proxy env vars (so terraform init can
+    # fetch PUBLIC registry/git modules through a corporate proxy) and the custom
+    # CA (so the runner trusts a TLS-intercepting proxy / private registry).
+    proxy: RunnerProxyConfig | None = Field(default=None)
+    ca_bundle_enabled: bool = Field(default=False)
+    ca_bundle_source_path: str = Field(
+        default="",
+        description=(
+            "Path on the LISTENER pod to the raw custom CA file (mounted from "
+            "the chart's caBundle source). The listener reads it at Job-launch "
+            "time and ships it into a per-run Secret in the runner namespace, "
+            "where the runner Job's init container merges it with the runner "
+            "image's own system roots."
+        ),
+    )
     stale_timeout_seconds: int = Field(
         default=3600,
         description="Seconds before a run with no Job status is marked errored",
