@@ -1,7 +1,7 @@
 # Terrapod
 
 [![CI](https://github.com/mattrobinsonsre/terrapod/actions/workflows/ci.yml/badge.svg)](https://github.com/mattrobinsonsre/terrapod/actions/workflows/ci.yml)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](LICENSE)
 
 **Open-source platform replacement for Terraform Enterprise.**
 
@@ -392,13 +392,13 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 
 Net: Terrapod is not a "better general TFE replacement" -- Terrakube is the more mature project and offers multi-org tenancy for those who want it (Terrapod is deliberately single-org, in line with [HashiCorp's current direction](https://developer.hashicorp.com/validated-patterns/terraform/migrate-terraform-orgs-projects)). Terrapod's defensible niche is **restricted-network, multi-cluster execution** (outbound-only runners, polling VCS, self-contained caching) with an AI-assisted review layer. Pick on that basis.
 
-Licensing: Terrapod is **GPLv3** (strong copyleft); Terrakube is **Apache-2.0** (permissive) -- relevant if you intend to redistribute a modified platform.
+Licensing: Terrapod is **MPL-2.0** (file-level copyleft, the same license as OpenTofu and the historical Terraform codebase); Terrakube is **Apache-2.0** (permissive) -- relevant if you intend to redistribute a modified platform.
 
 ---
 
 ## License
 
-[GPLv3](LICENSE) -- strong copyleft ensures Terrapod and all derivative works remain open source.
+[MPL-2.0](LICENSE) -- file-level copyleft keeps Terrapod's own source open while staying friendly to enterprise adoption (the same license as OpenTofu and the historical Terraform codebase).
 
 ---
 

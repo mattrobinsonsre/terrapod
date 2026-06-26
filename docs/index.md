@@ -135,7 +135,7 @@ See [Architecture](architecture.md) for the full breakdown.
 
 ## License
 
-[GPLv3](https://github.com/mattrobinsonsre/terrapod/blob/main/LICENSE) -- strong copyleft ensures Terrapod and all derivative works remain open source.
+[MPL-2.0](https://github.com/mattrobinsonsre/terrapod/blob/main/LICENSE) -- file-level copyleft keeps Terrapod's own source open (the same license as OpenTofu and the historical Terraform codebase).
 
 ---
 
