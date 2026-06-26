@@ -514,8 +514,8 @@ jobs:
       - name: Install ${{ matrix.tool }}
         run: |
           if [ "${{ matrix.tool }}" = "kind" ]; then
-            curl -fsSLo /usr/local/bin/kind https://kind.sigs.k8s.io/dl/v0.32.0/kind-linux-amd64
-            chmod +x /usr/local/bin/kind
+            curl -fsSLo ./kind https://kind.sigs.k8s.io/dl/v0.32.0/kind-linux-amd64
+            sudo install -m 0755 ./kind /usr/local/bin/kind && rm -f ./kind
           else
             curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/v5.9.0/install.sh | TAG=v5.9.0 bash
           fi

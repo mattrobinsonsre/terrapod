@@ -23,6 +23,12 @@ CHART_DIR="${REPO_ROOT}/helm/terrapod"
 ADMIN_EMAIL="admin@example.com"
 ADMIN_PASSWORD="terrapod"
 
+# Caller's kube-context, captured before we create a cluster (kind/k3d switch it).
+# Script-global so the EXIT trap can restore it after up() returns; default empty
+# keeps `set -u` happy when it was never set.
+prev_ctx=""
+restore_ctx() { [ -n "${prev_ctx:-}" ] && kubectl config use-context "$prev_ctx" >/dev/null 2>&1 || true; }
+
 c_green=$'\033[0;32m'; c_bold=$'\033[1m'; c_yel=$'\033[0;33m'; c_reset=$'\033[0m'
 log()  { echo "${c_green}==>${c_reset} $*"; }
 warn() { echo "${c_yel}!! ${c_reset} $*"; }
@@ -71,8 +77,7 @@ up() {
   # it to the new cluster, which would yank your default context (e.g. away from
   # a Tilt-deployed Terrapod). We pin every command below to --context "$ctx" and
   # restore the original on exit, so the eval never touches your active context.
-  local prev_ctx; prev_ctx="$(kubectl config current-context 2>/dev/null || true)"
-  restore_ctx() { [ -n "$prev_ctx" ] && kubectl config use-context "$prev_ctx" >/dev/null 2>&1 || true; }
+  prev_ctx="$(kubectl config current-context 2>/dev/null || true)"
   trap restore_ctx EXIT
   create_cluster "$tool"
   restore_ctx
