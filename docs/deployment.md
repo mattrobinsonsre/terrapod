@@ -10,8 +10,7 @@ Terrapod is deployed exclusively via Helm chart on Kubernetes. This guide covers
 
 - Kubernetes 1.27+
 - Helm 3.x
-- PostgreSQL 14+ (external, managed)
-- Redis 7+ (external, managed)
+- PostgreSQL 14+ and Redis 7+ — **external, managed** for production. For evaluation/dev the chart can run both in-cluster (`postgresql.deploy=true` / `redis.deploy=true`, single-replica, no HA or backups — **not** for production); see [Database Setup](#database-setup).
 - Object storage (S3, Azure Blob, GCS) or PVC-backed filesystem
 - TLS certificate for the ingress hostname
 - DNS record pointing to the ingress
@@ -653,6 +652,8 @@ Note: Filesystem storage uses a PVC with `ReadWriteOnce` access mode, which limi
 ## Database Setup
 
 Terrapod requires PostgreSQL 14+. Use a managed service (RDS, Cloud SQL, Azure Database) for production.
+
+> **Evaluation/dev shortcut:** set `postgresql.deploy=true` (and `redis.deploy=true`) to have the chart run a single in-cluster PostgreSQL (PVC-backed) and Redis instead of providing connection URLs. This is what the [`make eval`](../README.md#quick-evaluation) quickstart uses. It is single-replica with no HA and no backups — **never** use it for production; provide a managed datastore via `postgresql.url` / `redis.url` (or `existingSecret`) there.
 
 ### Connection URL
 

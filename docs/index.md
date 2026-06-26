@@ -43,7 +43,15 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
 ## Quick Start
 
-Deploy onto any Kubernetes cluster (or a single-node [k3s](https://k3s.io/) VM) with the Helm chart:
+**Just want to try it?** One command spins up a throwaway [kind](https://kind.sigs.k8s.io/) or [k3d](https://k3d.io/) cluster, batteries-included — chart-managed PostgreSQL + Redis, filesystem storage, a local admin — and prints the URL + login:
+
+```zsh
+make eval        # boots the stack; `make eval-down` tears it down
+```
+
+See the [README's Quick Evaluation section](https://github.com/mattrobinsonsre/terrapod#quick-evaluation) for details. The eval profile is for kicking the tyres only — not production.
+
+For a real deployment onto any Kubernetes cluster (or a single-node [k3s](https://k3s.io/) VM) with the Helm chart:
 
 ```zsh
 helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
@@ -57,7 +65,7 @@ helm install terrapod oci://ghcr.io/mattrobinsonsre/terrapod \
   --set bootstrap.adminPassword="change-me-now"
 ```
 
-PostgreSQL and Redis are external (not bundled). See [Getting Started](getting-started.md) for the full walkthrough, or [Local Development](local-development.md) if you want to run Terrapod from source.
+For production, PostgreSQL and Redis are external (managed) services — the chart can run them in-cluster (`postgresql.deploy=true` / `redis.deploy=true`) but that single-replica, no-backup mode is for evaluation/dev only. See [Getting Started](getting-started.md) for the full walkthrough, [Deployment](deployment.md) for the datastore options, or [Local Development](local-development.md) if you want to run Terrapod from source.
 
 ---
 
