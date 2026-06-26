@@ -72,6 +72,8 @@ spec:
             # Set to "" to disable.
             - name: HSTS
               value: {{ .Values.web.hsts.value | quote }}
+            {{- include "terrapod.proxyEnv" . | nindent 12 }}
+            {{- include "terrapod.caBundle.envNode" . | nindent 12 }}
             {{- with .Values.web.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -104,9 +106,12 @@ spec:
             preStop:
               exec:
                 command: ["sleep", "{{ .Values.web.preStopSleepSeconds | default 30 }}"]
-          {{- with .Values.web.extraVolumeMounts }}
+          {{- if or (eq (include "terrapod.caBundle.enabled" .) "true") .Values.web.extraVolumeMounts }}
           volumeMounts:
+            {{- include "terrapod.caBundle.volumeMountsNode" . | nindent 12 }}
+            {{- with .Values.web.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- end }}
           resources:
             {{- toYaml .Values.web.resources | nindent 12 }}
@@ -117,9 +122,12 @@ spec:
         {{- with .Values.web.extraContainers }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- with .Values.web.extraVolumes }}
+      {{- if or (eq (include "terrapod.caBundle.enabled" .) "true") .Values.web.extraVolumes }}
       volumes:
+        {{- include "terrapod.caBundle.volumesNode" . | nindent 8 }}
+        {{- with .Values.web.extraVolumes }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
       {{- with .Values.web.nodeSelector }}
       nodeSelector:

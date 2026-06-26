@@ -22,6 +22,10 @@ def _runner_config():
     cfg.topology_spread_constraints = []
     cfg.pod_security_context = {}
     cfg.pod_annotations = {}
+    # Proxy + CA off by default (#592) — explicit None/False so the truthy
+    # MagicMock defaults don't inject phantom proxy env into every test.
+    cfg.proxy = None
+    cfg.ca_bundle_enabled = False
 
     default_def = MagicMock()
     default_def.name = "default"
@@ -349,3 +353,119 @@ class TestVarsSecretDelivery:
         )
         pod = spec["spec"]["template"]["spec"]
         assert not any(v["name"] == "tfvars" for v in pod["volumes"])
+
+
+class TestProxyInjection:
+    """#592 — forward-proxy env injected into runner Jobs."""
+
+    def _spec(self, proxy):
+        from terrapod.runner.job_template import build_job_spec
+
+        cfg = _runner_config()
+        cfg.proxy = proxy
+        return build_job_spec(
+            run_id="abc123def456",
+            phase="plan",
+            runner_config=cfg,
+            auth_secret_name="tprun-abc123def456-plan-auth",
+            env_vars=[],
+            terraform_vars=[],
+        )
+
+    def test_proxy_env_upper_and_lower(self):
+        proxy = MagicMock()
+        proxy.http_proxy = "http://proxy:3128"
+        proxy.https_proxy = "http://proxy:3128"
+        proxy.no_proxy = "localhost,terrapod-api"
+        spec = self._spec(proxy)
+        env = {
+            e["name"]: e.get("value")
+            for e in spec["spec"]["template"]["spec"]["containers"][0]["env"]
+        }
+        # Both upper (Go/terraform) and lower (libs) forms.
+        for name in (
+            "HTTP_PROXY",
+            "http_proxy",
+            "HTTPS_PROXY",
+            "https_proxy",
+            "NO_PROXY",
+            "no_proxy",
+        ):
+            assert name in env, name
+        assert env["HTTP_PROXY"] == "http://proxy:3128"
+        assert env["no_proxy"] == "localhost,terrapod-api"
+
+    def test_no_proxy_env_when_disabled(self):
+        spec = self._spec(None)
+        env_names = {e["name"] for e in spec["spec"]["template"]["spec"]["containers"][0]["env"]}
+        assert "HTTP_PROXY" not in env_names
+        assert "http_proxy" not in env_names
+
+    def test_blank_proxy_values_skipped(self):
+        proxy = MagicMock()
+        proxy.http_proxy = ""
+        proxy.https_proxy = "http://proxy:3128"
+        proxy.no_proxy = ""
+        spec = self._spec(proxy)
+        env_names = {e["name"] for e in spec["spec"]["template"]["spec"]["containers"][0]["env"]}
+        assert "HTTP_PROXY" not in env_names  # empty → skipped
+        assert "HTTPS_PROXY" in env_names
+        assert "NO_PROXY" not in env_names
+
+
+class TestCABundleInjection:
+    """#592 — custom CA trust bundle delivered to runner Jobs."""
+
+    def _spec(self, ca_secret_name, ca_enabled=True):
+        from terrapod.runner.job_template import build_job_spec
+
+        cfg = _runner_config()
+        cfg.ca_bundle_enabled = ca_enabled
+        return build_job_spec(
+            run_id="abc123def456",
+            phase="plan",
+            runner_config=cfg,
+            auth_secret_name="tprun-abc123def456-plan-auth",
+            env_vars=[],
+            terraform_vars=[],
+            ca_secret_name=ca_secret_name,
+        )
+
+    def test_ca_env_volumes_and_init_container(self):
+        spec = self._spec("tprun-abc123def456-plan-ca")
+        pod = spec["spec"]["template"]["spec"]
+        container = pod["containers"][0]
+        env = {e["name"]: e.get("value") for e in container["env"]}
+        # TLS env all point at the merged bundle.
+        for name in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "GIT_SSL_CAINFO"):
+            assert env[name] == "/etc/terrapod-ca/ca-bundle.crt"
+        # Source Secret + merged emptyDir volumes present.
+        vols = {v["name"]: v for v in pod["volumes"]}
+        assert vols["ca-src"]["secret"]["secretName"] == "tprun-abc123def456-plan-ca"
+        assert "emptyDir" in vols["ca-merged"]
+        # Runner mounts the MERGED bundle read-only.
+        mounts = {m["name"]: m for m in container["volumeMounts"]}
+        assert mounts["ca-merged"]["mountPath"] == "/etc/terrapod-ca"
+        assert mounts["ca-merged"]["readOnly"] is True
+        # Init container merges system roots + custom CA into the writable emptyDir.
+        init = next(c for c in pod["initContainers"] if c["name"] == "ca-merge")
+        assert "/etc/ssl/certs/ca-certificates.crt" in init["command"][2]
+        assert init["command"][2].endswith("> /etc/terrapod-ca/ca-bundle.crt")
+        assert init["securityContext"]["readOnlyRootFilesystem"] is True
+        assert init["securityContext"]["runAsNonRoot"] is True
+
+    def test_no_ca_when_secret_unset(self):
+        spec = self._spec("")  # listener provided no CA (none configured)
+        pod = spec["spec"]["template"]["spec"]
+        env_names = {e["name"] for e in pod["containers"][0]["env"]}
+        assert "SSL_CERT_FILE" not in env_names
+        assert not any(v["name"] == "ca-src" for v in pod["volumes"])
+        assert "initContainers" not in pod or not any(
+            c["name"] == "ca-merge" for c in pod.get("initContainers", [])
+        )
+
+    def test_no_ca_when_bundle_disabled(self):
+        # ca_secret_name set but bundle disabled in config → still skipped.
+        spec = self._spec("tprun-abc-ca", ca_enabled=False)
+        pod = spec["spec"]["template"]["spec"]
+        assert not any(v["name"] == "ca-src" for v in pod["volumes"])

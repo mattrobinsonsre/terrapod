@@ -640,6 +640,12 @@ class RunnerListener:
         # so no variable value is ever plaintext in the Job spec. Per-phase name
         # mirrors the auth Secret; ownerReference GCs it with the Job.
         vars_secret_name = f"tprun-{run_short}-{phase}-vars" if (env_vars or terraform_vars) else ""
+        # Per-run CA Secret (#592): ships the custom outbound CA into the runner
+        # namespace so the Job's init container can merge it with the runner
+        # image's system roots. Only when a CA bundle is configured AND the
+        # listener can actually read its own mounted copy.
+        ca_pem = self._read_ca_bundle_pem()
+        ca_secret_name = f"tprun-{run_short}-{phase}-ca" if ca_pem else ""
 
         spec = build_job_spec(
             run_id=run_id,
@@ -664,6 +670,7 @@ class RunnerListener:
             allow_empty_apply=attrs.get("allow-empty-apply", False),
             is_destroy=attrs.get("is-destroy", False),
             working_directory=attrs.get("working-directory", ""),
+            ca_secret_name=ca_secret_name,
         )
 
         namespace = os.environ.get("TERRAPOD_RUNNER_NAMESPACE", "terrapod-runners")
@@ -695,6 +702,17 @@ class RunnerListener:
             except Exception as e:
                 logger.error("Failed to create vars secret", run_id=run_id, error=str(e))
                 await self._report_launch_failed(run_id, f"Failed to create variables Secret: {e}")
+                return
+
+        # Create the per-run CA Secret (#592) — same ownerReference GC as the
+        # auth/vars Secrets. Holds the custom outbound CA the runner's init
+        # container merges with its image roots.
+        if ca_secret_name:
+            try:
+                await self._create_ca_secret(ca_secret_name, run_id, ca_pem, job_name, job_uid)
+            except Exception as e:
+                logger.error("Failed to create CA secret", run_id=run_id, error=str(e))
+                await self._report_launch_failed(run_id, f"Failed to create CA Secret: {e}")
                 return
 
         # Report Job launched to the API
@@ -1026,6 +1044,76 @@ class RunnerListener:
         core_api.create_namespaced_secret(namespace=namespace, body=secret)
         logger.info("Created vars secret", secret=secret_name, job=job_name)
         return secret_name
+
+    def _read_ca_bundle_pem(self) -> str:
+        """Read the listener's own mounted custom CA source file (#592).
+
+        Returns the raw PEM, cached after first read (the mounted file is
+        stable for the pod's lifetime). Empty string when no CA bundle is
+        configured or the file is missing/unreadable — the caller then skips
+        per-run CA delivery rather than failing the run. We ship the raw
+        SOURCE (not the listener's merged bundle) so the runner trusts the
+        RUNNER image's roots + the custom CA, not the listener image's roots.
+        """
+        if not self.runner_config.ca_bundle_enabled:
+            return ""
+        cached = getattr(self, "_ca_bundle_pem_cache", None)
+        if cached is not None:
+            return cached
+        path = self.runner_config.ca_bundle_source_path
+        pem = ""
+        if path and os.path.isfile(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    pem = f.read().strip()
+            except OSError as e:
+                logger.warning("Could not read CA bundle source", path=path, error=str(e))
+        else:
+            logger.warning("CA bundle enabled but source file missing", path=path)
+        self._ca_bundle_pem_cache = pem
+        return pem
+
+    async def _create_ca_secret(
+        self, secret_name: str, run_id: str, ca_pem: str, job_name: str, job_uid: str
+    ) -> None:
+        """Create a K8s Secret holding the custom outbound CA (#592), with an
+        ownerReference to the Job (cascade-GC'd with it, like the auth Secret).
+
+        The CA is public material, but a Secret avoids needing `configmaps:
+        create` RBAC the listener doesn't have. The runner Job mounts it and
+        merges it with the image's system roots in an init container.
+        """
+        from kubernetes import client as k8s_client
+
+        from terrapod.runner.job_manager import _get_core_api
+
+        namespace = os.environ.get("TERRAPOD_RUNNER_NAMESPACE", "terrapod-runners")
+
+        secret = k8s_client.V1Secret(
+            metadata=k8s_client.V1ObjectMeta(
+                name=secret_name,
+                namespace=namespace,
+                labels={
+                    "app.kubernetes.io/name": "terrapod-runner",
+                    "terrapod.io/run-id": run_id,
+                },
+                owner_references=[
+                    k8s_client.V1OwnerReference(
+                        api_version="batch/v1",
+                        kind="Job",
+                        name=job_name,
+                        uid=job_uid,
+                        block_owner_deletion=True,
+                    )
+                ],
+            ),
+            type="Opaque",
+            string_data={"ca-extra.pem": ca_pem},
+        )
+
+        core_api = _get_core_api()
+        core_api.create_namespaced_secret(namespace=namespace, body=secret)
+        logger.info("Created CA secret", secret=secret_name, job=job_name)
 
 
 def _handle_signals() -> None:

@@ -361,6 +361,29 @@
         "create": { "type": "boolean" },
         "labels": { "type": "object" }
       }
+    },
+
+    "proxy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "httpProxy": { "type": "string" },
+        "httpsProxy": { "type": "string" },
+        "noProxy": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "caBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "inline": { "type": "string" },
+        "existingConfigMap": { "type": "string" },
+        "existingSecret": { "type": "string" },
+        "key": { "type": "string" }
+      }
     }
   },
 

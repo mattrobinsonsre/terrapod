@@ -91,6 +91,7 @@ How each capability is turned on. **Platform-level** features are Helm values un
 - [docs/tfe-cli-surface.md](docs/tfe-cli-surface.md): the verified subset of the TFE V2 API the CLI consumes (mounted at `/api/v2/`); everything else is Terrapod-native at `/api/terrapod/v1/`.
 - [docs/deployment.md](docs/deployment.md): production Helm deployment, storage backends, scaling.
 - [docs/deployment-network-isolation.md](docs/deployment-network-isolation.md) and [docs/deployment-webhook-ingress.md](docs/deployment-webhook-ingress.md): split-ingress topologies.
+- [docs/deployment-proxy.md](docs/deployment-proxy.md): forward proxy (`proxy.*`) + custom outbound CA trust (`caBundle.*`) across all components incl. runner Jobs; for no-direct-egress / TLS-intercepting networks.
 - [docs/security-hardening.md](docs/security-hardening.md), [docs/production-checklist.md](docs/production-checklist.md), [docs/disaster-recovery.md](docs/disaster-recovery.md): go-live and break-glass.
 - [docs/runbooks.md](docs/runbooks.md): operator runbooks for high-blast-radius surfaces.
 - [docs/local-development.md](docs/local-development.md): run from source with Tilt (contributors).

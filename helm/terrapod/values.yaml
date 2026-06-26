@@ -1218,3 +1218,45 @@ networkPolicies:
 namespace:
   create: false
   labels: {}
+
+# ── Egress: forward proxy + custom CA trust (restricted-network deployments) ──
+# proxy.* and caBundle.* are a matched pair for high-security / restricted-egress
+# networks where outbound traffic must egress via a forward proxy and/or TLS
+# terminates against internal/corporate CAs — including a TLS-intercepting "MITM"
+# proxy presenting its OWN CA. They apply to EVERY component that makes outbound
+# calls: the API, web/BFF, listener, the migrations + bootstrap Jobs, and the
+# runner Jobs (so terraform/tofu provider+module fetches egress through the proxy
+# and trust the CA too). See docs/deployment-proxy.md.
+
+# Forward proxy. When enabled, BOTH upper- and lower-case env vars
+# (HTTP_PROXY/http_proxy, HTTPS_PROXY/https_proxy, NO_PROXY/no_proxy) are injected
+# into every component — different runtimes (Python httpx/requests, Go,
+# terraform/tofu, curl, cloud SDKs) read different cases. The chart APPENDS
+# cluster-internal destinations to noProxy automatically (localhost, 127.0.0.1,
+# .svc, .svc.cluster.local, .cluster.local, the in-cluster service names) so
+# internal traffic is never proxied. Add cloud metadata (169.254.169.254) and any
+# object-store/STS endpoints that must bypass the proxy to noProxy yourself.
+proxy:
+  enabled: false
+  httpProxy: ""                   # e.g. http://proxy.internal:3128
+  httpsProxy: ""                  # e.g. http://proxy.internal:3128 (often the same as httpProxy)
+  noProxy: []                     # extra no_proxy entries; cluster-internal defaults are appended
+
+# Custom CA trust bundle for OUTBOUND TLS (corporate roots, internal registries /
+# VCS / artifact stores, and a TLS-intercepting proxy's MITM CA). For the Python/
+# Go/git components an init container MERGES the supplied CA(s) with the image's
+# system roots into one bundle on a shared emptyDir, so the app trusts BOTH public
+# and corporate/proxy CAs (a replacement bundle would drop the public roots and
+# break public endpoints); the merged bundle is wired via SSL_CERT_FILE /
+# REQUESTS_CA_BUNDLE / CURL_CA_BUNDLE (Python, curl, Go, terraform/tofu) and
+# GIT_SSL_CAINFO (git). The web/BFF (Node) trusts it via NODE_EXTRA_CA_CERTS, which
+# APPENDS to Node's built-in roots (no merge needed). A CA bundle is public,
+# non-secret material — prefer a ConfigMap. This is SEPARATE from api.databaseCA,
+# which verifies the database SERVER cert specifically; caBundle is general
+# outbound trust. See docs/deployment-proxy.md for how the two interact.
+caBundle:
+  enabled: false
+  inline: ""                      # paste the extra CA PEM(s) here; the chart creates a ConfigMap
+  existingConfigMap: ""           # OR reference an existing ConfigMap holding the CA bundle
+  existingSecret: ""              # OR an existing Secret holding the CA bundle
+  key: ca-extra.pem               # key within the ConfigMap/Secret (the supplied CA filename)

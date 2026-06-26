@@ -62,4 +62,39 @@ data:
     extra_env_from:
       {{- toYaml . | nindent 6 }}
     {{- end }}
+    {{- /*
+    Forward proxy (#592): the runner Job fetches PUBLIC registry/git modules
+    directly, which is the egress the proxy is for. When a proxy is configured
+    the listener injects HTTP(S)_PROXY/NO_PROXY into the Job.
+
+    no_proxy carries the cluster-local defaults (loopback, the *.svc /
+    *.cluster.local domains, and the bare in-cluster Service names). We do NOT
+    assume the runner→API hop is always proxy-exempt: in the ARC split-cluster
+    topology the listener+runner live in a DIFFERENT cluster from the API and
+    reach it over the PUBLIC URL — that hop SHOULD traverse the proxy, and it
+    does because the public host isn't in this list. The bare Service name
+    `<release>-api` only matches (and only needs to bypass) when the API really
+    is in-cluster; in split-cluster it simply never matches. Operators who have
+    a direct path to a remote API can add its host to proxy.noProxy.
+    */}}
+    {{- if .Values.proxy.enabled }}
+    {{- $fn := include "terrapod.fullname" . }}
+    {{- $defaults := list "localhost" "127.0.0.1" ".svc" ".svc.cluster.local" ".cluster.local" (printf "%s-api" $fn) (printf "%s-web" $fn) (printf "%s-postgresql" $fn) (printf "%s-redis" $fn) }}
+    proxy:
+      http_proxy: {{ .Values.proxy.httpProxy | quote }}
+      https_proxy: {{ .Values.proxy.httpsProxy | quote }}
+      no_proxy: {{ join "," (concat $defaults (.Values.proxy.noProxy | default (list))) | quote }}
+    {{- end }}
+    {{- /*
+    Custom CA trust bundle (#592): the listener reads its OWN mounted raw CA
+    source file (path below) and ships it into a per-run Secret in the runner
+    namespace; the runner Job's init container merges it with the runner image's
+    own system roots. We deliver the raw source (not the listener's merged
+    bundle) so the runner trusts runner-system-roots + custom-CA, not the
+    listener image's roots.
+    */}}
+    {{- if eq (include "terrapod.caBundle.enabled" .) "true" }}
+    ca_bundle_enabled: true
+    ca_bundle_source_path: {{ printf "/etc/terrapod-ca-src/%s" (include "terrapod.caBundle.key" .) | quote }}
+    {{- end }}
 {{- end }}
