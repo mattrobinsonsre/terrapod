@@ -9,6 +9,7 @@
 	build images \
 	pentest pentest-sast pentest-images pentest-dast \
 	dev dev-down \
+	ai-eval \
 	clean test-down \
 	help
 
@@ -25,6 +26,9 @@ test:               ## Test all (Python) in Docker
 
 test-python:        ## Test Python only (Docker)
 	scripts/test.sh python
+
+ai-eval:            ## Run the AI-analysis eval harness (live model). e.g. make ai-eval ARGS="run --model bedrock/us.anthropic.claude-sonnet-4-6 -n 3"
+	scripts/ai-eval.sh $(ARGS)
 
 test-e2e:           ## Run Playwright E2E tests (Docker Compose stack)
 	scripts/e2e.sh
