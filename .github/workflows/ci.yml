@@ -575,7 +575,12 @@ jobs:
             for img in $imgs; do kind load docker-image "$img" --name terrapod-eval; done
           else
             k3d cluster create terrapod-eval --wait --timeout 120s
-            for img in $imgs; do k3d image import "$img" -c terrapod-eval; done
+            # Import ALL images in ONE call. Separate per-image `k3d image import`
+            # calls race on their temp tarball ("ctr: open …tar: no such file or
+            # directory") and k3d masks that with exit 0 — which silently left the
+            # listener image unimported (ImagePullBackOff → run stuck queued). One
+            # call = one tarball = no race.
+            k3d image import $imgs -c terrapod-eval
           fi
       - name: make eval (install into the cluster)
         env:
