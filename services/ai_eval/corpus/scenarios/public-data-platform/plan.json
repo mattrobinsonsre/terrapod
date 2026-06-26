@@ -1,0 +1,237 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.12.2",
+  "resource_changes": [
+    {
+      "address": "aws_vpc.main",
+      "mode": "managed",
+      "type": "aws_vpc",
+      "name": "main",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "assign_generated_ipv6_cidr_block": false,
+          "cidr_block": "10.40.0.0/16",
+          "enable_dns_hostnames": true,
+          "enable_dns_support": true,
+          "instance_tenancy": "default",
+          "tags": {
+            "Environment": "prod",
+            "Name": "prod-data-platform"
+          },
+          "tags_all": {
+            "Environment": "prod",
+            "ManagedBy": "opentofu",
+            "Name": "prod-data-platform",
+            "Project": "data-platform"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "default_network_acl_id": true,
+          "default_route_table_id": true,
+          "default_security_group_id": true,
+          "dhcp_options_id": true,
+          "id": true,
+          "main_route_table_id": true,
+          "owner_id": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {}
+      }
+    },
+    {
+      "address": "aws_internet_gateway.main",
+      "mode": "managed",
+      "type": "aws_internet_gateway",
+      "name": "main",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "tags": {"Name": "prod-data-platform"},
+          "tags_all": {
+            "ManagedBy": "opentofu",
+            "Name": "prod-data-platform",
+            "Project": "data-platform"
+          }
+        },
+        "after_unknown": {"arn": true, "id": true, "owner_id": true, "vpc_id": true},
+        "before_sensitive": false,
+        "after_sensitive": {}
+      }
+    },
+    {
+      "address": "aws_subnet.public[\"a\"]",
+      "mode": "managed",
+      "type": "aws_subnet",
+      "name": "public",
+      "index": "a",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "availability_zone": "eu-west-1a",
+          "cidr_block": "10.40.1.0/24",
+          "map_public_ip_on_launch": true,
+          "tags": {"Name": "prod-public-a", "Tier": "public"},
+          "tags_all": {
+            "ManagedBy": "opentofu", "Name": "prod-public-a",
+            "Project": "data-platform", "Tier": "public"
+          }
+        },
+        "after_unknown": {"arn": true, "id": true, "owner_id": true, "vpc_id": true},
+        "before_sensitive": false,
+        "after_sensitive": {}
+      }
+    },
+    {
+      "address": "aws_subnet.public[\"b\"]",
+      "mode": "managed",
+      "type": "aws_subnet",
+      "name": "public",
+      "index": "b",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "availability_zone": "eu-west-1b",
+          "cidr_block": "10.40.2.0/24",
+          "map_public_ip_on_launch": true,
+          "tags": {"Name": "prod-public-b", "Tier": "public"},
+          "tags_all": {
+            "ManagedBy": "opentofu", "Name": "prod-public-b",
+            "Project": "data-platform", "Tier": "public"
+          }
+        },
+        "after_unknown": {"arn": true, "id": true, "owner_id": true, "vpc_id": true},
+        "before_sensitive": false,
+        "after_sensitive": {}
+      }
+    },
+    {
+      "address": "aws_db_subnet_group.analytics",
+      "mode": "managed",
+      "type": "aws_db_subnet_group",
+      "name": "analytics",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "prod-analytics",
+          "tags": {"Name": "prod-analytics"},
+          "tags_all": {"ManagedBy": "opentofu", "Name": "prod-analytics", "Project": "data-platform"}
+        },
+        "after_unknown": {"arn": true, "id": true, "subnet_ids": true, "supported_network_types": true},
+        "before_sensitive": false,
+        "after_sensitive": {}
+      }
+    },
+    {
+      "address": "aws_security_group.database",
+      "mode": "managed",
+      "type": "aws_security_group",
+      "name": "database",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "description": "Analytics database access",
+          "egress": [
+            {
+              "cidr_blocks": ["0.0.0.0/0"],
+              "from_port": 0,
+              "protocol": "-1",
+              "to_port": 0,
+              "description": "",
+              "ipv6_cidr_blocks": [],
+              "prefix_list_ids": [],
+              "security_groups": [],
+              "self": false
+            }
+          ],
+          "ingress": [
+            {
+              "cidr_blocks": ["0.0.0.0/0"],
+              "description": "Postgres from anywhere",
+              "from_port": 5432,
+              "protocol": "tcp",
+              "to_port": 5432,
+              "ipv6_cidr_blocks": [],
+              "prefix_list_ids": [],
+              "security_groups": [],
+              "self": false
+            }
+          ],
+          "name": "prod-analytics-db",
+          "tags": {"Name": "prod-analytics-db"},
+          "tags_all": {"ManagedBy": "opentofu", "Name": "prod-analytics-db", "Project": "data-platform"}
+        },
+        "after_unknown": {
+          "arn": true, "id": true, "owner_id": true, "vpc_id": true,
+          "egress": [{}], "ingress": [{}]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {"egress": [{}], "ingress": [{}]}
+      }
+    },
+    {
+      "address": "aws_db_instance.analytics",
+      "mode": "managed",
+      "type": "aws_db_instance",
+      "name": "analytics",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "allocated_storage": 200,
+          "auto_minor_version_upgrade": true,
+          "backup_retention_period": 0,
+          "db_name": "analytics",
+          "deletion_protection": false,
+          "engine": "postgres",
+          "engine_version": "16.3",
+          "identifier": "prod-analytics",
+          "instance_class": "db.r6g.large",
+          "iops": 0,
+          "multi_az": false,
+          "password": "change-me-in-prod",
+          "publicly_accessible": true,
+          "skip_final_snapshot": true,
+          "storage_encrypted": false,
+          "storage_type": "gp3",
+          "username": "dbadmin",
+          "tags": {"Environment": "prod", "Name": "prod-analytics"},
+          "tags_all": {
+            "Environment": "prod", "ManagedBy": "opentofu",
+            "Name": "prod-analytics", "Project": "data-platform"
+          }
+        },
+        "after_unknown": {
+          "address": true, "arn": true, "endpoint": true, "hosted_zone_id": true,
+          "id": true, "kms_key_id": true, "port": true, "resource_id": true,
+          "status": true, "db_subnet_group_name": true, "vpc_security_group_ids": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {"password": true, "tags": {}, "tags_all": {}}
+      }
+    }
+  ],
+  "configuration": {
+    "provider_config": {
+      "aws": {
+        "name": "aws",
+        "full_name": "registry.terraform.io/hashicorp/aws",
+        "expressions": {"region": {"references": ["var.region"]}}
+      }
+    }
+  }
+}

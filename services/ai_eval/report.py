@@ -39,6 +39,12 @@ class CaseScore:
     hard_pass_repeatability: float  # fraction of runs that hard-pass
     failures: list[str]
     error: str = ""
+    # Representative model output (first successful run) — so a failure can be
+    # diagnosed (real miss vs scoring-matcher gap vs label problem) without a
+    # re-run. This is what makes the iterate loop tractable.
+    risk_level: str = ""
+    description: str = ""
+    risk_factors: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -140,6 +146,11 @@ def score_model(cases_by_id: dict[str, Case], runs: list[CaseRun]) -> ModelRepor
                 risk_repeatability=round(risk_rep, 3),
                 hard_pass_repeatability=round(hp_rep, 3),
                 failures=rep_score.failures,
+                risk_level=str(oks[0].parsed.get("risk_level", "")),
+                description=str(oks[0].parsed.get("description", "")),
+                risk_factors=[
+                    f for f in (oks[0].parsed.get("risk_factors") or []) if isinstance(f, dict)
+                ],
             )
         )
     return rep

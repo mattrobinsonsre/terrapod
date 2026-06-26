@@ -31,7 +31,7 @@ def test_generated_corpus_is_substantial_and_unique():
 
 def test_every_surface_represented():
     surfaces = {c.surface for c in build_generated_cases()}
-    assert {"plan", "drift"} <= surfaces
+    assert {"plan", "drift", "apply_failure"} <= surfaces
 
 
 def test_generated_cases_well_formed():

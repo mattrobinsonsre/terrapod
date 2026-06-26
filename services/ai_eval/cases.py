@@ -106,7 +106,15 @@ class Case:
     # Inputs — exactly one primary per surface.
     plan_json: dict[str, Any] | None = None  # plan / drift
     apply_log: str = ""  # apply_failure
-    code_diff: str = ""  # optional context for any surface
+    # Context the production prompt also receives (CODE_DIFF + CODE_CONTEXT
+    # sections). These inform the narrative/"why" but, per the prompt's
+    # grounding rule, must NEVER raise risk above what PLAN_JSON justifies —
+    # which is exactly what the corpus needs to test.
+    code_diff: str = ""  # unified diff of *.tf / *.tfvars vs prior applied config
+    code_context: str = ""  # current .tf source (truncated)
+    # NOT fed to the shipping prompt today; carried here so the corpus can test
+    # a future COMMIT_CONTEXT enhancement (incl. misleading-message resistance).
+    commit_message: str = ""
     state_diverged: bool = False
 
     @property
@@ -143,23 +151,47 @@ def _truth_from_dict(d: dict[str, Any]) -> Truth:
     )
 
 
+def _concat_tf_sources(base_dir: Path) -> str:
+    """Concatenate the scenario's real *.tf files into a CODE_CONTEXT blob,
+    mirroring the production format (``# === <file> ===`` headers) so the model
+    sees the same shape it would in a real run."""
+    parts: list[str] = []
+    for tf in sorted(base_dir.glob("*.tf")):
+        parts.append(f"# === {tf.name} ===\n{tf.read_text(encoding='utf-8')}")
+    return "\n".join(parts)
+
+
 def case_from_dict(d: dict[str, Any], *, base_dir: Path | None = None) -> Case:
     """Build a Case from a parsed YAML/JSON mapping.
 
-    ``inputs.plan_json`` may be an inline mapping or, via
-    ``inputs.plan_json_file``, a path (relative to ``base_dir``) to a
-    standalone ``*.plan.json``. Same for ``apply_log`` / ``apply_log_file``.
+    ``inputs.plan_json`` may be inline or via ``inputs.plan_json_file`` (a path
+    relative to ``base_dir``). Same for ``apply_log`` / ``apply_log_file`` and
+    ``code_diff`` / ``code_diff_file``. CODE_CONTEXT is either inline
+    (``code_context``), from a file (``code_context_file``), or — the common
+    case for scenario dirs — auto-assembled from the dir's ``*.tf`` when
+    ``code_context_from_tf: true``. ``commit_message`` is carried for the future
+    COMMIT_CONTEXT enhancement (not fed to the shipping prompt yet).
     """
     inputs = d.get("inputs") or {}
+    bd = base_dir or Path(".")
+
     plan_json = inputs.get("plan_json")
     if plan_json is None and inputs.get("plan_json_file"):
-        path = (base_dir or Path(".")) / inputs["plan_json_file"]
-        plan_json = json.loads(path.read_text(encoding="utf-8"))
+        plan_json = json.loads((bd / inputs["plan_json_file"]).read_text(encoding="utf-8"))
 
     apply_log = inputs.get("apply_log", "")
     if not apply_log and inputs.get("apply_log_file"):
-        path = (base_dir or Path(".")) / inputs["apply_log_file"]
-        apply_log = path.read_text(encoding="utf-8")
+        apply_log = (bd / inputs["apply_log_file"]).read_text(encoding="utf-8")
+
+    code_diff = inputs.get("code_diff", "")
+    if not code_diff and inputs.get("code_diff_file"):
+        code_diff = (bd / inputs["code_diff_file"]).read_text(encoding="utf-8")
+
+    code_context = inputs.get("code_context", "")
+    if not code_context and inputs.get("code_context_file"):
+        code_context = (bd / inputs["code_context_file"]).read_text(encoding="utf-8")
+    if not code_context and inputs.get("code_context_from_tf"):
+        code_context = _concat_tf_sources(bd)
 
     return Case(
         id=d["id"],
@@ -170,7 +202,9 @@ def case_from_dict(d: dict[str, Any], *, base_dir: Path | None = None) -> Case:
         tags=tuple(d.get("tags") or []),
         plan_json=plan_json,
         apply_log=apply_log,
-        code_diff=inputs.get("code_diff", ""),
+        code_diff=code_diff,
+        code_context=code_context,
+        commit_message=inputs.get("commit_message", ""),
         state_diverged=bool(inputs.get("state_diverged", False)),
     )
 

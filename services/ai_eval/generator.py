@@ -74,6 +74,48 @@ STATEFUL = [
         "irreversible": False,
         "after": {"engine": "redis"},
     },
+    {
+        "type": "aws_redshift_cluster",
+        "name": "warehouse",
+        "irreversible": True,
+        "after": {"node_type": "ra3.xlplus"},
+    },
+    {
+        "type": "aws_neptune_cluster",
+        "name": "graph",
+        "irreversible": True,
+        "after": {"engine": "neptune"},
+    },
+    {
+        "type": "aws_docdb_cluster",
+        "name": "docs",
+        "irreversible": True,
+        "after": {"engine": "docdb"},
+    },
+    {
+        "type": "aws_msk_cluster",
+        "name": "events",
+        "irreversible": True,
+        "after": {"kafka_version": "3.6.0"},
+    },
+    {
+        "type": "aws_memorydb_cluster",
+        "name": "memdb",
+        "irreversible": True,
+        "after": {"node_type": "db.r6g.large"},
+    },
+    {
+        "type": "aws_fsx_lustre_file_system",
+        "name": "scratch",
+        "irreversible": True,
+        "after": {"storage_capacity": 1200},
+    },
+    {
+        "type": "aws_timestreamwrite_table",
+        "name": "metrics",
+        "irreversible": True,
+        "after": {"table_name": "metrics"},
+    },
 ]
 
 # Irreversible-by-nature security/crypto material.
@@ -538,6 +580,125 @@ def _drift_cases() -> list[Case]:
     return out
 
 
+def _apply_log(addr: str, rtype: str, line: int, error_block: str) -> str:
+    """Render a realistic terraform apply error tail for one resource."""
+    verb = "Creating" if "Creating" not in error_block else "Modifying"
+    return (
+        f"{addr}: {verb}...\n"
+        f"╷\n"
+        f"│ Error: {error_block}\n"
+        f"│\n"
+        f"│   with {addr},\n"
+        f'│   on main.tf line {line}, in resource "{rtype}" "{addr.split(".", 1)[1]}":\n'
+        f'│   {line}: resource "{rtype}" "{addr.split(".", 1)[1]}" {{\n'
+        f"╵\n"
+    )
+
+
+def _apply_failure_cases() -> list[Case]:
+    """Apply-phase failures — failure_analysis must name the failed resource,
+    explain the root cause, and rate how blocking it is. risk_factors are
+    candidate fixes; the rubric's must_flag maps to 'the analysis attaches a
+    fix to the failed resource'."""
+    out: list[Case] = []
+
+    def case(cid, addr, rtype, line, err, *, band, sev, facts, tags=("apply_failure",), forbid=()):
+        out.append(
+            Case(
+                id=cid,
+                surface="apply_failure",
+                source="generated",
+                tags=tags,
+                title=cid.replace("gen-applyfail-", "").replace("-", " "),
+                apply_log=_apply_log(addr, rtype, line, err),
+                truth=Truth(
+                    risk=RiskBand(**band),
+                    must_flag=(MustFlag(addr, sev),),
+                    key_facts=facts,
+                    forbidden_claims=forbid,
+                ),
+            )
+        )
+
+    # Already-exists → fix is import (not recreate).
+    case(
+        "gen-applyfail-iam-already-exists",
+        "aws_iam_role.task",
+        "aws_iam_role",
+        12,
+        "creating IAM Role (acme-task): operation error IAM: CreateRole, "
+        "https response error StatusCode: 409, EntityAlreadyExists: Role with "
+        "name acme-task already exists.",
+        band={"min": "medium"},
+        sev="medium",
+        facts=("aws_iam_role.task", "already exists"),
+    )
+    # AccessDenied → IAM permission gap.
+    case(
+        "gen-applyfail-s3-access-denied",
+        "aws_s3_bucket.data",
+        "aws_s3_bucket",
+        3,
+        "creating S3 Bucket (acme-data): operation error S3: CreateBucket, "
+        "https response error StatusCode: 403, api error AccessDenied: "
+        "User is not authorized to perform: s3:CreateBucket.",
+        band={"min": "medium"},
+        sev="medium",
+        facts=("aws_s3_bucket.data", "AccessDenied"),
+    )
+    # DependencyViolation deleting a SG → detach ENIs first.
+    case(
+        "gen-applyfail-sg-dependency-violation",
+        "aws_security_group.app",
+        "aws_security_group",
+        40,
+        "deleting Security Group (sg-0abc): operation error EC2: "
+        "DeleteSecurityGroup, DependencyViolation: resource sg-0abc has a "
+        "dependent object (a network interface is still attached).",
+        band={"min": "medium"},
+        sev="medium",
+        facts=("aws_security_group.app", "DependencyViolation"),
+    )
+    # InvalidParameterValue — bad engine version.
+    case(
+        "gen-applyfail-rds-invalid-engine-version",
+        "aws_db_instance.main",
+        "aws_db_instance",
+        20,
+        "creating RDS DB Instance (acme-main): InvalidParameterCombination: "
+        "Cannot find version 13.99 for postgres.",
+        band={"min": "medium"},
+        sev="medium",
+        facts=("aws_db_instance.main", "13.99"),
+    )
+    # Throttling — transient, retry. Lower blocking level.
+    case(
+        "gen-applyfail-throttling-transient",
+        "aws_cloudwatch_log_group.app",
+        "aws_cloudwatch_log_group",
+        5,
+        "creating CloudWatch Log Group (/acme/app): ThrottlingException: "
+        "Rate exceeded. (RequestLimitExceeded)",
+        band={"min": "low", "max": "medium"},
+        sev="low",
+        facts=("ThrottlingException",),
+        tags=("apply_failure", "churn"),
+    )
+    # Service quota exceeded — needs a quota increase, not a code fix.
+    case(
+        "gen-applyfail-vpc-quota-exceeded",
+        "aws_vpc.main",
+        "aws_vpc",
+        1,
+        "creating EC2 VPC: operation error EC2: CreateVpc, VpcLimitExceeded: "
+        "The maximum number of VPCs has been reached.",
+        band={"min": "medium"},
+        sev="medium",
+        facts=("aws_vpc.main", "VpcLimitExceeded"),
+    )
+    return out
+
+
 def build_generated_cases() -> list[Case]:
     """Return the full deterministic set of generated cases."""
     cases: list[Case] = []
@@ -547,4 +708,5 @@ def build_generated_cases() -> list[Case]:
     cases += _benign_create_cases()
     cases += _churn_cases()
     cases += _drift_cases()
+    cases += _apply_failure_cases()
     return cases

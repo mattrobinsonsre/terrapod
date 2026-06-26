@@ -59,7 +59,7 @@ def build_messages(
         primary_input=primary,
         primary_input_label=label,
         primary_input_lang=lang,
-        code_context_truncated="",
+        code_context_truncated=case.code_context,
         code_diff=case.code_diff,
         prompt_prefix="",
         prompt_suffix="",

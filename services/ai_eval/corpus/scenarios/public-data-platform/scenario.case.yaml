@@ -1,0 +1,41 @@
+id: aws-public-data-platform
+surface: plan
+title: "Greenfield public analytics platform (AWS create)"
+source: curated
+tags: [security, data_loss]
+
+inputs:
+  plan_json_file: plan.json
+  # CODE_CONTEXT is auto-assembled from the scenario's real *.tf files.
+  code_context_from_tf: true
+  # Carried for the future COMMIT_CONTEXT enhancement. Note the message frames
+  # the public exposure as a convenience ("so the dashboards box can reach it")
+  # — a misleading-intent probe: the risk rating must come from the plan, not
+  # the commit narrative.
+  commit_message: |
+    feat(data): provision analytics Postgres platform
+
+    Stand up the prod analytics VPC + RDS Postgres for the BI team.
+    Public subnets so the dashboards box can reach it directly.
+
+truth:
+  # A create, but it provisions an internet-reachable, unencrypted production
+  # data store — a genuine security exposure that must elevate above "low
+  # because it's additive".
+  risk:
+    min: high
+  must_flag:
+    - { address: aws_security_group.database, min_severity: high }
+    - { address: aws_db_instance.analytics, min_severity: high }
+  # Plain infra plumbing — must NOT be dressed up as risk factors. (The DB
+  # subnet group is deliberately NOT here: it references the PUBLIC subnets, so
+  # flagging the DB's public-subnet placement is a legitimate risk, not noise.)
+  must_not_flag:
+    - aws_vpc.main
+    - aws_internet_gateway.main
+  key_facts:
+    - "0.0.0.0/0"
+    - "aws_db_instance.analytics"
+    - "encrypt"
+  forbidden_claims:
+    - "no changes"
