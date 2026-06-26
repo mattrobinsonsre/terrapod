@@ -336,24 +336,31 @@ async def _fetch_terraform_versions() -> list[str]:
     return versions
 
 
-async def _fetch_tofu_versions() -> list[str]:
-    """Fetch tofu versions from GitHub releases.
+# Official OpenTofu version index — the same one OpenTofu's own installer uses.
+# We resolve tofu versions from here instead of the GitHub releases API, which is
+# rate-limited (60 req/hr unauthenticated) and routinely 504s from CI/cloud IPs.
+# When that listing failed, the binary cache could not resolve a partial version
+# (e.g. "1.12") and 502'd the runner, which then dead-ended because it had no
+# fully-qualified version to fall back on (#338). This CDN-backed static JSON is
+# not rate-limited. Version ids carry NO leading "v" and include pre-releases as
+# "x.y.z-suffix", so the allow_prerelease policy still applies on the string.
+_TOFU_VERSION_INDEX_URL = "https://get.opentofu.org/tofu/api.json"
 
-    Filters by the configured allow_prerelease policy. GitHub's
-    `prerelease` flag is the authoritative signal for pre-release status;
-    the policy is applied on top of it.
-    """
-    url = "https://api.github.com/repos/opentofu/opentofu/releases"
+
+async def _fetch_tofu_version_ids() -> list[str]:
+    """Return every OpenTofu release version id from the official index."""
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await arequest_with_retry(client, "GET", url, params={"per_page": 100})
+        resp = await arequest_with_retry(client, "GET", _TOFU_VERSION_INDEX_URL)
         resp.raise_for_status()
-        releases = resp.json()
+        data = resp.json()
+    return [v["id"] for v in data.get("versions", []) if v.get("id")]
 
+
+async def _fetch_tofu_versions() -> list[str]:
+    """Fetch the list of installable tofu versions (allow_prerelease applied)."""
     policy = settings.registry.binary_cache.allow_prerelease
     versions = []
-    for release in releases:
-        tag = release.get("tag_name", "")
-        version = tag.lstrip("v")
+    for version in await _fetch_tofu_version_ids():
         if not _is_version_allowed(version, policy):
             continue
         parts = version.split("-")[0].split(".")
@@ -486,26 +493,19 @@ async def _resolve_terraform_version(partial: str) -> str:
 
 
 async def _resolve_tofu_version(partial: str) -> str:
-    """Resolve partial tofu version via GitHub releases API.
+    """Resolve a partial tofu version (e.g. "1.12") to the highest matching
+    exact release via the official OpenTofu version index (#338).
 
     Honors the allow_prerelease policy: pre-release versions are only
     considered when explicitly permitted.
     """
-    url = "https://api.github.com/repos/opentofu/opentofu/releases"
-    prefix = f"v{partial}."
+    prefix = f"{partial}."  # index ids carry no leading "v"
     policy = settings.registry.binary_cache.allow_prerelease
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await arequest_with_retry(client, "GET", url, params={"per_page": 100})
-        resp.raise_for_status()
-        releases = resp.json()
-
     matching = []
-    for release in releases:
-        tag = release.get("tag_name", "")
-        if not tag.startswith(prefix):
+    for version in await _fetch_tofu_version_ids():
+        if not version.startswith(prefix):
             continue
-        version = tag.lstrip("v")
         if not _is_version_allowed(version, policy):
             continue
         matching.append(version)

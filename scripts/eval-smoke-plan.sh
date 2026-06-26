@@ -96,7 +96,7 @@ status=""
 while [ "$elapsed" -lt "$DEADLINE" ]; do
   status=$(curl -fsS "${API}/api/v2/runs/${RUN}" "${auth[@]}" \
     | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['attributes'].get('status',''))" 2>/dev/null || echo "")
-  jobs=$(k get pods -l app.kubernetes.io/component=runner 2>/dev/null | grep -c tprun || true)
+  jobs=$(k get pods -l app.kubernetes.io/name=terrapod-runner 2>/dev/null | grep -c tprun || true)
   echo "  [${elapsed}s] status=${status} runner-job-pods=${jobs:-0}"
   case "$status" in
     planned|planned_and_finished) log "PLAN SUCCEEDED through the listener (status=${status})"; exit 0 ;;

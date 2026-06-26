@@ -16,6 +16,15 @@ metadata:
   labels:
     {{- include "terrapod.labels" . | nindent 4 }}
     app.kubernetes.io/component: redis
+  annotations:
+    # Pre-install hook (weight -20, same as the embedded Postgres) so Redis is
+    # up BEFORE the API rolls out — the API's lifespan pings Redis and EXITS if
+    # it can't connect, so a main-resource Redis that starts concurrently makes
+    # the API crash-loop on a slow node until Redis is ready. No hook-delete-
+    # policy: the hook isn't re-run on upgrade and the original keeps serving.
+    # Eval/dev only (gated on redis.deploy); production uses external Redis.
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-20"
 spec:
   replicas: 1
   selector:
@@ -67,6 +76,11 @@ metadata:
   labels:
     {{- include "terrapod.labels" . | nindent 4 }}
     app.kubernetes.io/component: redis
+  annotations:
+    # Same pre-install hook as the Deployment so the Service exists when the
+    # API (and its pre-install hooks) resolve terrapod-redis. See above.
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "-20"
 spec:
   selector:
     {{- include "terrapod.selectorLabels" . | nindent 4 }}

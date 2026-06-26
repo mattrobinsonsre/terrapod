@@ -287,3 +287,76 @@ class TestTerragruntBinary:
         added = db.add.call_args[0][0]
         assert added.tool == "terragrunt"
         assert added.version == "0.67.0"
+
+
+class TestTofuVersionResolution:
+    """OpenTofu versions resolve via the official, non-rate-limited index
+    (get.opentofu.org/tofu/api.json), not the GitHub releases API (#338)."""
+
+    @patch("terrapod.services.binary_cache_service.arequest_with_retry", new_callable=AsyncMock)
+    async def test_fetch_ids_parses_official_index(self, mock_req: AsyncMock) -> None:
+        from terrapod.services.binary_cache_service import (
+            _TOFU_VERSION_INDEX_URL,
+            _fetch_tofu_version_ids,
+        )
+
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json = MagicMock(
+            return_value={"versions": [{"id": "1.12.3"}, {"id": "1.12.0-rc1"}, {"id": "1.11.11"}]}
+        )
+        mock_req.return_value = resp
+
+        ids = await _fetch_tofu_version_ids()
+
+        assert ids == ["1.12.3", "1.12.0-rc1", "1.11.11"]
+        # Must hit the official index, NOT api.github.com.
+        called_url = mock_req.call_args[0][2]
+        assert called_url == _TOFU_VERSION_INDEX_URL
+        assert "api.github.com" not in called_url
+
+    @patch("terrapod.services.binary_cache_service.settings")
+    @patch(
+        "terrapod.services.binary_cache_service._fetch_tofu_version_ids",
+        new_callable=AsyncMock,
+    )
+    async def test_resolves_partial_to_highest_stable(
+        self, mock_ids: AsyncMock, mock_settings: MagicMock
+    ) -> None:
+        from terrapod.services.binary_cache_service import _resolve_tofu_version
+
+        mock_settings.registry.binary_cache.allow_prerelease = "none"
+        mock_ids.return_value = ["1.12.0", "1.12.3", "1.12.1", "1.12.0-rc1", "1.11.11"]
+
+        assert await _resolve_tofu_version("1.12") == "1.12.3"
+
+    @patch("terrapod.services.binary_cache_service.settings")
+    @patch(
+        "terrapod.services.binary_cache_service._fetch_tofu_version_ids",
+        new_callable=AsyncMock,
+    )
+    async def test_excludes_prereleases_when_policy_none(
+        self, mock_ids: AsyncMock, mock_settings: MagicMock
+    ) -> None:
+        from terrapod.services.binary_cache_service import _resolve_tofu_version
+
+        mock_settings.registry.binary_cache.allow_prerelease = "none"
+        # Only pre-releases match → no stable → returns the partial unchanged.
+        mock_ids.return_value = ["1.13.0-rc1", "1.13.0-beta1"]
+
+        assert await _resolve_tofu_version("1.13") == "1.13"
+
+    @patch("terrapod.services.binary_cache_service.settings")
+    @patch(
+        "terrapod.services.binary_cache_service._fetch_tofu_version_ids",
+        new_callable=AsyncMock,
+    )
+    async def test_includes_rc_when_policy_rc(
+        self, mock_ids: AsyncMock, mock_settings: MagicMock
+    ) -> None:
+        from terrapod.services.binary_cache_service import _resolve_tofu_version
+
+        mock_settings.registry.binary_cache.allow_prerelease = "rc"
+        mock_ids.return_value = ["1.13.0-rc1", "1.13.0-rc2"]
+
+        assert await _resolve_tofu_version("1.13") == "1.13.0-rc2"

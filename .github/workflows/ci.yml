@@ -502,13 +502,17 @@ jobs:
   # mechanism + chart, not the PR's app code (that's covered by the test job).
   helm-eval-boot:
     name: Eval Boot (${{ matrix.tool }})
-    needs: prepare
+    # Depend on the amd64 build so the eval boots the images BUILT FROM THIS PR
+    # (loaded into the cluster), not published `:latest`. That's what makes the
+    # plan-through-listener smoke test the PR's actual code (e.g. the binary-cache
+    # version-resolution path), and keeps it from depending on whatever is live.
+    needs: [prepare, build-images-amd64]
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
     # `helm --wait` blocks on the full stack (incl. the listener joining the
-    # bootstrapped pool) and the plan-smoke launches a runner Job that pulls the
-    # runner image + a tofu binary — so cap the job at a sensible ceiling rather
-    # than the 6h default, in case an install or the run ever hangs.
+    # bootstrapped pool) and the plan-smoke launches a runner Job — so cap the
+    # job at a sensible ceiling rather than the 6h default, in case an install or
+    # the run ever hangs.
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -524,11 +528,61 @@ jobs:
           else
             curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/v5.9.0/install.sh | TAG=v5.9.0 bash
           fi
-      - name: make eval (boot the stack)
+      # ── Get the amd64 images built by this run ───────────────────────────────
+      # PR builds load them from the build-images-amd64 artifacts (no GHCR push on
+      # PRs); branch/tag builds pull them from GHCR. Either way they end up in the
+      # local docker daemon under their canonical sha-<short>-amd64 tag, which is
+      # what eval.sh resolves below (chart pullPolicy is IfNotPresent, so the
+      # loaded images are used without a registry round-trip).
+      - name: Log in to GHCR (branch/tag)
+        if: needs.prepare.outputs.is_pr != 'true'
+        uses: ./.github/actions/ghcr-login
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+      - name: Pull images (branch/tag)
+        if: needs.prepare.outputs.is_pr != 'true'
+        run: |
+          sha="${{ needs.prepare.outputs.sha_short }}"
+          for i in terrapod-api terrapod-web terrapod-migrations terrapod-listener terrapod-runner; do
+            docker pull "$REGISTRY/$i:sha-${sha}-amd64"
+          done
+      - name: Download image artifacts (PR)
+        if: needs.prepare.outputs.is_pr == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: image-*-amd64
+          path: /tmp/images
+          merge-multiple: true
+      - name: Load images into docker (PR)
+        if: needs.prepare.outputs.is_pr == 'true'
+        run: |
+          for i in terrapod-api terrapod-web terrapod-migrations terrapod-listener terrapod-runner; do
+            gunzip -c "/tmp/images/$i-amd64.tar.gz" | docker load
+          done
+      # ── Create the cluster + load the images into it, then install ───────────
+      # eval.sh reuses an existing cluster, so we create it here (kind load /
+      # k3d image import need the cluster to exist first) and let eval.sh install.
+      - name: Create cluster + load images
+        run: |
+          sha="${{ needs.prepare.outputs.sha_short }}"
+          imgs=""
+          for i in terrapod-api terrapod-web terrapod-migrations terrapod-listener terrapod-runner; do
+            imgs="$imgs $REGISTRY/$i:sha-${sha}-amd64"
+          done
+          if [ "${{ matrix.tool }}" = "kind" ]; then
+            kind create cluster --name terrapod-eval --wait 120s
+            for img in $imgs; do kind load docker-image "$img" --name terrapod-eval; done
+          else
+            k3d cluster create terrapod-eval --wait --timeout 120s
+            for img in $imgs; do k3d image import "$img" -c terrapod-eval; done
+          fi
+      - name: make eval (install into the cluster)
         env:
           CI: "1"
           EVAL_NO_PORT_FORWARD: "1"
-          TERRAPOD_VERSION: latest
+          # Use the images built + loaded above (NOT :latest).
+          TERRAPOD_VERSION: sha-${{ needs.prepare.outputs.sha_short }}-amd64
           # Pin the tool — the runner ships a pre-installed `kind`, so without
           # this the k3d matrix job would auto-detect kind and the smoke step's
           # k3d-pinned context lookup would miss.
@@ -566,7 +620,7 @@ jobs:
           ctx=$([ "${{ matrix.tool }}" = "kind" ] && echo kind-terrapod-eval || echo k3d-terrapod-eval)
           kubectl --context "$ctx" -n terrapod-eval get pods,jobs || true
           kubectl --context "$ctx" -n terrapod-eval logs deploy/terrapod-listener --tail=80 || true
-          kubectl --context "$ctx" -n terrapod-eval logs -l app.kubernetes.io/component=runner --tail=120 --prefix || true
+          kubectl --context "$ctx" -n terrapod-eval logs -l app.kubernetes.io/name=terrapod-runner --tail=120 --prefix || true
       - name: Teardown
         if: always()
         env:
