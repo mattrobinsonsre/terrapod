@@ -12,8 +12,20 @@ metadata:
     {{- include "terrapod.labels" . | nindent 4 }}
     app.kubernetes.io/component: bootstrap
   annotations:
-    "helm.sh/hook": post-install
-    "helm.sh/hook-weight": "10"
+    # Hook phase/weight are configurable, defaulting to the historical
+    # production behavior (post-install, weight 10) so production renders
+    # IDENTICALLY unless explicitly overridden. The eval profile sets
+    # `bootstrap.hook: "pre-install,pre-upgrade"` + `hookWeight: "-3"` so the
+    # admin user AND the bootstrap-created agent pool exist BEFORE the main
+    # resources roll out: with the runner listener enabled, the listener's
+    # readiness probe only passes once it has JOINED the pool, so a post-install
+    # pool would make `helm --wait` block on the listener (waiting for a pool
+    # that doesn't exist yet) and deadlock. The bootstrap is DB-direct (needs
+    # only the migrated schema at weight -5) and idempotent (skips an existing
+    # admin/pool — never resets a changed password), so running it pre-install
+    # at weight -3 is safe for profiles that opt in.
+    "helm.sh/hook": {{ .Values.bootstrap.hook | default "post-install" | quote }}
+    "helm.sh/hook-weight": {{ .Values.bootstrap.hookWeight | default "10" | quote }}
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   ttlSecondsAfterFinished: 300

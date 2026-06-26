@@ -33,7 +33,7 @@ dependencies**.
 
 ```sh
 make eval          # create a local cluster + install Terrapod, then port-forward
-# → open http://localhost:8080  (login: admin@example.com / terrapod)
+# → open http://localhost:8080  (login: admin / terrapod)
 
 make eval-down     # delete the whole thing when you're done
 ```

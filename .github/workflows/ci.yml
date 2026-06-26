@@ -505,6 +505,11 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.images_exist != 'true'
     runs-on: ubuntu-latest
+    # `helm --wait` blocks on the full stack (incl. the listener joining the
+    # bootstrapped pool) and the plan-smoke launches a runner Job that pulls the
+    # runner image + a tofu binary — so cap the job at a sensible ceiling rather
+    # than the 6h default, in case an install or the run ever hangs.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -533,15 +538,35 @@ jobs:
         run: |
           ctx=$([ "${{ matrix.tool }}" = "kind" ] && echo kind-terrapod-eval || echo k3d-terrapod-eval)
           ns=terrapod-eval
-          # helm --wait already gated on readiness; assert the data plane is real:
-          kubectl --context "$ctx" -n "$ns" wait --for=condition=available deploy/terrapod-web --timeout=120s
-          kubectl --context "$ctx" -n "$ns" wait --for=condition=available deploy/terrapod-api --timeout=120s
+          # eval.sh installs with `helm --wait`, so these are already satisfied;
+          # assert them explicitly anyway as the smoke contract.
+          kubectl --context "$ctx" -n "$ns" wait --for=condition=available deploy/terrapod-web --timeout=150s
+          kubectl --context "$ctx" -n "$ns" wait --for=condition=available deploy/terrapod-api --timeout=150s
+          # The listener only reports Available once it has JOINED the bootstrapped
+          # eval-pool — so this proves the agent-execution wiring end-to-end, not
+          # just that a pod started.
+          kubectl --context "$ctx" -n "$ns" wait --for=condition=available deploy/terrapod-listener --timeout=180s
           kubectl --context "$ctx" -n "$ns" port-forward svc/terrapod-web 18080:3000 >/dev/null 2>&1 &
           sleep 6
           code=$(curl -s -o /dev/null -w '%{http_code}' --retry 8 --retry-delay 3 --retry-all-errors http://localhost:18080/login)
           echo "GET /login -> $code"
           [ "$code" = "200" ] || { echo "FAIL: UI did not serve /login"; exit 1; }
           echo "Eval stack booted + UI served on ${{ matrix.tool }}"
+      - name: Plan through the listener
+        # Prove the listener actually EXECUTES runs: create an agent workspace on
+        # the bootstrapped eval-pool, upload a config, queue a plan, and assert it
+        # reaches `planned` on a real Kubernetes Job. This is the difference
+        # between "a listener pod exists" and "server-side runs work".
+        run: |
+          ctx=$([ "${{ matrix.tool }}" = "kind" ] && echo kind-terrapod-eval || echo k3d-terrapod-eval)
+          scripts/eval-smoke-plan.sh "$ctx" terrapod-eval
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          ctx=$([ "${{ matrix.tool }}" = "kind" ] && echo kind-terrapod-eval || echo k3d-terrapod-eval)
+          kubectl --context "$ctx" -n terrapod-eval get pods,jobs || true
+          kubectl --context "$ctx" -n terrapod-eval logs deploy/terrapod-listener --tail=80 || true
+          kubectl --context "$ctx" -n terrapod-eval logs -l app.kubernetes.io/component=runner --tail=120 --prefix || true
       - name: Teardown
         if: always()
         env:

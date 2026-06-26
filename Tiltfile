@@ -233,32 +233,16 @@ k8s_resource(
     links=[link('https://terrapod.local', 'Terrapod')],
 )
 
-# Dev pool setup — creates pool + join token via the API pod's bootstrap script.
-# Idempotent: skips if pool already exists.
-local_resource(
-    'setup-dev-pool',
-    cmd='''
-echo "Waiting for API pod to be ready..."
-kubectl -n terrapod wait --for=condition=Ready pod -l app.kubernetes.io/name=terrapod,app.kubernetes.io/component=api --timeout=120s
-
-echo "Creating dev pool + join token..."
-kubectl -n terrapod exec deploy/terrapod-api -- env \
-    DATABASE_URL="postgresql+asyncpg://terrapod:terrapod@terrapod-postgresql:5432/terrapod" \
-    TERRAPOD_BOOTSTRAP_ADMIN_EMAIL=admin \
-    TERRAPOD_BOOTSTRAP_ADMIN_PASSWORD=admin \
-    TERRAPOD_BOOTSTRAP_POOL_NAME=dev \
-    TERRAPOD_BOOTSTRAP_POOL_TOKEN=dev-join-token-do-not-use-in-prod \
-    python -m terrapod.cli.bootstrap
-''',
-    labels=['setup'],
-    resource_deps=['terrapod-api'],
-)
-
-# Runner Listener (uses same image as API, needs dev pool)
+# Runner Listener (uses same image as API). The agent pool + join token are
+# created by the chart's bootstrap Job (terrapod-bootstrap-1), driven by
+# `bootstrap.poolName` / `bootstrap.poolToken` in values-local.yaml — the SAME
+# mechanism the kind/k3d eval profile uses (values-eval.yaml). The listener joins
+# that pool with the matching `listener.joinToken`, so it depends on the bootstrap
+# Job (pool must exist) and the API (the join target). No separate pool-setup step.
 k8s_resource(
     'terrapod-listener',
     labels=['backend'],
-    resource_deps=['setup-dev-pool'],
+    resource_deps=['terrapod-bootstrap-1', 'terrapod-api'],
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -1135,6 +1135,14 @@ migrations:
 #   passwordKey: password
 #   poolName: ""       # Optional: auto-create an agent pool with this name
 #   poolToken: ""      # Optional: auto-create a join token for the pool
+#   hook: ""           # Helm hook phase (default "post-install"). Set to
+#                      # "pre-install,pre-upgrade" with hookWeight "-3" to create
+#                      # the admin/pool BEFORE the listener rolls out — required if
+#                      # you enable the listener with a bootstrap-created pool AND
+#                      # install with `helm --wait` (otherwise --wait deadlocks on
+#                      # the listener's pool-join readiness). The eval profile does
+#                      # this; production defaults keep the historical post-install.
+#   hookWeight: ""     # Helm hook-weight (default "10")
 
 # ── Database (PostgreSQL) ─────────────────────────────────────────────────────
 # Provide credentials via existingSecret (recommended) or url (dev only).

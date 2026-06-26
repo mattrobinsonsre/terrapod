@@ -267,7 +267,9 @@
         "emailKey": { "type": "string" },
         "passwordKey": { "type": "string" },
         "poolName": { "type": "string" },
-        "poolToken": { "type": "string" }
+        "poolToken": { "type": "string" },
+        "hook": { "type": "string" },
+        "hookWeight": { "type": "string" }
       }
     },
 

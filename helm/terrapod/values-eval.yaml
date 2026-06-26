@@ -32,11 +32,33 @@ storage:
 
 api:
   replicas: 1
+  # Filesystem storage uses a ReadWriteOnce PVC the API pod mounts. A rolling
+  # update would try to start the new pod while the old one still holds the RWO
+  # volume → the new pod stays Pending and `helm upgrade --wait` deadlocks.
+  # maxSurge: 0 means the old pod is removed before the new one is created, so
+  # the volume hands over cleanly (brief downtime, fine for a single-replica eval).
+  strategy:
+    maxSurge: 0
+    maxUnavailable: 1
   config:
     # Browser-facing URL via `kubectl port-forward svc/terrapod-web 8080:3000`.
     external_url: "http://localhost:8080"
     auth:
       local_enabled: true
+      # Don't expire CLI/automation API tokens after 7 idle days without an
+      # interactive login (#495) — for an eval people poke via curl / `tofu`
+      # with a freshly-minted token and no prior browser login. Matches the
+      # local-dev profile. Production keeps the default (7).
+      bound_token_idle_days: 0
+    storage:
+      backend: filesystem
+      filesystem:
+        # In-cluster runner Jobs fetch config/state/module tarballs from the
+        # filesystem backend via presigned URLs. Those URLs are built from this
+        # base_url; it MUST be the in-cluster API service (not external_url,
+        # which is localhost:8080 and unreachable from a runner pod). Without
+        # this, server-side (agent) runs fail at the config/state download step.
+        base_url: "http://terrapod-api:8000"
   # The hardened ephemeral PVC isn't needed for a local eval.
   ephemeralStorage:
     enabled: false
@@ -49,13 +71,26 @@ web:
 ingress:
   enabled: false
 
-# Agent execution (server-side plan/apply on runner Jobs) is OFF for the quickstart
-# to keep the footprint tiny. To try it, create an agent pool + join token and set
-# listener.enabled=true with a runner image.
+# Agent execution (server-side plan/apply on runner Jobs) is ON so the quickstart
+# is a working platform: queue a plan in the UI and it runs on a Kubernetes Job.
+# The listener joins the `eval-pool` the bootstrap job seeds below using this
+# fixed join token. Eval-only — the cluster is throwaway and this token is never
+# used anywhere real; do NOT copy it into a production config.
 listener:
-  enabled: false
+  enabled: true
+  joinToken: "eval-join-token-not-for-real-use"
 
-# Seed a local admin so you can log in immediately. Eval-only credentials.
+# Seed a local admin (log in immediately) AND an agent pool + matching join token
+# so the listener can join and execute runs. Eval-only credentials.
+#
+# Run the bootstrap as a PRE-install hook (production defaults to post-install,
+# unchanged) so the agent pool exists BEFORE the listener Deployment starts —
+# otherwise `helm --wait` would block on the listener, whose readiness gates on
+# having joined a pool that wouldn't exist yet. See job-bootstrap.yaml.
 bootstrap:
-  adminEmail: admin@example.com
+  hook: "pre-install,pre-upgrade"
+  hookWeight: "-3"
+  adminEmail: admin
   adminPassword: terrapod
+  poolName: eval-pool
+  poolToken: "eval-join-token-not-for-real-use"

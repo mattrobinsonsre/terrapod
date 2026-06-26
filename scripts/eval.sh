@@ -21,7 +21,7 @@ VERSION="${TERRAPOD_VERSION:-latest}"
 PF_PORT="${TERRAPOD_EVAL_PORT:-8080}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CHART_DIR="${REPO_ROOT}/helm/terrapod"
-ADMIN_EMAIL="admin@example.com"
+ADMIN_EMAIL="admin"
 ADMIN_PASSWORD="terrapod"
 
 # Caller's kube-context, captured before we create a cluster (kind/k3d switch it).
@@ -99,16 +99,24 @@ up() {
   restore_ctx
 
   log "Installing Terrapod (${RELEASE}) into namespace '${NS}' using image tag '${VERSION}'…"
+  # `--wait` blocks until every Deployment — including the runner listener — is
+  # ready. The listener only reports ready once it has JOINED the agent pool, and
+  # the pool is created by the bootstrap job, which is a PRE-install hook (see
+  # job-bootstrap.yaml) so it exists before the listener starts. That ordering is
+  # what makes `--wait` safe here: a working server-side-runs stack the moment the
+  # install returns, not just pods that exist.
   helm --kube-context "$ctx" upgrade --install "$RELEASE" "$CHART_DIR" \
     --namespace "$NS" --create-namespace \
     -f "${CHART_DIR}/values-eval.yaml" \
     --set "api.image.tag=${VERSION}" \
     --set "web.image.tag=${VERSION}" \
     --set "migrations.image.tag=${VERSION}" \
+    --set "listener.image.tag=${VERSION}" \
+    --set "runners.image.tag=${VERSION}" \
     --set "bootstrap.adminEmail=${ADMIN_EMAIL}" \
     --set "bootstrap.adminPassword=${ADMIN_PASSWORD}" \
     --set "api.config.external_url=http://localhost:${PF_PORT}" \
-    --wait --timeout 300s || {
+    --wait --timeout "${TERRAPOD_EVAL_HELM_TIMEOUT:-600s}" || {
       warn "helm install did not report ready in time — showing pod status:"
       kubectl --context "$ctx" -n "$NS" get pods || true
       die "install failed (see pod status above; 'scripts/eval.sh status' to re-check)"
@@ -133,6 +141,10 @@ ${c_bold}${c_green}Terrapod is up.${c_reset}
   URL:       ${c_bold}http://localhost:${PF_PORT}${c_reset}   (after the port-forward below)
   Username:  ${c_bold}${ADMIN_EMAIL}${c_reset}
   Password:  ${c_bold}${ADMIN_PASSWORD}${c_reset}
+
+  Server-side runs are enabled: a runner listener has joined the '${c_bold}eval-pool${c_reset}'
+  agent pool, so you can create a workspace and queue a plan in the UI and it
+  executes on a Kubernetes Job (first run pulls the runner image + a tofu binary).
 
   Port-forward (if not started automatically):
     kubectl --context ${ctx} -n ${NS} port-forward svc/${RELEASE}-web ${PF_PORT}:3000
