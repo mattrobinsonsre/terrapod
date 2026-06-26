@@ -232,7 +232,7 @@ Set to `0` for unlimited.
 
 The counter is on output tokens only (cheaper to reason about than
 mixed input/output cost). Input-side cost is bounded by
-`plan_json_max_bytes` (default 500 KB) and `code_context_max_bytes`
+`plan_json_max_bytes` (default 600 KB) and `code_context_max_bytes`
 (default 200 KB).
 
 ## Skipping and overrides
@@ -275,8 +275,12 @@ the bulk of the request):
 - `PLAN_JSON` (for `plan_summary`) — the structured plan JSON
   output by the runner, cleaned (`prior_state` stripped, no-op
   resource_changes pruned, drift partitioned, etc. — see
-  `_clean_plan_json_bytes`). Capped at
-  `ai_summary.plan_json_max_bytes` (default 500 KB).
+  `_clean_plan_json_bytes`). Bounded by
+  `ai_summary.plan_json_max_bytes` (default 600 KB): under the cap the
+  plan is sent unchanged; over it, `_fit_plan_json` reduces structurally
+  — every change keeps its address and actions (destroys → creates →
+  updates → sampled remainder) so a `destroy` is never hidden; only
+  attribute detail is trimmed.
 - `PLAN_LOG` / `APPLY_LOG` (for `failure_analysis`) — the raw text
   of the run log. Tail-truncated when over `plan_json_max_bytes`.
 - `CODE_DIFF` — unified `git diff --no-index` of `*.tf` / `*.tfvars`
