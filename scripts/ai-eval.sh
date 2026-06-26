@@ -23,8 +23,10 @@ IMAGE="${TEST_IMAGE:-terrapod-test:local}"
 REGION="${AI_EVAL_AWS_REGION:-${AWS_REGION:-${AWS_DEFAULT_REGION:-us-west-2}}}"
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
-  echo "test image '$IMAGE' not found — build it once with 'make test' (or 'make images')." >&2
-  exit 1
+  # The test image is Docker-GC'd between runs; rebuild it on demand so the
+  # harness is self-sufficient (same image scripts/test.sh builds).
+  echo "test image '$IMAGE' not found — building it..." >&2
+  docker build -f "$REPO_ROOT/docker/Dockerfile.test" -t "$IMAGE" "$REPO_ROOT" >&2
 fi
 
 mkdir -p "$REPO_ROOT/reports/ai-eval"

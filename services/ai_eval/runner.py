@@ -66,6 +66,10 @@ async def _one_call(
     kwargs["model"] = model
     if temperature is not None:
         kwargs["temperature"] = temperature
+    # Bounded retry with backoff so Bedrock/anthropic throttling on a large
+    # sweep degrades to slower, not to spurious call errors that corrupt the
+    # scorecard. LiteLLM retries RateLimitError / transient 5xx internally.
+    kwargs["num_retries"] = 5
     # Bedrock: ensure LiteLLM/boto3 has a region even when the summariser
     # settings don't carry one (the harness reads ambient AWS_* env creds).
     if model.startswith("bedrock/") and "aws_region_name" not in kwargs:

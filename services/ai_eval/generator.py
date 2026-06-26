@@ -236,6 +236,11 @@ def _irreversibility_cases() -> list[Case]:
     out: list[Case] = []
     for spec in IRREVERSIBLE:
         addr = f"{spec['type']}.{spec['name']}"
+        # A single snapshot is ONE recovery point — high (unmitigated destroy),
+        # not critical. Reserve critical for the encryption key (locks out all
+        # data) and the backup vault (holds every backup). The model reasoned
+        # this distinction consistently; the label follows the reasoning.
+        sev = "high" if spec["type"].endswith("snapshot") else "critical"
         out.append(
             Case(
                 id=f"gen-irrev-destroy-{spec['type']}",
@@ -247,8 +252,8 @@ def _irreversibility_cases() -> list[Case]:
                     [_rc(addr, spec["type"], spec["name"], ["delete"], spec["after"], None)]
                 ),
                 truth=Truth(
-                    risk=RiskBand(min="critical"),
-                    must_flag=(MustFlag(addr, "critical"),),
+                    risk=RiskBand(min=sev),
+                    must_flag=(MustFlag(addr, sev),),
                     key_facts=(addr,),
                     forbidden_claims=("no changes",),
                 ),

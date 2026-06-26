@@ -1,0 +1,103 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.12.2",
+  "resource_changes": [
+    {
+      "address": "azurerm_resource_group.data",
+      "mode": "managed",
+      "type": "azurerm_resource_group",
+      "name": "data",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "location": "westeurope",
+          "name": "prod-analytics-rg",
+          "tags": {"environment": "prod", "managed_by": "opentofu"}
+        },
+        "after_unknown": {"id": true, "tags": {}},
+        "before_sensitive": false,
+        "after_sensitive": {"tags": {}}
+      }
+    },
+    {
+      "address": "azurerm_mssql_server.analytics",
+      "mode": "managed",
+      "type": "azurerm_mssql_server",
+      "name": "analytics",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "administrator_login": "sqladmin",
+          "administrator_login_password": "P@ssw0rd-change-me",
+          "location": "westeurope",
+          "minimum_tls_version": "1.0",
+          "name": "prod-analytics-sql",
+          "public_network_access_enabled": true,
+          "resource_group_name": "prod-analytics-rg",
+          "version": "12.0"
+        },
+        "after_unknown": {
+          "fully_qualified_domain_name": true, "id": true, "identity": true,
+          "restorable_dropped_database_ids": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {"administrator_login_password": true}
+      }
+    },
+    {
+      "address": "azurerm_mssql_firewall_rule.allow_all",
+      "mode": "managed",
+      "type": "azurerm_mssql_firewall_rule",
+      "name": "allow_all",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "end_ip_address": "255.255.255.255",
+          "name": "allow-all",
+          "start_ip_address": "0.0.0.0"
+        },
+        "after_unknown": {"id": true, "server_id": true},
+        "before_sensitive": false,
+        "after_sensitive": {}
+      }
+    },
+    {
+      "address": "azurerm_mssql_database.analytics",
+      "mode": "managed",
+      "type": "azurerm_mssql_database",
+      "name": "analytics",
+      "provider_name": "registry.terraform.io/hashicorp/azurerm",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "analytics",
+          "sku_name": "S1",
+          "storage_account_type": "Local",
+          "tags": {"environment": "prod"}
+        },
+        "after_unknown": {
+          "id": true, "server_id": true, "collation": true,
+          "transparent_data_encryption_enabled": true
+        },
+        "before_sensitive": false,
+        "after_sensitive": {"tags": {}}
+      }
+    }
+  ],
+  "configuration": {
+    "provider_config": {
+      "azurerm": {
+        "name": "azurerm",
+        "full_name": "registry.terraform.io/hashicorp/azurerm",
+        "expressions": {"features": [{}]}
+      }
+    }
+  }
+}

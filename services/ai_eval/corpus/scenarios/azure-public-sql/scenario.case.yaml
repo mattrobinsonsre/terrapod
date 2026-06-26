@@ -1,0 +1,30 @@
+id: azure-public-sql
+surface: plan
+title: "Public Azure SQL with allow-all firewall (create)"
+source: curated
+tags: [security]
+
+inputs:
+  plan_json_file: plan.json
+  code_context_from_tf: true
+  commit_message: |
+    feat(analytics): add managed SQL for the reporting service
+
+    Provision the prod Azure SQL server + analytics DB. Firewall opened so
+    the on-call laptops and the reporting VMs can connect without VPN.
+
+truth:
+  # An internet-reachable managed SQL server (public access + allow-all
+  # firewall + TLS 1.0) is a clear exposure even on create.
+  risk:
+    min: high
+  must_flag:
+    - { address: azurerm_mssql_firewall_rule.allow_all, min_severity: high }
+    - { address: azurerm_mssql_server.analytics, min_severity: high }
+  must_not_flag:
+    - azurerm_resource_group.data
+  key_facts:
+    - "0.0.0.0"
+    - "255.255.255.255"
+  forbidden_claims:
+    - "no changes"

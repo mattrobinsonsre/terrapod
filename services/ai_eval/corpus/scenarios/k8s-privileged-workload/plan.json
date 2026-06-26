@@ -1,0 +1,83 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.12.2",
+  "resource_changes": [
+    {
+      "address": "kubernetes_namespace.apps",
+      "mode": "managed",
+      "type": "kubernetes_namespace",
+      "name": "apps",
+      "provider_name": "registry.terraform.io/hashicorp/kubernetes",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "metadata": [{"name": "batch"}]
+        },
+        "after_unknown": {"id": true, "metadata": [{"generation": true, "resource_version": true, "uid": true}]},
+        "before_sensitive": false,
+        "after_sensitive": {"metadata": [{}]}
+      }
+    },
+    {
+      "address": "kubernetes_deployment.worker",
+      "mode": "managed",
+      "type": "kubernetes_deployment",
+      "name": "worker",
+      "provider_name": "registry.terraform.io/hashicorp/kubernetes",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "metadata": [{"name": "log-shipper", "namespace": "batch"}],
+          "spec": [
+            {
+              "replicas": "3",
+              "selector": [{"match_labels": {"app": "log-shipper"}}],
+              "template": [
+                {
+                  "metadata": [{"labels": {"app": "log-shipper"}}],
+                  "spec": [
+                    {
+                      "host_network": true,
+                      "container": [
+                        {
+                          "name": "shipper",
+                          "image": "acme/log-shipper:1.4.2",
+                          "security_context": [
+                            {
+                              "privileged": true,
+                              "allow_privilege_escalation": true,
+                              "run_as_user": "0"
+                            }
+                          ],
+                          "volume_mount": [{"name": "host-root", "mount_path": "/host"}]
+                        }
+                      ],
+                      "volume": [{"name": "host-root", "host_path": [{"path": "/"}]}]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true,
+          "metadata": [{"generation": true, "resource_version": true, "uid": true}],
+          "spec": [{}]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {"metadata": [{}], "spec": [{}]}
+      }
+    }
+  ],
+  "configuration": {
+    "provider_config": {
+      "kubernetes": {
+        "name": "kubernetes",
+        "full_name": "registry.terraform.io/hashicorp/kubernetes"
+      }
+    }
+  }
+}

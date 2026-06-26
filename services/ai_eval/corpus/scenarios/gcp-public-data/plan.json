@@ -1,0 +1,114 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.12.2",
+  "resource_changes": [
+    {
+      "address": "google_storage_bucket.data",
+      "mode": "managed",
+      "type": "google_storage_bucket",
+      "name": "data",
+      "provider_name": "registry.terraform.io/hashicorp/google",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "force_destroy": true,
+          "location": "EU",
+          "name": "acme-analytics-exports",
+          "project": "acme-analytics-prod",
+          "storage_class": "STANDARD",
+          "uniform_bucket_level_access": true
+        },
+        "after_unknown": {"id": true, "self_link": true, "url": true},
+        "before_sensitive": false,
+        "after_sensitive": {}
+      }
+    },
+    {
+      "address": "google_storage_bucket_iam_member.public",
+      "mode": "managed",
+      "type": "google_storage_bucket_iam_member",
+      "name": "public",
+      "provider_name": "registry.terraform.io/hashicorp/google",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "bucket": "acme-analytics-exports",
+          "member": "allUsers",
+          "role": "roles/storage.objectViewer"
+        },
+        "after_unknown": {"etag": true, "id": true},
+        "before_sensitive": false,
+        "after_sensitive": {}
+      }
+    },
+    {
+      "address": "google_sql_database_instance.analytics",
+      "mode": "managed",
+      "type": "google_sql_database_instance",
+      "name": "analytics",
+      "provider_name": "registry.terraform.io/hashicorp/google",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "database_version": "POSTGRES_16",
+          "deletion_protection": false,
+          "name": "acme-analytics",
+          "region": "europe-west1",
+          "settings": [
+            {
+              "tier": "db-custom-4-16384",
+              "backup_configuration": [{"enabled": false}],
+              "ip_configuration": [
+                {
+                  "ipv4_enabled": true,
+                  "authorized_networks": [{"name": "world", "value": "0.0.0.0/0"}]
+                }
+              ]
+            }
+          ]
+        },
+        "after_unknown": {
+          "id": true, "self_link": true, "connection_name": true,
+          "public_ip_address": true, "first_ip_address": true,
+          "server_ca_cert": true, "settings": [{}]
+        },
+        "before_sensitive": false,
+        "after_sensitive": {"settings": [{}], "server_ca_cert": []}
+      }
+    },
+    {
+      "address": "google_sql_user.admin",
+      "mode": "managed",
+      "type": "google_sql_user",
+      "name": "admin",
+      "provider_name": "registry.terraform.io/hashicorp/google",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "instance": "acme-analytics",
+          "name": "dbadmin",
+          "password": "change-me-in-prod"
+        },
+        "after_unknown": {"id": true},
+        "before_sensitive": false,
+        "after_sensitive": {"password": true}
+      }
+    }
+  ],
+  "configuration": {
+    "provider_config": {
+      "google": {
+        "name": "google",
+        "full_name": "registry.terraform.io/hashicorp/google",
+        "expressions": {
+          "project": {"references": ["var.project_id"]},
+          "region": {"references": ["var.region"]}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+id: k8s-privileged-workload
+surface: plan
+title: "Privileged Deployment with hostNetwork + host root mount (create)"
+source: curated
+tags: [security]
+
+inputs:
+  plan_json_file: plan.json
+  code_context_from_tf: true
+  commit_message: |
+    chore(batch): deploy log-shipper daemon
+
+    Ships node logs to the SIEM. Needs host access to read the journald
+    socket and the container runtime logs under /.
+
+truth:
+  # A privileged container that shares the host network and bind-mounts the
+  # host root filesystem is effectively root on the node — a node-escape /
+  # cluster-compromise surface.
+  risk:
+    min: high
+  must_flag:
+    - { address: kubernetes_deployment.worker, min_severity: high }
+  must_not_flag:
+    - kubernetes_namespace.apps
+  key_facts:
+    - "privileged"
+  forbidden_claims:
+    - "no changes"

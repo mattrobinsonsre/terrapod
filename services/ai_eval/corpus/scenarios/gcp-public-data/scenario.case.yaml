@@ -1,0 +1,31 @@
+id: gcp-public-data
+surface: plan
+title: "Public GCS bucket + Cloud SQL with public IP (create)"
+source: curated
+tags: [security]
+
+inputs:
+  plan_json_file: plan.json
+  code_context_from_tf: true
+  commit_message: |
+    feat: analytics exports bucket + managed Postgres
+
+    Bucket holds the nightly CSV exports the partner dashboards read.
+    Cloud SQL with a public IP so the BI tool (no VPC peering yet) can reach it.
+
+truth:
+  # allUsers on a bucket = world-readable data; Cloud SQL with a public IP and a
+  # 0.0.0.0/0 authorized network = internet-exposed database. Both are clear
+  # exposures on create.
+  risk:
+    min: high
+  must_flag:
+    - { address: google_storage_bucket_iam_member.public, min_severity: high }
+    - { address: google_sql_database_instance.analytics, min_severity: high }
+  must_not_flag:
+    - google_storage_bucket.data
+  key_facts:
+    - "allUsers"
+    - "0.0.0.0/0"
+  forbidden_claims:
+    - "no changes"
