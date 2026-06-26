@@ -13,6 +13,7 @@ Surfaces map to the production summariser ``kind`` + flags:
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -29,6 +30,24 @@ RISK_ORDER: dict[str, int] = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 def risk_rank(level: str) -> int:
     """Numeric rank of a risk level; unknown → -1 (sorts below 'low')."""
     return RISK_ORDER.get((level or "").strip().lower(), -1)
+
+
+# Fraction of the corpus reserved as holdout when not pinned explicitly.
+_HOLDOUT_MODULUS = 4  # ~25%
+
+
+def is_holdout(case: Case) -> bool:
+    """Whether a case is in the held-out validation set.
+
+    Explicit ``case.holdout`` wins; otherwise a deterministic id hash assigns
+    ~1/_HOLDOUT_MODULUS of cases to holdout. Deterministic so the split is
+    stable across runs and across machines — the prompt-tuner can rely on the
+    same cases always being held out.
+    """
+    if case.holdout is not None:
+        return case.holdout
+    digest = hashlib.md5(case.id.encode("utf-8")).hexdigest()
+    return int(digest, 16) % _HOLDOUT_MODULUS == 0
 
 
 @dataclass(frozen=True)
@@ -116,6 +135,12 @@ class Case:
     # a future COMMIT_CONTEXT enhancement (incl. misleading-message resistance).
     commit_message: str = ""
     state_diverged: bool = False
+    # Train/holdout split for honest generalization measurement. None = decide
+    # deterministically by id hash (see is_holdout); an explicit bool pins it.
+    # The prompt is tuned ONLY against train failures; holdout is never read
+    # while editing the prompt, so a gain that doesn't show on holdout is
+    # overfitting (teaching-to-the-test) and must be reverted.
+    holdout: bool | None = None
 
     @property
     def kind(self) -> str:
@@ -206,6 +231,7 @@ def case_from_dict(d: dict[str, Any], *, base_dir: Path | None = None) -> Case:
         code_context=code_context,
         commit_message=inputs.get("commit_message", ""),
         state_diverged=bool(inputs.get("state_diverged", False)),
+        holdout=d.get("holdout"),
     )
 
 

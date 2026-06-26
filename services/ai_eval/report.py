@@ -20,7 +20,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from . import rubric
-from .cases import Case
+from .cases import Case, is_holdout
 from .runner import CaseRun
 
 
@@ -45,6 +45,7 @@ class CaseScore:
     risk_level: str = ""
     description: str = ""
     risk_factors: list[dict] = field(default_factory=list)
+    holdout: bool = False
 
 
 @dataclass
@@ -68,6 +69,19 @@ class ModelReport:
     @property
     def mean_risk_repeatability(self) -> float:
         return _mean([c.risk_repeatability for c in self.case_scores])
+
+    def hard_pass_rate_split(self, holdout: bool) -> float:
+        """Hard-pass rate over just the train (holdout=False) or holdout subset.
+
+        The prompt is tuned against train only; holdout is the honest
+        generalization signal. A train gain that doesn't carry to holdout is
+        overfitting and must be reverted."""
+        xs = [1.0 if c.hard_pass else 0.0 for c in self.case_scores if c.holdout == holdout]
+        return _mean(xs)
+
+    def split_counts(self) -> tuple[int, int]:
+        train = sum(1 for c in self.case_scores if not c.holdout)
+        return train, len(self.case_scores) - train
 
     def axis_pass_rates(self) -> dict[str, float]:
         names = ["risk_band", "must_flag", "no_false_risk", "key_facts", "no_forbidden"]
@@ -121,6 +135,7 @@ def score_model(cases_by_id: dict[str, Case], runs: list[CaseRun]) -> ModelRepor
                     hard_pass_repeatability=0.0,
                     failures=[f"call_error: {err}"],
                     error=err,
+                    holdout=is_holdout(case),
                 )
             )
             continue
@@ -151,6 +166,7 @@ def score_model(cases_by_id: dict[str, Case], runs: list[CaseRun]) -> ModelRepor
                 risk_factors=[
                     f for f in (oks[0].parsed.get("risk_factors") or []) if isinstance(f, dict)
                 ],
+                holdout=is_holdout(case),
             )
         )
     return rep
@@ -182,6 +198,9 @@ def render_markdown(reports: list[ModelReport]) -> str:
             "",
             f"- cases: **{r.n}**",
             f"- hard-pass (risk-correctness): **{r.hard_pass_rate:.0%}**",
+            f"- hard-pass train / **holdout**: "
+            f"{r.hard_pass_rate_split(False):.0%} / **{r.hard_pass_rate_split(True):.0%}** "
+            f"(n={r.split_counts()[0]}/{r.split_counts()[1]})",
             f"- mean score: **{r.mean_score:.2f}**",
             f"- risk repeatability: **{r.mean_risk_repeatability:.0%}**",
             "",

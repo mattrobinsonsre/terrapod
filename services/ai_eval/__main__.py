@@ -75,8 +75,11 @@ def _cmd_run(args: argparse.Namespace) -> int:
         )
         rep = score_model(cases_by_id, runs)
         reports.append(rep)
+        tr, ho = rep.split_counts()
         print(
-            f"  {model}: hard-pass {rep.hard_pass_rate:.0%}  "
+            f"  {model}: hard-pass {rep.hard_pass_rate:.0%} "
+            f"(train {rep.hard_pass_rate_split(False):.0%} n={tr} / "
+            f"holdout {rep.hard_pass_rate_split(True):.0%} n={ho})  "
             f"mean {rep.mean_score:.2f}  risk-repeat {rep.mean_risk_repeatability:.0%}",
             file=sys.stderr,
         )
