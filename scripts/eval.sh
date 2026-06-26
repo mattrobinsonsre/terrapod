@@ -7,8 +7,9 @@
 #   scripts/eval.sh down    Delete the eval cluster.
 #   scripts/eval.sh status  Show pod status.
 #
-# Auto-detects `kind` (preferred) or `k3d`. Uses released images (tag overridable
-# via TERRAPOD_VERSION, default `latest`). NOT for production — see values-eval.yaml.
+# Auto-detects `kind` (preferred) or `k3d`; pin with TERRAPOD_EVAL_TOOL=kind|k3d
+# when both are installed. Uses released images (tag overridable via
+# TERRAPOD_VERSION, default `latest`). NOT for production — see values-eval.yaml.
 set -euo pipefail
 
 CLUSTER="${TERRAPOD_EVAL_CLUSTER:-terrapod-eval}"
@@ -35,7 +36,22 @@ warn() { echo "${c_yel}!! ${c_reset} $*"; }
 die()  { echo "ERROR: $*" >&2; exit 1; }
 
 # ── Cluster tool detection ────────────────────────────────────────────────────
+# TERRAPOD_EVAL_TOOL pins the tool explicitly (kind|k3d); otherwise prefer kind.
+# The override matters when both are installed and you need a specific one — e.g.
+# CI's k3d matrix job runs on a runner that ALSO ships a pre-installed `kind`, so
+# without the pin auto-detection would silently pick kind and the smoke step's
+# k3d-pinned context lookup would miss.
 detect_tool() {
+  if [ -n "${TERRAPOD_EVAL_TOOL:-}" ]; then
+    case "$TERRAPOD_EVAL_TOOL" in
+      kind|k3d)
+        command -v "$TERRAPOD_EVAL_TOOL" >/dev/null 2>&1 \
+          || die "TERRAPOD_EVAL_TOOL=$TERRAPOD_EVAL_TOOL but '$TERRAPOD_EVAL_TOOL' is not installed"
+        echo "$TERRAPOD_EVAL_TOOL" ;;
+      *) die "TERRAPOD_EVAL_TOOL must be 'kind' or 'k3d', got '$TERRAPOD_EVAL_TOOL'" ;;
+    esac
+    return
+  fi
   if command -v kind >/dev/null 2>&1; then echo kind
   elif command -v k3d >/dev/null 2>&1; then echo k3d
   else die "neither 'kind' nor 'k3d' found — install one: https://kind.sigs.k8s.io or https://k3d.io"; fi

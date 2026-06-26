@@ -524,6 +524,10 @@ jobs:
           CI: "1"
           EVAL_NO_PORT_FORWARD: "1"
           TERRAPOD_VERSION: latest
+          # Pin the tool — the runner ships a pre-installed `kind`, so without
+          # this the k3d matrix job would auto-detect kind and the smoke step's
+          # k3d-pinned context lookup would miss.
+          TERRAPOD_EVAL_TOOL: ${{ matrix.tool }}
         run: scripts/eval.sh up
       - name: Smoke the running stack
         run: |
@@ -540,6 +544,8 @@ jobs:
           echo "Eval stack booted + UI served on ${{ matrix.tool }}"
       - name: Teardown
         if: always()
+        env:
+          TERRAPOD_EVAL_TOOL: ${{ matrix.tool }}
         run: scripts/eval.sh down
 
   # ── SAST (Semgrep) ─────────────────────────────────────
