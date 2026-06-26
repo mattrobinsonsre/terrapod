@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 ARG TARGETARCH
-ARG OPA_VERSION=1.17.1
+ARG OPA_VERSION=1.18.0
 # GitHub Releases intermittently 5xx; --retry-all-errors covers 5xx as
 # well as transport errors. 6 attempts × 4s base = ~25s ceiling.
 RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
@@ -50,7 +50,7 @@ LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapo
 
 # Bump APT_REFRESH to bust the cached apt layer and re-pull Debian
 # security patches. See Dockerfile.api for the same pattern.
-ARG APT_REFRESH=2026-06-08
+ARG APT_REFRESH=2026-06-26
 RUN echo "apt-refresh=${APT_REFRESH}" \
     && apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
         git \

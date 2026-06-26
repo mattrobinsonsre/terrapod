@@ -1778,12 +1778,14 @@ POST /api/terrapod/v1/vcs-connections
 }
 ```
 
-> `webhook-secret` (GitHub, optional) is **write-only** — it is never returned;
-> the response carries `has-webhook-secret` (boolean) instead. When set, this
-> connection's inbound webhooks are validated against it, falling back to the
-> global `vcs.github.webhook_secret` when absent. On `PATCH`, supply a
-> non-empty value to rotate, an explicit empty string to clear, or omit the
-> key to leave it untouched.
+> `webhook-secret` (optional, both providers) is **write-only** — it is never
+> returned; the response carries `has-webhook-secret` (boolean) instead. When
+> set, this connection's inbound webhooks are validated against it: GitHub
+> deliveries are HMAC-SHA256 verified, GitLab deliveries are matched against
+> the `X-Gitlab-Token` header (timing-safe). GitHub falls back to the global
+> `vcs.github.webhook_secret` when the per-connection secret is absent. On
+> `PATCH`, supply a non-empty value to rotate, an explicit empty string to
+> clear, or omit the key to leave it untouched.
 
 **GitLab example:**
 ```json
@@ -2018,7 +2020,15 @@ Response: dry-run `{dry_run:true, matched, would_change:[{id,name,diff}], unchan
 POST /api/terrapod/v1/vcs-events/github
 ```
 
-Validates HMAC-SHA256 signature and triggers an immediate poll cycle. The webhook secret must match `TERRAPOD_VCS__GITHUB__WEBHOOK_SECRET`.
+Validates HMAC-SHA256 signature and triggers an immediate poll cycle. The webhook secret must match the connection's own `webhook-secret`, falling back to the global `TERRAPOD_VCS__GITHUB__WEBHOOK_SECRET`.
+
+### GitLab Webhook Receiver
+
+```
+POST /api/terrapod/v1/vcs-events/gitlab
+```
+
+Validates the `X-Gitlab-Token` header (timing-safe comparison against the connection's `webhook-secret`) and triggers an immediate poll cycle. Handles `Push Hook`, `Tag Push Hook`, and `Merge Request Hook` events; other event types are acknowledged and ignored. Like GitHub, webhooks are an **optional accelerator** — the background poller still picks up changes within `vcs.poll_interval_seconds` if no webhook is configured.
 
 ---
 
