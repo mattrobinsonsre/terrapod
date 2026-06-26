@@ -16,7 +16,7 @@ import json
 from terrapod.config import settings
 from terrapod.services.summariser import (
     _clean_plan_json_bytes,
-    _truncate_head,
+    _fit_plan_json,
     _truncate_tail,
 )
 from terrapod.services.summariser_prompt import render_prompt
@@ -44,7 +44,7 @@ def build_messages(
     if case.surface in ("plan", "drift"):
         raw = json.dumps(case.plan_json or {}).encode("utf-8")
         cleaned = _clean_plan_json_bytes(raw)
-        primary = _truncate_head(cleaned, max_bytes)
+        primary = _fit_plan_json(cleaned, max_bytes)
         label, lang = "PLAN_JSON", "json"
     elif case.surface == "apply_failure":
         primary = _truncate_tail(case.apply_log.encode("utf-8"), max_bytes)

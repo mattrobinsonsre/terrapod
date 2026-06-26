@@ -51,19 +51,6 @@ def test_resolve_workspace_mode_truth_table(global_enabled, mode, expected):
 # ── Truncation ───────────────────────────────────────────────────────────
 
 
-def test_truncate_head_preserves_head():
-    data = b"a" * 100 + b"TAIL"
-    out = summariser._truncate_head(data, 50)
-    assert out.startswith("a" * 50)
-    assert "TAIL" not in out
-    assert "truncated from tail" in out
-
-
-def test_truncate_head_no_op_when_under_cap():
-    data = b"small"
-    assert summariser._truncate_head(data, 100) == "small"
-
-
 def test_truncate_tail_preserves_tail():
     data = b"HEAD" + b"a" * 100
     out = summariser._truncate_tail(data, 50)
@@ -77,10 +64,9 @@ def test_truncate_tail_no_op_when_under_cap():
 
 
 def test_truncate_zero_cap_returns_full_string():
-    # 0 means "unlimited" in this helper — _gather_inputs uses the
-    # config value directly. Code-context max=0 disables code entirely,
-    # but the truncation primitives themselves are no-ops at 0.
-    assert summariser._truncate_head(b"abc", 0) == "abc"
+    # 0 means "unlimited" in these helpers — _gather_inputs uses the
+    # config value directly. The truncation primitives themselves no-op at 0.
+    assert summariser._truncate_tail(b"abc", 0) == "abc"
 
 
 # ── _extract_tf_sources ──────────────────────────────────────────────────

@@ -67,9 +67,10 @@ def test_plan_summary_prompt_grounds_risk_in_plan_not_code_diff():
     assert "grounded in PLAN_JSON" in prompt
     assert "SOLELY" in prompt
     assert "no informative `resource_changes`" in prompt
-    # CODE_DIFF explicitly demoted to background-only, not a risk source.
-    assert "BACKGROUND ONLY" in prompt
-    assert "never derive what-changes — or risk — from it" in prompt.lower()
+    # CODE_DIFF explicitly demoted to background-only, not a risk source. The
+    # rule must be present; exact wording may evolve (de-duplicated 2026).
+    assert "background only" in prompt.lower()
+    assert "raise `risk_level`" in prompt
 
 
 def test_render_unknown_kind_raises():
@@ -293,19 +294,18 @@ def test_plan_summary_skill_forbids_empty_risk_factors_at_elevated_level():
     others.
     """
     skill = PLAN_SUMMARY_SKILL_PROMPT
-    # Dedicated CRITICAL block, not a single bullet.
+    # Dedicated CRITICAL block, not a single bullet. (Wording de-duplicated
+    # 2026; the invariant — elevated level requires >=1 factor — must remain.)
     assert "CRITICAL — `risk_level` and `risk_factors` are paired" in skill
-    # The biconditional names all three elevated levels.
-    assert 'risk_level in {"medium", "high", "critical"}  ⇔  len(risk_factors) ≥ 1' in skill
-    # The empty-array carve-out is bound to risk_level == "low".
-    assert "empty `risk_factors` array is permitted ONLY when" in skill
-    assert '`risk_level == "low"`' in skill
-    # Submitting elevated + empty is called out as invalid output, not
-    # just "discouraged".
-    assert "is invalid output" in skill
-    # And the prompt instructs the fallback: downgrade to low rather
-    # than return an elevated level with no factors.
-    assert 'set `risk_level = "low"`' in skill
+    # Names all three elevated levels + the pairing requirement.
+    assert "medium/high/critical" in skill
+    assert "REQUIRES at least one" in skill
+    # The empty-array carve-out is bound to low.
+    assert "empty array is valid ONLY at `low`" in skill
+    # An elevated rating with no factors is called out as worse than nothing.
+    assert "no rating at all" in skill
+    # And the fallback: downgrade to low rather than elevated-with-no-factors.
+    assert "`low` with `[]`" in skill
 
 
 def test_failure_analysis_skill_also_describes_code_diff():

@@ -704,6 +704,325 @@ def _apply_failure_cases() -> list[Case]:
     return out
 
 
+def _hard_cases() -> list[Case]:
+    """Discriminating cases — the ones that catch a prompt that over-flags
+    (cry-wolf) or under-flags (misses a buried risk). These are where an
+    already-strong model actually fails, so they're what validate the prompt."""
+    out: list[Case] = []
+
+    # --- cry-wolf traps: scary-looking actions, ~zero real risk -> low -------
+
+    # A null_resource replace: actions [delete, create] but no infrastructure.
+    out.append(
+        Case(
+            id="hard-noop-null-resource-replace",
+            surface="plan",
+            source="generated",
+            tags=("churn", "calibration"),
+            title="Replace null_resource (no blast radius)",
+            plan_json=_plan(
+                [
+                    _rc(
+                        "null_resource.provisioner",
+                        "null_resource",
+                        "provisioner",
+                        ["delete", "create"],
+                        {"triggers": {"v": "1"}},
+                        {"triggers": {"v": "2"}},
+                    )
+                ]
+            ),
+            truth=Truth(
+                risk=RiskBand(exact="low"),
+                must_not_flag=("null_resource.provisioner",),
+                forbidden_claims=("data loss", "critical"),
+            ),
+        )
+    )
+    # Rotating a managed password: a replace, routine, not data loss.
+    out.append(
+        Case(
+            id="hard-noop-random-password-rotate",
+            surface="plan",
+            source="generated",
+            tags=("churn", "calibration"),
+            title="Rotate random_password (routine)",
+            plan_json=_plan(
+                [
+                    _rc(
+                        "random_password.db",
+                        "random_password",
+                        "db",
+                        ["delete", "create"],
+                        {"length": 32},
+                        {"length": 32},
+                        after_unknown={"result": True, "bcrypt_hash": True},
+                    )
+                ]
+            ),
+            truth=Truth(risk=RiskBand(max="medium"), must_not_flag=("random_password.db",)),
+        )
+    )
+    # Tightening a security group: 0.0.0.0/0 -> internal CIDR is an IMPROVEMENT.
+    out.append(
+        Case(
+            id="hard-improve-sg-tighten",
+            surface="plan",
+            source="generated",
+            tags=("security", "calibration"),
+            title="Tighten SG from world to internal (improvement)",
+            plan_json=_plan(
+                [
+                    _rc(
+                        "aws_security_group.api",
+                        "aws_security_group",
+                        "api",
+                        ["update"],
+                        {
+                            "ingress": [
+                                {"from_port": 443, "to_port": 443, "cidr_blocks": ["0.0.0.0/0"]}
+                            ]
+                        },
+                        {
+                            "ingress": [
+                                {"from_port": 443, "to_port": 443, "cidr_blocks": ["10.0.0.0/8"]}
+                            ]
+                        },
+                    )
+                ]
+            ),
+            truth=Truth(risk=RiskBand(max="medium"), must_not_flag=("aws_security_group.api",)),
+        )
+    )
+    # Enabling encryption: a security improvement, not a risk.
+    out.append(
+        Case(
+            id="hard-improve-enable-encryption",
+            surface="plan",
+            source="generated",
+            tags=("security", "calibration"),
+            title="Enable S3 bucket encryption (improvement)",
+            plan_json=_plan(
+                [
+                    _rc(
+                        "aws_s3_bucket_server_side_encryption_configuration.data",
+                        "aws_s3_bucket_server_side_encryption_configuration",
+                        "data",
+                        ["create"],
+                        None,
+                        {
+                            "rule": [
+                                {
+                                    "apply_server_side_encryption_by_default": [
+                                        {"sse_algorithm": "aws:kms"}
+                                    ]
+                                }
+                            ]
+                        },
+                    )
+                ]
+            ),
+            truth=Truth(
+                risk=RiskBand(exact="low"),
+                must_not_flag=("aws_s3_bucket_server_side_encryption_configuration.data",),
+            ),
+        )
+    )
+    # Deleting an observability resource: low consequence.
+    out.append(
+        Case(
+            id="hard-noop-delete-log-group",
+            surface="plan",
+            source="generated",
+            tags=("churn", "calibration"),
+            title="Delete a CloudWatch log group (low)",
+            plan_json=_plan(
+                [
+                    _rc(
+                        "aws_cloudwatch_log_group.debug",
+                        "aws_cloudwatch_log_group",
+                        "debug",
+                        ["delete"],
+                        {"name": "/acme/debug"},
+                        None,
+                    )
+                ]
+            ),
+            truth=Truth(risk=RiskBand(max="medium"), must_not_flag=()),
+        )
+    )
+    # Large benign greenfield: many creates, all safe -> low (no inflation at scale).
+    greenfield = [
+        _rc(
+            "aws_cloudwatch_log_group.app",
+            "aws_cloudwatch_log_group",
+            "app",
+            ["create"],
+            None,
+            {"name": "/acme/app", "retention_in_days": 30},
+        ),
+        _rc("aws_iam_role.task", "aws_iam_role", "task", ["create"], None, {"name": "acme-task"}),
+        _rc(
+            "aws_lb_target_group.app",
+            "aws_lb_target_group",
+            "app",
+            ["create"],
+            None,
+            {"port": 443, "protocol": "HTTPS"},
+        ),
+        _rc(
+            "aws_ssm_parameter.cfg",
+            "aws_ssm_parameter",
+            "cfg",
+            ["create"],
+            None,
+            {"name": "/acme/cfg", "type": "String"},
+        ),
+    ]
+    out.append(
+        Case(
+            id="hard-noop-benign-greenfield",
+            surface="plan",
+            source="generated",
+            tags=("benign", "calibration"),
+            title="Greenfield of benign resources (low)",
+            plan_json=_plan(greenfield),
+            truth=Truth(
+                risk=RiskBand(exact="low"),
+                must_not_flag=("aws_iam_role.task", "aws_lb_target_group.app"),
+            ),
+        )
+    )
+    # In-place DB resize: medium (brief failover), not high.
+    out.append(
+        Case(
+            id="hard-calib-rds-resize-inplace",
+            surface="plan",
+            source="generated",
+            tags=("calibration",),
+            title="In-place RDS instance_class resize (medium)",
+            plan_json=_plan(
+                [
+                    _rc(
+                        "aws_db_instance.main",
+                        "aws_db_instance",
+                        "main",
+                        ["update"],
+                        {"instance_class": "db.r6g.large", "apply_immediately": True},
+                        {"instance_class": "db.r6g.xlarge", "apply_immediately": True},
+                    )
+                ]
+            ),
+            truth=Truth(
+                risk=RiskBand(min="medium", max="high"),
+                must_flag=(MustFlag("aws_db_instance.main", "medium"),),
+            ),
+        )
+    )
+
+    # --- buried needles + subtle exposures: real risk, easy to miss ----------
+
+    # One real DB destroy among many tag-only updates.
+    needle = [
+        _rc(
+            f"aws_ssm_parameter.p{i}",
+            "aws_ssm_parameter",
+            f"p{i}",
+            ["update"],
+            {"tags": {}},
+            {"tags": {"team": "x"}},
+        )
+        for i in range(12)
+    ]
+    needle.insert(
+        7,
+        _rc(
+            "aws_rds_cluster.core",
+            "aws_rds_cluster",
+            "core",
+            ["delete"],
+            {"engine": "aurora-postgresql"},
+            None,
+        ),
+    )
+    out.append(
+        Case(
+            id="hard-needle-db-destroy-in-churn",
+            surface="plan",
+            source="generated",
+            tags=("data_loss", "churn"),
+            title="One RDS destroy buried in 12 tag updates",
+            plan_json=_plan(needle),
+            truth=Truth(
+                risk=RiskBand(min="critical"),
+                must_flag=(MustFlag("aws_rds_cluster.core", "critical"),),
+                churn_addresses=tuple(f"aws_ssm_parameter.p{i}" for i in range(12)),
+                key_facts=("aws_rds_cluster.core",),
+            ),
+        )
+    )
+    # S3 bucket policy that adds a wildcard Principal — public, subtle (in a doc).
+    out.append(
+        Case(
+            id="hard-subtle-s3-policy-wildcard",
+            surface="plan",
+            source="generated",
+            tags=("security",),
+            title="S3 bucket policy adds Principal:* (public)",
+            plan_json=_plan(
+                [
+                    _rc(
+                        "aws_s3_bucket_policy.data",
+                        "aws_s3_bucket_policy",
+                        "data",
+                        ["update"],
+                        {
+                            "policy": '{"Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::111111111111:root"},"Action":"s3:GetObject"}]}'
+                        },
+                        {
+                            "policy": '{"Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject"}]}'
+                        },
+                    )
+                ]
+            ),
+            truth=Truth(
+                risk=RiskBand(min="high"),
+                must_flag=(MustFlag("aws_s3_bucket_policy.data", "high"),),
+            ),
+        )
+    )
+    # IAM policy that adds iam:PassRole on * — privilege escalation, subtle.
+    out.append(
+        Case(
+            id="hard-subtle-iam-passrole-wildcard",
+            surface="plan",
+            source="generated",
+            tags=("security",),
+            title="IAM policy adds iam:PassRole on * (priv-esc)",
+            plan_json=_plan(
+                [
+                    _rc(
+                        "aws_iam_role_policy.ci",
+                        "aws_iam_role_policy",
+                        "ci",
+                        ["update"],
+                        {
+                            "policy": '{"Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::acme/*"}]}'
+                        },
+                        {
+                            "policy": '{"Statement":[{"Effect":"Allow","Action":["s3:GetObject","iam:PassRole"],"Resource":"*"}]}'
+                        },
+                    )
+                ]
+            ),
+            truth=Truth(
+                risk=RiskBand(min="high"), must_flag=(MustFlag("aws_iam_role_policy.ci", "high"),)
+            ),
+        )
+    )
+    return out
+
+
 def build_generated_cases() -> list[Case]:
     """Return the full deterministic set of generated cases."""
     cases: list[Case] = []
@@ -714,4 +1033,5 @@ def build_generated_cases() -> list[Case]:
     cases += _churn_cases()
     cases += _drift_cases()
     cases += _apply_failure_cases()
+    cases += _hard_cases()
     return cases

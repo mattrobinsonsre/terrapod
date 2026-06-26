@@ -937,12 +937,19 @@ class AISummaryConfig(BaseModel):
         ),
     )
     plan_json_max_bytes: int = Field(
-        default=500_000,
+        default=600_000,
         description=(
-            "Max bytes of plan JSON attached. The runner-uploaded "
-            "plan JSON is truncated to this cap (keeping resource_changes "
-            "intact via best-effort structural truncation). Defends "
-            "against pathological monorepos producing 50MB plan files."
+            "Max bytes of plan JSON attached to the model request. This is a "
+            "last-resort ceiling for the model's context window, not routine "
+            "trimming: the cap only engages on plans with ~1000+ resource "
+            "changes (a cleaned change is a few hundred bytes); everything "
+            "smaller is sent whole and untouched. When it does engage, the "
+            "reduction is STRUCTURAL (`_fit_plan_json`) — every change keeps "
+            "its address and `change.actions`, so a destroy can never be "
+            "hidden; only per-resource attribute detail is trimmed. Defends "
+            "against pathological monorepos producing tens-of-MB plan files "
+            "that would otherwise overflow the context window and hard-fail "
+            "the summary."
         ),
     )
     code_diff_max_bytes: int = Field(
