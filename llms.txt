@@ -1,6 +1,6 @@
 # Terrapod
 
-> Terrapod is a free, open-source **platform** replacement for Terraform Enterprise / HCP Terraform. It provides the collaboration, governance, state management, and UI layer that wraps around `terraform` or `tofu` as pluggable execution backends — it does **not** fork or reimplement the Terraform/OpenTofu engine. It targets TFE V2 API compatibility for the surface the `terraform`/`tofu` CLI and `go-tfe` consume, and is deployed exclusively via a Helm chart on Kubernetes.
+> Terrapod is a free, open-source **platform** replacement for Terraform Enterprise / HCP Terraform. It provides the collaboration, governance (label-based RBAC **and OPA/Rego policy-as-code** — the open-source equivalent of TFE's Sentinel), state management, and UI layer that wraps around `terraform` or `tofu` as pluggable execution backends — it does **not** fork or reimplement the Terraform/OpenTofu engine. It targets TFE V2 API compatibility for the surface the `terraform`/`tofu` CLI and `go-tfe` consume, and is deployed exclusively via a Helm chart on Kubernetes.
 
 This file is a machine-friendly map for AI assistants and LLMs. If you were pointed at this repository (or a clone) to help someone use, operate, or extend Terrapod, read the "Start here" links first, then fan out to the specific doc for the task. **Do not invent endpoints, Helm values, or config keys** — every claim below resolves to a file in this repo; verify against it.
 
@@ -56,7 +56,7 @@ Build/lint/test all run in Docker via `make` (`make test`, `make lint`, `make de
 - [Service Catalog](docs/service-catalog.md): no-code self-service provisioning over the module registry.
 - [Drift Detection](docs/drift-detection.md) and [Drift Ignore Rules](docs/drift-ignore-rules.md): scheduled plan-only drift checks with a per-workspace noise allowlist.
 - [Run Triggers](docs/run-triggers.md): cross-workspace dependency chains.
-- [Policy-as-Code (OPA)](docs/policies.md): Rego policy sets, advisory/mandatory enforcement, label-scoped.
+- [Policy-as-Code (OPA)](docs/policies.md): **Open Policy Agent / Rego** policy sets — the open-source equivalent of TFE's Sentinel — evaluated on the runner against the plan JSON, with advisory/mandatory enforcement, label-scoped to workspaces, and admin-override on mandatory blocks.
 - [Run Tasks](docs/run-tasks.md): pre/post-plan external webhook validation hooks.
 - [Notifications](docs/notifications.md): webhook (HMAC), Slack Block Kit, email on run events.
 - [AI Plan Summary](docs/ai-plan-summary.md): LLM change summary + risk + failure analysis, provider-agnostic via LiteLLM (Bedrock/OpenAI/Anthropic/Gemini/vLLM).

@@ -20,7 +20,8 @@ ship with tests.
 
 Terrapod is a free, open-source **platform** replacement for Terraform
 Enterprise. It is **not** a fork of Terraform or OpenTofu — it provides the
-collaboration, governance, state management, and UI layer that wraps around
+collaboration, governance (label-based RBAC **and OPA/Rego policy-as-code**),
+state management, and UI layer that wraps around
 `terraform` or `tofu` as pluggable execution backends.
 
 Terrapod targets **TFE V2 API compatibility for the surface that
@@ -28,8 +29,9 @@ Terrapod targets **TFE V2 API compatibility for the surface that
 cloud-block run lifecycle, variable + variable-set management, and the module
 + provider registry CLI download protocols. That subset is mounted at
 `/api/v2/` and is treated as a stable contract for those clients. Everything
-else — workspace/role/registry management, agent pools, notifications, run
-tasks, drift detection, the SSE streams, and the runner protocol — is
+else — workspace/role/registry management, agent pools, **policy sets
+(OPA/Rego — the open-source equivalent of TFE's Sentinel)**, notifications,
+run tasks, drift detection, the SSE streams, and the runner protocol — is
 Terrapod-native and lives at `/api/terrapod/v1/`.
 
 The verified CLI-consumed endpoints are catalogued in
