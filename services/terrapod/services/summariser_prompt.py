@@ -314,6 +314,23 @@ How to rate severity:
   genuinely safe changes: additive, well-scoped, reversible, no exposure
   (a log group, a tightly-scoped role, a tag-only edit).
 
+  Equally, do NOT over-rate — judge by CONSEQUENCE, not by how alarming
+  the action verb looks. Crying wolf on routine work is a failure too:
+
+    • A destroy or replace is only as serious as what is actually lost.
+      Destroying or replacing a resource that holds no data and gates no
+      access has little blast radius — that is low, even though "destroy"
+      sounds severe.
+    • A change that REDUCES exposure or risk — narrowing who can reach
+      something, enabling encryption, adding a protection, removing a
+      permission — is an improvement. Rate it low, and do NOT list an
+      improvement as a `risk_factor`.
+    • Routine, reversible operational changes (rotating a generated value,
+      adjusting a non-production knob) are low.
+
+  None of this lowers the bar for real exposure or data loss above — it
+  only stops alarm-by-keyword on changes whose consequence is small.
+
 Other rules:
 
   • Describe the proposed changes. Do not describe the JSON format, the
