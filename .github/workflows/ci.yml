@@ -130,7 +130,7 @@ jobs:
         run: go build ./...
         working-directory: provider
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2
           working-directory: provider
@@ -174,7 +174,7 @@ jobs:
         run: go build ./...
         working-directory: go-terrapod
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2
           working-directory: go-terrapod
@@ -218,7 +218,7 @@ jobs:
         run: go build ./...
         working-directory: migrate
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2
           working-directory: migrate
@@ -261,7 +261,7 @@ jobs:
         run: go build ./...
         working-directory: publish
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2
           working-directory: publish
