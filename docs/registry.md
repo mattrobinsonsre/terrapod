@@ -793,7 +793,41 @@ api:
 
 ### Admin UI
 
-The web UI includes a cache admin page at `/admin/binary-cache` (admin-only) for viewing and purging cached CLI binaries and provider binaries.
+The web UI includes a cache admin page at `/admin/binary-cache` (admin-only) for viewing and purging cached CLI binaries and provider binaries, and a **Warm cache** panel for bulk pre-population.
+
+---
+
+## Cache pre-population
+
+Both caches normally fill on demand (a cache miss fetches from upstream), but you can also seed them ahead of time — essential for restricted-network deployments and useful anywhere you want the first run to be fast. Three ways, all building on the same warm routine:
+
+### Declarative warm manifest (Helm)
+
+List the binaries and providers to pre-pull under `registry.binary_cache.warm` / `registry.provider_cache.warm`. Shortly after the API starts, a single deduped (multi-replica-safe) warm runs, so a fresh — or air-gap-seeded — install comes up populated. It's idempotent: already-cached entries are cheap no-ops, so restarts and upgrades are safe, and a changed manifest is picked up on the next start.
+
+```yaml
+api:
+  config:
+    registry:
+      binary_cache:
+        warm:
+          - tool: tofu
+            version: "1.9.0"            # empty platforms → linux/amd64 + linux/arm64
+          - tool: terraform
+            version: "1.12.0"
+            platforms:
+              - { os: linux, arch: amd64 }
+      provider_cache:
+        warm:
+          - source: registry.terraform.io/hashicorp/aws   # hostname/namespace/type
+            version: "5.60.0"           # empty platforms → provider_cache.platforms
+```
+
+### Bulk warm (admin API / UI)
+
+`POST /api/terrapod/v1/admin/binary-cache/warm-bulk` warms many entries in one call (see [API reference](api-reference.md#bulk-warm-cache-admin)). The same operation is available interactively in the **Warm cache** panel on the `/admin/binary-cache` page — one entry per line. Warming is resilient: each (entry, platform) is warmed independently and reported back with its own success/error, so one missing version never fails the batch.
+
+Both the manifest and the bulk endpoint honour the upstream-source overrides (`*_mirror_url`, `*_version_index_url`, `provider_cache.upstream_registries`), so they pull from your internal mirror when one is configured.
 
 ---
 

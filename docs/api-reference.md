@@ -2364,6 +2364,36 @@ POST /api/terrapod/v1/admin/binary-cache/warm
 
 Pre-cache a specific tool version.
 
+### Bulk Warm Cache (Admin)
+
+```
+POST /api/terrapod/v1/admin/binary-cache/warm-bulk
+```
+
+Pre-cache many binaries and/or provider platforms in one call. Request body:
+
+```json
+{
+  "binaries": [
+    { "tool": "tofu", "version": "1.9.0", "platforms": [{ "os": "linux", "arch": "amd64" }] }
+  ],
+  "providers": [
+    { "source": "registry.terraform.io/hashicorp/aws", "version": "5.60.0" }
+  ]
+}
+```
+
+`platforms` is optional — omitted, a binary falls back to linux/amd64 + linux/arm64 and a provider falls back to the configured `provider_cache.platforms`. Provider `source` is the `hostname/namespace/type` address. Resilient: each (entry, platform) is warmed independently and reported back, so one missing version doesn't fail the batch. Returns HTTP 200 with per-target results even when some failed:
+
+```json
+{ "total": 2, "succeeded": 1, "failed": 1, "results": [
+  { "kind": "binary", "ref": "tofu 1.9.0 linux/amd64", "ok": true },
+  { "kind": "provider", "ref": "registry.terraform.io/hashicorp/aws 5.60.0 linux/amd64", "ok": false, "error": "..." }
+]}
+```
+
+The same warming also runs declaratively from the Helm `registry.binary_cache.warm` / `registry.provider_cache.warm` manifest shortly after startup, so a fresh install comes up populated. See [Cache pre-population](registry.md#cache-pre-population).
+
 ### Purge Cache (Admin)
 
 ```

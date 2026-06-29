@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_admin
 from terrapod.api.serialization import rfc3339
-from terrapod.config import settings
+from terrapod.config import WarmBinaryEntry, WarmProviderEntry, settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.binary_cache_service import (
@@ -39,6 +39,7 @@ from terrapod.services.binary_cache_service import (
     resolve_version,
     warm_binary,
 )
+from terrapod.services.cache_warm_service import warm_from_manifest
 from terrapod.services.provider_cache_service import (
     list_cached_providers,
     purge_cached_provider,
@@ -248,6 +249,49 @@ async def warm_binary_endpoint(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={"status": "cached", "download_url": url},
+    )
+
+
+class BulkWarmRequest(BaseModel):
+    """Bulk cache pre-population request — warm many binaries + provider
+    platforms in one call. Powers the admin UI bulk-warm and automation."""
+
+    binaries: list[WarmBinaryEntry] = []
+    providers: list[WarmProviderEntry] = []
+
+
+@router.post("/admin/binary-cache/warm-bulk")
+async def warm_bulk_endpoint(
+    body: BulkWarmRequest,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    storage: ObjectStore = Depends(get_storage),
+) -> JSONResponse:
+    """Warm a batch of binaries and/or provider platforms.
+
+    Resilient: each (entry, platform) is warmed independently and reported back
+    with its own ok/error, so one missing version doesn't fail the whole batch.
+    Returns HTTP 200 with per-entry results even when some entries failed; the
+    caller inspects `failed`/`results` to surface partial outcomes.
+    """
+    if not body.binaries and not body.providers:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No entries to warm — provide at least one binary or provider.",
+        )
+
+    summary = await warm_from_manifest(db, storage, body.binaries, body.providers)
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "total": summary.total,
+            "succeeded": summary.succeeded,
+            "failed": summary.failed,
+            "results": [
+                {"kind": r.kind, "ref": r.ref, "ok": r.ok, "error": r.error}
+                for r in summary.results
+            ],
+        },
     )
 
 

@@ -53,6 +53,15 @@ export default function CachePage() {
   const [selectedProviders, setSelectedProviders] = useState<Set<string>>(new Set())
   const [purging, setPurging] = useState(false)
 
+  // Bulk-warm state
+  const [showWarm, setShowWarm] = useState(false)
+  const [warmBinariesText, setWarmBinariesText] = useState('')
+  const [warmProvidersText, setWarmProvidersText] = useState('')
+  const [warming, setWarming] = useState(false)
+  const [warmResults, setWarmResults] = useState<
+    { kind: string; ref: string; ok: boolean; error?: string }[] | null
+  >(null)
+
   type BinarySortKey = 'tool' | 'version' | 'os' | 'arch' | 'cached-at'
   const binaryAccessor = useCallback((item: CachedBinary, key: BinarySortKey) => {
     switch (key) {
@@ -108,6 +117,61 @@ export default function CachePage() {
       setError(err instanceof Error ? err.message : 'Failed to load cache')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Parse "os/arch os/arch ..." trailing tokens into platform objects.
+  function parsePlatforms(tokens: string[]): { os: string; arch: string }[] {
+    return tokens
+      .map((t) => t.split('/'))
+      .filter((p) => p.length === 2 && p[0] && p[1])
+      .map((p) => ({ os: p[0], arch: p[1] }))
+  }
+
+  async function handleBulkWarm() {
+    setError('')
+    setSuccess('')
+    setWarmResults(null)
+
+    // Each line: "<tool> <version> [os/arch ...]" / "<source> <version> [os/arch ...]".
+    const binaries = warmBinariesText
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => {
+        const [tool, version, ...rest] = l.split(/\s+/)
+        return { tool, version, platforms: parsePlatforms(rest) }
+      })
+    const providers = warmProvidersText
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => {
+        const [source, version, ...rest] = l.split(/\s+/)
+        return { source, version, platforms: parsePlatforms(rest) }
+      })
+
+    if (binaries.length === 0 && providers.length === 0) {
+      setError('Add at least one binary or provider line to warm.')
+      return
+    }
+
+    setWarming(true)
+    try {
+      const res = await apiFetch('/api/terrapod/v1/admin/binary-cache/warm-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ binaries, providers }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.detail || `Warm failed (${res.status})`)
+      setWarmResults(data.results || [])
+      setSuccess(`Warmed ${data.succeeded}/${data.total} (${data.failed} failed)`)
+      await loadAll()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to warm cache')
+    } finally {
+      setWarming(false)
     }
   }
 
@@ -268,6 +332,74 @@ export default function CachePage() {
           <LoadingSpinner />
         ) : (
           <>
+            {/* Bulk warm (pre-population) */}
+            <div className="mb-6 bg-slate-800/50 rounded-lg border border-slate-700/50">
+              <button
+                onClick={() => setShowWarm((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left text-slate-200 font-semibold"
+                aria-expanded={showWarm}
+              >
+                <span>Warm cache</span>
+                <span className="text-slate-400 text-sm">{showWarm ? 'Hide' : 'Pre-populate…'}</span>
+              </button>
+              {showWarm && (
+                <div className="px-4 pb-4 space-y-4 border-t border-slate-700/50 pt-4">
+                  <p className="text-sm text-slate-400">
+                    Pre-pull binaries and provider platforms into the cache (one per line).
+                    Trailing <code className="text-slate-300">os/arch</code> tokens are optional —
+                    omit them to use the configured default platforms.
+                  </p>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label htmlFor="warm-binaries" className="block text-sm text-slate-300 mb-1">
+                        Binaries — <span className="text-slate-500">tool version [os/arch …]</span>
+                      </label>
+                      <textarea
+                        id="warm-binaries"
+                        value={warmBinariesText}
+                        onChange={(e) => setWarmBinariesText(e.target.value)}
+                        rows={4}
+                        spellCheck={false}
+                        placeholder={'tofu 1.9.0\nterraform 1.12.0 linux/amd64 linux/arm64'}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-900/70 border border-slate-700 text-sm text-slate-200 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="warm-providers" className="block text-sm text-slate-300 mb-1">
+                        Providers — <span className="text-slate-500">host/ns/type version [os/arch …]</span>
+                      </label>
+                      <textarea
+                        id="warm-providers"
+                        value={warmProvidersText}
+                        onChange={(e) => setWarmProvidersText(e.target.value)}
+                        rows={4}
+                        spellCheck={false}
+                        placeholder={'registry.terraform.io/hashicorp/aws 5.60.0'}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-900/70 border border-slate-700 text-sm text-slate-200 font-mono"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleBulkWarm}
+                    disabled={warming}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-violet-600/30 hover:bg-violet-600/50 disabled:opacity-50 text-violet-200 transition-colors"
+                  >
+                    {warming ? 'Warming…' : 'Warm'}
+                  </button>
+                  {warmResults && warmResults.length > 0 && (
+                    <ul className="space-y-1 text-sm">
+                      {warmResults.map((r, i) => (
+                        <li key={i} className={r.ok ? 'text-green-400' : 'text-red-400'}>
+                          {r.ok ? '✓' : '✗'} <span className="text-slate-300">{r.ref}</span>
+                          {!r.ok && r.error ? ` — ${r.error}` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Binary Cache Section */}
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-slate-200">CLI Binaries</h2>

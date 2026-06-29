@@ -229,6 +229,86 @@ class TestAdminWarm:
         assert resp.status_code == 400
 
 
+class TestAdminWarmBulk:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_non_admin_returns_403(self, *mocks):
+        app = _make_app(_user(roles=["everyone"]))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/admin/binary-cache/warm-bulk",
+                json={"binaries": [{"tool": "tofu", "version": "1.9.0"}]},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 403
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_empty_body_returns_400(self, *mocks):
+        app = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/admin/binary-cache/warm-bulk",
+                json={"binaries": [], "providers": []},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 400
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.binary_cache.warm_from_manifest", new_callable=AsyncMock)
+    async def test_bulk_reports_partial_results(self, mock_warm, *mocks):
+        from terrapod.services.cache_warm_service import WarmResult, WarmSummary
+
+        mock_warm.return_value = WarmSummary(
+            results=[
+                WarmResult("binary", "tofu 1.9.0 linux/amd64", ok=True),
+                WarmResult(
+                    "provider",
+                    "registry.terraform.io/hashicorp/aws 5.60.0 linux/amd64",
+                    ok=False,
+                    error="upstream 404",
+                ),
+            ]
+        )
+        app = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/admin/binary-cache/warm-bulk",
+                json={
+                    "binaries": [{"tool": "tofu", "version": "1.9.0"}],
+                    "providers": [
+                        {"source": "registry.terraform.io/hashicorp/aws", "version": "5.60.0"}
+                    ],
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 2
+        assert body["succeeded"] == 1
+        assert body["failed"] == 1
+        assert body["results"][1]["error"] == "upstream 404"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_invalid_provider_source_returns_422(self, *mocks):
+        # source must be hostname/namespace/type — a bare name is rejected by
+        # the model before any warming runs.
+        app = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/admin/binary-cache/warm-bulk",
+                json={"providers": [{"source": "aws", "version": "5.60.0"}]},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+
+
 class TestAdminPurge:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

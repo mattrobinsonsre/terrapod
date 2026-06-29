@@ -42,3 +42,36 @@ test.describe('Admin access control', () => {
     expect(hasAdminContent).toBe(false);
   });
 });
+
+test.describe('Cache bulk-warm (#606)', () => {
+  test('admin can open the warm panel and a bad provider source surfaces an error', async ({ adminPage }) => {
+    await adminPage.goto('/admin/binary-cache');
+    await expect(adminPage.locator('h1:has-text("Cache")')).toBeVisible();
+
+    // Expand the collapsible "Warm cache" panel.
+    await adminPage.getByRole('button', { name: 'Warm cache' }).click();
+    const providers = adminPage.locator('#warm-providers');
+    await expect(providers).toBeVisible();
+
+    // A provider source must be hostname/namespace/type — a bare name is
+    // rejected (422) by the server before any upstream fetch, so this is
+    // deterministic without egress.
+    await providers.fill('aws 5.60.0');
+    await adminPage.getByRole('button', { name: 'Warm', exact: true }).click();
+
+    // The validation failure surfaces in the error banner.
+    await expect(adminPage.locator('text=/Warm failed|hostname\\/namespace\\/type/i')).toBeVisible({
+      timeout: 15_000,
+    });
+  });
+
+  test('regular user is redirected from the cache admin page', async ({ userPage }) => {
+    await userPage.goto('/admin/binary-cache');
+    await userPage.waitForTimeout(3_000);
+    const hasContent = await userPage
+      .locator('h1:has-text("Cache")')
+      .isVisible()
+      .catch(() => false);
+    expect(hasContent).toBe(false);
+  });
+});

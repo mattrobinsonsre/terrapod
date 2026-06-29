@@ -690,7 +690,31 @@
                   "type": "string",
                   "enum": ["off", "checksum", "signature"]
                 },
-                "allow_unsigned": { "type": "boolean" }
+                "allow_unsigned": { "type": "boolean" },
+                "warm": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["source", "version"],
+                    "properties": {
+                      "source": { "type": "string" },
+                      "version": { "type": "string" },
+                      "platforms": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["os", "arch"],
+                          "properties": {
+                            "os": { "type": "string" },
+                            "arch": { "type": "string" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
               }
             },
             "binary_cache": {
@@ -715,6 +739,33 @@
                 "signing_keys": {
                   "type": "object",
                   "additionalProperties": { "type": "string" }
+                },
+                "warm": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["version"],
+                    "properties": {
+                      "tool": {
+                        "type": "string",
+                        "enum": ["terraform", "tofu", "terragrunt"]
+                      },
+                      "version": { "type": "string" },
+                      "platforms": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["os", "arch"],
+                          "properties": {
+                            "os": { "type": "string" },
+                            "arch": { "type": "string" }
+                          }
+                        }
+                      }
+                    }
+                  }
                 }
               }
             },

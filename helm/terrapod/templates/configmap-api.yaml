@@ -213,6 +213,10 @@ data:
         {{- if hasKey .Values.api.config.registry.provider_cache "allow_unsigned" }}
         allow_unsigned: {{ .Values.api.config.registry.provider_cache.allow_unsigned }}
         {{- end }}
+        {{- with .Values.api.config.registry.provider_cache.warm }}
+        warm:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
       {{- end }}
       {{- if .Values.api.config.registry.binary_cache }}
       binary_cache:
@@ -244,6 +248,10 @@ data:
         {{- if .Values.api.config.registry.binary_cache.signing_keys }}
         signing_keys:
           {{- toYaml .Values.api.config.registry.binary_cache.signing_keys | nindent 10 }}
+        {{- end }}
+        {{- with .Values.api.config.registry.binary_cache.warm }}
+        warm:
+          {{- toYaml . | nindent 10 }}
         {{- end }}
       {{- end }}
       {{- if .Values.api.config.registry.module_interface }}
