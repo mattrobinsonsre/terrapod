@@ -113,30 +113,21 @@ async def _fetch_bytes(client: httpx.AsyncClient, url: str) -> bytes:
     return resp.content
 
 
-async def verify_binary(
+async def fetch_sums_and_sig(
     client: httpx.AsyncClient,
     tool: str,
     version: str,
-    os_: str,
-    arch: str,
-    artifact_sha256_hex: str,
     *,
     level: VerifyLevel,
-) -> None:
-    """Verify a downloaded CLI binary against its published SHA256SUMS.
+) -> tuple[bytes, bytes | None]:
+    """Fetch the publisher SHA256SUMS (+ detached sig in ``signature`` mode)
+    for a CLI tool/version and verify the signature against the pinned key.
 
-    Raises ``VerificationError`` (fail-closed) on any mismatch, bad signature,
-    missing manifest entry, or unreachable verification material. No-op when
-    ``level == "off"``.
+    Returns ``(manifest_bytes, signature_bytes_or_None)``. Raises
+    ``VerificationError`` on a bad/absent signature or unreachable material.
+    Used both to verify a downloaded binary and to persist the signed manifest
+    for the runner (which re-verifies it independently with the same pinned key).
     """
-    if level == "off":
-        logger.warning(
-            "binary verification disabled (verify=off) — trusting upstream bytes",
-            tool=tool,
-            version=version,
-        )
-        return
-
     spec = _BINARY_SPECS.get(tool)
     if spec is None:
         raise VerificationError(f"no verification spec for tool {tool!r}")
@@ -151,6 +142,7 @@ async def verify_binary(
     sums_url = spec.sums_path.format(base=base, version=version)
     manifest = await _fetch_bytes(client, sums_url)
 
+    signature: bytes | None = None
     if level == "signature":
         sig_url = spec.sig_path.format(base=base, version=version)
         signature = await _fetch_bytes(client, sig_url)
@@ -161,20 +153,52 @@ async def verify_binary(
                 f"GPG signature on {sums_url} did not verify against the pinned "
                 f"{tool} publisher key — refusing to cache (possible tampering)"
             )
+    return manifest, signature
+
+
+async def verify_binary(
+    client: httpx.AsyncClient,
+    tool: str,
+    version: str,
+    os_: str,
+    arch: str,
+    artifact_sha256_hex: str,
+    *,
+    level: VerifyLevel,
+) -> tuple[bytes, bytes | None]:
+    """Verify a downloaded CLI binary against its published SHA256SUMS.
+
+    Returns the ``(manifest, signature)`` it verified against so the caller can
+    persist them for the runner. Raises ``VerificationError`` (fail-closed) on
+    any mismatch, bad signature, missing manifest entry, or unreachable
+    material. Returns ``(b"", None)`` when ``level == "off"``.
+    """
+    if level == "off":
+        logger.warning(
+            "binary verification disabled (verify=off) — trusting upstream bytes",
+            tool=tool,
+            version=version,
+        )
+        return b"", None
+
+    spec = _BINARY_SPECS[tool] if tool in _BINARY_SPECS else None
+    if spec is None:
+        raise VerificationError(f"no verification spec for tool {tool!r}")
+
+    manifest, signature = await fetch_sums_and_sig(client, tool, version, level=level)
 
     sums = parse_sha256sums(manifest.decode("utf-8", errors="replace"))
-    expected = sums.get(spec.artifact_name.format(version=version, os=os_, arch=arch))
+    artifact = spec.artifact_name.format(version=version, os=os_, arch=arch)
+    expected = sums.get(artifact)
     if expected is None:
-        raise VerificationError(
-            f"{spec.artifact_name.format(version=version, os=os_, arch=arch)} not "
-            f"listed in {sums_url} — cannot verify"
-        )
+        raise VerificationError(f"{artifact} not listed in the SHA256SUMS manifest — cannot verify")
     if expected.lower() != artifact_sha256_hex.lower():
         raise VerificationError(
             f"checksum mismatch for {tool} {version} {os_}/{arch}: "
             f"downloaded {artifact_sha256_hex}, manifest says {expected} — "
             f"refusing to cache (possible tampering)"
         )
+    return manifest, signature
 
 
 async def verify_provider(
