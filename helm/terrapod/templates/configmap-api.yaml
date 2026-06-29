@@ -10,6 +10,12 @@ metadata:
 data:
   config.yaml: |
     log_level: {{ .Values.api.config.log_level | quote }}
+    {{- if hasKey .Values.api.config "debug" }}
+    debug: {{ .Values.api.config.debug }}
+    {{- end }}
+    {{- if hasKey .Values.api.config "json_logs" }}
+    json_logs: {{ .Values.api.config.json_logs }}
+    {{- end }}
     {{- if .Values.api.config.external_url }}
     external_url: {{ .Values.api.config.external_url | quote }}
     {{- end }}
@@ -147,6 +153,10 @@ data:
               - {{ . | quote }}
               {{- end }}
             {{- end }}
+            {{- if .claims_to_roles }}
+            claims_to_roles:
+              {{- toYaml .claims_to_roles | nindent 14 }}
+            {{- end }}
           {{- end }}
         {{- end }}
         {{- if .Values.api.config.auth.sso.saml }}
@@ -160,11 +170,18 @@ data:
             {{- if .entity_id }}
             entity_id: {{ .entity_id | quote }}
             {{- end }}
+            {{- if .acs_url }}
+            acs_url: {{ .acs_url | quote }}
+            {{- end }}
             {{- if .role_prefixes }}
             role_prefixes:
               {{- range .role_prefixes }}
               - {{ . | quote }}
               {{- end }}
+            {{- end }}
+            {{- if .claims_to_roles }}
+            claims_to_roles:
+              {{- toYaml .claims_to_roles | nindent 14 }}
             {{- end }}
           {{- end }}
         {{- end }}
@@ -229,6 +246,10 @@ data:
           {{- toYaml .Values.api.config.registry.binary_cache.signing_keys | nindent 10 }}
         {{- end }}
       {{- end }}
+      {{- if .Values.api.config.registry.module_interface }}
+      module_interface:
+        enabled: {{ .Values.api.config.registry.module_interface.enabled }}
+      {{- end }}
     {{- end }}
     {{- if .Values.api.config.catalog }}
     catalog:
@@ -244,6 +265,9 @@ data:
       tmpdir: {{ .Values.api.config.vcs.tmpdir | default .Values.api.ephemeralStorage.mountPath | default "/var/lib/terrapod/tmp" | quote }}
       {{- with .Values.api.config.vcs.archive_cache_retention_days }}
       archive_cache_retention_days: {{ . }}
+      {{- end }}
+      {{- with .Values.api.config.vcs.tmpdir_min_free_bytes }}
+      tmpdir_min_free_bytes: {{ . | int64 }}
       {{- end }}
     {{- end }}
     {{- if .Values.api.config.audit }}
@@ -347,11 +371,38 @@ data:
     {{- end }}
     default_execution_backend: {{ .Values.api.config.default_execution_backend | default "tofu" | quote }}
     default_terraform_version: {{ .Values.api.config.default_terraform_version | default "1.12" | quote }}
-    {{- if .Values.api.config.cors.allow_origins }}
+    {{- if .Values.api.config.cors }}
     cors:
+      {{- if .Values.api.config.cors.allow_origins }}
       allow_origins:
         {{- range .Values.api.config.cors.allow_origins }}
         - {{ . | quote }}
         {{- end }}
+      {{- end }}
+      {{- if hasKey .Values.api.config.cors "allow_credentials" }}
+      allow_credentials: {{ .Values.api.config.cors.allow_credentials }}
+      {{- end }}
+      {{- with .Values.api.config.cors.allow_methods }}
+      allow_methods:
+        {{- range . }}
+        - {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.api.config.cors.allow_headers }}
+      allow_headers:
+        {{- range . }}
+        - {{ . | quote }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.api.config.rate_limit }}
+    rate_limit:
+      enabled: {{ .Values.api.config.rate_limit.enabled }}
+      {{- /* Rendered directly (no `| default`): 0 means "unlimited" for these
+             rates and Helm's `default` would silently rewrite a configured 0. */}}
+      requests_per_minute: {{ .Values.api.config.rate_limit.requests_per_minute }}
+      authenticated_requests_per_minute: {{ .Values.api.config.rate_limit.authenticated_requests_per_minute }}
+      runner_requests_per_minute: {{ .Values.api.config.rate_limit.runner_requests_per_minute }}
+      auth_requests_per_minute: {{ .Values.api.config.rate_limit.auth_requests_per_minute }}
     {{- end }}
 {{- end }}

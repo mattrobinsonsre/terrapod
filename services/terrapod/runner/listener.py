@@ -40,18 +40,15 @@ logger = get_logger(__name__)
 # Shutdown flag
 _shutdown = asyncio.Event()
 
-# SSE read watchdog: API sends a keepalive comment every 1s, so any stretch
-# of silence longer than this means the stream has gone silent even though
-# the TCP socket is still open (e.g. API-side Redis pubsub detached, proxy
-# buffering). 30s is generous enough to absorb network jitter without
-# accidentally killing healthy streams.
-_SSE_READ_TIMEOUT = int(os.environ.get("TERRAPOD_SSE_READ_TIMEOUT", "30"))
-
-# Mandatory periodic reconnect — even a healthy connection is torn down
-# and rebuilt at this interval to guarantee no stale subscription state
-# survives forever. 10 minutes balances "cheap to reconnect" against
-# "don't churn unnecessarily."
-_SSE_MAX_AGE = int(os.environ.get("TERRAPOD_SSE_MAX_AGE", "600"))
+# SSE tuning lives on RunnerConfig (sse_read_timeout / sse_max_age), layered
+# from runners.yaml + env. The listener reads them via self._sse_read_timeout /
+# self._sse_max_age (set in __init__) rather than module-level env constants.
+#
+# - read watchdog (sse_read_timeout): the API sends a keepalive comment every
+#   1s, so silence longer than this means the stream has gone quiet even though
+#   the TCP socket is open (API-side Redis pubsub detached, proxy buffering).
+# - mandatory reconnect (sse_max_age): even a healthy connection is rebuilt at
+#   this interval so no stale subscription state survives forever.
 
 
 class RunnerListener:
@@ -59,12 +56,18 @@ class RunnerListener:
 
     def __init__(self):
         self.identity = None
+        # Single layered config object (defaults → runners.yaml → env) — the
+        # listener reads ALL its non-sensitive settings from here, never from
+        # os.environ. Only secrets (join token) + runtime values (POD_NAME)
+        # remain as Deployment env (read at their point of use).
         self.runner_config = load_runner_config()
-        self._heartbeat_interval = int(os.environ.get("TERRAPOD_HEARTBEAT_INTERVAL", "60"))
-        self._max_concurrent = int(os.environ.get("TERRAPOD_MAX_CONCURRENT", "3"))
-        self._health_port = int(os.environ.get("TERRAPOD_HEALTH_PORT", "8081"))
-        self._sse_retry_interval = int(os.environ.get("TERRAPOD_SSE_RETRY_INTERVAL", "5"))
-        self._poll_interval = int(os.environ.get("TERRAPOD_POLL_INTERVAL", "30"))
+        self._heartbeat_interval = self.runner_config.heartbeat_interval
+        self._max_concurrent = self.runner_config.max_concurrent
+        self._health_port = self.runner_config.health_port
+        self._sse_retry_interval = self.runner_config.sse_retry_interval
+        self._poll_interval = self.runner_config.poll_interval
+        self._sse_read_timeout = self.runner_config.sse_read_timeout
+        self._sse_max_age = self.runner_config.sse_max_age
         self._identity_ready = False
         self._last_heartbeat_at: float | None = None
         self._active_launches = 0  # count of concurrent launch operations
@@ -120,7 +123,7 @@ class RunnerListener:
         """Establish or re-establish listener identity."""
         from terrapod.runner.identity import establish_identity
 
-        self.identity = await establish_identity()
+        self.identity = await establish_identity(self.runner_config)
         self._identity_ready = True
         # Drop any cached headers so the next call re-encodes against the new cert.
         self._cached_auth_headers_for_cert = None
@@ -182,9 +185,11 @@ class RunnerListener:
             renew_loop,
         )
 
-        cert_validity_seconds = int(os.environ.get("TERRAPOD_LISTENER_CERT_TTL_SECONDS", "3600"))
-        secret_name = _credentials_secret_name(self.identity.name)
-        namespace = _read_in_pod_namespace()
+        cert_validity_seconds = self.runner_config.listener_cert_ttl_seconds
+        secret_name = _credentials_secret_name(
+            self.identity.name, self.runner_config.credentials_secret_name
+        )
+        namespace = _read_in_pod_namespace(self.runner_config.listener_namespace)
 
         await renew_loop(
             self,
@@ -218,7 +223,7 @@ class RunnerListener:
             listener_id=str(self.identity.listener_id) if self.identity else "<unknown>",
             name=self.identity.name if self.identity else "<unknown>",
         )
-        clear_credentials_secret()
+        clear_credentials_secret(self.runner_config)
         await self._establish_identity()
 
         # Recreate HTTP clients with the new identity base URL
@@ -480,17 +485,21 @@ class RunnerListener:
                 # Mandatory periodic reconnect — return cleanly so the outer
                 # loop reopens a fresh connection (and a fresh Redis pubsub
                 # subscription on the API side).
-                if time.monotonic() - connected_at > _SSE_MAX_AGE:
-                    logger.info("SSE max-age reached, reconnecting", age=_SSE_MAX_AGE)
+                if time.monotonic() - connected_at > self._sse_max_age:
+                    logger.info("SSE max-age reached, reconnecting", age=self._sse_max_age)
                     return
 
                 try:
-                    line = await asyncio.wait_for(line_iter.__anext__(), timeout=_SSE_READ_TIMEOUT)
+                    line = await asyncio.wait_for(
+                        line_iter.__anext__(), timeout=self._sse_read_timeout
+                    )
                 except StopAsyncIteration:
                     return  # Stream closed by server — outer loop reconnects
                 except TimeoutError:
                     # Silent stall — kill the connection, outer loop reconnects.
-                    logger.warning("SSE read timeout — stream stalled", timeout=_SSE_READ_TIMEOUT)
+                    logger.warning(
+                        "SSE read timeout — stream stalled", timeout=self._sse_read_timeout
+                    )
                     return
 
                 if line.startswith("event:"):
@@ -673,7 +682,7 @@ class RunnerListener:
             ca_secret_name=ca_secret_name,
         )
 
-        namespace = os.environ.get("TERRAPOD_RUNNER_NAMESPACE", "terrapod-runners")
+        namespace = self.runner_config.runner_namespace
 
         try:
             job_name = await create_job(spec)
@@ -953,7 +962,7 @@ class RunnerListener:
 
         from terrapod.runner.job_manager import _get_core_api
 
-        namespace = os.environ.get("TERRAPOD_RUNNER_NAMESPACE", "terrapod-runners")
+        namespace = self.runner_config.runner_namespace
 
         secret = k8s_client.V1Secret(
             metadata=k8s_client.V1ObjectMeta(
@@ -1005,7 +1014,7 @@ class RunnerListener:
 
         from terrapod.runner.job_manager import _get_core_api
 
-        namespace = os.environ.get("TERRAPOD_RUNNER_NAMESPACE", "terrapod-runners")
+        namespace = self.runner_config.runner_namespace
 
         string_data: dict[str, str] = {}
         if terraform_vars:
@@ -1087,7 +1096,7 @@ class RunnerListener:
 
         from terrapod.runner.job_manager import _get_core_api
 
-        namespace = os.environ.get("TERRAPOD_RUNNER_NAMESPACE", "terrapod-runners")
+        namespace = self.runner_config.runner_namespace
 
         secret = k8s_client.V1Secret(
             metadata=k8s_client.V1ObjectMeta(

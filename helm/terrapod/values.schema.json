@@ -143,6 +143,9 @@
         "tokenTTLSeconds": { "type": "integer", "minimum": 1 },
         "maxTokenTTLSeconds": { "type": "integer", "minimum": 1 },
         "staleTimeoutSeconds": { "type": "integer", "minimum": 60 },
+        "launchTimeoutSeconds": { "type": "integer", "minimum": 0 },
+        "defaultTerraformVersion": { "type": "string" },
+        "defaultExecutionBackend": { "type": "string", "enum": ["tofu", "terraform"] },
         "driftMaxDurationSeconds": { "type": "integer", "minimum": 0 },
         "lifecycleDestroyRetries": { "type": "integer", "minimum": 0 },
         "lifecycleDestroyRetryBackoffSeconds": { "type": "integer", "minimum": 0 },
@@ -163,6 +166,12 @@
         "healthPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
         "apiUrl": { "type": "string" },
         "publicApiUrl": { "type": "string" },
+        "heartbeatInterval": { "type": "integer", "minimum": 1 },
+        "maxConcurrent": { "type": "integer", "minimum": 1 },
+        "pollInterval": { "type": "integer", "minimum": 1 },
+        "sseReadTimeout": { "type": "integer", "minimum": 1 },
+        "sseMaxAge": { "type": "integer", "minimum": 1 },
+        "sseRetryInterval": { "type": "integer", "minimum": 1 },
         "joinToken": { "type": "string" },
         "existingSecret": { "type": "string" },
         "joinTokenKey": { "type": "string" },
@@ -499,6 +508,8 @@
           "type": "string",
           "enum": ["debug", "info", "warning", "error", "critical"]
         },
+        "debug": { "type": "boolean" },
+        "json_logs": { "type": "boolean" },
         "external_url": { "type": "string" },
         "public_webhook_url": { "type": "string" },
         "database": {
@@ -622,6 +633,7 @@
                       "audience": { "type": "string" },
                       "groups_claim": { "type": "string" },
                       "role_prefixes": { "type": "array", "items": { "type": "string" } },
+                      "claims_to_roles": { "type": "array", "items": { "type": "object" } },
                       "existingSecret": { "type": "string" },
                       "existingSecretKey": { "type": "string" }
                     }
@@ -638,7 +650,9 @@
                       "display_name": { "type": "string" },
                       "metadata_url": { "type": "string" },
                       "entity_id": { "type": "string" },
-                      "role_prefixes": { "type": "array", "items": { "type": "string" } }
+                      "acs_url": { "type": "string" },
+                      "role_prefixes": { "type": "array", "items": { "type": "string" } },
+                      "claims_to_roles": { "type": "array", "items": { "type": "object" } }
                     }
                   }
                 }
@@ -729,6 +743,7 @@
             "enabled": { "type": "boolean" },
             "poll_interval_seconds": { "type": "integer", "minimum": 1 },
             "tmpdir": { "type": "string" },
+            "tmpdir_min_free_bytes": { "type": "integer", "minimum": 0 },
             "archive_cache_retention_days": { "type": "integer", "minimum": 0 },
             "github": {
               "type": "object",
@@ -898,6 +913,9 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "allow_credentials": { "type": "boolean" },
+            "allow_methods": { "type": "array", "items": { "type": "string" } },
+            "allow_headers": { "type": "array", "items": { "type": "string" } },
             "allow_origins": {
               "type": "array",
               "items": { "type": "string" }

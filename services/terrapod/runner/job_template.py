@@ -1,7 +1,6 @@
 """Build K8s Job specs for terraform/tofu plan and apply phases."""
 
 import json
-import os
 import re
 
 from terrapod.config import RunnerConfig, settings
@@ -103,13 +102,13 @@ def build_job_spec(
         namespace: Target namespace for the Job.
     """
     if not namespace:
-        namespace = os.environ.get("TERRAPOD_RUNNER_NAMESPACE", "terrapod-runners")
+        namespace = runner_config.runner_namespace
 
     run_short = run_id[:16]
     job_name = f"tprun-{run_short}-{phase}"
 
     # Build container env vars
-    api_url = os.environ.get("TERRAPOD_API_URL", "http://terrapod-api:8000")
+    api_url = runner_config.server_url or "http://terrapod-api:8000"
     container_env = [
         # HOME defends against tools that consult $HOME without a
         # passwd entry (helm's repository/index cache,
@@ -148,7 +147,7 @@ def build_job_spec(
     # a trailing `/` ("https://x.example/" vs "https://x.example") don't
     # trigger a no-op redirect — the entrypoint's host-extraction re-
     # checks at hostname level either way, this is just a tighter guard.
-    public_api_url = os.environ.get("TERRAPOD_PUBLIC_API_URL", "").strip()
+    public_api_url = (runner_config.public_api_url or "").strip()
     if public_api_url and public_api_url.rstrip("/") != api_url.rstrip("/"):
         container_env.append({"name": "TP_PUBLIC_API_URL", "value": public_api_url})
 

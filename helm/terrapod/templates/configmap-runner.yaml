@@ -23,6 +23,28 @@ data:
     drift_max_duration_seconds: {{ .Values.runners.driftMaxDurationSeconds | default 1800 }}
     lifecycle_destroy_retries: {{ .Values.runners.lifecycleDestroyRetries | default 2 }}
     lifecycle_destroy_retry_backoff_seconds: {{ .Values.runners.lifecycleDestroyRetryBackoffSeconds | default 45 }}
+    default_terraform_version: {{ .Values.runners.defaultTerraformVersion | default "1.12" | quote }}
+    default_execution_backend: {{ .Values.runners.defaultExecutionBackend | default "tofu" | quote }}
+    launch_timeout_seconds: {{ .Values.runners.launchTimeoutSeconds | default 300 }}
+    {{- /*
+    Listener operational settings (#617): non-sensitive, so they flow through
+    this ConfigMap instead of TERRAPOD_* env on the listener Deployment. The
+    listener reads them from RunnerConfig (layered defaults → runners.yaml →
+    env). Secrets (join token) + runtime values (POD_NAME) stay Deployment env.
+    */}}
+    listener_name: {{ .Values.listener.name | default "listener" | quote }}
+    runner_namespace: {{ include "terrapod.runnerNamespace" . | quote }}
+    listener_namespace: {{ .Release.Namespace | quote }}
+    credentials_secret_name: {{ include "terrapod.listenerCredentialsSecretName" . | quote }}
+    health_port: {{ .Values.listener.healthPort | default 8081 }}
+    public_api_url: {{ .Values.listener.publicApiUrl | default .Values.api.config.external_url | default "" | quote }}
+    listener_cert_ttl_seconds: {{ .Values.api.config.agent_pools.listener_cert_ttl_seconds | default 3600 }}
+    heartbeat_interval: {{ .Values.listener.heartbeatInterval | default 60 }}
+    max_concurrent: {{ .Values.listener.maxConcurrent | default 3 }}
+    poll_interval: {{ .Values.listener.pollInterval | default 30 }}
+    sse_read_timeout: {{ .Values.listener.sseReadTimeout | default 30 }}
+    sse_max_age: {{ .Values.listener.sseMaxAge | default 600 }}
+    sse_retry_interval: {{ .Values.listener.sseRetryInterval | default 5 }}
     {{- with .Values.runners.imagePullSecrets }}
     image_pull_secrets:
       {{- toYaml . | nindent 6 }}

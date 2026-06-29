@@ -522,6 +522,22 @@ jobs:
           echo "$out" | grep -q "http_proxy: \"http://proxy.example.com:3128\"" || { echo "FAIL: runners.yaml proxy missing"; exit 1; }
           echo "proxy + CA bundle render OK (#592)"
 
+  # ── Config-channel contract (#617) ────────────────────
+  # Renders the chart (every values profile) and parses the rendered ConfigMaps
+  # THROUGH the real Pydantic config models (Settings / RunnerConfig), asserting
+  # the chart ↔ code ↔ chart-test contract: no drift (every rendered key is a
+  # real model field), contract-spine keys present, and no non-sensitive
+  # TERRAPOD_* env on any Deployment. See AGENTS.md → "The config-channel
+  # contract" and scripts/check_helm_config_contract.py.
+  helm-config-contract:
+    name: Helm Config Contract
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: scripts/helm-config-contract.sh
+
   # ── Eval quickstart boot (kind + k3d) ──────────────────
   # Proves `make eval` actually stands up a complete stack (embedded
   # Postgres/Redis + migrations + API + web) on a throwaway cluster, on both
@@ -1536,6 +1552,7 @@ jobs:
       - dependency-review
       - helm-lint
       - helm-smoke
+      - helm-config-contract
       - helm-eval-boot
       - sast
       - build-images-amd64
@@ -1574,6 +1591,7 @@ jobs:
             "${{ needs.dependency-review.result }}"
             "${{ needs.helm-lint.result }}"
             "${{ needs.helm-smoke.result }}"
+            "${{ needs.helm-config-contract.result }}"
             "${{ needs.helm-eval-boot.result }}"
             "${{ needs.sast.result }}"
             "${{ needs.build-images-amd64.result }}"

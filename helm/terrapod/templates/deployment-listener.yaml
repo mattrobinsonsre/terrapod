@@ -59,38 +59,17 @@ spec:
               containerPort: {{ .Values.listener.healthPort | default 8081 }}
               protocol: TCP
           env:
-            - name: TERRAPOD_RUNNER_NAMESPACE
-              value: {{ include "terrapod.runnerNamespace" . | quote }}
-            - name: TERRAPOD_LISTENER_NAME
-              value: {{ .Values.listener.name | default "listener" | quote }}
-            # Credentials-Secret name is tied to the listener Deployment, not
-            # to listener.name, so renaming the listener (changing its
-            # API-registered identity) doesn't orphan the Secret.
-            - name: TERRAPOD_CREDENTIALS_SECRET_NAME
-              value: {{ include "terrapod.listenerCredentialsSecretName" . | quote }}
-            - name: TERRAPOD_HEALTH_PORT
-              value: {{ .Values.listener.healthPort | default 8081 | quote }}
+            # Non-sensitive listener settings (name, namespaces, API URLs,
+            # health port, cert TTL, SSE/heartbeat/poll knobs) now come from
+            # the runner ConfigMap (runners.yaml → RunnerConfig), NOT from
+            # TERRAPOD_* Deployment env (#617). Only the runtime POD_NAME
+            # (Downward API — can't be file config) and the join-token secret
+            # remain here. server_url in runners.yaml carries the internal API
+            # URL the listener uses (was TERRAPOD_API_URL).
             - name: POD_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: TERRAPOD_API_URL
-              value: {{ .Values.listener.apiUrl | default (printf "http://%s-api:8000" (include "terrapod.fullname" .)) | quote }}
-            # Public/canonical API URL — what users see in their browsers,
-            # the CLI cloud block, and module/provider source URLs. When
-            # different from TERRAPOD_API_URL, the listener forwards it to
-            # runner Jobs as TP_PUBLIC_API_URL so the runner entrypoint can
-            # add a terraform host{} redirect (canonical → internal).
-            # Defaults to api.config.external_url; empty in single-network
-            # deployments where listener.apiUrl == the canonical URL.
-            - name: TERRAPOD_PUBLIC_API_URL
-              value: {{ .Values.listener.publicApiUrl | default .Values.api.config.external_url | default "" | quote }}
-            # Cert TTL drives the renewal threshold (renew at 50% + splay).
-            # Must match `api.config.agent_pools.listener_cert_ttl_seconds` so
-            # pods anticipate renewal correctly. Values-local.yaml lowers
-            # this for fast iteration.
-            - name: TERRAPOD_LISTENER_CERT_TTL_SECONDS
-              value: {{ .Values.api.config.agent_pools.listener_cert_ttl_seconds | default 3600 | quote }}
             {{- if .Values.listener.existingSecret }}
             - name: TERRAPOD_JOIN_TOKEN
               valueFrom:

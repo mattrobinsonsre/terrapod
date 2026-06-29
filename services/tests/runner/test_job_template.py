@@ -26,6 +26,11 @@ def _runner_config():
     # MagicMock defaults don't inject phantom proxy env into every test.
     cfg.proxy = None
     cfg.ca_bundle_enabled = False
+    # Listener/runner settings the job template reads off RunnerConfig (#617),
+    # not os.environ. Real string defaults so `or`/`.strip()` behave.
+    cfg.server_url = "http://terrapod-api:8000"
+    cfg.public_api_url = ""
+    cfg.runner_namespace = "terrapod-runners"
 
     default_def = MagicMock()
     default_def.name = "default"
@@ -226,15 +231,14 @@ class TestPublicApiUrl:
     def _build(self, monkeypatch, api_url, public_api_url):
         from terrapod.runner.job_template import build_job_spec
 
-        monkeypatch.setenv("TERRAPOD_API_URL", api_url)
-        if public_api_url is None:
-            monkeypatch.delenv("TERRAPOD_PUBLIC_API_URL", raising=False)
-        else:
-            monkeypatch.setenv("TERRAPOD_PUBLIC_API_URL", public_api_url)
+        # server_url / public_api_url come off RunnerConfig (#617), not env.
+        cfg = _runner_config()
+        cfg.server_url = api_url
+        cfg.public_api_url = "" if public_api_url is None else public_api_url
         spec = build_job_spec(
             run_id="abc123",
             phase="plan",
-            runner_config=_runner_config(),
+            runner_config=cfg,
             auth_secret_name="tprun-abc12345-auth",
             env_vars=[],
             terraform_vars=[],

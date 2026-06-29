@@ -44,6 +44,10 @@ import os
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from terrapod.config import RunnerConfig
 
 from cryptography import x509
 
@@ -77,12 +81,18 @@ class ListenerIdentity:
 # ── Public entry point ──────────────────────────────────────────────
 
 
-async def establish_identity() -> ListenerIdentity:
-    """Establish a listener identity for this pod. See module docstring."""
-    name = os.environ.get("TERRAPOD_LISTENER_NAME", "listener")
-    api_url = os.environ.get("TERRAPOD_API_URL", "http://localhost:8000")
-    secret_name = _credentials_secret_name(name)
-    namespace = _read_in_pod_namespace()
+async def establish_identity(runner_config: RunnerConfig) -> ListenerIdentity:
+    """Establish a listener identity for this pod. See module docstring.
+
+    Non-sensitive identity inputs (name, API URL, namespace, credentials Secret
+    name) come from the layered `RunnerConfig` (runners.yaml + env), not from
+    os.environ. The join token itself stays an env secret (read in
+    `_bootstrap_via_join_token`).
+    """
+    name = runner_config.listener_name
+    api_url = runner_config.server_url or "http://localhost:8000"
+    secret_name = _credentials_secret_name(name, runner_config.credentials_secret_name)
+    namespace = _read_in_pod_namespace(runner_config.listener_namespace)
 
     secret = _read_secret(secret_name, namespace)
     if secret is not None:
@@ -102,7 +112,7 @@ async def establish_identity() -> ListenerIdentity:
 # ── Secret I/O ──────────────────────────────────────────────────────
 
 
-def clear_credentials_secret() -> None:
+def clear_credentials_secret(runner_config: RunnerConfig) -> None:
     """Delete the credentials Secret so the next establish_identity() bootstraps fresh.
 
     Used by `_rejoin` after persistent 401s — the cert in the Secret has been
@@ -114,9 +124,9 @@ def clear_credentials_secret() -> None:
     """
     from kubernetes.client.rest import ApiException
 
-    name = os.environ.get("TERRAPOD_LISTENER_NAME", "listener")
-    secret_name = _credentials_secret_name(name)
-    namespace = _read_in_pod_namespace()
+    name = runner_config.listener_name
+    secret_name = _credentials_secret_name(name, runner_config.credentials_secret_name)
+    namespace = _read_in_pod_namespace(runner_config.listener_namespace)
     api = _core_api()
     try:
         api.delete_namespaced_secret(name=secret_name, namespace=namespace)
@@ -127,29 +137,31 @@ def clear_credentials_secret() -> None:
         logger.warning("Failed to clear credentials Secret", error=str(e))
 
 
-def _credentials_secret_name(listener_name: str) -> str:
+def _credentials_secret_name(listener_name: str, explicit: str = "") -> str:
     """Resolve the credentials Secret name.
 
-    Helm sets `TERRAPOD_CREDENTIALS_SECRET_NAME` to the Deployment fullname +
-    `-credentials` so the Secret is tied to the Deployment lifecycle. Falls
-    back to `{listener_name}-credentials` for environments without Helm
-    (legacy deployments, local tests).
+    The chart sets `RunnerConfig.credentials_secret_name` (runners.yaml) to the
+    Deployment fullname + `-credentials` so the Secret is tied to the Deployment
+    lifecycle. Falls back to `{listener_name}-credentials` when unset
+    (non-Helm deployments, local tests).
     """
-    explicit = os.environ.get("TERRAPOD_CREDENTIALS_SECRET_NAME")
     if explicit:
         return explicit
     return f"{listener_name}-credentials"
 
 
-def _read_in_pod_namespace() -> str:
-    """Read the pod's own namespace from the projected SA token mount."""
+def _read_in_pod_namespace(fallback: str = "terrapod") -> str:
+    """Read the pod's own namespace from the projected SA token mount.
+
+    Falls back to `RunnerConfig.listener_namespace` (passed in) when the in-pod
+    SA namespace file is unreadable (local dev / tests).
+    """
     path = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
     try:
         with open(path) as f:
             return f.read().strip()
     except OSError:
-        # Local dev fallback. Helm tests / Tilt can set TERRAPOD_LISTENER_NAMESPACE.
-        return os.environ.get("TERRAPOD_LISTENER_NAMESPACE", "terrapod")
+        return fallback
 
 
 def _read_secret(name: str, namespace: str):

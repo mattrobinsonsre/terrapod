@@ -86,3 +86,4 @@ smoke-*
 
 # Claude Code session-local files (transient — do not commit)
 .claude/
+.helmrender/

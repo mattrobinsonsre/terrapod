@@ -22,6 +22,22 @@ def yaml_config_settings_source() -> dict[str, Any]:
     return {}
 
 
+def runners_yaml_config_settings_source() -> dict[str, Any]:
+    """Load runner/listener configuration from the runner ConfigMap (runners.yaml).
+
+    The listener mounts this ConfigMap at /etc/terrapod/runners.yaml. Mirrors
+    `yaml_config_settings_source` so `RunnerConfig` layers defaults → file → env
+    via pydantic-settings, instead of the listener hand-reading os.environ. The
+    file is absent in the API pod (which only consumes a few runner defaults via
+    `load_runner_config`), so it falls back to defaults + env there.
+    """
+    config_path = Path("/etc/terrapod/runners.yaml")
+    if config_path.exists():
+        with open(config_path) as f:
+            return yaml.safe_load(f) or {}
+    return {}
+
+
 # --- Storage Configuration Models ---
 
 
@@ -52,21 +68,85 @@ class RunnerProxyConfig(BaseModel):
     no_proxy: str = Field(default="")
 
 
-class RunnerConfig(BaseModel):
-    """Runner configuration, loaded from /etc/terrapod/runners.yaml.
+class RunnerConfig(BaseSettings):
+    """Runner + listener configuration, layered defaults → runners.yaml → env.
 
-    Separate from main Settings because listeners need their own
-    config independent of the API server's config.
+    A pydantic-settings model (like `Settings`) so the listener reads ONE
+    config object instead of hand-reading os.environ: the runner ConfigMap
+    (runners.yaml) is the file source, `TERRAPOD_*` env vars override it, and
+    field defaults backstop both. This carries BOTH the runner-Job settings
+    (image, resources, proxy/CA) AND the listener's own operational settings
+    (name, namespaces, API URLs, health port, cert TTL, SSE/heartbeat/poll
+    knobs) — all non-sensitive, so they flow through the ConfigMap, not via
+    chart-set Deployment env vars. Secrets (the join token) and runtime values
+    (POD_NAME) stay as Deployment env and are NOT fields here.
     """
+
+    model_config = SettingsConfigDict(
+        env_prefix="TERRAPOD_",
+        env_nested_delimiter="__",
+        extra="ignore",
+    )
 
     image: RunnerImageConfig = Field(default_factory=RunnerImageConfig)
     server_url: str = Field(
         default="",
-        description="Internal API URL for runner Jobs (e.g. http://terrapod-api:8000). "
-        "Used as base URL for presigned storage URLs. Falls back to TERRAPOD_API_URL env var.",
+        description="Internal API URL the listener + runner Jobs call "
+        "(e.g. http://terrapod-api:8000). Also the base for presigned storage URLs. "
+        "Env override: TERRAPOD_SERVER_URL.",
     )
     default_terraform_version: str = Field(default="1.12")
     default_execution_backend: str = Field(default="tofu")
+    # --- Listener operational settings (non-sensitive; from runners.yaml) ---
+    # Previously read by the listener directly from os.environ; now layered
+    # through this config object so they are ConfigMap-driven, not chart-env.
+    listener_name: str = Field(
+        default="listener",
+        description="Base listener name; the pod name is appended per replica.",
+    )
+    runner_namespace: str = Field(
+        default="terrapod-runners",
+        description="Namespace the listener creates runner Jobs + per-run Secrets in.",
+    )
+    listener_namespace: str = Field(
+        default="terrapod",
+        description="Fallback namespace for the listener's own resources when the "
+        "in-pod service-account namespace file is unreadable (local/dev).",
+    )
+    credentials_secret_name: str = Field(
+        default="",
+        description="Explicit name for the listener credentials Secret. Empty → "
+        "derived as '{listener_name}-credentials'. Set by the chart to tie the "
+        "Secret to the Deployment lifecycle (a Secret NAME, not a secret value).",
+    )
+    health_port: int = Field(default=8081, description="Listener health/readiness port.")
+    public_api_url: str = Field(
+        default="",
+        description="Public/canonical API URL forwarded to runner Jobs as "
+        "TP_PUBLIC_API_URL when it differs from server_url (canonical→internal "
+        "host redirect). Empty in single-network deployments.",
+    )
+    listener_cert_ttl_seconds: int = Field(
+        default=3600,
+        description="Listener certificate validity; drives the renewal threshold. "
+        "Must match api.config.agent_pools.listener_cert_ttl_seconds.",
+    )
+    heartbeat_interval: int = Field(default=60, description="Listener heartbeat interval (s).")
+    max_concurrent: int = Field(
+        default=3, description="Max concurrent run launches per listener pod."
+    )
+    poll_interval: int = Field(
+        default=30, description="Fallback poll interval when SSE is idle (s)."
+    )
+    sse_read_timeout: int = Field(
+        default=30, description="SSE read timeout — silence beyond this reconnects (s)."
+    )
+    sse_max_age: int = Field(
+        default=600, description="Max SSE connection age before a proactive reconnect (s)."
+    )
+    sse_retry_interval: int = Field(
+        default=5, description="Backoff between SSE reconnect attempts (s)."
+    )
     service_account_name: str = Field(default="")
     azure_workload_identity: bool = Field(default=False)
     ttl_seconds_after_finished: int = Field(default=600)
@@ -160,14 +240,33 @@ class RunnerConfig(BaseModel):
         ),
     )
 
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: Any,
+        env_settings: Any,
+        dotenv_settings: Any,
+        file_secret_settings: Any,
+    ) -> tuple[Any, ...]:
+        """Layer sources: init args > env vars > runners.yaml > defaults."""
+        return (
+            init_settings,
+            env_settings,
+            runners_yaml_config_settings_source,
+            dotenv_settings,
+            file_secret_settings,
+        )
+
 
 def load_runner_config(path: str = "/etc/terrapod/runners.yaml") -> RunnerConfig:
-    """Load runner configuration from YAML file."""
-    config_path = Path(path)
-    if config_path.exists():
-        with open(config_path) as f:
-            data = yaml.safe_load(f) or {}
-        return RunnerConfig(**data)
+    """Construct the runner/listener config (defaults → runners.yaml → env).
+
+    The `path` argument is retained for backward compatibility but ignored: the
+    runners.yaml file is now a pydantic-settings source on `RunnerConfig`
+    (`runners_yaml_config_settings_source`, fixed at /etc/terrapod/runners.yaml),
+    so the layering — and env overrides — happen inside the model.
+    """
     return RunnerConfig()
 
 

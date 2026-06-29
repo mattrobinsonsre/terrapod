@@ -8,7 +8,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
+from terrapod.config import RunnerConfig
 from terrapod.runner import identity as identity_mod
+
+# establish_identity()/clear_credentials_secret() now take their non-sensitive
+# inputs from RunnerConfig (runners.yaml + env layering) rather than reading
+# os.environ directly (#617). These tests construct a RunnerConfig with the
+# same name/API URL the env used to provide.
+_RC = RunnerConfig(listener_name="core", server_url="http://api")
 
 # ── pod_splay_seconds ───────────────────────────────────────────────
 
@@ -167,7 +174,7 @@ class TestEstablishIdentity:
             patch.object(identity_mod, "_read_secret", return_value=secret),
             patch.object(identity_mod, "_call_join", new=AsyncMock()) as mock_join,
         ):
-            result = await identity_mod.establish_identity()
+            result = await identity_mod.establish_identity(_RC)
 
         assert result.listener_id == lid
         assert result.pool_id == pid
@@ -201,7 +208,7 @@ class TestEstablishIdentity:
             patch.object(identity_mod, "_call_join", new=AsyncMock(return_value=join_response)),
             patch.object(identity_mod, "_create_secret", return_value=created_secret),
         ):
-            result = await identity_mod.establish_identity()
+            result = await identity_mod.establish_identity(_RC)
 
         assert str(result.listener_id) == lid
         assert str(result.pool_id) == pid
@@ -245,7 +252,7 @@ class TestEstablishIdentity:
                 side_effect=identity_mod._SecretAlreadyExists("409"),
             ),
         ):
-            result = await identity_mod.establish_identity()
+            result = await identity_mod.establish_identity(_RC)
 
         # We adopted the winner's cert, not the one /join handed us
         assert result.listener_id == winner_lid
@@ -279,7 +286,7 @@ class TestEstablishIdentity:
             ),
             patch("asyncio.sleep", new=AsyncMock()),
         ):
-            result = await identity_mod.establish_identity()
+            result = await identity_mod.establish_identity(_RC)
 
         assert result.listener_id == winner_lid
 
@@ -293,4 +300,4 @@ class TestEstablishIdentity:
             patch.object(identity_mod, "_read_secret", return_value=None),
         ):
             with pytest.raises(RuntimeError, match="TERRAPOD_JOIN_TOKEN"):
-                await identity_mod.establish_identity()
+                await identity_mod.establish_identity(_RC)

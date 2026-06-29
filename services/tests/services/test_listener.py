@@ -24,7 +24,18 @@ def fresh_shutdown_event():
 def _make_listener(shutdown_event: asyncio.Event, **overrides) -> RunnerListener:
     """Create a listener with mocked identity and config."""
     with patch("terrapod.runner.listener.load_runner_config") as mock_cfg:
-        mock_cfg.return_value = MagicMock(definitions=[])
+        # __init__ now reads listener knobs off RunnerConfig (#617) — give the
+        # mock real int defaults so comparisons (active >= max_concurrent) work.
+        mock_cfg.return_value = MagicMock(
+            definitions=[],
+            heartbeat_interval=60,
+            max_concurrent=3,
+            health_port=8081,
+            sse_retry_interval=5,
+            poll_interval=30,
+            sse_read_timeout=30,
+            sse_max_age=600,
+        )
         listener = RunnerListener()
 
     listener.identity = MagicMock()

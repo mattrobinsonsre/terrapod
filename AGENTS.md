@@ -228,10 +228,49 @@ Playwright's auto-waiting.
   API pod `/tmp` is RAM-backed. Anything that can hold tens of MB (provider
   archives, VCS tarballs, state snapshots, config tarballs) must be written to
   the configured ephemeral PVC dir, not `/tmp`, or it will OOM the pod.
-- **Helm values ↔ schema** — when you add/rename/remove a key in
-  `values.yaml`, update `values.schema.json` to match (it uses
-  `additionalProperties: false`, so `helm lint` fails otherwise), and make
-  sure the template renders it.
+- **The config-channel contract (hard requirement)** — a three-way contract
+  binding the **config code**, the **Helm chart**, and the **chart tests**:
+  the in-code config models (the API's Pydantic `Settings`, the listener's
+  `RunnerConfig`) ↔ the chart that feeds them (`values.yaml` /
+  `values.schema.json` / `configmap-api.yaml` / `configmap-runner.yaml` /
+  the Deployment templates) ↔ the `helm-smoke` CI job that renders the chart
+  and asserts the wiring. Change one leg, update all three in the same PR.
+  `Settings` is rendered into `config.yaml` by `configmap-api.yaml`;
+  `RunnerConfig` into `runners.yaml` by `configmap-runner.yaml`. The rules:
+  - **Non-sensitive settings flow through a ConfigMap, end to end.** Adding one
+    has **three legs that must all land in the same PR**: (1) a `values.yaml`
+    entry with a rationale comment, (2) a matching `values.schema.json`
+    constraint (the schema uses `additionalProperties: false`, so `helm lint`
+    fails if `values.yaml` carries an undeclared key — include template-only
+    `| default` keys too; K8s pass-through objects like `podSecurityContext` /
+    `nodeSelector` / `affinity` / `tolerations` use schema `type: object` with
+    no property restrictions), and (3) a **render line in the ConfigMap
+    template**
+    (`configmap-api.yaml` for `Settings`, `configmap-runner.yaml` for
+    `RunnerConfig`). Miss leg 3 and the value is silently inert: the operator
+    sets it in `values.yaml`, it never reaches the pod, and the code default
+    wins. `helm template -f <profile>` must show the key in the rendered
+    ConfigMap.
+  - **Secrets** (tokens, private keys, passwords, connection strings) go via
+    **`secretKeyRef`** / env on the Deployment, and are **never** rendered into
+    a ConfigMap. Prefer a first-class `existingSecret`/key block in the
+    Deployment template over relying on `extraEnv`.
+  - **The chart never sets a non-sensitive setting via a `TERRAPOD_*` env var.**
+    Deployment `env:` is reserved for secrets (`secretKeyRef`) and unavoidable
+    runtime values (Downward API like `POD_NAME`, and the proxy/TLS env vars
+    `HTTP(S)_PROXY`/`NO_PROXY`/`SSL_CERT_FILE` that libraries only read from
+    env). Everything else is ConfigMap config. (Pydantic's env-var override
+    still exists for an operator in a pinch, but the chart doesn't rely on it.)
+  - **Verification leg — the `helm-smoke` CI job.** Chart behaviour is tested
+    the house way: `helm template` then grep the **rendered** output (not the
+    template text), the same pattern as the existing Ingress / embedded-Postgres
+    smoke checks. A config-channel change must add/keep assertions there: the new
+    key renders into the right ConfigMap (e.g. `grep -q "rate_limit:"` in the
+    rendered `config.yaml`), and the rendered **Deployment** env carries no
+    non-sensitive `TERRAPOD_*` (secrets via `secretKeyRef` and runtime values
+    like `POD_NAME` are the only env). Grepping the rendered YAML — not Python
+    source-introspection of the Go templates — is what catches a missing render
+    line or a smuggled-in env var, and it's where chart invariants live.
 - **The chart has three first-class value profiles — keep all three working.**
   `values.yaml` (production defaults), `values-local.yaml` (the Tilt dev loop),
   and `values-eval.yaml` (the `make eval` kind/k3d quickstart). Any chart value /

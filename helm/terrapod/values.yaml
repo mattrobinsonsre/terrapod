@@ -833,6 +833,13 @@ runners:
   tokenTTLSeconds: 3600         # Runner token TTL (default 1 hour)
   maxTokenTTLSeconds: 7200      # Runner token max TTL (default 2 hours)
   staleTimeoutSeconds: 3600     # Seconds before a run with no Job status is marked errored
+  # Seconds before a claimed run with no Job launched is errored (listener
+  # claimed it but never created the Job — e.g. runner-token 401, K8s outage).
+  launchTimeoutSeconds: 300
+  # Default terraform/tofu version + backend for runner Jobs when a workspace
+  # doesn't pin one. Runs snapshot the resolved version at creation time.
+  defaultTerraformVersion: "1.12"
+  defaultExecutionBackend: "tofu"  # tofu | terraform
   # Maximum wall-clock seconds a drift-detection run may spend in `planning`
   # before the reconciler errors it out. Independent of staleTimeoutSeconds:
   # that one fires on listeners going dark; this one fires on terraform
@@ -934,6 +941,16 @@ listener:
   #
   # See docs/deployment-network-isolation.md for the full pattern.
   publicApiUrl: ""
+
+  # Listener tuning — non-sensitive, delivered via the runner ConfigMap
+  # (runners.yaml → RunnerConfig), not Deployment env (#617). Defaults are
+  # sane; override per cluster as needed.
+  heartbeatInterval: 60   # Seconds between listener heartbeats (Redis TTL is 300).
+  maxConcurrent: 3        # Max concurrent run launches per listener pod.
+  pollInterval: 30        # Fallback poll interval when SSE is idle (s).
+  sseReadTimeout: 30      # SSE silence beyond this reconnects (keepalive is 1s).
+  sseMaxAge: 600          # Proactive SSE reconnect interval (s).
+  sseRetryInterval: 5     # Backoff between SSE reconnect attempts (s).
 
   # Join token for pool registration.
   # Either set joinToken directly or reference an existing K8s Secret (recommended).

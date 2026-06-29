@@ -6,6 +6,7 @@
 
 .PHONY: lint lint-python \
 	test test-python test-e2e test-e2e-down \
+	helm-config-contract \
 	build images \
 	pentest pentest-sast pentest-images pentest-dast \
 	dev dev-down \
@@ -26,6 +27,9 @@ test:               ## Test all (Python) in Docker
 
 test-python:        ## Test Python only (Docker)
 	scripts/test.sh python
+
+helm-config-contract: ## Config-channel contract: render chart + parse via real config models (#617)
+	scripts/helm-config-contract.sh
 
 ai-eval:            ## Run the AI-analysis eval harness (live model). e.g. make ai-eval ARGS="run --model bedrock/us.anthropic.claude-sonnet-4-6 -n 3"
 	scripts/ai-eval.sh $(ARGS)
