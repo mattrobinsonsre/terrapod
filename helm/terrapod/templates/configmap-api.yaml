@@ -371,29 +371,35 @@ data:
     {{- end }}
     default_execution_backend: {{ .Values.api.config.default_execution_backend | default "tofu" | quote }}
     default_terraform_version: {{ .Values.api.config.default_terraform_version | default "1.12" | quote }}
-    {{- if .Values.api.config.cors }}
+    {{- with .Values.api.config.cors }}
+    {{- /* Only emit `cors:` when at least one child renders — a bare `cors:`
+           serialises to null, which Settings (CORSConfig) rejects. The common
+           `cors: { allow_origins: [] }` default therefore renders nothing and
+           the API uses its CORSConfig default. */}}
+    {{- if or .allow_origins (hasKey . "allow_credentials") .allow_methods .allow_headers }}
     cors:
-      {{- if .Values.api.config.cors.allow_origins }}
+      {{- with .allow_origins }}
       allow_origins:
-        {{- range .Values.api.config.cors.allow_origins }}
+        {{- range . }}
         - {{ . | quote }}
         {{- end }}
       {{- end }}
-      {{- if hasKey .Values.api.config.cors "allow_credentials" }}
-      allow_credentials: {{ .Values.api.config.cors.allow_credentials }}
+      {{- if hasKey . "allow_credentials" }}
+      allow_credentials: {{ .allow_credentials }}
       {{- end }}
-      {{- with .Values.api.config.cors.allow_methods }}
+      {{- with .allow_methods }}
       allow_methods:
         {{- range . }}
         - {{ . | quote }}
         {{- end }}
       {{- end }}
-      {{- with .Values.api.config.cors.allow_headers }}
+      {{- with .allow_headers }}
       allow_headers:
         {{- range . }}
         - {{ . | quote }}
         {{- end }}
       {{- end }}
+    {{- end }}
     {{- end }}
     {{- if .Values.api.config.rate_limit }}
     rate_limit:

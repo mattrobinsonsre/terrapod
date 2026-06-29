@@ -1,45 +1,44 @@
 #!/usr/bin/env python3
 """Config-channel contract check (#617).
 
-Parses the **rendered** Helm output through the real Pydantic config models and
-asserts the chart ↔ code ↔ chart-test contract:
+Parses the **rendered** Helm output and binds it to the real Pydantic config
+models. Run once per values profile (a fresh process each, so the model
+construction below validates that profile's rendered config). Asserts:
 
-  1. **No drift** — every key the chart renders into the API ConfigMap
-     (config.yaml) is a real field on `Settings`, and every key in the runner
-     ConfigMap (runners.yaml) is a real field on `RunnerConfig`. A chart key the
-     code doesn't know (typo, stale rename) fails here. Because this reads the
-     *rendered YAML* (concrete dicts), there is none of the brittleness of
-     grepping Go-template text.
-  2. **Coverage** — config-channel keys that were historically inert or are
-     central to the contract are present (rate_limit, module_interface, the
-     migrated listener settings).
-  3. **Env channel** — the rendered API + listener Deployments carry no
-     non-sensitive `TERRAPOD_*` env: Deployment env is for secrets
-     (`secretKeyRef`) and unavoidable runtime values (Downward API) only.
+  1. **Validates** — the rendered config.yaml / runners.yaml actually
+     construct `Settings()` / `RunnerConfig()` (full pydantic validation, like
+     the API/listener do at startup). Catches type/null errors a key-walk
+     misses (e.g. a bare `cors:` → null).
+  2. **No drift** — every key the chart renders is a real field on the model.
+  3. **Coverage** — contract-spine keys present (rate_limit,
+     registry.module_interface, the migrated listener settings).
+  4. **Env channel** — rendered Deployments carry no non-sensitive TERRAPOD_*
+     env (secrets via secretKeyRef + runtime values only).
 
 Usage:
     check_helm_config_contract.py <rendered-manifests.yaml> [profile-label]
-
-Reads a `helm template` multi-doc stream and exits non-zero with a precise
-message on any violation. Run once per values profile.
 """
 
 from __future__ import annotations
 
+import os
 import sys
 import typing
 
 import yaml
-from pydantic import BaseModel
 
-from terrapod.config import RunnerConfig, Settings
+# Stub the required secret env so Settings() construction gets past the
+# secret fields to the config we actually want to validate. These are NOT read
+# from the ConfigMap (they're secretKeyRef) — values here are throwaway.
+os.environ.setdefault("TERRAPOD_DATABASE_URL", "postgresql+asyncpg://t:t@db:5432/t")
+os.environ.setdefault("TERRAPOD_REDIS_URL", "redis://r:6379")
+os.environ.setdefault("TERRAPOD_TOKEN_SIGNING_KEY", "contract-check-stub")
 
 # TERRAPOD_* env vars allowed on a Deployment: secrets (delivered via
 # secretKeyRef; some carry a documented dev-only literal `value:` fallback) plus
-# build/runtime values that can't be config-file driven. Everything else is a
-# non-sensitive setting that must come from a ConfigMap, not env.
+# build/runtime values that can't be config-file driven.
 _ENV_ALLOWLIST = {
-    "TERRAPOD_VERSION",  # Chart.AppVersion, deploy-time
+    "TERRAPOD_VERSION",
     "TERRAPOD_DATABASE_URL",
     "TERRAPOD_REDIS_URL",
     "TERRAPOD_TOKEN_SIGNING_KEY",
@@ -51,13 +50,8 @@ _ENV_ALLOWLIST = {
     "TERRAPOD_AI_SUMMARY__AUTH__API_KEY",
     "TERRAPOD_JOIN_TOKEN",
 }
-# OIDC client secrets render as TERRAPOD_{NAME}_CLIENT_SECRET (per-provider) —
-# always a secretKeyRef, allowed by suffix.
 _ENV_ALLOWLIST_SUFFIX = ("_CLIENT_SECRET",)
 
-# Dotted key paths that MUST appear in the rendered ConfigMaps (regression /
-# contract spine). rate_limit was wholly inert before #617; registry's
-# module_interface block was omitted from the render entirely.
 _API_REQUIRED = ["rate_limit", "registry.module_interface"]
 _RUNNER_REQUIRED = [
     "listener_name",
@@ -68,39 +62,15 @@ _RUNNER_REQUIRED = [
 ]
 
 
-def _model_in(annotation) -> tuple[type[BaseModel] | None, bool]:
-    """Return (BaseModel subclass inside the annotation, is_list)."""
-    origin = typing.get_origin(annotation)
-    args = typing.get_args(annotation)
-    if origin is typing.Union:
-        non_none = [a for a in args if a is not type(None)]
-        return _model_in(non_none[0]) if len(non_none) == 1 else (None, False)
-    if origin in (list, set, tuple):
-        if args and isinstance(args[0], type) and issubclass(args[0], BaseModel):
-            return (args[0], True)
-        return (None, False)
-    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
-        return (annotation, False)
-    return (None, False)
+def _docs(stream: str) -> list[dict]:
+    return [d for d in yaml.safe_load_all(stream) if isinstance(d, dict)]
 
 
-def _walk(data: dict, model: type[BaseModel], path: str = "") -> list[str]:
-    """Return dotted paths of rendered keys that are NOT fields on `model`."""
-    errs: list[str] = []
-    fields = model.model_fields
-    if not isinstance(data, dict):
-        return errs
-    for key, val in data.items():
-        if key not in fields:
-            errs.append(f"{path}{key}")
-            continue
-        sub, is_list = _model_in(fields[key].annotation)
-        if sub and isinstance(val, dict):
-            errs += _walk(val, sub, f"{path}{key}.")
-        elif sub and is_list and isinstance(val, list):
-            for i, item in enumerate(val):
-                errs += _walk(item, sub, f"{path}{key}[{i}].")
-    return errs
+def _configmap_raw(docs: list[dict], name_suffix: str, file_key: str) -> str | None:
+    for d in docs:
+        if d.get("kind") == "ConfigMap" and d["metadata"]["name"].endswith(name_suffix):
+            return d.get("data", {}).get(file_key)
+    return None
 
 
 def _has_path(data: dict, dotted: str) -> bool:
@@ -112,20 +82,44 @@ def _has_path(data: dict, dotted: str) -> bool:
     return True
 
 
-def _docs(stream: str) -> list[dict]:
-    return [d for d in yaml.safe_load_all(stream) if isinstance(d, dict)]
+def _model_in(annotation):
+    origin = typing.get_origin(annotation)
+    args = typing.get_args(annotation)
+    if origin is typing.Union:
+        non_none = [a for a in args if a is not type(None)]
+        return _model_in(non_none[0]) if len(non_none) == 1 else (None, False)
+    if origin in (list, set, tuple):
+        from pydantic import BaseModel
+
+        if args and isinstance(args[0], type) and issubclass(args[0], BaseModel):
+            return (args[0], True)
+        return (None, False)
+    from pydantic import BaseModel
+
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return (annotation, False)
+    return (None, False)
 
 
-def _configmap_data(docs: list[dict], name_suffix: str, file_key: str) -> dict | None:
-    for d in docs:
-        if d.get("kind") == "ConfigMap" and d["metadata"]["name"].endswith(name_suffix):
-            raw = d.get("data", {}).get(file_key, "")
-            return yaml.safe_load(raw) or {}
-    return None
+def _walk(data: dict, model, path: str = "") -> list[str]:
+    errs: list[str] = []
+    if not isinstance(data, dict):
+        return errs
+    fields = model.model_fields
+    for key, val in data.items():
+        if key not in fields:
+            errs.append(f"{path}{key}")
+            continue
+        sub, is_list = _model_in(fields[key].annotation)
+        if sub and isinstance(val, dict):
+            errs += _walk(val, sub, f"{path}{key}.")
+        elif sub and is_list and isinstance(val, list):
+            for item in val:
+                errs += _walk(item, sub, f"{path}{key}[].")
+    return errs
 
 
 def _deployment_env_offenders(docs: list[dict]) -> list[str]:
-    """Non-sensitive TERRAPOD_* env (literal `value:`) on any Deployment."""
     offenders: list[str] = []
     for d in docs:
         if d.get("kind") != "Deployment":
@@ -138,8 +132,6 @@ def _deployment_env_offenders(docs: list[dict]) -> list[str]:
                     continue
                 if name in _ENV_ALLOWLIST or name.endswith(_ENV_ALLOWLIST_SUFFIX):
                     continue
-                # secretKeyRef / fieldRef env are fine; only literal `value:` is a
-                # potential non-sensitive-config-in-env violation.
                 if "value" in e:
                     offenders.append(f"{dep}: {name}")
     return offenders
@@ -151,25 +143,44 @@ def main() -> int:
         return 2
     profile = sys.argv[2] if len(sys.argv) > 2 else sys.argv[1]
     docs = _docs(open(sys.argv[1]).read())
-
     problems: list[str] = []
 
-    api = _configmap_data(docs, "-api-config", "config.yaml")
-    if api is None:
-        problems.append("API ConfigMap (-api-config) not rendered")
-    else:
+    api_raw = _configmap_raw(docs, "-api-config", "config.yaml")
+    runner_raw = _configmap_raw(docs, "-runner-config", "runners.yaml")
+
+    # 1) VALIDATE: write the rendered config to where the models read it, then
+    #    construct them (full pydantic validation, exactly like pod startup).
+    #    Importing terrapod.config constructs `settings = Settings()` against the
+    #    written config.yaml; RunnerConfig() reads the written runners.yaml.
+    os.makedirs("/etc/terrapod", exist_ok=True)
+    if api_raw is not None:
+        with open("/etc/terrapod/config.yaml", "w") as f:
+            f.write(api_raw)
+    if runner_raw is not None:
+        with open("/etc/terrapod/runners.yaml", "w") as f:
+            f.write(runner_raw)
+
+    Settings = RunnerConfig = None
+    try:
+        import terrapod.config as cfg  # triggers settings = Settings()
+
+        Settings, RunnerConfig = cfg.Settings, cfg.RunnerConfig
+        if runner_raw is not None:
+            RunnerConfig()  # validate runners.yaml
+    except Exception as e:  # pydantic ValidationError or import-time settings build
+        problems.append(f"rendered config fails model validation: {type(e).__name__}: {str(e)[:600]}")
+
+    # 2) DRIFT + 3) COVERAGE (only if the models imported cleanly).
+    if Settings is not None and api_raw is not None:
+        api = yaml.safe_load(api_raw) or {}
         drift = _walk(api, Settings)
         if drift:
             problems.append(f"config.yaml keys not on Settings: {sorted(drift)}")
         for k in _API_REQUIRED:
             if not _has_path(api, k):
                 problems.append(f"config.yaml missing required key: {k}")
-
-    runner = _configmap_data(docs, "-runner-config", "runners.yaml")
-    if runner is None:
-        # runner ConfigMap only renders when listener.enabled — tolerate absence.
-        pass
-    else:
+    if RunnerConfig is not None and runner_raw is not None:
+        runner = yaml.safe_load(runner_raw) or {}
         drift = _walk(runner, RunnerConfig)
         if drift:
             problems.append(f"runners.yaml keys not on RunnerConfig: {sorted(drift)}")
@@ -177,6 +188,7 @@ def main() -> int:
             if k not in runner:
                 problems.append(f"runners.yaml missing required key: {k}")
 
+    # 4) ENV CHANNEL
     env_offenders = _deployment_env_offenders(docs)
     if env_offenders:
         problems.append(f"non-sensitive TERRAPOD_* Deployment env: {env_offenders}")
