@@ -4,7 +4,6 @@ Uses the kubernetes Python client to interact with the K8s API.
 """
 
 import asyncio
-import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 
@@ -62,7 +61,17 @@ def _get_core_api() -> client.CoreV1Api:
 
 
 def _default_namespace() -> str:
-    return os.environ.get("TERRAPOD_RUNNER_NAMESPACE", "terrapod-runners")
+    """Fallback runner namespace for call sites that don't pass one explicitly.
+
+    Sourced from the loaded RunnerConfig (the runners.yaml ConfigMap) — the
+    single source of truth per the config-channel contract. The listener's
+    launch/status/delete paths always pass the namespace explicitly; this is a
+    defensive fallback only. (It deliberately does NOT read an env var: the
+    chart delivers the runner namespace via the ConfigMap, not env.)
+    """
+    from terrapod.config import load_runner_config
+
+    return load_runner_config().runner_namespace
 
 
 async def create_job(job_spec: dict, namespace: str = "") -> str:

@@ -685,15 +685,17 @@ class RunnerListener:
         namespace = self.runner_config.runner_namespace
 
         try:
-            job_name = await create_job(spec)
+            job_name = await create_job(spec, namespace=namespace)
         except Exception as e:
             logger.error("Failed to create Job", run_id=run_id, error=str(e))
             await self._report_launch_failed(run_id, f"Failed to create K8s Job: {e}")
             return
 
-        # Create auth Secret with ownerReference to the Job
+        # Create auth Secret with ownerReference to the Job. Pass the namespace
+        # explicitly (from runner_config) — never rely on job_manager's fallback,
+        # which is decoupled from the configured runner namespace.
         try:
-            job_uid = await get_job_uid(job_name)
+            job_uid = await get_job_uid(job_name, namespace=namespace)
             await self._create_auth_secret(
                 auth_secret_name, run_id, runner_token, job_name, job_uid
             )

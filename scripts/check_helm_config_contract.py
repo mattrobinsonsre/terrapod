@@ -142,7 +142,8 @@ def main() -> int:
         print("usage: check_helm_config_contract.py <rendered.yaml> [profile]", file=sys.stderr)
         return 2
     profile = sys.argv[2] if len(sys.argv) > 2 else sys.argv[1]
-    docs = _docs(open(sys.argv[1]).read())
+    with open(sys.argv[1]) as f:
+        docs = _docs(f.read())
     problems: list[str] = []
 
     api_raw = _configmap_raw(docs, "-api-config", "config.yaml")

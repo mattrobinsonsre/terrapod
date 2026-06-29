@@ -108,3 +108,32 @@ class TestGetJobFailureInfo:
         mock_batch.return_value.read_namespaced_job.side_effect = ApiException(404)
 
         assert await get_job_failure_info("tprun-abc-plan", namespace="terrapod") is None
+
+
+class TestDefaultNamespace:
+    """Regression: the runner-namespace fallback must come from the loaded
+    RunnerConfig (the runners.yaml ConfigMap), NOT a removed env var.
+
+    The config-channel refactor moved the runner namespace from the
+    TERRAPOD_RUNNER_NAMESPACE env var onto the ConfigMap. A call site that
+    omitted an explicit namespace (get_job_uid during auth-Secret creation)
+    then fell back to the stale hard-coded default and created the Secret /
+    looked up the Job in the wrong namespace than the one the Job itself was
+    created in — a 403 on every launch when the configured namespace differed
+    from that default."""
+
+    def test_default_namespace_sourced_from_runner_config(self):
+        from terrapod.runner import job_manager
+
+        fake_cfg = SimpleNamespace(runner_namespace="cfg-runner-ns")
+        with patch("terrapod.config.load_runner_config", return_value=fake_cfg):
+            assert job_manager._default_namespace() == "cfg-runner-ns"
+
+    def test_default_namespace_ignores_legacy_env(self, monkeypatch):
+        from terrapod.runner import job_manager
+
+        # The chart no longer sets this; the fallback must not honour it.
+        monkeypatch.setenv("TERRAPOD_RUNNER_NAMESPACE", "should-be-ignored")
+        fake_cfg = SimpleNamespace(runner_namespace="cfg-runner-ns")
+        with patch("terrapod.config.load_runner_config", return_value=fake_cfg):
+            assert job_manager._default_namespace() == "cfg-runner-ns"

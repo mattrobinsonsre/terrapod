@@ -394,3 +394,47 @@ class TestCreateVarsSecret:
         sd = core_api.create_namespaced_secret.call_args.kwargs["body"].string_data
         assert "terraform.tfvars.json" not in sd
         assert sd["FOO"] == "bar"
+
+
+# ── Launch namespace propagation (regression) ────────────────────────
+
+
+class TestLaunchNamespace:
+    """Regression: the launch path must create the Job AND look up its UID (for
+    the auth-Secret ownerReference) in the *configured* runner namespace.
+
+    get_job_uid() previously omitted the namespace and fell back to a stale
+    default decoupled from the configured runner namespace, so the auth-Secret
+    step did a `get jobs` in the wrong namespace than the Job was created in —
+    a 403 on every launch when the two differed (e.g. single-namespace eval)."""
+
+    async def test_launch_uses_configured_runner_namespace(self, fresh_shutdown_event):
+        listener = _make_listener(fresh_shutdown_event)
+        listener.runner_config.runner_namespace = "custom-runner-ns"
+
+        listener._get_runner_token = AsyncMock(return_value="runtok:abc")
+        listener._create_auth_secret = AsyncMock()
+        listener._read_ca_bundle_pem = MagicMock(return_value="")
+        listener._report_launch_failed = AsyncMock()
+        listener._auth_headers = MagicMock(return_value={})
+
+        spec = {"metadata": {"name": "tprun-r1-plan", "namespace": "custom-runner-ns"}}
+        with (
+            patch("terrapod.runner.job_template.build_job_spec", return_value=spec),
+            patch(
+                "terrapod.runner.job_manager.create_job",
+                new=AsyncMock(return_value="tprun-r1-plan"),
+            ) as mock_create,
+            patch(
+                "terrapod.runner.job_manager.get_job_uid",
+                new=AsyncMock(return_value="uid-1"),
+            ) as mock_uid,
+            patch("terrapod.runner.listener.arequest_with_retry", new=AsyncMock()),
+        ):
+            await listener._launch_run("r1", {"phase": "plan"})
+
+        listener._report_launch_failed.assert_not_called()
+        mock_create.assert_awaited_once()
+        assert mock_create.await_args.kwargs["namespace"] == "custom-runner-ns"
+        mock_uid.assert_awaited_once()
+        assert mock_uid.await_args.kwargs["namespace"] == "custom-runner-ns"
