@@ -12,6 +12,58 @@ trusting it, at two layers:
 Both are **on by default and fail closed**: a checksum mismatch or bad signature
 is rejected, never cached, never executed.
 
+This page covers two directions:
+
+1. **Verifying Terrapod's own release artifacts** (below) — the images + Helm
+   chart Terrapod publishes are signed and carry SBOM + provenance attestations.
+2. **Terrapod verifying the upstream artifacts it fetches** ([further down](#what-is-verified-and-why-it-matters)).
+
+## Verifying Terrapod's own release artifacts
+
+Every released container image and the Helm chart are **keyless-signed with
+[cosign](https://docs.sigstore.dev/)** (Sigstore), and each image carries an
+**SBOM attestation** (SPDX) and a **SLSA build-provenance attestation** — all
+anchored to the release workflow's GitHub OIDC identity and logged in the public
+Rekor transparency log. No long-lived signing key exists to leak. (SPDX SBOMs
+are also attached to each GitHub Release as files.)
+
+The signing identity to pin in your verification:
+
+- **Issuer**: `https://token.actions.githubusercontent.com`
+- **Identity** (regex): `^https://github.com/mattrobinsonsre/terrapod/.github/workflows/ci.yml@refs/tags/v.*$`
+
+### Verify an image signature
+
+```sh
+IMAGE=ghcr.io/mattrobinsonsre/terrapod-api:v0.49.0
+cosign verify "$IMAGE" \
+  --certificate-identity-regexp '^https://github.com/mattrobinsonsre/terrapod/.github/workflows/ci.yml@refs/tags/v.*$' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+Repeat for `terrapod-web`, `terrapod-runner`, `terrapod-listener`,
+`terrapod-migrations`, and the chart `ghcr.io/mattrobinsonsre/terrapod:<version>`
+(chart version is the tag without the leading `v`).
+
+### Verify the SBOM attestation
+
+```sh
+cosign verify-attestation "$IMAGE" --type spdxjson \
+  --certificate-identity-regexp '^https://github.com/mattrobinsonsre/terrapod/.github/workflows/ci.yml@refs/tags/v.*$' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  | jq -r '.payload | @base64d | fromjson | .predicate' > sbom.spdx.json
+```
+
+### Verify build provenance (SLSA)
+
+```sh
+gh attestation verify oci://"$IMAGE" --repo mattrobinsonsre/terrapod
+```
+
+A deployment can enforce these at admission time (e.g. a Kyverno / Sigstore
+policy-controller rule requiring a valid cosign signature for
+`ghcr.io/mattrobinsonsre/terrapod-*`), so only signed Terrapod images ever run.
+
 ## What is verified, and why it matters
 
 | Artifact | Downstream verifier? | What Terrapod's verification adds |
@@ -125,3 +177,13 @@ In a sealed/air-gapped install the runner never reaches upstream: it fetches the
 binary **and** the signed manifest from Terrapod, and verifies both with its
 pinned key. Verification therefore holds end-to-end without any upstream
 connectivity. See [Sealed (cache-only) mode](registry.md#sealed-cache-only-mode) and [Cache pre-population](registry.md#cache-pre-population) for the full air-gapped flow (point at an internal mirror → warm → seal).
+
+## Security posture summary
+
+For an adopter's security review, in one place:
+
+- **Signed releases** — every image + the Helm chart is keyless cosign-signed; each image carries an SBOM (SPDX) and SLSA build-provenance attestation, all logged in Rekor ([verify](#verifying-terrapods-own-release-artifacts)).
+- **Verified dependencies** — terraform/tofu/terragrunt binaries and provider archives are verified against the publisher's signed `SHA256SUMS` before being cached, served, or executed; **fail-closed by default**.
+- **CI security scanning** — every change runs three layers via `scripts/pentest.sh`: **Semgrep** SAST (custom + `p/python`/`p/owasp-top-ten`/`p/secrets` rulesets), **Trivy** container-image CVE scanning, and **Nuclei** DAST against a live stack; plus CodeQL and dependency/secret scanning in `ci.yml`.
+- **Hardened by default** — all pods run non-root with read-only root filesystems, dropped capabilities, and seccomp (api/web/listener/runner/jobs).
+- **Reporting** — see [SECURITY.md](../SECURITY.md) for the vulnerability-disclosure policy.
