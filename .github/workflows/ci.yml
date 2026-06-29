@@ -1282,7 +1282,7 @@ jobs:
       # attestations on every release image and the Helm chart, anchored to
       # this workflow's GitHub OIDC identity and logged in Rekor. Signing is
       # done by immutable digest so it's independent of the retag above.
-      - name: Sign images + Helm chart + attest SBOMs (cosign keyless)
+      - name: Sign images + Helm chart (cosign keyless)
         id: digests
         env:
           COSIGN_YES: "true"
@@ -1294,9 +1294,9 @@ jobs:
             digest=$(docker buildx imagetools inspect "$REGISTRY/$image:$version" --format '{{.Manifest.Digest}}')
             echo "Signing $image@$digest"
             cosign sign "$REGISTRY/$image@$digest"
-            cosign attest --type spdxjson --predicate "dist/sbom-${image}.spdx.json" "$REGISTRY/$image@$digest"
             # Expose the digest (hyphens → underscores for the output key) so the
-            # SLSA provenance steps below can attest the same immutable subject.
+            # SBOM + SLSA provenance steps below can attest the same immutable
+            # subject as OCI 1.1 referrers.
             echo "${image//-/_}_digest=$digest" >> "$GITHUB_OUTPUT"
           done
 
@@ -1335,6 +1335,47 @@ jobs:
         with:
           subject-name: ${{ env.REGISTRY }}/terrapod-migrations
           subject-digest: ${{ steps.digests.outputs.terrapod_migrations_digest }}
+          push-to-registry: true
+
+      # SBOM (SPDX) per image, published as an OCI 1.1 referrer next to the image
+      # — same discovery path as the provenance above. (Previously attached via
+      # `cosign attest`, which writes the legacy `.att` tag that
+      # `cosign verify-attestation`/`gh attestation verify` don't read as a
+      # referrer; #549 follow-up.)
+      - name: SBOM — terrapod-api
+        uses: actions/attest-sbom@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/terrapod-api
+          subject-digest: ${{ steps.digests.outputs.terrapod_api_digest }}
+          sbom-path: dist/sbom-terrapod-api.spdx.json
+          push-to-registry: true
+      - name: SBOM — terrapod-web
+        uses: actions/attest-sbom@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/terrapod-web
+          subject-digest: ${{ steps.digests.outputs.terrapod_web_digest }}
+          sbom-path: dist/sbom-terrapod-web.spdx.json
+          push-to-registry: true
+      - name: SBOM — terrapod-runner
+        uses: actions/attest-sbom@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/terrapod-runner
+          subject-digest: ${{ steps.digests.outputs.terrapod_runner_digest }}
+          sbom-path: dist/sbom-terrapod-runner.spdx.json
+          push-to-registry: true
+      - name: SBOM — terrapod-listener
+        uses: actions/attest-sbom@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/terrapod-listener
+          subject-digest: ${{ steps.digests.outputs.terrapod_listener_digest }}
+          sbom-path: dist/sbom-terrapod-listener.spdx.json
+          push-to-registry: true
+      - name: SBOM — terrapod-migrations
+        uses: actions/attest-sbom@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/terrapod-migrations
+          subject-digest: ${{ steps.digests.outputs.terrapod_migrations_digest }}
+          sbom-path: dist/sbom-terrapod-migrations.spdx.json
           push-to-registry: true
 
       - name: Generate checksums

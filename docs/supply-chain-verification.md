@@ -47,6 +47,15 @@ Repeat for `terrapod-web`, `terrapod-runner`, `terrapod-listener`,
 
 ### Verify the SBOM attestation
 
+The SBOM (SPDX) is attached to each image as an OCI 1.1 referrer:
+
+```sh
+gh attestation verify oci://"$IMAGE" --repo mattrobinsonsre/terrapod \
+  --predicate-type https://spdx.dev/Document
+```
+
+…or with cosign (reads the same referrer):
+
 ```sh
 cosign verify-attestation "$IMAGE" --type spdxjson \
   --certificate-identity-regexp '^https://github.com/mattrobinsonsre/terrapod/.github/workflows/ci.yml@refs/tags/v.*$' \
@@ -54,10 +63,14 @@ cosign verify-attestation "$IMAGE" --type spdxjson \
   | jq -r '.payload | @base64d | fromjson | .predicate' > sbom.spdx.json
 ```
 
+(The SPDX SBOMs are also attached to each GitHub Release as files, if you'd
+rather download them directly.)
+
 ### Verify build provenance (SLSA)
 
 ```sh
-gh attestation verify oci://"$IMAGE" --repo mattrobinsonsre/terrapod
+gh attestation verify oci://"$IMAGE" --repo mattrobinsonsre/terrapod \
+  --predicate-type https://slsa.dev/provenance/v1
 ```
 
 A deployment can enforce these at admission time (e.g. a Kyverno / Sigstore
