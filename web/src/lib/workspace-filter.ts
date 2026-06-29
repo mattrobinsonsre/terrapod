@@ -19,6 +19,20 @@
 // the labels in `resolveStatus` on the workspaces page (see STATUS_FILTER
 // constants below).
 //
+// One `status:` value is an aggregate rather than a single resolved status:
+// `status:unhealthy` (`HEALTH_ISSUE_STATUS`) matches any workspace with at
+// least one entry in its server-computed `health-conditions` array. It rides
+// the already-reserved `status` facet deliberately — so no NEW reserved label
+// key has to be introduced (which would risk trapping operators who already
+// use a real label like `health:` — see the reserved-key chokepoint in
+// `label_validation.py`). It is the roll-up of every health condition
+// (state-diverged, no-agent-pool, vcs-error, drifted, drift-errored), which is
+// strictly broader than any single `status:` value — e.g. a `needs-confirm`
+// run hides an underlying `state_diverged` from the resolved status, and
+// `no_agent_pool` / `drift_errored` have no resolved-status value at all. It
+// is matched on the same `health-conditions` array the "Health Issues"
+// indicator counts, so the filter can never drift from that indicator.
+//
 // `status` (and the other reserved keys — see `RESERVED_LABEL_KEYS` in
 // `services/terrapod/services/label_validation.py`) cannot be used as
 // literal label keys: the API rejects them at create/update time so the
@@ -43,6 +57,11 @@ export interface StatusTerm {
   kind: 'status'
   value: string
 }
+
+/** The aggregate `status:` value matching any workspace with ≥1 health
+ *  condition. Not a real resolved-status value — matched specially in
+ *  `matchWorkspace` against the `health-conditions` array. */
+export const HEALTH_ISSUE_STATUS = 'unhealthy'
 
 export type FilterTerm = NameTerm | LabelTerm | StatusTerm
 
@@ -132,6 +151,9 @@ export interface MatchableWorkspace {
   attributes: {
     name: string
     labels?: Record<string, string> | null
+    // Server-computed health conditions (see `_compute_health_conditions`).
+    // Only consulted by the `status:unhealthy` aggregate term; safe to omit.
+    'health-conditions'?: unknown[] | null
   }
 }
 
@@ -153,7 +175,14 @@ export function matchWorkspace(
     if (term.kind === 'name') {
       if (!name.includes(term.value.toLowerCase())) return false
     } else if (term.kind === 'status') {
-      if (resolvedStatus !== term.value) return false
+      if (term.value === HEALTH_ISSUE_STATUS) {
+        // Aggregate: any active health condition, independent of the single
+        // resolved status (which can mask underlying conditions, e.g.
+        // needs-confirm over state_diverged).
+        if ((ws.attributes['health-conditions'] || []).length === 0) return false
+      } else if (resolvedStatus !== term.value) {
+        return false
+      }
     } else if (term.value === null) {
       if (!Object.prototype.hasOwnProperty.call(labels, term.key)) return false
     } else if (labels[term.key] !== term.value) {

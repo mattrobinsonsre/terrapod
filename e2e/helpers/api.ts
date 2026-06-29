@@ -166,6 +166,7 @@ export async function setRoleAssignments(
 export async function createWorkspace(
   token: string,
   name: string,
+  attrs: Record<string, unknown> = {},
 ): Promise<string> {
   const res = await fetch(
     `${API_URL}/api/v2/organizations/default/workspaces`,
@@ -178,7 +179,7 @@ export async function createWorkspace(
       body: JSON.stringify({
         data: {
           type: 'workspaces',
-          attributes: { name },
+          attributes: { name, ...attrs },
         },
       }),
     },
