@@ -54,10 +54,12 @@ gh attestation verify oci://"$IMAGE" --repo mattrobinsonsre/terrapod \
   --predicate-type https://spdx.dev/Document
 ```
 
-…or with cosign (reads the same referrer):
+…or with cosign (reads the same referrer). Note the SBOM predicate type is the
+**versioned** SPDX URI, so pass it explicitly — cosign's `--type spdxjson` alias
+maps to the unversioned URI and will not match:
 
 ```sh
-cosign verify-attestation "$IMAGE" --type spdxjson \
+cosign verify-attestation "$IMAGE" --type https://spdx.dev/Document/v2.3 \
   --certificate-identity-regexp '^https://github.com/mattrobinsonsre/terrapod/.github/workflows/ci.yml@refs/tags/v.*$' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   | jq -r '.payload | @base64d | fromjson | .predicate' > sbom.spdx.json
