@@ -11,7 +11,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from terrapod.config import settings
-from terrapod.services import binary_cache_service, provider_cache_service
+from terrapod.services import (
+    binary_cache_service,
+    platform_provider_service,
+    provider_cache_service,
+)
 from terrapod.services.binary_cache_service import _pick_cached_version
 from terrapod.services.cache_errors import CacheOnlyError
 
@@ -183,6 +187,41 @@ class TestSealedProvider:
             await provider_cache_service.fetch_and_cache_single_platform(
                 db, storage, "registry.terraform.io", "hashicorp", "aws", "5.60.0", "linux", "amd64"
             )
+
+
+# ── Sealed: SHA256SUMS re-verify path + platform provider (no upstream) ──
+
+
+class TestSealedSums:
+    async def test_get_or_cache_sums_miss_raises_no_upstream(self):
+        # Not persisted + sealed → CacheOnlyError, never constructs an httpx client.
+        storage = AsyncMock()
+        storage.exists = AsyncMock(return_value=False)
+        with (
+            _sealed(),
+            patch.object(binary_cache_service.httpx, "AsyncClient") as mock_client,
+        ):
+            with pytest.raises(CacheOnlyError):
+                await binary_cache_service.get_or_cache_sums(storage, "terraform", "1.12.3")
+        mock_client.assert_not_called()
+
+
+class TestSealedPlatformProvider:
+    async def test_get_download_info_miss_raises_no_github(self):
+        # The Terrapod provider itself must not be fetched from GitHub when sealed.
+        storage = AsyncMock()
+        storage.exists = AsyncMock(return_value=False)
+        with (
+            _sealed(),
+            patch.object(
+                platform_provider_service, "_fetch_and_cache_binary", new=AsyncMock()
+            ) as mock_fetch,
+        ):
+            with pytest.raises(CacheOnlyError):
+                await platform_provider_service.get_download_info(
+                    storage, "0.49.0", "linux", "amd64"
+                )
+        mock_fetch.assert_not_called()
 
 
 # ── Artifact retention skips caches when sealed ──────────────────────

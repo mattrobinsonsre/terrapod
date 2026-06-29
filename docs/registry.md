@@ -707,7 +707,7 @@ The provider network mirror has the equivalent override: `registry.provider_cach
 
 All of these fetches go through the [forward proxy and custom CA](deployment-proxy.md) when configured (the API's HTTP client honours `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` / the mounted CA bundle), so an internal mirror reached only via a corporate egress proxy works without further changes. Integrity verification ([supply-chain verification](supply-chain-verification.md)) still applies to mirror-served artifacts — if the mirror re-signs binaries with its own key, supply the key via `binary_cache.signing_keys`.
 
-> A fully sealed, **no-egress** deployment (cache-miss must never reach upstream at all) plus declarative cache pre-population is tracked as the later parts of air-gapped support (#606). This section covers pointing the pull-through caches at internal sources; the caches still fall through to those configured sources on a miss.
+> This section covers pointing the pull-through caches at internal sources; the caches still fall through to those configured sources on a miss. To pre-fill the caches up front see [Cache pre-population](#cache-pre-population) below, and to forbid any upstream fall-through entirely (cache-miss must never reach upstream) see [Sealed (cache-only) mode](#sealed-cache-only-mode).
 
 ### Pre-release versions (`allow_prerelease`)
 

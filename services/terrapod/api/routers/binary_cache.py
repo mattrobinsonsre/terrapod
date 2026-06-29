@@ -157,6 +157,8 @@ async def get_binary_sha256sums(
     try:
         resolved = await resolve_version(tool, version)
         manifest, _sig = await get_or_cache_sums(storage, tool, resolved)
+    except CacheOnlyError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except Exception as e:
@@ -182,6 +184,8 @@ async def get_binary_sha256sums_sig(
     try:
         resolved = await resolve_version(tool, version)
         _manifest, sig = await get_or_cache_sums(storage, tool, resolved)
+    except CacheOnlyError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except Exception as e:

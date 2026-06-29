@@ -325,6 +325,14 @@ async def get_or_cache_sums(storage: ObjectStore, tool: str, version: str) -> tu
     if await storage.exists(sums_key) and await storage.exists(sig_key):
         return await storage.get(sums_key), await storage.get(sig_key)
 
+    # Sealed (cache-only) mode: never fetch the manifest/sig from upstream.
+    if _sealed():
+        raise CacheOnlyError(
+            f"SHA256SUMS for {tool} {version} are not cached and sealed (cache_only) "
+            f"mode is enabled. They are persisted when the binary is warmed under "
+            f"verify=signature — re-warm it before sealing, or disable registry.cache_only."
+        )
+
     # Not persisted yet — fetch from upstream, verify the signature against the
     # pinned publisher key, persist, and return. Import locally to avoid a
     # module-load cycle (artifact_verification imports config, not this module).
@@ -382,8 +390,13 @@ async def warm_binary(
     os_: str,
     arch: str,
 ) -> str:
-    """Pre-warm a binary into the cache. Returns presigned URL."""
-    return await get_or_cache_binary(db, storage, tool, version, os_, arch)
+    """Pre-warm a binary into the cache. Returns presigned URL.
+
+    Resolves a partial version (e.g. "1.12" → "1.12.3") first, so warm
+    manifests / bulk-warm entries can use major.minor like the CLI does.
+    """
+    resolved = await resolve_version(tool, version)
+    return await get_or_cache_binary(db, storage, tool, resolved, os_, arch)
 
 
 # --- Available Versions ---

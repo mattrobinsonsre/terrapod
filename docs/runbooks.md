@@ -1027,3 +1027,32 @@ The catalog provisions **and** destroys real infrastructure on behalf of self-se
 - **Archive is a soft delete** — the workspace row, its state versions, and run history are **retained** (`lifecycle_state = "archived"`), only hidden from the active catalog/workspace lists. State and audit are recoverable.
 - To restore visibility, flip `lifecycle_state` back to `active` on the workspace row (DBA action — there is intentionally no API to "un-destroy", since the infra was torn down). The workspace's last state version is still in object storage under its state key.
 - If you need the **infrastructure** back (not just the record), re-provision the catalog item with the same inputs — the wrapper is regenerated deterministically from the item + inputs.
+
+---
+
+## Sealed (cache-only) mode — runs failing with cache-miss 404
+
+**Symptom**: after enabling `registry.cache_only: true` (air-gap / sealed mode), runner Jobs fail early — `terraform`/`tofu` `init` can't fetch its CLI binary or a provider, and the API logs / run errors show a **404** with a message like *"… is not in the cache and sealed (cache_only) mode is enabled. Pre-populate it … before sealing, or disable registry.cache_only."* Every run that needs an un-cached artifact fails; runs whose binary + providers are all cached keep working.
+
+This is **by design** — sealed mode guarantees no upstream fetch ever happens, so a cache miss is an actionable error rather than a silent (and, with no egress, doomed) upstream attempt. It is not data loss; nothing is destroyed.
+
+### Diagnosis
+
+- Confirm sealed mode is on: `registry.cache_only` in the API ConfigMap (`helm get values` / the rendered `config.yaml`).
+- Identify the missing artifact from the 404 detail (tool+version+os/arch, or provider `host/ns/type@version`).
+- List what IS cached: `GET /api/terrapod/v1/admin/binary-cache` and `GET /api/terrapod/v1/admin/provider-cache` (admin), or the `/admin/binary-cache` UI.
+- Remember partial versions resolve **only against the cache** when sealed — a workspace pinned to `terraform_version = "1.12"` needs a cached `1.12.x`; if none is cached the resolve itself 404s.
+- The **platform Terrapod provider** (`<host>/default/terrapod`) and the **SHA256SUMS** used for runner re-verification are subject to the same gate — they must be cached too (SHA256SUMS are persisted when the binary is warmed under `verify=signature`).
+
+### Resolution
+
+1. **Preferred — warm the missing artifacts, keep sealed.** Sealed mode refuses to fetch, so warm from a path that *can* reach the source:
+   - Temporarily set `registry.cache_only: false` (optionally with the upstream overrides pointing at an internal mirror), bulk-warm the needed entries via `POST /api/terrapod/v1/admin/binary-cache/warm-bulk` or the **Warm cache** UI panel, confirm they appear in the cache lists, then set `cache_only: true` again. See [Cache pre-population](registry.md#cache-pre-population).
+   - Or warm a staging Terrapod that shares/replicates the same object store + DB, so the sealed instance sees the artifacts.
+2. **Escape hatch — unseal.** Set `registry.cache_only: false` to re-allow upstream fall-through (only viable if the instance actually has egress to upstream or an internal mirror).
+
+### Verification
+
+- Re-list the binary/provider caches and confirm the previously-missing artifact (and the right partial-version match) is present.
+- Re-queue the failed run; `init` now resolves the binary + providers from cache and the run proceeds.
+- Note: the artifact-retention sweeper intentionally **skips** the binary/provider caches while sealed, so warmed artifacts won't be evicted out from under a sealed instance.

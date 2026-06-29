@@ -124,4 +124,4 @@ compare only) until the trust set is updated.
 In a sealed/air-gapped install the runner never reaches upstream: it fetches the
 binary **and** the signed manifest from Terrapod, and verifies both with its
 pinned key. Verification therefore holds end-to-end without any upstream
-connectivity. See [Air-gapped artifact delivery](https://github.com/mattrobinsonsre/terrapod/issues/606).
+connectivity. See [Sealed (cache-only) mode](registry.md#sealed-cache-only-mode) and [Cache pre-population](registry.md#cache-pre-population) for the full air-gapped flow (point at an internal mirror → warm → seal).

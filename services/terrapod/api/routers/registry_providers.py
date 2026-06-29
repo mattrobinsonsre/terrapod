@@ -53,6 +53,7 @@ from terrapod.api.serialization import rfc3339
 from terrapod.config import settings
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
+from terrapod.services.cache_errors import CacheOnlyError
 from terrapod.services.platform_provider_service import (
     get_download_info as platform_get_download_info,
 )
@@ -266,6 +267,9 @@ async def download_provider_cli(
         try:
             info = await platform_get_download_info(storage, version, os, arch)
             return JSONResponse(content=info)
+        except CacheOnlyError as e:
+            # Sealed mode + not cached — actionable 404, never fetch upstream.
+            raise HTTPException(status_code=404, detail=str(e)) from e
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e)) from e
         except RuntimeError as e:
