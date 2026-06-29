@@ -1,0 +1,8 @@
+# Paths excluded from Semgrep (CI `semgrep scan`, `make pentest-sast`, and any
+# Semgrep app integration all honour this file).
+
+# AI-analysis evaluation harness + its synthetic, never-applied terraform/HCL
+# corpus fixtures. The corpus is deliberately "insecure" infra (public SQL,
+# no TLS, public IPs, no logging) so the AI risk-analysis prompt has something
+# to flag — it is test data, never deployed, and must not raise security alerts.
+services/ai_eval/

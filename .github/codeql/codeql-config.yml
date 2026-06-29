@@ -26,6 +26,11 @@
 paths-ignore:
   - e2e
   - alembic/versions
+  # services/ai_eval is the AI-analysis evaluation harness + its synthetic,
+  # never-applied terraform/HCL corpus fixtures (deliberately "insecure" infra
+  # so the AI risk-analysis prompt has something to flag). Not product code,
+  # never deployed — excluded from code scanning entirely (see also .semgrepignore).
+  - services/ai_eval
 
 query-filters:
   - exclude:

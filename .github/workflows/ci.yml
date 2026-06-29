@@ -686,6 +686,7 @@ jobs:
               --exclude "dist" \
               --exclude "alembic/versions" \
               --exclude "reports" \
+              --exclude "services/ai_eval" \
               --exclude-rule "python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5" \
               --exclude-rule "python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure" \
               --exclude-rule "python.flask.security.audit.directly-returned-format-string.directly-returned-format-string" \
