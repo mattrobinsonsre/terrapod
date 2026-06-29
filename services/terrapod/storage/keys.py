@@ -126,6 +126,20 @@ def binary_cache_key(tool: str, version: str, os_: str, arch: str) -> str:
     return f"cache/binaries/{tool}/{version}/{os_}_{arch}"
 
 
+def binary_cache_sums_key(tool: str, version: str) -> str:
+    """Key for the cached publisher SHA256SUMS manifest (per tool+version).
+
+    Persisted at cache time (#607) so runners can verify the executable
+    against the publisher's signed manifest without reaching upstream.
+    """
+    return f"cache/binaries/{tool}/{version}/SHA256SUMS"
+
+
+def binary_cache_sums_sig_key(tool: str, version: str) -> str:
+    """Key for the cached detached GPG signature over the SHA256SUMS manifest."""
+    return f"cache/binaries/{tool}/{version}/SHA256SUMS.sig"
+
+
 # --- Platform Provider Cache ---
 
 

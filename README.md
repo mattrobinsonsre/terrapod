@@ -61,6 +61,7 @@ quickstart pulls released images, so the only wait is the image download.
 | Private Module Registry | Implemented | Publish, version, and share modules internally |
 | Private Provider Registry | Implemented | Publish, version, and share providers with GPG signing and network mirror caching |
 | Binary Caching | Implemented | Pull-through cache for terraform/tofu/terragrunt CLI binaries |
+| Supply-chain Verification | Implemented | Cached binaries + provider archives verified against the publisher's GPG-signed SHA256SUMS (pinned keys); the runner re-verifies the executable before running it |
 | **Terragrunt** | **Implemented** | **Per-workspace Terragrunt support for agent-mode runs — a `terragrunt_enabled` flag + pinned version, pull-through binary cache for the terragrunt CLI, and transparent local-backend reconciliation so Terrapod still owns state. CLI-driven runs work with zero extra config. See [docs/terragrunt.md](docs/terragrunt.md).** |
 | Agent Pools | Implemented | Named groups of runner listeners; join token → certificate exchange for auth |
 | CLI-Driven Runs | Implemented | `terraform plan` / `apply` via cloud backend (both `terraform` and `tofu` verified) |

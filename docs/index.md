@@ -34,6 +34,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | **Workspace Health** | Per-workspace health conditions with status indicators on workspace list |
 | **Cloud Credentials** | Dynamic provider credentials via Kubernetes workload identity (AWS IRSA, GCP WIF, Azure WI) |
 | **Binary Caching** | Pull-through cache for terraform/tofu/terragrunt CLI binaries |
+| **Supply-chain Verification** | Cached binaries + provider archives verified against the publisher's GPG-signed SHA256SUMS with pinned keys; the runner re-verifies the executable (visible in the run log) before running it |
 | **Terragrunt** | Per-workspace Terragrunt for agent-mode runs (flag + version, pull-through binary cache, local-backend reconciliation); CLI-driven runs work with zero config |
 | **Workspace Autodiscovery** | Atlantis-style monorepo autodiscovery with rule templating; safe-by-default rename/delete/orphan lifecycle (opt-in destroy) |
 | **Bulk Workspace Operations** | Server-side workspace search + all-or-nothing bulk settings update (dry-run by default; never triggers runs) |
@@ -107,6 +108,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Autodiscovery](autodiscovery.md) | Atlantis-style monorepo workspace autodiscovery |
 | [Drift Detection](drift-detection.md) | Scheduled plan-only runs to detect infrastructure drift |
 | [Drift Ignore Rules](drift-ignore-rules.md) | Per-workspace allowlist that suppresses known-noisy attributes from the drift signal (e.g. provider-rotated certs, externally co-managed replicas) |
+| [Supply-chain Verification](supply-chain-verification.md) | How cached binaries/providers and runner executables are verified against publisher signatures (pinned keys, `verify` knobs, air-gap) |
 | [Run Triggers](run-triggers.md) | Cross-workspace dependency chains |
 | [Terragrunt](terragrunt.md) | CLI-driven and agent-mode Terragrunt support, the agent-mode `terragrunt_enabled` flag, and current limitations |
 | [Remote State](remote-state.md) | Cross-workspace `terraform_remote_state` composition with producer-controlled allowlist |

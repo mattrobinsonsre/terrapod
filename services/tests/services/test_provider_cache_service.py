@@ -29,8 +29,10 @@ class TestConcurrentCacheMissRace:
     )
     @patch("terrapod.services.provider_cache_service.httpx.AsyncClient")
     @patch("terrapod.services.provider_cache_service.HashingStream")
+    @patch("terrapod.services.provider_cache_service.verify_provider", new_callable=AsyncMock)
     async def test_integrity_error_on_flush_falls_back_to_presigned_get(
         self,
+        mock_verify: AsyncMock,  # verification not under test here (#607)
         mock_hashing_stream: MagicMock,
         mock_async_client: MagicMock,
         mock_fetch_download: AsyncMock,

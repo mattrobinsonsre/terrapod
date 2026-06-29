@@ -28,6 +28,10 @@ def _cfg(**overrides) -> RunnerConfig:
         "TP_BACKEND": "tofu",
         "TP_VERSION": "1.12.1",
         "TP_DOWNLOAD_RETRY_DELAY": "0",
+        # These exercise download/extract mechanics, not executable
+        # verification (covered by test_binary_verify.py). The pinned keys
+        # only exist in the runner image, not the test image.
+        "TP_VERIFY_BINARIES": "off",
     }
     base.update(overrides)
     return RunnerConfig.from_env(env=base)

@@ -18,8 +18,13 @@ from terrapod.config import settings
 from terrapod.db.models import CachedBinary
 from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
+from terrapod.services.artifact_verification import VerificationError, verify_binary
 from terrapod.services.hashing_stream import HashingStream
-from terrapod.storage.keys import binary_cache_key
+from terrapod.storage.keys import (
+    binary_cache_key,
+    binary_cache_sums_key,
+    binary_cache_sums_sig_key,
+)
 from terrapod.storage.protocol import ObjectStore
 
 logger = get_logger(__name__)
@@ -157,6 +162,37 @@ async def get_or_cache_binary(
         storage, key, download_url, content_type=content_type
     )
 
+    # Integrity gate (#607): verify the downloaded binary against the publisher's
+    # signed SHA256SUMS before recording it. The DB row is what gates serving
+    # (no row → cache miss → never returned), so verifying before the INSERT
+    # below means a tampered binary is never served. On failure we also delete
+    # the just-written object so it doesn't linger orphaned in storage. The
+    # binary is *executed* on every run, so this is fail-closed by default.
+    verify_level = settings.registry.binary_cache.verify
+    if verify_level != "off":
+        try:
+            async with httpx.AsyncClient(follow_redirects=True) as vclient:
+                manifest, sig = await verify_binary(
+                    vclient, tool, version, os_, arch, shasum, level=verify_level
+                )
+        except VerificationError:
+            await storage.delete(key)
+            BINARY_CACHE_REQUESTS.labels(tool=tool, result="verify_failed").inc()
+            raise
+        # Persist the signed manifest + sig so the runner can independently
+        # re-verify the executable against the publisher's signature with its
+        # own pinned key — no upstream reach needed (#607). Only when we have
+        # both (signature mode); checksum mode has no sig to serve.
+        if sig is not None:
+            await storage.put(
+                binary_cache_sums_key(tool, version), manifest, content_type="text/plain"
+            )
+            await storage.put(
+                binary_cache_sums_sig_key(tool, version),
+                sig,
+                content_type="application/pgp-signature",
+            )
+
     # Record in database. Two concurrent cache misses for the same
     # (tool, version, os, arch) — typical when two runners spin up
     # within milliseconds of each other against an empty cache — both
@@ -198,6 +234,37 @@ async def get_or_cache_binary(
 
     presigned = await storage.presigned_get_url(key)
     return presigned.url
+
+
+async def get_or_cache_sums(storage: ObjectStore, tool: str, version: str) -> tuple[bytes, bytes]:
+    """Return the (SHA256SUMS, detached-sig) bytes for a tool/version (#607).
+
+    Serves the runner's cache-path executable verification: the runner fetches
+    these and re-verifies the downloaded binary against the publisher signature
+    with its own pinned key. Lazily fetches from upstream + verifies + persists
+    if not already cached (e.g. a binary cached before this feature shipped).
+    Raises on unverifiable/unavailable material — fail closed.
+    """
+    if tool not in VALID_TOOLS:
+        raise ValueError(f"Invalid tool: {tool}. Must be one of {VALID_TOOLS}")
+
+    sums_key = binary_cache_sums_key(tool, version)
+    sig_key = binary_cache_sums_sig_key(tool, version)
+    if await storage.exists(sums_key) and await storage.exists(sig_key):
+        return await storage.get(sums_key), await storage.get(sig_key)
+
+    # Not persisted yet — fetch from upstream, verify the signature against the
+    # pinned publisher key, persist, and return. Import locally to avoid a
+    # module-load cycle (artifact_verification imports config, not this module).
+    from terrapod.services.artifact_verification import fetch_sums_and_sig
+
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        manifest, sig = await fetch_sums_and_sig(client, tool, version, level="signature")
+    if sig is None:  # pragma: no cover - signature level always returns a sig
+        raise ValueError("no signature available for SHA256SUMS")
+    await storage.put(sums_key, manifest, content_type="text/plain")
+    await storage.put(sig_key, sig, content_type="application/pgp-signature")
+    return manifest, sig
 
 
 async def list_cached_binaries(

@@ -210,6 +210,7 @@ class TestConcurrentCacheMissRace:
         from sqlalchemy.exc import IntegrityError
 
         mock_settings.registry.binary_cache.allow_prerelease = "none"
+        mock_settings.registry.binary_cache.verify = "off"  # not under test here (#607)
         # First call: cache miss (returns None). The second-fetcher path
         # below doesn't re-call _get_cached — the IntegrityError handler
         # falls straight through to presigning the row the winner wrote.
@@ -261,6 +262,7 @@ class TestTerragruntBinary:
         mock_fetch: AsyncMock,
     ) -> None:
         mock_settings.registry.binary_cache.allow_prerelease = "none"
+        mock_settings.registry.binary_cache.verify = "off"  # not under test here (#607)
         mock_settings.registry.binary_cache.terragrunt_mirror_url = (
             "https://github.com/gruntwork-io/terragrunt/releases/download"
         )

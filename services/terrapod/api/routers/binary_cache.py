@@ -20,7 +20,7 @@ Endpoints:
     DELETE /api/terrapod/v1/admin/provider-cache/{hostname}/{namespace}/{type}/{version}      — purge provider
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +32,7 @@ from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.binary_cache_service import (
     get_or_cache_binary,
+    get_or_cache_sums,
     list_available_versions,
     list_cached_binaries,
     purge_binary,
@@ -129,6 +130,61 @@ async def download_binary(
 
     await db.commit()
     return RedirectResponse(url=url, status_code=status.HTTP_302_FOUND)
+
+
+@router.get("/binary-cache/{tool}/{version}/sha256sums")
+async def get_binary_sha256sums(
+    tool: str,
+    version: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """Serve the publisher SHA256SUMS manifest for a tool/version (#607).
+
+    The runner fetches this (and `.sig`) to independently verify the executable
+    against the publisher's signature with its own pinned key. Lazily warmed
+    from upstream if not yet persisted. Same source as the binary (cache path).
+    """
+    if not settings.registry.binary_cache.enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Binary cache is disabled"
+        )
+    try:
+        resolved = await resolve_version(tool, version)
+        manifest, _sig = await get_or_cache_sums(storage, tool, resolved)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to obtain SHA256SUMS for {tool} {version}: {e}",
+        ) from e
+    return Response(content=manifest, media_type="text/plain")
+
+
+@router.get("/binary-cache/{tool}/{version}/sha256sums.sig")
+async def get_binary_sha256sums_sig(
+    tool: str,
+    version: str,
+    user: AuthenticatedUser = Depends(get_current_user),
+    storage: ObjectStore = Depends(get_storage),
+) -> Response:
+    """Serve the detached GPG signature over the SHA256SUMS manifest (#607)."""
+    if not settings.registry.binary_cache.enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Binary cache is disabled"
+        )
+    try:
+        resolved = await resolve_version(tool, version)
+        _manifest, sig = await get_or_cache_sums(storage, tool, resolved)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to obtain SHA256SUMS signature for {tool} {version}: {e}",
+        ) from e
+    return Response(content=sig, media_type="application/pgp-signature")
 
 
 # --- Admin endpoints ---

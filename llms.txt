@@ -99,5 +99,6 @@ How each capability is turned on. **Platform-level** features are Helm values un
 ## Optional
 
 - [docs/registry-publishing.md](docs/registry-publishing.md): the client-signed provider/module publish protocol.
+- [docs/supply-chain-verification.md](docs/supply-chain-verification.md): cached binaries + provider archives verified against the publisher's GPG-signed SHA256SUMS (pinned keys); the runner re-verifies the executable before running it. Config: `registry.binary_cache.verify` / `registry.provider_cache.verify` (off|checksum|signature, default signature).
 - [docs/remote-state.md](docs/remote-state.md): cross-workspace `terraform_remote_state` composition.
 - The four Go modules (`go-terrapod/`, `provider/`, `migrate/`, `publish/`) each have their own `go.mod` and package docs.

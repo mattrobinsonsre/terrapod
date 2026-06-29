@@ -11,4 +11,10 @@ dependencies = [
     "structlog>=25.5",
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
+    # Runner-side executable verification (#607): verify the terraform/tofu/
+    # terragrunt binary against the publisher's signed SHA256SUMS with a pinned
+    # key before executing it. pgpy is pure-Python OpenPGP (pulls cryptography).
+    # standard-imghdr backfills the stdlib imghdr pgpy imports (removed in 3.13).
+    "pgpy>=0.6.0",
+    "standard-imghdr>=3.13",
 ]

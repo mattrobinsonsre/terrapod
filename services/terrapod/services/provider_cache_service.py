@@ -34,6 +34,7 @@ from terrapod.db.models import (
 from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
+from terrapod.services.artifact_verification import verify_provider
 from terrapod.services.hashing_stream import HashingStream
 from terrapod.storage.keys import provider_binary_key, provider_cache_key
 from terrapod.storage.protocol import ObjectStore
@@ -732,13 +733,18 @@ async def fetch_and_cache_single_platform(
     meta = await _get_cached_metadata(hostname, namespace, type_, version)
     download_url = None
     filename = None
+    download_info: dict | None = None
     if meta and platform_key in meta:
         download_url = meta[platform_key].get("download_url")
         filename = meta[platform_key].get("filename")
 
+    verify_level = settings.registry.provider_cache.verify
+
     async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
-        # If we don't have download info from Redis, fetch from upstream
-        if not download_url or not filename:
+        # If we don't have download info from Redis — OR verification is on, in
+        # which case the reduced Redis metadata lacks the shasum/signature/keys
+        # material we need — fetch the authoritative download response upstream.
+        if not download_url or not filename or verify_level != "off":
             download_info = await _fetch_platform_download(
                 client, hostname, namespace, type_, version, os_, arch
             )
@@ -777,6 +783,21 @@ async def fetch_and_cache_single_platform(
                         fh.write(chunk)
                     shasum = stream.sha256_hex
                     size_bytes = stream.size
+
+            # Integrity gate (#607): verify the downloaded archive against the
+            # registry-advertised shasum (+ GPG signature in `signature` mode)
+            # BEFORE computing h1 / persisting. Fail closed — an unverified
+            # archive must never be cached, served, or have its h1 spliced into
+            # a lock file. `download_info` is guaranteed populated above when
+            # verify_level != "off".
+            if verify_level != "off":
+                await verify_provider(
+                    client,
+                    download_info or {},
+                    shasum,
+                    level=verify_level,
+                    allow_unsigned=settings.registry.provider_cache.allow_unsigned,
+                )
 
             # Phase 2: compute h1 from the on-disk archive (constant
             # memory). Earlier versions called `_compute_h1_from_zip_bytes(fh.read())`
