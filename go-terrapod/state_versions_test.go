@@ -90,6 +90,9 @@ func TestCreateAndUploadState_ComputesMD5WhenEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// MD5 here is the TFE state-version checksum the V2 protocol mandates, not a
+	// security primitive — this test asserts we send the right checksum.
+	// nosemgrep: go.lang.security.audit.crypto.use_of_weak_crypto.use-of-md5
 	sum := md5.Sum(raw) //nolint:gosec
 	wantMD5 := hex.EncodeToString(sum[:])
 	var req struct {

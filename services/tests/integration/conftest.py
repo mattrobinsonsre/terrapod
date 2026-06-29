@@ -260,6 +260,10 @@ async def clean_db(app):
     from terrapod.db.session import get_db_session
 
     async with get_db_session() as session:
+        # _TRUNCATE_SQL is built from a hard-coded table list (see top of file),
+        # not from any request/user input — no injection surface in this test
+        # cleanup fixture.
+        # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
         await session.execute(text(_TRUNCATE_SQL))
 
 

@@ -110,7 +110,10 @@ class TestGenerateAppJwt:
         ).decode()
 
         token = _generate_app_jwt(42, pem)
-        # Decode without verification to inspect claims
+        # Decode without verification to inspect claims — this is a test that
+        # asserts the claims our own signer produced; there is no untrusted
+        # token here and nothing to verify against.
+        # nosemgrep: python.jwt.security.unverified-jwt-decode.unverified-jwt-decode
         claims = jwt.decode(token, options={"verify_signature": False})
 
         assert claims["iss"] == "42"
@@ -130,6 +133,8 @@ class TestGenerateAppJwt:
         ).decode()
 
         token = _generate_app_jwt(1, pem)
+        # Inspect-only decode of a token we just signed (see above).
+        # nosemgrep: python.jwt.security.unverified-jwt-decode.unverified-jwt-decode
         claims = jwt.decode(token, options={"verify_signature": False})
 
         # exp should be ~11 minutes from iat (iat is now-60, exp is now+600)
