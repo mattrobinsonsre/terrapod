@@ -675,7 +675,8 @@
                 "verify": {
                   "type": "string",
                   "enum": ["off", "checksum", "signature"]
-                }
+                },
+                "allow_unsigned": { "type": "boolean" }
               }
             },
             "binary_cache": {
@@ -693,6 +694,10 @@
                 "verify": {
                   "type": "string",
                   "enum": ["off", "checksum", "signature"]
+                },
+                "signing_keys": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
                 }
               }
             },

@@ -122,6 +122,14 @@ def test_url_source_follows_binary_source():
     assert bv._upstream_sums_urls("terragrunt", "1.0.8")[0].endswith("/SHA256SUMS")
 
 
+def test_key_for_tool_env_override(monkeypatch):
+    # job_template injects TP_SIGNING_KEY_<TOOL>; the runner must use it over
+    # the bundled key, so the same operator-controlled trust set applies.
+    k = _new_key()
+    monkeypatch.setenv("TP_SIGNING_KEY_TERRAFORM", str(k.pubkey))
+    assert bv._key_for_tool("terraform").fingerprint.keyid == k.fingerprint.keyid
+
+
 def test_artifact_names():
     assert (
         bv._artifact_name("terraform", "1.9.8", "linux", "amd64")

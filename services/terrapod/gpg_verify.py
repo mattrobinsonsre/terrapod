@@ -40,6 +40,12 @@ def load_key(path: str) -> pgpy.PGPKey:
     return key
 
 
+def load_key_from_armor(armor: str) -> pgpy.PGPKey:
+    """Load an ASCII-armored public key from a string (operator-supplied key)."""
+    key, _ = pgpy.PGPKey.from_blob(armor)
+    return key
+
+
 def verify_detached(manifest: bytes, signature: bytes, key: pgpy.PGPKey) -> bool:
     """Verify a detached OpenPGP signature over ``manifest`` using ``key``.
 

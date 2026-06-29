@@ -72,12 +72,52 @@ api:
     registry:
       binary_cache:
         verify: signature      # also drives the runner via TP_VERIFY_BINARIES
+        signing_keys: {}       # operator key override (see "Key rotation" below)
       provider_cache:
         verify: signature
+        allow_unsigned: false  # see "Unsigned / obscure providers" below
 ```
 
 The runner inherits `binary_cache.verify` automatically (the listener injects it
 into the Job), so one knob controls both API and runner.
+
+### Unsigned / obscure providers
+
+Provider signature verification uses the **registry-advertised** signing key, so
+it works for any provider the registry signs — which the public registries
+(`registry.terraform.io`, `registry.opentofu.org`) do for essentially all
+providers, mainstream or obscure. But a **private/self-hosted registry or a
+non-signing network mirror** may advertise no signature material. By default
+(`allow_unsigned: false`) such a provider is **rejected** in `signature` mode.
+
+Set `provider_cache.allow_unsigned: true` to **degrade to a shasum-only check
+(with a warning)** for those upstreams instead of rejecting them — the archive
+is still verified against the registry-advertised shasum; only the GPG-signature
+step is skipped when no signature exists. It's opt-in so the secure default
+stays fail-closed.
+
+### Key rotation / operator-supplied keys
+
+The publisher keys are **pinned** (image-baked) by default. If a publisher
+rotates or expires its signing key, the pinned key stops verifying *new*
+releases until an updated Terrapod image ships — a hard, fail-closed break.
+
+To bridge a rotation without waiting for a release (or to trust an **internal
+re-signing mirror**), supply the key via `binary_cache.signing_keys`, keyed by
+tool. Operator-supplied keys take precedence over the bundled ones and are
+propagated to runner Jobs so runner-side verification uses the same trust set:
+
+```yaml
+binary_cache:
+  signing_keys:
+    terraform: |
+      -----BEGIN PGP PUBLIC KEY BLOCK-----
+      ...your trusted key...
+      -----END PGP PUBLIC KEY BLOCK-----
+```
+
+As a stopgap you can also drop `binary_cache.verify` to `checksum` (manifest
+compare only) until the trust set is updated.
 
 ## Air-gapped deployments
 

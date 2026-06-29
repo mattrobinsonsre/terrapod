@@ -164,6 +164,13 @@ def build_job_spec(
     container_env.append(
         {"name": "TP_VERIFY_BINARIES", "value": settings.registry.binary_cache.verify}
     )
+    # Operator-overridden publisher keys (#607): propagate the configured trust
+    # set to the Job so runner-side verification uses the same keys as the API
+    # (set at Job-creation from config, not fetched at request time → not an
+    # attacker-controllable trust anchor). Empty (default) → runner uses bundled.
+    for _tool, _armor in settings.registry.binary_cache.signing_keys.items():
+        if _armor:
+            container_env.append({"name": f"TP_SIGNING_KEY_{_tool.upper()}", "value": _armor})
     # Terragrunt (#534): the runner wraps tofu/terraform with terragrunt when
     # enabled. Version is partial (e.g. "1.0") — the binary cache resolves it.
     if terragrunt_enabled:

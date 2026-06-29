@@ -276,6 +276,11 @@ api:
         # registry-advertised signing key (mirrors `terraform init`).
         # 'checksum' = shasum-only. 'off' = no verification (NOT recommended).
         verify: signature
+        # In 'signature' mode, when an upstream advertises NO signature material
+        # (private registries / non-signing mirrors / some community providers),
+        # default false = fail closed. Set true to degrade to a shasum-only check
+        # (with a warning) for those providers instead of rejecting them.
+        allow_unsigned: false
       binary_cache:
         enabled: true
         terraform_mirror_url: "https://releases.hashicorp.com/terraform"
@@ -298,6 +303,16 @@ api:
         # on every run, so verification is on by default. 'checksum' = manifest
         # compare only. 'off' = no verification (NOT recommended).
         verify: signature
+        # Operator override for the pinned publisher keys, keyed by tool →
+        # ASCII-armored public key. Empty (default) uses the keys bundled in the
+        # image (HashiCorp / OpenTofu / Gruntwork). Supply a key to bridge an
+        # upstream key rotation without a Terrapod release, or to trust an
+        # internal re-signing mirror. Propagated to runner Jobs. Example:
+        #   signing_keys:
+        #     terraform: |
+        #       -----BEGIN PGP PUBLIC KEY BLOCK-----
+        #       ...
+        signing_keys: {}
       module_interface:
         enabled: true
 

@@ -19,12 +19,18 @@ Synchronous by design — the runner orchestrator is sync.
 from __future__ import annotations
 
 import hashlib
+import os
 from pathlib import Path
 
 import httpx
 import structlog
 
-from terrapod.gpg_verify import load_key, parse_sha256sums, verify_detached
+from terrapod.gpg_verify import (
+    load_key,
+    load_key_from_armor,
+    parse_sha256sums,
+    verify_detached,
+)
 from terrapod.runner.runner_config import RunnerConfig
 
 logger = structlog.get_logger("runner.phase.binary_verify")
@@ -43,6 +49,17 @@ class ExecutableVerificationError(RuntimeError):
 
     Fail-closed: the run must abort rather than execute an unverified binary.
     """
+
+
+def _key_for_tool(tool: str):
+    """Resolve the trusted publisher key: an operator override injected by
+    job_template via TP_SIGNING_KEY_<TOOL> (from binary_cache.signing_keys), else
+    the bundled pinned key. Mirrors the API's resolution so both honour the same
+    operator-controlled trust set without an image rebuild."""
+    override = os.environ.get(f"TP_SIGNING_KEY_{tool.upper()}")
+    if override:
+        return load_key_from_armor(override)
+    return load_key(str(_KEYS_DIR / _KEY_FILES[tool]))
 
 
 def _sha256_file(path: Path) -> str:
@@ -141,7 +158,7 @@ def verify_executable(
     key_uid = ""
     if level == "signature":
         sig = _get(client, sig_url, headers, cfg.download_retries, cfg.download_retry_delay_seconds)
-        key = load_key(str(_KEYS_DIR / _KEY_FILES[tool]))
+        key = _key_for_tool(tool)
         if not verify_detached(manifest, sig, key):
             raise ExecutableVerificationError(
                 f"GPG signature on {tool} SHA256SUMS ({source}) did not verify against the "

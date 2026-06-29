@@ -206,3 +206,47 @@ async def test_verify_provider_advertised_shasum_absent_from_manifest(patched_pr
 
 async def test_verify_provider_off_is_noop():
     await verify_provider(None, {}, "deadbeef", level="off")
+
+
+# --- allow_unsigned (opt-in graceful degrade) ------------------------------
+
+
+async def test_verify_provider_unsigned_rejected_by_default():
+    # No signature material; default allow_unsigned=False → fail closed.
+    info = {"shasum": SHA_A}  # shasum only, no shasums_url/sig/signing_keys
+    with pytest.raises(VerificationError, match="lacked shasums"):
+        await verify_provider(None, info, SHA_A, level="signature")
+
+
+async def test_verify_provider_unsigned_allowed_degrades_to_checksum():
+    # allow_unsigned=True → degrade to the shasum check (which still ran) instead
+    # of rejecting. Matching shasum → no raise.
+    info = {"shasum": SHA_A}
+    await verify_provider(None, info, SHA_A, level="signature", allow_unsigned=True)
+
+
+async def test_verify_provider_unsigned_allowed_still_checks_shasum():
+    # allow_unsigned does NOT skip the checksum — a mismatch still fails closed.
+    info = {"shasum": SHA_A}
+    with pytest.raises(VerificationError, match="checksum mismatch"):
+        await verify_provider(None, info, SHA_B, level="signature", allow_unsigned=True)
+
+
+# --- operator key override (binary_cache.signing_keys) ---------------------
+
+
+def test_key_for_tool_uses_config_override(monkeypatch):
+    override_key = _new_key()
+    monkeypatch.setattr(
+        av.settings.registry.binary_cache,
+        "signing_keys",
+        {"terraform": str(override_key.pubkey)},
+    )
+    resolved = av._key_for_tool("terraform")
+    assert resolved.fingerprint.keyid == override_key.fingerprint.keyid
+
+
+def test_key_for_tool_falls_back_to_bundled(monkeypatch):
+    monkeypatch.setattr(av.settings.registry.binary_cache, "signing_keys", {})
+    # bundled HashiCorp key
+    assert av._key_for_tool("terraform").fingerprint.keyid == "34365D9472D7468F"

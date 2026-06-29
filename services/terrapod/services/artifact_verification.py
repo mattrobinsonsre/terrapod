@@ -36,7 +36,12 @@ import pgpy
 import structlog
 
 from terrapod.config import settings
-from terrapod.gpg_verify import load_key, parse_sha256sums, verify_detached
+from terrapod.gpg_verify import (
+    load_key,
+    load_key_from_armor,
+    parse_sha256sums,
+    verify_detached,
+)
 from terrapod.http_retry import arequest_with_retry
 
 logger = structlog.get_logger(__name__)
@@ -98,6 +103,17 @@ def _load_key(key_file: str) -> pgpy.PGPKey:
     return load_key(str(_KEYS_DIR / key_file))
 
 
+def _key_for_tool(tool: str) -> pgpy.PGPKey:
+    """Resolve the trusted publisher key for a tool: an operator-supplied
+    override (``binary_cache.signing_keys[tool]``) if set, else the bundled
+    pinned key. Lets operators rotate/replace keys without an image rebuild.
+    """
+    override = settings.registry.binary_cache.signing_keys.get(tool)
+    if override:
+        return load_key_from_armor(override)
+    return _load_key(_BINARY_SPECS[tool].key_file)
+
+
 # Cryptographic core lives in terrapod.gpg_verify (shared with the runner).
 # `parse_sha256sums` is re-exported for callers/tests that import it here.
 _verify_gpg_sync = verify_detached
@@ -146,7 +162,7 @@ async def fetch_sums_and_sig(
     if level == "signature":
         sig_url = spec.sig_path.format(base=base, version=version)
         signature = await _fetch_bytes(client, sig_url)
-        key = _load_key(spec.key_file)
+        key = _key_for_tool(tool)
         ok = await asyncio.to_thread(_verify_gpg_sync, manifest, signature, key)
         if not ok:
             raise VerificationError(
@@ -207,6 +223,7 @@ async def verify_provider(
     archive_sha256_hex: str,
     *,
     level: VerifyLevel,
+    allow_unsigned: bool = False,
 ) -> None:
     """Verify a downloaded provider archive against the registry download info.
 
@@ -215,6 +232,12 @@ async def verify_provider(
     and ``signing_keys.gpg_public_keys[].ascii_armor``. Raises
     ``VerificationError`` (fail-closed) on any failure. No-op when
     ``level == "off"``.
+
+    ``allow_unsigned`` (opt-in, default off): in ``signature`` mode, when the
+    upstream advertises NO signature material (private registries / non-signing
+    mirrors / some community providers), degrade to the shasum check already
+    performed above (with a warning) instead of rejecting. Off by default →
+    strict fail-closed.
     """
     if level == "off":
         logger.warning("provider verification disabled (verify=off) — trusting upstream bytes")
@@ -236,10 +259,18 @@ async def verify_provider(
     sig_url = download_info.get("shasums_signature_url")
     signing_keys = (download_info.get("signing_keys") or {}).get("gpg_public_keys") or []
     if not sums_url or not sig_url or not signing_keys:
+        if allow_unsigned:
+            logger.warning(
+                "provider upstream advertised no signature material — degrading to "
+                "shasum-only verification (provider_cache.allow_unsigned=true). The "
+                "archive checksum was verified against the advertised shasum."
+            )
+            return
         raise VerificationError(
             "registry download response lacked shasums/signature/signing keys; "
-            "cannot perform signature verification (set provider_cache.verify=checksum "
-            "to accept shasum-only verification)"
+            "cannot perform signature verification (set provider_cache.verify=checksum, "
+            "or provider_cache.allow_unsigned=true to degrade to shasum-only for "
+            "unsigned upstreams)"
         )
 
     manifest = await _fetch_bytes(client, sums_url)

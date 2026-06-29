@@ -791,7 +791,13 @@ async def fetch_and_cache_single_platform(
             # a lock file. `download_info` is guaranteed populated above when
             # verify_level != "off".
             if verify_level != "off":
-                await verify_provider(client, download_info or {}, shasum, level=verify_level)
+                await verify_provider(
+                    client,
+                    download_info or {},
+                    shasum,
+                    level=verify_level,
+                    allow_unsigned=settings.registry.provider_cache.allow_unsigned,
+                )
 
             # Phase 2: compute h1 from the on-disk archive (constant
             # memory). Earlier versions called `_compute_h1_from_zip_bytes(fh.read())`
