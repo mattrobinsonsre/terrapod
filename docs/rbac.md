@@ -328,6 +328,8 @@ A small set of label keys are reserved as **virtual filter fields** in the works
 | `locked` | `true`/`false` — currently locked | reserved (planned virtual) |
 | `branch` | `vcs_branch` | reserved (planned virtual) |
 
+The `status` field also accepts one **aggregate** value beyond the per-status values above: `status:unhealthy` matches any workspace with at least one active **health condition** (state diverged, no agent pool assigned, VCS polling error, drift detected, or drift-detection errored). It is the roll-up behind the **Health Issues** summary card on the workspace list — clicking the card when the count is non-zero toggles this filter so you can jump straight to the affected workspaces (and click again to clear). Because it rides the already-reserved `status` field, no additional label key is reserved for it. It is deliberately broader than any single status value: a workspace awaiting confirmation shows as `needs-confirm` even when its state has diverged, and the `no_agent_pool`/`drift_errored` conditions have no standalone status value at all — `status:unhealthy` catches all of them.
+
 The set is intentionally aggressive: reserving a key today is near-zero cost (no virtual implementation required), but adding a reservation later — once the key is in customer use as a literal label — is a migration.
 
 If you have an existing label with one of the reserved keys, reads and existing rows continue to work, but the next create or update of that resource that includes the reserved key in its `labels` field will be rejected with a 422 that names the offending key. Migrate by renaming — for example, swap `version: 1.11` for `tf-version: 1.11` (or drop it if the same data is already on `terraform_version`).

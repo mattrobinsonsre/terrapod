@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { getStoredToken, createWorkspace, uniqueName } from '../helpers/api';
 
 test.describe('Workspaces', () => {
   test('workspace list page loads', async ({ page }) => {
@@ -251,5 +252,51 @@ test.describe('Workspaces', () => {
     await expect(page.locator('button:has-text("Edit")')).toBeVisible({ timeout: 10_000 });
     await page.reload();
     await expect(page.locator(`code:has-text("${rule}")`)).not.toBeVisible();
+  });
+
+  test('Health Issues indicator filters the list to unhealthy workspaces', async ({
+    page,
+  }) => {
+    // Create two workspaces via the API so the test is deterministic and
+    // self-isolated (uniquely-named, no reliance on other specs):
+    //   - healthy: default local mode → no health conditions
+    //   - unhealthy: agent mode with no pool → a `no_agent_pool` health
+    //     condition, which `_compute_health_conditions` flags. This is the
+    //     simplest condition to provoke without running anything.
+    const token = getStoredToken();
+    const healthyName = uniqueName('e2e-health-ok');
+    const unhealthyName = uniqueName('e2e-health-bad');
+    await createWorkspace(token, healthyName);
+    await createWorkspace(token, unhealthyName, { 'execution-mode': 'agent' });
+
+    await page.goto('/workspaces');
+    await expect(page.locator('h1:has-text("Workspaces")')).toBeVisible();
+
+    // Both of MY workspaces are present before filtering. (Never assert global
+    // counts/positions — other workers mutate the same org concurrently.)
+    const healthyRow = page.getByRole('link', { name: healthyName });
+    const unhealthyRow = page.getByRole('link', { name: unhealthyName });
+    await expect(unhealthyRow).toBeVisible({ timeout: 10_000 });
+    await expect(healthyRow).toBeVisible();
+
+    // The Health Issues card is a toggle button whenever the count is > 0
+    // (which my unhealthy workspace guarantees). Clicking it applies the
+    // aggregate `status:unhealthy` filter.
+    const healthBtn = page.getByRole('button', { name: /health issues/i });
+    await expect(healthBtn).toBeVisible();
+    await healthBtn.click();
+
+    // Filter now active: the term is in the box, my unhealthy ws stays, my
+    // healthy ws is filtered out. (Assert on MY named resources, not counts —
+    // the unhealthy view also contains other workers' unhealthy workspaces.)
+    await expect(page.locator('input[aria-label="Filter workspaces"]')).toHaveValue(
+      /status:unhealthy/,
+    );
+    await expect(unhealthyRow).toBeVisible();
+    await expect(healthyRow).toBeHidden();
+
+    // Toggling the badge again clears the filter — my healthy ws returns.
+    await healthBtn.click();
+    await expect(healthyRow).toBeVisible({ timeout: 10_000 });
   });
 });
