@@ -297,10 +297,7 @@ class TestTofuVersionResolution:
 
     @patch("terrapod.services.binary_cache_service.arequest_with_retry", new_callable=AsyncMock)
     async def test_fetch_ids_parses_official_index(self, mock_req: AsyncMock) -> None:
-        from terrapod.services.binary_cache_service import (
-            _TOFU_VERSION_INDEX_URL,
-            _fetch_tofu_version_ids,
-        )
+        from terrapod.services.binary_cache_service import _fetch_tofu_version_ids
 
         resp = MagicMock()
         resp.raise_for_status = MagicMock()
@@ -312,9 +309,11 @@ class TestTofuVersionResolution:
         ids = await _fetch_tofu_version_ids()
 
         assert ids == ["1.12.3", "1.12.0-rc1", "1.11.11"]
-        # Must hit the official index, NOT api.github.com.
+        # Defaults to the official OpenTofu index, NOT the rate-limited GitHub
+        # releases API (#338). The source is now operator-overridable via
+        # tofu_version_index_url (#606); unset, it resolves to this default.
         called_url = mock_req.call_args[0][2]
-        assert called_url == _TOFU_VERSION_INDEX_URL
+        assert called_url == "https://get.opentofu.org/tofu/api.json"
         assert "api.github.com" not in called_url
 
     @patch("terrapod.services.binary_cache_service.settings")
@@ -362,3 +361,107 @@ class TestTofuVersionResolution:
         mock_ids.return_value = ["1.13.0-rc1", "1.13.0-rc2"]
 
         assert await _resolve_tofu_version("1.13") == "1.13.0-rc2"
+
+
+class TestConfigurableVersionIndex:
+    """#606 part 1: every version-index / listing source is operator-overridable
+    to an internal mirror (air-gap / egress-restricted), not hardcoded to the
+    public upstream. The download bases (*_mirror_url) were already configurable;
+    these tests cover the version-index sources, which were hardcoded."""
+
+    @patch("terrapod.services.binary_cache_service.arequest_with_retry", new_callable=AsyncMock)
+    @patch("terrapod.services.binary_cache_service.settings")
+    async def test_terraform_fetch_uses_configured_index(
+        self, mock_settings: MagicMock, mock_req: AsyncMock
+    ) -> None:
+        from terrapod.services.binary_cache_service import _fetch_terraform_versions
+
+        mock_settings.registry.binary_cache.terraform_version_index_url = (
+            "https://mirror.internal/terraform/index.json"
+        )
+        mock_settings.registry.binary_cache.allow_prerelease = "none"
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json = MagicMock(return_value={"versions": {"1.12.3": {}}})
+        mock_req.return_value = resp
+
+        await _fetch_terraform_versions()
+
+        assert mock_req.call_args[0][2] == "https://mirror.internal/terraform/index.json"
+        assert "releases.hashicorp.com" not in mock_req.call_args[0][2]
+
+    @patch("terrapod.services.binary_cache_service.arequest_with_retry", new_callable=AsyncMock)
+    @patch("terrapod.services.binary_cache_service.settings")
+    async def test_terraform_resolve_uses_configured_index(
+        self, mock_settings: MagicMock, mock_req: AsyncMock
+    ) -> None:
+        from terrapod.services.binary_cache_service import _resolve_terraform_version
+
+        mock_settings.registry.binary_cache.terraform_version_index_url = (
+            "https://mirror.internal/terraform/index.json"
+        )
+        mock_settings.registry.binary_cache.allow_prerelease = "none"
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json = MagicMock(return_value={"versions": {"1.12.0": {}, "1.12.3": {}}})
+        mock_req.return_value = resp
+
+        assert await _resolve_terraform_version("1.12") == "1.12.3"
+        assert mock_req.call_args[0][2] == "https://mirror.internal/terraform/index.json"
+
+    @patch("terrapod.services.binary_cache_service.arequest_with_retry", new_callable=AsyncMock)
+    @patch("terrapod.services.binary_cache_service.settings")
+    async def test_tofu_fetch_uses_configured_index(
+        self, mock_settings: MagicMock, mock_req: AsyncMock
+    ) -> None:
+        from terrapod.services.binary_cache_service import _fetch_tofu_version_ids
+
+        mock_settings.registry.binary_cache.tofu_version_index_url = (
+            "https://mirror.internal/tofu/api.json"
+        )
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json = MagicMock(return_value={"versions": [{"id": "1.12.3"}]})
+        mock_req.return_value = resp
+
+        assert await _fetch_tofu_version_ids() == ["1.12.3"]
+        assert mock_req.call_args[0][2] == "https://mirror.internal/tofu/api.json"
+        assert "get.opentofu.org" not in mock_req.call_args[0][2]
+
+    @patch("terrapod.services.binary_cache_service.arequest_with_retry", new_callable=AsyncMock)
+    @patch("terrapod.services.binary_cache_service.settings")
+    async def test_terragrunt_fetch_uses_configured_index(
+        self, mock_settings: MagicMock, mock_req: AsyncMock
+    ) -> None:
+        from terrapod.services.binary_cache_service import _fetch_terragrunt_versions
+
+        mock_settings.registry.binary_cache.terragrunt_version_index_url = (
+            "https://mirror.internal/terragrunt/releases"
+        )
+        mock_settings.registry.binary_cache.allow_prerelease = "none"
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json = MagicMock(return_value=[{"tag_name": "v0.58.0", "prerelease": False}])
+        mock_req.return_value = resp
+
+        assert await _fetch_terragrunt_versions() == ["0.58.0"]
+        assert mock_req.call_args[0][2] == "https://mirror.internal/terragrunt/releases"
+        assert "api.github.com" not in mock_req.call_args[0][2]
+
+
+class TestVersionIndexConfigDefaults:
+    """The new config fields default to the public upstreams (so behaviour is
+    unchanged unless an operator overrides them)."""
+
+    def test_defaults(self) -> None:
+        from terrapod.config import BinaryCacheConfig
+
+        cfg = BinaryCacheConfig()
+        assert (
+            cfg.terraform_version_index_url == "https://releases.hashicorp.com/terraform/index.json"
+        )
+        assert cfg.tofu_version_index_url == "https://get.opentofu.org/tofu/api.json"
+        assert (
+            cfg.terragrunt_version_index_url
+            == "https://api.github.com/repos/gruntwork-io/terragrunt/releases"
+        )

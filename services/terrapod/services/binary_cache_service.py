@@ -379,15 +379,18 @@ async def list_available_versions(tool: str) -> list[str]:
 
 
 async def _fetch_terraform_versions() -> list[str]:
-    """Fetch terraform versions from releases.hashicorp.com.
+    """Fetch terraform versions from the configured terraform version index
+    (default releases.hashicorp.com; overridable via
+    `binary_cache.terraform_version_index_url` for internal mirrors).
 
     Filters by the configured allow_prerelease policy: stable-only by default,
     or includes rc/beta/alpha/dev tiers down to the configured floor.
     """
-    url = "https://releases.hashicorp.com/terraform/index.json"
+    url = settings.registry.binary_cache.terraform_version_index_url
     async with httpx.AsyncClient(timeout=30.0) as client:
         # Upstream GET — idempotent by method; retried on flaky-upstream
         # transient failures (connection errors, read-timeouts, 5xx).
+        # trust_env (httpx default) routes via the configured proxy/CA (#592).
         resp = await arequest_with_retry(client, "GET", url)
         resp.raise_for_status()
         data = resp.json()
@@ -403,21 +406,25 @@ async def _fetch_terraform_versions() -> list[str]:
     return versions
 
 
-# Official OpenTofu version index — the same one OpenTofu's own installer uses.
-# We resolve tofu versions from here instead of the GitHub releases API, which is
-# rate-limited (60 req/hr unauthenticated) and routinely 504s from CI/cloud IPs.
-# When that listing failed, the binary cache could not resolve a partial version
-# (e.g. "1.12") and 502'd the runner, which then dead-ended because it had no
-# fully-qualified version to fall back on (#338). This CDN-backed static JSON is
-# not rate-limited. Version ids carry NO leading "v" and include pre-releases as
+# Official OpenTofu version index (the default for tofu_version_index_url) — the
+# same one OpenTofu's own installer uses. We resolve tofu versions from here
+# instead of the GitHub releases API, which is rate-limited (60 req/hr
+# unauthenticated) and routinely 504s from CI/cloud IPs. When that listing
+# failed, the binary cache could not resolve a partial version (e.g. "1.12") and
+# 502'd the runner, which then dead-ended because it had no fully-qualified
+# version to fall back on (#338). This CDN-backed static JSON is not
+# rate-limited. Version ids carry NO leading "v" and include pre-releases as
 # "x.y.z-suffix", so the allow_prerelease policy still applies on the string.
-_TOFU_VERSION_INDEX_URL = "https://get.opentofu.org/tofu/api.json"
+# Operators can override the source via `binary_cache.tofu_version_index_url`
+# (an internal mirror must serve the same `{"versions": [{"id": ...}]}` shape).
 
 
 async def _fetch_tofu_version_ids() -> list[str]:
-    """Return every OpenTofu release version id from the official index."""
+    """Return every OpenTofu release version id from the configured index."""
+    url = settings.registry.binary_cache.tofu_version_index_url
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await arequest_with_retry(client, "GET", _TOFU_VERSION_INDEX_URL)
+        # trust_env (httpx default) routes via the configured proxy/CA (#592).
+        resp = await arequest_with_retry(client, "GET", url)
         resp.raise_for_status()
         data = resp.json()
     return [v["id"] for v in data.get("versions", []) if v.get("id")]
@@ -442,8 +449,9 @@ async def _fetch_terragrunt_versions() -> list[str]:
     Same shape as `_fetch_tofu_versions`: GitHub's `prerelease` flag plus the
     configured allow_prerelease policy gate which versions are offered.
     """
-    url = "https://api.github.com/repos/gruntwork-io/terragrunt/releases"
+    url = settings.registry.binary_cache.terragrunt_version_index_url
     async with httpx.AsyncClient(timeout=30.0) as client:
+        # trust_env (httpx default) routes via the configured proxy/CA (#592).
         resp = await arequest_with_retry(client, "GET", url, params={"per_page": 100})
         resp.raise_for_status()
         releases = resp.json()
@@ -528,16 +536,18 @@ async def resolve_version(tool: str, partial_version: str) -> str:
 
 
 async def _resolve_terraform_version(partial: str) -> str:
-    """Resolve partial terraform version via releases.hashicorp.com index.
+    """Resolve partial terraform version via the configured terraform version
+    index (default releases.hashicorp.com; see terraform_version_index_url).
 
     Honors the allow_prerelease policy: pre-release versions are only
     considered when explicitly permitted.
     """
-    url = "https://releases.hashicorp.com/terraform/index.json"
+    url = settings.registry.binary_cache.terraform_version_index_url
     prefix = f"{partial}."
     policy = settings.registry.binary_cache.allow_prerelease
 
     async with httpx.AsyncClient(timeout=30.0) as client:
+        # trust_env (httpx default) routes via the configured proxy/CA (#592).
         resp = await arequest_with_retry(client, "GET", url)
         resp.raise_for_status()
         data = resp.json()
@@ -590,11 +600,12 @@ async def _resolve_terragrunt_version(partial: str) -> str:
 
     Mirrors `_resolve_tofu_version`; honors the allow_prerelease policy.
     """
-    url = "https://api.github.com/repos/gruntwork-io/terragrunt/releases"
+    url = settings.registry.binary_cache.terragrunt_version_index_url
     prefix = f"v{partial}."
     policy = settings.registry.binary_cache.allow_prerelease
 
     async with httpx.AsyncClient(timeout=30.0) as client:
+        # trust_env (httpx default) routes via the configured proxy/CA (#592).
         resp = await arequest_with_retry(client, "GET", url, params={"per_page": 100})
         resp.raise_for_status()
         releases = resp.json()

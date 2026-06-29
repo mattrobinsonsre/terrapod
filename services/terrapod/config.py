@@ -474,6 +474,37 @@ class BinaryCacheConfig(BaseModel):
         "not a zip/tarball — the pull-through cache stores it as-is. Only used by "
         "workspaces with terragrunt enabled.",
     )
+    # --- Version-index (listing / partial-version resolution) sources ---
+    # The *_mirror_url fields above are the per-binary download bases. These are
+    # the separate endpoints the cache reads to LIST available versions and to
+    # resolve a partial version (e.g. "1.12" -> "1.12.3"). Upstream they live on
+    # different hosts from the download base (terraform's index is on
+    # releases.hashicorp.com, tofu's on get.opentofu.org, terragrunt's on the
+    # GitHub API), so an internal-mirror / air-gapped deployment must override
+    # BOTH the download base and the version-index source for each tool. A mirror
+    # MUST serve the same response shape as the upstream it replaces (documented
+    # per field below), since the cache parses the upstream JSON format.
+    terraform_version_index_url: str = Field(
+        default="https://releases.hashicorp.com/terraform/index.json",
+        description="Version-index source for terraform. Must return the HashiCorp "
+        "releases index JSON shape: a top-level object with a `versions` map keyed "
+        'by version string (e.g. {"versions": {"1.12.3": {...}}}). Used for '
+        "version listing and partial-version resolution.",
+    )
+    tofu_version_index_url: str = Field(
+        default="https://get.opentofu.org/tofu/api.json",
+        description="Version-index source for tofu. Must return the OpenTofu index "
+        'JSON shape: {"versions": [{"id": "1.12.3"}, ...]} with ids carrying no '
+        "leading 'v'. (Distinct from tofu_mirror_url, which is the GitHub releases "
+        "download base.) Used for version listing and partial-version resolution.",
+    )
+    terragrunt_version_index_url: str = Field(
+        default="https://api.github.com/repos/gruntwork-io/terragrunt/releases",
+        description="Version-index source for terragrunt. Must return the GitHub "
+        "releases API shape: a JSON array of objects with `tag_name` (e.g. "
+        '"v0.58.0") and `prerelease`. Used for version listing and '
+        "partial-version resolution.",
+    )
     allow_prerelease: Literal["none", "rc", "beta", "alpha", "dev"] = Field(
         default="none",
         description="Lowest pre-release tier to accept for terraform/tofu/terragrunt CLI version "

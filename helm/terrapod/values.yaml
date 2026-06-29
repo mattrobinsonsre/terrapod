@@ -288,6 +288,19 @@ api:
         # Upstream download base for terragrunt binaries (bare per-platform
         # binary, not a zip). Only used by workspaces with terragrunt enabled.
         terragrunt_mirror_url: "https://github.com/gruntwork-io/terragrunt/releases/download"
+        # Version-index sources — separate from the *_mirror_url download bases
+        # above. These are the endpoints the cache reads to LIST versions and to
+        # resolve a partial version (e.g. "1.12" -> "1.12.3"). Upstream they live
+        # on different hosts from the download base, so an internal-mirror /
+        # air-gapped deployment must override BOTH the download base AND the
+        # version index for each tool. A mirror MUST serve the same response
+        # shape as the upstream it replaces:
+        #   - terraform: HashiCorp index JSON  {"versions": {"1.12.3": {...}}}
+        #   - tofu:      OpenTofu index JSON    {"versions": [{"id": "1.12.3"}]}
+        #   - terragrunt: GitHub releases array [{"tag_name": "v0.58.0", ...}]
+        terraform_version_index_url: "https://releases.hashicorp.com/terraform/index.json"
+        tofu_version_index_url: "https://get.opentofu.org/tofu/api.json"
+        terragrunt_version_index_url: "https://api.github.com/repos/gruntwork-io/terragrunt/releases"
         # Lowest pre-release tier to accept for terraform/tofu CLI version
         # resolution + caching. One of: none, rc, beta, alpha, dev.
         # 'none' (default) permits only GA releases. 'rc' allows release

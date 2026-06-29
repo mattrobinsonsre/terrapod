@@ -666,8 +666,48 @@ api:
         enabled: true
         terraform_mirror_url: "https://releases.hashicorp.com/terraform"
         tofu_mirror_url: "https://github.com/opentofu/opentofu/releases/download"
+        terragrunt_mirror_url: "https://github.com/gruntwork-io/terragrunt/releases/download"
         allow_prerelease: none    # none | rc | beta | alpha | dev
 ```
+
+### Pointing the cache at an internal mirror (restricted-network / air-gapped)
+
+Every upstream the binary cache reaches is operator-overridable, so a deployment with no direct egress to `releases.hashicorp.com` / GitHub / `get.opentofu.org` can pull from an internal artifact repository (Artifactory, Nexus, an internal HTTP mirror) instead. There are **two distinct sources per tool**, and an internal-mirror deployment must override **both**:
+
+1. **Download base** (`*_mirror_url`) — where the per-platform binary is fetched.
+2. **Version index** (`*_version_index_url`) — the endpoint the cache reads to **list** versions and to resolve a partial version (e.g. `terraform_version = "1.12"` → `1.12.3`). Upstream these live on different hosts from the download base, which is why they are separate keys.
+
+```yaml
+api:
+  config:
+    registry:
+      binary_cache:
+        # Download bases
+        terraform_mirror_url:  "https://artifacts.internal/terraform"
+        tofu_mirror_url:       "https://artifacts.internal/opentofu/releases/download"
+        terragrunt_mirror_url: "https://artifacts.internal/terragrunt/releases/download"
+        # Version-index sources
+        terraform_version_index_url:  "https://artifacts.internal/terraform/index.json"
+        tofu_version_index_url:       "https://artifacts.internal/opentofu/api.json"
+        terragrunt_version_index_url: "https://artifacts.internal/terragrunt/releases"
+```
+
+A mirror **must serve the same response shape** as the upstream it replaces, because the cache parses the upstream JSON format:
+
+| Source | Expected response shape |
+|---|---|
+| `terraform_version_index_url` | HashiCorp releases index JSON: `{"versions": {"1.12.3": {...}, ...}}` |
+| `tofu_version_index_url` | OpenTofu index JSON: `{"versions": [{"id": "1.12.3"}, ...]}` (ids carry no leading `v`) |
+| `terragrunt_version_index_url` | GitHub releases array: `[{"tag_name": "v0.58.0", "prerelease": false}, ...]` |
+| `terraform_mirror_url` | `…/{version}/terraform_{version}_{os}_{arch}.zip` |
+| `tofu_mirror_url` | `…/v{version}/tofu_{version}_{os}_{arch}.zip` |
+| `terragrunt_mirror_url` | `…/v{version}/terragrunt_{os}_{arch}` (a bare binary, not an archive) |
+
+The provider network mirror has the equivalent override: `registry.provider_cache.upstream_registries` (see [Provider Caching](#provider-caching-network-mirror) above) — point it at an internal provider registry that implements the provider network-mirror protocol.
+
+All of these fetches go through the [forward proxy and custom CA](deployment-proxy.md) when configured (the API's HTTP client honours `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` / the mounted CA bundle), so an internal mirror reached only via a corporate egress proxy works without further changes. Integrity verification ([supply-chain verification](supply-chain-verification.md)) still applies to mirror-served artifacts — if the mirror re-signs binaries with its own key, supply the key via `binary_cache.signing_keys`.
+
+> A fully sealed, **no-egress** deployment (cache-miss must never reach upstream at all) plus declarative cache pre-population is tracked as the later parts of air-gapped support (#606). This section covers pointing the pull-through caches at internal sources; the caches still fall through to those configured sources on a miss.
 
 ### Pre-release versions (`allow_prerelease`)
 

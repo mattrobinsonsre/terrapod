@@ -190,6 +190,12 @@ data:
             arch: {{ .arch | quote }}
           {{- end }}
         {{- end }}
+        {{- if .Values.api.config.registry.provider_cache.verify }}
+        verify: {{ .Values.api.config.registry.provider_cache.verify | quote }}
+        {{- end }}
+        {{- if hasKey .Values.api.config.registry.provider_cache "allow_unsigned" }}
+        allow_unsigned: {{ .Values.api.config.registry.provider_cache.allow_unsigned }}
+        {{- end }}
       {{- end }}
       {{- if .Values.api.config.registry.binary_cache }}
       binary_cache:
@@ -200,8 +206,27 @@ data:
         {{- if .Values.api.config.registry.binary_cache.tofu_mirror_url }}
         tofu_mirror_url: {{ .Values.api.config.registry.binary_cache.tofu_mirror_url | quote }}
         {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.terragrunt_mirror_url }}
+        terragrunt_mirror_url: {{ .Values.api.config.registry.binary_cache.terragrunt_mirror_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.terraform_version_index_url }}
+        terraform_version_index_url: {{ .Values.api.config.registry.binary_cache.terraform_version_index_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.tofu_version_index_url }}
+        tofu_version_index_url: {{ .Values.api.config.registry.binary_cache.tofu_version_index_url | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.terragrunt_version_index_url }}
+        terragrunt_version_index_url: {{ .Values.api.config.registry.binary_cache.terragrunt_version_index_url | quote }}
+        {{- end }}
         {{- if .Values.api.config.registry.binary_cache.allow_prerelease }}
         allow_prerelease: {{ .Values.api.config.registry.binary_cache.allow_prerelease | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.verify }}
+        verify: {{ .Values.api.config.registry.binary_cache.verify | quote }}
+        {{- end }}
+        {{- if .Values.api.config.registry.binary_cache.signing_keys }}
+        signing_keys:
+          {{- toYaml .Values.api.config.registry.binary_cache.signing_keys | nindent 10 }}
         {{- end }}
       {{- end }}
     {{- end }}

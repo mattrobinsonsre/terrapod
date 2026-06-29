@@ -33,7 +33,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | **Drift Detection** | Scheduled plan-only runs to detect out-of-band infrastructure changes |
 | **Workspace Health** | Per-workspace health conditions with status indicators on workspace list |
 | **Cloud Credentials** | Dynamic provider credentials via Kubernetes workload identity (AWS IRSA, GCP WIF, Azure WI) |
-| **Binary Caching** | Pull-through cache for terraform/tofu/terragrunt CLI binaries |
+| **Binary Caching** | Pull-through cache for terraform/tofu/terragrunt CLI binaries; download base + version-index sources are operator-overridable to an internal mirror (restricted-network / air-gapped) and honour the forward proxy/CA |
 | **Supply-chain Verification** | Cached binaries + provider archives verified against the publisher's GPG-signed SHA256SUMS with pinned keys; the runner re-verifies the executable (visible in the run log) before running it |
 | **Terragrunt** | Per-workspace Terragrunt for agent-mode runs (flag + version, pull-through binary cache, local-backend reconciliation); CLI-driven runs work with zero config |
 | **Workspace Autodiscovery** | Atlantis-style monorepo autodiscovery with rule templating; safe-by-default rename/delete/orphan lifecycle (opt-in destroy) |

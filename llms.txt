@@ -53,7 +53,7 @@ Build/lint/test all run in Docker via `make` (`make test`, `make lint`, `make de
 - [RBAC](docs/rbac.md): label-based roles, hierarchical workspace permissions (read/plan/write/admin); no teams.
 - [Authentication](docs/authentication.md): local, OIDC, SAML, `terraform login`, API tokens, scoped service tokens.
 - [Cloud Credentials](docs/cloud-credentials.md): zero static cloud credentials — runs and the platform use K8s workload identity (AWS IRSA, GCP WIF, Azure WI), plus passwordless **database** and **Redis/Valkey** IAM auth.
-- [Private Module & Provider Registry](docs/registry.md) and [Registry Publishing](docs/registry-publishing.md): GPG-signed registry, provider network-mirror + binary caching, `terrapod-publish` CLI.
+- [Private Module & Provider Registry](docs/registry.md) and [Registry Publishing](docs/registry-publishing.md): GPG-signed registry, provider network-mirror + binary caching (every upstream — terraform/tofu/terragrunt download base AND version index, plus the provider registry — is operator-overridable to an internal mirror for restricted-network deployments, and honours the forward proxy/CA), `terrapod-publish` CLI.
 - [Service Catalog](docs/service-catalog.md): no-code self-service provisioning over the module registry.
 - [Drift Detection](docs/drift-detection.md) and [Drift Ignore Rules](docs/drift-ignore-rules.md): scheduled plan-only drift checks with a per-workspace noise allowlist.
 - [Run Triggers](docs/run-triggers.md): cross-workspace dependency chains.
