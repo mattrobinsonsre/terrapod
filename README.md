@@ -62,6 +62,7 @@ quickstart pulls released images, so the only wait is the image download.
 | Private Provider Registry | Implemented | Publish, version, and share providers with GPG signing and network mirror caching |
 | Binary Caching | Implemented | Pull-through cache for terraform/tofu/terragrunt CLI binaries |
 | Cache Pre-population | Implemented | Seed the binary + provider caches ahead of time via a bulk-warm admin endpoint + UI panel (for restricted-network / fast-first-run deployments) |
+| Sealed (cache-only) Mode | Implemented | Air-gap switch (`registry.cache_only`) guaranteeing no upstream fetch — cache-backed version resolution, actionable cache-miss errors, retention skips the caches |
 | Supply-chain Verification | Implemented | Cached binaries + provider archives verified against the publisher's GPG-signed SHA256SUMS (pinned keys); the runner re-verifies the executable before running it |
 | **Terragrunt** | **Implemented** | **Per-workspace Terragrunt support for agent-mode runs — a `terragrunt_enabled` flag + pinned version, pull-through binary cache for the terragrunt CLI, and transparent local-backend reconciliation so Terrapod still owns state. CLI-driven runs work with zero extra config. See [docs/terragrunt.md](docs/terragrunt.md).** |
 | Agent Pools | Implemented | Named groups of runner listeners; join token → certificate exchange for auth |

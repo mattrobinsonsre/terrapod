@@ -35,6 +35,7 @@ from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
 from terrapod.services.artifact_verification import verify_provider
+from terrapod.services.cache_errors import CacheOnlyError
 from terrapod.services.hashing_stream import HashingStream
 from terrapod.storage.keys import provider_binary_key, provider_cache_key
 from terrapod.storage.protocol import ObjectStore
@@ -44,6 +45,11 @@ logger = get_logger(__name__)
 # Redis key for cached upstream platform metadata (24h TTL)
 _META_KEY_PREFIX = "tp:provider_meta"
 _META_TTL = 86400  # 24 hours
+
+
+def _sealed() -> bool:
+    """Sealed (cache-only) mode — never fetch upstream."""
+    return settings.registry.cache_only
 
 
 def _meta_redis_key(hostname: str, namespace: str, type_: str, version: str) -> str:
@@ -86,6 +92,20 @@ async def get_or_fetch_versions(
     we've cached binaries for — so that terraform/tofu version constraint
     resolution works correctly.
     """
+    # Sealed (cache-only) mode: the version index reflects ONLY versions we've
+    # cached binaries for — never the upstream index.
+    if _sealed():
+        result = await db.execute(
+            select(CachedProviderPackage.version)
+            .where(
+                CachedProviderPackage.hostname == hostname,
+                CachedProviderPackage.namespace == namespace,
+                CachedProviderPackage.type == type_,
+            )
+            .distinct()
+        )
+        return {"versions": {row[0]: {} for row in result.all()}}
+
     cfg = settings.registry.provider_cache
     if hostname not in cfg.upstream_registries:
         return {"versions": {}}
@@ -282,6 +302,13 @@ async def get_or_fetch_platforms(
             "archives": archives,
             "cached_platforms": sorted(configured_platforms),
         }
+
+    # Sealed (cache-only) mode: serve ONLY what's physically cached (tier 1) —
+    # never consult upstream metadata, eagerly fetch, or hand back an
+    # upstream-direct URL. terraform/tofu surfaces its own clear error if a
+    # requested platform isn't present.
+    if _sealed():
+        return _resp()
 
     # --- Tier 2: check Redis for upstream metadata ---
     meta = await _get_cached_metadata(hostname, namespace, type_, version)
@@ -728,6 +755,16 @@ async def fetch_and_cache_single_platform(
     .terraform.lock.hcl, avoiding the per-plan `tofu providers lock`
     archive download.
     """
+    # Sealed (cache-only) mode: never fetch upstream — defense in depth for the
+    # warm path and any direct caller (get_or_fetch_platforms already serves
+    # cached-only in sealed mode and won't reach here).
+    if _sealed():
+        raise CacheOnlyError(
+            f"Provider {hostname}/{namespace}/{type_} {version} ({os_}/{arch}) is not "
+            f"in the cache and sealed (cache_only) mode is enabled. Pre-populate it via "
+            f"the bulk-warm admin endpoint before sealing, or disable registry.cache_only."
+        )
+
     # Check Redis metadata for download info (avoids extra upstream call)
     platform_key = f"{os_}_{arch}"
     meta = await _get_cached_metadata(hostname, namespace, type_, version)

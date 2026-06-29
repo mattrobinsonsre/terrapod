@@ -132,6 +132,24 @@ class TestDownloadBinary:
         assert resp.status_code == 502
 
 
+class TestSealedDownload:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.binary_cache.get_or_cache_binary", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.binary_cache.resolve_version", new_callable=AsyncMock)
+    async def test_cache_only_miss_returns_404(self, mock_resolve, mock_get, *mocks):
+        from terrapod.services.cache_errors import CacheOnlyError
+
+        mock_resolve.return_value = "1.9.0"
+        mock_get.side_effect = CacheOnlyError("not in cache; sealed mode")
+        app = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(_DL, headers=_AUTH)
+        assert resp.status_code == 404
+        assert "sealed" in resp.json()["detail"]
+
+
 class TestAvailableVersions:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

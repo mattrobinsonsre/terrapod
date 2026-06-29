@@ -39,6 +39,7 @@ from terrapod.services.binary_cache_service import (
     resolve_version,
     warm_binary,
 )
+from terrapod.services.cache_errors import CacheOnlyError
 from terrapod.services.cache_warm_service import warm_from_manifest
 from terrapod.services.provider_cache_service import (
     list_cached_providers,
@@ -113,6 +114,9 @@ async def download_binary(
     try:
         resolved = await resolve_version(tool, version)
         url = await get_or_cache_binary(db, storage, tool, resolved, os, arch)
+    except CacheOnlyError as e:
+        # Sealed mode + cache miss — genuinely not available; don't fetch upstream.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except Exception as e:
@@ -237,6 +241,9 @@ async def warm_binary_endpoint(
 
     try:
         url = await warm_binary(db, storage, body.tool, body.version, body.os, body.arch)
+    except CacheOnlyError as e:
+        # Sealed mode can't fetch upstream — warming must run before sealing.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except Exception as e:

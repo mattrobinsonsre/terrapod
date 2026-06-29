@@ -77,8 +77,16 @@ async def artifact_retention_cycle() -> None:
             ),
         ]
 
+        # Sealed (cache-only) mode: never evict the binary/provider caches — an
+        # un-refetchable artifact would be lost permanently. Other categories
+        # (state/run/config artifacts) are unaffected.
+        sealed_skip = {"provider_cache", "binary_cache"} if settings.registry.cache_only else set()
+
         for category, handler, threshold in categories:
             if threshold == 0:
+                continue
+            if category in sealed_skip:
+                logger.info("Skipping cache eviction in sealed mode", category=category)
                 continue
             try:
                 async with get_db_session() as db:

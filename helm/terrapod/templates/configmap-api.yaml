@@ -190,6 +190,9 @@ data:
     {{- if .Values.api.config.registry }}
     registry:
       enabled: {{ .Values.api.config.registry.enabled }}
+      {{- if hasKey .Values.api.config.registry "cache_only" }}
+      cache_only: {{ .Values.api.config.registry.cache_only }}
+      {{- end }}
       {{- if .Values.api.config.registry.provider_cache }}
       provider_cache:
         enabled: {{ .Values.api.config.registry.provider_cache.enabled }}

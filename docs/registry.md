@@ -807,6 +807,19 @@ Warming honours the upstream-source overrides (`*_mirror_url`, `*_version_index_
 
 ---
 
+## Sealed (cache-only) mode
+
+For fully air-gapped deployments, set `registry.cache_only: true`. This is a hard guarantee that **no upstream fetch ever happens** — across the binary cache, the provider network mirror, the terragrunt binary, and version resolution. Specifically, when sealed:
+
+- **Cache miss → actionable 404.** A request for a binary or provider platform that isn't cached returns a clear `404` (e.g. *"terraform 1.12.3 (linux/amd64) is not in the cache and sealed (cache_only) mode is enabled. Pre-populate it via the bulk-warm admin endpoint before sealing, or disable registry.cache_only."*) instead of silently attempting (and failing) an upstream request.
+- **Partial-version resolution is cache-backed.** `terraform_version = "1.12"` resolves to the highest **cached** `1.12.x`, never the upstream version index. If nothing cached matches, resolution fails with the same actionable error. (Outside sealed mode, resolution still consults the upstream index as before.)
+- **The provider mirror serves cached-only.** The version index and platform list reflect exactly what's cached — no upstream metadata fetch, no eager caching, no upstream-direct download URLs.
+- **The artifact-retention sweeper skips the binary + provider caches.** Evicting an un-refetchable artifact would lose it permanently, so those categories are left untouched while sealed (other retention categories are unaffected).
+
+**Workflow:** pre-populate the cache *first* — typically with `cache_only` **off**, pointing the upstream overrides at an internal mirror and running [bulk warm](#cache-pre-population) — then flip `cache_only: true` to seal. Pairs with the [forward proxy / CA](deployment-proxy.md) as defense-in-depth: the proxy controls *how* upstream would be reached; `cache_only` guarantees it *isn't*.
+
+---
+
 ## Service Discovery
 
 The `/.well-known/terraform.json` endpoint includes paths for both module and provider registries:

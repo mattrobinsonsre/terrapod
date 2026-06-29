@@ -666,6 +666,7 @@
           "additionalProperties": false,
           "properties": {
             "enabled": { "type": "boolean" },
+            "cache_only": { "type": "boolean" },
             "provider_cache": {
               "type": "object",
               "additionalProperties": false,

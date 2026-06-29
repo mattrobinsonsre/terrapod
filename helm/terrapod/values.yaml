@@ -258,6 +258,15 @@ api:
     # Private Registry & Caching
     registry:
       enabled: true
+      # Sealed (cache-only) mode for air-gapped deployments. When true, NO
+      # upstream fetch ever happens across the binary cache, provider network
+      # mirror, terragrunt binary, and version resolution: a cache miss returns
+      # an actionable 404 instead of attempting upstream, partial-version
+      # resolution (e.g. "1.12") resolves ONLY against cached entries, and the
+      # artifact-retention sweeper skips the binary/provider caches. Pre-populate
+      # the cache first (bulk-warm admin endpoint/UI, typically with cache_only
+      # off pointing at an internal mirror), then seal. See docs/registry.md.
+      cache_only: false
       provider_cache:
         enabled: true
         upstream_registries:

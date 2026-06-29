@@ -695,6 +695,20 @@ class RegistryConfig(BaseModel):
     """Private registry and caching configuration."""
 
     enabled: bool = Field(default=True)
+    cache_only: bool = Field(
+        default=False,
+        description="Sealed (cache-only) mode for air-gapped deployments. When true, "
+        "NO upstream fetch ever happens across the binary cache, provider network "
+        "mirror, terragrunt binary, and version resolution: a cache miss returns a "
+        "clear, actionable error instead of (and never even attempting) an upstream "
+        "request, partial-version resolution (e.g. '1.12') resolves ONLY against "
+        "cached entries, and the artifact-retention sweeper skips the binary/provider "
+        "caches (evicting an un-refetchable artifact would lose it permanently). "
+        "Pre-populate the cache first (bulk-warm admin endpoint / UI) — typically "
+        "with cache_only off, pointing at an internal mirror — then seal. Pairs with "
+        "the forward proxy/CA as defense-in-depth: the proxy controls HOW upstream "
+        "would be reached; cache_only guarantees it ISN'T.",
+    )
     signing_key: str = Field(
         default="",
         description="ASCII-armored GPG private key for provider signing. "

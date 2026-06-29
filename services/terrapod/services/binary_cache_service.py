@@ -19,6 +19,7 @@ from terrapod.db.models import CachedBinary
 from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
 from terrapod.services.artifact_verification import VerificationError, verify_binary
+from terrapod.services.cache_errors import CacheOnlyError
 from terrapod.services.hashing_stream import HashingStream
 from terrapod.storage.keys import (
     binary_cache_key,
@@ -99,6 +100,67 @@ def _version_sort_key(v: str) -> tuple:
     return base_parts + (tier_rank, tier_num)
 
 
+def _sealed() -> bool:
+    """Sealed (cache-only) mode — never fetch upstream."""
+    return settings.registry.cache_only
+
+
+async def _cached_versions(db: AsyncSession, tool: str) -> list[str]:
+    """Distinct versions present in the binary cache for a tool, newest first
+    (with major.minor shortcuts), shaped like ``list_available_versions``."""
+    result = await db.execute(
+        select(CachedBinary.version).where(CachedBinary.tool == tool).distinct()
+    )
+    versions = sorted({row[0] for row in result.all()}, key=_version_sort_key, reverse=True)
+    shortcuts: list[str] = []
+    seen: set[str] = set()
+    for v in versions:
+        parts = v.split(".")
+        if len(parts) >= 2:
+            sc = f"{parts[0]}.{parts[1]}"
+            if sc not in seen:
+                seen.add(sc)
+                shortcuts.append(sc)
+    return shortcuts + versions
+
+
+def _pick_cached_version(full: list[str], partial: str) -> str | None:
+    """Pick the best match for a partial version from a NEWEST-FIRST list of
+    full x.y.z versions. Empty/'latest' → newest; 'x.y' → newest 'x.y.*';
+    exact 'x.y.z' → itself. Returns None when nothing matches. Pure (no I/O)."""
+    want = (partial or "").strip()
+    if want and want.lower() != "latest" and len(want.split(".")) >= 3:
+        return want  # exact — honoured; cache lookup errors later if absent
+    candidates = full
+    if want and want.lower() != "latest":
+        prefix = want + "."
+        candidates = [v for v in full if v.startswith(prefix)]
+    return candidates[0] if candidates else None
+
+
+async def _sealed_resolve(tool: str, partial: str) -> str:
+    """Resolve a partial version against ONLY cached entries (sealed mode).
+
+    Picks the highest cached x.y.z matching the partial; an exact x.y.z is
+    returned as-is (the subsequent cache lookup surfaces an actionable error if
+    it isn't present). Raises CacheOnlyError when nothing cached matches.
+    """
+    from terrapod.db.session import get_db_session
+
+    async with get_db_session() as db:
+        full = [v for v in await _cached_versions(db, tool) if len(v.split(".")) >= 3]
+
+    picked = _pick_cached_version(full, partial)
+    if picked is not None:
+        return picked
+
+    raise CacheOnlyError(
+        f"No cached {tool} version matches {partial or 'latest'!r} and sealed "
+        f"(cache_only) mode is enabled. Pre-populate it via the bulk-warm admin "
+        f"endpoint before sealing, or disable registry.cache_only."
+    )
+
+
 async def get_or_cache_binary(
     db: AsyncSession,
     storage: ObjectStore,
@@ -137,8 +199,18 @@ async def get_or_cache_binary(
         presigned = await storage.presigned_get_url(key)
         return presigned.url
 
-    # Cache miss — fetch from upstream
+    # Cache miss
     BINARY_CACHE_REQUESTS.labels(tool=tool, result="miss").inc()
+
+    # Sealed (cache-only) mode: never fetch upstream — surface an actionable error.
+    if _sealed():
+        raise CacheOnlyError(
+            f"{tool} {version} ({os_}/{arch}) is not in the cache and sealed "
+            f"(cache_only) mode is enabled. Pre-populate it via the bulk-warm admin "
+            f"endpoint (POST /api/terrapod/v1/admin/binary-cache/warm-bulk) before "
+            f"sealing, or disable registry.cache_only."
+        )
+
     logger.info(
         "Binary cache miss, fetching from upstream",
         tool=tool,
@@ -326,6 +398,13 @@ async def list_available_versions(tool: str) -> list[str]:
     if tool not in VALID_TOOLS:
         raise ValueError(f"Invalid tool: {tool}. Must be one of {VALID_TOOLS}")
 
+    # Sealed mode: list ONLY cached versions, never the upstream index.
+    if _sealed():
+        from terrapod.db.session import get_db_session
+
+        async with get_db_session() as db:
+            return await _cached_versions(db, tool)
+
     # Check Redis cache
     cache_key = f"tp:versions:{tool}"
     try:
@@ -482,6 +561,10 @@ async def resolve_version(tool: str, partial_version: str) -> str:
 
     Results are cached in Redis for 1 hour.
     """
+    # Sealed mode: resolve ONLY against cached entries, never the upstream index.
+    if _sealed():
+        return await _sealed_resolve(tool, partial_version)
+
     # Normalize empty, None, or "latest" to the latest stable release
     if not partial_version or partial_version.strip().lower() == "latest":
         versions = await list_available_versions(tool)
