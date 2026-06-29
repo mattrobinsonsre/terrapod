@@ -440,6 +440,16 @@ class ProviderCacheConfig(BaseModel):
     platforms: list[dict[str, str]] = Field(
         default=[{"os": "linux", "arch": "amd64"}, {"os": "linux", "arch": "arm64"}],
     )
+    verify: Literal["off", "checksum", "signature"] = Field(
+        default="signature",
+        description="Integrity verification for provider archives fetched from upstream. "
+        "'signature' (default, fail-closed): verify the archive's SHA-256 against the "
+        "registry-advertised shasum AND verify the registry's SHA256SUMS GPG signature "
+        "against the registry-advertised signing key (mirrors `terraform init`). "
+        "'checksum': verify the SHA-256 against the advertised shasum only. "
+        "'off': no verification (NOT recommended — the mirror would trust any bytes). "
+        "On failure the fetch is rejected; nothing is cached or served.",
+    )
 
 
 class BinaryCacheConfig(BaseModel):
@@ -463,6 +473,16 @@ class BinaryCacheConfig(BaseModel):
         "'rc' allows release candidates and GA. 'dev' allows everything. "
         "Intended for dev/staging deployments trying upcoming releases such as "
         "terraform 1.15-rc or tofu 1.12-beta.",
+    )
+    verify: Literal["off", "checksum", "signature"] = Field(
+        default="signature",
+        description="Integrity verification for terraform/tofu/terragrunt binaries fetched "
+        "from upstream. 'signature' (default, fail-closed): verify the upstream SHA256SUMS "
+        "GPG signature against the pinned publisher key (HashiCorp / OpenTofu / Gruntwork) "
+        "AND verify the downloaded binary's SHA-256 against that signed manifest. "
+        "'checksum': verify against the SHA256SUMS manifest only (no signature check). "
+        "'off': no verification (NOT recommended — the binary is executed on every run). "
+        "On failure the fetch is rejected; nothing is cached or served.",
     )
 
 

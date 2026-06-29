@@ -18,6 +18,7 @@ from terrapod.config import settings
 from terrapod.db.models import CachedBinary
 from terrapod.http_retry import arequest_with_retry
 from terrapod.logging_config import get_logger
+from terrapod.services.artifact_verification import VerificationError, verify_binary
 from terrapod.services.hashing_stream import HashingStream
 from terrapod.storage.keys import binary_cache_key
 from terrapod.storage.protocol import ObjectStore
@@ -156,6 +157,22 @@ async def get_or_cache_binary(
     shasum, size_bytes = await _fetch_and_store_binary(
         storage, key, download_url, content_type=content_type
     )
+
+    # Integrity gate (#607): verify the downloaded binary against the publisher's
+    # signed SHA256SUMS before recording it. The DB row is what gates serving
+    # (no row → cache miss → never returned), so verifying before the INSERT
+    # below means a tampered binary is never served. On failure we also delete
+    # the just-written object so it doesn't linger orphaned in storage. The
+    # binary is *executed* on every run, so this is fail-closed by default.
+    verify_level = settings.registry.binary_cache.verify
+    if verify_level != "off":
+        try:
+            async with httpx.AsyncClient(follow_redirects=True) as vclient:
+                await verify_binary(vclient, tool, version, os_, arch, shasum, level=verify_level)
+        except VerificationError:
+            await storage.delete(key)
+            BINARY_CACHE_REQUESTS.labels(tool=tool, result="verify_failed").inc()
+            raise
 
     # Record in database. Two concurrent cache misses for the same
     # (tool, version, os, arch) — typical when two runners spin up

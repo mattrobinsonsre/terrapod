@@ -671,6 +671,10 @@
                       "arch": { "type": "string" }
                     }
                   }
+                },
+                "verify": {
+                  "type": "string",
+                  "enum": ["off", "checksum", "signature"]
                 }
               }
             },
@@ -685,6 +689,10 @@
                 "allow_prerelease": {
                   "type": "string",
                   "enum": ["none", "rc", "beta", "alpha", "dev"]
+                },
+                "verify": {
+                  "type": "string",
+                  "enum": ["off", "checksum", "signature"]
                 }
               }
             },

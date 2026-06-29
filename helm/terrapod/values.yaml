@@ -269,6 +269,13 @@ api:
             arch: amd64
           - os: linux
             arch: arm64
+        # Integrity verification for provider archives fetched from upstream.
+        # One of: off, checksum, signature. 'signature' (default, fail-closed)
+        # checks the archive SHA-256 against the registry-advertised shasum AND
+        # verifies the registry's SHA256SUMS GPG signature against the
+        # registry-advertised signing key (mirrors `terraform init`).
+        # 'checksum' = shasum-only. 'off' = no verification (NOT recommended).
+        verify: signature
       binary_cache:
         enabled: true
         terraform_mirror_url: "https://releases.hashicorp.com/terraform"
@@ -283,6 +290,14 @@ api:
         # in dev/staging to try upcoming releases like terraform 1.15-rc or
         # tofu 1.12-beta before they GA.
         allow_prerelease: none
+        # Integrity verification for terraform/tofu/terragrunt binaries fetched
+        # from upstream. One of: off, checksum, signature. 'signature' (default,
+        # fail-closed) verifies the upstream SHA256SUMS GPG signature against the
+        # pinned publisher key (HashiCorp / OpenTofu / Gruntwork) AND checks the
+        # binary's SHA-256 against that signed manifest. The binary is executed
+        # on every run, so verification is on by default. 'checksum' = manifest
+        # compare only. 'off' = no verification (NOT recommended).
+        verify: signature
       module_interface:
         enabled: true
 
