@@ -31,6 +31,10 @@ import httpx
 import structlog
 
 from terrapod.runner.download import download_to_file
+from terrapod.runner.phases.binary_verify import (
+    ExecutableVerificationError,
+    verify_executable,
+)
 from terrapod.runner.runner_config import RunnerConfig
 
 logger = structlog.get_logger("runner.phase.binary")
@@ -111,6 +115,7 @@ def download_binary(
         client=client,
     )
 
+    from_cache = result.ok
     if not result.ok:
         logger.warning(
             "binary cache unavailable — trying upstream",
@@ -150,6 +155,26 @@ def download_binary(
             "This usually means the presigned storage URL returned an error. "
             "Check that the API storage backend region/endpoint is correct."
         )
+
+    # Integrity gate (#607): verify the downloaded zip against the publisher's
+    # signed SHA256SUMS with our pinned key BEFORE extracting/executing it.
+    # Material comes from the same source as the binary (cache vs upstream).
+    # Fail closed — never run an unverified executable.
+    _verify_client = client or httpx.Client()
+    try:
+        verify_executable(
+            cfg,
+            cfg.backend,
+            cfg.version,
+            zip_path,
+            from_cache=from_cache,
+            client=_verify_client,
+        )
+    except ExecutableVerificationError as exc:
+        raise BinaryDownloadError(f"executable verification failed: {exc}") from exc
+    finally:
+        if client is None:
+            _verify_client.close()
 
     bin_dir.mkdir(parents=True, exist_ok=True)
     try:

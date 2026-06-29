@@ -41,6 +41,10 @@ import httpx
 import structlog
 
 from terrapod.runner.download import download_to_file
+from terrapod.runner.phases.binary_verify import (
+    ExecutableVerificationError,
+    verify_executable,
+)
 from terrapod.runner.runner_config import RunnerConfig
 
 logger = structlog.get_logger("runner.phase.terragrunt")
@@ -103,6 +107,26 @@ def download_terragrunt(
             f"terragrunt binary cache fetch failed (HTTP {result.status}) for "
             f"{cfg.terragrunt_version or '1.0'} {cfg.os}/{cfg.arch}."
         )
+
+    # Integrity gate (#607): verify the terragrunt binary against the publisher's
+    # signed SHA256SUMS with our pinned key before it's run. Cache-only path, so
+    # verification material comes from the Terrapod cache (same source).
+    _verify_client = client or httpx.Client()
+    try:
+        verify_executable(
+            cfg,
+            "terragrunt",
+            cfg.terragrunt_version or "1.0",
+            dest,
+            from_cache=True,
+            client=_verify_client,
+        )
+    except ExecutableVerificationError as exc:
+        raise TerragruntError(f"terragrunt verification failed: {exc}") from exc
+    finally:
+        if client is None:
+            _verify_client.close()
+
     dest.chmod(0o755)
     logger.info("terragrunt ready", path=str(dest))
     return dest

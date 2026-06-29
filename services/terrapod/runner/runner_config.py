@@ -64,6 +64,12 @@ class RunnerConfig:
     download_retries: int
     download_retry_delay_seconds: int
 
+    # Runner-side executable verification (#607): "off" | "checksum" |
+    # "signature" (default). The runner re-verifies the terraform/tofu/
+    # terragrunt binary against the publisher's signed SHA256SUMS with its own
+    # pinned key before executing it. Set by job_template from binary_cache.verify.
+    verify_binaries: str
+
     # Platform — derived locally, exposed here so phases can branch
     # without re-shelling out to uname.
     os: str
@@ -130,6 +136,7 @@ class RunnerConfig:
             upload_timeout_seconds=_int("TP_UPLOAD_TIMEOUT", 60),
             download_retries=_int("TP_DOWNLOAD_RETRIES", 3),
             download_retry_delay_seconds=_int("TP_DOWNLOAD_RETRY_DELAY", 5),
+            verify_binaries=e.get("TP_VERIFY_BINARIES", "signature"),  # type: ignore[arg-type]
             os=os_name,
             arch=arch,
         )

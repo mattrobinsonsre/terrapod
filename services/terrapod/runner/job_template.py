@@ -4,7 +4,7 @@ import json
 import os
 import re
 
-from terrapod.config import RunnerConfig
+from terrapod.config import RunnerConfig, settings
 from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -157,6 +157,13 @@ def build_job_spec(
     backend = execution_backend or runner_config.default_execution_backend
     container_env.append({"name": "TP_VERSION", "value": version})
     container_env.append({"name": "TP_BACKEND", "value": backend})
+    # Runner-side executable verification level (#607): the runner re-verifies
+    # the terraform/tofu/terragrunt binary against the publisher's signed
+    # SHA256SUMS with its own pinned key before executing it. Mirrors the
+    # server's binary_cache.verify so operators control it in one place.
+    container_env.append(
+        {"name": "TP_VERIFY_BINARIES", "value": settings.registry.binary_cache.verify}
+    )
     # Terragrunt (#534): the runner wraps tofu/terraform with terragrunt when
     # enabled. Version is partial (e.g. "1.0") — the binary cache resolves it.
     if terragrunt_enabled:
