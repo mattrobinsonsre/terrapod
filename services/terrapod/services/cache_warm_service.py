@@ -1,13 +1,11 @@
-"""Cache pre-population (warming) — shared routine for the declarative warm
-manifest (run once on API startup via a deduped scheduler trigger) and the
-bulk-warm admin endpoint.
+"""Cache pre-population (warming) — the shared routine behind the bulk-warm
+admin endpoint (and its UI panel).
 
-Warming pulls binaries and provider platforms into the cache ahead of time so a
-fresh install — or an air-gapped one seeded from an egress-capable machine —
-comes up with a populated cache instead of fetching lazily on first run. The
-routine is resilient: one entry failing never aborts the rest; every attempt is
-reported back so callers (the Job logs, the UI) can show exactly what landed and
-what didn't.
+Warming pulls binaries and provider platforms into the cache ahead of time so an
+operator can seed an air-gapped (or just slow-first-run) install instead of
+relying on lazy fetch-on-first-use. The routine is resilient: one entry failing
+never aborts the rest; every attempt is reported back so the caller (the UI) can
+show exactly what landed and what didn't.
 """
 
 from dataclasses import dataclass, field
@@ -127,36 +125,3 @@ async def warm_from_manifest(
                 logger.warning("Failed to warm provider", ref=ref, error=str(e))
 
     return summary
-
-
-async def warm_manifest_task(payload: dict | None = None) -> None:
-    """Scheduler trigger handler: warm the declarative manifest from settings.
-
-    Fired once (deduped via Redis) shortly after API startup so a fresh install
-    — or one whose manifest changed on upgrade — comes up with a populated
-    cache, without a separate Job duplicating the API's runtime environment.
-    Idempotent: already-cached entries are cheap DB hits, so re-firing on a
-    later restart is a safe no-op. Self-gates when the manifest is empty.
-    """
-    from terrapod.db.session import get_db_session
-    from terrapod.storage import get_storage
-
-    binaries = settings.registry.binary_cache.warm
-    providers = settings.registry.provider_cache.warm
-    if not binaries and not providers:
-        return
-
-    logger.info(
-        "Warming cache from declarative manifest",
-        binaries=len(binaries),
-        providers=len(providers),
-    )
-    storage = get_storage()
-    async with get_db_session() as db:
-        summary = await warm_from_manifest(db, storage, binaries, providers)
-    logger.info(
-        "Cache manifest warm complete",
-        total=summary.total,
-        succeeded=summary.succeeded,
-        failed=summary.failed,
-    )

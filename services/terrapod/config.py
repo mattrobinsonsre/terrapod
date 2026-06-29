@@ -608,14 +608,6 @@ class ProviderCacheConfig(BaseModel):
         "providers instead of rejecting them — the archive checksum is still verified "
         "against the advertised shasum. Only relevant when verify='signature'.",
     )
-    warm: list[WarmProviderEntry] = Field(
-        default_factory=list,
-        description="Declarative provider-cache pre-population manifest. Each entry "
-        "is {source: 'hostname/namespace/type', version, platforms: [{os, arch}]}. "
-        "The post-install/upgrade warm Job pulls every listed platform into the "
-        "cache so a fresh install (or a sealed/air-gapped one seeded with egress) "
-        "comes up populated. Empty platforms falls back to `platforms` above.",
-    )
 
 
 class BinaryCacheConfig(BaseModel):
@@ -690,13 +682,6 @@ class BinaryCacheConfig(BaseModel):
         "key here to bridge an upstream key rotation without waiting for a Terrapod release, "
         "or to trust an internal re-signing mirror. Provided keys are propagated to runner "
         "Jobs so runner-side verification honours the same trust set.",
-    )
-    warm: list[WarmBinaryEntry] = Field(
-        default_factory=list,
-        description="Declarative binary-cache pre-population manifest. Each entry is "
-        "{tool, version, platforms: [{os, arch}]}. The post-install/upgrade warm Job "
-        "pulls every listed platform into the cache so a fresh install comes up "
-        "populated. Empty platforms falls back to linux/amd64 + linux/arm64.",
     )
 
 

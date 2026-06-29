@@ -281,19 +281,6 @@ api:
         # default false = fail closed. Set true to degrade to a shasum-only check
         # (with a warning) for those providers instead of rejecting them.
         allow_unsigned: false
-        # Declarative provider-cache pre-population manifest (#606). Each entry
-        # is pulled into the cache shortly after API startup (deduped, multi-
-        # replica safe) so a fresh — or air-gap-seeded — install comes up
-        # populated instead of fetching lazily on first run. `source` is the
-        # provider address 'hostname/namespace/type'; empty `platforms` falls
-        # back to the `platforms` list above. Example:
-        #   warm:
-        #     - source: registry.terraform.io/hashicorp/aws
-        #       version: "5.60.0"
-        #       platforms:
-        #         - os: linux
-        #           arch: amd64
-        warm: []
       binary_cache:
         enabled: true
         terraform_mirror_url: "https://releases.hashicorp.com/terraform"
@@ -339,18 +326,6 @@ api:
         #       -----BEGIN PGP PUBLIC KEY BLOCK-----
         #       ...
         signing_keys: {}
-        # Declarative binary-cache pre-population manifest (#606). Each entry is
-        # pulled into the cache shortly after API startup (deduped, multi-replica
-        # safe) so a fresh install comes up populated. `tool` is one of
-        # terraform/tofu/terragrunt; empty `platforms` falls back to
-        # linux/amd64 + linux/arm64. Example:
-        #   warm:
-        #     - tool: tofu
-        #       version: "1.9.0"
-        #       platforms:
-        #         - os: linux
-        #           arch: amd64
-        warm: []
       module_interface:
         enabled: true
 

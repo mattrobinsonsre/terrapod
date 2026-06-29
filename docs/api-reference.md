@@ -2392,7 +2392,7 @@ Pre-cache many binaries and/or provider platforms in one call. Request body:
 ]}
 ```
 
-The same warming also runs declaratively from the Helm `registry.binary_cache.warm` / `registry.provider_cache.warm` manifest shortly after startup, so a fresh install comes up populated. See [Cache pre-population](registry.md#cache-pre-population).
+See [Cache pre-population](registry.md#cache-pre-population).
 
 ### Purge Cache (Admin)
 

@@ -271,33 +271,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Clean up old artifacts from object storage",
         )
 
-    # Declarative cache pre-population (#606): warm the binary/provider manifest
-    # once, shortly after startup, via a deduped trigger so a fresh (or air-gap
-    # seeded) install comes up populated. Handler self-gates on an empty
-    # manifest; warming is idempotent so re-firing on restart is a cheap no-op.
-    from terrapod.services.cache_warm_service import warm_manifest_task
-
-    register_trigger_handler(
-        "warm_manifest",
-        handler=warm_manifest_task,
-        description="Pre-populate binary/provider cache from the declarative warm manifest",
-    )
-
     await start_scheduler()
     logger.info("Distributed scheduler started")
-
-    _warm_binaries = settings.registry.binary_cache.warm
-    _warm_providers = settings.registry.provider_cache.warm
-    if _warm_binaries or _warm_providers:
-        from terrapod.services.scheduler import enqueue_trigger
-
-        # Deduped so a multi-replica rollout enqueues a single warm run.
-        await enqueue_trigger("warm_manifest", dedup_key="warm_manifest", dedup_ttl=600)
-        logger.info(
-            "Enqueued declarative cache warm",
-            binaries=len(_warm_binaries),
-            providers=len(_warm_providers),
-        )
 
     yield
 
