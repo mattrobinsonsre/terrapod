@@ -164,7 +164,15 @@ export default function CachePage() {
         body: JSON.stringify({ binaries, providers }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.detail || `Warm failed (${res.status})`)
+      if (!res.ok) {
+        // FastAPI validation errors (422) return `detail` as an array of
+        // {msg, loc, ...}; plain errors return a string. Surface either readably.
+        const detail = data.detail
+        const msg = Array.isArray(detail)
+          ? detail.map((d) => d?.msg || JSON.stringify(d)).join('; ')
+          : detail || `Warm failed (${res.status})`
+        throw new Error(msg)
+      }
       setWarmResults(data.results || [])
       setSuccess(`Warmed ${data.succeeded}/${data.total} (${data.failed} failed)`)
       await loadAll()
