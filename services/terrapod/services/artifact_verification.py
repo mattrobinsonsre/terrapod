@@ -36,6 +36,7 @@ import pgpy
 import structlog
 
 from terrapod.config import settings
+from terrapod.gpg_verify import load_key, parse_sha256sums, verify_detached
 from terrapod.http_retry import arequest_with_retry
 
 logger = structlog.get_logger(__name__)
@@ -94,42 +95,12 @@ def _load_key(key_file: str) -> pgpy.PGPKey:
 
     Cached for the process lifetime — the keys are static, image-baked assets.
     """
-    path = _KEYS_DIR / key_file
-    key, _ = pgpy.PGPKey.from_file(str(path))
-    return key
+    return load_key(str(_KEYS_DIR / key_file))
 
 
-def parse_sha256sums(text: str) -> dict[str, str]:
-    """Parse a ``SHA256SUMS`` manifest into ``{filename: sha256_hex}``.
-
-    Each line is ``<hex>␠␠<filename>`` (two spaces, GNU coreutils style); we
-    tolerate any run of whitespace. Blank lines are skipped.
-    """
-    out: dict[str, str] = {}
-    for line in text.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        parts = line.split()
-        if len(parts) < 2:
-            continue
-        digest, name = parts[0], parts[-1]
-        out[name.lstrip("*")] = digest.lower()
-    return out
-
-
-def _verify_gpg_sync(manifest: bytes, signature: bytes, key: pgpy.PGPKey) -> bool:
-    """Verify a detached GPG signature over ``manifest`` using ``key``.
-
-    Synchronous (pgpy) — call via ``asyncio.to_thread``. Returns True only on a
-    cryptographically valid signature by the pinned key.
-    """
-    try:
-        sig = pgpy.PGPSignature.from_blob(signature)
-        result = key.verify(manifest, sig)
-        return bool(result)
-    except Exception:  # pragma: no cover - any parse/verify error == not verified
-        return False
+# Cryptographic core lives in terrapod.gpg_verify (shared with the runner).
+# `parse_sha256sums` is re-exported for callers/tests that import it here.
+_verify_gpg_sync = verify_detached
 
 
 async def _fetch_bytes(client: httpx.AsyncClient, url: str) -> bytes:
