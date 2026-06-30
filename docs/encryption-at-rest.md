@@ -107,10 +107,44 @@ the DEK (canary fail-closed).
 - The DB backup CronJob and your object store are unaffected: encrypted columns
   are ciphertext in the dump, which is the point.
 - **Disabling** stops new encryption immediately; existing ciphertext stays
-  readable as long as the provider + key remain configured (a decrypt-everything
-  migration to fully revert lands with the Phase-2 breadth work).
-- Rotation (re-wrap DEKs under a new KEK; roll the DEK) and a resumable
-  encrypt-existing-data pass are Phase-2 follow-ups.
+  readable as long as the provider + key remain configured. To fully revert,
+  run the decrypt migration **before** removing the key (see below).
+
+## Encrypt existing data / revert (resumable migration)
+
+Enabling encryption only encrypts **new** writes; rows written earlier stay
+plaintext until re-written. To encrypt everything now — or to decrypt back before
+disabling — run the resumable migration. It is **verify-readback per row** (a row
+is only overwritten once the new value is proven decryptable), resumable, and
+idempotent:
+
+```bash
+# encrypt all existing secrets under the active DEK (run with encryption enabled)
+kubectl exec deploy/terrapod-api -- python -m terrapod.cli.encryption_migrate encrypt
+
+# decrypt everything back to plaintext BEFORE disabling / removing the key
+kubectl exec deploy/terrapod-api -- python -m terrapod.cli.encryption_migrate decrypt
+```
+
+`encrypt` skips rows already at the active DEK version, so it's safe to re-run
+after an interruption. **Run `decrypt` while the key is still available** — once
+the key is gone, encrypted rows can't be converted back.
+
+## Key rotation
+
+- **DEK rotation** — mint a new active data-encryption key via
+  `POST /api/terrapod/v1/admin/encryption/rotate-dek` (admin). Prior DEK versions
+  are **retained** so existing ciphertext stays decryptable; new writes use the
+  new key. To re-encrypt old rows under the new key, run
+  `encryption_migrate encrypt` afterwards. The new key is wrapped **and unwrapped
+  (round-trip verified)** before it's activated — a broken provider aborts with
+  nothing changed.
+- **KEK rotation** — for `awskms` / `vault_transit`, the provider manages its own
+  key versions transparently; Terrapod's wrapped DEKs keep working across the
+  CSP/Vault key rotation as long as the old version remains decryptable. For
+  `static`, rotating the master key means re-wrapping the DEKs under the new key
+  — do this as a deliberate, backed-up operation (and verify with the
+  [encryption doctor](#monitoring-decryptability--dont-get-surprised) after).
 
 ## Monitoring decryptability — don't get surprised
 

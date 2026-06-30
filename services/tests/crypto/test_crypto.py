@@ -272,3 +272,71 @@ def test_phase1_secret_columns_use_encrypted_text():
     for model, col in encrypted:
         coltype = model.__table__.c[col].type
         assert isinstance(coltype, EncryptedText), f"{model.__name__}.{col} must be EncryptedText"
+
+
+# ── Rotation (#553 Phase 4) ───────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_rotate_dek_mints_new_active_retains_old(monkeypatch):
+    from terrapod.crypto import service as svc_mod
+    from terrapod.db.models import CryptoKey
+
+    # Start enabled with an active v1 service + one existing DEK row.
+    svc = _enabled_service()
+    svc.enabled = True
+    svc_mod._service = svc
+    good = _GoodProvider()
+    monkeypatch.setattr(svc_mod, "build_provider", lambda: good)
+    existing = CryptoKey(version=1, wrapped_dek="w", provider="static", canary="", active=True)
+    db = _FakeDB(rows=[existing])
+
+    new_version = await svc_mod.rotate_dek(db)
+    assert new_version == 2
+    assert svc._active_version == 2
+    assert 1 in svc._deks and 2 in svc._deks  # old version retained for reads
+    assert existing.active is False  # prior key deactivated
+    svc_mod.reset_encryption_for_tests()
+
+
+@pytest.mark.asyncio
+async def test_rotate_dek_refused_when_disabled(monkeypatch):
+    from terrapod.crypto import service as svc_mod
+
+    svc_mod.reset_encryption_for_tests()  # disabled passthrough
+    with pytest.raises(RuntimeError, match="not enabled"):
+        await svc_mod.rotate_dek(_FakeDB(rows=[]))
+
+
+# ── Migration per-row planner (#553 Phase 4) ──────────────────────────────────
+
+
+def test_plan_row_encrypt_and_decrypt_paths():
+    from terrapod.cli.encryption_migrate import _plan_row
+
+    svc = _enabled_service()  # active version 1
+    active = svc._active_version
+
+    # encrypt: legacy plaintext → gets encrypted to active version
+    new, pt = _plan_row("legacy-plain", "encrypt", active, svc)
+    assert pt == "legacy-plain" and envelope.is_encrypted(new)
+    assert envelope.parse_version(new) == active
+
+    # encrypt: already at active version → skip
+    at_active = svc.encrypt("x")
+    assert _plan_row(at_active, "encrypt", active, svc) == (None, None)
+
+    # encrypt: an older DEK version still in the cache → re-keyed to active
+    dek0 = envelope.new_dek()
+    svc._deks[0] = dek0
+    older = envelope.encrypt("z", dek0, 0)
+    new2, pt2 = _plan_row(older, "encrypt", active, svc)
+    assert pt2 == "z" and envelope.parse_version(new2) == active
+
+    # decrypt: envelope → plaintext
+    enc = svc.encrypt("secret")
+    new3, pt3 = _plan_row(enc, "decrypt", active, svc)
+    assert new3 == "secret" and pt3 == "secret"
+
+    # decrypt: already plaintext → skip
+    assert _plan_row("plain", "decrypt", active, svc) == (None, None)

@@ -33,3 +33,23 @@ func (c *Client) GetEncryptionStatus(ctx context.Context) (*EncryptionStatus, er
 	}
 	return &env.Data.Attributes, nil
 }
+
+// RotateDEK mints a new active data-encryption key. Prior versions are retained
+// so existing ciphertext stays decryptable; run the encrypt migration to re-key
+// old rows. Requires platform admin; returns ConflictError when encryption is
+// disabled.
+func (c *Client) RotateDEK(ctx context.Context) (*EncryptionStatus, error) {
+	body, err := c.Post(ctx, "/api/terrapod/v1/admin/encryption/rotate-dek", nil)
+	if err != nil {
+		return nil, err
+	}
+	var env struct {
+		Data struct {
+			Attributes EncryptionStatus `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &env); err != nil {
+		return nil, err
+	}
+	return &env.Data.Attributes, nil
+}

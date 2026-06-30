@@ -36,3 +36,29 @@ func TestGetEncryptionStatus(t *testing.T) {
 		t.Fatalf("unexpected versions: %+v", st)
 	}
 }
+
+func TestRotateDEK(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || !strings.HasSuffix(r.URL.Path, "/admin/encryption/rotate-dek") {
+			http.Error(w, "unhandled", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"type":"encryption-status","attributes":{
+		  "enabled":true,"provider":"static","active_version":3,
+		  "dek_versions":[1,2,3],"canary_ok":true,"decryptable":true}}}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := c.RotateDEK(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.ActiveVersion == nil || *st.ActiveVersion != 3 || len(st.DEKVersions) != 3 {
+		t.Fatalf("unexpected rotate result: %+v", st)
+	}
+}

@@ -155,6 +155,51 @@ async def init_encryption(db: AsyncSession) -> None:
     )
 
 
+async def rotate_dek(db: AsyncSession) -> int:
+    """Mint a new active DEK; retain all prior versions for decryption.
+
+    Verify-before-activate: the new DEK is wrapped and immediately unwrapped back
+    (round-trip equality) BEFORE it is persisted/activated — a broken provider
+    aborts with nothing changed. Prior DEK versions are NEVER dropped, so every
+    existing ciphertext stays decryptable; re-encrypting old rows under the new
+    DEK is the separate, idempotent migration pass. Returns the new version.
+    """
+    svc = get_encryption()
+    if not svc.enabled or svc._active_version is None:
+        raise RuntimeError("cannot rotate DEK: encryption is not enabled")
+
+    provider = build_provider()
+    rows = (await db.execute(select(CryptoKey))).scalars().all()
+    new_version = max((r.version for r in rows), default=0) + 1
+
+    dek = envelope.new_dek()
+    wrapped = await provider.wrap(dek)
+    if await provider.unwrap(wrapped) != dek:
+        raise RuntimeError(
+            "DEK rotation aborted: provider wrap→unwrap round-trip failed — nothing changed"
+        )
+    canary = envelope.encrypt(_CANARY, dek, new_version)
+
+    for r in rows:
+        r.active = False
+    db.add(
+        CryptoKey(
+            version=new_version,
+            wrapped_dek=wrapped,
+            provider=provider.id,
+            canary=canary,
+            active=True,
+        )
+    )
+    await db.commit()
+
+    # Update the live cache: keep old DEKs for reads, switch active to the new one.
+    svc._deks[new_version] = dek
+    svc._active_version = new_version
+    logger.info("Rotated DEK", new_version=new_version, retained=sorted(svc._deks))
+    return new_version
+
+
 async def verify_live(db: AsyncSession) -> dict:
     """Independently prove every stored DEK is decryptable RIGHT NOW.
 
