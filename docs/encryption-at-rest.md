@@ -19,17 +19,22 @@ just the platform."
 
 ## What's encrypted (Phase 1)
 
-Application-layer encryption currently covers **DB-stored secrets**, starting
-with the **CA private key** (the single most sensitive blob). The remaining
-Phase-1 columns — sensitive variables, variable-set values, catalog inputs, VCS
-tokens/keys, webhook secrets — land in a follow-up. **State files are out of
-scope for now** (they need a decrypting download proxy and chunked streaming;
-keep them protected by object-store at-rest encryption).
+Application-layer encryption covers **DB-stored secrets**:
 
-The DB columns stay `TEXT`; nothing is re-typed at the database level. Values
-written before you enable encryption stay readable (they're passed through
-untouched until a future migration re-encrypts them), so enabling/disabling is a
-migration, not a hard cutover.
+- the **CA private key** (`certificate_authority.ca_key_pem`) — the single most sensitive blob;
+- **workspace + variable-set variable values** (`variables.value`, `variable_set_variables.value`) — this also covers catalog inputs, which are stored as workspace variables;
+- **VCS connection credentials** (`vcs_connections.token` — GitHub App PEM / GitLab PAT) and the per-connection **webhook secret** (`vcs_connections.webhook_secret`);
+- **notification tokens** (`notification_configurations.token`).
+
+**State files are out of scope** (Phase 2): they need a decrypting download proxy
+and chunked streaming; keep them protected by object-store at-rest encryption.
+
+Encrypted columns are `TEXT` (the one length-bounded column, `webhook_secret`,
+was widened `VARCHAR(255)→TEXT` so an envelope can never overflow it). Values
+written **before** you enable encryption stay readable — they pass through
+untouched until re-written or migrated — so enabling/disabling is a migration,
+not a hard cutover. Encrypted columns are never indexed or unique-constrained
+(ciphertext is non-deterministic).
 
 ## How it works — envelope encryption
 

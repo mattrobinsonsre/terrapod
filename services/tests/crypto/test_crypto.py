@@ -243,3 +243,32 @@ async def test_verify_live_ok_and_failure(monkeypatch):
     res2 = await svc_mod.verify_live(_FakeDB(rows=[row]))
     assert res2["ok"] is False
     assert res2["failures"]
+
+
+# ── Breadth: which columns are encrypted at rest (#553 Phase 3) ────────────────
+
+
+def test_phase1_secret_columns_use_encrypted_text():
+    """Hard invariant: the Phase-1 DB secret columns are EncryptedText, so they
+    are app-encrypted when encryption is enabled. Guards against a future change
+    silently dropping encryption from a secret column."""
+    from terrapod.crypto.types import EncryptedText
+    from terrapod.db.models import (
+        CertificateAuthorityModel,
+        NotificationConfiguration,
+        Variable,
+        VariableSetVariable,
+        VCSConnection,
+    )
+
+    encrypted = [
+        (CertificateAuthorityModel, "ca_key_pem"),
+        (Variable, "value"),
+        (VariableSetVariable, "value"),
+        (VCSConnection, "token"),
+        (VCSConnection, "webhook_secret"),
+        (NotificationConfiguration, "token"),
+    ]
+    for model, col in encrypted:
+        coltype = model.__table__.c[col].type
+        assert isinstance(coltype, EncryptedText), f"{model.__name__}.{col} must be EncryptedText"

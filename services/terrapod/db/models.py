@@ -999,8 +999,8 @@ class VCSConnection(Base):
         String(500), nullable=False, default=""
     )  # e.g. https://gitlab.example.com, https://github.example.com
     token: Mapped[str | None] = mapped_column(
-        Text, nullable=True
-    )  # PAT (GitLab) or PEM private key (GitHub App)
+        EncryptedText, nullable=True
+    )  # PAT (GitLab) or PEM private key (GitHub App) — app-encrypted at rest (#553)
 
     # GitHub-specific
     github_app_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -1012,9 +1012,10 @@ class VCSConnection(Base):
 
     # Per-connection webhook HMAC secret (GitHub). Optional: when set it is
     # used to validate this connection's inbound webhooks, falling back to the
-    # global vcs.github.webhook_secret when null. Write-only via the API and
-    # protected at rest by database encryption (same as `token`).
-    webhook_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # global vcs.github.webhook_secret when null. Write-only via the API.
+    # EncryptedText (#553): the DB column was widened VARCHAR(255)→TEXT so an
+    # encryption envelope never overflows it. App-encrypted at rest when enabled.
+    webhook_secret: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)
 
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="active"
@@ -1203,7 +1204,7 @@ class Variable(Base):
         nullable=False,
     )
     key: Mapped[str] = mapped_column(String(255), nullable=False)
-    value: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    value: Mapped[str] = mapped_column(EncryptedText, nullable=False, default="")
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     category: Mapped[str] = mapped_column(
         String(20), nullable=False, default="terraform"
@@ -1271,7 +1272,7 @@ class VariableSetVariable(Base):
         nullable=False,
     )
     key: Mapped[str] = mapped_column(String(255), nullable=False)
-    value: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    value: Mapped[str] = mapped_column(EncryptedText, nullable=False, default="")
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     category: Mapped[str] = mapped_column(String(20), nullable=False, default="terraform")
     hcl: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -1660,7 +1661,7 @@ class NotificationConfiguration(Base):
         String(20), nullable=False
     )  # generic, slack, email
     url: Mapped[str] = mapped_column(String(2000), nullable=False, default="")
-    token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token: Mapped[str | None] = mapped_column(EncryptedText, nullable=True)  # app-encrypted (#553)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     triggers: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=list)
     email_addresses: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=list)
