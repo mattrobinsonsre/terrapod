@@ -1237,3 +1237,44 @@ Read the failure mode:
 
 - A fresh drill logs `DR drill PASSED — backup <key> restored and verified` and the Job completes successfully.
 - The backup CronJob's most recent Job is `Complete` and a new `backups/<ts>.dump` object exists.
+
+---
+
+## Encryption key lost or unusable (`decryptable: false`)
+
+App-layer encryption at rest (#553) failed its decryptability check. **This is potentially data loss** — secrets encrypted under a key you can no longer use are unrecoverable. Act carefully and do **not** rotate or delete anything until the key is restored.
+
+### Symptoms
+
+- `GET /api/terrapod/v1/admin/encryption` returns `decryptable: false` (or `canary_ok: false`).
+- `python -m terrapod.cli.encryption_doctor` exits non-zero with `unwrap failed` / `canary did not decrypt`.
+- The API **fails to start** with `encryption canary mismatch — refusing to start` (it fails closed rather than serving/writing unreadable data).
+
+### Diagnosis
+
+Run the doctor to see which versions fail and why:
+```bash
+kubectl exec deploy/terrapod-api -- python -m terrapod.cli.encryption_doctor
+```
+Map the failure to the provider:
+- **`static`** — the master key env (`TERRAPOD_ENCRYPTION__STATIC_KEY`, from the K8s Secret) changed, was lost, or doesn't match what encrypted the data. Compare against your out-of-band backup.
+- **`vault_transit`** — Vault unreachable, the token lacks `decrypt` on the transit key, the key was rotated with `min_decryption_version` advanced past the stored version, or the key was deleted.
+- **`awskms`** — the KMS key was disabled/scheduled-for-deletion, or the pod's IAM identity lost `kms:Decrypt`.
+
+### Resolution
+
+1. **Restore the exact prior key material / permission** — do not improvise:
+   - `static`: put the original master secret back in the Secret (`kubectl edit secret …` from your backup), restart the API.
+   - `vault_transit`: restore Vault availability, re-grant `decrypt`, lower `min_decryption_version` to include the stored version, or undelete the key.
+   - `awskms`: re-enable the key / cancel deletion, restore `kms:Decrypt` on the role.
+2. **Restart the API.** The boot canary re-verifies; a clean start means recovery succeeded (fail-closed guarantees you can't half-recover).
+3. If the key is **genuinely unrecoverable**, the encrypted columns are lost. Restore the database (and key) from a backup taken while the key was valid (see [disaster-recovery.md](disaster-recovery.md)). The CA private key can instead be regenerated (re-issues listener certs); workspace secrets cannot.
+
+### Verification
+
+- `python -m terrapod.cli.encryption_doctor` exits 0: "all encrypted data is decryptable".
+- `GET /api/terrapod/v1/admin/encryption` shows `decryptable: true`.
+
+### Prevention
+
+- Back up the KEK out-of-band **before** enabling (esp. `static`). Schedule the doctor so a broken key path is caught before a restart forces it. Never change the provider/key on a deployment with encrypted rows without proving the new path unwraps the existing DEKs first. See [encryption-at-rest.md](encryption-at-rest.md#recovery).

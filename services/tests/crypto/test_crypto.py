@@ -116,3 +116,130 @@ def test_service_disabled_can_still_decrypt_loaded_versions():
     svc.enabled = False
     assert svc.encrypt("new") == "new"  # no longer encrypts
     assert svc.decrypt(enc) == "v"  # still reads old ciphertext
+
+
+# ── Durability safety net (#553 Phase 2) ──────────────────────────────────────
+
+
+def test_status_reports_decryptable():
+    svc = _enabled_service()
+    svc._provider_id = "static"
+    st = svc.status()
+    assert st["enabled"] is True
+    assert st["provider"] == "static"
+    assert st["active_version"] == 1
+    assert st["dek_versions"] == [1]
+    assert st["decryptable"] is True
+
+
+def test_status_disabled_is_decryptable():
+    svc = EncryptionService()  # disabled
+    st = svc.status()
+    assert st["enabled"] is False
+    assert st["decryptable"] is True  # nothing encrypted → nothing at risk
+
+
+class _FakeResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def scalars(self):
+        return self
+
+    def all(self):
+        return self._rows
+
+
+class _FakeDB:
+    """Minimal AsyncSession stand-in for init/verify_live tests."""
+
+    def __init__(self, rows):
+        self._rows = rows
+        self.added = []
+
+    async def execute(self, _stmt):
+        return _FakeResult(list(self._rows))
+
+    def add(self, obj):
+        self.added.append(obj)
+        self._rows.append(obj)
+
+    async def commit(self):
+        pass
+
+
+class _GoodProvider:
+    id = "static"
+
+    def __init__(self):
+        self._dek = envelope.new_dek()
+
+    async def wrap(self, dek):
+        self._dek = dek
+        return "wrapped"
+
+    async def unwrap(self, wrapped):
+        return self._dek
+
+
+class _BrokenUnwrapProvider:
+    """Wraps fine but unwrap returns the WRONG key — the dangerous case."""
+
+    id = "static"
+
+    async def wrap(self, dek):
+        return "wrapped"
+
+    async def unwrap(self, wrapped):
+        return envelope.new_dek()  # never equals the wrapped DEK
+
+
+@pytest.mark.asyncio
+async def test_enable_aborts_if_provider_cannot_unwrap(monkeypatch):
+    """Death-by-encryption guard: enabling must abort (and write nothing) when
+    the provider can't round-trip — never encrypt under an unusable key."""
+    from terrapod.crypto import service as svc_mod
+
+    monkeypatch.setattr(svc_mod.settings.encryption, "enabled", True)
+    monkeypatch.setattr(svc_mod, "build_provider", lambda: _BrokenUnwrapProvider())
+    db = _FakeDB(rows=[])
+    with pytest.raises(RuntimeError, match="round-trip"):
+        await svc_mod.init_encryption(db)
+    assert db.added == []  # no DEK row was ever persisted
+
+
+@pytest.mark.asyncio
+async def test_enable_succeeds_with_good_provider(monkeypatch):
+    from terrapod.crypto import service as svc_mod
+
+    monkeypatch.setattr(svc_mod.settings.encryption, "enabled", True)
+    monkeypatch.setattr(svc_mod, "build_provider", lambda: _GoodProvider())
+    db = _FakeDB(rows=[])
+    await svc_mod.init_encryption(db)
+    svc = svc_mod.get_encryption()
+    assert svc.enabled is True
+    assert svc.status()["decryptable"] is True
+    svc_mod.reset_encryption_for_tests()
+
+
+@pytest.mark.asyncio
+async def test_verify_live_ok_and_failure(monkeypatch):
+    from terrapod.crypto import service as svc_mod
+    from terrapod.db.models import CryptoKey
+
+    good = _GoodProvider()
+    dek = envelope.new_dek()
+    good._dek = dek
+    canary = envelope.encrypt(svc_mod._CANARY, dek, 1)
+    row = CryptoKey(version=1, wrapped_dek="wrapped", provider="static", canary=canary, active=True)
+
+    monkeypatch.setattr(svc_mod, "build_provider", lambda: good)
+    res = await svc_mod.verify_live(_FakeDB(rows=[row]))
+    assert res["ok"] is True
+    assert res["checked_versions"] == [1]
+
+    # A provider that returns the wrong key → canary won't decrypt → not ok.
+    monkeypatch.setattr(svc_mod, "build_provider", lambda: _BrokenUnwrapProvider())
+    res2 = await svc_mod.verify_live(_FakeDB(rows=[row]))
+    assert res2["ok"] is False
+    assert res2["failures"]

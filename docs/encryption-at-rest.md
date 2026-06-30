@@ -107,6 +107,52 @@ the DEK (canary fail-closed).
 - Rotation (re-wrap DEKs under a new KEK; roll the DEK) and a resumable
   encrypt-existing-data pass are Phase-2 follow-ups.
 
+## Monitoring decryptability — don't get surprised
+
+Losing decryptability is data loss, so treat "can we still decrypt?" as a
+first-class health signal, the same way you'd treat a backup you've never tested.
+
+- **Status endpoint** (admin): `GET /api/terrapod/v1/admin/encryption` returns
+  `{enabled, provider, active_version, dek_versions, canary_ok, decryptable}`.
+  `decryptable: false` means the platform is running but can't read the canary
+  back — page on it.
+- **Encryption doctor** — an on-demand drill that independently re-builds the
+  KEK provider and re-unwraps **every** DEK version live (catching a KMS
+  permission revoked, a Vault key deleted, or a static key rotated away *after*
+  startup) and verifies each canary. Exit code is non-zero on any failure:
+
+  ```bash
+  kubectl exec deploy/terrapod-api -- python -m terrapod.cli.encryption_doctor
+  ```
+
+  Run it after any change to the KEK/IAM/Vault policy, and consider scheduling it
+  (a CronJob using the same image + entrypoint) so a broken key path is caught
+  *before* an outage forces a restart that then can't decrypt.
+
+## Recovery
+
+There is **no recovery without the KEK** — that is the whole point of the
+feature and the whole danger. Plan for it:
+
+1. **Before enabling**, back up the KEK out-of-band:
+   - `static` — copy the master secret to a separate secret manager / offline
+     vault, under multi-person control. This is the only copy that matters.
+   - `vault_transit` / `awskms` — ensure the Vault key / KMS key has the
+     provider's own durable backup + a deletion-protection / key-recovery window
+     enabled, and that the Terrapod identity retains decrypt permission.
+2. **If the doctor or status reports `decryptable: false`:**
+   - Do **not** delete or rotate anything. First restore the *exact* prior key
+     material / permissions (re-grant KMS decrypt, undelete the Vault key,
+     restore the `static` secret from your out-of-band copy).
+   - The API fails closed on a bad key, so a misconfigured restart won't corrupt
+     data — fix the key, then restart; the boot canary confirms recovery.
+3. **Never** change `encryption.provider` or the key on a deployment that already
+   has encrypted rows without first proving the new path can unwrap the existing
+   DEKs — otherwise existing ciphertext becomes unreadable. (Safe KEK/DEK
+   rotation that re-wraps existing DEKs is a separate, guarded operation.)
+
+See the [encryption key recovery runbook](runbooks.md#encryption-key-lost-or-unusable-decryptable-false).
+
 ## See also
 
 - [Cloud Credentials](cloud-credentials.md) — the at-rest encryption baseline this sits on top of.

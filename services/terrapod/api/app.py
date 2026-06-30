@@ -802,6 +802,11 @@ def create_application() -> FastAPI:
 
     include_terrapod(audit_router)
 
+    # Encryption-at-rest status (admin only) — Terrapod-specific (#553).
+    from terrapod.api.routers.encryption import router as encryption_router
+
+    include_terrapod(encryption_router)
+
     # User management endpoints — Terrapod-native. Canonical paths at
     # /api/terrapod/v1/users{,/{email}}.
     from terrapod.api.routers.users import (

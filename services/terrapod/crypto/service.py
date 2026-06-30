@@ -32,6 +32,25 @@ class EncryptionService:
         self.enabled: bool = False
         self._deks: dict[int, bytes] = {}
         self._active_version: int | None = None
+        self._provider_id: str = ""
+        self._canary_ok: bool = True
+
+    def status(self) -> dict:
+        """Operator-facing health: are we currently able to decrypt everything?
+
+        ``decryptable`` is the headline durability signal — true when the canary
+        decrypts and the active DEK is loaded. Used by the admin status endpoint
+        and the encryption doctor.
+        """
+        decryptable = self._canary_ok and (not self.enabled or self._active_version is not None)
+        return {
+            "enabled": self.enabled,
+            "provider": self._provider_id,
+            "active_version": self._active_version,
+            "dek_versions": sorted(self._deks),
+            "canary_ok": self._canary_ok,
+            "decryptable": decryptable,
+        }
 
     def encrypt(self, plaintext: str) -> str:
         """Encrypt when enabled; otherwise return plaintext unchanged."""
@@ -84,9 +103,20 @@ async def init_encryption(db: AsyncSession) -> None:
     provider = build_provider()
 
     if not rows and settings.encryption.enabled:
-        # First enable: mint a DEK, wrap it, stash the canary.
+        # First enable: mint a DEK and wrap it. DEATH-BY-ENCRYPTION GUARD — before
+        # we persist the key or let a single byte of data get encrypted, PROVE the
+        # provider can both wrap AND unwrap: wrap, then unwrap and assert we get
+        # the exact DEK back. If the provider is misconfigured (wrong KMS key,
+        # no decrypt permission, unreachable Vault) this raises here and nothing
+        # is ever written encrypted — so you can never reach a state where data
+        # is encrypted under a key you cannot use.
         dek = envelope.new_dek()
         wrapped = await provider.wrap(dek)
+        if await provider.unwrap(wrapped) != dek:
+            raise RuntimeError(
+                "encryption enable aborted: KEK provider wrap→unwrap round-trip failed "
+                f"(provider={provider.id}). Refusing to encrypt data the provider cannot decrypt."
+            )
         canary = envelope.encrypt(_CANARY, dek, 1)
         row = CryptoKey(
             version=1, wrapped_dek=wrapped, provider=provider.id, canary=canary, active=True
@@ -95,6 +125,8 @@ async def init_encryption(db: AsyncSession) -> None:
         await db.commit()
         rows = [row]
         logger.info("Encryption at rest enabled — minted DEK v1", provider=provider.id)
+
+    svc._provider_id = provider.id
 
     # Unwrap all DEK versions into the cache (older versions needed for reads).
     for row in rows:
@@ -111,6 +143,7 @@ async def init_encryption(db: AsyncSession) -> None:
     if active is not None and active.canary:
         if svc.decrypt(active.canary) != _CANARY:
             raise RuntimeError("encryption canary mismatch — refusing to start (wrong key?)")
+        svc._canary_ok = True
 
     _service = svc
     logger.info(
@@ -120,6 +153,54 @@ async def init_encryption(db: AsyncSession) -> None:
         dek_versions=sorted(svc._deks),
         active_version=svc._active_version,
     )
+
+
+async def verify_live(db: AsyncSession) -> dict:
+    """Independently prove every stored DEK is decryptable RIGHT NOW.
+
+    Unlike the cached boot state, this re-builds the provider and re-unwraps every
+    ``crypto_keys`` row live (catching e.g. a KMS permission revoked or a Vault key
+    deleted after startup), then verifies each row's canary. Returns a result dict
+    with ``ok``; the encryption doctor exits non-zero when ``ok`` is False. This is
+    the "can I still decrypt everything?" drill.
+    """
+    rows = (await db.execute(select(CryptoKey))).scalars().all()
+    if not rows:
+        return {
+            "ok": True,
+            "enabled": settings.encryption.enabled,
+            "checked_versions": [],
+            "failures": [],
+            "note": "no DEKs (encryption never enabled)",
+        }
+
+    provider = build_provider()
+    failures: list[str] = []
+    checked: list[int] = []
+    for row in rows:
+        try:
+            dek = await provider.unwrap(row.wrapped_dek)
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"v{row.version}: unwrap failed: {exc}")
+            continue
+        # The canary decrypt itself can raise (e.g. AES-GCM InvalidTag when the
+        # unwrapped key is wrong) — catch it so the doctor reports a clean
+        # failure instead of crashing.
+        try:
+            if row.canary and envelope.decrypt(row.canary, dek) != _CANARY:
+                failures.append(f"v{row.version}: canary did not decrypt to the expected value")
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"v{row.version}: canary decrypt failed: {exc}")
+            continue
+        checked.append(row.version)
+
+    return {
+        "ok": not failures,
+        "enabled": settings.encryption.enabled,
+        "provider": provider.id,
+        "checked_versions": sorted(checked),
+        "failures": failures,
+    }
 
 
 def reset_encryption_for_tests() -> None:
