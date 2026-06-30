@@ -21,7 +21,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
-from terrapod.api.upload_stream import file_chunks, stream_to_tempfile
+from terrapod.api.upload_stream import file_chunks, read_file_bytes, stream_to_tempfile
 from terrapod.db.models import StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -168,11 +168,15 @@ async def rollback_state_version(
     sv = await _get_state_version(state_version_id, db)
     ws = await _require_sv_workspace_permission(sv, "write", user, db)
 
-    # Download the old state bytes
+    # Download the old state bytes (decrypting if app-layer state encryption was
+    # on when they were written, #635). Working in plaintext keeps md5/state_size
+    # below consistent; the re-store re-encrypts under the active DEK.
+    from terrapod.crypto.state import decrypt_state_bytes, encrypt_state_bytes
+
     storage = get_storage()
     old_key = state_key(str(sv.workspace_id), str(sv.id))
     try:
-        state_bytes = await storage.get(old_key)
+        state_bytes = await decrypt_state_bytes(await storage.get(old_key))
     except Exception:
         raise HTTPException(
             status_code=404,
@@ -201,9 +205,9 @@ async def rollback_state_version(
     db.add(new_sv)
     await db.flush()
 
-    # Store state bytes at new key
+    # Store state bytes at new key (re-encrypted under the active DEK when on)
     new_key = state_key(str(sv.workspace_id), str(new_sv.id))
-    await storage.put(new_key, state_bytes)
+    await storage.put(new_key, await encrypt_state_bytes(state_bytes))
 
     await db.commit()
     await db.refresh(new_sv)
@@ -287,11 +291,22 @@ async def upload_state_manual(
         db.add(sv)
         await db.flush()
 
+        # Stream straight to storage when state encryption is off; when on,
+        # envelope the whole blob first (#635). md5/state_size above are over the
+        # plaintext, which is what downloads/divergence checks compare.
+        from terrapod.crypto.state import encrypt_state_bytes, state_encryption_active
+
         storage = get_storage()
         key = state_key(str(ws.id), str(sv.id))
-        await storage.put_stream(
-            key, file_chunks(tmp_path), content_type="application/octet-stream"
-        )
+        if state_encryption_active():
+            plaintext = await asyncio.to_thread(read_file_bytes, tmp_path)
+            await storage.put(
+                key, await encrypt_state_bytes(plaintext), content_type="application/octet-stream"
+            )
+        else:
+            await storage.put_stream(
+                key, file_chunks(tmp_path), content_type="application/octet-stream"
+            )
 
         await db.commit()
         await db.refresh(sv)

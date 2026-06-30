@@ -295,7 +295,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Security Hardening](docs/security-hardening.md) | Pod hardening defaults, secrets, network posture |
 | [Production Checklist](docs/production-checklist.md) | Pre-go-live checklist for a production deployment |
 | [Disaster Recovery](docs/disaster-recovery.md) | Break-glass state recovery, shipped DB backup CronJob + restore-verification DR drill, per-backend object-storage protection |
-| [Encryption at Rest](docs/encryption-at-rest.md) | Optional off-by-default app-layer (BYOK) envelope encryption of DB secrets — for no-/niche-CSP, bare-metal, or air-gapped deployments (static / Vault Transit / AWS KMS) |
+| [Encryption at Rest](docs/encryption-at-rest.md) | Optional off-by-default app-layer (BYOK) envelope encryption of DB secrets **and state files** — for no-/niche-CSP, bare-metal, or air-gapped deployments (static / Vault Transit / AWS KMS) |
 
 ---
 

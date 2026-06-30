@@ -72,6 +72,42 @@ class EncryptionService:
             )
         return envelope.decrypt(stored, dek)
 
+    # ── State-file (binary blob) path (#635) ──────────────────────────────────
+    #
+    # State files often carry secrets (any resource attribute the provider stored
+    # in plaintext), so when encryption is on we encrypt the state blob at rest
+    # too. Same DEK cache + versioning as the column path; only the wire format
+    # differs (binary TPENC1 vs the base64 string envelope). These are CPU-bound
+    # on potentially multi-MB buffers, so callers MUST offload them with
+    # asyncio.to_thread (CLAUDE.md #13) — they are kept synchronous here so the
+    # crypto stays simple and testable.
+
+    @property
+    def state_encryption_active(self) -> bool:
+        """True when new state writes should be encrypted (enabled + active DEK)."""
+        return self.enabled and self._active_version is not None
+
+    def encrypt_state(self, data: bytes) -> bytes:
+        """Encrypt a state blob when enabled; otherwise return it unchanged."""
+        if not self.state_encryption_active:
+            return data
+        assert self._active_version is not None
+        return envelope.encrypt_blob(data, self._deks[self._active_version], self._active_version)
+
+    def decrypt_state(self, blob: bytes) -> bytes:
+        """Decrypt a TPENC1 state blob; pass legacy plaintext blobs through unchanged."""
+        if not envelope.is_encrypted_blob(blob):
+            return blob
+        version = envelope.parse_blob_version(blob)
+        dek = self._deks.get(version)
+        if dek is None:
+            # Fail loud — never hand back ciphertext as if it were plaintext state.
+            raise RuntimeError(
+                f"cannot decrypt state: no DEK for version {version} "
+                "(wrong/rotated-away key, or encryption disabled before a decrypt pass)"
+            )
+        return envelope.decrypt_blob(blob, dek)
+
 
 _service: EncryptionService | None = None
 

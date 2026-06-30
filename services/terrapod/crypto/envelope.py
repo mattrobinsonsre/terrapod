@@ -77,3 +77,58 @@ def new_dek() -> bytes:
     import os
 
     return os.urandom(DEK_LEN)
+
+
+# ── Binary blob path (state files) ────────────────────────────────────────────
+#
+# State files are bytes, not small strings, so they get a compact *binary*
+# envelope instead of the base64 string form above:
+#
+#     b"TPENC1" | version(4, big-endian) | nonce(12) | ciphertext+tag
+#
+# The 6-byte magic distinguishes an encrypted blob from a legacy plaintext state
+# (terraform/tofu state is JSON, which always starts with ``{`` / whitespace, so
+# it can never collide with the ``TPENC1`` magic) — exactly like the string
+# ``tpenc:`` marker, so enabling/disabling stays a well-defined migration: a blob
+# without the magic is read back unchanged. A single AES-GCM tag covers the whole
+# state, so there is no chunk-reordering/truncation footgun — it decrypts whole or
+# fails whole.
+
+_BLOB_MAGIC = b"TPENC1"
+_BLOB_VER_LEN = 4
+
+
+def is_encrypted_blob(blob: bytes) -> bool:
+    """True if ``blob`` is an application-encrypted state envelope (vs plaintext)."""
+    return blob[: len(_BLOB_MAGIC)] == _BLOB_MAGIC
+
+
+def encrypt_blob(
+    plaintext: bytes, dek: bytes, dek_version: int, *, nonce: bytes | None = None
+) -> bytes:
+    """Encrypt ``plaintext`` bytes with ``dek`` (AES-256-GCM) into a binary envelope."""
+    if len(dek) != DEK_LEN:
+        raise ValueError(f"DEK must be {DEK_LEN} bytes, got {len(dek)}")
+    import os
+
+    n = nonce if nonce is not None else os.urandom(_NONCE_LEN)
+    ct = AESGCM(dek).encrypt(n, plaintext, None)
+    return _BLOB_MAGIC + dek_version.to_bytes(_BLOB_VER_LEN, "big") + n + ct
+
+
+def parse_blob_version(blob: bytes) -> int:
+    """Return the DEK version a binary blob was encrypted under."""
+    if not is_encrypted_blob(blob):
+        raise ValueError("not a TPENC1 blob")
+    start = len(_BLOB_MAGIC)
+    return int.from_bytes(blob[start : start + _BLOB_VER_LEN], "big")
+
+
+def decrypt_blob(blob: bytes, dek: bytes) -> bytes:
+    """Decrypt a ``TPENC1`` binary envelope with the matching ``dek``."""
+    if not is_encrypted_blob(blob):
+        raise ValueError("not a TPENC1 blob")
+    start = len(_BLOB_MAGIC) + _BLOB_VER_LEN
+    nonce = blob[start : start + _NONCE_LEN]
+    ct = blob[start + _NONCE_LEN :]
+    return AESGCM(dek).decrypt(nonce, ct, None)

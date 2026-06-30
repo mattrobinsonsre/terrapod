@@ -17,24 +17,45 @@ Postgres, so a leaked database dump exposes ciphertext, not plaintext. The key
 that protects them is held by a key manager you choose — "we hold the key, not
 just the platform."
 
-## What's encrypted (Phase 1)
+## What's encrypted
 
-Application-layer encryption covers **DB-stored secrets**:
+The same master switch (`encryption.enabled`) covers two kinds of secret at rest.
+
+**DB-stored secrets** (envelope-encrypted *before* they reach Postgres):
 
 - the **CA private key** (`certificate_authority.ca_key_pem`) — the single most sensitive blob;
 - **workspace + variable-set variable values** (`variables.value`, `variable_set_variables.value`) — this also covers catalog inputs, which are stored as workspace variables;
 - **VCS connection credentials** (`vcs_connections.token` — GitHub App PEM / GitLab PAT) and the per-connection **webhook secret** (`vcs_connections.webhook_secret`);
 - **notification tokens** (`notification_configurations.token`).
 
-**State files are out of scope** (Phase 2): they need a decrypting download proxy
-and chunked streaming; keep them protected by object-store at-rest encryption.
+**State files** (envelope-encrypted *before* they reach object storage) — state
+routinely contains secrets (any attribute a provider persisted in plaintext), so
+when encryption is on, new state writes are encrypted too. Because the stored
+object is then ciphertext, the runner's state download switches from a presigned
+redirect to an **API-proxied decrypt** (the CLI's `cloud`-backend download +
+manual upload + rollback already go through the API, so those just decrypt/encrypt
+in place). The integrity metadata (`md5`, `sha256`, `serial`, `state_size`) is
+always computed over the **plaintext**, so divergence detection and the TFE
+protocol are unaffected.
+
+> **State encryption buffers, it doesn't stream.** A state blob is sealed under a
+> single AES-GCM tag (so it decrypts whole or fails whole — no chunk-reordering
+> footgun), which means the encrypt/decrypt path holds the whole state file in
+> memory (off the event loop) instead of streaming it. For the typical few-MB
+> state this is a non-issue; if you have very large state *and* a CSP that
+> already encrypts the bucket, prefer leaving state encryption to the object
+> store. The plaintext-streaming path is unchanged when encryption is off (the
+> default). (The plan binary + plan-JSON artifacts are not yet app-encrypted —
+> keep object-store SSE for those.)
 
 Encrypted columns are `TEXT` (the one length-bounded column, `webhook_secret`,
 was widened `VARCHAR(255)→TEXT` so an envelope can never overflow it). Values
 written **before** you enable encryption stay readable — they pass through
 untouched until re-written or migrated — so enabling/disabling is a migration,
-not a hard cutover. Encrypted columns are never indexed or unique-constrained
-(ciphertext is non-deterministic).
+not a hard cutover. The same is true of state: state versions written before you
+enabled encryption stay readable (plaintext blobs pass through), and each new
+apply writes an encrypted version. Encrypted columns are never indexed or
+unique-constrained (ciphertext is non-deterministic).
 
 ## How it works — envelope encryption
 

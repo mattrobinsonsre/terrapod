@@ -1699,6 +1699,12 @@ async def download_state(
     except Exception:
         raise HTTPException(status_code=404, detail="State data not yet uploaded") from None
 
+    # Decrypt if app-layer state encryption was on when this version was written
+    # (#635). Legacy/plaintext blobs pass straight through.
+    from terrapod.crypto.state import decrypt_state_bytes
+
+    data = await decrypt_state_bytes(data)
+
     return Response(content=data, media_type="application/json")
 
 
@@ -1993,10 +1999,16 @@ async def upload_state_content(
             detail=f"md5 mismatch: client declared {sv.md5} but received bytes hash to {computed_md5}",
         )
 
-    # Store in object storage (encryption at rest delegated to storage backend)
+    # Store in object storage. Storage-backend (CSP) at-rest encryption is the
+    # baseline; when optional app-layer state encryption is on (#635) we envelope
+    # the blob here first (md5/state_size above are over the plaintext, which is
+    # what the TFE protocol + divergence checks compare). Passthrough when off.
+    from terrapod.crypto.state import encrypt_state_bytes
+
     storage = get_storage()
     key = state_key(str(sv.workspace_id), str(sv.id))
-    await storage.put(key, state_data, content_type="application/octet-stream")
+    stored_bytes = await encrypt_state_bytes(state_data)
+    await storage.put(key, stored_bytes, content_type="application/octet-stream")
 
     # Update metadata. md5 already verified above; record the trusted value.
     sv.state_size = len(state_data)

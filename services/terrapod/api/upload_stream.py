@@ -109,6 +109,18 @@ async def stream_to_tempfile(
         raise
 
 
+def read_file_bytes(path: str) -> bytes:
+    """Read a whole file into memory (sync — call via asyncio.to_thread).
+
+    Used by the state-encryption path (#635), which must envelope the whole blob
+    under a single AES-GCM tag and therefore cannot stream. Buffers the file, so
+    it's the one place the streaming guarantee is traded for encryption — only
+    taken when app-layer state encryption is explicitly enabled.
+    """
+    with open(path, "rb") as src:
+        return src.read()
+
+
 async def file_chunks(path: str, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]:
     """Yield a file's bytes in bounded chunks for ``storage.put_stream``.
 

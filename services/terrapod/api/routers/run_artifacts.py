@@ -35,7 +35,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_runner_for_run
-from terrapod.api.upload_stream import file_chunks, stream_to_tempfile
+from terrapod.api.upload_stream import file_chunks, read_file_bytes, stream_to_tempfile
 from terrapod.config import settings
 from terrapod.db.models import Run, StateVersion, Workspace
 from terrapod.db.session import get_db
@@ -162,7 +162,7 @@ async def download_state(
     run_id: str,
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> RedirectResponse:
+) -> Response:
     """Download the current state for the run's workspace."""
     require_runner_for_run(user, run_id)
     run = await _get_run(run_id, db)
@@ -179,6 +179,17 @@ async def download_state(
 
     storage = get_storage()
     key = state_key(str(run.workspace_id), str(sv.id))
+
+    # When app-layer state encryption is on (#635) the object is ciphertext, so a
+    # presigned redirect would hand the runner an unreadable blob — proxy it
+    # through the API and decrypt instead. When off (the default) keep the
+    # zero-copy presigned redirect: no behaviour change for the common case.
+    from terrapod.crypto.state import decrypt_state_bytes, state_encryption_active
+
+    if state_encryption_active():
+        data = await decrypt_state_bytes(await storage.get(key))
+        return Response(content=data, media_type="application/octet-stream")
+
     url = await storage.presigned_get_url(key)
     return RedirectResponse(url=url.url, status_code=302)
 
@@ -553,11 +564,25 @@ async def _persist_runner_state(
         await db.rollback()
         raise HTTPException(status_code=409, detail=_existing_serial_msg) from None
 
-    # Store at canonical key (same format used by download_state). Stream the
-    # tempfile straight into storage — constant memory, never re-buffered.
+    # Store at canonical key (same format used by download_state). With state
+    # encryption off (default) stream the tempfile straight into storage —
+    # constant memory, never re-buffered. With it on (#635) the blob must be
+    # enveloped first; read + encrypt off the event loop, then store the
+    # ciphertext (md5/sha256/state_size above are over the plaintext, which the
+    # divergence checks compare).
+    from terrapod.crypto.state import encrypt_state_bytes, state_encryption_active
+
     storage = get_storage()
     key = state_key(str(run.workspace_id), str(sv.id))
-    await storage.put_stream(key, file_chunks(tmp_path), content_type="application/octet-stream")
+    if state_encryption_active():
+        plaintext = await asyncio.to_thread(read_file_bytes, tmp_path)
+        await storage.put(
+            key, await encrypt_state_bytes(plaintext), content_type="application/octet-stream"
+        )
+    else:
+        await storage.put_stream(
+            key, file_chunks(tmp_path), content_type="application/octet-stream"
+        )
 
     # Clear state_diverged flag on successful state upload
     ws = await db.get(Workspace, run.workspace_id)

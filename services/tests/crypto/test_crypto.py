@@ -340,3 +340,140 @@ def test_plan_row_encrypt_and_decrypt_paths():
 
     # decrypt: already plaintext → skip
     assert _plan_row("plain", "decrypt", active, svc) == (None, None)
+
+
+# ── State-file binary blob envelope (#635) ────────────────────────────────────
+
+
+def test_blob_round_trip():
+    dek = envelope.new_dek()
+    blob = envelope.encrypt_blob(b'{"version":4,"serial":1}', dek, 3)
+    assert envelope.is_encrypted_blob(blob)
+    assert blob.startswith(b"TPENC1")
+    assert envelope.parse_blob_version(blob) == 3
+    assert envelope.decrypt_blob(blob, dek) == b'{"version":4,"serial":1}'
+
+
+def test_is_encrypted_blob_rejects_plaintext_state():
+    # Real tfstate is JSON — starts with '{' / whitespace, never the magic.
+    assert not envelope.is_encrypted_blob(b'{"version": 4}')
+    assert not envelope.is_encrypted_blob(b"")
+    assert not envelope.is_encrypted_blob(b"  \n{")
+
+
+def test_blob_decrypt_wrong_key_fails():
+    dek = envelope.new_dek()
+    blob = envelope.encrypt_blob(b"secret-state", dek, 1)
+    with pytest.raises(InvalidTag):
+        envelope.decrypt_blob(blob, envelope.new_dek())
+
+
+def test_blob_decrypt_tampered_fails():
+    dek = envelope.new_dek()
+    blob = bytearray(envelope.encrypt_blob(b"secret-state", dek, 1))
+    blob[-1] ^= 0x01  # flip a ciphertext bit
+    with pytest.raises(InvalidTag):
+        envelope.decrypt_blob(bytes(blob), dek)
+
+
+def test_blob_empty_state_round_trips():
+    dek = envelope.new_dek()
+    blob = envelope.encrypt_blob(b"", dek, 1)
+    assert envelope.is_encrypted_blob(blob)
+    assert envelope.decrypt_blob(blob, dek) == b""
+
+
+# ── EncryptionService state path (#635) ───────────────────────────────────────
+
+
+def test_service_state_disabled_is_passthrough():
+    svc = EncryptionService()  # disabled
+    assert svc.state_encryption_active is False
+    assert svc.encrypt_state(b"plain-state") == b"plain-state"
+    assert svc.decrypt_state(b"plain-state") == b"plain-state"
+
+
+def test_service_state_round_trip_when_enabled():
+    svc = _enabled_service()
+    assert svc.state_encryption_active is True
+    enc = svc.encrypt_state(b'{"serial": 7}')
+    assert envelope.is_encrypted_blob(enc)
+    assert svc.decrypt_state(enc) == b'{"serial": 7}'
+
+
+def test_service_decrypt_state_legacy_plaintext_passthrough():
+    # An enabled service must still read pre-encryption (plaintext) state blobs.
+    svc = _enabled_service()
+    assert svc.decrypt_state(b'{"legacy": true}') == b'{"legacy": true}'
+
+
+def test_service_decrypt_state_unknown_version_fails_loud():
+    svc = _enabled_service()
+    foreign = envelope.encrypt_blob(b"x", envelope.new_dek(), 9)  # version not in cache
+    with pytest.raises(RuntimeError):
+        svc.decrypt_state(foreign)
+
+
+def test_service_disabled_can_still_decrypt_loaded_state():
+    # Mid-disable migration: encrypt passthrough, but loaded blobs still decrypt.
+    svc = _enabled_service()
+    enc = svc.encrypt_state(b"s")
+    svc.enabled = False
+    assert svc.state_encryption_active is False
+    assert svc.encrypt_state(b"new") == b"new"  # no longer encrypts
+    assert svc.decrypt_state(enc) == b"s"  # still reads old ciphertext
+
+
+# ── Async state helpers (crypto/state.py, #635) ───────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_state_async_helpers_round_trip(monkeypatch):
+    from terrapod.crypto import service as svc_mod
+    from terrapod.crypto import state as state_mod
+
+    svc = _enabled_service()
+    svc_mod._service = svc
+    assert state_mod.state_encryption_active() is True
+    enc = await state_mod.encrypt_state_bytes(b'{"k":"v"}')
+    assert enc.startswith(b"TPENC1")
+    assert await state_mod.decrypt_state_bytes(enc) == b'{"k":"v"}'
+    svc_mod.reset_encryption_for_tests()
+
+
+@pytest.mark.asyncio
+async def test_state_async_helpers_passthrough_when_disabled(monkeypatch):
+    from terrapod.crypto import service as svc_mod
+    from terrapod.crypto import state as state_mod
+
+    svc_mod.reset_encryption_for_tests()  # disabled passthrough singleton
+    assert state_mod.state_encryption_active() is False
+    assert await state_mod.encrypt_state_bytes(b"plain") == b"plain"
+    assert await state_mod.decrypt_state_bytes(b"plain") == b"plain"
+
+
+def test_every_state_io_router_routes_through_crypto_helpers():
+    """Death-by-encryption tripwire: every router that reads or writes state
+    objects MUST go through the state-crypto helpers, or a state file could be
+    written encrypted and never decrypted on read (or vice-versa). If a future
+    change adds a raw state put/get that bypasses the helpers, this fails loudly.
+
+    We assert each state-I/O router references the encrypt+decrypt helpers; the
+    behavioural round-trip is proven by the service/helper tests above.
+    """
+    import pathlib
+
+    import terrapod
+
+    root = pathlib.Path(terrapod.__path__[0]) / "api" / "routers"
+    # (file, must encrypt on write, must decrypt on read)
+    expectations = {
+        "tfe_v2.py": ("encrypt_state_bytes", "decrypt_state_bytes"),
+        "run_artifacts.py": ("encrypt_state_bytes", "decrypt_state_bytes"),
+        "state_management.py": ("encrypt_state_bytes", "decrypt_state_bytes"),
+    }
+    for fname, needles in expectations.items():
+        src = (root / fname).read_text()
+        assert "state_key(" in src, f"{fname} no longer does state I/O — update this test"
+        for needle in needles:
+            assert needle in src, f"{fname} state I/O must route through {needle} (#635)"
