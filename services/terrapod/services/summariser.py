@@ -74,6 +74,26 @@ from terrapod.storage.keys import (
 
 logger = get_logger(__name__)
 
+# ── LiteLLM noise + resilience ────────────────────────────────────────────────
+#
+# LiteLLM is chatty by default (an INFO "LiteLLM completion() model=…" line on
+# every call) and emits provider-debug banners on errors — pure noise in our
+# logs since we wrap every call with our own structured logging. Quiet it.
+import logging as _logging  # noqa: E402
+
+litellm.suppress_debug_info = True
+_logging.getLogger("LiteLLM").setLevel(_logging.WARNING)
+
+# Bounded retry for the model call. Bedrock (and any provider) occasionally
+# fails a connection instantly under concurrency — LiteLLM surfaces these as
+# `litellm.Timeout` with ~0s elapsed even though the model isn't slow. Almost
+# all calls succeed, so a couple of backed-off retries make the intermittent
+# blips self-heal instead of failing the (best-effort) summary and spamming the
+# log. LiteLLM retries its own transient classes (Timeout / APIConnectionError /
+# RateLimitError / InternalServerError / ServiceUnavailable); a 4xx is final and
+# not retried. Matches the "outbound calls use bounded retry" invariant.
+_LLM_NUM_RETRIES = 2  # → up to 3 attempts
+
 
 # --- Input retrieval ---------------------------------------------------------
 
@@ -830,6 +850,10 @@ def _build_litellm_kwargs(
         "max_tokens": max_output_tokens,
         "messages": messages,
         "timeout": cfg.request_timeout_seconds,
+        # Self-heal transient instant-failures (see _LLM_NUM_RETRIES). LiteLLM
+        # backs off between attempts and only retries its transient classes.
+        "num_retries": _LLM_NUM_RETRIES,
+        "retry_strategy": "exponential_backoff_retry",
     }
 
     if use_tools:

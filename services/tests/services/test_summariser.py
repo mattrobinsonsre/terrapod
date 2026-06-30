@@ -359,6 +359,35 @@ def test_build_litellm_kwargs_omits_role_when_unset():
         assert "aws_external_id" not in kw
 
 
+def test_build_litellm_kwargs_includes_bounded_retry():
+    """The model call must carry a bounded retry so transient instant-failures
+    (Bedrock surfaces these as litellm.Timeout with ~0s elapsed under
+    concurrency) self-heal instead of failing the best-effort summary."""
+    with (
+        patch.object(summariser.settings.ai_summary, "model", "bedrock/anthropic.claude-opus-4-8"),
+        patch.object(summariser.settings.ai_summary, "api_base", ""),
+        patch.object(summariser.settings.ai_summary.auth, "api_key", ""),
+        patch.object(summariser.settings.ai_summary.auth, "aws_role_arn", ""),
+    ):
+        kw = summariser._build_litellm_kwargs(
+            kind="plan_summary",
+            system_message="sys",
+            user_message="usr",
+            max_output_tokens=100,
+        )
+        assert kw["num_retries"] == summariser._LLM_NUM_RETRIES >= 1
+        assert kw["retry_strategy"] == "exponential_backoff_retry"
+
+
+def test_litellm_logging_quieted_at_import():
+    """LiteLLM's chatty INFO logging is turned down so the per-call
+    'LiteLLM completion() model=…' banner stops flooding our logs."""
+    import logging
+
+    assert logging.getLogger("LiteLLM").level >= logging.WARNING
+    assert summariser.litellm.suppress_debug_info is True
+
+
 def test_build_litellm_kwargs_includes_tool_choice_for_plan_summary():
     """Tool-calling is the canonical structured-output path. The kwargs
     must include the submit_plan_summary tool AND force it via
