@@ -1019,6 +1019,32 @@ class MetricsConfig(BaseModel):
     )
 
 
+class BackupConfig(BaseModel):
+    """Logical PostgreSQL backup settings (consumed by terrapod.cli.backup).
+
+    The backup CronJob (off by default in the chart) runs ``pg_dump`` and
+    streams the dump to the configured object store under ``prefix``. This is a
+    logical dump — RPO is the dump interval, not point-in-time — and is the
+    baseline floor, not a replacement for RDS snapshots / WAL-G / pgBackRest.
+    See docs/disaster-recovery.md.
+    """
+
+    prefix: str = Field(
+        default="backups/",
+        description="Object-store key prefix backups are written under",
+    )
+    retention_keep: int = Field(
+        default=0,
+        ge=0,
+        description="Number of most-recent backups to keep (0 = keep all)",
+    )
+    retention_days: int = Field(
+        default=0,
+        ge=0,
+        description="Delete backups older than this many days (0 = disabled)",
+    )
+
+
 # --- AI Plan Summary Configuration ---
 
 
@@ -1486,6 +1512,9 @@ class Settings(BaseSettings):
 
     # Artifact Retention
     artifact_retention: ArtifactRetentionConfig = Field(default_factory=ArtifactRetentionConfig)
+
+    # Logical PostgreSQL backup (terrapod.cli.backup; CronJob off by default)
+    backup: BackupConfig = Field(default_factory=BackupConfig)
 
     # Runner artifact upload limits (API-side enforcement)
     runner_artifacts: RunnerArtifactsConfig = Field(default_factory=RunnerArtifactsConfig)

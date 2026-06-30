@@ -1,0 +1,148 @@
+{{- if ne .Values.api.enabled false }}
+{{- if and .Values.backup .Values.backup.enabled .Values.backup.restoreVerify .Values.backup.restoreVerify.enabled }}
+{{- $fs := eq .Values.api.config.storage.backend "filesystem" }}
+{{- $pgImage := .Values.backup.restoreVerify.postgresImage | default "postgres:17-alpine" }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "terrapod.fullname" . }}-restore-verify
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: restore-verify
+spec:
+  # DR drill — restores the latest backup into a THROWAWAY sidecar Postgres
+  # (never the live database) and asserts core invariants. Run on demand with:
+  #   kubectl create job --from=cronjob/{{ include "terrapod.fullname" . }}-restore-verify <name>
+  schedule: {{ .Values.backup.restoreVerify.schedule | default "0 4 * * 0" | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.backup.restoreVerify.successfulJobsHistoryLimit | default 3 }}
+  failedJobsHistoryLimit: {{ .Values.backup.restoreVerify.failedJobsHistoryLimit | default 3 }}
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.backup.restoreVerify.backoffLimit | default 1 }}
+      template:
+        metadata:
+          labels:
+            {{- include "terrapod.labels" . | nindent 12 }}
+            app.kubernetes.io/component: restore-verify
+        spec:
+          {{- with .Values.global.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          # API ServiceAccount → same cloud workload identity to READ object
+          # storage. The drill never writes to the store or touches the live DB.
+          serviceAccountName: {{ include "terrapod.serviceAccountName" . }}
+          restartPolicy: Never
+          securityContext:
+            {{- toYaml .Values.api.podSecurityContext | nindent 12 }}
+          initContainers:
+            {{- if eq (include "terrapod.caBundle.enabled" .) "true" }}
+            {{- include "terrapod.caBundle.initContainer" (dict "root" . "image" (include "terrapod.api.image" .) "pullPolicy" .Values.api.image.pullPolicy) | nindent 12 }}
+            {{- end }}
+            # Native sidecar (restartPolicy: Always) — throwaway Postgres the
+            # backup is restored INTO. Auto-terminates when the main container
+            # exits. Trust auth on loopback only; data on an emptyDir.
+            - name: throwaway-postgres
+              image: {{ $pgImage }}
+              imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+              restartPolicy: Always
+              env:
+                - name: POSTGRES_HOST_AUTH_METHOD
+                  value: "trust"
+                - name: PGDATA
+                  value: /var/lib/postgresql/data/pgdata
+              ports:
+                - containerPort: 5432
+              volumeMounts:
+                - name: pgdata
+                  mountPath: /var/lib/postgresql/data
+                - name: pgrun
+                  mountPath: /var/run/postgresql
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 70
+                runAsGroup: 70
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: false
+                capabilities:
+                  drop: ["ALL"]
+                seccompProfile:
+                  type: RuntimeDefault
+              resources:
+                {{- toYaml (.Values.backup.restoreVerify.postgresResources | default dict) | nindent 16 }}
+          containers:
+            - name: restore-verify
+              image: {{ include "terrapod.api.image" . }}
+              imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+              command:
+                - python
+                - -m
+                - terrapod.cli.restore_verify
+              env:
+                - name: TP_RESTORE_TARGET_URL
+                  value: "postgresql://postgres@localhost:5432/postgres"
+                - name: TERRAPOD_STORAGE__FILESYSTEM__HMAC_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "terrapod.fullname" . }}-storage
+                      key: hmac-secret
+                      optional: true
+                {{- include "terrapod.proxyEnv" . | nindent 16 }}
+                {{- include "terrapod.caBundle.env" . | nindent 16 }}
+              volumeMounts:
+                - name: config
+                  mountPath: /etc/terrapod
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+                {{- if .Values.api.ephemeralStorage.enabled }}
+                - name: restore-tmpdir
+                  mountPath: {{ .Values.api.ephemeralStorage.mountPath | default "/var/lib/terrapod/tmp" }}
+                {{- end }}
+                {{- if $fs }}
+                - name: storage
+                  mountPath: {{ .Values.api.config.storage.filesystem.root_dir }}
+                  readOnly: true
+                {{- end }}
+                {{- include "terrapod.caBundle.volumeMounts" . | nindent 16 }}
+              resources:
+                {{- toYaml (.Values.backup.restoreVerify.resources | default dict) | nindent 16 }}
+              securityContext:
+                {{- toYaml .Values.api.containerSecurityContext | nindent 16 }}
+          volumes:
+            - name: config
+              configMap:
+                name: {{ include "terrapod.fullname" . }}-api-config
+            - name: tmp
+              emptyDir: {}
+            - name: pgdata
+              emptyDir: {}
+            - name: pgrun
+              emptyDir: {}
+            {{- if .Values.api.ephemeralStorage.enabled }}
+            - name: restore-tmpdir
+              ephemeral:
+                volumeClaimTemplate:
+                  spec:
+                    accessModes: ["ReadWriteOnce"]
+                    {{- if .Values.api.ephemeralStorage.storageClass }}
+                    storageClassName: {{ .Values.api.ephemeralStorage.storageClass | quote }}
+                    {{- end }}
+                    resources:
+                      requests:
+                        storage: {{ .Values.api.ephemeralStorage.size | default "10Gi" | quote }}
+            {{- end }}
+            {{- if $fs }}
+            - name: storage
+              {{- if .Values.storage.filesystem.persistence.enabled }}
+              persistentVolumeClaim:
+                claimName: {{ include "terrapod.fullname" . }}-storage
+              {{- else }}
+              emptyDir: {}
+              {{- end }}
+            {{- end }}
+            {{- include "terrapod.caBundle.volumes" . | nindent 12 }}
+{{- end }}
+{{- end }}

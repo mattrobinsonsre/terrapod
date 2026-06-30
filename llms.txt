@@ -78,6 +78,8 @@ How each capability is turned on. **Platform-level** features are Helm values un
 | Prometheus metrics | `api.config.metrics.enabled` | [monitoring.md](docs/monitoring.md) |
 | Shipped Grafana dashboard | `api.config.metrics.grafanaDashboards.enabled` (sidecar auto-import; off by default) | [monitoring.md](docs/monitoring.md#grafana-dashboards) |
 | Shipped Prometheus alert rules | `api.config.metrics.prometheusRule.enabled` (off by default; each alert links a runbook) | [monitoring.md](docs/monitoring.md#alerting-shipped-prometheusrule) |
+| Logical DB backup CronJob | `backup.enabled` (off by default; `pg_dump` → object store, retention) | [disaster-recovery.md](docs/disaster-recovery.md#shipped-backup-automation-the-baseline-floor) |
+| Restore-verification DR drill | `backup.restoreVerify.enabled` (off by default; restores into a throwaway Postgres + asserts invariants) | [disaster-recovery.md](docs/disaster-recovery.md#restore-verification-drill-dr-drill) |
 | SSO (OIDC/SAML) | `api.config.auth.sso.*` + client secrets via K8s Secret `secretKeyRef` | [authentication.md](docs/authentication.md) |
 | VCS integration | Admin creates a VCS connection, then sets the workspace's `vcs_*` fields | [vcs-integration.md](docs/vcs-integration.md) |
 | Drift detection | Per-workspace setting (enable + interval) via API/UI/provider | [drift-detection.md](docs/drift-detection.md) |

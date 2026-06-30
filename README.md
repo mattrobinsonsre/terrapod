@@ -294,7 +294,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Forward Proxy & Custom CA](docs/deployment-proxy.md) | Route all outbound HTTP(S) through a corporate proxy and trust a private/MITM CA, across every component including runner Jobs |
 | [Security Hardening](docs/security-hardening.md) | Pod hardening defaults, secrets, network posture |
 | [Production Checklist](docs/production-checklist.md) | Pre-go-live checklist for a production deployment |
-| [Disaster Recovery](docs/disaster-recovery.md) | Break-glass state recovery from object storage |
+| [Disaster Recovery](docs/disaster-recovery.md) | Break-glass state recovery, shipped DB backup CronJob + restore-verification DR drill, per-backend object-storage protection |
 
 ---
 

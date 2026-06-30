@@ -546,6 +546,28 @@ jobs:
               --set redis.url=redis://redis:6379)
           echo "$stock" | grep -q "kind: PrometheusRule" && { echo "FAIL: PrometheusRule rendered by default (should be opt-in)"; exit 1; }
           echo "observability bundle renders OK and is off by default (#546)"
+      - name: Backup + DR-drill CronJobs render and are off by default (#545)
+        run: |
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            template terrapod helm/terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 \
+              --set backup.enabled=true \
+              --set backup.restoreVerify.enabled=true)
+          echo "$out" | grep -q "kind: CronJob" || { echo "FAIL: backup CronJob not rendered"; exit 1; }
+          echo "$out" | grep -q "terrapod.cli.backup" || { echo "FAIL: backup entrypoint missing"; exit 1; }
+          echo "$out" | grep -q "terrapod.cli.restore_verify" || { echo "FAIL: restore-verify entrypoint missing"; exit 1; }
+          echo "$out" | grep -q "restartPolicy: Always" || { echo "FAIL: throwaway-postgres native sidecar missing"; exit 1; }
+          echo "$out" | grep -q "component: backup" || { echo "FAIL: backup component label missing"; exit 1; }
+          # config.yaml carries the backup settings (config-channel contract).
+          echo "$out" | grep -q "retention_keep:" || { echo "FAIL: backup config not rendered into config.yaml"; exit 1; }
+          # Off by default.
+          stock=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            template terrapod helm/terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379)
+          echo "$stock" | grep -q "component: backup" && { echo "FAIL: backup CronJob rendered by default (should be opt-in)"; exit 1; }
+          echo "backup + DR-drill CronJobs render OK and are off by default (#545)"
 
   # ── Config-channel contract (#617) ────────────────────
   # Renders the chart (every values profile) and parses the rendered ConfigMaps

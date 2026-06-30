@@ -686,6 +686,43 @@ api:
     #   iam.gke.io/gcp-service-account: terrapod@project.iam.gserviceaccount.com
     annotations: {}
 
+# ── Logical PostgreSQL backup + DR drill (#545) ───────────────────────────────
+# OFF by default. A standard deployment already has both halves a backup needs
+# (a Postgres URL + an object-storage backend), so enabling this needs no new
+# infra or credentials: a CronJob runs `pg_dump` and streams the dump to the
+# configured object store under `prefix`, inheriting the bucket's at-rest
+# encryption and the API ServiceAccount's cloud workload identity.
+#
+# This is a LOGICAL dump — RPO is the dump interval, not point-in-time — and is
+# the baseline floor, not a replacement for RDS snapshots / WAL-G / pgBackRest
+# for serious-RPO deployments. To keep the only backup out of the app data's
+# blast radius, enable object-store cross-region replication on the destination
+# bucket (see docs/disaster-recovery.md) rather than dual-writing app-side.
+backup:
+  enabled: false
+  schedule: "0 2 * * *"          # daily at 02:00 (cluster TZ)
+  prefix: "backups/"             # object-store key prefix for dumps
+  retention:
+    keep: 0                      # keep N most-recent backups (0 = keep all)
+    days: 0                      # delete backups older than N days (0 = disabled)
+  backoffLimit: 2
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  resources: {}
+  # DR drill — restore the latest backup into a THROWAWAY sidecar Postgres
+  # (never the live DB) and assert core invariants. A tested restore beats a
+  # documented one. Run on demand with:
+  #   kubectl create job --from=cronjob/<release>-terrapod-restore-verify drill-now
+  restoreVerify:
+    enabled: false
+    schedule: "0 4 * * 0"        # weekly, Sundays at 04:00
+    postgresImage: "postgres:17-alpine"
+    backoffLimit: 1
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    resources: {}
+    postgresResources: {}
+
 # ── Web UI (Next.js) ──────────────────────────────────────────────────────────
 # The web frontend is the BFF (Backend-For-Frontend): all browser, CLI, and
 # listener traffic enters through it and is proxied to the API. The Ingress

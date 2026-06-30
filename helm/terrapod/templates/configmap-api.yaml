@@ -332,6 +332,12 @@ data:
       binary_cache_retention_days: {{ .Values.api.config.artifact_retention.binary_cache_retention_days | default 30 }}
       module_overrides_retention_days: {{ .Values.api.config.artifact_retention.module_overrides_retention_days | default 14 }}
     {{- end }}
+    {{- if .Values.backup }}
+    backup:
+      prefix: {{ .Values.backup.prefix | default "backups/" | quote }}
+      retention_keep: {{ (.Values.backup.retention).keep | default 0 }}
+      retention_days: {{ (.Values.backup.retention).days | default 0 }}
+    {{- end }}
     {{- if .Values.api.config.ai_summary }}
     ai_summary:
       enabled: {{ .Values.api.config.ai_summary.enabled | default false }}

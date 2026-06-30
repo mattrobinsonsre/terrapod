@@ -1198,3 +1198,42 @@ Fires from `TerrapodHighBinaryCacheMissRate` (info): the terraform/tofu binary c
 
 - The hit ratio recovers above 50% as warmed/again-cached versions are served.
 - Per-tool: `sum by (tool) (rate(terrapod_binary_cache_requests_total{result="hit"}[1h]))` rises.
+
+---
+
+## DR restore drill failed
+
+The shipped restore-verify CronJob (`<release>-terrapod-restore-verify`) restores the latest backup into a throwaway sidecar Postgres and asserts core invariants. A failed Job means **the latest backup did not restore cleanly** — treat it as urgent: your backups may not be recoverable.
+
+### Symptoms
+
+- The `restore-verify` Job is in `Failed` state (surfaced by kube-state-metrics / your Job-failure alerts).
+- Job logs end with `DR drill FAILED:` and one or more `✗` invariant lines, **or** never get that far (download / restore error).
+
+### Diagnosis
+
+```bash
+kubectl logs job/<failed-restore-verify-job> -n <ns>
+```
+
+Read the failure mode:
+- **`TP_RESTORE_TARGET_URL must not equal DATABASE_URL — refusing`** — misconfiguration: the drill was pointed at the live DB. It refuses by design. Fix the chart values (the bundled CronJob always targets the sidecar; this only happens with a hand-edited Job).
+- **`no backups found under 'backups/'`** — the backup CronJob hasn't produced a dump (check `backup.enabled`, its schedule, and that its Jobs are succeeding). Without a backup there is nothing to restore.
+- **`pg_restore exited N`** (warning) followed by invariant failures — the dump is corrupt or partial. Check the **backup** Job's logs for a truncated `pg_dump` (OOM, timeout, storage write error).
+- **`certificate_authority is empty` / `workspaces not queryable`** — the restore ran but the data isn't there: suspect a `pg_dump` that captured an empty/wrong database, or a dump format mismatch (the `pg_dump`/`pg_restore` client major must be ≥ the server major).
+- **`state version(s) in DB but no readable object under state/`** — the DB restored but the object store the drill reads is missing state objects: the DB snapshot and object store are badly time-skewed, or the store/credentials are wrong.
+
+### Resolution
+
+1. Fix the root cause surfaced above (most often: the backup Job itself is failing/truncating — fix that first, then a fresh backup gives the drill something restorable).
+2. If `pg_dump`/`pg_restore` version mismatch: align the API image's `postgresql-client` major with your server major (the client must be ≥ server).
+3. Re-run the drill on demand once a good backup exists:
+   ```bash
+   kubectl create job --from=cronjob/<release>-terrapod-restore-verify drill-now -n <ns>
+   kubectl logs -f job/drill-now -n <ns>
+   ```
+
+### Verification
+
+- A fresh drill logs `DR drill PASSED — backup <key> restored and verified` and the Job completes successfully.
+- The backup CronJob's most recent Job is `Complete` and a new `backups/<ts>.dump` object exists.

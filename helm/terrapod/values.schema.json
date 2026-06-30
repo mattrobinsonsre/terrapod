@@ -282,6 +282,42 @@
       }
     },
 
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "schedule": { "type": "string" },
+        "prefix": { "type": "string" },
+        "retention": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "keep": { "type": "integer", "minimum": 0 },
+            "days": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "backoffLimit": { "type": "integer", "minimum": 0 },
+        "successfulJobsHistoryLimit": { "type": "integer", "minimum": 0 },
+        "failedJobsHistoryLimit": { "type": "integer", "minimum": 0 },
+        "resources": { "type": "object" },
+        "restoreVerify": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "schedule": { "type": "string" },
+            "postgresImage": { "type": "string" },
+            "backoffLimit": { "type": "integer", "minimum": 0 },
+            "successfulJobsHistoryLimit": { "type": "integer", "minimum": 0 },
+            "failedJobsHistoryLimit": { "type": "integer", "minimum": 0 },
+            "resources": { "type": "object" },
+            "postgresResources": { "type": "object" }
+          }
+        }
+      }
+    },
+
     "postgresql": {
       "type": "object",
       "additionalProperties": false,

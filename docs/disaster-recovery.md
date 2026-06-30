@@ -182,3 +182,89 @@ state is self-consistent (extra orphaned objects are harmless). Keep the two
 backups loosely time-aligned to minimise orphans. The CA keypair lives in
 PostgreSQL, so a DB restore re-establishes listener trust without re-issuing
 certificates.
+
+### Shipped backup automation (the baseline floor)
+
+If you don't already run RDS snapshots / WAL-G / pgBackRest, the chart ships an
+**optional, off-by-default** logical-backup CronJob. A standard deployment
+already has both halves it needs — a Postgres URL and an object-storage backend
+— so enabling it needs no new infrastructure or credentials:
+
+```yaml
+backup:
+  enabled: true
+  schedule: "0 2 * * *"     # daily at 02:00 (cluster TZ)
+  prefix: "backups/"        # written under this key in the app object store
+  retention:
+    keep: 14                # keep the 14 most-recent dumps (0 = keep all)
+    days: 30                # and/or delete dumps older than 30 days (0 = off)
+```
+
+The CronJob runs `pg_dump` (custom format) and streams the dump to
+`<prefix><timestamp>.dump` in the configured object store, inheriting the
+bucket's at-rest encryption and the API ServiceAccount's cloud workload
+identity. It works across S3 / Azure / GCS / filesystem and across
+static-password **and** cloud-IAM database auth (it mints the same short-lived
+token the API uses).
+
+This is a **logical** dump: RPO is the dump interval, not point-in-time. Treat
+it as the floor — for tighter RPO keep using RDS snapshots / WAL-G / pgBackRest
+(set `backup.enabled: false` and rely on those instead).
+
+**Keep the backup out of the app data's blast radius.** Rather than dual-writing
+app-side, enable object-store **cross-region/account replication** on the bucket
+so the dumps (and all state) land in a second location automatically — see the
+per-backend toggles below.
+
+### Object-storage protection per backend
+
+Object storage holds state, config tarballs, logs, registry artifacts **and**
+(when enabled) the DB dumps above. Turn on the provider's native protections:
+
+| Backend | Versioning (undo overwrite/delete) | Off-site copy |
+|---|---|---|
+| **AWS S3** | `aws s3api put-bucket-versioning --versioning-configuration Status=Enabled` | S3 Cross-Region Replication (CRR) to a bucket in another account/region |
+| **Azure Blob** | enable Blob versioning + soft-delete on the storage account | Object replication to a second account |
+| **GCS** | `gcloud storage buckets update gs://BUCKET --versioning` | Bucket cross-region/dual-region or `gcloud storage rsync` to a second bucket |
+
+Versioning protects against accidental overwrite/delete; replication protects
+against losing the whole bucket/region. Both are operator-managed (Terrapod
+never needs delete-then-recreate semantics on these objects).
+
+### Restore-verification drill (DR drill)
+
+A tested restore beats a documented one. The chart ships an optional
+**restore-verify** CronJob that restores the latest backup into a **throwaway
+sidecar Postgres** (never the live database) and asserts core invariants — the
+schema + CA load, workspaces resolve, and a state object downloads from the
+store. It exits non-zero on any failure, so it's a real green check:
+
+```yaml
+backup:
+  enabled: true
+  restoreVerify:
+    enabled: true
+    schedule: "0 4 * * 0"   # weekly DR drill, Sundays 04:00
+```
+
+Run it **on demand** any time:
+
+```bash
+kubectl create job --from=cronjob/<release>-terrapod-restore-verify drill-now -n <ns>
+kubectl logs -f job/drill-now -n <ns>
+```
+
+A failing drill is paged via the shipped alert path (the CronJob's Job failure
+surfaces through kube-state-metrics / your Job-failure alerts). See the
+[restore-failed runbook](runbooks.md#dr-restore-drill-failed).
+
+### Full restore (production)
+
+1. **Restore PostgreSQL first.** From an RDS/Azure snapshot, or from a logical
+   dump: `pg_restore --clean --if-exists -d "$DATABASE_URL" <dump>` (the dump
+   the CronJob wrote, fetched from `backups/` in object storage).
+2. **Point the new deployment at the restored object-storage bucket** via Helm
+   values (same bucket, or the replication target).
+3. **Bring up Terrapod.** The CA keypair came back with the DB, so listeners
+   re-establish trust on reconnect; Redis starts fresh. Confirm with the
+   on-demand drill above before declaring recovery complete.

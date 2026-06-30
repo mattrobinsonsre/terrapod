@@ -1,0 +1,145 @@
+{{- if ne .Values.api.enabled false }}
+{{- if and .Values.backup .Values.backup.enabled }}
+{{- $dbAuthMode := (.Values.api.config.database).auth_mode | default "password" }}
+{{- $dbIam := or (eq $dbAuthMode "aws_iam") (eq $dbAuthMode "gcp_iam") (eq $dbAuthMode "azure_ad") }}
+{{- $dbCa := or .Values.api.databaseCA.inline .Values.api.databaseCA.existingConfigMap }}
+{{- $fs := eq .Values.api.config.storage.backend "filesystem" }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "terrapod.fullname" . }}-backup
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.backup.schedule | default "0 2 * * *" | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.backup.successfulJobsHistoryLimit | default 3 }}
+  failedJobsHistoryLimit: {{ .Values.backup.failedJobsHistoryLimit | default 3 }}
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.backup.backoffLimit | default 2 }}
+      template:
+        metadata:
+          labels:
+            {{- include "terrapod.labels" . | nindent 12 }}
+            app.kubernetes.io/component: backup
+        spec:
+          {{- with .Values.global.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          # The backup runs under the API's ServiceAccount so it inherits the
+          # same cloud workload identity (IRSA / GKE WI / Azure WI) used to
+          # reach object storage — no separate credentials.
+          serviceAccountName: {{ include "terrapod.serviceAccountName" . }}
+          restartPolicy: Never
+          securityContext:
+            {{- toYaml .Values.api.podSecurityContext | nindent 12 }}
+          {{- if eq (include "terrapod.caBundle.enabled" .) "true" }}
+          initContainers:
+            {{- include "terrapod.caBundle.initContainer" (dict "root" . "image" (include "terrapod.api.image" .) "pullPolicy" .Values.api.image.pullPolicy) | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: backup
+              image: {{ include "terrapod.api.image" . }}
+              imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+              command:
+                - python
+                - -m
+                - terrapod.cli.backup
+              env:
+                - name: TERRAPOD_STORAGE__FILESYSTEM__HMAC_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "terrapod.fullname" . }}-storage
+                      key: hmac-secret
+                      optional: true
+                {{- $pgSecret := include "terrapod.postgresql.secretName" . }}
+                {{- if $pgSecret }}
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $pgSecret }}
+                      key: {{ include "terrapod.postgresql.secretKey" . }}
+                {{- else if .Values.postgresql.url }}
+                - name: DATABASE_URL
+                  value: {{ .Values.postgresql.url | quote }}
+                {{- end }}
+                {{- if $dbIam }}
+                - name: TP_DB_AUTH_MODE
+                  value: {{ $dbAuthMode | quote }}
+                - name: TP_DB_AWS_IAM_REGION
+                  value: {{ (.Values.api.config.database).aws_iam_region | default "" | quote }}
+                - name: TP_DB_SSL_MODE
+                  value: {{ (.Values.api.config.database).ssl_mode | default "" | quote }}
+                - name: TP_DB_SSL_ROOT_CERT
+                  {{- if $dbCa }}
+                  value: {{ printf "/etc/terrapod/db-ca/%s" (.Values.api.databaseCA.key | default "ca.pem") | quote }}
+                  {{- else }}
+                  value: {{ (.Values.api.config.database).ssl_root_cert | default "" | quote }}
+                  {{- end }}
+                {{- end }}
+                {{- include "terrapod.proxyEnv" . | nindent 16 }}
+                {{- include "terrapod.caBundle.env" . | nindent 16 }}
+              volumeMounts:
+                - name: config
+                  mountPath: /etc/terrapod
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+                {{- if .Values.api.ephemeralStorage.enabled }}
+                - name: backup-tmpdir
+                  mountPath: {{ .Values.api.ephemeralStorage.mountPath | default "/var/lib/terrapod/tmp" }}
+                {{- end }}
+                {{- if $fs }}
+                - name: storage
+                  mountPath: {{ .Values.api.config.storage.filesystem.root_dir }}
+                {{- end }}
+                {{- if and $dbIam $dbCa }}
+                - name: database-ca
+                  mountPath: /etc/terrapod/db-ca
+                  readOnly: true
+                {{- end }}
+                {{- include "terrapod.caBundle.volumeMounts" . | nindent 16 }}
+              resources:
+                {{- toYaml (.Values.backup.resources | default dict) | nindent 16 }}
+              securityContext:
+                {{- toYaml .Values.api.containerSecurityContext | nindent 16 }}
+          volumes:
+            - name: config
+              configMap:
+                name: {{ include "terrapod.fullname" . }}-api-config
+            - name: tmp
+              emptyDir: {}
+            {{- if .Values.api.ephemeralStorage.enabled }}
+            - name: backup-tmpdir
+              ephemeral:
+                volumeClaimTemplate:
+                  spec:
+                    accessModes: ["ReadWriteOnce"]
+                    {{- if .Values.api.ephemeralStorage.storageClass }}
+                    storageClassName: {{ .Values.api.ephemeralStorage.storageClass | quote }}
+                    {{- end }}
+                    resources:
+                      requests:
+                        storage: {{ .Values.api.ephemeralStorage.size | default "10Gi" | quote }}
+            {{- end }}
+            {{- if $fs }}
+            - name: storage
+              {{- if .Values.storage.filesystem.persistence.enabled }}
+              persistentVolumeClaim:
+                claimName: {{ include "terrapod.fullname" . }}-storage
+              {{- else }}
+              emptyDir: {}
+              {{- end }}
+            {{- end }}
+            {{- if and $dbIam $dbCa }}
+            - name: database-ca
+              configMap:
+                name: {{ .Values.api.databaseCA.existingConfigMap | default (printf "%s-database-ca" (include "terrapod.fullname" .)) }}
+            {{- end }}
+            {{- include "terrapod.caBundle.volumes" . | nindent 12 }}
+{{- end }}
+{{- end }}

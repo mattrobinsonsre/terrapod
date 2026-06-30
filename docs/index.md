@@ -130,7 +130,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Forward proxy & custom CA trust](deployment-proxy.md) | Route all outbound HTTP(S) through a corporate proxy and trust a private/MITM CA, across every component including runner Jobs |
 | [Security Hardening](security-hardening.md) | TLS, secrets management, network policies, rate limiting |
 | [Production Checklist](production-checklist.md) | Step-by-step checklist for go-live readiness |
-| [Disaster Recovery](disaster-recovery.md) | Break-glass state recovery from object storage |
+| [Disaster Recovery](disaster-recovery.md) | Break-glass state recovery, shipped DB backup CronJob + restore-verification DR drill, per-backend object-storage protection |
 | [API Reference](api-reference.md) | All API endpoints with examples |
 
 ---
