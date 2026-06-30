@@ -587,6 +587,26 @@ jobs:
               --set redis.url=redis://redis:6379)
           echo "$stock" | grep -q "component: preflight" && { echo "FAIL: preflight rendered by default (should be opt-in)"; exit 1; }
           echo "preflight Jobs render OK and are off by default (#571)"
+      - name: Encryption-at-rest config + secret wiring (#553)
+        run: |
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            template terrapod helm/terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 \
+              --set api.config.encryption.enabled=true \
+              --set api.config.encryption.existingSecret=tp-enc)
+          echo "$out" | grep -q "encryption:" || { echo "FAIL: encryption block not in config.yaml"; exit 1; }
+          echo "$out" | grep -q "TERRAPOD_ENCRYPTION__STATIC_KEY" || { echo "FAIL: static-key secretKeyRef missing"; exit 1; }
+          echo "$out" | grep -q "TERRAPOD_ENCRYPTION__VAULT_TOKEN" || { echo "FAIL: vault-token secretKeyRef missing"; exit 1; }
+          # Secret values never rendered into a ConfigMap.
+          echo "$out" | awk '/kind: ConfigMap/,/^---/' | grep -q "static_key\|vault_token" && { echo "FAIL: secret key leaked into ConfigMap"; exit 1; }
+          # Off by default — no encryption block enabled.
+          stock=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            template terrapod helm/terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379)
+          echo "$stock" | grep -A1 "encryption:" | grep -q "enabled: true" && { echo "FAIL: encryption enabled by default"; exit 1; }
+          echo "encryption-at-rest config + secret wiring OK and off by default (#553)"
 
   # ── Config-channel contract (#617) ────────────────────
   # Renders the chart (every values profile) and parses the rendered ConfigMaps

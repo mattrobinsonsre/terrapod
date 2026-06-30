@@ -31,8 +31,12 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Only the modules needed for migrations: db models + alembic config
+# Only the modules needed for migrations: db models + alembic config.
+# models.py imports terrapod.crypto.types (the EncryptedText column type), so the
+# crypto package must be present; its service/provider deps are import-lazy and
+# are never loaded during a migration run.
 COPY services/terrapod/db/ ./terrapod/db/
+COPY services/terrapod/crypto/ ./terrapod/crypto/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
 

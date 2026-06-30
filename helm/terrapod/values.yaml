@@ -569,6 +569,36 @@ api:
           grafana_dashboard: "1"
         annotations: {}
 
+    # Optional application-layer encryption at rest (#553). OFF by default.
+    #
+    # WHEN TO USE: for deployments WITHOUT a usable CSP at-rest encryption switch
+    # — bare-metal, on-prem, niche cloud, or air-gapped — where this is your path
+    # to encryption at rest. If your CSP already encrypts at rest (RDS/S3/Azure/
+    # GCS), prefer that; this is then belt-and-braces, not a requirement.
+    #
+    # Phase 1 encrypts DB-stored secrets (starting with the CA private key).
+    # KEK durability is the backend's job — and for `static` it is YOURS: losing
+    # the master key makes encrypted data unrecoverable. See
+    # docs/encryption-at-rest.md before enabling.
+    encryption:
+      enabled: false
+      # static (operator-held key, works anywhere) | vault_transit (CSP-agnostic,
+      # on-prem/air-gapped) | awskms (cloud belt-and-braces)
+      provider: static
+      # Vault Transit (provider: vault_transit)
+      vault_address: ""
+      vault_mount: transit
+      vault_key_name: terrapod
+      vault_namespace: ""
+      # AWS KMS (provider: awskms)
+      aws_kms_key_id: ""
+      aws_kms_region: ""
+      # Secret holding the static master key and/or Vault token, injected via
+      # secretKeyRef (NEVER a ConfigMap). Required for static + vault_transit.
+      existingSecret: ""
+      staticKeyKey: static_key
+      vaultTokenKey: vault_token
+
     # Artifact Retention — periodic cleanup of old artifacts from object storage.
     # When enabled, a background task runs at the configured interval and removes
     # artifacts that exceed their retention thresholds.  Cache entries (provider

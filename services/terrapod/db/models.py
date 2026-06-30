@@ -27,6 +27,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from terrapod.crypto.types import EncryptedText
+
 
 def generate_uuid7() -> uuid.UUID:
     """Generate a UUIDv7 (time-sortable UUID)."""
@@ -938,11 +940,34 @@ class CertificateAuthorityModel(Base):
         UUID(as_uuid=True), primary_key=True, default=generate_uuid7
     )
     ca_cert: Mapped[str] = mapped_column(Text, nullable=False)
-    # The CA private key as a PKCS8 PEM. This is NOT application-encrypted
-    # (the old column name `ca_key_encrypted` was misleading) — at-rest
-    # protection comes from database encryption (RDS/Azure/GCS-managed),
-    # the same model used for sensitive variables and VCS tokens.
-    ca_key_pem: Mapped[str] = mapped_column(Text, nullable=False)
+    # The CA private key as a PKCS8 PEM. Stored via EncryptedText (#553): when
+    # app-layer encryption at rest is enabled it is envelope-encrypted, otherwise
+    # it is plaintext and at-rest protection comes from the database's own
+    # encryption (RDS/Azure/GCS-managed). The DB column is still TEXT either way.
+    ca_key_pem: Mapped[str] = mapped_column(EncryptedText, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+
+
+class CryptoKey(Base):
+    """Wrapped data-encryption keys for app-layer encryption at rest (#553).
+
+    Each row is a DEK version, KEK-wrapped by the configured provider. The raw
+    DEK is never stored — it is unwrapped into memory at startup. ``canary`` is a
+    known plaintext encrypted under the DEK, verified on every boot.
+    """
+
+    __tablename__ = "crypto_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, unique=True)
+    wrapped_dek: Mapped[str] = mapped_column(Text, nullable=False)
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    canary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )

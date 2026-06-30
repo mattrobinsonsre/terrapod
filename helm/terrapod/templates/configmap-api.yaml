@@ -338,6 +338,19 @@ data:
       retention_keep: {{ (.Values.backup.retention).keep | default 0 }}
       retention_days: {{ (.Values.backup.retention).days | default 0 }}
     {{- end }}
+    {{- if .Values.api.config.encryption }}
+    # App-layer encryption at rest (#553) — non-secret config only; the static
+    # master key + Vault token arrive via secretKeyRef env, never here.
+    encryption:
+      enabled: {{ .Values.api.config.encryption.enabled | default false }}
+      provider: {{ .Values.api.config.encryption.provider | default "static" | quote }}
+      vault_address: {{ .Values.api.config.encryption.vault_address | default "" | quote }}
+      vault_mount: {{ .Values.api.config.encryption.vault_mount | default "transit" | quote }}
+      vault_key_name: {{ .Values.api.config.encryption.vault_key_name | default "terrapod" | quote }}
+      vault_namespace: {{ .Values.api.config.encryption.vault_namespace | default "" | quote }}
+      aws_kms_key_id: {{ .Values.api.config.encryption.aws_kms_key_id | default "" | quote }}
+      aws_kms_region: {{ .Values.api.config.encryption.aws_kms_region | default "" | quote }}
+    {{- end }}
     {{- if .Values.api.config.ai_summary }}
     ai_summary:
       enabled: {{ .Values.api.config.ai_summary.enabled | default false }}

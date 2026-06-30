@@ -109,6 +109,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Drift Detection](drift-detection.md) | Scheduled plan-only runs to detect infrastructure drift |
 | [Drift Ignore Rules](drift-ignore-rules.md) | Per-workspace allowlist that suppresses known-noisy attributes from the drift signal (e.g. provider-rotated certs, externally co-managed replicas) |
 | [Supply-chain Verification](supply-chain-verification.md) | How cached binaries/providers and runner executables are verified against publisher signatures (pinned keys, `verify` knobs, air-gap) |
+| [Encryption at Rest](encryption-at-rest.md) | Optional, off-by-default app-layer (BYOK) envelope encryption of DB secrets — for no-/niche-CSP / bare-metal / air-gapped deployments; belt-and-braces if your CSP already encrypts at rest. Providers: static / Vault Transit / AWS KMS |
 | [Run Triggers](run-triggers.md) | Cross-workspace dependency chains |
 | [Terragrunt](terragrunt.md) | CLI-driven and agent-mode Terragrunt support, the agent-mode `terragrunt_enabled` flag, and current limitations |
 | [Remote State](remote-state.md) | Cross-workspace `terraform_remote_state` composition with producer-controlled allowlist |

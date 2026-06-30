@@ -45,6 +45,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     await init_storage()
     logger.info("Storage initialized")
 
+    # Initialize app-layer encryption at rest (#553) BEFORE the CA — the CA
+    # private key column is EncryptedText, so the service must be ready first.
+    # Fail CLOSED when encryption is enabled (a wrong/missing key must crash);
+    # tolerate errors only when disabled (e.g. table missing pre-migration).
+    from terrapod.config import settings as _settings
+    from terrapod.crypto.service import init_encryption
+
+    try:
+        async with get_db_session() as db:
+            await init_encryption(db)
+    except Exception as e:
+        if _settings.encryption.enabled:
+            raise
+        logger.warning("Encryption init skipped (disabled; migration may be pending)", error=str(e))
+
     # Initialize Certificate Authority
     from terrapod.auth.ca import init_ca
 

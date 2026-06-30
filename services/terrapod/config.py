@@ -1019,6 +1019,43 @@ class MetricsConfig(BaseModel):
     )
 
 
+class EncryptionConfig(BaseModel):
+    """Optional application-layer encryption at rest (#553).
+
+    OFF by default. For deployments WITHOUT a CSP at-rest encryption switch
+    (bare-metal / on-prem / niche cloud / air-gapped) this is the path to
+    encryption at rest; if your CSP already encrypts at rest (RDS/S3/Azure/GCS),
+    prefer that and treat this as belt-and-braces. Envelope encryption with a
+    pluggable KEK provider — see docs/encryption-at-rest.md.
+
+    Secrets (the static master key, the Vault token) are NOT here — they come
+    from env (`TERRAPOD_ENCRYPTION__STATIC_KEY` / `__VAULT_TOKEN`) via a K8s
+    Secret, never a ConfigMap.
+    """
+
+    enabled: bool = Field(default=False, description="Enable app-layer encryption at rest")
+    provider: str = Field(
+        default="static",
+        description="KEK provider: static | vault_transit | awskms",
+    )
+    # Vault Transit (CSP-agnostic; on-prem / air-gapped)
+    vault_address: str = Field(default="", description="Vault address, e.g. https://vault:8200")
+    vault_mount: str = Field(default="transit", description="Vault transit mount path")
+    vault_key_name: str = Field(default="terrapod", description="Vault transit key name")
+    vault_namespace: str = Field(default="", description="Vault namespace (Enterprise; optional)")
+    # AWS KMS (cloud belt-and-braces)
+    aws_kms_key_id: str = Field(default="", description="AWS KMS key ARN or id")
+    aws_kms_region: str = Field(default="", description="AWS region for KMS (optional)")
+
+    @field_validator("provider")
+    @classmethod
+    def _valid_provider(cls, v: str) -> str:
+        allowed = {"static", "vault_transit", "awskms"}
+        if v not in allowed:
+            raise ValueError(f"encryption.provider must be one of {sorted(allowed)}")
+        return v
+
+
 class BackupConfig(BaseModel):
     """Logical PostgreSQL backup settings (consumed by terrapod.cli.backup).
 
@@ -1515,6 +1552,9 @@ class Settings(BaseSettings):
 
     # Logical PostgreSQL backup (terrapod.cli.backup; CronJob off by default)
     backup: BackupConfig = Field(default_factory=BackupConfig)
+
+    # Optional app-layer encryption at rest (#553; off by default)
+    encryption: EncryptionConfig = Field(default_factory=EncryptionConfig)
 
     # Runner artifact upload limits (API-side enforcement)
     runner_artifacts: RunnerArtifactsConfig = Field(default_factory=RunnerArtifactsConfig)

@@ -917,6 +917,24 @@
           }
         },
 
+        "encryption": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "provider": { "type": "string", "enum": ["static", "vault_transit", "awskms"] },
+            "vault_address": { "type": "string" },
+            "vault_mount": { "type": "string" },
+            "vault_key_name": { "type": "string" },
+            "vault_namespace": { "type": "string" },
+            "aws_kms_key_id": { "type": "string" },
+            "aws_kms_region": { "type": "string" },
+            "existingSecret": { "type": "string" },
+            "staticKeyKey": { "type": "string" },
+            "vaultTokenKey": { "type": "string" }
+          }
+        },
+
         "metrics": {
           "type": "object",
           "additionalProperties": false,

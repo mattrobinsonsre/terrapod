@@ -78,6 +78,23 @@ spec:
                   name: {{ .Values.api.tokenSigningKey.existingSecret }}
                   key: {{ .Values.api.tokenSigningKey.existingSecretKey | default "token_signing_key" }}
             {{- end }}
+            {{- if (.Values.api.config.encryption).existingSecret }}
+            # App-layer encryption at rest (#553) — KEK secrets via secretKeyRef.
+            # optional:true so a single Secret can carry only the key the chosen
+            # provider needs (static → static_key, vault_transit → vault_token).
+            - name: TERRAPOD_ENCRYPTION__STATIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.config.encryption.existingSecret }}
+                  key: {{ .Values.api.config.encryption.staticKeyKey | default "static_key" }}
+                  optional: true
+            - name: TERRAPOD_ENCRYPTION__VAULT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.config.encryption.existingSecret }}
+                  key: {{ .Values.api.config.encryption.vaultTokenKey | default "vault_token" }}
+                  optional: true
+            {{- end }}
             {{- $pgSecret := include "terrapod.postgresql.secretName" . }}
             {{- if $pgSecret }}
             - name: TERRAPOD_DATABASE_URL
