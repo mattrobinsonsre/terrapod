@@ -542,6 +542,32 @@ api:
         enabled: false
         interval: 30s
         labels: {}
+      # Shipped PrometheusRule (alert rules) — off by default; enable when you
+      # run the Prometheus Operator. The bundled rules cover API availability /
+      # error-rate / latency, stuck runs, listener launch failures, reconciler
+      # stalls, DB/Redis/storage errors, cache miss rate, and retention errors.
+      # Each alert carries a runbook_url annotation pointing at docs/runbooks.md.
+      prometheusRule:
+        enabled: false
+        # Extra labels so your Prometheus's ruleSelector picks the rule up
+        # (e.g. {release: kube-prometheus-stack}).
+        labels: {}
+        # Base URL the runbook_url annotations point at. Override to pin a tag
+        # or mirror the runbooks internally.
+        runbookBaseUrl: "https://github.com/mattrobinsonsre/terrapod/blob/main/docs/runbooks.md"
+        # Append your own rule groups (raw PrometheusRule spec.groups entries).
+        extraGroups: []
+      # Bundled Grafana dashboard(s), shipped as a ConfigMap labeled for the
+      # Grafana sidecar (kiwigrid/k8s-sidecar — used by kube-prometheus-stack
+      # and the bitnami Grafana chart) so they auto-import. Off by default.
+      # Operators without the sidecar can import helm/terrapod/dashboards/*.json
+      # by hand.
+      grafanaDashboards:
+        enabled: false
+        # Label the sidecar watches for. Match your Grafana sidecar config.
+        labels:
+          grafana_dashboard: "1"
+        annotations: {}
 
     # Artifact Retention — periodic cleanup of old artifacts from object storage.
     # When enabled, a background task runs at the configured interval and removes

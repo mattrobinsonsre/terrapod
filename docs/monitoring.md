@@ -217,84 +217,68 @@ The listener process itself exposes metrics on its health port (`8081` at `GET /
 
 ---
 
-## Recommended Alerts
+## Grafana dashboards
 
-### High Error Rate
+Terrapod ships an opinionated **Grafana dashboard** (`Terrapod — Overview`) covering API throughput/latency, run lifecycle, scheduler/reconciler health, listeners, VCS polling, caches, and infrastructure dependencies. The source JSON lives in the chart at [`helm/terrapod/dashboards/`](../helm/terrapod/dashboards/).
 
-```yaml
-- alert: TerrapodHighErrorRate
-  expr: |
-    sum(rate(terrapod_http_requests_total{status=~"5.."}[5m]))
-    / sum(rate(terrapod_http_requests_total[5m])) > 0.05
-  for: 5m
-  annotations:
-    summary: "Terrapod API error rate above 5%"
-```
+Two ways to get it into Grafana:
 
-### Stuck Runs
+**Auto-import via the Grafana sidecar** (kube-prometheus-stack, bitnami Grafana). Enable the bundled ConfigMap — it's labeled `grafana_dashboard: "1"` so the sidecar picks it up automatically:
 
 ```yaml
-- alert: TerrapodStuckRuns
-  expr: |
-    increase(terrapod_runs_transitioned_total{to_status=~"planning|applying"}[30m]) > 0
-    unless increase(terrapod_runs_terminal_total[30m]) > 0
-  for: 30m
-  annotations:
-    summary: "Runs entering planning/applying but none reaching terminal state"
+api:
+  config:
+    metrics:
+      enabled: true
+      grafanaDashboards:
+        enabled: true
+        labels:
+          grafana_dashboard: "1"   # match your sidecar's watch label
 ```
 
-### Scheduler Stalls
+**Manual import.** In Grafana → *Dashboards → New → Import*, upload `helm/terrapod/dashboards/terrapod-overview.json` and pick your Prometheus data source.
+
+The dashboard uses a templated `datasource` variable, so it works with any Prometheus data source — no hard-coded UID.
+
+---
+
+## Alerting (shipped PrometheusRule)
+
+Terrapod ships a curated **`PrometheusRule`** (Prometheus Operator) so you don't have to author alerts from scratch. It's **off by default**; enable it and label it so your Prometheus's `ruleSelector` picks it up:
 
 ```yaml
-- alert: TerrapodSchedulerStall
-  expr: |
-    increase(terrapod_scheduler_task_executions_total{task="run_reconciler"}[5m]) == 0
-  for: 5m
-  annotations:
-    summary: "Run reconciler has not executed in 5 minutes"
+api:
+  config:
+    metrics:
+      enabled: true
+      prometheusRule:
+        enabled: true
+        labels:
+          release: kube-prometheus-stack   # match your ruleSelector
+        # Optional: pin runbook links to a tag or an internal mirror.
+        runbookBaseUrl: "https://github.com/mattrobinsonsre/terrapod/blob/main/docs/runbooks.md"
+        # Optional: append your own spec.groups entries.
+        extraGroups: []
 ```
 
-### Storage Errors
+Every alert carries a `runbook_url` annotation linking to the matching [operational runbook](runbooks.md). The bundled rules:
 
-```yaml
-- alert: TerrapodStorageErrors
-  expr: rate(terrapod_storage_errors_total[5m]) > 0
-  for: 5m
-  annotations:
-    summary: "Storage backend errors detected"
-```
+| Alert | Severity | Fires when | Runbook |
+|---|---|---|---|
+| `TerrapodAPIDown` | critical | No `terrapod-api` scrape target healthy for 2m | [API Down](runbooks.md#api-down--not-ready) |
+| `TerrapodHighErrorRate` | warning | 5xx ratio > 5% over 5m | [High API Error Rate](runbooks.md#high-api-error-rate) |
+| `TerrapodHighRequestLatency` | warning | p99 latency > 5s for 10m | [High API Latency](runbooks.md#high-api-latency) |
+| `TerrapodRunsStuck` | warning | Runs enter planning/applying but none reach terminal in 30m | [Stale Run](runbooks.md#stale-run-errored-after-timeout) |
+| `TerrapodListenerLaunchFailures` | warning | Listener claimed a run but couldn't launch its Job | [Listener Offline](runbooks.md#listener-offline) |
+| `TerrapodListenerPrelaunchTimeouts` | warning | Reconciler timed out a claimed-but-never-launched run | [Listener Offline](runbooks.md#listener-offline) |
+| `TerrapodReconcilerStalled` | critical | Run reconciler hasn't executed in 5m | [Scheduler Stall](runbooks.md#scheduler-stall) |
+| `TerrapodSchedulerTaskFailing` | warning | A periodic task errors repeatedly over 15m | [Scheduler Stall](runbooks.md#scheduler-stall) |
+| `TerrapodDatabaseErrors` | critical | DB error rate > 0.1/s for 5m | [DB Pool Exhaustion](runbooks.md#db-pool-exhaustion) |
+| `TerrapodRedisErrors` | critical | Redis error rate > 0.1/s for 5m | [Redis Connection Loss](runbooks.md#redis-connection-loss) |
+| `TerrapodStorageErrors` | warning | Object-storage errors for 5m | [Storage Errors](runbooks.md#storage-errors) |
+| `TerrapodHighBinaryCacheMissRate` | info | Binary cache miss rate > 50% over 1h | [High Cache Miss Rate](runbooks.md#high-cache-miss-rate) |
+| `TerrapodRetentionErrors` | warning | > 10 retention deletion errors in a day | [Storage Errors](runbooks.md#storage-errors) |
 
-### Database/Redis Errors
+Thresholds are sensible defaults; to tune them, disable the bundled rule and copy the [template](../helm/terrapod/templates/prometheusrule-api.yaml), or add overriding rules via `extraGroups`.
 
-```yaml
-- alert: TerrapodInfraErrors
-  expr: |
-    rate(terrapod_db_errors_total[5m]) > 0.1
-    or rate(terrapod_redis_errors_total[5m]) > 0.1
-  for: 5m
-  annotations:
-    summary: "Database or Redis errors detected"
-```
-
-### Cache Miss Rate
-
-```yaml
-- alert: TerrapodHighCacheMissRate
-  expr: |
-    sum(rate(terrapod_binary_cache_requests_total{result="miss"}[1h]))
-    / sum(rate(terrapod_binary_cache_requests_total[1h])) > 0.5
-  for: 1h
-  annotations:
-    summary: "Binary cache miss rate above 50% over the last hour"
-```
-
-### Retention Errors
-
-```yaml
-- alert: TerrapodRetentionErrors
-  expr: increase(terrapod_retention_errors_total[1d]) > 10
-  for: 1h
-  annotations:
-    summary: "Artifact retention encountering persistent errors"
-    description: "More than 10 retention deletion errors in the last day. Check storage backend health."
-```
+> **`up{job=...}`** — the `TerrapodAPIDown` rule matches `job=~".*terrapod-api.*"`. The `job` label is derived by the Prometheus Operator from the scraped Service; if your relabeling produces a different value, adjust the matcher.

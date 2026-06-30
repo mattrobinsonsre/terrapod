@@ -61,7 +61,7 @@ Build/lint/test all run in Docker via `make` (`make test`, `make lint`, `make de
 - [Run Tasks](docs/run-tasks.md): pre/post-plan external webhook validation hooks.
 - [Notifications](docs/notifications.md): webhook (HMAC), Slack Block Kit, email on run events.
 - [AI Plan Summary](docs/ai-plan-summary.md): LLM change summary + risk + failure analysis, provider-agnostic via LiteLLM (Bedrock/OpenAI/Anthropic/Gemini/vLLM).
-- [Audit Logging](docs/audit-logging.md), [Monitoring](docs/monitoring.md), [Artifact Retention](docs/artifact-retention.md): immutable event log, Prometheus metrics, automated cleanup.
+- [Audit Logging](docs/audit-logging.md), [Monitoring](docs/monitoring.md), [Artifact Retention](docs/artifact-retention.md): immutable event log, Prometheus metrics + shipped Grafana dashboard + alert rules with per-alert runbooks, automated cleanup.
 - [Terragrunt](docs/terragrunt.md): per-workspace Terragrunt support for agent-mode and CLI-driven runs.
 - [Migration](docs/migration.md): move TFE/HCP and Atlantis platforms onto Terrapod with `terrapod-migrate`.
 
@@ -76,6 +76,8 @@ How each capability is turned on. **Platform-level** features are Helm values un
 | AI plan summary | `api.config.ai_summary.enabled` + provider/model config | [ai-plan-summary.md](docs/ai-plan-summary.md) |
 | Service catalog | `api.config.catalog.enabled` (on by default; the `catalog_permission` RBAC axis is opt-in) | [service-catalog.md](docs/service-catalog.md) |
 | Prometheus metrics | `api.config.metrics.enabled` | [monitoring.md](docs/monitoring.md) |
+| Shipped Grafana dashboard | `api.config.metrics.grafanaDashboards.enabled` (sidecar auto-import; off by default) | [monitoring.md](docs/monitoring.md#grafana-dashboards) |
+| Shipped Prometheus alert rules | `api.config.metrics.prometheusRule.enabled` (off by default; each alert links a runbook) | [monitoring.md](docs/monitoring.md#alerting-shipped-prometheusrule) |
 | SSO (OIDC/SAML) | `api.config.auth.sso.*` + client secrets via K8s Secret `secretKeyRef` | [authentication.md](docs/authentication.md) |
 | VCS integration | Admin creates a VCS connection, then sets the workspace's `vcs_*` fields | [vcs-integration.md](docs/vcs-integration.md) |
 | Drift detection | Per-workspace setting (enable + interval) via API/UI/provider | [drift-detection.md](docs/drift-detection.md) |

@@ -1056,3 +1056,145 @@ This is **by design** — sealed mode guarantees no upstream fetch ever happens,
 - Re-list the binary/provider caches and confirm the previously-missing artifact (and the right partial-version match) is present.
 - Re-queue the failed run; `init` now resolves the binary + providers from cache and the run proceeds.
 - Note: the artifact-retention sweeper intentionally **skips** the binary/provider caches while sealed, so warmed artifacts won't be evicted out from under a sealed instance.
+
+---
+
+## API Down / Not Ready
+
+Fires from the bundled `TerrapodAPIDown` alert: no `terrapod-api` scrape target has been healthy for 2 minutes. The platform is unavailable to the UI, CLI, runners, and listeners.
+
+### Symptoms
+
+- `max(up{job=~".*terrapod-api.*"}) == 0`
+- The UI returns 502/503 through the ingress; `terraform`/`tofu` against the cloud backend hang or error.
+- `/ready` failing on the API pods.
+
+### Diagnosis
+
+1. **Pod state:**
+   ```bash
+   kubectl get pods -n <ns> -l app.kubernetes.io/component=api
+   kubectl describe pod <api-pod> -n <ns>
+   ```
+   Look for `CrashLoopBackOff`, `OOMKilled`, failing readiness probes, or `Pending` (unschedulable).
+2. **Readiness detail** — `/ready` checks DB + Redis. Hit it from inside the cluster:
+   ```bash
+   kubectl exec -n <ns> deploy/terrapod-api -- python -c "import urllib.request;print(urllib.request.urlopen('http://localhost:8000/ready').read())" 2>&1 || true
+   ```
+   A failing `/ready` with healthy pods almost always means a dependency is down — see [DB Pool Exhaustion](#db-pool-exhaustion) / [Redis Connection Loss](#redis-connection-loss).
+3. **Recent rollout:**
+   ```bash
+   kubectl rollout history deploy/terrapod-api -n <ns>
+   ```
+   A bad image/config (e.g. a migration that didn't run) often correlates with the outage start.
+4. **Migrations** — a schema/app skew makes the API refuse to start. Confirm the migration Job for the current version succeeded.
+
+### Resolution
+
+- **Dependency down** → restore Postgres/Redis (their runbooks above); the API recovers on the next readiness probe.
+- **Bad rollout** → `kubectl rollout undo deploy/terrapod-api -n <ns>`.
+- **OOM/crash** → check `kubectl logs --previous`; raise `api.resources` if genuinely under-provisioned (confirm with the OOM `reason` field, don't assume).
+- **Unschedulable** → free capacity or fix nodeSelector/taints.
+
+### Verification
+
+- `max(up{job=~".*terrapod-api.*"}) == 1` and `/ready` returns 200.
+- The UI loads and a `terraform plan` against the cloud backend succeeds.
+
+---
+
+## High API Error Rate
+
+Fires from `TerrapodHighErrorRate`: more than 5% of API requests returned 5xx over 5 minutes.
+
+### Symptoms
+
+- `sum(rate(terrapod_http_requests_total{status=~"5.."}[5m])) / sum(rate(terrapod_http_requests_total[5m])) > 0.05`
+- Intermittent UI/CLI failures rather than a hard outage.
+
+### Diagnosis
+
+1. **Which routes?**
+   ```promql
+   topk(10, sum by (path_template, status) (rate(terrapod_http_requests_total{status=~"5.."}[5m])))
+   ```
+2. **Dependency errors** correlate with most 5xx spikes:
+   ```promql
+   rate(terrapod_db_errors_total[5m]) ; rate(terrapod_redis_errors_total[5m]) ; rate(terrapod_storage_errors_total[5m])
+   ```
+   Follow the matching runbook ([DB](#db-pool-exhaustion) / [Redis](#redis-connection-loss) / [Storage](#storage-errors)).
+3. **Logs** for the offending route:
+   ```logql
+   {namespace="<ns>", pod=~"terrapod-api.*"} | json | status >= 500
+   ```
+
+### Resolution
+
+- Fix the underlying dependency error surfaced above (the common case).
+- If 5xx is concentrated on one route after a deploy, roll back (`kubectl rollout undo`) and open a bug.
+- If it's load-driven (paired with [High API Latency](#high-api-latency)), scale the API (`api.replicas` / HPA) and check DB pool size.
+
+### Verification
+
+- The 5xx ratio drops back below 5% and stays there.
+- `topk` over `{status=~"5.."}` is empty for the previously-failing route.
+
+---
+
+## High API Latency
+
+Fires from `TerrapodHighRequestLatency`: p99 request latency above 5s for 10 minutes.
+
+### Symptoms
+
+- `histogram_quantile(0.99, sum(rate(terrapod_http_request_duration_seconds_bucket[5m])) by (le)) > 5`
+- The UI feels slow; SSE reconnects; CLI operations time out.
+
+### Diagnosis
+
+1. **Slow routes:**
+   ```promql
+   topk(10, histogram_quantile(0.95, sum by (le, path_template) (rate(terrapod_http_request_duration_seconds_bucket[5m]))))
+   ```
+2. **DB/Redis pressure** — latency usually tracks a saturated dependency. Check connection-pool saturation (see [DB Pool Exhaustion](#db-pool-exhaustion)) and Redis latency.
+3. **Event-loop starvation** — a sync call in an async handler stalls the whole worker (see the no-sync-work-in-async invariant). Check for a recent change on the slow route; look for liveness-probe restarts in `kubectl get pods`.
+4. **Run load** — a burst of concurrent runs/log-streaming can saturate the API.
+
+### Resolution
+
+- Relieve the saturated dependency (scale Postgres connections / Redis, or the API replicas).
+- If a specific route regressed, roll back and fix the blocking call (wrap in `asyncio.to_thread` or make the endpoint `def`).
+- Scale API replicas / enable the HPA for sustained load.
+
+### Verification
+
+- p99 latency returns under threshold.
+- No API pods are being restarted by the liveness probe.
+
+---
+
+## High Cache Miss Rate
+
+Fires from `TerrapodHighBinaryCacheMissRate` (info): the terraform/tofu binary cache hit rate fell below 50% over the last hour. Not an outage — runs still work by falling back upstream — but slower, and a problem in restricted-network/air-gapped installs.
+
+### Symptoms
+
+- `sum(rate(terrapod_binary_cache_requests_total{result="miss"}[1h])) / sum(rate(terrapod_binary_cache_requests_total[1h])) > 0.5`
+- `terraform init` slower than usual; runner egress to `releases.hashicorp.com` / GitHub increasing.
+
+### Diagnosis
+
+1. **Version spread** — many distinct tool versions in use means each is a legitimate first-time miss. Check the workspace `terraform_version` distribution.
+2. **Eviction too aggressive** — `registry.cache_ttl_days` (default 30, evicted on last-access) may be reclaiming entries between uses on a low-traffic instance.
+3. **Sealed mode** — if `registry.cache_only` is on, a miss is a hard 404, not a slow fall-through; see [Sealed (cache-only) mode](#sealed-cache-only-mode--runs-failing-with-cache-miss-404) instead.
+
+### Resolution
+
+- **Pre-warm** the versions your fleet pins via `POST /api/terrapod/v1/admin/binary-cache/warm-bulk` or the **Warm cache** UI panel ([Cache pre-population](registry.md#cache-pre-population)).
+- **Raise** `registry.cache_ttl_days` if eviction is the cause.
+- **Consolidate** on fewer tool versions where practical.
+
+### Verification
+
+- The hit ratio recovers above 50% as warmed/again-cached versions are served.
+- Per-tool: `sum by (tool) (rate(terrapod_binary_cache_requests_total{result="hit"}[1h]))` rises.

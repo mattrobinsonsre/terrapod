@@ -123,7 +123,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Registry](registry.md) | Private module/provider registry, caching layers |
 | [Registry Publishing](registry-publishing.md) | Publishing providers/modules with the `terrapod-publish` CLI and the client-signed publish protocol |
 | [Service Catalog](service-catalog.md) | No-code self-service provisioning over the private module registry: blessed catalog items, provider templates, a `catalog_permission` RBAC axis, and a full provision → reconfigure → destroy lifecycle |
-| [Monitoring](monitoring.md) | Prometheus metrics, scraping, recommended alerts |
+| [Monitoring](monitoring.md) | Prometheus metrics, scraping, shipped Grafana dashboard + alert rules (with per-alert runbooks) |
 | [Deployment](deployment.md) | Production Helm deployment, storage backends, scaling |
 | [Split-networking deployments](deployment-network-isolation.md) | Three-Ingress model: management / webhook / internal agent path, with split-hostname runner config |
 | [Optional split webhook ingress](deployment-webhook-ingress.md) | Optional second Ingress for the public-must-reach surface (VCS webhooks, run-task callbacks) |

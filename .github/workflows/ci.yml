@@ -521,6 +521,31 @@ jobs:
           echo "$out" | grep -q "ca_bundle_source_path" || { echo "FAIL: runners.yaml CA source path missing"; exit 1; }
           echo "$out" | grep -q "http_proxy: \"http://proxy.example.com:3128\"" || { echo "FAIL: runners.yaml proxy missing"; exit 1; }
           echo "proxy + CA bundle render OK (#592)"
+      - name: Observability bundle render — PrometheusRule + Grafana dashboards (#546)
+        run: |
+          # Every bundled dashboard JSON is valid JSON before it's embedded.
+          # (jq is preinstalled on GitHub ubuntu-latest runners.)
+          for f in helm/terrapod/dashboards/*.json; do
+            jq -e . "$f" > /dev/null || { echo "FAIL: invalid dashboard JSON: $f"; exit 1; }
+          done
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            template terrapod helm/terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 \
+              --set api.config.metrics.prometheusRule.enabled=true \
+              --set api.config.metrics.grafanaDashboards.enabled=true)
+          echo "$out" | grep -q "kind: PrometheusRule" || { echo "FAIL: PrometheusRule not rendered"; exit 1; }
+          echo "$out" | grep -q "alert: TerrapodAPIDown" || { echo "FAIL: bundled alert rules missing"; exit 1; }
+          echo "$out" | grep -q "runbook_url:" || { echo "FAIL: alerts missing runbook_url annotation"; exit 1; }
+          echo "$out" | grep -q "grafana_dashboard:" || { echo "FAIL: Grafana dashboard sidecar label missing"; exit 1; }
+          echo "$out" | grep -q "terrapod-overview.json:" || { echo "FAIL: dashboard ConfigMap key missing"; exit 1; }
+          # Off by default: a stock render emits neither.
+          stock=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            template terrapod helm/terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379)
+          echo "$stock" | grep -q "kind: PrometheusRule" && { echo "FAIL: PrometheusRule rendered by default (should be opt-in)"; exit 1; }
+          echo "observability bundle renders OK and is off by default (#546)"
 
   # ── Config-channel contract (#617) ────────────────────
   # Renders the chart (every values profile) and parses the rendered ConfigMaps

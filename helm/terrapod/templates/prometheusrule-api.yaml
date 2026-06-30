@@ -1,0 +1,183 @@
+{{- if ne .Values.api.enabled false }}
+{{- if and .Values.api.config.metrics.enabled .Values.api.config.metrics.prometheusRule.enabled }}
+{{- $rb := .Values.api.config.metrics.prometheusRule.runbookBaseUrl | default "https://github.com/mattrobinsonsre/terrapod/blob/main/docs/runbooks.md" }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "terrapod.fullname" . }}-api
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+    {{- with .Values.api.config.metrics.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    # ── Availability ───────────────────────────────────────────────────────
+    - name: terrapod.availability
+      rules:
+        - alert: TerrapodAPIDown
+          # `job` is derived by the Prometheus Operator from the scraped
+          # Service; the matcher is intentionally loose so it survives common
+          # relabeling. Tighten it to your environment if needed.
+          expr: |
+            max(up{job=~".*terrapod-api.*"}) == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Terrapod API is down (no healthy scrape targets)"
+            description: "No terrapod-api target has been scrapeable for 2m. The platform is unavailable."
+            runbook_url: "{{ $rb }}#api-down--not-ready"
+        - alert: TerrapodHighErrorRate
+          expr: |
+            sum(rate(terrapod_http_requests_total{status=~"5.."}[5m]))
+            / sum(rate(terrapod_http_requests_total[5m])) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Terrapod API 5xx error rate above 5%"
+            description: "More than 5% of API requests have returned 5xx over the last 5m."
+            runbook_url: "{{ $rb }}#high-api-error-rate"
+        - alert: TerrapodHighRequestLatency
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(terrapod_http_request_duration_seconds_bucket[5m])) by (le)
+            ) > 5
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Terrapod API p99 latency above 5s"
+            description: "p99 request latency has exceeded 5s for 10m. Check DB/Redis health and run load."
+            runbook_url: "{{ $rb }}#high-api-latency"
+
+    # ── Run lifecycle ──────────────────────────────────────────────────────
+    - name: terrapod.runs
+      rules:
+        - alert: TerrapodRunsStuck
+          # Runs entered planning/applying but none reached a terminal state in
+          # the same window — the reconciler or listeners are not draining work.
+          expr: |
+            increase(terrapod_runs_transitioned_total{to_status=~"planning|applying"}[30m]) > 0
+            unless increase(terrapod_runs_terminal_total[30m]) > 0
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Runs entering planning/applying but none reaching terminal state"
+            description: "Runs have started executing but none have finished in 30m. Suspect a stalled reconciler or no healthy listeners."
+            runbook_url: "{{ $rb }}#stale-run-errored-after-timeout"
+        - alert: TerrapodListenerLaunchFailures
+          expr: |
+            increase(terrapod_listener_launch_failures_total[15m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Listener pre-Job launch failures detected"
+            description: "A listener claimed a run but could not launch its Kubernetes Job (runner-token, Job create, or auth Secret failure)."
+            runbook_url: "{{ $rb }}#listener-offline"
+        - alert: TerrapodListenerPrelaunchTimeouts
+          expr: |
+            increase(terrapod_listener_prelaunch_timeouts_total[15m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Reconciler timed out runs that were claimed but never launched"
+            description: "Backstop signal for silent listener failures — a run was claimed but no Job was ever launched and the listener never reported the failure."
+            runbook_url: "{{ $rb }}#listener-offline"
+
+    # ── Scheduler / background tasks ───────────────────────────────────────
+    - name: terrapod.scheduler
+      rules:
+        - alert: TerrapodReconcilerStalled
+          expr: |
+            increase(terrapod_scheduler_task_executions_total{task="run_reconciler"}[5m]) == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Run reconciler has not executed in 5 minutes"
+            description: "The run reconciler drives all run state transitions. If it stops, runs hang. Check scheduler health and Redis."
+            runbook_url: "{{ $rb }}#scheduler-stall"
+        - alert: TerrapodSchedulerTaskFailing
+          expr: |
+            increase(terrapod_scheduler_task_executions_total{status="error"}[15m]) > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "A periodic scheduler task is failing"
+            description: "One or more periodic tasks ({{ "{{ $labels.task }}" }}) have errored repeatedly over 15m."
+            runbook_url: "{{ $rb }}#scheduler-stall"
+
+    # ── Infrastructure dependencies ────────────────────────────────────────
+    - name: terrapod.infra
+      rules:
+        - alert: TerrapodDatabaseErrors
+          expr: |
+            rate(terrapod_db_errors_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Terrapod database errors detected"
+            description: "The API is logging database errors. Suspect connection-pool exhaustion or a Postgres outage."
+            runbook_url: "{{ $rb }}#db-pool-exhaustion"
+        - alert: TerrapodRedisErrors
+          expr: |
+            rate(terrapod_redis_errors_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Terrapod Redis errors detected"
+            description: "The API is logging Redis errors. Sessions, the scheduler, and SSE all depend on Redis."
+            runbook_url: "{{ $rb }}#redis-connection-loss"
+        - alert: TerrapodStorageErrors
+          expr: |
+            rate(terrapod_storage_errors_total[5m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Terrapod object-storage errors detected"
+            description: "Storage operations ({{ "{{ $labels.operation }}" }}) are failing. State, plans, and artifacts depend on object storage."
+            runbook_url: "{{ $rb }}#storage-errors"
+
+    # ── Caches (warning only) ──────────────────────────────────────────────
+    - name: terrapod.cache
+      rules:
+        - alert: TerrapodHighBinaryCacheMissRate
+          expr: |
+            sum(rate(terrapod_binary_cache_requests_total{result="miss"}[1h]))
+            / clamp_min(sum(rate(terrapod_binary_cache_requests_total[1h])), 1) > 0.5
+          for: 1h
+          labels:
+            severity: info
+          annotations:
+            summary: "Binary cache miss rate above 50% over the last hour"
+            description: "Runners are repeatedly missing the terraform/tofu binary cache and falling back upstream. Check cache eviction and upstream reachability."
+            runbook_url: "{{ $rb }}#high-cache-miss-rate"
+
+    # ── Retention ──────────────────────────────────────────────────────────
+    - name: terrapod.retention
+      rules:
+        - alert: TerrapodRetentionErrors
+          expr: |
+            increase(terrapod_retention_errors_total[1d]) > 10
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Artifact retention encountering persistent errors"
+            description: "More than 10 retention deletion errors in the last day. Check object-storage health."
+            runbook_url: "{{ $rb }}#storage-errors"
+    {{- with .Values.api.config.metrics.prometheusRule.extraGroups }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}
+{{- end }}

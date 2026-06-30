@@ -1,0 +1,32 @@
+{{- if ne .Values.api.enabled false }}
+{{- if and .Values.api.config.metrics.enabled .Values.api.config.metrics.grafanaDashboards.enabled }}
+{{- /*
+  Ship the bundled Grafana dashboard JSON as a ConfigMap labeled for the
+  Grafana sidecar (kiwigrid/k8s-sidecar, as used by the kube-prometheus-stack
+  and bitnami Grafana charts). The sidecar watches for ConfigMaps carrying the
+  configured label (default `grafana_dashboard: "1"`) and imports them
+  automatically — no manual upload. Operators not using the sidecar can import
+  the same JSON from helm/terrapod/dashboards/ by hand.
+  Each file in dashboards/*.json becomes one key in the ConfigMap.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "terrapod.fullname" . }}-dashboards
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+    {{- range $k, $v := .Values.api.config.metrics.grafanaDashboards.labels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- with .Values.api.config.metrics.grafanaDashboards.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  {{- range $path, $_ := .Files.Glob "dashboards/*.json" }}
+  {{ base $path }}: |
+    {{- $.Files.Get $path | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
