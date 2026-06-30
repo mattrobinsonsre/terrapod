@@ -127,6 +127,11 @@ the DEK (canary fail-closed).
 - **Back up the KEK first** (`static` especially) — see the footgun box above.
 - The DB backup CronJob and your object store are unaffected: encrypted columns
   are ciphertext in the dump, which is the point.
+- **Break-glass DR** — when state encryption is on, the state objects in your
+  bucket (and the `state/index.yaml` break-glass index points at them) are
+  `TPENC1` ciphertext. Recovering state out-of-band therefore needs the KEK and
+  the envelope format, not just the bucket — factor the KEK into your DR runbook
+  exactly as you would the database.
 - **Disabling** stops new encryption immediately; existing ciphertext stays
   readable as long as the provider + key remain configured. To fully revert,
   run the decrypt migration **before** removing the key (see below).
@@ -160,6 +165,13 @@ the key is gone, encrypted rows can't be converted back.
   `encryption_migrate encrypt` afterwards. The new key is wrapped **and unwrapped
   (round-trip verified)** before it's activated — a broken provider aborts with
   nothing changed.
+  - **Multi-replica propagation** — the new DEK is minted on whichever replica
+    served the request; the others pick it up automatically within ~30s via the
+    `encryption_key_refresh` background task (no leader election, no restart). In
+    that short window a replica that hasn't refreshed yet may transiently fail to
+    read data just written under the new key. It's harmless (fail-loud, no data
+    loss) but if you want zero-window propagation, do a rolling restart after
+    rotating, or rotate during low traffic.
 - **KEK rotation** — for `awskms` / `vault_transit`, the provider manages its own
   key versions transparently; Terrapod's wrapped DEKs keep working across the
   CSP/Vault key rotation as long as the old version remains decryptable. For

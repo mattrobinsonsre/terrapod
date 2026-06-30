@@ -2402,6 +2402,51 @@ DELETE /api/terrapod/v1/admin/binary-cache/{tool}/{version}
 
 ---
 
+## Encryption at Rest (Admin)
+
+Optional application-layer BYOK envelope encryption — off by default. See
+[Encryption at Rest](encryption-at-rest.md) for the full operator guide. Both
+endpoints require platform `admin`.
+
+### Status
+
+```
+GET /api/terrapod/v1/admin/encryption
+```
+
+Reports encryption-at-rest health. `decryptable` is the headline durability
+signal — `false` means the platform is running but cannot read its encrypted data
+back (page on it). Always returns 200 (even when encryption is disabled).
+
+**Response attributes** (`data.type` = `encryption-status`):
+
+| Attribute | Type | Meaning |
+|---|---|---|
+| `enabled` | bool | Whether new writes are encrypted |
+| `provider` | string | KEK provider in use (`static` / `vault_transit` / `awskms` / empty when off) |
+| `active_version` | int \| null | DEK version new writes use |
+| `dek_versions` | array<int> | All DEK versions loaded (older ones decrypt existing data) |
+| `canary_ok` | bool | The boot decryptability canary verified |
+| `decryptable` | bool | Can currently decrypt — the alarm signal |
+
+### Rotate DEK
+
+```
+POST /api/terrapod/v1/admin/encryption/rotate-dek
+```
+
+Mints a new active data-encryption key. Prior DEK versions are **retained** so
+existing ciphertext stays decryptable; run `encryption_migrate encrypt` afterwards
+to re-key old rows. The new key is wrapped **and** unwrapped (round-trip verified)
+before activation — a broken provider aborts with nothing changed. Returns the
+same status shape as above. **409** when encryption is disabled.
+
+> Rotation propagates to all API replicas within ~30s via the
+> `encryption_key_refresh` background task (no restart needed); see the
+> [rotation notes](encryption-at-rest.md#key-rotation).
+
+---
+
 ## Agent Pool Events (SSE)
 
 ```

@@ -261,3 +261,72 @@ class TestStateVersions:
 
         resp = await client.get(f"/api/v2/workspaces/{ws_id}/current-state-version", headers=AUTH)
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# State encryption at rest (#635) — real DB + filesystem storage round-trip
+# ---------------------------------------------------------------------------
+
+
+class TestStateEncryptionRoundTrip:
+    """Proves the load-bearing #635 invariants against real storage: the stored
+    object is ciphertext (TPENC1), the download decrypts back to the exact
+    plaintext, and the recorded md5 is over the PLAINTEXT (not the ciphertext)."""
+
+    async def test_state_is_ciphertext_at_rest_and_decrypts_on_download(self, app, client):
+        from terrapod.crypto import envelope
+        from terrapod.crypto import service as enc
+        from terrapod.storage import get_storage
+        from terrapod.storage.keys import state_key
+
+        # Turn on encryption with an in-memory DEK (no KEK provider needed).
+        svc = enc.EncryptionService()
+        svc.enabled = True
+        svc._deks = {1: envelope.new_dek()}
+        svc._active_version = 1
+        enc._service = svc
+        try:
+            set_auth(app, admin_user())
+            create = await client.post(WS_ENDPOINT, json=_ws_body("enc-state-ws"), headers=AUTH)
+            ws_id = create.json()["data"]["id"]
+
+            state_bytes = b'{"serial": 1, "lineage": "test-lineage", "secret": "s3cr3t"}'
+            plaintext_md5 = hashlib.md5(state_bytes).hexdigest()
+            sv_resp = await client.post(
+                f"/api/v2/workspaces/{ws_id}/state-versions",
+                json={
+                    "data": {
+                        "type": "state-versions",
+                        "attributes": {
+                            "serial": 1,
+                            "lineage": "test-lineage",
+                            "md5": plaintext_md5,
+                        },
+                    }
+                },
+                headers=AUTH,
+            )
+            assert sv_resp.status_code == 201
+            sv_id = sv_resp.json()["data"]["id"]
+
+            up = await client.put(f"/api/v2/state-versions/{sv_id}/content", content=state_bytes)
+            assert up.status_code == 200
+
+            # At rest: the object is TPENC1 ciphertext, NOT the plaintext.
+            # Storage keys use the bare UUIDs (the JSON:API ids carry ws-/sv- prefixes).
+            stored = await get_storage().get(
+                state_key(ws_id.removeprefix("ws-"), sv_id.removeprefix("sv-"))
+            )
+            assert envelope.is_encrypted_blob(stored)
+            assert state_bytes not in stored
+
+            # md5 recorded is over the PLAINTEXT (TFE-protocol consistency).
+            meta = await client.get(f"/api/v2/state-versions/{sv_id}", headers=AUTH)
+            assert meta.json()["data"]["attributes"]["md5"] == plaintext_md5
+
+            # Download decrypts back to the exact plaintext.
+            dl = await client.get(f"/api/v2/state-versions/{sv_id}/download", headers=AUTH)
+            assert dl.status_code == 200
+            assert dl.content == state_bytes
+        finally:
+            enc.reset_encryption_for_tests()

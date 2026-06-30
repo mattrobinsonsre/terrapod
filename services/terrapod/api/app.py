@@ -286,6 +286,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             description="Clean up old artifacts from object storage",
         )
 
+    # Encryption DEK refresh — multi-replica DEK propagation (no leader election).
+    # Lets a DEK rotated on one replica become usable on all replicas without a
+    # restart. Cheap no-op when nothing changed. Only when encryption is enabled.
+    if settings.encryption.enabled:
+
+        async def _encryption_key_refresh() -> None:
+            from terrapod.crypto.service import refresh_keys
+
+            async with get_db_session() as db:
+                await refresh_keys(db)
+
+        register_periodic_task(
+            "encryption_key_refresh",
+            interval_seconds=30,
+            handler=_encryption_key_refresh,
+            description="Propagate rotated DEKs to all replicas (multi-replica safe)",
+        )
+
     await start_scheduler()
     logger.info("Distributed scheduler started")
 

@@ -308,6 +308,128 @@ async def test_rotate_dek_refused_when_disabled(monkeypatch):
         await svc_mod.rotate_dek(_FakeDB(rows=[]))
 
 
+# ── Multi-replica DEK propagation: refresh_keys (#553 audit) ───────────────────
+
+
+@pytest.mark.asyncio
+async def test_refresh_keys_picks_up_dek_rotated_on_another_replica(monkeypatch):
+    """A DEK minted by rotate_dek on replica A must become usable on replica B
+    after refresh_keys — without a restart. Otherwise B 500s on v2-written data."""
+    from terrapod.crypto import service as svc_mod
+    from terrapod.db.models import CryptoKey
+
+    monkeypatch.setattr(svc_mod.settings.encryption, "enabled", True)
+    # This replica only knows v1.
+    svc = _enabled_service()
+    dek = svc._deks[1]
+    svc_mod._service = svc
+
+    # Another replica rotated to v2 (active); the provider unwraps both to `dek`.
+    good = _GoodProvider()
+    good._dek = dek
+    monkeypatch.setattr(svc_mod, "build_provider", lambda: good)
+    rows = [
+        CryptoKey(version=1, wrapped_dek="w1", provider="static", canary="", active=False),
+        CryptoKey(
+            version=2,
+            wrapped_dek="w2",
+            provider="static",
+            canary=envelope.encrypt(svc_mod._CANARY, dek, 2),
+            active=True,
+        ),
+    ]
+    await svc_mod.refresh_keys(_FakeDB(rows=rows))
+
+    refreshed = svc_mod.get_encryption()
+    assert refreshed._active_version == 2
+    assert {1, 2}.issubset(refreshed._deks)
+    svc_mod.reset_encryption_for_tests()
+
+
+@pytest.mark.asyncio
+async def test_refresh_keys_noop_makes_no_kek_calls_when_nothing_new(monkeypatch):
+    """Steady state: nothing changed → fast path returns before build_provider,
+    so we don't hammer the KEM/KMS every interval."""
+    from terrapod.crypto import service as svc_mod
+    from terrapod.db.models import CryptoKey
+
+    monkeypatch.setattr(svc_mod.settings.encryption, "enabled", True)
+    svc = _enabled_service()  # has v1, active v1
+    svc_mod._service = svc
+
+    def _boom():
+        raise AssertionError("build_provider must not be called on the no-op fast path")
+
+    monkeypatch.setattr(svc_mod, "build_provider", _boom)
+    rows = [CryptoKey(version=1, wrapped_dek="w", provider="static", canary="", active=True)]
+    await svc_mod.refresh_keys(_FakeDB(rows=rows))  # must not raise
+    svc_mod.reset_encryption_for_tests()
+
+
+@pytest.mark.asyncio
+async def test_refresh_keys_keeps_cache_on_provider_error(monkeypatch):
+    """A blipped refresh must NOT tear down a working cache."""
+    from terrapod.crypto import service as svc_mod
+    from terrapod.db.models import CryptoKey
+
+    monkeypatch.setattr(svc_mod.settings.encryption, "enabled", True)
+    svc = _enabled_service()
+    svc_mod._service = svc
+    monkeypatch.setattr(svc_mod, "build_provider", lambda: _BrokenUnwrapProvider())
+    # A new v2 row exists, so the fast path won't short-circuit; the broken
+    # provider then fails the rebuild — but the existing cache must survive.
+    rows = [
+        CryptoKey(version=1, wrapped_dek="w1", provider="static", canary="", active=False),
+        CryptoKey(version=2, wrapped_dek="w2", provider="static", canary="x", active=True),
+    ]
+    await svc_mod.refresh_keys(_FakeDB(rows=rows))
+    assert svc_mod.get_encryption() is svc  # unchanged
+    assert 1 in svc_mod.get_encryption()._deks
+    svc_mod.reset_encryption_for_tests()
+
+
+# ── Boot safety: disabled-but-keys-exist with an unusable KEK (#553 audit) ─────
+
+
+@pytest.mark.asyncio
+async def test_init_degraded_when_disabled_with_rows_and_broken_kek(monkeypatch):
+    """Turning encryption off AND removing the KEK before the decrypt migration
+    must NOT boot a clean passthrough that silently 500s on every encrypted read —
+    it must surface decryptable:false so monitoring/the doctor catch it."""
+    from terrapod.crypto import service as svc_mod
+    from terrapod.db.models import CryptoKey
+
+    monkeypatch.setattr(svc_mod.settings.encryption, "enabled", False)
+
+    def _boom():
+        raise RuntimeError("KEK unreachable")
+
+    monkeypatch.setattr(svc_mod, "build_provider", _boom)
+    rows = [CryptoKey(version=1, wrapped_dek="w", provider="static", canary="c", active=True)]
+    await svc_mod.init_encryption(_FakeDB(rows=rows))  # must NOT raise (disabled)
+
+    st = svc_mod.get_encryption().status()
+    assert st["enabled"] is False
+    assert st["decryptable"] is False  # the durability alarm fires
+    svc_mod.reset_encryption_for_tests()
+
+
+@pytest.mark.asyncio
+async def test_init_active_row_empty_canary_is_not_decryptable(monkeypatch):
+    """An active DEK row with no canary can't prove decryptability — status must
+    not claim decryptable:true on an unverified key."""
+    from terrapod.crypto import service as svc_mod
+    from terrapod.db.models import CryptoKey
+
+    monkeypatch.setattr(svc_mod.settings.encryption, "enabled", True)
+    good = _GoodProvider()
+    monkeypatch.setattr(svc_mod, "build_provider", lambda: good)
+    rows = [CryptoKey(version=1, wrapped_dek="w", provider="static", canary="", active=True)]
+    await svc_mod.init_encryption(_FakeDB(rows=rows))
+    assert svc_mod.get_encryption().status()["decryptable"] is False
+    svc_mod.reset_encryption_for_tests()
+
+
 # ── Migration per-row planner (#553 Phase 4) ──────────────────────────────────
 
 
