@@ -115,6 +115,18 @@ class Role(Base):
         String(20), nullable=False, default="none", server_default="none"
     )  # none, read, use, admin
 
+    # Explicit capability set (#585). Expanded from the level fields above via
+    # the shared preset map (terrapod.auth.capabilities.expand_preset) at write
+    # time and by the role-expansion migration. Source of truth for capability-
+    # based resolution; the level columns remain as the preset inputs. JSONB list
+    # of "<resource>:<verb>" strings; never indexed/unique.
+    # server_default mirrors the migration so schemas built from metadata
+    # (integration tests, which bypass the ORM Python default on raw inserts)
+    # also default to an empty list instead of violating NOT NULL.
+    capabilities: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default="[]", nullable=False
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=now_utc, nullable=False
     )

@@ -30,6 +30,11 @@ type Role struct {
 	RegistryPermission  string `json:"registry-permission,omitempty"` // read | write | admin (modules + providers)
 	CatalogPermission   string `json:"catalog-permission,omitempty"`  // none | read | use | admin
 
+	// Capabilities is the explicit capability set the permission levels above
+	// expand to (#585). Read-only for now (server-derived from the levels);
+	// direct capability authoring is a later slice.
+	Capabilities []string `json:"capabilities,omitempty"`
+
 	BuiltIn   bool   `json:"built-in"`
 	CreatedAt string `json:"created-at,omitempty"`
 	UpdatedAt string `json:"updated-at,omitempty"`

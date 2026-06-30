@@ -37,6 +37,11 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # are never loaded during a migration run.
 COPY services/terrapod/db/ ./terrapod/db/
 COPY services/terrapod/crypto/ ./terrapod/crypto/
+# The role-capabilities migration (#585) imports terrapod.auth.capabilities for
+# the shared preset map (zero-drift with the runtime). That module is
+# dependency-free and auth/__init__.py is empty, so this stays import-light.
+COPY services/terrapod/auth/__init__.py ./terrapod/auth/__init__.py
+COPY services/terrapod/auth/capabilities.py ./terrapod/auth/capabilities.py
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
 

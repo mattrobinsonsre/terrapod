@@ -40,6 +40,16 @@ def _mock_role(name="dev-team", ws_perm="read", reg_perm="read", catalog_perm="n
     role.pool_permission = "read"
     role.registry_permission = reg_perm
     role.catalog_permission = catalog_perm
+    # Capabilities are expanded from the levels (#585); set a real list so the
+    # mock serialises (an unset MagicMock attr isn't JSON-serialisable).
+    from terrapod.auth.capabilities import expand_preset
+
+    role.capabilities = expand_preset(
+        workspace_permission=ws_perm,
+        pool_permission="read",
+        registry_permission=reg_perm,
+        catalog_permission=catalog_perm,
+    )
     role.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     role.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
     return role

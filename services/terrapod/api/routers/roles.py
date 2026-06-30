@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, require_admin, require_admin_or_audit
 from terrapod.auth.builtin_roles import BUILTIN_ROLES, is_builtin_role
+from terrapod.auth.capabilities import capabilities_for_builtin
 from terrapod.db.models import Role
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -57,6 +58,10 @@ def _role_json(role: Role) -> dict:
             "pool-permission": role.pool_permission,
             "registry-permission": role.registry_permission,
             "catalog-permission": role.catalog_permission,
+            # The explicit capability set this role grants (#585). Existing roles
+            # were back-filled from their permission levels by the migration;
+            # going forward new roles are authored with capabilities directly.
+            "capabilities": role.capabilities,
             "built-in": False,
             "created-at": _rfc3339(role.created_at),
             "updated-at": _rfc3339(role.updated_at),
@@ -82,6 +87,7 @@ def _builtin_role_json(name: str, info: dict) -> dict:
             "catalog-permission": (
                 "admin" if name == "admin" else "read" if name == "audit" else "none"
             ),
+            "capabilities": capabilities_for_builtin(name),
             "built-in": True,
             "created-at": "",
             "updated-at": "",
