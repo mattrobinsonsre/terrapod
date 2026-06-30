@@ -271,3 +271,25 @@ func TestDefaultStateFile_IsExpected(t *testing.T) {
 		t.Errorf("DefaultStateFile changed: %q — update docs/migration.md and the rewriter UX if intentional", DefaultStateFile)
 	}
 }
+
+func TestRollbackTargets_OnlyCreatedByMigration(t *testing.T) {
+	s := &State{Workspaces: []WorkspaceRecord{
+		{SourceName: "created", TerrapodID: "ws-1", State: "created", CreatedByMigration: true},
+		{SourceName: "reused", TerrapodID: "ws-2", State: "created", CreatedByMigration: false},
+		{SourceName: "planned-no-id", State: "planned", CreatedByMigration: false},
+		{SourceName: "already-rolled-back", TerrapodID: "ws-3", State: "rolled_back", CreatedByMigration: true},
+		{SourceName: "created-but-no-id", State: "errored", CreatedByMigration: true},
+	}}
+	targets := s.RollbackTargets()
+	if len(targets) != 1 {
+		t.Fatalf("expected exactly 1 rollback target, got %d: %+v", len(targets), targets)
+	}
+	if targets[0].SourceName != "created" {
+		t.Fatalf("wrong target: %q (rollback must never select reused/pre-existing/rolled-back records)", targets[0].SourceName)
+	}
+	// Mutating the returned pointer must write through to the State.
+	targets[0].State = "rolled_back"
+	if s.Workspaces[0].State != "rolled_back" {
+		t.Fatal("RollbackTargets must return pointers into s.Workspaces")
+	}
+}

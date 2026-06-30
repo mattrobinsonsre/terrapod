@@ -7,11 +7,11 @@
 //
 // Two modes:
 //
-//   * DryRun (default) — walks the Plan, builds a Report describing
+//   - DryRun (default) — walks the Plan, builds a Report describing
 //     the would-be writes, never touches Terrapod. Sensitive variable
 //     values are NEVER read from the source in this mode.
 //
-//   * Apply — actually writes. Order is dependency-first: VCS
+//   - Apply — actually writes. Order is dependency-first: VCS
 //     connections → workspaces → variables. After each write the state
 //     file is saved so a crash mid-migration is resumable from the
 //     same state file.
@@ -83,14 +83,14 @@ type Options struct {
 // stays self-contained (no live SDK references) so callers can
 // serialise it to disk for the handover document.
 type Report struct {
-	DryRun      bool                  `json:"dry_run"`
-	StartedAt   time.Time             `json:"started_at"`
-	FinishedAt  time.Time             `json:"finished_at"`
-	Source      string                `json:"source"`
-	Connections []ConnectionOutcome   `json:"connections,omitempty"`
-	Workspaces  []WorkspaceOutcome    `json:"workspaces,omitempty"`
-	Skipped     []ir.SkippedItem      `json:"skipped,omitempty"`
-	Errors      []string              `json:"errors,omitempty"`
+	DryRun      bool                `json:"dry_run"`
+	StartedAt   time.Time           `json:"started_at"`
+	FinishedAt  time.Time           `json:"finished_at"`
+	Source      string              `json:"source"`
+	Connections []ConnectionOutcome `json:"connections,omitempty"`
+	Workspaces  []WorkspaceOutcome  `json:"workspaces,omitempty"`
+	Skipped     []ir.SkippedItem    `json:"skipped,omitempty"`
+	Errors      []string            `json:"errors,omitempty"`
 }
 
 // ConnectionOutcome is the per-VCS-connection result. State is
@@ -325,6 +325,14 @@ func (w *Writer) applyWorkspace(ctx context.Context, ws *ir.Workspace, connByRef
 		for _, v := range ws.Variables {
 			out.VarOutcomes = append(out.VarOutcomes, VarOutcome{Key: v.Key, State: "planned"})
 		}
+		// Report the state version that WOULD migrate so the dry-run plan
+		// is complete (the issue's "report exactly what would be created
+		// … state versions"). This only READS the source state for its
+		// metadata (lineage/serial/size) — it never uploads. Reading is
+		// the same safe operation apply does; no Terrapod write happens.
+		if opts.StateForWorkspace != nil {
+			out.StateOutcome = w.planState(ctx, ws.SourceID, opts.StateForWorkspace)
+		}
 		return out
 	}
 
@@ -384,6 +392,10 @@ func (w *Writer) applyWorkspace(ctx context.Context, ws *ir.Workspace, connByRef
 	w.recordWorkspace(ws, "created", "")
 	if rec := w.state.WorkspaceBySourceID(ws.SourceID); rec != nil {
 		rec.TerrapodID = created.ID
+		// Provenance for rollback: WE created this workspace, so rollback
+		// is allowed to delete it. Reused/pre-existing workspaces never
+		// reach this path, so this flag is the safe delete gate.
+		rec.CreatedByMigration = true
 	}
 
 	for i := range ws.Variables {
@@ -396,6 +408,36 @@ func (w *Writer) applyWorkspace(ctx context.Context, ws *ir.Workspace, connByRef
 		out.StateOutcome = w.applyState(ctx, created.ID, ws.SourceID, opts.StateForWorkspace)
 	}
 
+	return out
+}
+
+// planState reads the source state for its metadata only and reports
+// what a real apply WOULD upload — it never writes to Terrapod. Used by
+// the dry-run path so the plan shows the state version (serial/lineage/
+// size) alongside the workspace + variables. A missing/empty source
+// state is reported as "no_source_state"; a read error is reported (so
+// the operator learns about an unreadable backend at plan time) but is
+// non-fatal to the dry-run.
+func (w *Writer) planState(ctx context.Context, sourceID string, reader StateReader) *StateOutcome {
+	out := &StateOutcome{State: "planned"}
+	raw, lineage, serial, err := reader(ctx, sourceID)
+	if err != nil {
+		var none *ErrNoStateForWorkspace
+		if errors.As(err, &none) {
+			out.State = "no_source_state"
+			return out
+		}
+		out.State = "errored"
+		out.Error = fmt.Sprintf("read source state: %v", err)
+		return out
+	}
+	if len(raw) == 0 {
+		out.State = "no_source_state"
+		return out
+	}
+	out.Serial = serial
+	out.Lineage = lineage
+	out.SizeKB = stateSizeKB(len(raw))
 	return out
 }
 
@@ -663,7 +705,6 @@ func (w *Writer) reconcileVariable(ctx context.Context, workspaceID string, req 
 	return nil
 }
 
-
 // ── State plumbing ───────────────────────────────────────────────────
 
 func (w *Writer) recordConnection(c *ir.VCSConnection, state, errMsg string) {
@@ -684,15 +725,17 @@ func (w *Writer) recordWorkspace(ws *ir.Workspace, state, errMsg string) {
 	if rec := w.state.WorkspaceBySourceID(ws.SourceID); rec != nil {
 		rec.State = state
 		rec.Error = errMsg
+		rec.ExpectedVarCount = len(ws.Variables)
 		return
 	}
 	rec := framework.WorkspaceRecord{
-		SourceID:   ws.SourceID,
-		SourceName: ws.Name,
-		State:      state,
-		Error:      errMsg,
-		Labels:     ws.Labels,
-		CreatedAt:  time.Now().UTC(),
+		SourceID:         ws.SourceID,
+		SourceName:       ws.Name,
+		State:            state,
+		Error:            errMsg,
+		Labels:           ws.Labels,
+		ExpectedVarCount: len(ws.Variables),
+		CreatedAt:        time.Now().UTC(),
 	}
 	w.state.Workspaces = append(w.state.Workspaces, rec)
 }
@@ -741,4 +784,3 @@ func collectErrors(r *Report) []string {
 	}
 	return errs
 }
-

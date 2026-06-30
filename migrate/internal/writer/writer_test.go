@@ -487,3 +487,71 @@ func TestApplyState_UploadFails_OrphanRollback(t *testing.T) {
 		t.Errorf("expected rollback DELETE, got %d calls", scenario.deleteCalled)
 	}
 }
+
+func TestWriter_Apply_SetsCreatedByMigrationAndVarCount(t *testing.T) {
+	_, c := newFakeServer(t)
+	state := &framework.State{}
+	w := New(c, state, "")
+	plan := ir.Plan{
+		Source: "tfe",
+		Workspaces: []ir.Workspace{{
+			SourceID: "ws-src-1",
+			Name:     "app",
+			Variables: []ir.Variable{
+				{Key: "region", Value: "eu-west-1", Category: "terraform"},
+				{Key: "tier", Value: "prod", Category: "terraform"},
+			},
+		}},
+	}
+	if _, err := w.Run(t.Context(), plan, Options{DryRun: false}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	rec := state.WorkspaceBySourceID("ws-src-1")
+	if rec == nil || !rec.CreatedByMigration {
+		t.Fatalf("CreatedByMigration must be true after a real create: %+v", rec)
+	}
+	if rec.ExpectedVarCount != 2 {
+		t.Fatalf("ExpectedVarCount = %d, want 2", rec.ExpectedVarCount)
+	}
+}
+
+func TestWriter_Reused_DoesNotSetCreatedByMigration(t *testing.T) {
+	_, c := newFakeServer(t)
+	// Pre-seed a reused workspace (e.g. apply --workspace direct mode):
+	// it has a TerrapodID but was NOT created by the migration.
+	state := &framework.State{Workspaces: []framework.WorkspaceRecord{
+		{SourceID: "direct:app", SourceName: "app", TerrapodID: "ws-pre", State: "created", CreatedByMigration: false},
+	}}
+	w := New(c, state, "")
+	plan := ir.Plan{Source: "atlantis", Workspaces: []ir.Workspace{{SourceID: "direct:app", Name: "app"}}}
+	if _, err := w.Run(t.Context(), plan, Options{DryRun: false}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if rec := state.WorkspaceBySourceID("direct:app"); rec.CreatedByMigration {
+		t.Fatal("reused workspace must NOT be flagged CreatedByMigration — rollback would delete an operator's pre-existing workspace")
+	}
+}
+
+func TestWriter_DryRun_PlansStateWithoutUpload(t *testing.T) {
+	fs, c := newFakeServer(t)
+	state := &framework.State{}
+	w := New(c, state, "")
+	reader := func(_ context.Context, _ string) ([]byte, string, int64, error) {
+		return []byte(`{"serial":5,"lineage":"lin-1"}`), "lin-1", 5, nil
+	}
+	plan := ir.Plan{Source: "tfe", Workspaces: []ir.Workspace{{SourceID: "ws-1", Name: "app"}}}
+	report, err := w.Run(t.Context(), plan, Options{DryRun: true, StateForWorkspace: reader})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if fs.workspacesCreated != 0 {
+		t.Fatalf("dry-run created a workspace")
+	}
+	so := report.Workspaces[0].StateOutcome
+	if so == nil || so.State != "planned" {
+		t.Fatalf("dry-run should report planned state, got %+v", so)
+	}
+	if so.Serial != 5 || so.Lineage != "lin-1" {
+		t.Fatalf("planned state metadata wrong: %+v", so)
+	}
+}

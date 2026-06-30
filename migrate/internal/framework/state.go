@@ -11,28 +11,28 @@
 // Every `apply` run reads and writes a JSON file (default
 // ./migration-state.json; override with --state-file). The file is:
 //
-//   * the idempotency record: SourceID → TerrapodID for every created
+//   - the idempotency record: SourceID → TerrapodID for every created
 //     resource, so re-running `apply` after a partial migration is safe
 //     and resumes where it left off;
-//   * the input the `rewrite` subcommand consumes (Mode 1) to derive
+//   - the input the `rewrite` subcommand consumes (Mode 1) to derive
 //     source/destination hostnames and the set of workspace names to
 //     rewrite — operators don't have to remember those flags after
 //     `apply` runs.
 //
 // Format choices:
 //
-//   * JSON, not YAML. Deterministic representation (sorted keys, fixed
+//   - JSON, not YAML. Deterministic representation (sorted keys, fixed
 //     indentation, no trailing whitespace) makes diffs between
 //     successive runs stable, which matters when an operator is
 //     reviewing what changed during a retry.
-//   * Top-level `version: 1` field. Schema evolution is real — over a
+//   - Top-level `version: 1` field. Schema evolution is real — over a
 //     few minor releases the set of fields we track will grow. The tool
 //     refuses to load a file written by a future version (loud error,
 //     no silent partial-load) and gracefully zero-fills fields added in
 //     versions it understands.
-//   * Wall-clock timestamps are written in RFC3339 UTC to match
+//   - Wall-clock timestamps are written in RFC3339 UTC to match
 //     Terrapod's wider convention.
-//   * Sensitive variable values are NEVER written here. Only metadata
+//   - Sensitive variable values are NEVER written here. Only metadata
 //     (key, category, sensitive flag) lands in the state file.
 package framework
 
@@ -123,11 +123,11 @@ type State struct {
 // the workspace has actually been created on the destination — until
 // then it stays empty and re-running `apply` re-attempts the create.
 type WorkspaceRecord struct {
-	SourceID    string    `json:"source_id"`
-	SourceName  string    `json:"source_name"`
-	TerrapodID  string    `json:"terrapod_id,omitempty"`
-	State       string    `json:"state"` // "pending" | "created" | "errored"
-	Error       string    `json:"error,omitempty"`
+	SourceID     string    `json:"source_id"`
+	SourceName   string    `json:"source_name"`
+	TerrapodID   string    `json:"terrapod_id,omitempty"`
+	State        string    `json:"state"` // "pending" | "created" | "errored" | "rolled_back"
+	Error        string    `json:"error,omitempty"`
 	StateLineage string    `json:"state_lineage,omitempty"`
 	StateSerial  int64     `json:"state_serial,omitempty"`
 	CreatedAt    time.Time `json:"created_at,omitzero"`
@@ -135,6 +135,22 @@ type WorkspaceRecord struct {
 	// rewriter can verify a cloud-block `tags = [...]` selection still
 	// resolves to a migrated workspace.
 	Labels map[string]string `json:"labels,omitempty"`
+
+	// CreatedByMigration is the rollback safety gate. It is set true
+	// ONLY when *this* migration actually created the Terrapod workspace
+	// (a successful CreateWorkspace). It stays false for workspaces the
+	// migration merely *reused* — pre-existing workspaces targeted via
+	// `apply --workspace`, or any workspace that already existed and was
+	// matched by name. `rollback` deletes ONLY CreatedByMigration
+	// records, so it can never delete a workspace the operator owned
+	// before the migration. Older state files (written before this field
+	// existed) decode to false → rollback conservatively skips them.
+	CreatedByMigration bool `json:"created_by_migration,omitempty"`
+
+	// ExpectedVarCount is how many variables the migration wrote/planned
+	// for this workspace. Recorded so `verify` can confirm the
+	// destination still has them all without re-reading the source.
+	ExpectedVarCount int `json:"expected_var_count,omitempty"`
 }
 
 // VCSConnectionRecord — never carries credentials. Just the SourceID →
@@ -261,6 +277,24 @@ func (s *State) WorkspaceBySourceID(sourceID string) *WorkspaceRecord {
 		}
 	}
 	return nil
+}
+
+// RollbackTargets returns the workspace records `rollback` may delete:
+// those THIS migration created (CreatedByMigration) that still carry a
+// TerrapodID and haven't already been rolled back. Reused/pre-existing
+// workspaces and already-rolled-back records are never returned, so the
+// caller can delete the full list without re-checking provenance. The
+// returned slice points into s.Workspaces so the caller can mutate the
+// records (mark rolled_back) and Save.
+func (s *State) RollbackTargets() []*WorkspaceRecord {
+	var out []*WorkspaceRecord
+	for i := range s.Workspaces {
+		r := &s.Workspaces[i]
+		if r.CreatedByMigration && r.TerrapodID != "" && r.State != "rolled_back" {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // WorkspaceBySourceName returns the recorded workspace by source name,

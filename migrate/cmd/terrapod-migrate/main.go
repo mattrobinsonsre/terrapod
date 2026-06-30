@@ -7,7 +7,8 @@
 //	rewrite    — rewrite HCL `cloud {}` / `backend "remote"` / private module
 //	             sources in an operator-supplied local directory tree. Does
 //	             not interact with VCS — operator commits and pushes after.
-//	verify     — re-run plans on migrated workspaces to confirm parity
+//	verify     — confirm migrated workspaces match (state file, or live source)
+//	rollback   — delete what a migration created (reversible migration)
 //	status     — print the contents of the migration state file
 //
 // Migration is dry-run by default; pass --apply to actually write. Every
@@ -43,6 +44,8 @@ func main() {
 		os.Exit(rewriteCmd(rest))
 	case "verify":
 		os.Exit(verifyCmd(rest))
+	case "rollback":
+		os.Exit(rollbackCmd(rest))
 	case "cutover":
 		os.Exit(cutoverCmd(rest))
 	case "version", "-v", "--version":
@@ -69,7 +72,12 @@ SUBCOMMANDS:
   rewrite   Mechanically rewrite HCL cloud{}/backend"remote"{}/private
             module sources in a local directory. No VCS interaction.
   verify    Read back the migrated workspaces from Terrapod and confirm
-            they match the migration state file.
+            they match the migration state file (or, with --source, diff
+            against the live source platform). Exits non-zero on mismatch.
+  rollback  Reverse a migration: delete the workspaces this migration
+            created (recorded in the state file). Default is dry-run;
+            pass --apply to delete. Never deletes pre-existing or
+            already-used workspaces, nor operator-owned VCS connections.
   cutover   Generate the handover Markdown doc; optionally --lock or
             --unlock source workspaces (TFE only) during the cutover.
   status    Print the contents of the migration state file.

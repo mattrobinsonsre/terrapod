@@ -33,9 +33,9 @@ producing half-migrated state.
 ## Status
 
 Available since **v0.27.0**. The `apply`, `status`, `rewrite`, `verify`,
-`cutover`, and `module` subcommands are fully implemented; `terrapod-migrate`
-ships as a GitHub Release artifact (universal-macOS + linux/windows
-amd64+arm64).
+`rollback`, `cutover`, and `module` subcommands are fully implemented;
+`terrapod-migrate` ships as a GitHub Release artifact (universal-macOS +
+linux/windows amd64+arm64).
 
 ## Subcommands
 
@@ -45,10 +45,67 @@ amd64+arm64).
 - `terrapod-migrate rewrite` — mechanically rewrite HCL `cloud {}` /
   `backend "remote"` blocks and private module sources in a local
   directory tree. No VCS interaction — operator commits and pushes after.
-- `terrapod-migrate verify` — re-run plans on migrated workspaces to
-  confirm parity with what the source produced.
+- `terrapod-migrate verify` — confirm each migrated workspace still
+  matches what the migration recorded: it's present, the variable count
+  is intact, and the state serial/lineage is unchanged. Exits non-zero on
+  any mismatch.
+- `terrapod-migrate rollback` — reverse a migration by deleting the
+  workspaces it created. Dry-run by default; pass `--apply` to delete.
+  Safe by construction (see [Reversibility](#reversibility-dry-run--rollback)).
 - `terrapod-migrate status` — print the contents of the migration state
   file.
+
+## Reversibility: dry-run + rollback
+
+Reversibility is what makes a migration approvable — "we can undo it"
+removes the largest switching-cost objection. The migration is therefore
+**dry-run by default at both ends** and fully undoable.
+
+**1. Preview with a dry-run.** `apply` writes nothing without `--apply`.
+The dry-run reports exactly what *would* be created — every workspace,
+variable, VCS-connection wiring, and **state version** (it reads the
+source state to report its serial/lineage/size, but uploads nothing) —
+plus the skipped-items report. Add `--json` for a machine-readable plan.
+
+```bash
+terrapod-migrate apply --source tfe --tfe-org acme --target https://terrapod.example.com --json   # preview
+terrapod-migrate apply --source tfe --tfe-org acme --target https://terrapod.example.com --apply  # commit
+```
+
+**2. Verify it landed.**
+
+```bash
+terrapod-migrate verify --target https://terrapod.example.com   # exits non-zero on any parity mismatch
+```
+
+**3. Roll back if it goes sideways.** `rollback` reads the state file and
+deletes the workspaces the migration created (cascading their variables
+and state). It is built to never destroy anything it shouldn't:
+
+```bash
+terrapod-migrate rollback --target https://terrapod.example.com           # dry-run: lists what would be deleted
+terrapod-migrate rollback --target https://terrapod.example.com --apply   # delete
+```
+
+Safety guarantees:
+
+- **Provenance gate** — deletes ONLY workspaces *this migration created*.
+  Workspaces it merely reused (anything pre-existing, including
+  `apply --workspace` direct targets) are never deleted.
+- **Advanced-state guard** — before deleting, it checks the workspace's
+  current state serial. If the workspace has been *used* since the
+  migration (serial advanced past what was migrated), it is skipped;
+  pass `--force` only if you really mean to discard that post-migration
+  work. A destination it can't read is left alone (no blind deletes)
+  unless `--force`.
+- **VCS connections are never touched** — the migrator only ever matched
+  pre-existing, operator-owned connections, so rollback leaves them in
+  place.
+- **Idempotent** — re-running is safe; already-deleted workspaces are
+  recorded as rolled back and skipped.
+
+So the end-to-end flow is "import in an afternoon, and roll back cleanly
+if it doesn't go to plan."
 
 ## The migration state file
 
