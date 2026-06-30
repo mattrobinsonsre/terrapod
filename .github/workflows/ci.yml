@@ -568,6 +568,25 @@ jobs:
               --set redis.url=redis://redis:6379)
           echo "$stock" | grep -q "component: backup" && { echo "FAIL: backup CronJob rendered by default (should be opt-in)"; exit 1; }
           echo "backup + DR-drill CronJobs render OK and are off by default (#545)"
+      - name: Preflight identity-doctor Jobs render and are off by default (#571)
+        run: |
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            template terrapod helm/terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 \
+              --set api.config.storage.backend=s3 --set api.config.storage.s3.bucket=b \
+              --set preflight.enabled=true)
+          echo "$out" | grep -q "terrapod.cli.preflight" || { echo "FAIL: preflight entrypoint missing"; exit 1; }
+          echo "$out" | grep -q "component: preflight" || { echo "FAIL: preflight component label missing"; exit 1; }
+          echo "$out" | grep -q "preflight-runner" || { echo "FAIL: runner-SA preflight Job missing (s3 backend)"; exit 1; }
+          echo "$out" | grep -q 'helm.sh/hook' || { echo "FAIL: preflight not a Helm hook"; exit 1; }
+          # Off by default.
+          stock=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            template terrapod helm/terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379)
+          echo "$stock" | grep -q "component: preflight" && { echo "FAIL: preflight rendered by default (should be opt-in)"; exit 1; }
+          echo "preflight Jobs render OK and are off by default (#571)"
 
   # ── Config-channel contract (#617) ────────────────────
   # Renders the chart (every values profile) and parses the rendered ConfigMaps

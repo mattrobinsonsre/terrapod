@@ -433,6 +433,40 @@ listener:
 
 ---
 
+## Preflight doctor: catch identity mistakes before the first run
+
+Workload identity fails closed and late — the first plan run errors cryptically
+mid-`init`. The **preflight doctor** catches an OIDC-trust / SA-binding mismatch
+up front by exercising the *same code path* the platform uses, under the real
+ServiceAccounts:
+
+- the **API SA** — initialise the configured storage backend and **list** the
+  bucket (proves read access), resolve the cloud identity (AWS STS
+  `GetCallerIdentity` / GCP SA email / Azure token), and connect to PostgreSQL;
+- the **runner SA** — resolve its cloud identity (runners need it for provider
+  auth).
+
+Each check prints a clear ✓/✗ and the resolved identity, and a failure exits
+non-zero with a pointer back to this troubleshooting section.
+
+**As a Helm hook (opt-in).** Turn it on so a misconfigured trust policy fails
+`helm install/upgrade` loudly instead of the first run failing later:
+
+```yaml
+preflight:
+  enabled: true     # runs as a post-install/upgrade hook; a ✗ fails the release
+```
+
+**On demand against a running release** (no chart change):
+
+```bash
+make preflight-identity                          # RELEASE=terrapod NAMESPACE=terrapod
+RELEASE=tp NAMESPACE=infra make preflight-identity
+```
+
+It renders the preflight Jobs from the same chart, runs them under the real SAs,
+and streams the report. A ✗ maps directly to the failure modes below.
+
 ## Troubleshooting: top failure modes
 
 Workload identity fails closed and the errors are often opaque. The three most common causes, with how to diagnose each:

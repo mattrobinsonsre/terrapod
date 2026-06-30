@@ -11,6 +11,7 @@
 	pentest pentest-sast pentest-images pentest-dast \
 	dev dev-down \
 	ai-eval \
+	preflight-identity \
 	clean test-down \
 	help
 
@@ -30,6 +31,9 @@ test-python:        ## Test Python only (Docker)
 
 helm-config-contract: ## Config-channel contract: render chart + parse via real config models (#617)
 	scripts/helm-config-contract.sh
+
+preflight-identity:  ## Cloud-identity preflight against a running release. e.g. RELEASE=tp NAMESPACE=infra make preflight-identity
+	scripts/preflight-identity.sh
 
 ai-eval:            ## Run the AI-analysis eval harness (live model). e.g. make ai-eval ARGS="run --model bedrock/us.anthropic.claude-sonnet-4-6 -n 3"
 	scripts/ai-eval.sh $(ARGS)

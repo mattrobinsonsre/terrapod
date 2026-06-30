@@ -71,6 +71,7 @@ How each capability is turned on. **Platform-level** features are Helm values un
 
 | Capability | How to enable | Doc |
 |---|---|---|
+| Cloud-identity preflight doctor | `preflight.enabled` (off by default; Helm hook) or `make preflight-identity` — verifies SA→cloud role + object-store read + DB before first run | [cloud-credentials.md](docs/cloud-credentials.md#preflight-doctor-catch-identity-mistakes-before-the-first-run) |
 | Cloud-IAM **database** auth | `api.config.database.auth_mode` = `aws_iam` \| `gcp_iam` \| `azure_ad` (default `password`) | [cloud-credentials.md](docs/cloud-credentials.md) |
 | Cloud-IAM **Redis/Valkey** auth | `api.config.redis.auth_mode` = `aws_iam` \| `gcp_iam` \| `azure_ad` (default `password`); requires a `rediss://` URL | [cloud-credentials.md](docs/cloud-credentials.md) |
 | AI plan summary | `api.config.ai_summary.enabled` + provider/model config | [ai-plan-summary.md](docs/ai-plan-summary.md) |

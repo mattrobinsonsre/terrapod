@@ -723,6 +723,21 @@ backup:
     resources: {}
     postgresResources: {}
 
+# ── Cloud-identity preflight doctor (#571) ────────────────────────────────────
+# OFF by default. When enabled, runs as a Helm post-install/upgrade hook so a
+# misconfigured OIDC trust policy / SA binding fails the install LOUDLY instead
+# of the first run failing cryptically. Two Jobs: the API ServiceAccount
+# (storage read + cloud identity + DB connect) and the runner ServiceAccount
+# (cloud identity only). A failing hook fails `helm install/upgrade` — that's the
+# point. Also runnable on demand via `make preflight-identity`.
+preflight:
+  enabled: false
+  checkRunner: true              # also probe the runner SA's cloud identity
+  hook: "post-install,post-upgrade"
+  hookWeight: "5"
+  backoffLimit: 0
+  resources: {}
+
 # ── Web UI (Next.js) ──────────────────────────────────────────────────────────
 # The web frontend is the BFF (Backend-For-Frontend): all browser, CLI, and
 # listener traffic enters through it and is proxied to the API. The Ingress

@@ -1,0 +1,182 @@
+{{- if ne .Values.api.enabled false }}
+{{- if and .Values.preflight .Values.preflight.enabled }}
+{{- $dbAuthMode := (.Values.api.config.database).auth_mode | default "password" }}
+{{- $dbIam := or (eq $dbAuthMode "aws_iam") (eq $dbAuthMode "gcp_iam") (eq $dbAuthMode "azure_ad") }}
+{{- $dbCa := or .Values.api.databaseCA.inline .Values.api.databaseCA.existingConfigMap }}
+{{- $fs := eq .Values.api.config.storage.backend "filesystem" }}
+{{- $hook := .Values.preflight.hook | default "post-install,post-upgrade" }}
+{{- $weight := .Values.preflight.hookWeight | default "5" }}
+# Cloud-identity + object-store preflight (#571). OFF by default. When enabled
+# it runs as a Helm hook so a misconfigured OIDC trust policy / SA binding fails
+# the install/upgrade loudly INSTEAD of the first run failing cryptically. Two
+# Jobs: the API SA (storage + identity + DB) and the runner SA (identity only).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "terrapod.fullname" . }}-preflight-api-{{ .Release.Revision }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: preflight
+  annotations:
+    "helm.sh/hook": {{ $hook | quote }}
+    "helm.sh/hook-weight": {{ $weight | quote }}
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.preflight.backoffLimit | default 0 }}
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "terrapod.labels" . | nindent 8 }}
+        app.kubernetes.io/component: preflight
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "terrapod.serviceAccountName" . }}
+      restartPolicy: Never
+      securityContext:
+        {{- toYaml .Values.api.podSecurityContext | nindent 8 }}
+      {{- if eq (include "terrapod.caBundle.enabled" .) "true" }}
+      initContainers:
+        {{- include "terrapod.caBundle.initContainer" (dict "root" . "image" (include "terrapod.api.image" .) "pullPolicy" .Values.api.image.pullPolicy) | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: preflight
+          image: {{ include "terrapod.api.image" . }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          command: ["python", "-m", "terrapod.cli.preflight"]
+          env:
+            - name: TP_PREFLIGHT_MODE
+              value: "full"
+            - name: TERRAPOD_STORAGE__FILESYSTEM__HMAC_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "terrapod.fullname" . }}-storage
+                  key: hmac-secret
+                  optional: true
+            {{- $pgSecret := include "terrapod.postgresql.secretName" . }}
+            {{- if $pgSecret }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: {{ include "terrapod.postgresql.secretKey" . }}
+            {{- else if .Values.postgresql.url }}
+            - name: DATABASE_URL
+              value: {{ .Values.postgresql.url | quote }}
+            {{- end }}
+            {{- if $dbIam }}
+            - name: TP_DB_AUTH_MODE
+              value: {{ $dbAuthMode | quote }}
+            - name: TP_DB_AWS_IAM_REGION
+              value: {{ (.Values.api.config.database).aws_iam_region | default "" | quote }}
+            - name: TP_DB_SSL_MODE
+              value: {{ (.Values.api.config.database).ssl_mode | default "" | quote }}
+            - name: TP_DB_SSL_ROOT_CERT
+              {{- if $dbCa }}
+              value: {{ printf "/etc/terrapod/db-ca/%s" (.Values.api.databaseCA.key | default "ca.pem") | quote }}
+              {{- else }}
+              value: {{ (.Values.api.config.database).ssl_root_cert | default "" | quote }}
+              {{- end }}
+            {{- end }}
+            {{- include "terrapod.proxyEnv" . | nindent 12 }}
+            {{- include "terrapod.caBundle.env" . | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/terrapod
+              readOnly: true
+            {{- if $fs }}
+            - name: storage
+              mountPath: {{ .Values.api.config.storage.filesystem.root_dir }}
+              readOnly: true
+            {{- end }}
+            {{- if and $dbIam $dbCa }}
+            - name: database-ca
+              mountPath: /etc/terrapod/db-ca
+              readOnly: true
+            {{- end }}
+            {{- include "terrapod.caBundle.volumeMounts" . | nindent 12 }}
+          resources:
+            {{- toYaml (.Values.preflight.resources | default dict) | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.api.containerSecurityContext | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "terrapod.fullname" . }}-api-config
+        {{- if $fs }}
+        - name: storage
+          {{- if .Values.storage.filesystem.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "terrapod.fullname" . }}-storage
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- end }}
+        {{- if and $dbIam $dbCa }}
+        - name: database-ca
+          configMap:
+            name: {{ .Values.api.databaseCA.existingConfigMap | default (printf "%s-database-ca" (include "terrapod.fullname" .)) }}
+        {{- end }}
+        {{- include "terrapod.caBundle.volumes" . | nindent 8 }}
+{{- if and (ne .Values.preflight.checkRunner false) (not $fs) }}
+---
+# Runner SA identity probe — confirms the runner ServiceAccount's cloud
+# workload-identity binding resolves (runners need it for provider auth).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "terrapod.fullname" . }}-preflight-runner-{{ .Release.Revision }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+    app.kubernetes.io/component: preflight
+  annotations:
+    "helm.sh/hook": {{ $hook | quote }}
+    "helm.sh/hook-weight": {{ $weight | quote }}
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.preflight.backoffLimit | default 0 }}
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "terrapod.labels" . | nindent 8 }}
+        app.kubernetes.io/component: preflight
+      {{- if .Values.runners.azureWorkloadIdentity }}
+        azure.workload.identity/use: "true"
+      {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "terrapod.runnerServiceAccountName" . }}
+      restartPolicy: Never
+      securityContext:
+        {{- toYaml .Values.api.podSecurityContext | nindent 8 }}
+      containers:
+        - name: preflight-runner
+          image: {{ include "terrapod.api.image" . }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          command: ["python", "-m", "terrapod.cli.preflight"]
+          env:
+            - name: TP_PREFLIGHT_MODE
+              value: "identity"
+            {{- include "terrapod.proxyEnv" . | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/terrapod
+              readOnly: true
+          resources:
+            {{- toYaml (.Values.preflight.resources | default dict) | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.api.containerSecurityContext | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "terrapod.fullname" . }}-api-config
+{{- end }}
+{{- end }}
+{{- end }}

@@ -318,6 +318,19 @@
       }
     },
 
+    "preflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "checkRunner": { "type": "boolean" },
+        "hook": { "type": "string" },
+        "hookWeight": { "type": "string" },
+        "backoffLimit": { "type": "integer", "minimum": 0 },
+        "resources": { "type": "object" }
+      }
+    },
+
     "postgresql": {
       "type": "object",
       "additionalProperties": false,

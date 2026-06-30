@@ -287,7 +287,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Audit Logging](docs/audit-logging.md) | Immutable event log, query API, retention |
 | [Artifact Retention](docs/artifact-retention.md) | Retention + purge of run logs, plans, and config tarballs |
 | [Runners](docs/runners.md) | Agent pools, the listener/runner ARC model, custom runner images |
-| [Cloud Credentials](docs/cloud-credentials.md) | AWS IRSA, GCP WIF, Azure WI setup |
+| [Cloud Credentials](docs/cloud-credentials.md) | AWS IRSA, GCP WIF, Azure WI setup + a preflight doctor that verifies SA→role + object-store access before the first run |
 | [Service Catalog](docs/service-catalog.md) | No-code self-service provisioning over the module registry |
 | [Monitoring](docs/monitoring.md) | Prometheus metrics, scraping, shipped Grafana dashboard + alert rules (with per-alert runbooks) |
 | [Optional Webhook Ingress](docs/deployment-webhook-ingress.md) | Split public webhook ingress so the management plane can stay private |
