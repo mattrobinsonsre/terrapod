@@ -9,6 +9,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.auth import capabilities as cap
 from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
 
@@ -1230,3 +1231,70 @@ class TestRetryRun:
 
         assert resp.status_code == 422
         mock_create_run.assert_not_called()
+
+
+class TestGranularCapabilityEnforcement:
+    """A capability set that matches NO preset is enforced per-gate — the
+    granularity capability RBAC exists to enable (levels cannot express
+    'plan but not apply and not cancel'). #585."""
+
+    _GRANULAR = frozenset({cap.RUN_PLAN, cap.RUN_READ})  # no run:apply, no run:cancel
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_granular_role_can_plan(self, mock_resolve, mock_create_run, mock_queue, *mocks):
+        mock_resolve.return_value = self._GRANULAR
+        ws = _mock_workspace()
+        run = _mock_run(ws_id=ws.id, plan_only=True, status="queued")
+        mock_create_run.return_value = run
+        mock_queue.return_value = run
+        app, mock_db = _make_app(_user())
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = result
+        mock_db.refresh = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"plan-only": True},
+                        "relationships": {"workspace": {"data": {"id": f"ws-{ws.id}"}}},
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_granular_role_cannot_apply(self, mock_resolve, *mocks):
+        # Same set that passed plan — but an apply run needs run:apply, which
+        # this role lacks. A 'plan' LEVEL would also block apply; the point is
+        # this set is NOT a level (it also lacks lock/state-read/cancel), yet
+        # each gate is enforced on its own capability.
+        mock_resolve.return_value = self._GRANULAR
+        ws = _mock_workspace()
+        app, mock_db = _make_app(_user())
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = result
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {},
+                        "relationships": {"workspace": {"data": {"id": f"ws-{ws.id}"}}},
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 403
+        assert "run:apply" in resp.json()["detail"]
