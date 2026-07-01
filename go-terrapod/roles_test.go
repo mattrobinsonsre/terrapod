@@ -199,3 +199,47 @@ func TestDeleteRole(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestRole_CapabilitiesRoundTrip(t *testing.T) {
+	var lastBody []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body != nil {
+			b, _ := io.ReadAll(r.Body)
+			lastBody = b
+			_ = r.Body.Close()
+		}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.WriteHeader(http.StatusCreated)
+		// Server echoes the effective caps + a derived "custom" workspace level.
+		_, _ = w.Write([]byte(`{"data":{"name":"granular","type":"roles","attributes":{
+		  "workspace-permission":"custom","pool-permission":"read","registry-permission":"read",
+		  "catalog-permission":"none","capabilities":["run:plan","run:read","var:read","var:write"],
+		  "built-in":false
+		}}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c, err := NewClient(Options{BaseURL: srv.URL, Token: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := c.CreateRole(t.Context(), CreateRoleRequest{
+		Name:         "granular",
+		Capabilities: []string{"run:read", "run:plan", "var:read", "var:write"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Request carries the capabilities list.
+	if !strings.Contains(string(lastBody), `"capabilities"`) ||
+		!strings.Contains(string(lastBody), `"run:plan"`) {
+		t.Errorf("create body missing capabilities: %s", lastBody)
+	}
+	// Response capabilities are parsed back (regression: roleFromItem must read
+	// the capabilities attribute, not drop it).
+	if len(r.Capabilities) != 4 {
+		t.Fatalf("capabilities not parsed: %+v", r.Capabilities)
+	}
+	if r.WorkspacePermission != "custom" {
+		t.Errorf("derived level should be custom: %q", r.WorkspacePermission)
+	}
+}

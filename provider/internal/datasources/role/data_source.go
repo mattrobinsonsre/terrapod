@@ -31,6 +31,7 @@ type roleDataSourceModel struct {
 	PoolPermission      types.String `tfsdk:"pool_permission"`
 	RegistryPermission  types.String `tfsdk:"registry_permission"`
 	CatalogPermission   types.String `tfsdk:"catalog_permission"`
+	Capabilities        types.Set    `tfsdk:"capabilities"`
 	BuiltIn             types.Bool   `tfsdk:"built_in"`
 	CreatedAt           types.String `tfsdk:"created_at"`
 	UpdatedAt           types.String `tfsdk:"updated_at"`
@@ -57,7 +58,8 @@ func (d *roleDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, r
 			"workspace_permission": schema.StringAttribute{Computed: true, Description: "Permission level."},
 			"pool_permission":      schema.StringAttribute{Computed: true, Description: "Agent pool permission level: read, write, or admin."},
 			"registry_permission":  schema.StringAttribute{Computed: true, Description: "Registry (modules + providers) permission level: read, write, or admin."},
-			"catalog_permission":   schema.StringAttribute{Computed: true, Description: "Service-catalog permission level: none, read, use, or admin."},
+			"catalog_permission":   schema.StringAttribute{Computed: true, Description: "Service-catalog permission level: none, read, use, or admin. May be \"custom\" when the role is authored via capabilities."},
+			"capabilities":         schema.SetAttribute{Computed: true, ElementType: types.StringType, Description: "Effective capability set as \"resource:verb\" tokens — the explicit set when authored directly, or the expansion of the permission levels otherwise."},
 			"built_in":             schema.BoolAttribute{Computed: true, Description: "Whether the role is built-in."},
 			"created_at":           schema.StringAttribute{Computed: true, Description: "Creation timestamp."},
 			"updated_at":           schema.StringAttribute{Computed: true, Description: "Update timestamp."},
@@ -105,6 +107,13 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	config.PoolPermission = types.StringValue(role.PoolPermission)
 	config.RegistryPermission = types.StringValue(role.RegistryPermission)
 	config.CatalogPermission = types.StringValue(role.CatalogPermission)
+	if len(role.Capabilities) > 0 {
+		val, dl := types.SetValueFrom(ctx, types.StringType, role.Capabilities)
+		resp.Diagnostics.Append(dl...)
+		config.Capabilities = val
+	} else {
+		config.Capabilities = types.SetNull(types.StringType)
+	}
 	config.BuiltIn = types.BoolValue(role.BuiltIn)
 	config.CreatedAt = types.StringValue(role.CreatedAt)
 	config.UpdatedAt = types.StringValue(role.UpdatedAt)

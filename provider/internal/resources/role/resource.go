@@ -25,6 +25,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
@@ -50,6 +51,7 @@ type roleModel struct {
 	PoolPermission      types.String `tfsdk:"pool_permission"`
 	RegistryPermission  types.String `tfsdk:"registry_permission"`
 	CatalogPermission   types.String `tfsdk:"catalog_permission"`
+	Capabilities        types.Set    `tfsdk:"capabilities"`
 
 	BuiltIn   types.Bool   `tfsdk:"built_in"`
 	CreatedAt types.String `tfsdk:"created_at"`
@@ -111,12 +113,29 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Optional:    true,
 				ElementType: types.StringType,
 			},
+			// The four *_permission level fields are Optional+Computed
+			// (#585). When `capabilities` is authored the server treats the
+			// explicit capability set as the stored truth and DERIVES these
+			// levels as a summary — which is a preset name OR the literal
+			// string "custom" when the caps match no preset. A user who
+			// authors capabilities won't have written these fields (or wrote
+			// values that won't match the derived summary), so they must be
+			// Computed to accept the server-returned value (including
+			// "custom") without a permanent plan diff. They stay Optional so
+			// authoring by level (the common case) still works. No validators
+			// restrict them to read/plan/write/admin — the read path can now
+			// legitimately return "custom", so an OneOf validator would
+			// wrongly reject a capability-authored role's derived level.
 			"workspace_permission": schema.StringAttribute{
-				Description: "Workspace permission level: read, plan, write, or admin.",
-				Required:    true,
+				Description: "Workspace permission level: read, plan, write, or admin. Server-derived (may be \"custom\") when capabilities are authored.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"pool_permission": schema.StringAttribute{
-				Description: "Agent pool permission level: read, write, or admin. Defaults to read.",
+				Description: "Agent pool permission level: read, write, or admin. Defaults to read. Server-derived (may be \"custom\") when capabilities are authored.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -124,7 +143,7 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			"registry_permission": schema.StringAttribute{
-				Description: "Registry permission level for modules and providers: read, write, or admin. Defaults to read.",
+				Description: "Registry permission level for modules and providers: read, write, or admin. Defaults to read. Server-derived (may be \"custom\") when capabilities are authored.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -132,11 +151,28 @@ func (r *roleResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				},
 			},
 			"catalog_permission": schema.StringAttribute{
-				Description: "Service-catalog permission level: none, read, use, or admin. Opt-in (no everyone floor); defaults to none.",
+				Description: "Service-catalog permission level: none, read, use, or admin. Opt-in (no everyone floor); defaults to none. Server-derived (may be \"custom\") when capabilities are authored.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			// capabilities (#585) — explicit "resource:verb" tokens. Chosen as
+			// Optional+Computed (the cleaner choice, per the issue): when the
+			// user authors it, it is the stored truth and the level fields
+			// above become a derived summary; when the user authors by LEVEL
+			// instead, the server still returns the effective (expanded)
+			// capability set for that level, and Computed lets that expanded
+			// set land in state without a diff. UseStateForUnknown keeps the
+			// value stable across plans when the config doesn't change.
+			"capabilities": schema.SetAttribute{
+				Description: "Explicit capability set as \"resource:verb\" tokens. When authored it is the source of truth and the *_permission levels become a server-derived summary (possibly \"custom\"). When omitted, reflects the effective capabilities the authored levels expand to.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.Set{
+					setplanmodifier.UseStateForUnknown(),
 				},
 			},
 
@@ -277,6 +313,13 @@ func buildCreateRoleRequest(m *roleModel) terrapod.CreateRoleRequest {
 	if !m.CatalogPermission.IsNull() && !m.CatalogPermission.IsUnknown() {
 		req.CatalogPermission = m.CatalogPermission.ValueString()
 	}
+	// Only send capabilities when the user authored them. Because the
+	// attribute is Computed, an unauthored value comes through as Unknown
+	// (never Null) on Create — guard on both so we never send the derived
+	// set back as if it were authored.
+	if !m.Capabilities.IsNull() && !m.Capabilities.IsUnknown() {
+		req.Capabilities = sliceFromTFSet(m.Capabilities)
+	}
 	if !m.Description.IsNull() {
 		req.Description = m.Description.ValueString()
 	}
@@ -311,6 +354,12 @@ func buildUpdateRoleRequest(m *roleModel) terrapod.UpdateRoleRequest {
 	}
 	if !m.CatalogPermission.IsNull() && !m.CatalogPermission.IsUnknown() {
 		req.CatalogPermission = m.CatalogPermission.ValueString()
+	}
+	// Send capabilities on update only when authored (non-null, known).
+	// An unauthored (Computed) capabilities field is Unknown in the plan;
+	// sending the previously-derived set would wrongly pin it as authored.
+	if !m.Capabilities.IsNull() && !m.Capabilities.IsUnknown() {
+		req.Capabilities = sliceFromTFSet(m.Capabilities)
 	}
 	if !m.Description.IsNull() && !m.Description.IsUnknown() {
 		d := m.Description.ValueString()
@@ -352,6 +401,18 @@ func readRoleFromSDK(ctx context.Context, role *terrapod.Role, m *roleModel) dia
 		m.CatalogPermission = types.StringValue(role.CatalogPermission)
 	} else {
 		m.CatalogPermission = types.StringValue("none")
+	}
+
+	// capabilities always come back from the server (the effective set,
+	// whether authored directly or expanded from the levels). Setting a
+	// non-null value here — even when the user authored by level — is what
+	// keeps the Computed attribute from perpetually diffing.
+	if len(role.Capabilities) > 0 {
+		val, d := types.SetValueFrom(ctx, types.StringType, role.Capabilities)
+		diags.Append(d...)
+		m.Capabilities = val
+	} else {
+		m.Capabilities = types.SetNull(types.StringType)
 	}
 
 	m.BuiltIn = types.BoolValue(role.BuiltIn)
@@ -429,4 +490,14 @@ func sliceFromTFListOrEmpty(l types.List) []string {
 		return []string{}
 	}
 	return sliceFromTFList(l)
+}
+
+// sliceFromTFSet projects a Terraform Set of strings into a Go slice.
+// Caller is responsible for guarding against IsNull/IsUnknown.
+func sliceFromTFSet(s types.Set) []string {
+	out := make([]string, 0, len(s.Elements()))
+	for _, v := range s.Elements() {
+		out = append(out, v.(types.String).ValueString())
+	}
+	return out
 }

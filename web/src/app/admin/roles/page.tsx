@@ -23,11 +23,169 @@ interface Role {
     'pool-permission': string | null
     'registry-permission': string | null
     'catalog-permission': string | null
+    capabilities?: string[]
     'allow-labels': Record<string, string>
     'allow-names': string[]
     'deny-labels': Record<string, string>
     'deny-names': string[]
   }
+}
+
+// ── Capability catalog (#585) ────────────────────────────────────────────────
+// The grantable capability tokens, grouped by resource (the part before ':').
+// Mirrors the server catalog in services/terrapod/auth/capabilities.py /
+// docs/rbac-capabilities.md — the four label-scoped axes (workspace/pool/
+// registry/catalog). platform:* tokens are NOT grantable and are excluded.
+// Ordering within a group follows the read→plan→write→admin tiering for
+// readability; the actual grant is an arbitrary subset of these.
+const CAPABILITY_GROUPS: { resource: string; label: string; caps: string[] }[] = [
+  {
+    resource: 'workspace',
+    label: 'Workspace',
+    caps: ['workspace:read', 'workspace:lock', 'workspace:settings', 'workspace:force-unlock', 'workspace:delete'],
+  },
+  {
+    resource: 'run',
+    label: 'Run',
+    caps: ['run:read', 'run:plan', 'run:cancel', 'run:apply', 'run:apply-destroy'],
+  },
+  {
+    resource: 'state',
+    label: 'State',
+    caps: ['state:read-metadata', 'state:read', 'state:write', 'state:delete'],
+  },
+  { resource: 'var', label: 'Variables', caps: ['var:read', 'var:write'] },
+  { resource: 'config', label: 'Config', caps: ['config:read', 'config:upload'] },
+  { resource: 'drift', label: 'Drift', caps: ['drift:dismiss'] },
+  { resource: 'run-task', label: 'Run tasks', caps: ['run-task:read', 'run-task:manage'] },
+  { resource: 'notification', label: 'Notifications', caps: ['notification:read', 'notification:manage'] },
+  { resource: 'run-trigger', label: 'Run triggers', caps: ['run-trigger:read', 'run-trigger:manage'] },
+  { resource: 'pool', label: 'Agent pools', caps: ['pool:read', 'pool:assign', 'pool:manage'] },
+  { resource: 'registry', label: 'Registry', caps: ['registry:read', 'registry:write', 'registry:admin'] },
+  { resource: 'catalog', label: 'Service catalog', caps: ['catalog:read', 'catalog:use', 'catalog:admin'] },
+]
+
+// Every grantable token, flat — used to filter unknown/platform tokens out of a
+// role's effective set before rendering the matrix, and to detect "extra"
+// tokens the UI catalog doesn't know about (forward-compat).
+const ALL_CAPABILITIES: string[] = CAPABILITY_GROUPS.flatMap((g) => g.caps)
+const ALL_CAPABILITIES_SET = new Set(ALL_CAPABILITIES)
+
+// ── Preset → capability expansion ────────────────────────────────────────────
+// Mirrors _WORKSPACE_LEVELS / _POOL_LEVELS / _REGISTRY_LEVELS / _CATALOG_LEVELS
+// (cumulative). Selecting the preset dropdowns pre-checks exactly these boxes;
+// this is the same expansion the server applies when a role is level-authored.
+const WORKSPACE_LEVELS: Record<string, string[]> = {
+  read: ['workspace:read', 'run:read', 'state:read-metadata', 'var:read', 'config:read', 'run-task:read', 'notification:read', 'run-trigger:read'],
+}
+WORKSPACE_LEVELS.plan = [...WORKSPACE_LEVELS.read, 'run:plan', 'run:cancel', 'workspace:lock', 'state:read', 'drift:dismiss']
+WORKSPACE_LEVELS.write = [...WORKSPACE_LEVELS.plan, 'run:apply', 'run:apply-destroy', 'var:write', 'state:write', 'config:upload']
+WORKSPACE_LEVELS.admin = [...WORKSPACE_LEVELS.write, 'workspace:settings', 'workspace:force-unlock', 'workspace:delete', 'state:delete', 'notification:manage', 'run-task:manage', 'run-trigger:manage']
+
+const POOL_LEVELS: Record<string, string[]> = {
+  read: ['pool:read'],
+  write: ['pool:read', 'pool:assign'],
+  admin: ['pool:read', 'pool:assign', 'pool:manage'],
+}
+const REGISTRY_LEVELS: Record<string, string[]> = {
+  read: ['registry:read'],
+  write: ['registry:read', 'registry:write'],
+  admin: ['registry:read', 'registry:write', 'registry:admin'],
+}
+const CATALOG_LEVELS: Record<string, string[]> = {
+  none: [],
+  read: ['catalog:read'],
+  use: ['catalog:read', 'catalog:use'],
+  admin: ['catalog:read', 'catalog:use', 'catalog:admin'],
+}
+
+// Expand the four preset dropdowns into the set of capabilities they grant
+// (union across axes), matching the server's expand_preset().
+function expandPresets(ws: string, pool: string, registry: string, catalog: string): Set<string> {
+  return new Set<string>([
+    ...(WORKSPACE_LEVELS[ws] || []),
+    ...(POOL_LEVELS[pool] || []),
+    ...(REGISTRY_LEVELS[registry] || []),
+    ...(CATALOG_LEVELS[catalog] || []),
+  ])
+}
+
+function setsEqual(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) return false
+  for (const x of a) if (!b.has(x)) return false
+  return true
+}
+
+// A grouped checkbox matrix over the grantable capability catalog. `selected`
+// is the current grant; `onToggle` flips one token. `custom` surfaces whether
+// the selection has diverged from the preset dropdowns. Any selected token not
+// in the known catalog (forward-compat: a newer server capability) is shown as
+// a read-only chip so it isn't silently dropped on save.
+function CapabilityMatrix({
+  selected,
+  onToggle,
+  custom,
+  idPrefix,
+}: {
+  selected: Set<string>
+  onToggle: (cap: string) => void
+  custom: boolean
+  idPrefix: string
+}) {
+  const unknown = Array.from(selected).filter((c) => !ALL_CAPABILITIES_SET.has(c)).sort()
+  return (
+    <div className="mt-2 rounded-lg border border-slate-700/50 bg-slate-900/40 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-slate-400">
+          {selected.size} {selected.size === 1 ? 'capability' : 'capabilities'} selected
+        </span>
+        {custom ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/50 text-purple-300">Custom</span>
+        ) : (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-400">Matches presets</span>
+        )}
+      </div>
+      <p className="text-xs text-slate-500 mb-3">
+        Selecting a preset above pre-checks its capabilities. Ticking or unticking a box past a preset marks the role
+        <span className="text-purple-300"> Custom</span> and its grant is sent as an explicit capability set.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+        {CAPABILITY_GROUPS.map((group) => (
+          <div key={group.resource}>
+            <div className="text-xs font-medium text-slate-300 mb-1">{group.label}</div>
+            <div className="space-y-1">
+              {group.caps.map((cap) => {
+                const verb = cap.split(':')[1]
+                const id = `${idPrefix}-cap-${cap.replace(/[:]/g, '-')}`
+                return (
+                  <label key={cap} htmlFor={id} className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      id={id}
+                      type="checkbox"
+                      checked={selected.has(cap)}
+                      onChange={() => onToggle(cap)}
+                      className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
+                    />
+                    <span className="text-xs text-slate-300 font-mono">{verb}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      {unknown.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-slate-700/50">
+          <div className="text-xs text-slate-500 mb-1">Other capabilities (preserved on save)</div>
+          <div className="flex flex-wrap gap-1">
+            {unknown.map((c) => (
+              <span key={c} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-700 text-slate-300">{c}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 interface RoleAssignment {
@@ -72,6 +230,11 @@ export default function RolesPage() {
   const [roleCatalogPermission, setRoleCatalogPermission] = useState('none')
   const [roleDenyNames, setRoleDenyNames] = useState('')
   const [creatingRole, setCreatingRole] = useState(false)
+  // Capability authoring (create). `roleCaps` is the working matrix selection;
+  // `roleCapsCustom` flips true once the user diverges from the preset expansion.
+  const [showCreateCaps, setShowCreateCaps] = useState(false)
+  const [roleCaps, setRoleCaps] = useState<Set<string>>(() => expandPresets('read', 'read', 'read', 'none'))
+  const [roleCapsCustom, setRoleCapsCustom] = useState(false)
 
   // Edit role
   const [editingRole, setEditingRole] = useState<string | null>(null)
@@ -85,9 +248,16 @@ export default function RolesPage() {
   const [editRoleCatalogPermission, setEditRoleCatalogPermission] = useState('none')
   const [editRoleDenyNames, setEditRoleDenyNames] = useState('')
   const [savingRole, setSavingRole] = useState(false)
+  // Capability authoring (edit).
+  const [showEditCaps, setShowEditCaps] = useState(false)
+  const [editRoleCaps, setEditRoleCaps] = useState<Set<string>>(new Set())
+  const [editRoleCapsCustom, setEditRoleCapsCustom] = useState(false)
 
   // Delete role
   const [deleteRoleName, setDeleteRoleName] = useState<string | null>(null)
+
+  // Display: which role rows have their capability list expanded
+  const [expandedCaps, setExpandedCaps] = useState<Set<string>>(new Set())
 
   // Assignments
   const [assignments, setAssignments] = useState<RoleAssignment[]>([])
@@ -174,6 +344,63 @@ export default function RolesPage() {
     return Object.entries(labels).map(([k, v]) => v ? `${k}=${v}` : k).join(', ')
   }
 
+  // ── Create-form capability matrix helpers ─────────────────────────────────
+  // Changing a preset dropdown re-derives the matrix from all four presets and
+  // clears the "custom" flag (the presets are once again the source of truth).
+  function setCreatePreset(axis: 'w' | 'p' | 'r' | 'c', value: string) {
+    const w = axis === 'w' ? value : rolePermission
+    const p = axis === 'p' ? value : rolePoolPermission
+    const r = axis === 'r' ? value : roleRegistryPermission
+    const c = axis === 'c' ? value : roleCatalogPermission
+    if (axis === 'w') setRolePermission(value)
+    if (axis === 'p') setRolePoolPermission(value)
+    if (axis === 'r') setRoleRegistryPermission(value)
+    if (axis === 'c') setRoleCatalogPermission(value)
+    setRoleCaps(expandPresets(w, p, r, c))
+    setRoleCapsCustom(false)
+  }
+
+  // Ticking/unticking a box updates the set and flips to "custom" if it no
+  // longer matches the current preset expansion.
+  function toggleCreateCap(cap: string) {
+    const next = new Set(roleCaps)
+    if (next.has(cap)) next.delete(cap)
+    else next.add(cap)
+    setRoleCaps(next)
+    setRoleCapsCustom(!setsEqual(next, expandPresets(rolePermission, rolePoolPermission, roleRegistryPermission, roleCatalogPermission)))
+  }
+
+  // ── Edit-form capability matrix helpers ───────────────────────────────────
+  function setEditPreset(axis: 'w' | 'p' | 'r' | 'c', value: string) {
+    const w = axis === 'w' ? value : editRolePermission
+    const p = axis === 'p' ? value : editRolePoolPermission
+    const r = axis === 'r' ? value : editRoleRegistryPermission
+    const c = axis === 'c' ? value : editRoleCatalogPermission
+    if (axis === 'w') setEditRolePermission(value)
+    if (axis === 'p') setEditRolePoolPermission(value)
+    if (axis === 'r') setEditRoleRegistryPermission(value)
+    if (axis === 'c') setEditRoleCatalogPermission(value)
+    setEditRoleCaps(expandPresets(w, p, r, c))
+    setEditRoleCapsCustom(false)
+  }
+
+  function toggleEditCap(cap: string) {
+    const next = new Set(editRoleCaps)
+    if (next.has(cap)) next.delete(cap)
+    else next.add(cap)
+    setEditRoleCaps(next)
+    setEditRoleCapsCustom(!setsEqual(next, expandPresets(editRolePermission, editRolePoolPermission, editRoleRegistryPermission, editRoleCatalogPermission)))
+  }
+
+  function toggleExpandCaps(name: string) {
+    setExpandedCaps((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+
   async function handleCreateRole(e: React.FormEvent) {
     e.preventDefault()
     setCreatingRole(true)
@@ -183,10 +410,16 @@ export default function RolesPage() {
       const attrs: Record<string, unknown> = {
         name: roleName,
         description: roleDesc,
-        'workspace-permission': rolePermission,
-        'pool-permission': rolePoolPermission,
-        'registry-permission': roleRegistryPermission,
-        'catalog-permission': roleCatalogPermission,
+      }
+      // If the user customised the capability matrix, author the role by its
+      // explicit capability set; otherwise send the four preset level fields.
+      if (roleCapsCustom) {
+        attrs['capabilities'] = Array.from(roleCaps).sort()
+      } else {
+        attrs['workspace-permission'] = rolePermission
+        attrs['pool-permission'] = rolePoolPermission
+        attrs['registry-permission'] = roleRegistryPermission
+        attrs['catalog-permission'] = roleCatalogPermission
       }
       if (roleAllowLabels.trim()) attrs['allow-labels'] = parseLabels(roleAllowLabels)
       if (roleAllowNames.trim()) attrs['allow-names'] = roleAllowNames.split(',').map((s) => s.trim()).filter(Boolean)
@@ -213,6 +446,9 @@ export default function RolesPage() {
       setRoleAllowNames('')
       setRoleDenyLabels('')
       setRoleDenyNames('')
+      setRoleCaps(expandPresets('read', 'read', 'read', 'none'))
+      setRoleCapsCustom(false)
+      setShowCreateCaps(false)
       setShowCreateRole(false)
       await loadRoles()
     } catch (err) {
@@ -223,16 +459,35 @@ export default function RolesPage() {
   }
 
   function startEditRole(role: Role) {
+    const a = role.attributes
     setEditingRole(role.name)
-    setEditRoleDesc(role.attributes.description || '')
-    setEditRolePermission(role.attributes['workspace-permission'] || 'read')
-    setEditRolePoolPermission(role.attributes['pool-permission'] || 'read')
-    setEditRoleRegistryPermission(role.attributes['registry-permission'] || 'read')
-    setEditRoleCatalogPermission(role.attributes['catalog-permission'] || 'none')
-    setEditRoleAllowLabels(formatLabels(role.attributes['allow-labels'] || {}))
-    setEditRoleAllowNames((role.attributes['allow-names'] || []).join(', '))
-    setEditRoleDenyLabels(formatLabels(role.attributes['deny-labels'] || {}))
-    setEditRoleDenyNames((role.attributes['deny-names'] || []).join(', '))
+    setEditRoleDesc(a.description || '')
+    // The server may report a derived level of "custom" per axis when the role's
+    // stored capabilities don't match any preset — coerce those to the floor
+    // preset for the dropdown so it stays a valid <option>. The capability matrix
+    // (seeded below) carries the true grant.
+    const coerce = (v: string | null, floor: string) => (v && v !== 'custom' ? v : floor)
+    const ws = coerce(a['workspace-permission'], 'read')
+    const pool = coerce(a['pool-permission'], 'read')
+    const registry = coerce(a['registry-permission'], 'read')
+    const catalog = coerce(a['catalog-permission'], 'none')
+    setEditRolePermission(ws)
+    setEditRolePoolPermission(pool)
+    setEditRoleRegistryPermission(registry)
+    setEditRoleCatalogPermission(catalog)
+    // Seed the matrix from the role's effective capabilities (restricted to the
+    // known grantable catalog). If that set matches the preset expansion, the
+    // role is preset-authored; otherwise it's custom (and editing keeps it so).
+    const effective = new Set((a.capabilities || []).filter((c) => ALL_CAPABILITIES_SET.has(c)))
+    const presetCaps = expandPresets(ws, pool, registry, catalog)
+    const isCustom = a.capabilities !== undefined && !setsEqual(effective, presetCaps)
+    setEditRoleCaps(isCustom ? effective : presetCaps)
+    setEditRoleCapsCustom(isCustom)
+    setShowEditCaps(isCustom)
+    setEditRoleAllowLabels(formatLabels(a['allow-labels'] || {}))
+    setEditRoleAllowNames((a['allow-names'] || []).join(', '))
+    setEditRoleDenyLabels(formatLabels(a['deny-labels'] || {}))
+    setEditRoleDenyNames((a['deny-names'] || []).join(', '))
   }
 
   async function handleSaveRole() {
@@ -243,14 +498,22 @@ export default function RolesPage() {
     try {
       const attrs: Record<string, unknown> = {
         description: editRoleDesc,
-        'workspace-permission': editRolePermission,
-        'pool-permission': editRolePoolPermission,
-        'registry-permission': editRoleRegistryPermission,
-        'catalog-permission': editRoleCatalogPermission,
         'allow-labels': parseLabels(editRoleAllowLabels),
         'allow-names': editRoleAllowNames.split(',').map((s) => s.trim()).filter(Boolean),
         'deny-labels': parseLabels(editRoleDenyLabels),
         'deny-names': editRoleDenyNames.split(',').map((s) => s.trim()).filter(Boolean),
+      }
+      // Custom matrix → author by explicit capabilities (server derives the level
+      // summary). Otherwise send the preset levels (server expands them). Sending
+      // level fields on a previously capability-authored role reverts it to
+      // preset-authoring, which is the intended behaviour of using the dropdowns.
+      if (editRoleCapsCustom) {
+        attrs['capabilities'] = Array.from(editRoleCaps).sort()
+      } else {
+        attrs['workspace-permission'] = editRolePermission
+        attrs['pool-permission'] = editRolePoolPermission
+        attrs['registry-permission'] = editRoleRegistryPermission
+        attrs['catalog-permission'] = editRoleCatalogPermission
       }
       const res = await apiFetch(`/api/terrapod/v1/roles/${editingRole}`, {
         method: 'PATCH',
@@ -346,8 +609,10 @@ export default function RolesPage() {
     switch (p) {
       case 'admin': return 'bg-red-900/50 text-red-300'
       case 'write': return 'bg-orange-900/50 text-orange-300'
+      case 'use': return 'bg-orange-900/50 text-orange-300'
       case 'plan': return 'bg-blue-900/50 text-blue-300'
       case 'read': return 'bg-green-900/50 text-green-300'
+      case 'custom': return 'bg-purple-900/50 text-purple-300'
       default: return 'bg-slate-700 text-slate-400'
     }
   }
@@ -414,7 +679,7 @@ export default function RolesPage() {
                   </div>
                   <div>
                     <label htmlFor="r-perm" className="block text-sm font-medium text-slate-300 mb-1">Workspace Permission</label>
-                    <select id="r-perm" value={rolePermission} onChange={(e) => setRolePermission(e.target.value)}
+                    <select id="r-perm" value={rolePermission} onChange={(e) => setCreatePreset('w', e.target.value)}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       <option value="read">read</option>
                       <option value="plan">plan</option>
@@ -424,7 +689,7 @@ export default function RolesPage() {
                   </div>
                   <div>
                     <label htmlFor="r-pool-perm" className="block text-sm font-medium text-slate-300 mb-1">Pool Permission</label>
-                    <select id="r-pool-perm" value={rolePoolPermission} onChange={(e) => setRolePoolPermission(e.target.value)}
+                    <select id="r-pool-perm" value={rolePoolPermission} onChange={(e) => setCreatePreset('p', e.target.value)}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       <option value="read">read</option>
                       <option value="write">write</option>
@@ -433,7 +698,7 @@ export default function RolesPage() {
                   </div>
                   <div>
                     <label htmlFor="r-registry-perm" className="block text-sm font-medium text-slate-300 mb-1">Registry Permission</label>
-                    <select id="r-registry-perm" value={roleRegistryPermission} onChange={(e) => setRoleRegistryPermission(e.target.value)}
+                    <select id="r-registry-perm" value={roleRegistryPermission} onChange={(e) => setCreatePreset('r', e.target.value)}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       <option value="read">read</option>
                       <option value="write">write</option>
@@ -442,7 +707,7 @@ export default function RolesPage() {
                   </div>
                   <div>
                     <label htmlFor="r-catalog-perm" className="block text-sm font-medium text-slate-300 mb-1">Catalog Permission</label>
-                    <select id="r-catalog-perm" value={roleCatalogPermission} onChange={(e) => setRoleCatalogPermission(e.target.value)}
+                    <select id="r-catalog-perm" value={roleCatalogPermission} onChange={(e) => setCreatePreset('c', e.target.value)}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       <option value="none">none</option>
                       <option value="read">read</option>
@@ -450,6 +715,16 @@ export default function RolesPage() {
                       <option value="admin">admin</option>
                     </select>
                   </div>
+                </div>
+                <div>
+                  <button type="button" onClick={() => setShowCreateCaps(!showCreateCaps)}
+                    className="text-xs text-brand-400 hover:text-brand-300">
+                    {showCreateCaps ? '▾ ' : '▸ '}Advanced — capabilities
+                    {roleCapsCustom && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/50 text-purple-300">Custom</span>}
+                  </button>
+                  {showCreateCaps && (
+                    <CapabilityMatrix selected={roleCaps} onToggle={toggleCreateCap} custom={roleCapsCustom} idPrefix="create" />
+                  )}
                 </div>
                 <div>
                   <label htmlFor="r-desc" className="block text-sm font-medium text-slate-300 mb-1">Description</label>
@@ -515,7 +790,7 @@ export default function RolesPage() {
                             </div>
                             <div>
                               <label className="block text-xs text-slate-500 mb-1">Workspace Permission</label>
-                              <select value={editRolePermission} onChange={(e) => setEditRolePermission(e.target.value)}
+                              <select value={editRolePermission} onChange={(e) => setEditPreset('w', e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
                                 <option value="read">read</option>
                                 <option value="plan">plan</option>
@@ -525,7 +800,7 @@ export default function RolesPage() {
                             </div>
                             <div>
                               <label className="block text-xs text-slate-500 mb-1">Pool Permission</label>
-                              <select value={editRolePoolPermission} onChange={(e) => setEditRolePoolPermission(e.target.value)}
+                              <select value={editRolePoolPermission} onChange={(e) => setEditPreset('p', e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
                                 <option value="read">read</option>
                                 <option value="write">write</option>
@@ -534,7 +809,7 @@ export default function RolesPage() {
                             </div>
                             <div>
                               <label className="block text-xs text-slate-500 mb-1">Registry Permission</label>
-                              <select value={editRoleRegistryPermission} onChange={(e) => setEditRoleRegistryPermission(e.target.value)}
+                              <select value={editRoleRegistryPermission} onChange={(e) => setEditPreset('r', e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
                                 <option value="read">read</option>
                                 <option value="write">write</option>
@@ -543,7 +818,7 @@ export default function RolesPage() {
                             </div>
                             <div>
                               <label className="block text-xs text-slate-500 mb-1">Catalog Permission</label>
-                              <select value={editRoleCatalogPermission} onChange={(e) => setEditRoleCatalogPermission(e.target.value)}
+                              <select value={editRoleCatalogPermission} onChange={(e) => setEditPreset('c', e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
                                 <option value="none">none</option>
                                 <option value="read">read</option>
@@ -571,6 +846,16 @@ export default function RolesPage() {
                               <input type="text" value={editRoleDenyNames} onChange={(e) => setEditRoleDenyNames(e.target.value)}
                                 className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                             </div>
+                          </div>
+                          <div>
+                            <button type="button" onClick={() => setShowEditCaps(!showEditCaps)}
+                              className="text-xs text-brand-400 hover:text-brand-300">
+                              {showEditCaps ? '▾ ' : '▸ '}Advanced — capabilities
+                              {editRoleCapsCustom && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-900/50 text-purple-300">Custom</span>}
+                            </button>
+                            {showEditCaps && (
+                              <CapabilityMatrix selected={editRoleCaps} onToggle={toggleEditCap} custom={editRoleCapsCustom} idPrefix={`edit-${role.name}`} />
+                            )}
                           </div>
                         </div>
                       ) : (
@@ -603,6 +888,25 @@ export default function RolesPage() {
                               )}
                             </div>
                             {a.description && <p className="text-xs text-slate-400 mb-2">{a.description}</p>}
+                            {(a.capabilities || []).length > 0 && (
+                              <div className="mb-2">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpandCaps(role.name)}
+                                  className="text-xs text-slate-400 hover:text-slate-200"
+                                >
+                                  {expandedCaps.has(role.name) ? '▾ ' : '▸ '}
+                                  {a.capabilities!.length} {a.capabilities!.length === 1 ? 'capability' : 'capabilities'}
+                                </button>
+                                {expandedCaps.has(role.name) && (
+                                  <div className="mt-1.5 flex flex-wrap gap-1">
+                                    {[...a.capabilities!].sort().map((c) => (
+                                      <span key={c} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-700/70 text-slate-300">{c}</span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                               {Object.keys(a['allow-labels'] || {}).length > 0 && (
                                 <span>Allow: {formatLabels(a['allow-labels'])}</span>
