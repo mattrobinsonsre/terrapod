@@ -5,10 +5,10 @@ of the single highest LEVEL a principal has on a resource, this returns the SET
 of capabilities they hold on it, so gates can check one capability
 (``has_capability(caps, RUN_PLAN)``) rather than a level threshold.
 
-A role's contribution is its explicit ``capabilities`` if populated (capability
-authoring), else ``expand_preset(role's levels)`` (migrated / level-authored
-roles) — so create/update need not expand on write. Sliced to the axis being
-resolved. Owner / platform-admin / audit / everyone-floor / runner-floor /
+A role's contribution is its persisted ``capabilities`` (always populated —
+migration back-fills it, create/update expand the level shorthand into it), with
+a defensive ``expand_preset(role's levels)`` fallback for any empty legacy row.
+Sliced to the axis being resolved. Owner / platform-admin / audit / everyone-floor / runner-floor /
 catalog-managed-clamp / token-attenuation all mirror the scalar resolvers
 exactly; the equivalence test (``test_capability_resolver``) asserts, for every
 preset role shape, that this layer agrees with ``expand_preset(scalar_level)``.
@@ -33,8 +33,10 @@ AXES = ("workspace", "pool", "registry", "catalog")
 
 
 def role_effective_capabilities(role: Role) -> frozenset[str]:
-    """A role's full capability set: stored ``capabilities`` if any, else the
-    expansion of its legacy level fields. Normalised (aliases upgraded)."""
+    """A role's full capability set. ``capabilities`` is persisted on every write
+    (the migration back-fills it; create/update expand the level shorthand into
+    it), so it is the source of truth; the ``expand_preset`` fallback is defensive
+    for any legacy row with an empty set. Normalised (aliases upgraded)."""
     caps = role.capabilities or cap.expand_preset(
         workspace_permission=role.workspace_permission,
         pool_permission=role.pool_permission,

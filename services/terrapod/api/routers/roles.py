@@ -213,12 +213,20 @@ async def create_role(
         registry_permission=registry_perm,
         catalog_permission=catalog_perm,
     )
-    # Capability-authoring (#585): if the caller supplies an explicit capability
-    # set it becomes the stored truth and the levels above are recomputed as its
-    # derived summary. Otherwise the role is level-authored (capabilities stays
-    # empty; enforcement expands the levels).
+    # Capabilities are always persisted as the role's individual permissions
+    # (#585). An explicit `capabilities` set is stored verbatim (and the levels
+    # become its derived summary); otherwise the chosen levels are a shorthand
+    # that expands into the persisted capability set. Either way enforcement
+    # reads the stored capabilities — the levels are only an authoring aid.
     if "capabilities" in attrs:
         _apply_capabilities(role, attrs["capabilities"])
+    else:
+        role.capabilities = expand_preset(
+            workspace_permission=ws_perm,
+            pool_permission=pool_perm,
+            registry_permission=registry_perm,
+            catalog_permission=catalog_perm,
+        )
     db.add(role)
     await db.commit()
     await db.refresh(role)
@@ -281,12 +289,11 @@ async def update_role(
         "registry-permission",
         "catalog-permission",
     }
-    # A level edit on a role that was capability-authored (or migrated) must take
-    # effect: clear the stored caps so enforcement expands the new levels (no
-    # expand-on-write — the resolver falls back). Applied after the level fields
-    # are updated below. Capability-authoring wins over any level fields sent
-    # alongside it (the caps are the truth).
-    revert_to_levels = "capabilities" not in attrs and bool(_level_keys & attrs.keys())
+    # A level edit (without an explicit capabilities set) re-expands the levels
+    # into the persisted capability set below, so the edit takes effect —
+    # capabilities are always the stored truth; levels are the authoring
+    # shorthand. Capability-authoring wins over any level fields sent alongside.
+    reexpand_levels = "capabilities" not in attrs and bool(_level_keys & attrs.keys())
     if "capabilities" in attrs:
         _apply_capabilities(role, attrs["capabilities"])
     # Level fields are only honoured when not capability-authoring (caps win).
@@ -318,10 +325,14 @@ async def update_role(
                 )
             role.catalog_permission = catalog_perm
 
-    if revert_to_levels:
-        # The role's granular stored caps (if any) no longer reflect the edited
-        # levels — drop them so enforcement expands the new levels.
-        role.capabilities = []
+    if reexpand_levels:
+        # Persist the expansion of the (edited) levels as the role's capabilities.
+        role.capabilities = expand_preset(
+            workspace_permission=role.workspace_permission,
+            pool_permission=role.pool_permission,
+            registry_permission=role.registry_permission,
+            catalog_permission=role.catalog_permission,
+        )
 
     await db.commit()
     await db.refresh(role)

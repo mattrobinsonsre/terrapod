@@ -860,11 +860,12 @@ class TestCapabilityAuthoring:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    async def test_update_level_edit_reverts_stored_caps(self, *mocks):
+    async def test_update_level_edit_reexpands_stored_caps(self, *mocks):
         from terrapod.auth import capabilities as cap
 
         # A migrated/cap-authored role whose stored caps are for "read"; editing
-        # the level to "admin" must take effect (caps cleared -> expand new level).
+        # the level to "admin" must take effect (the levels re-expand into the
+        # persisted capability set).
         role = _mock_role(name="dev-team", ws_perm="read")
         app, mock_db = _make_app(_user())
         result = MagicMock()
