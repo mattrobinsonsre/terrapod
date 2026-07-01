@@ -1,9 +1,21 @@
 # Capability-based RBAC (#585)
 
-> **Status:** design contract. This document is the source of the gate →
-> capability mapping that `services/terrapod/auth/capabilities.py` encodes and
-> that the enforcement layer (a follow-up slice) checks against. It is the
-> faithfulness proof for the migration that back-fills existing roles.
+> **Status:** implemented. Enforcement across every workspace/pool/registry/
+> catalog gate checks capabilities (not level thresholds); roles can be authored
+> with an explicit `capabilities` set via the API, `terrapod` provider, and web
+> UI. This document is the source of the gate → capability mapping that
+> `services/terrapod/auth/capabilities.py` encodes, and the faithfulness contract
+> for the migration that back-filled existing roles — existing (level-authored)
+> roles are unaffected.
+>
+> **Authoring.** A role is either *level-authored* (pick a preset per axis:
+> workspace `read`/`plan`/`write`/`admin`, pool/registry `read`/`write`/`admin`,
+> catalog `none`/`read`/`use`/`admin`) or *capability-authored* (send an explicit
+> `capabilities` list of `resource:verb` tokens; the level fields are then
+> returned as a derived summary — a preset name, or `custom` when the set matches
+> no preset). Capabilities are the stored, enforced truth; a role's response
+> always includes its **effective** `capabilities`. Only the grantable tokens
+> below are accepted (the `platform:*` tokens are not yet grantable — see #642).
 
 ## Model
 

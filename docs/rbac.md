@@ -56,6 +56,30 @@ Pool permission resolution follows the same order as workspace permissions:
 5. **`everyone` role** — pools with label `access: everyone` → `read`
 6. **Default** → no access (pool is invisible)
 
+### Fine-grained capabilities
+
+The permission *levels* above (read/plan/write/admin, etc.) are **presets** over
+an explicit set of **capabilities** — `resource:verb` tokens such as `run:plan`,
+`run:apply`, `run:apply-destroy`, `var:write`, `state:read`, `workspace:delete`.
+Enforcement checks the specific capability a request needs, so a role can grant,
+for example, *plan but not apply*, or *apply but not destroy*, or *manage
+variables without confirming applies* — grants the four levels cannot express.
+
+- A role is either **level-authored** (pick a preset per axis — the common case)
+  or **capability-authored** (supply an explicit `capabilities` list). When you
+  author capabilities, the level fields become a derived summary (a preset name,
+  or `custom`).
+- A role's API response always includes its **effective** `capabilities` (the
+  explicit set, or the expansion of its levels), so the API/UI show exactly what
+  is enforced.
+- Existing roles were migrated faithfully — turning on capability enforcement
+  changed nothing for them.
+
+See **[Capability-based RBAC](rbac-capabilities.md)** for the full capability
+catalogue and the gate → capability mapping. Author capabilities via the API
+(`capabilities` attribute on create/update role), the `terrapod_role` provider
+resource (`capabilities`), or the web roles page ("Advanced — capabilities").
+
 ### Platform Permissions
 
 | Operation | Required Role |
