@@ -58,6 +58,12 @@ type CreateRoleRequest struct {
 	PoolPermission      string
 	RegistryPermission  string
 	CatalogPermission   string
+
+	// Capabilities authors the role's grant directly as explicit
+	// "resource:verb" tokens (#585). When set it is the source of truth and
+	// the *Permission level fields are ignored (the server derives them as a
+	// summary). Leave empty to author by level instead.
+	Capabilities []string
 }
 
 // UpdateRoleRequest is the partial-update shape. Name is immutable.
@@ -76,6 +82,10 @@ type UpdateRoleRequest struct {
 	PoolPermission      string
 	RegistryPermission  string
 	CatalogPermission   string
+
+	// Capabilities replaces the role's grant with the given explicit
+	// capability set (#585); when non-empty it wins over the level fields.
+	Capabilities []string
 }
 
 // CreateRole creates a custom role. Admin required.
@@ -145,6 +155,9 @@ func roleCreateAttrs(req CreateRoleRequest) map[string]any {
 	if req.CatalogPermission != "" {
 		attrs["catalog-permission"] = req.CatalogPermission
 	}
+	if len(req.Capabilities) > 0 {
+		attrs["capabilities"] = req.Capabilities
+	}
 	if req.Description != "" {
 		attrs["description"] = req.Description
 	}
@@ -170,6 +183,9 @@ func roleUpdateAttrs(req UpdateRoleRequest) map[string]any {
 	}
 	if req.CatalogPermission != "" {
 		attrs["catalog-permission"] = req.CatalogPermission
+	}
+	if len(req.Capabilities) > 0 {
+		attrs["capabilities"] = req.Capabilities
 	}
 	if req.Description != nil {
 		attrs["description"] = *req.Description

@@ -22,7 +22,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, require_admin, require_admin_or_audit
 from terrapod.auth.builtin_roles import BUILTIN_ROLES, is_builtin_role
-from terrapod.auth.capabilities import capabilities_for_builtin
+from terrapod.auth.capabilities import (
+    GRANTABLE_CAPABILITIES,
+    capabilities_for_builtin,
+    expand_preset,
+    normalize_capabilities,
+    summarize_capabilities,
+)
 from terrapod.db.models import Role
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -44,6 +50,49 @@ def _rfc3339(dt) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _effective_capabilities(role: Role) -> list[str]:
+    """The capability set a role actually grants: its stored ``capabilities`` if
+    populated (capability-authored / migrated), else the expansion of its legacy
+    level fields (a level-only role). Mirrors the enforcement resolver so the API
+    shows exactly what it enforces (#585)."""
+    if role.capabilities:
+        return list(role.capabilities)
+    return expand_preset(
+        workspace_permission=role.workspace_permission,
+        pool_permission=role.pool_permission,
+        registry_permission=role.registry_permission,
+        catalog_permission=role.catalog_permission,
+    )
+
+
+def _validate_capabilities(caps_in) -> list[str]:
+    """Normalise (alias-upgrade) then reject any token that is not a grantable
+    capability — platform:* and typos are refused here (422)."""
+    if not isinstance(caps_in, list) or not all(isinstance(c, str) for c in caps_in):
+        raise HTTPException(status_code=422, detail="capabilities must be a list of strings")
+    normalized = normalize_capabilities(caps_in)
+    unknown = sorted(set(normalized) - GRANTABLE_CAPABILITIES)
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown or non-grantable capabilities: {unknown}",
+        )
+    return normalized
+
+
+def _apply_capabilities(role: Role, caps_in) -> None:
+    """Capability-author a role: store the validated set and recompute the level
+    fields as the derived summary (a preset name per axis, or ``custom``) so the
+    legacy level columns stay a faithful, display-only cache of the caps."""
+    caps = _validate_capabilities(caps_in)
+    role.capabilities = caps
+    summary = summarize_capabilities(caps)
+    role.workspace_permission = summary["workspace_permission"]
+    role.pool_permission = summary["pool_permission"]
+    role.registry_permission = summary["registry_permission"]
+    role.catalog_permission = summary["catalog_permission"]
+
+
 def _role_json(role: Role) -> dict:
     return {
         "name": role.name,
@@ -54,14 +103,16 @@ def _role_json(role: Role) -> dict:
             "allow-names": role.allow_names,
             "deny-labels": role.deny_labels,
             "deny-names": role.deny_names,
+            # Level fields are the authored shorthand for level-only roles and a
+            # derived summary ("custom" where the caps match no preset) for
+            # capability-authored roles.
             "workspace-permission": role.workspace_permission,
             "pool-permission": role.pool_permission,
             "registry-permission": role.registry_permission,
             "catalog-permission": role.catalog_permission,
-            # The explicit capability set this role grants (#585). Existing roles
-            # were back-filled from their permission levels by the migration;
-            # going forward new roles are authored with capabilities directly.
-            "capabilities": role.capabilities,
+            # The explicit capability set this role grants + enforces (#585) —
+            # authored directly, or expanded from the levels for a level-only role.
+            "capabilities": _effective_capabilities(role),
             "built-in": False,
             "created-at": _rfc3339(role.created_at),
             "updated-at": _rfc3339(role.updated_at),
@@ -162,6 +213,12 @@ async def create_role(
         registry_permission=registry_perm,
         catalog_permission=catalog_perm,
     )
+    # Capability-authoring (#585): if the caller supplies an explicit capability
+    # set it becomes the stored truth and the levels above are recomputed as its
+    # derived summary. Otherwise the role is level-authored (capabilities stays
+    # empty; enforcement expands the levels).
+    if "capabilities" in attrs:
+        _apply_capabilities(role, attrs["capabilities"])
     db.add(role)
     await db.commit()
     await db.refresh(role)
@@ -217,30 +274,54 @@ async def update_role(
         role.deny_labels = attrs["deny-labels"]
     if "deny-names" in attrs:
         role.deny_names = attrs["deny-names"]
-    if "workspace-permission" in attrs:
-        ws_perm = attrs["workspace-permission"]
-        if ws_perm not in VALID_PERMISSIONS:
-            raise HTTPException(status_code=422, detail=f"Invalid workspace-permission: {ws_perm}")
-        role.workspace_permission = ws_perm
-    if "pool-permission" in attrs:
-        pool_perm = attrs["pool-permission"]
-        if pool_perm not in VALID_POOL_PERMISSIONS:
-            raise HTTPException(status_code=422, detail=f"Invalid pool-permission: {pool_perm}")
-        role.pool_permission = pool_perm
-    if "registry-permission" in attrs:
-        registry_perm = attrs["registry-permission"]
-        if registry_perm not in VALID_REGISTRY_PERMISSIONS:
-            raise HTTPException(
-                status_code=422, detail=f"Invalid registry-permission: {registry_perm}"
-            )
-        role.registry_permission = registry_perm
-    if "catalog-permission" in attrs:
-        catalog_perm = attrs["catalog-permission"]
-        if catalog_perm not in VALID_CATALOG_PERMISSIONS:
-            raise HTTPException(
-                status_code=422, detail=f"Invalid catalog-permission: {catalog_perm}"
-            )
-        role.catalog_permission = catalog_perm
+
+    _level_keys = {
+        "workspace-permission",
+        "pool-permission",
+        "registry-permission",
+        "catalog-permission",
+    }
+    # A level edit on a role that was capability-authored (or migrated) must take
+    # effect: clear the stored caps so enforcement expands the new levels (no
+    # expand-on-write — the resolver falls back). Applied after the level fields
+    # are updated below. Capability-authoring wins over any level fields sent
+    # alongside it (the caps are the truth).
+    revert_to_levels = "capabilities" not in attrs and bool(_level_keys & attrs.keys())
+    if "capabilities" in attrs:
+        _apply_capabilities(role, attrs["capabilities"])
+    # Level fields are only honoured when not capability-authoring (caps win).
+    if "capabilities" not in attrs:
+        if "workspace-permission" in attrs:
+            ws_perm = attrs["workspace-permission"]
+            if ws_perm not in VALID_PERMISSIONS:
+                raise HTTPException(
+                    status_code=422, detail=f"Invalid workspace-permission: {ws_perm}"
+                )
+            role.workspace_permission = ws_perm
+        if "pool-permission" in attrs:
+            pool_perm = attrs["pool-permission"]
+            if pool_perm not in VALID_POOL_PERMISSIONS:
+                raise HTTPException(status_code=422, detail=f"Invalid pool-permission: {pool_perm}")
+            role.pool_permission = pool_perm
+        if "registry-permission" in attrs:
+            registry_perm = attrs["registry-permission"]
+            if registry_perm not in VALID_REGISTRY_PERMISSIONS:
+                raise HTTPException(
+                    status_code=422, detail=f"Invalid registry-permission: {registry_perm}"
+                )
+            role.registry_permission = registry_perm
+        if "catalog-permission" in attrs:
+            catalog_perm = attrs["catalog-permission"]
+            if catalog_perm not in VALID_CATALOG_PERMISSIONS:
+                raise HTTPException(
+                    status_code=422, detail=f"Invalid catalog-permission: {catalog_perm}"
+                )
+            role.catalog_permission = catalog_perm
+
+    if revert_to_levels:
+        # The role's granular stored caps (if any) no longer reflect the edited
+        # levels — drop them so enforcement expands the new levels.
+        role.capabilities = []
 
     await db.commit()
     await db.refresh(role)

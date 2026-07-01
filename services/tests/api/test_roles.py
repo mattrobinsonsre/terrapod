@@ -782,3 +782,103 @@ class TestRoleAssignments:
                 headers=_AUTH,
             )
         assert resp.status_code == 404
+
+
+class TestCapabilityAuthoring:
+    """Direct capability authoring on roles (#585)."""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_with_granular_capabilities(self, *mocks):
+        from terrapod.auth import capabilities as cap
+
+        granular = [cap.RUN_READ, cap.RUN_PLAN, cap.VAR_READ, cap.VAR_WRITE]
+        app, mock_db = _make_app(_user())
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = result
+        mock_db.refresh = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/roles",
+                json={"data": {"name": "granular", "attributes": {"capabilities": granular}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201
+        attrs = resp.json()["data"]["attributes"]
+        # Round-trips as the stored truth; the level field is the derived summary
+        # ("custom" — this set matches no preset).
+        assert set(attrs["capabilities"]) == set(granular)
+        assert attrs["workspace-permission"] == "custom"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_create_rejects_ungrantable_capability(self, *mocks):
+        app, mock_db = _make_app(_user())
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = result
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/terrapod/v1/roles",
+                json={
+                    "data": {
+                        "name": "bad",
+                        # platform:* is not grantable (it's #642, not this feature).
+                        "attributes": {"capabilities": ["workspace:read", "platform:role-admin"]},
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+        assert "platform:role-admin" in resp.json()["detail"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_update_with_capabilities_replaces(self, *mocks):
+        from terrapod.auth import capabilities as cap
+
+        role = _mock_role(name="dev-team", ws_perm="read")
+        app, mock_db = _make_app(_user())
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = role
+        mock_db.execute.return_value = result
+        mock_db.refresh = AsyncMock()
+        new_caps = [cap.RUN_READ, cap.VAR_READ, cap.VAR_WRITE]
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                "/api/terrapod/v1/roles/dev-team",
+                json={"data": {"attributes": {"capabilities": new_caps}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200
+        assert set(resp.json()["data"]["attributes"]["capabilities"]) == set(new_caps)
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_update_level_edit_reverts_stored_caps(self, *mocks):
+        from terrapod.auth import capabilities as cap
+
+        # A migrated/cap-authored role whose stored caps are for "read"; editing
+        # the level to "admin" must take effect (caps cleared -> expand new level).
+        role = _mock_role(name="dev-team", ws_perm="read")
+        app, mock_db = _make_app(_user())
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = role
+        mock_db.execute.return_value = result
+        mock_db.refresh = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                "/api/terrapod/v1/roles/dev-team",
+                json={"data": {"attributes": {"workspace-permission": "admin"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["workspace-permission"] == "admin"
+        # The effective caps now reflect admin (a delete cap the old "read" lacked).
+        assert cap.WORKSPACE_DELETE in attrs["capabilities"]
