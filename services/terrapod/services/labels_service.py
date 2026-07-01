@@ -65,14 +65,14 @@ async def _readable_workspaces(db: AsyncSession, user: AuthenticatedUser) -> lis
     token_preloaded = await workspace_rbac_service.fetch_custom_roles(db, user.pinned_roles or [])
     out: list[Workspace] = []
     for ws in workspaces:
-        perm = await workspace_rbac_service.resolve_workspace_permission_for(
+        caps = await workspace_rbac_service.resolve_workspace_capabilities_for(
             db,
             user,
             ws,
             preloaded_roles=preloaded,
             token_preloaded_roles=token_preloaded,
         )
-        if perm is not None:
+        if caps:
             out.append(ws)
     return out
 
@@ -84,7 +84,7 @@ async def _readable_pools(db: AsyncSession, user: AuthenticatedUser) -> list[Age
     token_preloaded = await pool_rbac_service.fetch_custom_roles(db, user.pinned_roles or [])
     out: list[AgentPool] = []
     for p in pools:
-        perm = await pool_rbac_service.resolve_pool_permission_for(
+        caps = await pool_rbac_service.resolve_pool_capabilities_for(
             db,
             user,
             pool_name=p.name,
@@ -93,7 +93,7 @@ async def _readable_pools(db: AsyncSession, user: AuthenticatedUser) -> list[Age
             preloaded_roles=preloaded,
             token_preloaded_roles=token_preloaded,
         )
-        if perm is not None:
+        if caps:
             out.append(p)
     return out
 
@@ -105,7 +105,7 @@ async def _readable_modules(db: AsyncSession, user: AuthenticatedUser) -> list[R
     token_preloaded = await registry_rbac_service.fetch_custom_roles(db, user.pinned_roles or [])
     out: list[RegistryModule] = []
     for m in modules:
-        perm = await registry_rbac_service.resolve_registry_permission_for(
+        caps = await registry_rbac_service.resolve_registry_capabilities_for(
             db,
             user,
             resource_name=m.name,
@@ -114,7 +114,7 @@ async def _readable_modules(db: AsyncSession, user: AuthenticatedUser) -> list[R
             preloaded_roles=preloaded,
             token_preloaded_roles=token_preloaded,
         )
-        if perm is not None:
+        if caps:
             out.append(m)
     return out
 
@@ -126,7 +126,7 @@ async def _readable_providers(db: AsyncSession, user: AuthenticatedUser) -> list
     token_preloaded = await registry_rbac_service.fetch_custom_roles(db, user.pinned_roles or [])
     out: list[RegistryProvider] = []
     for p in providers:
-        perm = await registry_rbac_service.resolve_registry_permission_for(
+        caps = await registry_rbac_service.resolve_registry_capabilities_for(
             db,
             user,
             resource_name=p.name,
@@ -135,7 +135,7 @@ async def _readable_providers(db: AsyncSession, user: AuthenticatedUser) -> list
             preloaded_roles=preloaded,
             token_preloaded_roles=token_preloaded,
         )
-        if perm is not None:
+        if caps:
             out.append(p)
     return out
 

@@ -253,10 +253,12 @@ the following — these are the holes an independent review flagged that a naive
    Note `can-force-unlock` shifts meaning from "is admin" to "has
    `workspace:force-unlock`" — permissive, acceptable in beta, but documented.
    Org/account entitlements stay platform-role based (unchanged).
-7. **Levels become a derived summary on read.** Capabilities are the stored
-   truth; the level columns are recomputed from `summarize_capabilities(caps)`
-   on every write (a denormalised cache, not a second source of truth) so
-   consumers that still read the level fields keep working until they migrate.
+7. **Levels are not persisted.** Capabilities are the *only* stored permission
+   on a role (there are no level columns). A level is an authoring shorthand —
+   expanded into `capabilities` on write — and a display summary computed from
+   `summarize_capabilities(caps)` on read (a preset name per axis, or `custom`).
+   So the level fields consumers read are derived, never a second stored source
+   of truth that could drift from the enforced capabilities.
 8. **Forward-compat.** Load and write-validate stored sets through
    `normalize_capabilities` (alias-upgrade legacy tokens) so a capability
    rename/split never silently drops a grant or traps a role uneditable.

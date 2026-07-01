@@ -99,27 +99,13 @@ class Role(Base):
     allow_names: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     deny_labels: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     deny_names: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
-    workspace_permission: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="read"
-    )  # read, plan, write, admin
-    pool_permission: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="read", server_default="read"
-    )  # read, write, admin
-    registry_permission: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="read", server_default="read"
-    )  # read, write, admin — modules + providers share this
-    # Service Catalog access (#535). Opt-in (default none): read = browse
-    # label-scoped items; use = provision + manage own instances via the
-    # catalog API only; admin = author items/provider-templates + manage all.
-    catalog_permission: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="none", server_default="none"
-    )  # none, read, use, admin
 
-    # Explicit capability set (#585). Expanded from the level fields above via
-    # the shared preset map (terrapod.auth.capabilities.expand_preset) at write
-    # time and by the role-expansion migration. Source of truth for capability-
-    # based resolution; the level columns remain as the preset inputs. JSONB list
-    # of "<resource>:<verb>" strings; never indexed/unique.
+    # The role's grant is its explicit capability set (#585) — the SINGLE
+    # persisted source of truth for enforcement. The legacy hierarchical
+    # permission *levels* (workspace/pool/registry/catalog) are NOT stored: they
+    # are only an authoring shorthand (expanded into `capabilities` on write) and
+    # a derived summary computed on read (terrapod.auth.capabilities). A JSONB
+    # list of "<resource>:<verb>" strings; never indexed/unique.
     # server_default mirrors the migration so schemas built from metadata
     # (integration tests, which bypass the ORM Python default on raw inserts)
     # also default to an empty list instead of violating NOT NULL.

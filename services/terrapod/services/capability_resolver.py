@@ -5,10 +5,10 @@ of the single highest LEVEL a principal has on a resource, this returns the SET
 of capabilities they hold on it, so gates can check one capability
 (``has_capability(caps, RUN_PLAN)``) rather than a level threshold.
 
-A role's contribution is its persisted ``capabilities`` (always populated —
-migration back-fills it, create/update expand the level shorthand into it), with
-a defensive ``expand_preset(role's levels)`` fallback for any empty legacy row.
-Sliced to the axis being resolved. Owner / platform-admin / audit / everyone-floor / runner-floor /
+A role's contribution is its persisted ``capabilities`` — the single source of
+truth (the migration back-fills it; create/update expand the level shorthand into
+it; the level columns no longer exist). Sliced to the axis being
+resolved. Owner / platform-admin / audit / everyone-floor / runner-floor /
 catalog-managed-clamp / token-attenuation all mirror the scalar resolvers
 exactly; the equivalence test (``test_capability_resolver``) asserts, for every
 preset role shape, that this layer agrees with ``expand_preset(scalar_level)``.
@@ -33,17 +33,10 @@ AXES = ("workspace", "pool", "registry", "catalog")
 
 
 def role_effective_capabilities(role: Role) -> frozenset[str]:
-    """A role's full capability set. ``capabilities`` is persisted on every write
-    (the migration back-fills it; create/update expand the level shorthand into
-    it), so it is the source of truth; the ``expand_preset`` fallback is defensive
-    for any legacy row with an empty set. Normalised (aliases upgraded)."""
-    caps = role.capabilities or cap.expand_preset(
-        workspace_permission=role.workspace_permission,
-        pool_permission=role.pool_permission,
-        registry_permission=role.registry_permission,
-        catalog_permission=role.catalog_permission,
-    )
-    return frozenset(cap.normalize_capabilities(caps))
+    """A role's capability set — its persisted ``capabilities`` (the single source
+    of truth; the migration back-fills it and create/update expand the level
+    shorthand into it). Normalised (aliases upgraded)."""
+    return frozenset(cap.normalize_capabilities(role.capabilities))
 
 
 def _role_matches(role: Role, resource_name: str, resource_labels: dict) -> bool:

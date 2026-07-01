@@ -294,21 +294,33 @@ async def insert_role(
     deny_labels: dict | None = None,
     deny_names: list[str] | None = None,
 ) -> None:
-    """Insert a custom role directly into Postgres via the app's DB pool."""
+    """Insert a custom role directly into Postgres via the app's DB pool.
+
+    The legacy hierarchical ``workspace_permission`` level (#585) is no longer a
+    column — it is expanded into the stored ``capabilities`` list via
+    ``expand_preset``, exactly as the roles router does on write."""
     import json
 
+    from terrapod.auth.capabilities import expand_preset
     from terrapod.db.session import get_db_session
+
+    capabilities = expand_preset(
+        workspace_permission=workspace_permission,
+        pool_permission=None,
+        registry_permission=None,
+        catalog_permission=None,
+    )
 
     async with get_db_session() as session:
         await session.execute(
             text(
-                "INSERT INTO roles (name, workspace_permission, allow_labels, allow_names, "
+                "INSERT INTO roles (name, capabilities, allow_labels, allow_names, "
                 "deny_labels, deny_names, created_at, updated_at) "
-                "VALUES (:name, :perm, :al, :an, :dl, :dn, now(), now())"
+                "VALUES (:name, :caps, :al, :an, :dl, :dn, now(), now())"
             ),
             {
                 "name": name,
-                "perm": workspace_permission,
+                "caps": json.dumps(capabilities),
                 "al": json.dumps(allow_labels or {}),
                 "an": json.dumps(allow_names or []),
                 "dl": json.dumps(deny_labels or {}),

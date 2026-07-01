@@ -23,7 +23,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from terrapod.api.dependencies import AuthenticatedUser, require_admin, require_admin_or_audit
 from terrapod.auth.builtin_roles import BUILTIN_ROLES, is_builtin_role
 from terrapod.auth.capabilities import (
+    AXIS_LEVEL_MAPS,
     GRANTABLE_CAPABILITIES,
+    axis_all_caps,
     capabilities_for_builtin,
     expand_preset,
     normalize_capabilities,
@@ -50,19 +52,13 @@ def _rfc3339(dt) -> str:
     return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _effective_capabilities(role: Role) -> list[str]:
-    """The capability set a role actually grants: its stored ``capabilities`` if
-    populated (capability-authored / migrated), else the expansion of its legacy
-    level fields (a level-only role). Mirrors the enforcement resolver so the API
-    shows exactly what it enforces (#585)."""
-    if role.capabilities:
-        return list(role.capabilities)
-    return expand_preset(
-        workspace_permission=role.workspace_permission,
-        pool_permission=role.pool_permission,
-        registry_permission=role.registry_permission,
-        catalog_permission=role.catalog_permission,
-    )
+# axis JSON:API key → (short axis name, valid level values)
+_LEVEL_INPUT: dict[str, tuple[str, set[str]]] = {
+    "workspace-permission": ("workspace", VALID_PERMISSIONS),
+    "pool-permission": ("pool", VALID_POOL_PERMISSIONS),
+    "registry-permission": ("registry", VALID_REGISTRY_PERMISSIONS),
+    "catalog-permission": ("catalog", VALID_CATALOG_PERMISSIONS),
+}
 
 
 def _validate_capabilities(caps_in) -> list[str]:
@@ -80,20 +76,42 @@ def _validate_capabilities(caps_in) -> list[str]:
     return normalized
 
 
-def _apply_capabilities(role: Role, caps_in) -> None:
-    """Capability-author a role: store the validated set and recompute the level
-    fields as the derived summary (a preset name per axis, or ``custom``) so the
-    legacy level columns stay a faithful, display-only cache of the caps."""
-    caps = _validate_capabilities(caps_in)
-    role.capabilities = caps
-    summary = summarize_capabilities(caps)
-    role.workspace_permission = summary["workspace_permission"]
-    role.pool_permission = summary["pool_permission"]
-    role.registry_permission = summary["registry_permission"]
-    role.catalog_permission = summary["catalog_permission"]
+def _level(attrs: dict, key: str, default: str, valid: set[str]) -> str:
+    v = attrs.get(key, default)
+    if v not in valid:
+        raise HTTPException(status_code=422, detail=f"Invalid {key}: {v}")
+    return v
+
+
+def _caps_from_level_input(attrs: dict) -> list[str]:
+    """Expand a create request's level shorthand into a capability set. Absent
+    axes use their default (read/read/read/none)."""
+    return expand_preset(
+        workspace_permission=_level(attrs, "workspace-permission", "read", VALID_PERMISSIONS),
+        pool_permission=_level(attrs, "pool-permission", "read", VALID_POOL_PERMISSIONS),
+        registry_permission=_level(
+            attrs, "registry-permission", "read", VALID_REGISTRY_PERMISSIONS
+        ),
+        catalog_permission=_level(attrs, "catalog-permission", "none", VALID_CATALOG_PERMISSIONS),
+    )
+
+
+def _apply_level_edits(role: Role, attrs: dict) -> None:
+    """A partial level edit replaces ONLY the edited axis's capabilities in the
+    stored set, preserving any granular capabilities on the other axes."""
+    caps = set(role.capabilities)
+    for key, (axis, valid) in _LEVEL_INPUT.items():
+        if key in attrs:
+            level = _level(attrs, key, "", valid)
+            caps -= axis_all_caps(axis)
+            caps |= AXIS_LEVEL_MAPS[axis].get(level, frozenset())
+    role.capabilities = sorted(caps)
 
 
 def _role_json(role: Role) -> dict:
+    # Levels are NOT stored — derive them as a display summary from the persisted
+    # capability set (a preset name per axis, or "custom").
+    summary = summarize_capabilities(role.capabilities)
     return {
         "name": role.name,
         "type": "roles",
@@ -103,16 +121,13 @@ def _role_json(role: Role) -> dict:
             "allow-names": role.allow_names,
             "deny-labels": role.deny_labels,
             "deny-names": role.deny_names,
-            # Level fields are the authored shorthand for level-only roles and a
-            # derived summary ("custom" where the caps match no preset) for
-            # capability-authored roles.
-            "workspace-permission": role.workspace_permission,
-            "pool-permission": role.pool_permission,
-            "registry-permission": role.registry_permission,
-            "catalog-permission": role.catalog_permission,
-            # The explicit capability set this role grants + enforces (#585) —
-            # authored directly, or expanded from the levels for a level-only role.
-            "capabilities": _effective_capabilities(role),
+            # Derived, read-only summary of the capabilities (not persisted).
+            "workspace-permission": summary["workspace_permission"],
+            "pool-permission": summary["pool_permission"],
+            "registry-permission": summary["registry_permission"],
+            "catalog-permission": summary["catalog_permission"],
+            # The role's grant + the single source of truth for enforcement (#585).
+            "capabilities": list(role.capabilities),
             "built-in": False,
             "created-at": _rfc3339(role.created_at),
             "updated-at": _rfc3339(role.updated_at),
@@ -185,22 +200,15 @@ async def create_role(
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(status_code=422, detail=f"Role '{name}' already exists")
 
-    ws_perm = attrs.get("workspace-permission", "read")
-    if ws_perm not in VALID_PERMISSIONS:
-        raise HTTPException(status_code=422, detail=f"Invalid workspace-permission: {ws_perm}")
-
-    pool_perm = attrs.get("pool-permission", "read")
-    if pool_perm not in VALID_POOL_PERMISSIONS:
-        raise HTTPException(status_code=422, detail=f"Invalid pool-permission: {pool_perm}")
-
-    registry_perm = attrs.get("registry-permission", "read")
-    if registry_perm not in VALID_REGISTRY_PERMISSIONS:
-        raise HTTPException(status_code=422, detail=f"Invalid registry-permission: {registry_perm}")
-
-    catalog_perm = attrs.get("catalog-permission", "none")
-    if catalog_perm not in VALID_CATALOG_PERMISSIONS:
-        raise HTTPException(status_code=422, detail=f"Invalid catalog-permission: {catalog_perm}")
-
+    # The role's grant is the persisted capability set — the single source of
+    # truth (#585). An explicit `capabilities` set is stored verbatim; otherwise
+    # the level shorthand (validated here) is expanded into it. Levels are never
+    # stored.
+    capabilities = (
+        _validate_capabilities(attrs["capabilities"])
+        if "capabilities" in attrs
+        else _caps_from_level_input(attrs)
+    )
     role = Role(
         name=name,
         description=attrs.get("description", ""),
@@ -208,25 +216,8 @@ async def create_role(
         allow_names=attrs.get("allow-names", []),
         deny_labels=attrs.get("deny-labels", {}),
         deny_names=attrs.get("deny-names", []),
-        workspace_permission=ws_perm,
-        pool_permission=pool_perm,
-        registry_permission=registry_perm,
-        catalog_permission=catalog_perm,
+        capabilities=capabilities,
     )
-    # Capabilities are always persisted as the role's individual permissions
-    # (#585). An explicit `capabilities` set is stored verbatim (and the levels
-    # become its derived summary); otherwise the chosen levels are a shorthand
-    # that expands into the persisted capability set. Either way enforcement
-    # reads the stored capabilities — the levels are only an authoring aid.
-    if "capabilities" in attrs:
-        _apply_capabilities(role, attrs["capabilities"])
-    else:
-        role.capabilities = expand_preset(
-            workspace_permission=ws_perm,
-            pool_permission=pool_perm,
-            registry_permission=registry_perm,
-            catalog_permission=catalog_perm,
-        )
     db.add(role)
     await db.commit()
     await db.refresh(role)
@@ -283,56 +274,14 @@ async def update_role(
     if "deny-names" in attrs:
         role.deny_names = attrs["deny-names"]
 
-    _level_keys = {
-        "workspace-permission",
-        "pool-permission",
-        "registry-permission",
-        "catalog-permission",
-    }
-    # A level edit (without an explicit capabilities set) re-expands the levels
-    # into the persisted capability set below, so the edit takes effect —
-    # capabilities are always the stored truth; levels are the authoring
-    # shorthand. Capability-authoring wins over any level fields sent alongside.
-    reexpand_levels = "capabilities" not in attrs and bool(_level_keys & attrs.keys())
+    # The role's grant is the persisted capabilities. An explicit `capabilities`
+    # set replaces it wholesale; otherwise a level edit replaces only the edited
+    # axis's capabilities (preserving granular caps on the other axes). Levels are
+    # never stored. Capability-authoring wins over any level fields sent alongside.
     if "capabilities" in attrs:
-        _apply_capabilities(role, attrs["capabilities"])
-    # Level fields are only honoured when not capability-authoring (caps win).
-    if "capabilities" not in attrs:
-        if "workspace-permission" in attrs:
-            ws_perm = attrs["workspace-permission"]
-            if ws_perm not in VALID_PERMISSIONS:
-                raise HTTPException(
-                    status_code=422, detail=f"Invalid workspace-permission: {ws_perm}"
-                )
-            role.workspace_permission = ws_perm
-        if "pool-permission" in attrs:
-            pool_perm = attrs["pool-permission"]
-            if pool_perm not in VALID_POOL_PERMISSIONS:
-                raise HTTPException(status_code=422, detail=f"Invalid pool-permission: {pool_perm}")
-            role.pool_permission = pool_perm
-        if "registry-permission" in attrs:
-            registry_perm = attrs["registry-permission"]
-            if registry_perm not in VALID_REGISTRY_PERMISSIONS:
-                raise HTTPException(
-                    status_code=422, detail=f"Invalid registry-permission: {registry_perm}"
-                )
-            role.registry_permission = registry_perm
-        if "catalog-permission" in attrs:
-            catalog_perm = attrs["catalog-permission"]
-            if catalog_perm not in VALID_CATALOG_PERMISSIONS:
-                raise HTTPException(
-                    status_code=422, detail=f"Invalid catalog-permission: {catalog_perm}"
-                )
-            role.catalog_permission = catalog_perm
-
-    if reexpand_levels:
-        # Persist the expansion of the (edited) levels as the role's capabilities.
-        role.capabilities = expand_preset(
-            workspace_permission=role.workspace_permission,
-            pool_permission=role.pool_permission,
-            registry_permission=role.registry_permission,
-            catalog_permission=role.catalog_permission,
-        )
+        role.capabilities = _validate_capabilities(attrs["capabilities"])
+    elif _LEVEL_INPUT.keys() & attrs.keys():
+        _apply_level_edits(role, attrs)
 
     await db.commit()
     await db.refresh(role)

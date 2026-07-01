@@ -12,6 +12,7 @@ from terrapod.api.dependencies import (
     require_admin,
     require_admin_or_audit,
 )
+from terrapod.auth.capabilities import expand_preset
 from terrapod.db.session import get_db
 
 _BASE = "http://test"
@@ -42,8 +43,6 @@ def _mock_role(name="dev-team", ws_perm="read", reg_perm="read", catalog_perm="n
     role.catalog_permission = catalog_perm
     # Capabilities are expanded from the levels (#585); set a real list so the
     # mock serialises (an unset MagicMock attr isn't JSON-serialisable).
-    from terrapod.auth.capabilities import expand_preset
-
     role.capabilities = expand_preset(
         workspace_permission=ws_perm,
         pool_permission="read",
@@ -111,7 +110,14 @@ class TestListRoles:
         user = _user(roles=["admin"])
         app, mock_db = _make_app(user)
         role = _mock_role("pool-role")
-        role.pool_permission = "write"
+        # The pool level is derived from the stored capabilities (#585): build a
+        # role whose capabilities include the pool-write preset.
+        role.capabilities = expand_preset(
+            workspace_permission="read",
+            pool_permission="write",
+            registry_permission="read",
+            catalog_permission="none",
+        )
         mock_result = MagicMock()
         mock_result.scalars.return_value.all.return_value = [role]
         mock_db.execute.return_value = mock_result
@@ -547,7 +553,14 @@ class TestShowRole:
     @patch("terrapod.api.app.init_db")
     async def test_show_role_includes_pool_permission(self, *mocks):
         role = _mock_role("pool-role")
-        role.pool_permission = "write"
+        # The pool level is derived from the stored capabilities (#585): build a
+        # role whose capabilities include the pool-write preset.
+        role.capabilities = expand_preset(
+            workspace_permission="read",
+            pool_permission="write",
+            registry_permission="read",
+            catalog_permission="none",
+        )
         app, mock_db = _make_app(_user(roles=["admin"]))
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = role
