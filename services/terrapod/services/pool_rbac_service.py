@@ -147,6 +147,34 @@ def min_pool_permission(a: str | None, b: str | None) -> str | None:
     return a if POOL_PERMISSION_HIERARCHY[a] <= POOL_PERMISSION_HIERARCHY[b] else b
 
 
+async def resolve_pool_capabilities_for(
+    db: AsyncSession,
+    user: AuthenticatedUser,
+    pool_name: str,
+    pool_labels: dict,
+    owner_email: str | None,
+    *,
+    preloaded_roles: list[Role] | None = None,
+    token_preloaded_roles: list[Role] | None = None,
+) -> frozenset[str]:
+    """Capability set a principal holds on an agent pool (#585 enforcement).
+
+    Pool-typed wrapper over ``capability_resolver`` (axis="pool"). Faithful to
+    :func:`resolve_pool_permission_for` for every preset role."""
+    from terrapod.services.capability_resolver import resolve_capabilities_for
+
+    return await resolve_capabilities_for(
+        db,
+        user,
+        pool_name,
+        pool_labels or {},
+        owner_email,
+        axis="pool",
+        preloaded_roles=preloaded_roles,
+        token_preloaded_roles=token_preloaded_roles,
+    )
+
+
 async def resolve_pool_permission_for(
     db: AsyncSession,
     user: AuthenticatedUser,

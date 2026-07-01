@@ -234,6 +234,35 @@ def normalize_capabilities(caps: list[str] | set[str] | frozenset[str]) -> list[
     return sorted(out)
 
 
+_LEVEL_TO_AXES: dict[str, dict[str, str]] = {
+    "read": {"w": "read", "p": "read", "r": "read", "c": "read"},
+    "plan": {"w": "plan", "p": "read", "r": "read", "c": "read"},
+    "write": {"w": "write", "p": "write", "r": "write", "c": "use"},
+    "admin": {"w": "admin", "p": "admin", "r": "admin", "c": "admin"},
+    "use": {"c": "use"},
+    "none": {},
+}
+
+
+def caps_for_level(level: str | None) -> frozenset[str]:
+    """The capability set a legacy permission level maps to, unioned across all
+    four axes. A given axis's gate only checks its own axis's capability, so this
+    union is a faithful stand-in for any single-axis resolver at ``level`` (used
+    by tests that mock a resolver, and by UX that renders a preset's caps).
+    ``None`` / unknown → empty (no access)."""
+    if not level:
+        return frozenset()
+    m = _LEVEL_TO_AXES.get(level, {})
+    return frozenset(
+        expand_preset(
+            workspace_permission=m.get("w"),
+            pool_permission=m.get("p"),
+            registry_permission=m.get("r"),
+            catalog_permission=m.get("c"),
+        )
+    )
+
+
 def has_capability(caps: frozenset[str] | set[str], required: str) -> bool:
     """Canonical capability membership check (the enforcement primitive).
 

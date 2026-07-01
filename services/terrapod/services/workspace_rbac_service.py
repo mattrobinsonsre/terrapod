@@ -165,6 +165,35 @@ def min_workspace_permission(a: str | None, b: str | None) -> str | None:
     return a if PERMISSION_HIERARCHY[a] <= PERMISSION_HIERARCHY[b] else b
 
 
+async def resolve_workspace_capabilities_for(
+    db: AsyncSession,
+    user: "AuthenticatedUser",
+    workspace: Workspace,
+    *,
+    preloaded_roles: list[Role] | None = None,
+    token_preloaded_roles: list[Role] | None = None,
+) -> frozenset[str]:
+    """Capability set a principal holds on a workspace (#585 enforcement).
+
+    Workspace-typed wrapper over ``capability_resolver`` — extracts the resource
+    fields and delegates. Gates check ``has_capability(caps, RUN_PLAN)`` instead
+    of a level threshold; faithful to :func:`resolve_workspace_permission_for`
+    for every preset role (``test_capability_resolver``)."""
+    from terrapod.services.capability_resolver import resolve_capabilities_for
+
+    return await resolve_capabilities_for(
+        db,
+        user,
+        workspace.name,
+        workspace.labels or {},
+        workspace.owner_email,
+        axis="workspace",
+        preloaded_roles=preloaded_roles,
+        token_preloaded_roles=token_preloaded_roles,
+        is_catalog_managed=workspace.catalog_item_id is not None,
+    )
+
+
 async def resolve_workspace_permission_for(
     db: AsyncSession,
     user: "AuthenticatedUser",

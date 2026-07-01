@@ -153,6 +153,35 @@ def min_registry_permission(a: str | None, b: str | None) -> str | None:
     return a if REGISTRY_PERMISSION_HIERARCHY[a] <= REGISTRY_PERMISSION_HIERARCHY[b] else b
 
 
+async def resolve_registry_capabilities_for(
+    db: AsyncSession,
+    user: "AuthenticatedUser",
+    resource_name: str,
+    resource_labels: dict,
+    owner_email: str,
+    *,
+    preloaded_roles: list[Role] | None = None,
+    token_preloaded_roles: list[Role] | None = None,
+) -> frozenset[str]:
+    """Capability set a principal holds on a registry resource (#585).
+
+    Registry-typed wrapper over ``capability_resolver`` (axis="registry"; the
+    runner-token read floor is applied inside via ``user.auth_method``). Faithful
+    to :func:`resolve_registry_permission_for` for every preset role."""
+    from terrapod.services.capability_resolver import resolve_capabilities_for
+
+    return await resolve_capabilities_for(
+        db,
+        user,
+        resource_name,
+        resource_labels or {},
+        owner_email,
+        axis="registry",
+        preloaded_roles=preloaded_roles,
+        token_preloaded_roles=token_preloaded_roles,
+    )
+
+
 async def resolve_registry_permission_for(
     db: AsyncSession,
     user: "AuthenticatedUser",

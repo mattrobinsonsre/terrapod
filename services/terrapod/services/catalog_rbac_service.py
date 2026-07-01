@@ -143,6 +143,35 @@ async def resolve_catalog_permission(
     return best
 
 
+async def resolve_catalog_capabilities_for(
+    db: AsyncSession,
+    user: "AuthenticatedUser",
+    resource_name: str,
+    resource_labels: dict,
+    owner_email: str,
+    *,
+    preloaded_roles: list[Role] | None = None,
+    token_preloaded_roles: list[Role] | None = None,
+) -> frozenset[str]:
+    """Capability set a principal holds on a catalog item (#585).
+
+    Catalog-typed wrapper over ``capability_resolver`` (axis="catalog"; no
+    everyone-floor, opt-in). Faithful to :func:`resolve_catalog_permission_for`
+    for every preset role."""
+    from terrapod.services.capability_resolver import resolve_capabilities_for
+
+    return await resolve_capabilities_for(
+        db,
+        user,
+        resource_name,
+        resource_labels or {},
+        owner_email,
+        axis="catalog",
+        preloaded_roles=preloaded_roles,
+        token_preloaded_roles=token_preloaded_roles,
+    )
+
+
 async def resolve_catalog_permission_for(
     db: AsyncSession,
     user: "AuthenticatedUser",
