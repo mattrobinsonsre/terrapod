@@ -107,6 +107,14 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
     {
+      // Capability RBAC enforcement drives the API directly with per-principal
+      // tokens (admin for setup, a capability-scoped session for the gates), so
+      // no project-level storageState is needed.
+      name: 'capability-rbac',
+      testMatch: 'capability-rbac.spec.ts',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
       name: 'manual-lock',
       testMatch: 'manual-lock.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },

@@ -161,6 +161,57 @@ export async function setRoleAssignments(
 }
 
 /**
+ * Create a custom role with a granular capability set (#585). Levels are not
+ * persisted — the role's grant IS its `capabilities`. `allowLabels` scopes the
+ * label RBAC so the role only applies to workspaces carrying those labels.
+ * Idempotent-ish: a 422 "already exists" is swallowed so re-runs don't fail.
+ */
+export async function createRole(
+  adminToken: string,
+  name: string,
+  capabilities: string[],
+  allowLabels: Record<string, string> = {},
+  description = 'E2E capability role',
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/terrapod/v1/roles`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/vnd.api+json',
+      Authorization: `Bearer ${adminToken}`,
+    },
+    body: JSON.stringify({
+      data: {
+        name,
+        type: 'roles',
+        attributes: {
+          description,
+          capabilities,
+          'allow-labels': allowLabels,
+        },
+      },
+    }),
+  });
+  if (!res.ok && res.status !== 422) {
+    const body = await res.text();
+    throw new Error(`Create role failed: ${res.status} ${body}`);
+  }
+}
+
+/**
+ * Delete a custom role (teardown helper). A 404 is fine — already gone.
+ */
+export async function deleteRole(adminToken: string, name: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/terrapod/v1/roles/${name}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${adminToken}` },
+  });
+  if (!res.ok && res.status !== 404) {
+    const body = await res.text();
+    throw new Error(`Delete role failed: ${res.status} ${body}`);
+  }
+}
+
+/**
  * Create a workspace via the admin API. Returns the workspace ID.
  */
 export async function createWorkspace(
