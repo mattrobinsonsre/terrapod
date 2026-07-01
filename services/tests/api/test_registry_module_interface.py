@@ -8,6 +8,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
 
 _BASE = "http://test"
@@ -125,7 +126,7 @@ class TestCreateModuleVersionDuplicate:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.registry_modules.resolve_registry_permission_for")
+    @patch("terrapod.api.routers.registry_modules.resolve_registry_capabilities_for")
     @patch("terrapod.api.routers.registry_modules.get_module")
     async def test_duplicate_version_returns_409(self, mock_get_module, mock_perm, *_mocks):
         """Creating a version that already exists returns a clean 409 (not a
@@ -136,7 +137,7 @@ class TestCreateModuleVersionDuplicate:
         app.dependency_overrides[get_storage] = lambda: AsyncMock()
         module = _mock_module()
         mock_get_module.return_value = module
-        mock_perm.return_value = "admin"
+        mock_perm.return_value = caps_for_level("admin")
         # The pre-check query finds an existing version → 409 before any insert.
         db.execute = AsyncMock(return_value=_scalar_result(_mock_version()))
 
@@ -156,7 +157,7 @@ class TestCreateModuleVersionDuplicate:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.registry_modules.create_module_version", new_callable=AsyncMock)
-    @patch("terrapod.api.routers.registry_modules.resolve_registry_permission_for")
+    @patch("terrapod.api.routers.registry_modules.resolve_registry_capabilities_for")
     @patch("terrapod.api.routers.registry_modules.get_module")
     async def test_concurrent_insert_race_rolls_back_to_409(
         self, mock_get_module, mock_perm, mock_create, *_mocks
@@ -170,7 +171,7 @@ class TestCreateModuleVersionDuplicate:
         app, db = _make_app()
         app.dependency_overrides[get_storage] = lambda: AsyncMock()
         mock_get_module.return_value = _mock_module()
-        mock_perm.return_value = "admin"
+        mock_perm.return_value = caps_for_level("admin")
         # Pre-check finds nothing → we proceed; then the flush races and raises.
         db.execute = AsyncMock(return_value=_scalar_result(None))
         db.rollback = AsyncMock()

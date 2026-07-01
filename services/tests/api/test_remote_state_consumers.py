@@ -18,6 +18,7 @@ from httpx import ASGITransport, AsyncClient
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.api.routers.tfe_v2 import _runner_state_read_allowed
+from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
 
 _BASE = "http://test"
@@ -154,7 +155,7 @@ class TestRunnerAuthzWiring:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.tfe_v2._get_workspace_by_id", new_callable=AsyncMock)
     @patch("terrapod.api.routers.tfe_v2._runner_state_read_allowed", new_callable=AsyncMock)
     async def test_current_state_version_grants_when_helper_returns_true(
@@ -192,7 +193,7 @@ class TestRunnerAuthzWiring:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.tfe_v2._get_workspace_by_id", new_callable=AsyncMock)
     @patch("terrapod.api.routers.tfe_v2._runner_state_read_allowed", new_callable=AsyncMock)
     async def test_current_state_version_falls_through_and_denies_runner(
@@ -204,7 +205,7 @@ class TestRunnerAuthzWiring:
         producer = _mock_ws(name="producer")
         m_get_ws.return_value = producer
         m_helper.return_value = False
-        m_resolve.return_value = None  # everyone role → no permission
+        m_resolve.return_value = frozenset()  # everyone role → no capabilities
 
         app, _db = _make_app(_user(auth_method="runner_token", run_id=str(uuid.uuid4())))
 
@@ -221,7 +222,7 @@ class TestRunnerAuthzWiring:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.tfe_v2._runner_state_read_allowed", new_callable=AsyncMock)
     async def test_download_state_falls_through_and_denies_runner(self, m_helper, m_resolve, *_):
         """Same wiring guarantee for the download endpoint — helper
@@ -232,7 +233,7 @@ class TestRunnerAuthzWiring:
         wasn't checked, masking a future regression of either kind)."""
         producer = _mock_ws(name="producer")
         m_helper.return_value = False
-        m_resolve.return_value = None
+        m_resolve.return_value = frozenset()
 
         sv = MagicMock()
         sv.id = uuid.uuid4()
@@ -259,13 +260,13 @@ class TestCreateConsumer:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_capabilities_for")
     @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
     async def test_create_happy_path(self, mock_publish, mock_resolve, *_):
         """Admin on producer → 201, and the response JSON carries the
         producer + consumer names (i.e. the row's relationships actually
         get populated)."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         producer = _mock_ws(name="producer")
         consumer = _mock_ws(name="consumer")
 
@@ -325,10 +326,10 @@ class TestCreateConsumer:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_capabilities_for")
     async def test_create_requires_producer_admin(self, mock_resolve, *_):
         """Read on producer is not enough — mutation requires admin."""
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         producer = _mock_ws()
 
         app, db = _make_app(_user())
@@ -349,10 +350,10 @@ class TestCreateConsumer:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_capabilities_for")
     async def test_create_self_reference_rejected(self, mock_resolve, *_):
         """A workspace listing itself is meaningless (already reads own state)."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_ws()
         app, db = _make_app(_user())
         r = MagicMock()
@@ -370,9 +371,9 @@ class TestCreateConsumer:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_capabilities_for")
     async def test_create_duplicate_rejected(self, mock_resolve, *_):
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         producer = _mock_ws(name="producer")
         consumer = _mock_ws(name="consumer")
         app, db = _make_app(_user())
@@ -399,10 +400,10 @@ class TestListConsumers:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_capabilities_for")
     async def test_list_outbound_default(self, mock_resolve, *_):
         """No filter ⇒ outbound (workspaces I share to)."""
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         producer = _mock_ws()
         app, db = _make_app(_user())
         ws_lookup = MagicMock()
@@ -422,9 +423,9 @@ class TestListConsumers:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_capabilities_for")
     async def test_list_invalid_filter_rejected(self, mock_resolve, *_):
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         producer = _mock_ws()
         app, db = _make_app(_user())
         r = MagicMock()
@@ -444,10 +445,10 @@ class TestDeleteConsumer:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_capabilities_for")
     async def test_delete_happy(self, mock_resolve, *_):
         """Admin on producer → 204."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         producer = _mock_ws()
         row = MagicMock()
         row.id = uuid.uuid4()
@@ -467,11 +468,11 @@ class TestDeleteConsumer:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.remote_state_consumers.resolve_workspace_capabilities_for")
     async def test_delete_requires_producer_admin(self, mock_resolve, *_):
         """A consumer (or any non-admin) cannot revoke their own grant
         — only the producer's admin may delete an edge."""
-        mock_resolve.return_value = "write"  # not admin
+        mock_resolve.return_value = caps_for_level("write")  # not admin
         producer = _mock_ws()
         row = MagicMock()
         row.id = uuid.uuid4()

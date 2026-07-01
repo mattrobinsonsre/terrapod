@@ -11,6 +11,7 @@ from httpx import ASGITransport, AsyncClient
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.api.routers import catalog as catalog_router
+from terrapod.auth.capabilities import caps_for_level
 from terrapod.config import settings
 from terrapod.db.session import get_db
 
@@ -170,8 +171,8 @@ class TestCatalogItemRBAC:
 
 class TestProvision:
     @patch("terrapod.api.routers.catalog.catalog_service.provision_instance")
-    @patch("terrapod.api.routers.catalog.resolve_pool_permission_for")
-    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_pool_capabilities_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_capabilities_for")
     @patch("terrapod.api.routers.catalog.catalog_service.get_catalog_item")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -189,8 +190,8 @@ class TestProvision:
         item.owner_email = ""
         item.allowed_agent_pool_ids = None
         mock_get.return_value = item
-        mock_cat.return_value = "use"
-        mock_pool.return_value = "write"
+        mock_cat.return_value = caps_for_level("use")
+        mock_pool.return_value = caps_for_level("write")
 
         pool = MagicMock()
         pool.id = pool_uuid
@@ -246,7 +247,7 @@ class TestProvision:
             )
         assert resp.status_code == 409
 
-    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_capabilities_for")
     @patch("terrapod.api.routers.catalog.catalog_service.get_catalog_item")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -258,7 +259,7 @@ class TestProvision:
         item.labels = {}
         item.owner_email = ""
         mock_get.return_value = item
-        mock_perm.return_value = "read"  # read, not use
+        mock_perm.return_value = caps_for_level("read")  # read, not use
 
         app, _ = _make_app(_user(roles=["everyone"]))
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -269,8 +270,8 @@ class TestProvision:
             )
         assert resp.status_code == 403
 
-    @patch("terrapod.api.routers.catalog.resolve_pool_permission_for")
-    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_pool_capabilities_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_capabilities_for")
     @patch("terrapod.api.routers.catalog.catalog_service.get_catalog_item")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -287,8 +288,8 @@ class TestProvision:
         item.owner_email = ""
         item.allowed_agent_pool_ids = [str(allowed)]
         mock_get.return_value = item
-        mock_cat_perm.return_value = "use"
-        mock_pool_perm.return_value = "write"
+        mock_cat_perm.return_value = caps_for_level("use")
+        mock_pool_perm.return_value = caps_for_level("write")
 
         pool = MagicMock()
         pool.id = chosen
@@ -308,8 +309,8 @@ class TestProvision:
         assert resp.status_code == 403
         assert "not allowed" in resp.json()["detail"]
 
-    @patch("terrapod.api.routers.catalog.resolve_pool_permission_for")
-    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_pool_capabilities_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_capabilities_for")
     @patch("terrapod.api.routers.catalog.catalog_service.get_catalog_item")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -325,8 +326,8 @@ class TestProvision:
         item.owner_email = ""
         item.allowed_agent_pool_ids = None  # any pool allowed
         mock_get.return_value = item
-        mock_cat_perm.return_value = "use"
-        mock_pool_perm.return_value = "read"  # not write
+        mock_cat_perm.return_value = caps_for_level("use")
+        mock_pool_perm.return_value = caps_for_level("read")  # not write
 
         pool = MagicMock()
         pool.id = chosen
@@ -375,7 +376,7 @@ class TestInstanceLifecycle:
             )
         assert resp.status_code == 404
 
-    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_capabilities_for")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
@@ -387,7 +388,7 @@ class TestInstanceLifecycle:
         item.labels = {}
         item.owner_email = ""
         mock_db.get = AsyncMock(side_effect=[ws, item])
-        mock_perm.return_value = "read"  # read, not use
+        mock_perm.return_value = caps_for_level("read")  # read, not use
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.patch(
@@ -398,7 +399,7 @@ class TestInstanceLifecycle:
         assert resp.status_code == 403
 
     @patch("terrapod.api.routers.catalog.catalog_service.reconfigure_instance")
-    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_capabilities_for")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
@@ -410,7 +411,7 @@ class TestInstanceLifecycle:
         item.labels = {}
         item.owner_email = ""
         mock_db.get = AsyncMock(side_effect=[ws, item])
-        mock_perm.return_value = "use"
+        mock_perm.return_value = caps_for_level("use")
         run = MagicMock()
         run.id = uuid.uuid4()
         run.status = "queued"
@@ -437,7 +438,7 @@ class TestInstanceLifecycle:
         assert mock_reconfig.await_args.kwargs["auto_apply"] is True
 
     @patch("terrapod.api.routers.catalog.catalog_service.destroy_instance")
-    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_capabilities_for")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
@@ -449,7 +450,7 @@ class TestInstanceLifecycle:
         item.labels = {}
         item.owner_email = ""
         mock_db.get = AsyncMock(side_effect=[ws, item])
-        mock_perm.return_value = "use"
+        mock_perm.return_value = caps_for_level("use")
         run = MagicMock()
         run.id = uuid.uuid4()
         run.status = "queued"
@@ -466,7 +467,7 @@ class TestInstanceLifecycle:
         assert resp.json()["data"]["attributes"]["is-destroy"] is True
         assert mock_destroy.await_args.kwargs["auto_apply"] is True
 
-    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_capabilities_for")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
@@ -478,7 +479,7 @@ class TestInstanceLifecycle:
         item.labels = {}
         item.owner_email = ""
         mock_db.get = AsyncMock(side_effect=[ws, item])
-        mock_perm.return_value = "read"
+        mock_perm.return_value = caps_for_level("read")
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.post(
@@ -488,7 +489,7 @@ class TestInstanceLifecycle:
             )
         assert resp.status_code == 403
 
-    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_capabilities_for")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
@@ -500,7 +501,7 @@ class TestInstanceLifecycle:
         item = MagicMock(labels={}, owner_email="")
         item.name = "vpc"
         mock_db.get = AsyncMock(side_effect=[ws, item])
-        mock_perm.return_value = "admin"
+        mock_perm.return_value = caps_for_level("admin")
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.delete(f"/api/terrapod/v1/catalog-instances/ws-{ws.id}", headers=_AUTH)
@@ -508,7 +509,7 @@ class TestInstanceLifecycle:
         assert "destroy" in resp.json()["detail"].lower()
         mock_db.delete.assert_not_called()
 
-    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_capabilities_for")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
@@ -519,7 +520,7 @@ class TestInstanceLifecycle:
         item = MagicMock(labels={}, owner_email="")
         item.name = "vpc"
         mock_db.get = AsyncMock(side_effect=[ws, item])
-        mock_perm.return_value = "admin"
+        mock_perm.return_value = caps_for_level("admin")
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.delete(
@@ -528,7 +529,7 @@ class TestInstanceLifecycle:
         assert resp.status_code == 204
         mock_db.delete.assert_awaited_once_with(ws)
 
-    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_capabilities_for")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
@@ -539,7 +540,7 @@ class TestInstanceLifecycle:
         item = MagicMock(labels={}, owner_email="")
         item.name = "vpc"
         mock_db.get = AsyncMock(side_effect=[ws, item])
-        mock_perm.return_value = "use"  # use is enough to destroy, not to orphan
+        mock_perm.return_value = caps_for_level("use")  # use is enough to destroy, not to orphan
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
             resp = await c.delete(
@@ -667,7 +668,7 @@ def _exec_returns(obj):
 
 class TestConfirmDiscard:
     @patch("terrapod.api.routers.catalog.run_service.confirm_run")
-    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_capabilities_for")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
@@ -677,7 +678,7 @@ class TestConfirmDiscard:
         item = MagicMock(labels={}, owner_email="")
         item.name = "vpc"
         mock_db.get = AsyncMock(side_effect=[ws, item])
-        mock_perm.return_value = "use"
+        mock_perm.return_value = caps_for_level("use")
         planned = _planned_run()
         mock_db.execute = AsyncMock(return_value=_exec_returns(planned))
         mock_confirm.return_value = _planned_run(status="confirmed")
@@ -689,7 +690,7 @@ class TestConfirmDiscard:
         assert resp.status_code == 200
         mock_confirm.assert_awaited_once()
 
-    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_capabilities_for")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
@@ -699,7 +700,7 @@ class TestConfirmDiscard:
         item = MagicMock(labels={}, owner_email="")
         item.name = "vpc"
         mock_db.get = AsyncMock(side_effect=[ws, item])
-        mock_perm.return_value = "use"
+        mock_perm.return_value = caps_for_level("use")
         mock_db.execute = AsyncMock(return_value=_exec_returns(None))  # no run
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -708,7 +709,7 @@ class TestConfirmDiscard:
             )
         assert resp.status_code == 409
 
-    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_capabilities_for")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
@@ -777,7 +778,7 @@ class TestConfirmDiscardRunSourceGuard:
     (plan_only, non-catalog source) is rejected 409 by confirm/discard."""
 
     @patch("terrapod.api.routers.catalog.run_service.confirm_run")
-    @patch("terrapod.api.routers.catalog.resolve_catalog_permission_for")
+    @patch("terrapod.api.routers.catalog.resolve_catalog_capabilities_for")
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
@@ -789,7 +790,7 @@ class TestConfirmDiscardRunSourceGuard:
         item = MagicMock(labels={}, owner_email="")
         item.name = "vpc"
         mock_db.get = AsyncMock(side_effect=[ws, item])
-        mock_perm.return_value = "use"
+        mock_perm.return_value = caps_for_level("use")
         speculative = _planned_run(source="module-test", plan_only=True)
         mock_db.execute = AsyncMock(return_value=_exec_returns(speculative))
 

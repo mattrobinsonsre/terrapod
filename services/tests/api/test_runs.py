@@ -9,6 +9,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
 
 _BASE = "http://test"
@@ -122,11 +123,11 @@ class TestCreateRun:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.run_service.queue_run")
     @patch("terrapod.api.routers.runs.run_service.create_run")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_create_plan_only_with_plan_perm(
         self, mock_resolve, mock_create_run, mock_queue, *mocks
     ):
-        mock_resolve.return_value = "plan"
+        mock_resolve.return_value = caps_for_level("plan")
         ws = _mock_workspace()
         run = _mock_run(ws_id=ws.id, plan_only=True, status="queued")
         mock_create_run.return_value = run
@@ -158,10 +159,10 @@ class TestCreateRun:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_create_apply_needs_write_perm(self, mock_resolve, *mocks):
         """Plan-only=false (default) requires write permission."""
-        mock_resolve.return_value = "plan"  # only plan, not write
+        mock_resolve.return_value = caps_for_level("plan")  # only plan, not write
         ws = _mock_workspace()
         app, mock_db = _make_app(_user())
         mock_result = MagicMock()
@@ -200,7 +201,7 @@ class TestCreateRun:
     @patch("terrapod.api.routers.runs.run_service.queue_run")
     @patch("terrapod.api.routers.runs.run_service.create_run")
     @patch("terrapod.api.routers.runs.run_service.get_latest_uploaded_cv")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_non_vcs_no_cv_uses_latest_uploaded_cv(
         self, mock_resolve, mock_get_cv, mock_create_run, mock_queue, *mocks
     ):
@@ -208,7 +209,7 @@ class TestCreateRun:
         configuration-version to the last successful CLI upload so the
         runner has something to download. Without this the run is
         created with cv_id=NULL and the runner 404s on archive fetch."""
-        mock_resolve.return_value = "plan"
+        mock_resolve.return_value = caps_for_level("plan")
         ws = _mock_workspace()  # vcs_connection_id is None by default
         cv = MagicMock(id=uuid.uuid4())
         mock_get_cv.return_value = cv
@@ -244,14 +245,14 @@ class TestCreateRun:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.run_service.get_latest_uploaded_cv")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_non_vcs_no_cv_no_uploaded_cv_returns_422(
         self, mock_resolve, mock_get_cv, *mocks
     ):
         """#358 counterpart: when no CLI upload has ever succeeded for a
         non-VCS workspace, queueing a plan must fail loudly with an
         actionable 422 rather than create an unrunnable run."""
-        mock_resolve.return_value = "plan"
+        mock_resolve.return_value = caps_for_level("plan")
         ws = _mock_workspace()
         mock_get_cv.return_value = None
 
@@ -282,7 +283,7 @@ class TestCreateRun:
     @patch("terrapod.api.routers.runs.run_service.queue_run")
     @patch("terrapod.api.routers.runs.run_service.create_run")
     @patch("terrapod.api.routers.runs.run_service.get_latest_uploaded_cv")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_vcs_workspace_with_empty_repo_url_falls_back_to_uploaded_cv(
         self, mock_resolve, mock_get_cv, mock_create_run, mock_queue, *mocks
     ):
@@ -291,7 +292,7 @@ class TestCreateRun:
         create a NULL-CV run. The fallback now covers this case so it
         behaves the same as a non-VCS workspace (use the latest uploaded
         CV or 422)."""
-        mock_resolve.return_value = "plan"
+        mock_resolve.return_value = caps_for_level("plan")
         ws = _mock_workspace()
         ws.vcs_connection_id = uuid.uuid4()  # connection set
         ws.vcs_repo_url = ""  # but no repo — misconfigured
@@ -335,9 +336,9 @@ class TestCatalogManagedRunGuard:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_run_with_cv_on_catalog_ws_rejected(self, mock_resolve, *mocks):
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace(catalog_item_id=uuid.uuid4())
 
         app, mock_db = _make_app(_user())
@@ -369,12 +370,12 @@ class TestCatalogManagedRunGuard:
     @patch("terrapod.api.routers.runs.run_service.queue_run")
     @patch("terrapod.api.routers.runs.run_service.create_run")
     @patch("terrapod.api.routers.runs.run_service.get_latest_uploaded_cv")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_cvless_rerun_on_catalog_ws_allowed(
         self, mock_resolve, mock_get_cv, mock_create_run, mock_queue, *mocks
     ):
         """CV-less re-plan/re-apply of the generated config stays allowed."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace(catalog_item_id=uuid.uuid4())  # non-VCS by default
         cv = MagicMock(id=uuid.uuid4())
         mock_get_cv.return_value = cv
@@ -411,10 +412,10 @@ class TestShowRun:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_show_with_read(self, mock_get_run, mock_resolve, *mocks):
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         run = _mock_run()
         mock_get_run.return_value = run
 
@@ -449,10 +450,10 @@ class TestConfirmRun:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.run_service.confirm_run")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_confirm_with_write_perm(self, mock_get_run, mock_resolve, mock_confirm, *mocks):
-        mock_resolve.return_value = "write"
+        mock_resolve.return_value = caps_for_level("write")
         run = _mock_run(status="planned")
         mock_get_run.return_value = run
         confirmed = _mock_run(status="confirmed")
@@ -473,12 +474,12 @@ class TestConfirmRun:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.run_service.confirm_run")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_confirm_wrong_state_returns_409(
         self, mock_get_run, mock_resolve, mock_confirm, *mocks
     ):
-        mock_resolve.return_value = "write"
+        mock_resolve.return_value = caps_for_level("write")
         run = _mock_run(status="queued")
         mock_get_run.return_value = run
         mock_confirm.side_effect = ValueError("Can only confirm planned")
@@ -498,7 +499,7 @@ class TestConfirmRun:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.run_service.confirm_run")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_confirm_no_changes_returns_422(
         self, mock_get_run, mock_resolve, mock_confirm, *mocks
@@ -510,7 +511,7 @@ class TestConfirmRun:
         Defensive check guards against legacy data and races, and pairs with
         `is-confirmable=false` in the response so UI and API agree.
         """
-        mock_resolve.return_value = "write"
+        mock_resolve.return_value = caps_for_level("write")
         run = _mock_run(status="planned")
         run.has_changes = False
         mock_get_run.return_value = run
@@ -538,10 +539,10 @@ class TestDiscardRun:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.run_service.discard_run")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_discard_with_plan_perm(self, mock_get_run, mock_resolve, mock_discard, *mocks):
-        mock_resolve.return_value = "plan"
+        mock_resolve.return_value = caps_for_level("plan")
         run = _mock_run(status="planned")
         mock_get_run.return_value = run
         mock_discard.return_value = _mock_run(status="discarded")
@@ -566,10 +567,10 @@ class TestCancelRun:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.run_service.cancel_run")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_cancel_with_plan_perm(self, mock_get_run, mock_resolve, mock_cancel, *mocks):
-        mock_resolve.return_value = "plan"
+        mock_resolve.return_value = caps_for_level("plan")
         run = _mock_run(status="planning")
         mock_get_run.return_value = run
         mock_cancel.return_value = _mock_run(status="canceled")
@@ -589,12 +590,12 @@ class TestCancelRun:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.run_service.cancel_run")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_cancel_terminal_returns_409(
         self, mock_get_run, mock_resolve, mock_cancel, *mocks
     ):
-        mock_resolve.return_value = "plan"
+        mock_resolve.return_value = caps_for_level("plan")
         run = _mock_run(status="applied")
         mock_get_run.return_value = run
         mock_cancel.side_effect = ValueError("terminal")
@@ -618,11 +619,11 @@ class TestRunJsonSerialization:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_actions_block(self, mock_get_run, mock_resolve, *mocks):
         """Verify actions reflect run state."""
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         run = _mock_run(status="planned", auto_apply=False)
         mock_get_run.return_value = run
 
@@ -644,7 +645,7 @@ class TestRunJsonSerialization:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_no_changes_hides_confirm_and_discard(self, mock_get_run, mock_resolve, *mocks):
         """Planned run with has_changes=False must not advertise confirm/discard.
@@ -654,7 +655,7 @@ class TestRunJsonSerialization:
         the state-upload 500 cycle. Keep both flags false (and the matching
         permission booleans) so the API and the UI present the same answer.
         """
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         run = _mock_run(status="planned", auto_apply=False)
         run.has_changes = False
         mock_get_run.return_value = run
@@ -690,7 +691,7 @@ class TestRunJsonSerialization:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_is_cancelable_by_status(
         self,
@@ -703,7 +704,7 @@ class TestRunJsonSerialization:
         expected: bool,
     ):
         """Cancelable flips per run state — only in-progress states allow cancel."""
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         run = _mock_run(status=status, auto_apply=False)
         mock_get_run.return_value = run
         ws = _mock_workspace(ws_id=run.workspace_id)
@@ -718,10 +719,10 @@ class TestRunJsonSerialization:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_timestamps_rfc3339(self, mock_get_run, mock_resolve, *mocks):
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         run = _mock_run()
         run.created_at = datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC)
         mock_get_run.return_value = run
@@ -739,11 +740,11 @@ class TestRunJsonSerialization:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_auto_apply_not_confirmable(self, mock_get_run, mock_resolve, *mocks):
         """Auto-apply runs in planned state are NOT confirmable."""
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         run = _mock_run(status="planned", auto_apply=True)
         mock_get_run.return_value = run
 
@@ -767,10 +768,10 @@ class TestCLIApplyGuard:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_create_apply_blocked_on_vcs_remote_workspace(self, mock_resolve, *mocks):
         """Remote + VCS + plan_only=false → 422."""
-        mock_resolve.return_value = "write"
+        mock_resolve.return_value = caps_for_level("write")
         ws = _mock_workspace()
         ws.execution_mode = "agent"
         ws.vcs_connection_id = uuid.uuid4()  # VCS-connected
@@ -801,10 +802,10 @@ class TestCLIApplyGuard:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_create_apply_blocked_even_with_spoofed_vcs_source(self, mock_resolve, *mocks):
         """Remote + VCS + CLI CV + source='vcs' spoofed → still 422."""
-        mock_resolve.return_value = "write"
+        mock_resolve.return_value = caps_for_level("write")
         ws = _mock_workspace()
         ws.execution_mode = "agent"
         ws.vcs_connection_id = uuid.uuid4()
@@ -837,12 +838,12 @@ class TestCLIApplyGuard:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.run_service.queue_run")
     @patch("terrapod.api.routers.runs.run_service.create_run")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_create_apply_allowed_on_non_vcs_remote_workspace(
         self, mock_resolve, mock_create_run, mock_queue, *mocks
     ):
         """Remote + no VCS + plan_only=false → 201 (CLI-driven workflow)."""
-        mock_resolve.return_value = "write"
+        mock_resolve.return_value = caps_for_level("write")
         ws = _mock_workspace()
         ws.execution_mode = "agent"
         ws.vcs_connection_id = None  # No VCS
@@ -880,12 +881,12 @@ class TestCLIApplyGuard:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.run_service.queue_run")
     @patch("terrapod.api.routers.runs.run_service.create_run")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_create_plan_forced_on_vcs_remote_workspace(
         self, mock_resolve, mock_create_run, mock_queue, *mocks
     ):
         """Remote + VCS + plan_only=true → 201 (plan is always allowed)."""
-        mock_resolve.return_value = "plan"
+        mock_resolve.return_value = caps_for_level("plan")
         ws = _mock_workspace()
         ws.execution_mode = "agent"
         ws.vcs_connection_id = uuid.uuid4()
@@ -921,13 +922,13 @@ class TestCLIApplyGuard:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_confirm_blocked_on_vcs_remote_workspace(
         self, mock_get_run, mock_resolve, *mocks
     ):
         """Confirm CLI run on VCS-connected remote workspace → 422."""
-        mock_resolve.return_value = "write"
+        mock_resolve.return_value = caps_for_level("write")
         run = _mock_run(status="planned")
         mock_get_run.return_value = run
 
@@ -950,13 +951,13 @@ class TestCLIApplyGuard:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.run_service.confirm_run")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_confirm_allowed_for_ui_queued_vcs_run(
         self, mock_get_run, mock_resolve, mock_confirm, *mocks
     ):
         """Confirm UI-queued run on VCS-connected workspace → 200 (code from VCS)."""
-        mock_resolve.return_value = "write"
+        mock_resolve.return_value = caps_for_level("write")
         run = _mock_run(status="planned")
         run.vcs_commit_sha = "abc123"  # Code was fetched from VCS
         mock_get_run.return_value = run
@@ -981,13 +982,13 @@ class TestCLIApplyGuard:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.run_service.confirm_run")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_confirm_allowed_on_non_vcs_remote_workspace(
         self, mock_get_run, mock_resolve, mock_confirm, *mocks
     ):
         """Confirm CLI run on non-VCS remote workspace → 200."""
-        mock_resolve.return_value = "write"
+        mock_resolve.return_value = caps_for_level("write")
         run = _mock_run(status="planned")
         mock_get_run.return_value = run
         confirmed = _mock_run(status="confirmed")
@@ -1112,10 +1113,10 @@ class TestPlanJsonAttribute:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_attribute_present_when_uploaded(self, mock_get_run, mock_resolve, *_mocks):
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         run = _mock_run(status="planned")
         run.has_json_output = True
         mock_get_run.return_value = run
@@ -1134,12 +1135,12 @@ class TestPlanJsonAttribute:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.runs.run_service.get_run")
     async def test_attribute_absent_when_not_uploaded(self, mock_get_run, mock_resolve, *_mocks):
         """Don't advertise a URL we know would 404. Older / errored / failed-upload
         runs must not carry the `json-output` attribute."""
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         run = _mock_run(status="planned")
         run.has_json_output = False
         mock_get_run.return_value = run
@@ -1162,13 +1163,13 @@ class TestRetryRun:
     @patch("terrapod.api.routers.runs.run_service.queue_run")
     @patch("terrapod.api.routers.runs.run_service.create_run")
     @patch("terrapod.api.routers.runs.run_service.get_run")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_retry_attaches_latest_cv_when_source_has_none(
         self, mock_resolve, mock_get_run, mock_create_run, mock_queue, *mocks
     ):
         """#439: retrying a run whose CV is null falls back to the workspace's
         latest uploaded CV rather than faithfully copying the null forward."""
-        mock_resolve.return_value = "plan"
+        mock_resolve.return_value = caps_for_level("plan")
 
         original = _mock_run(status="errored")
         original.configuration_version_id = None  # The bug
@@ -1201,13 +1202,13 @@ class TestRetryRun:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.api.routers.runs.run_service.create_run")
     @patch("terrapod.api.routers.runs.run_service.get_run")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_retry_rejects_when_workspace_has_no_cv(
         self, mock_resolve, mock_get_run, mock_create_run, *mocks
     ):
         """If the source run has no CV AND the workspace has never had one
         uploaded, the retry is rejected with 422 (nothing the runner could do)."""
-        mock_resolve.return_value = "plan"
+        mock_resolve.return_value = caps_for_level("plan")
 
         original = _mock_run(status="errored")
         original.configuration_version_id = None

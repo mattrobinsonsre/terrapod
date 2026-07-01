@@ -27,6 +27,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user, require_admin
+from terrapod.auth import capabilities as cap
+from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import (
     Variable,
     VariableSet,
@@ -38,8 +40,7 @@ from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import variable_service
 from terrapod.services.workspace_rbac_service import (
-    has_permission,
-    resolve_workspace_permission_for,
+    resolve_workspace_capabilities_for,
 )
 
 router = APIRouter(prefix="/api/v2", tags=["variables"])
@@ -99,8 +100,8 @@ async def list_workspace_vars(
 ) -> JSONResponse:
     """List all variables for a workspace. Requires read."""
     ws = await _get_workspace(workspace_id, db)
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "read"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.VAR_READ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Requires read permission on workspace"
         )
@@ -117,8 +118,8 @@ async def create_workspace_var(
 ) -> JSONResponse:
     """Create a variable for a workspace. Requires write."""
     ws = await _get_workspace(workspace_id, db)
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "write"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.VAR_WRITE):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Requires write permission on workspace"
         )
@@ -160,8 +161,8 @@ async def update_workspace_var(
 ) -> JSONResponse:
     """Update a workspace variable. Requires write."""
     ws = await _get_workspace(workspace_id, db)
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "write"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.VAR_WRITE):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Requires write permission on workspace"
         )
@@ -204,8 +205,8 @@ async def delete_workspace_var(
 ) -> None:
     """Delete a workspace variable. Requires write."""
     ws = await _get_workspace(workspace_id, db)
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "write"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.VAR_WRITE):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Requires write permission on workspace"
         )

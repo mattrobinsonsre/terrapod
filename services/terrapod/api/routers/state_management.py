@@ -22,12 +22,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
 from terrapod.api.upload_stream import file_chunks, read_file_bytes, stream_to_tempfile
+from terrapod.auth import capabilities as cap
+from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import StateVersion, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.workspace_rbac_service import (
-    has_permission,
-    resolve_workspace_permission_for,
+    resolve_workspace_capabilities_for,
 )
 from terrapod.storage import get_storage
 from terrapod.storage.keys import state_key
@@ -65,21 +66,21 @@ def _read_state_lineage_md5(path: str) -> tuple[str, str]:
     return state_data.get("lineage", ""), h.hexdigest()
 
 
-async def _require_sv_workspace_permission(
+async def _require_sv_workspace_capability(
     sv: StateVersion,
     required: str,
     user: AuthenticatedUser,
     db: AsyncSession,
 ) -> Workspace:
-    """Check permission on the state version's workspace. Returns workspace."""
+    """Check a capability on the state version's workspace. Returns workspace."""
     ws = await db.get(Workspace, sv.workspace_id)
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, required):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, required):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Requires {required} permission on workspace",
+            detail=f"Requires {required} capability on workspace",
         )
     return ws
 
@@ -96,7 +97,7 @@ async def delete_state_version(
     protects against accidentally removing the active workspace state.
     """
     sv = await _get_state_version(state_version_id, db)
-    ws = await _require_sv_workspace_permission(sv, "admin", user, db)
+    ws = await _require_sv_workspace_capability(sv, cap.STATE_DELETE, user, db)
 
     # Prevent deleting the current (latest) state version, UNLESS the
     # record is an unuploaded orphan placeholder. We can't gate on
@@ -166,7 +167,7 @@ async def rollback_state_version(
     — no versions are deleted, history is preserved.
     """
     sv = await _get_state_version(state_version_id, db)
-    ws = await _require_sv_workspace_permission(sv, "write", user, db)
+    ws = await _require_sv_workspace_capability(sv, cap.STATE_WRITE, user, db)
 
     # Download the old state bytes (decrypting if app-layer state encryption was
     # on when they were written, #635). Working in plaintext keeps md5/state_size
@@ -252,11 +253,11 @@ async def upload_state_manual(
     from terrapod.api.routers.tfe_v2 import _get_workspace_by_id
 
     ws = await _get_workspace_by_id(workspace_id, db)
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "write"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.STATE_WRITE):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Requires write permission on workspace",
+            detail="Requires state:write capability on workspace",
         )
 
     # Stream the state body to a capped tempfile on the ephemeral PVC rather

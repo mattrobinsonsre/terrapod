@@ -8,6 +8,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
 
 _BASE = "http://test"
@@ -66,11 +67,11 @@ class TestCreateRunTrigger:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_triggers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.run_triggers.resolve_workspace_capabilities_for")
     @patch("terrapod.redis.client.publish_workspace_event", new_callable=AsyncMock)
     async def test_create_run_trigger(self, mock_publish, mock_resolve, *mocks):
         """Happy path: create a run trigger → 201."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         dest_ws = _mock_workspace(name="dest")
         source_ws = _mock_workspace(name="source")
 
@@ -122,10 +123,10 @@ class TestCreateRunTrigger:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_triggers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.run_triggers.resolve_workspace_capabilities_for")
     async def test_create_self_referential_rejected(self, mock_resolve, *mocks):
         """Same source and destination workspace → 422."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace()
 
         app, mock_db = _make_app(_user())
@@ -151,10 +152,10 @@ class TestCreateRunTrigger:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_triggers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.run_triggers.resolve_workspace_capabilities_for")
     async def test_create_duplicate_rejected(self, mock_resolve, *mocks):
         """Same pair twice → 409."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         dest_ws = _mock_workspace(name="dest")
         source_ws = _mock_workspace(name="source")
 
@@ -191,10 +192,10 @@ class TestCreateRunTrigger:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_triggers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.run_triggers.resolve_workspace_capabilities_for")
     async def test_create_max_20_sources(self, mock_resolve, *mocks):
         """21st source → 422."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         dest_ws = _mock_workspace(name="dest")
         source_ws = _mock_workspace(name="source")
 
@@ -235,10 +236,10 @@ class TestCreateRunTrigger:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_triggers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.run_triggers.resolve_workspace_capabilities_for")
     async def test_create_requires_admin(self, mock_resolve, *mocks):
         """Non-admin → 403."""
-        mock_resolve.return_value = "write"
+        mock_resolve.return_value = caps_for_level("write")
         ws = _mock_workspace()
 
         app, mock_db = _make_app(_user())
@@ -270,9 +271,9 @@ class TestListRunTriggers:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_triggers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.run_triggers.resolve_workspace_capabilities_for")
     async def test_list_inbound(self, mock_resolve, *mocks):
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         ws = _mock_workspace()
         trigger = _mock_trigger(ws=ws)
 
@@ -296,9 +297,9 @@ class TestListRunTriggers:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_triggers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.run_triggers.resolve_workspace_capabilities_for")
     async def test_list_outbound(self, mock_resolve, *mocks):
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         ws = _mock_workspace()
         trigger = _mock_trigger(source_ws=ws)
 
@@ -322,10 +323,10 @@ class TestListRunTriggers:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_triggers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.run_triggers.resolve_workspace_capabilities_for")
     async def test_list_requires_filter(self, mock_resolve, *mocks):
         """Missing filter → 422."""
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         ws = _mock_workspace()
 
         app, mock_db = _make_app(_user())
@@ -348,9 +349,9 @@ class TestShowRunTrigger:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_triggers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.run_triggers.resolve_workspace_capabilities_for")
     async def test_show_run_trigger(self, mock_resolve, *mocks):
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         trigger = _mock_trigger()
 
         app, mock_db = _make_app(_user())
@@ -385,10 +386,10 @@ class TestDeleteRunTrigger:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.run_triggers.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.run_triggers.resolve_workspace_capabilities_for")
     async def test_delete_run_trigger(self, mock_resolve, *mocks):
         """Happy path → 204."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         trigger = _mock_trigger()
 
         app, mock_db = _make_app(_user())

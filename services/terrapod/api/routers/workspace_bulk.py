@@ -31,6 +31,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, effective_platform_roles, require_admin
 from terrapod.api.labels import validate_labels
+from terrapod.auth import capabilities as cap
+from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import (
     AgentPool,
     AuditLog,
@@ -41,7 +43,7 @@ from terrapod.db.models import (
 )
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
-from terrapod.services import pool_rbac_service
+from terrapod.services.capability_resolver import resolve_capabilities
 from terrapod.services.notification_service import VALID_TRIGGERS
 from terrapod.services.run_task_service import VALID_ENFORCEMENT_LEVELS, VALID_STAGES
 from terrapod.services.workspace_search_service import (
@@ -218,13 +220,19 @@ async def _validate_update(
                 pool = await db.get(AgentPool, pid)
                 if pool is None:
                     raise HTTPException(status_code=422, detail="agent-pool-id not found")
-                # Assigning a pool requires pool `write` (platform admin bypass) —
-                # mirrors the single-workspace rule.
+                # Assigning a pool requires the pool:assign capability (platform
+                # admin bypass) — mirrors the single-workspace rule (#585).
                 if "admin" not in effective_platform_roles(user):
-                    perm = await pool_rbac_service.resolve_pool_permission(
-                        db, user.email, user.roles, pool.name, pool.labels, pool.owner_email
+                    pool_caps = await resolve_capabilities(
+                        db,
+                        user.email,
+                        user.roles,
+                        pool.name,
+                        pool.labels or {},
+                        pool.owner_email,
+                        axis="pool",
                     )
-                    if not pool_rbac_service.has_pool_permission(perm, "write"):
+                    if not has_capability(pool_caps, cap.POOL_ASSIGN):
                         raise HTTPException(
                             status_code=403,
                             detail=f"write permission on agent pool '{pool.name}' is required",

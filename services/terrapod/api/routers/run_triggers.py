@@ -22,12 +22,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.auth import capabilities as cap
+from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import RunTrigger, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.workspace_rbac_service import (
-    has_permission,
-    resolve_workspace_permission_for,
+    resolve_workspace_capabilities_for,
 )
 
 router = APIRouter(tags=["run-triggers"])
@@ -79,14 +80,14 @@ async def _get_workspace(workspace_id: str, db: AsyncSession) -> Workspace:
     return ws
 
 
-async def _require_ws_permission(
+async def _require_ws_capability(
     ws: Workspace, required: str, user: AuthenticatedUser, db: AsyncSession
 ) -> None:
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, required):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, required):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Requires {required} permission on workspace",
+            detail=f"Requires {required} capability on workspace",
         )
 
 
@@ -99,7 +100,7 @@ async def create_run_trigger(
 ) -> JSONResponse:
     """Create a run trigger. Requires admin on the destination workspace."""
     ws = await _get_workspace(workspace_id, db)
-    await _require_ws_permission(ws, "admin", user, db)
+    await _require_ws_capability(ws, cap.RUN_TRIGGER_MANAGE, user, db)
 
     # Extract source workspace from relationships
     relationships = body.get("data", {}).get("relationships", {})
@@ -174,7 +175,7 @@ async def list_run_triggers(
 ) -> JSONResponse:
     """List run triggers for a workspace (inbound or outbound). Requires read."""
     ws = await _get_workspace(workspace_id, db)
-    await _require_ws_permission(ws, "read", user, db)
+    await _require_ws_capability(ws, cap.RUN_TRIGGER_READ, user, db)
 
     if filter_type not in ("inbound", "outbound"):
         raise HTTPException(
@@ -221,7 +222,7 @@ async def show_run_trigger(
         raise HTTPException(status_code=404, detail="Run trigger not found")
 
     ws = trigger.workspace
-    await _require_ws_permission(ws, "read", user, db)
+    await _require_ws_capability(ws, cap.RUN_TRIGGER_READ, user, db)
 
     return JSONResponse(content={"data": _trigger_json(trigger)})
 
@@ -244,7 +245,7 @@ async def delete_run_trigger(
         raise HTTPException(status_code=404, detail="Run trigger not found")
 
     ws = trigger.workspace
-    await _require_ws_permission(ws, "admin", user, db)
+    await _require_ws_capability(ws, cap.RUN_TRIGGER_MANAGE, user, db)
 
     # Capture both endpoint ids before the row is gone.
     dest_id = str(trigger.workspace_id)

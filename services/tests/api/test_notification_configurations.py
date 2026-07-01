@@ -8,6 +8,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
 
 _BASE = "http://test"
@@ -74,10 +75,10 @@ class TestCreateNotificationConfiguration:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_capabilities_for")
     async def test_create_generic(self, mock_resolve, *mocks):
         """Create generic webhook → 201."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace()
 
         app, mock_db = _make_app(_user())
@@ -108,10 +109,10 @@ class TestCreateNotificationConfiguration:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_capabilities_for")
     async def test_create_invalid_type(self, mock_resolve, *mocks):
         """Invalid destination-type → 422."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace()
 
         app, mock_db = _make_app(_user())
@@ -139,10 +140,10 @@ class TestCreateNotificationConfiguration:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_capabilities_for")
     async def test_create_invalid_triggers(self, mock_resolve, *mocks):
         """Invalid trigger event → 422."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace()
 
         app, mock_db = _make_app(_user())
@@ -172,10 +173,10 @@ class TestCreateNotificationConfiguration:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_capabilities_for")
     async def test_create_requires_admin(self, mock_resolve, *mocks):
         """Write permission → 403."""
-        mock_resolve.return_value = "write"
+        mock_resolve.return_value = caps_for_level("write")
         ws = _mock_workspace()
 
         app, mock_db = _make_app(_user())
@@ -204,10 +205,10 @@ class TestCreateNotificationConfiguration:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_capabilities_for")
     async def test_create_email_requires_addresses(self, mock_resolve, *mocks):
         """Email type without email-addresses → 422."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace()
 
         app, mock_db = _make_app(_user())
@@ -236,10 +237,10 @@ class TestCreateNotificationConfiguration:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_capabilities_for")
     async def test_create_generic_requires_url(self, mock_resolve, *mocks):
         """Generic without url → 422."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace()
 
         app, mock_db = _make_app(_user())
@@ -272,10 +273,10 @@ class TestListNotificationConfigurations:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_capabilities_for")
     async def test_list(self, mock_resolve, *mocks):
         """List returns configs. Read permission sufficient."""
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         ws = _mock_workspace()
         nc = _mock_nc(ws=ws)
 
@@ -304,9 +305,9 @@ class TestShowNotificationConfiguration:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_capabilities_for")
     async def test_show(self, mock_resolve, *mocks):
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         nc = _mock_nc()
 
         app, mock_db = _make_app(_user())
@@ -350,10 +351,10 @@ class TestUpdateNotificationConfiguration:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_capabilities_for")
     async def test_update_name(self, mock_resolve, *mocks):
         """PATCH updates name → 200."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         nc = _mock_nc()
 
         app, mock_db = _make_app(_user())
@@ -378,10 +379,10 @@ class TestUpdateNotificationConfiguration:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_capabilities_for")
     async def test_update_requires_admin(self, mock_resolve, *mocks):
         """Write permission → 403."""
-        mock_resolve.return_value = "write"
+        mock_resolve.return_value = caps_for_level("write")
         nc = _mock_nc()
 
         app, mock_db = _make_app(_user())
@@ -405,10 +406,10 @@ class TestDeleteNotificationConfiguration:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_capabilities_for")
     async def test_delete(self, mock_resolve, *mocks):
         """Admin can delete → 204."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         nc = _mock_nc()
 
         app, mock_db = _make_app(_user())
@@ -432,12 +433,12 @@ class TestVerifyNotificationConfiguration:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.notification_configurations.resolve_workspace_capabilities_for")
     @patch("terrapod.api.routers.notification_configurations.deliver_notification")
     @patch("terrapod.api.routers.notification_configurations.record_delivery_response")
     async def test_verify(self, mock_record, mock_deliver, mock_resolve, *mocks):
         """Verify sends test notification and records response."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         mock_deliver.return_value = {"status": 200, "body": "ok", "success": True}
 
         nc = _mock_nc()

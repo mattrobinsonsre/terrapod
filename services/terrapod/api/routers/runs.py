@@ -44,6 +44,8 @@ from terrapod.api.dependencies import (
     get_current_user,
     get_listener_identity,
 )
+from terrapod.auth import capabilities as cap
+from terrapod.auth.capabilities import has_capability
 from terrapod.config import settings
 from terrapod.db.models import (
     PlanSummary,
@@ -58,8 +60,7 @@ from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service, run_service
 from terrapod.services.workspace_rbac_service import (
-    has_permission,
-    resolve_workspace_permission_for,
+    resolve_workspace_capabilities_for,
 )
 from terrapod.storage import get_storage
 from terrapod.storage.keys import apply_log_key, plan_json_output_key, plan_log_key
@@ -266,18 +267,18 @@ async def _get_workspace(workspace_id: str, db: AsyncSession) -> Workspace:
     return ws
 
 
-async def _require_run_ws_permission(
+async def _require_run_ws_capability(
     run: Run, required: str, user: AuthenticatedUser, db: AsyncSession
 ) -> None:
-    """Check that user has the required permission on the run's workspace."""
+    """Check that user holds the required capability on the run's workspace."""
     ws = await db.get(Workspace, run.workspace_id)
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, required):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, required):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Requires {required} permission on workspace",
+            detail=f"Requires '{required}' capability on workspace",
         )
 
 
@@ -424,13 +425,19 @@ async def create_run(
             )
         plan_only = True
 
-    # Check permission: plan-only requires plan, apply requires write
-    required = "plan" if plan_only else "write"
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, required):
+    # Check capability: plan-only needs run:plan; apply needs run:apply, or
+    # run:apply-destroy when the run is a destroy (is-destroy=true).
+    if plan_only:
+        required_cap = cap.RUN_PLAN
+    elif attrs.get("is-destroy", False):
+        required_cap = cap.RUN_APPLY_DESTROY
+    else:
+        required_cap = cap.RUN_APPLY
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, required_cap):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Requires {required} permission on workspace",
+            detail=f"Requires '{required_cap}' capability on workspace",
         )
 
     # Configuration version (optional — provided by CLI uploads)
@@ -533,7 +540,7 @@ async def show_run(
 ) -> JSONResponse:
     """Show a run. Requires read on workspace."""
     run = await _get_run(run_id, db)
-    await _require_run_ws_permission(run, "read", user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
     ws = await db.get(Workspace, run.workspace_id)
 
     # Look up state version created by this run (detail endpoint only)
@@ -563,8 +570,8 @@ async def list_workspace_runs(
 ) -> JSONResponse:
     """List runs for a workspace. Requires read."""
     ws = await _get_workspace(workspace_id, db)
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "read"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.RUN_READ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Requires read permission on workspace",
@@ -589,7 +596,9 @@ async def confirm_run(
 ) -> JSONResponse:
     """Confirm a planned run for apply. Requires write."""
     run = await _get_run(run_id, db)
-    await _require_run_ws_permission(run, "write", user, db)
+    await _require_run_ws_capability(
+        run, cap.RUN_APPLY_DESTROY if run.is_destroy else cap.RUN_APPLY, user, db
+    )
 
     # No-op apply guard: a plan with has_changes=False has nothing to apply.
     # The reconciler short-circuits these directly to `applied`, so this
@@ -641,7 +650,7 @@ async def discard_run(
 ) -> JSONResponse:
     """Discard a planned run. Requires plan."""
     run = await _get_run(run_id, db)
-    await _require_run_ws_permission(run, "plan", user, db)
+    await _require_run_ws_capability(run, cap.RUN_CANCEL, user, db)
     try:
         run = await run_service.discard_run(db, run)
         await db.commit()
@@ -658,7 +667,7 @@ async def cancel_run(
 ) -> JSONResponse:
     """Cancel a run. Requires plan."""
     run = await _get_run(run_id, db)
-    await _require_run_ws_permission(run, "plan", user, db)
+    await _require_run_ws_capability(run, cap.RUN_CANCEL, user, db)
     try:
         run = await run_service.cancel_run(db, run)
         await db.commit()
@@ -681,7 +690,7 @@ async def retry_run(
     Requires plan permission.
     """
     run = await _get_run(run_id, db)
-    await _require_run_ws_permission(run, "plan", user, db)
+    await _require_run_ws_capability(run, cap.RUN_CANCEL, user, db)
 
     is_terminal = run.status in run_service.TERMINAL_STATES or (
         run.plan_only and run.status == "planned"
@@ -816,7 +825,7 @@ async def list_run_events(
     We synthesize events from the run's status timestamps.
     """
     run = await _get_run(run_id, db)
-    await _require_run_ws_permission(run, "read", user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
 
     events = []
     event_pairs = [
@@ -900,7 +909,7 @@ async def show_plan_by_id(
     Plan IDs use the same UUID as the run with a 'plan-' prefix.
     """
     run = await _get_run(plan_id.replace("plan-", "run-"), db)
-    await _require_run_ws_permission(run, "read", user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
     return JSONResponse(content=_plan_json(run))
 
 
@@ -921,7 +930,7 @@ async def show_plan_summary(
     branches on the ``kind`` attribute.
     """
     run = await _get_run(run_id, db)
-    await _require_run_ws_permission(run, "read", user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
 
     summary = (
         await db.execute(select(PlanSummary).where(PlanSummary.run_id == run.id))
@@ -1000,7 +1009,7 @@ async def regenerate_plan_summary(
         raise HTTPException(status_code=503, detail="AI summary is disabled globally")
 
     run = await _get_run(run_id, db)
-    await _require_run_ws_permission(run, "read", user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
 
     kind = _summary_kind_for_run(run)
     if kind is None:
@@ -1123,7 +1132,7 @@ async def _resolve_plan_summary_for_chat(
     plan that hasn't been summarised), and returns the joined rows.
     """
     run = await _get_run(run_id, db)
-    await _require_run_ws_permission(run, "read", user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
     summary = (
         await db.execute(select(PlanSummary).where(PlanSummary.run_id == run.id))
     ).scalar_one_or_none()
@@ -1269,7 +1278,7 @@ async def show_plan(
 ) -> JSONResponse:
     """Show plan details including log URL."""
     run = await _get_run(run_id, db)
-    await _require_run_ws_permission(run, "read", user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
     return JSONResponse(content=_plan_json(run))
 
 
@@ -1305,7 +1314,7 @@ async def show_apply_by_id(
     Apply IDs use the same UUID as the run with an 'apply-' prefix.
     """
     run = await _get_run(apply_id.replace("apply-", "run-"), db)
-    await _require_run_ws_permission(run, "read", user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
     return JSONResponse(content=_apply_json(run))
 
 
@@ -1317,7 +1326,7 @@ async def show_apply(
 ) -> JSONResponse:
     """Show apply details including log URL."""
     run = await _get_run(run_id, db)
-    await _require_run_ws_permission(run, "read", user, db)
+    await _require_run_ws_capability(run, cap.RUN_READ, user, db)
     return JSONResponse(content=_apply_json(run))
 
 
@@ -1343,8 +1352,8 @@ async def run_events_stream(
 
     async with get_db_session() as db:
         ws = await _get_workspace(workspace_id, db)
-        perm = await resolve_workspace_permission_for(db, user, ws)
-        if not has_permission(perm, "read"):
+        caps = await resolve_workspace_capabilities_for(db, user, ws)
+        if not has_capability(caps, cap.RUN_READ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Requires read permission on workspace",

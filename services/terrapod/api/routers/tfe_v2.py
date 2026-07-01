@@ -53,6 +53,8 @@ from terrapod.api.dependencies import (
     require_non_runner,
 )
 from terrapod.api.labels import validate_labels
+from terrapod.auth import capabilities as cap
+from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import (
     AuditLog,
     Run,
@@ -64,11 +66,9 @@ from terrapod.db.models import (
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service as _agent_pool_service
-from terrapod.services.pool_rbac_service import has_pool_permission, resolve_pool_permission_for
+from terrapod.services.pool_rbac_service import resolve_pool_capabilities_for
 from terrapod.services.workspace_rbac_service import (
-    PERMISSION_HIERARCHY,
-    has_permission,
-    resolve_workspace_permission_for,
+    resolve_workspace_capabilities_for,
 )
 from terrapod.storage import get_storage
 from terrapod.storage.keys import state_index_key, state_key
@@ -613,16 +613,16 @@ def _compute_health_conditions(ws: Workspace) -> list[dict]:
 
 def _workspace_json(
     ws: Workspace,
-    effective_permission: str | None = None,
+    caps: frozenset[str] | None = None,
     latest_run: Run | None = None,
 ) -> dict:
     """Serialize a Workspace to TFE V2 JSON:API format.
 
-    When effective_permission is provided, the permissions block reflects
-    the user's actual permission level. Otherwise defaults to full access
-    (for backwards compat with internal callers).
+    When ``caps`` (the caller's resolved capability set on this workspace)
+    is provided, the permissions block reflects the user's actual
+    capabilities. Otherwise defaults to no access (empty set).
     """
-    perm = effective_permission
+    caps = caps or frozenset()
 
     latest_run_attr = None
     if latest_run is not None:
@@ -695,20 +695,20 @@ def _workspace_json(
                 "created-at": _rfc3339(ws.created_at),
                 "updated-at": _rfc3339(ws.updated_at),
                 "permissions": {
-                    "can-update": has_permission(perm, "admin"),
-                    "can-destroy": has_permission(perm, "admin"),
-                    "can-queue-run": has_permission(perm, "plan"),
-                    "can-read-state-versions": has_permission(perm, "read"),
-                    "can-create-state-versions": has_permission(perm, "write"),
-                    "can-read-variable": has_permission(perm, "read"),
-                    "can-update-variable": has_permission(perm, "write"),
-                    "can-lock": has_permission(perm, "plan"),
-                    "can-unlock": has_permission(perm, "plan"),
-                    "can-force-unlock": has_permission(perm, "admin"),
-                    "can-read-settings": has_permission(perm, "read"),
+                    "can-update": has_capability(caps, cap.WORKSPACE_SETTINGS),
+                    "can-destroy": has_capability(caps, cap.WORKSPACE_DELETE),
+                    "can-queue-run": has_capability(caps, cap.RUN_PLAN),
+                    "can-read-state-versions": has_capability(caps, cap.STATE_READ_METADATA),
+                    "can-create-state-versions": has_capability(caps, cap.STATE_WRITE),
+                    "can-read-variable": has_capability(caps, cap.VAR_READ),
+                    "can-update-variable": has_capability(caps, cap.VAR_WRITE),
+                    "can-lock": has_capability(caps, cap.WORKSPACE_LOCK),
+                    "can-unlock": has_capability(caps, cap.WORKSPACE_LOCK),
+                    "can-force-unlock": has_capability(caps, cap.WORKSPACE_FORCE_UNLOCK),
+                    "can-read-settings": has_capability(caps, cap.WORKSPACE_READ),
                 },
                 "actions": {
-                    "is-destroyable": has_permission(perm, "admin"),
+                    "is-destroyable": has_capability(caps, cap.WORKSPACE_DELETE),
                 },
             },
             "relationships": {
@@ -844,9 +844,9 @@ async def list_workspaces(
     # Filter to workspaces user has at least read access to
     visible = []
     for ws in workspaces:
-        perm = await resolve_workspace_permission_for(db, user, ws)
-        if perm is not None:
-            visible.append(_workspace_json(ws, perm, latest_run=latest_runs.get(ws.id))["data"])
+        caps = await resolve_workspace_capabilities_for(db, user, ws)
+        if caps:
+            visible.append(_workspace_json(ws, caps, latest_run=latest_runs.get(ws.id))["data"])
 
     return JSONResponse(
         content={"data": visible},
@@ -867,8 +867,8 @@ async def show_workspace(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if perm is None:
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not caps:
         # Runner-token consumers can resolve the producer workspace by name
         # so the OpenTofu `remote` backend's first hop (workspace lookup) in
         # `data "terraform_remote_state"` finds it instead of falling through
@@ -876,7 +876,7 @@ async def show_workspace(
         # runner's missing org-write permission). Allowlist check mirrors
         # the state-read endpoints below.
         if await _runner_state_read_allowed(db, user, ws):
-            perm = "read"
+            caps = cap.caps_for_level("read")
         else:
             raise HTTPException(status_code=404, detail="Workspace not found")
 
@@ -890,7 +890,7 @@ async def show_workspace(
     latest_run = run_result.scalar_one_or_none()
 
     return JSONResponse(
-        content=_workspace_json(ws, perm, latest_run=latest_run),
+        content=_workspace_json(ws, caps, latest_run=latest_run),
         headers=_tfe_headers(),
     )
 
@@ -935,16 +935,16 @@ async def create_workspace(
         target_pool = await _agent_pool_service.get_pool(db, agent_pool_id)
         if target_pool is None:
             raise HTTPException(status_code=404, detail="Agent pool not found")
-        pool_perm = await resolve_pool_permission_for(
+        pool_caps = await resolve_pool_capabilities_for(
             db,
             user,
             pool_name=target_pool.name,
             pool_labels=target_pool.labels or {},
             owner_email=target_pool.owner_email or "",
         )
-        if pool_perm is None:
+        if not has_capability(pool_caps, cap.POOL_READ):
             raise HTTPException(status_code=404, detail="Agent pool not found")
-        if not has_pool_permission(pool_perm, "write"):
+        if not has_capability(pool_caps, cap.POOL_ASSIGN):
             raise HTTPException(
                 status_code=403,
                 detail="Requires write permission on agent pool",
@@ -1000,7 +1000,7 @@ async def create_workspace(
     await publish_workspace_event(str(ws.id), "workspace_created")
 
     return JSONResponse(
-        content=_workspace_json(ws, "admin"),
+        content=_workspace_json(ws, cap.caps_for_level("admin")),
         status_code=201,
         headers=_tfe_headers(),
     )
@@ -1022,21 +1022,21 @@ async def _get_workspace_by_id(workspace_id: str, db: AsyncSession) -> Workspace
     return ws
 
 
-async def _require_ws_permission(
+async def _require_ws_capability(
     workspace_id: str,
     required: str,
     user: AuthenticatedUser,
     db: AsyncSession,
-) -> tuple[Workspace, str]:
-    """Load workspace and check permission. Returns (workspace, effective_permission)."""
+) -> tuple[Workspace, frozenset[str]]:
+    """Load workspace and check capability. Returns (workspace, capability set)."""
     ws = await _get_workspace_by_id(workspace_id, db)
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, required):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, required):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Requires {required} permission on workspace",
+            detail=f"Requires '{required}' capability on workspace",
         )
-    return ws, perm
+    return ws, caps
 
 
 async def _runner_state_read_allowed(
@@ -1127,10 +1127,10 @@ async def show_workspace_by_id(
     state-read endpoints further down.
     """
     ws = await _get_workspace_by_id(workspace_id, db)
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "read"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.WORKSPACE_READ):
         if await _runner_state_read_allowed(db, user, ws):
-            perm = "read"
+            caps = cap.caps_for_level("read")
         else:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -1147,7 +1147,7 @@ async def show_workspace_by_id(
     latest_run = run_result.scalar_one_or_none()
 
     return JSONResponse(
-        content=_workspace_json(ws, perm, latest_run=latest_run),
+        content=_workspace_json(ws, caps, latest_run=latest_run),
         headers=_tfe_headers(),
     )
 
@@ -1169,7 +1169,7 @@ async def list_workspace_tag_bindings(
     (also used for label-based RBAC) double as TFE tag bindings. Each label
     key/value pair is returned as one tag-binding entry.
     """
-    ws, _ = await _require_ws_permission(workspace_id, "read", user, db)
+    ws, _ = await _require_ws_capability(workspace_id, cap.WORKSPACE_READ, user, db)
 
     # `id` is required by JSON:API and go-tfe's jsonapi parser silently
     # drops entries that are missing it. Without an id, ListTagBindings
@@ -1206,7 +1206,7 @@ async def list_workspace_effective_tag_bindings(
     Terrapod has no project hierarchy, so this is identical to the
     workspace-level bindings.
     """
-    ws, _ = await _require_ws_permission(workspace_id, "read", user, db)
+    ws, _ = await _require_ws_capability(workspace_id, cap.WORKSPACE_READ, user, db)
 
     # See note on `id` in `list_workspace_tag_bindings` above — required by
     # JSON:API or go-tfe drops the entry on parse.
@@ -1252,7 +1252,7 @@ async def add_workspace_tag_names(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Legacy POST tag-add — no-op."""
-    await _require_ws_permission(workspace_id, "read", user, db)
+    await _require_ws_capability(workspace_id, cap.WORKSPACE_READ, user, db)
     return Response(status_code=204, headers=_tfe_headers())
 
 
@@ -1264,7 +1264,7 @@ async def remove_workspace_tag_names(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Legacy DELETE tag-remove — no-op."""
-    await _require_ws_permission(workspace_id, "read", user, db)
+    await _require_ws_capability(workspace_id, cap.WORKSPACE_READ, user, db)
     return Response(status_code=204, headers=_tfe_headers())
 
 
@@ -1276,7 +1276,7 @@ async def update_workspace(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Update workspace settings. Requires admin on workspace."""
-    ws, perm = await _require_ws_permission(workspace_id, "admin", user, db)
+    ws, old_caps = await _require_ws_capability(workspace_id, cap.WORKSPACE_SETTINGS, user, db)
 
     attrs = body.get("data", {}).get("attributes", {})
 
@@ -1420,12 +1420,13 @@ async def update_workspace(
         ):
             old_labels = ws.labels
             ws.labels = new_labels
-            new_perm = await resolve_workspace_permission_for(db, user, ws)
+            new_caps = await resolve_workspace_capabilities_for(db, user, ws)
             ws.labels = old_labels  # revert before deciding
-            if new_perm is None or PERMISSION_HIERARCHY.get(
-                new_perm, -1
-            ) < PERMISSION_HIERARCHY.get(perm, -1):
-                new_level = new_perm or "none"
+            # Capability sets are a partial order — a "reduction" is any
+            # capability the caller currently holds that the edit would
+            # remove (set difference), not a drop in a total-order level.
+            removed = old_caps - new_caps
+            if removed:
                 return JSONResponse(
                     status_code=409,
                     content={
@@ -1434,9 +1435,10 @@ async def update_workspace(
                                 "status": "409",
                                 "title": "Label change would reduce your access",
                                 "detail": (
-                                    f"This label change would reduce your access from "
-                                    f"{perm} to {new_level} on this workspace. "
-                                    f'Re-submit with "force": true to confirm.'
+                                    "This label change would remove capabilities you "
+                                    "currently hold on this workspace "
+                                    f"({', '.join(sorted(removed))}). "
+                                    'Re-submit with "force": true to confirm.'
                                 ),
                             }
                         ]
@@ -1465,16 +1467,16 @@ async def update_workspace(
             target_pool = await _agent_pool_service.get_pool(db, new_pool_id)
             if target_pool is None:
                 raise HTTPException(status_code=404, detail="Agent pool not found")
-            pool_perm = await resolve_pool_permission_for(
+            pool_caps = await resolve_pool_capabilities_for(
                 db,
                 user,
                 pool_name=target_pool.name,
                 pool_labels=target_pool.labels or {},
                 owner_email=target_pool.owner_email or "",
             )
-            if pool_perm is None:
+            if not has_capability(pool_caps, cap.POOL_READ):
                 raise HTTPException(status_code=404, detail="Agent pool not found")
-            if not has_pool_permission(pool_perm, "write"):
+            if not has_capability(pool_caps, cap.POOL_ASSIGN):
                 raise HTTPException(
                     status_code=403,
                     detail="Requires write permission on agent pool",
@@ -1557,7 +1559,7 @@ async def update_workspace(
             )
         logger.info("Workspace renamed", old_name=old_name, new_name=ws.name)
 
-    return JSONResponse(content=_workspace_json(ws, perm), headers=_tfe_headers())
+    return JSONResponse(content=_workspace_json(ws, old_caps), headers=_tfe_headers())
 
 
 @extensions_router.delete("/workspaces/{workspace_id}")
@@ -1574,7 +1576,7 @@ async def delete_workspace(
     the infrastructure (the recommended path), or the explicit, discouraged
     ``DELETE /catalog-instances/{id}?orphan=true`` to abandon it.
     """
-    ws, _ = await _require_ws_permission(workspace_id, "admin", user, db)
+    ws, _ = await _require_ws_capability(workspace_id, cap.WORKSPACE_DELETE, user, db)
     if ws.catalog_item_id is not None:
         raise HTTPException(
             status_code=409,
@@ -1606,7 +1608,7 @@ async def list_state_versions(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """List all state versions for a workspace, ordered by serial DESC."""
-    ws, _ = await _require_ws_permission(workspace_id, "read", user, db)
+    ws, _ = await _require_ws_capability(workspace_id, cap.STATE_READ_METADATA, user, db)
 
     result = await db.execute(
         select(StateVersion)
@@ -1640,8 +1642,8 @@ async def current_state_version(
     """
     ws = await _get_workspace_by_id(workspace_id, db)
     if not await _runner_state_read_allowed(db, user, ws):
-        perm = await resolve_workspace_permission_for(db, user, ws)
-        if not has_permission(perm, "read"):
+        caps = await resolve_workspace_capabilities_for(db, user, ws)
+        if not has_capability(caps, cap.STATE_READ_METADATA):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Requires read permission on workspace",
@@ -1685,8 +1687,8 @@ async def download_state(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     if not await _runner_state_read_allowed(db, user, ws):
-        perm = await resolve_workspace_permission_for(db, user, ws)
-        if not has_permission(perm, "plan"):
+        caps = await resolve_workspace_capabilities_for(db, user, ws)
+        if not has_capability(caps, cap.STATE_READ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Requires plan permission on workspace",
@@ -1836,8 +1838,8 @@ async def show_state_version(
     # Check read permission on workspace
     ws = await db.get(Workspace, sv.workspace_id)
     if ws is not None:
-        perm = await resolve_workspace_permission_for(db, user, ws)
-        if perm is None:
+        caps = await resolve_workspace_capabilities_for(db, user, ws)
+        if not has_capability(caps, cap.STATE_READ_METADATA):
             raise HTTPException(status_code=404, detail="State version not found")
 
     return JSONResponse(content=_state_version_json(sv, request), headers=_tfe_headers())
@@ -1851,7 +1853,7 @@ async def create_state_version(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Create a new state version. Requires write permission."""
-    ws, _ = await _require_ws_permission(workspace_id, "write", user, db)
+    ws, _ = await _require_ws_capability(workspace_id, cap.STATE_WRITE, user, db)
 
     body = await request.json()
     attrs = body.get("data", {}).get("attributes", {})
@@ -2063,7 +2065,7 @@ async def lock_workspace(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Lock a workspace. Requires plan permission."""
-    ws, perm = await _require_ws_permission(workspace_id, "plan", user, db)
+    ws, caps = await _require_ws_capability(workspace_id, cap.WORKSPACE_LOCK, user, db)
 
     # Parse lock info from request body
     import json as json_mod
@@ -2093,7 +2095,7 @@ async def lock_workspace(
 
     await publish_workspace_event(str(ws.id), "workspace_lock_change", {"locked": True})
 
-    return JSONResponse(content=_workspace_json(ws, perm), headers=_tfe_headers())
+    return JSONResponse(content=_workspace_json(ws, caps), headers=_tfe_headers())
 
 
 @router.post("/workspaces/{workspace_id}/actions/unlock")
@@ -2104,18 +2106,18 @@ async def unlock_workspace(
 ) -> JSONResponse:
     """Unlock a workspace. Plan for own lock, admin for force-unlock."""
     ws = await _get_workspace_by_id(workspace_id, db)
-    perm = await resolve_workspace_permission_for(db, user, ws)
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
 
-    # Check: at minimum plan permission required
-    if not has_permission(perm, "plan"):
+    # Check: at minimum the lock capability is required
+    if not has_capability(caps, cap.WORKSPACE_LOCK):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Requires plan permission on workspace",
         )
 
-    # If locked by someone else, require admin to force-unlock
+    # If locked by someone else, require the force-unlock capability
     own_lock = ws.lock_id and (ws.lock_id == f"lock-{user.email}")
-    if ws.locked and not own_lock and not has_permission(perm, "admin"):
+    if ws.locked and not own_lock and not has_capability(caps, cap.WORKSPACE_FORCE_UNLOCK):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Requires admin permission to force-unlock workspace locked by another user",
@@ -2130,4 +2132,4 @@ async def unlock_workspace(
 
     await publish_workspace_event(str(ws.id), "workspace_lock_change", {"locked": False})
 
-    return JSONResponse(content=_workspace_json(ws, perm), headers=_tfe_headers())
+    return JSONResponse(content=_workspace_json(ws, caps), headers=_tfe_headers())

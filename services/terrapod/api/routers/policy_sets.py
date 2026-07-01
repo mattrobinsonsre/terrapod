@@ -47,6 +47,8 @@ from terrapod.api.dependencies import (
     require_admin,
     require_runner_for_run,
 )
+from terrapod.auth import capabilities as cap
+from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import (
     Policy,
     PolicyEvaluation,
@@ -61,8 +63,7 @@ from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import policy_engine, policy_set_service, run_service
 from terrapod.services.workspace_rbac_service import (
-    has_permission,
-    resolve_workspace_permission_for,
+    resolve_workspace_capabilities_for,
 )
 
 router = APIRouter(tags=["policy-sets"])
@@ -550,8 +551,8 @@ async def _get_run_for_read(db: AsyncSession, run_id: str, user: AuthenticatedUs
     ws = await db.get(Workspace, run.workspace_id)
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "read"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.RUN_READ):
         raise HTTPException(status_code=403, detail="Requires read permission on workspace")
     return run
 
@@ -596,8 +597,8 @@ async def override_run_policy(
     ws = await db.get(Workspace, run.workspace_id)
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "admin"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.WORKSPACE_SETTINGS):
         raise HTTPException(status_code=403, detail="Requires admin permission on workspace")
 
     count = await policy_set_service.override_run_policies(db, run.id, user.email)

@@ -14,6 +14,7 @@ from terrapod.api.dependencies import (
     get_listener_identity,
     require_admin,
 )
+from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
 
 _BASE = "http://test"
@@ -213,7 +214,7 @@ class TestListPoolsRBAC:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.list_pools", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     @patch(
@@ -230,8 +231,8 @@ class TestListPoolsRBAC:
         mock_fetch_roles.return_value = []
         mock_list_listeners.return_value = []
 
-        # First pool: read access; second pool: no access
-        mock_resolve.side_effect = ["read", None]
+        # First pool: read access; second pool: no access (empty cap set)
+        mock_resolve.side_effect = [caps_for_level("read"), frozenset()]
 
         user = _user(roles=["everyone"])
         app, _ = _make_app(user)
@@ -250,7 +251,7 @@ class TestListPoolsRBAC:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.list_pools", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     @patch(
@@ -265,7 +266,7 @@ class TestListPoolsRBAC:
         mock_list_pools.return_value = [pool]
         mock_fetch_roles.return_value = []
         mock_list_listeners.return_value = []
-        mock_resolve.return_value = "write"
+        mock_resolve.return_value = caps_for_level("write")
 
         user = _user(roles=["pool-writer"])
         app, _ = _make_app(user)
@@ -287,7 +288,7 @@ class TestPoolStatus:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.list_pools", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     @patch(
@@ -300,7 +301,7 @@ class TestPoolStatus:
         pool = _mock_pool(name="busy-pool")
         mock_list_pools.return_value = [pool]
         mock_fetch_roles.return_value = []
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         mock_list_listeners.return_value = [
             {"id": str(uuid.uuid4()), "name": "lis-1", "status": "online"}
         ]
@@ -321,7 +322,7 @@ class TestPoolStatus:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.list_pools", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     @patch(
@@ -334,7 +335,7 @@ class TestPoolStatus:
         pool = _mock_pool(name="quiet-pool")
         mock_list_pools.return_value = [pool]
         mock_fetch_roles.return_value = []
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         mock_list_listeners.return_value = []
 
         app, _ = _make_app(_user())
@@ -349,7 +350,7 @@ class TestPoolStatus:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_show_pool_includes_status(
@@ -357,7 +358,7 @@ class TestPoolStatus:
     ):
         pool = _mock_pool(name="visible")
         mock_get_pool.return_value = pool
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         mock_list_listeners.return_value = [
             {"id": str(uuid.uuid4()), "name": "lis", "status": "online"}
         ]
@@ -443,7 +444,7 @@ class TestDerivePoolStatus:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.list_pools", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     @patch(
@@ -457,7 +458,7 @@ class TestDerivePoolStatus:
         pool = _mock_pool(name="dying-pool")
         mock_list_pools.return_value = [pool]
         mock_fetch_roles.return_value = []
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         past = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
         mock_list_listeners.return_value = [
             {
@@ -485,7 +486,7 @@ class TestListListenersReplicaCount:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_listeners_carry_replica_count(
@@ -498,7 +499,7 @@ class TestListListenersReplicaCount:
     ):
         pool = _mock_pool()
         mock_get_pool.return_value = pool
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         lid_a, lid_b = uuid.uuid4(), uuid.uuid4()
         mock_list_listeners.return_value = [
             {"id": str(lid_a), "name": "lis-a", "status": "online", "tracks_pods": "1"},
@@ -526,7 +527,7 @@ class TestListListenersReplicaCount:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_replica_count_omitted_when_listener_does_not_track_pods(
@@ -541,7 +542,7 @@ class TestListListenersReplicaCount:
         and count_listener_replicas is never called."""
         pool = _mock_pool()
         mock_get_pool.return_value = pool
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         lid = uuid.uuid4()
         mock_list_listeners.return_value = [
             {"id": str(lid), "name": "old-listener", "status": "online"},
@@ -565,7 +566,7 @@ class TestListListenersReplicaCount:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_replica_count_included_for_mixed_listeners(
@@ -579,7 +580,7 @@ class TestListListenersReplicaCount:
         """Mixed list: tracking listener gets replica-count, old one doesn't."""
         pool = _mock_pool()
         mock_get_pool.return_value = pool
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         lid_new, lid_old = uuid.uuid4(), uuid.uuid4()
         mock_list_listeners.return_value = [
             {"id": str(lid_new), "name": "new", "status": "online", "tracks_pods": "1"},
@@ -608,7 +609,7 @@ class TestShowPoolRBAC:
     @patch("terrapod.services.agent_pool_service.list_listeners", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_show_pool_with_read(
@@ -617,7 +618,7 @@ class TestShowPoolRBAC:
         pool = _mock_pool(name="visible", labels={"env": "dev"}, owner_email="owner@test.com")
         mock_get_pool.return_value = pool
         mock_list_listeners.return_value = []
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
 
         user = _user()
         app, _ = _make_app(user)
@@ -637,14 +638,14 @@ class TestShowPoolRBAC:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_show_pool_no_access_returns_404(self, mock_resolve, mock_get_pool, *mocks):
         """Pool invisible to user returns 404 (not 403)."""
         pool = _mock_pool(name="secret")
         mock_get_pool.return_value = pool
-        mock_resolve.return_value = None
+        mock_resolve.return_value = caps_for_level(None)
 
         user = _user()
         app, _ = _make_app(user)
@@ -733,14 +734,14 @@ class TestUpdatePoolRBAC:
     @patch("terrapod.services.agent_pool_service.update_pool", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_update_pool_with_labels(self, mock_resolve, mock_get_pool, mock_update, *mocks):
         pool = _mock_pool(name="my-pool", labels={"env": "dev"})
         updated_pool = _mock_pool(name="my-pool", labels={"env": "prod"})
         mock_get_pool.return_value = pool
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         mock_update.return_value = updated_pool
 
         user = _user(email="owner@example.com")
@@ -768,14 +769,14 @@ class TestUpdatePoolRBAC:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_update_pool_write_only_returns_403(self, mock_resolve, mock_get_pool, *mocks):
         """Write permission is insufficient for pool update — admin required."""
         pool = _mock_pool(name="restricted")
         mock_get_pool.return_value = pool
-        mock_resolve.return_value = "write"
+        mock_resolve.return_value = caps_for_level("write")
 
         user = _user()
         app, _ = _make_app(user)
@@ -803,7 +804,7 @@ class TestDeletePoolRBAC:
     )
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_delete_pool_with_admin(
@@ -811,7 +812,7 @@ class TestDeletePoolRBAC:
     ):
         pool = _mock_pool()
         mock_get_pool.return_value = pool
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
 
         user = _user(email="owner@example.com")
         app, mock_db = _make_app(user)
@@ -829,13 +830,13 @@ class TestDeletePoolRBAC:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_delete_pool_no_access_returns_404(self, mock_resolve, mock_get_pool, *mocks):
         pool = _mock_pool()
         mock_get_pool.return_value = pool
-        mock_resolve.return_value = None
+        mock_resolve.return_value = caps_for_level(None)
 
         user = _user()
         app, _ = _make_app(user)
@@ -856,14 +857,14 @@ class TestTokenEndpointRBAC:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_list_tokens_read_only_returns_403(self, mock_resolve, mock_get_pool, *mocks):
         """User with read permission cannot list pool tokens."""
         pool = _mock_pool()
         mock_get_pool.return_value = pool
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
 
         user = _user()
         app, _ = _make_app(user)
@@ -880,14 +881,14 @@ class TestTokenEndpointRBAC:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_create_token_read_only_returns_403(self, mock_resolve, mock_get_pool, *mocks):
         """User with read permission cannot create pool tokens."""
         pool = _mock_pool()
         mock_get_pool.return_value = pool
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
 
         user = _user()
         app, _ = _make_app(user)
@@ -910,7 +911,7 @@ class TestUpdatePoolSelfLockout:
     @patch("terrapod.api.app.init_db")
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_label_change_reducing_access_returns_409(
@@ -919,9 +920,15 @@ class TestUpdatePoolSelfLockout:
         """Changing labels that would reduce user's access returns 409."""
         pool = _mock_pool(name="my-pool", labels={"team": "sre"})
         mock_get_pool.return_value = pool
-        # First call: current permission check → admin
-        # Second call: simulated new permission → None (locked out)
-        mock_resolve.side_effect = ["admin", None]
+        # Three resolver calls in update_pool: (1) the _require_pool_capability
+        # gate, (2) old_caps capture, (3) new_caps after the label change. Start
+        # as pool admin, drop to read (no POOL_MANAGE/POOL_ASSIGN) → removed
+        # capabilities → 409.
+        mock_resolve.side_effect = [
+            caps_for_level("admin"),
+            caps_for_level("admin"),
+            caps_for_level("read"),
+        ]
 
         user = _user(email="user@example.com", roles=["sre-role"])
         app, _ = _make_app(user)
@@ -934,7 +941,9 @@ class TestUpdatePoolSelfLockout:
             )
 
         assert res.status_code == 409
-        assert "reduce your access" in res.json()["errors"][0]["detail"]
+        err = res.json()["errors"][0]
+        assert "reduce your access" in err["title"]
+        assert "remove capabilities you currently hold" in err["detail"]
 
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
@@ -942,7 +951,7 @@ class TestUpdatePoolSelfLockout:
     @patch("terrapod.services.agent_pool_service.update_pool", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_force_bypasses_lockout_check(
@@ -952,7 +961,7 @@ class TestUpdatePoolSelfLockout:
         pool = _mock_pool(name="my-pool", labels={"team": "sre"})
         updated_pool = _mock_pool(name="my-pool", labels={"team": "other"})
         mock_get_pool.return_value = pool
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         mock_update.return_value = updated_pool
 
         user = _user(email="user@example.com", roles=["sre-role"])
@@ -975,7 +984,7 @@ class TestUpdatePoolSelfLockout:
     @patch("terrapod.services.agent_pool_service.update_pool", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_platform_admin_immune_to_lockout(
@@ -985,7 +994,7 @@ class TestUpdatePoolSelfLockout:
         pool = _mock_pool(name="my-pool", labels={"team": "sre"})
         updated_pool = _mock_pool(name="my-pool", labels={})
         mock_get_pool.return_value = pool
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         mock_update.return_value = updated_pool
 
         user = _user(email="admin@example.com", roles=["admin"])
@@ -1016,7 +1025,7 @@ class TestDeleteListenerRBAC:
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_listener")
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_delete_listener_with_pool_admin(
@@ -1027,7 +1036,7 @@ class TestDeleteListenerRBAC:
         listener = _mock_listener_dict(listener_id=lid, pool_id=pool.id)
         mock_get_listener.return_value = listener
         mock_get_pool.return_value = pool
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
 
         user = _user()
         app, _ = _make_app(user)
@@ -1043,7 +1052,7 @@ class TestDeleteListenerRBAC:
     @patch("terrapod.services.agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch("terrapod.services.agent_pool_service.get_listener")
     @patch(
-        "terrapod.api.routers.agent_pools.resolve_pool_permission_for",
+        "terrapod.api.routers.agent_pools.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_delete_listener_read_only_returns_403(
@@ -1055,7 +1064,7 @@ class TestDeleteListenerRBAC:
         listener = _mock_listener_dict(listener_id=lid, pool_id=pool.id)
         mock_get_listener.return_value = listener
         mock_get_pool.return_value = pool
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
 
         user = _user()
         app, _ = _make_app(user)

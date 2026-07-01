@@ -42,6 +42,8 @@ from terrapod.api.dependencies import (
     require_admin_or_audit,
 )
 from terrapod.api.labels import validate_labels
+from terrapod.auth import capabilities as cap
+from terrapod.auth.capabilities import has_capability
 from terrapod.config import settings
 from terrapod.db.models import (
     AgentPool,
@@ -55,13 +57,11 @@ from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import catalog_service, run_service
 from terrapod.services.catalog_rbac_service import (
-    has_catalog_permission,
-    resolve_catalog_permission_for,
+    resolve_catalog_capabilities_for,
 )
 from terrapod.services.catalog_service import CatalogError
 from terrapod.services.pool_rbac_service import (
-    has_pool_permission,
-    resolve_pool_permission_for,
+    resolve_pool_capabilities_for,
 )
 
 router = APIRouter(tags=["catalog"])
@@ -401,10 +401,10 @@ async def list_catalog_items(
     items = await catalog_service.list_catalog_items(db)
     visible = []
     for item in items:
-        perm = await resolve_catalog_permission_for(
+        caps = await resolve_catalog_capabilities_for(
             db, user, item.name, item.labels or {}, item.owner_email or ""
         )
-        if has_catalog_permission(perm, "read"):
+        if has_capability(caps, cap.CATALOG_READ):
             visible.append(item)
     return JSONResponse(content={"data": [_item_json(i) for i in visible]})
 
@@ -453,10 +453,10 @@ async def _load_item_for_read(
         raise HTTPException(status_code=404, detail="catalog item not found") from e
     if item is None:
         raise HTTPException(status_code=404, detail="catalog item not found")
-    perm = await resolve_catalog_permission_for(
+    caps = await resolve_catalog_capabilities_for(
         db, user, item.name, item.labels or {}, item.owner_email or ""
     )
-    if not has_catalog_permission(perm, "read"):
+    if not has_capability(caps, cap.CATALOG_READ):
         raise HTTPException(status_code=403, detail="Requires catalog read on this item")
     return item
 
@@ -581,10 +581,10 @@ async def provision_catalog_item(
     if not item.enabled:
         raise HTTPException(status_code=409, detail="catalog item is disabled")
 
-    perm = await resolve_catalog_permission_for(
+    caps = await resolve_catalog_capabilities_for(
         db, user, item.name, item.labels or {}, item.owner_email or ""
     )
-    if not has_catalog_permission(perm, "use"):
+    if not has_capability(caps, cap.CATALOG_USE):
         raise HTTPException(status_code=403, detail="Requires catalog 'use' on this item")
 
     attrs = body.get("data", {}).get("attributes", {})
@@ -613,11 +613,11 @@ async def provision_catalog_item(
                 detail="agent pool is not allowed for this catalog item",
             )
 
-    # User must have write on the pool to assign it (pool RBAC intersection).
-    pool_perm = await resolve_pool_permission_for(
+    # User must have pool:assign to assign the pool (pool RBAC intersection).
+    pool_caps = await resolve_pool_capabilities_for(
         db, user, pool.name, pool.labels or {}, pool.owner_email
     )
-    if not has_pool_permission(pool_perm, "write"):
+    if not has_capability(pool_caps, cap.POOL_ASSIGN):
         raise HTTPException(status_code=403, detail="Requires write permission on the agent pool")
 
     input_values = attrs.get("input-values", {})
@@ -675,11 +675,11 @@ async def _load_instance(
     user: AuthenticatedUser,
     ws_id: str,
     *,
-    required: str,
+    required_cap: str,
     active_only: bool = False,
 ) -> Workspace:
-    """Load a catalog instance workspace and enforce `required` catalog
-    permission on its originating item. Lifecycle actions are gated by catalog
+    """Load a catalog instance workspace and enforce the `required_cap` catalog
+    capability on its originating item. Lifecycle actions are gated by catalog
     'use' on the item — NOT by workspace permission (the clamp gives the
     provisioner read only; the catalog surface is the control plane).
 
@@ -699,11 +699,11 @@ async def _load_instance(
     item = await db.get(CatalogItem, ws.catalog_item_id)
     if item is None:
         raise HTTPException(status_code=409, detail="catalog item no longer exists")
-    perm = await resolve_catalog_permission_for(
+    caps = await resolve_catalog_capabilities_for(
         db, user, item.name, item.labels or {}, item.owner_email or ""
     )
-    if not has_catalog_permission(perm, required):
-        raise HTTPException(status_code=403, detail=f"Requires catalog '{required}' on this item")
+    if not has_capability(caps, required_cap):
+        raise HTTPException(status_code=403, detail=f"Requires '{required_cap}' on this item")
     return ws
 
 
@@ -714,7 +714,7 @@ async def show_catalog_instance(
     user: AuthenticatedUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    ws = await _load_instance(db, user, ws_id, required="read")
+    ws = await _load_instance(db, user, ws_id, required_cap=cap.CATALOG_READ)
     attrs = _instance_json(ws)["attributes"]
     attrs["input-values"] = dict(ws.catalog_input_values or {})
     return JSONResponse(
@@ -741,7 +741,7 @@ async def reconfigure_catalog_instance(
     Requires catalog 'use' on the originating item. A non-auto-apply run plans
     and waits for a platform-admin confirm (the clamp blocks 'use' holders from
     confirming via the workspace API); pass auto-apply to apply directly."""
-    ws = await _load_instance(db, user, ws_id, required="use", active_only=True)
+    ws = await _load_instance(db, user, ws_id, required_cap=cap.CATALOG_USE, active_only=True)
     attrs = body.get("data", {}).get("attributes", {})
     input_values = attrs.get("input-values")
     if input_values is None:
@@ -785,7 +785,7 @@ async def destroy_catalog_instance(
     originating item. On a successful apply the workspace is archived. As with
     reconfigure, a non-auto-apply destroy plans and waits for an admin confirm;
     pass auto-apply to tear down directly."""
-    ws = await _load_instance(db, user, ws_id, required="use", active_only=True)
+    ws = await _load_instance(db, user, ws_id, required_cap=cap.CATALOG_USE, active_only=True)
     attrs = body.get("data", {}).get("attributes", {}) if body else {}
     auto_apply = bool(attrs.get("auto-apply", False))
     try:
@@ -837,7 +837,7 @@ async def confirm_catalog_instance_run(
     provisioner only `read`, so a non-auto-apply provision/reconfigure/destroy
     is confirmed here rather than via the workspace run API (which would need a
     platform admin)."""
-    ws = await _load_instance(db, user, ws_id, required="use")
+    ws = await _load_instance(db, user, ws_id, required_cap=cap.CATALOG_USE)
     run = await _latest_run(db, ws.id)
     if not _is_confirmable_catalog_run(run):
         raise HTTPException(status_code=409, detail="no planned run awaiting confirmation")
@@ -860,7 +860,7 @@ async def discard_catalog_instance_run(
     """Discard the instance's pending **planned** run. Requires catalog `use`.
     Catalog-surface counterpart of confirm (the clamp blocks the workspace run
     API for the provisioner)."""
-    ws = await _load_instance(db, user, ws_id, required="use")
+    ws = await _load_instance(db, user, ws_id, required_cap=cap.CATALOG_USE)
     run = await _latest_run(db, ws.id)
     if not _is_confirmable_catalog_run(run):
         raise HTTPException(status_code=409, detail="no planned run to discard")
@@ -895,7 +895,7 @@ async def delete_catalog_instance(
     and points at destroy — there is no way to orphan a catalog instance by
     accident.
     """
-    ws = await _load_instance(db, user, ws_id, required="admin")
+    ws = await _load_instance(db, user, ws_id, required_cap=cap.CATALOG_ADMIN)
     if not orphan:
         raise HTTPException(
             status_code=409,

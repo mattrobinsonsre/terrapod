@@ -27,6 +27,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.auth import capabilities as cap
+from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import Run, RunTask, TaskStage, TaskStageResult, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
@@ -39,8 +41,7 @@ from terrapod.services.run_task_service import (
     verify_callback_token,
 )
 from terrapod.services.workspace_rbac_service import (
-    has_permission,
-    resolve_workspace_permission_for,
+    resolve_workspace_capabilities_for,
 )
 
 router = APIRouter(prefix="/api/v2", tags=["run-tasks"])
@@ -153,14 +154,14 @@ async def _get_workspace(workspace_id: str, db: AsyncSession) -> Workspace:
     return ws
 
 
-async def _require_ws_permission(
+async def _require_ws_capability(
     ws: Workspace, required: str, user: AuthenticatedUser, db: AsyncSession
 ) -> None:
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, required):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, required):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Requires {required} permission on workspace",
+            detail=f"Requires {required} capability on workspace",
         )
 
 
@@ -187,7 +188,7 @@ async def create_run_task(
 ) -> JSONResponse:
     """Create a run task. Requires admin on the workspace."""
     ws = await _get_workspace(workspace_id, db)
-    await _require_ws_permission(ws, "admin", user, db)
+    await _require_ws_capability(ws, cap.RUN_TASK_MANAGE, user, db)
 
     attrs = body.get("data", {}).get("attributes", {})
     name = attrs.get("name", "").strip()
@@ -245,7 +246,7 @@ async def list_run_tasks(
 ) -> JSONResponse:
     """List run tasks for a workspace. Requires read."""
     ws = await _get_workspace(workspace_id, db)
-    await _require_ws_permission(ws, "read", user, db)
+    await _require_ws_capability(ws, cap.RUN_TASK_READ, user, db)
 
     result = await db.execute(
         select(RunTask)
@@ -266,7 +267,7 @@ async def show_run_task(
 ) -> JSONResponse:
     """Show a run task. Requires read on the workspace."""
     rt = await _get_run_task(rt_id, db)
-    await _require_ws_permission(rt.workspace, "read", user, db)
+    await _require_ws_capability(rt.workspace, cap.RUN_TASK_READ, user, db)
     return JSONResponse(content={"data": _run_task_json(rt)})
 
 
@@ -279,7 +280,7 @@ async def update_run_task(
 ) -> JSONResponse:
     """Update a run task. Requires admin on the workspace."""
     rt = await _get_run_task(rt_id, db)
-    await _require_ws_permission(rt.workspace, "admin", user, db)
+    await _require_ws_capability(rt.workspace, cap.RUN_TASK_MANAGE, user, db)
 
     attrs = body.get("data", {}).get("attributes", {})
 
@@ -339,7 +340,7 @@ async def delete_run_task(
 ) -> None:
     """Delete a run task. Requires admin on the workspace."""
     rt = await _get_run_task(rt_id, db)
-    await _require_ws_permission(rt.workspace, "admin", user, db)
+    await _require_ws_capability(rt.workspace, cap.RUN_TASK_MANAGE, user, db)
 
     rt_ws_id = str(rt.workspace_id)
 
@@ -374,9 +375,11 @@ async def list_task_stages(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "read"):
-        raise HTTPException(status_code=403, detail="Requires read permission on workspace")
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.RUN_TASK_READ):
+        raise HTTPException(
+            status_code=403, detail="Requires run-task:read capability on workspace"
+        )
 
     from terrapod.services.run_task_service import list_run_task_stages
 
@@ -405,9 +408,11 @@ async def show_task_stage(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "read"):
-        raise HTTPException(status_code=403, detail="Requires read permission on workspace")
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.RUN_TASK_READ):
+        raise HTTPException(
+            status_code=403, detail="Requires run-task:read capability on workspace"
+        )
 
     return JSONResponse(content={"data": _task_stage_json(ts)})
 
@@ -434,9 +439,11 @@ async def override_task_stage(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "admin"):
-        raise HTTPException(status_code=403, detail="Requires admin permission on workspace")
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.RUN_TASK_MANAGE):
+        raise HTTPException(
+            status_code=403, detail="Requires run-task:manage capability on workspace"
+        )
 
     try:
         ts = await override_stage(db, ts_uuid)

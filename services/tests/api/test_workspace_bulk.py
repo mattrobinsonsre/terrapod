@@ -15,6 +15,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, require_admin
+from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
 
 _BASE = "http://test"
@@ -563,15 +564,14 @@ class TestBulkUpdateFailureRollback:
 
 
 class TestBulkUpdatePoolRbac:
-    @patch("terrapod.api.routers.workspace_bulk.pool_rbac_service.has_pool_permission")
     @patch(
-        "terrapod.api.routers.workspace_bulk.pool_rbac_service.resolve_pool_permission",
+        "terrapod.api.routers.workspace_bulk.resolve_capabilities",
         new_callable=AsyncMock,
     )
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    async def test_non_admin_without_pool_write_403(self, _db, _redis, _storage, m_resolve, m_has):
+    async def test_non_admin_without_pool_write_403(self, _db, _redis, _storage, m_resolve):
         """A non-admin assigning an agent pool needs pool `write`; without
         it the update is rejected 403 with zero mutation."""
         pool = MagicMock()
@@ -579,8 +579,8 @@ class TestBulkUpdatePoolRbac:
         pool.name = "aws-prod"
         pool.labels = {}
         pool.owner_email = "someone-else@example.com"
-        m_resolve.return_value = "read"
-        m_has.return_value = False
+        # `read` caps do NOT include pool:assign → the gate rejects.
+        m_resolve.return_value = caps_for_level("read")
 
         app, db = _make_app(_non_admin())
         db.get = AsyncMock(return_value=pool)
@@ -603,22 +603,21 @@ class TestBulkUpdatePoolRbac:
         assert "write permission on agent pool" in resp.json()["detail"]
         db.commit.assert_not_awaited()
 
-    @patch("terrapod.api.routers.workspace_bulk.pool_rbac_service.has_pool_permission")
     @patch(
-        "terrapod.api.routers.workspace_bulk.pool_rbac_service.resolve_pool_permission",
+        "terrapod.api.routers.workspace_bulk.resolve_capabilities",
         new_callable=AsyncMock,
     )
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    async def test_non_admin_with_pool_write_allowed(self, _db, _redis, _storage, m_resolve, m_has):
+    async def test_non_admin_with_pool_write_allowed(self, _db, _redis, _storage, m_resolve):
         pool = MagicMock()
         pool.id = uuid.uuid4()
         pool.name = "aws-prod"
         pool.labels = {}
         pool.owner_email = "someone-else@example.com"
-        m_resolve.return_value = "write"
-        m_has.return_value = True
+        # `write` caps include pool:assign → the gate passes.
+        m_resolve.return_value = caps_for_level("write")
 
         ws = _mock_ws(name="w1", agent_pool_id=None)
         app, db = _make_app(_non_admin())

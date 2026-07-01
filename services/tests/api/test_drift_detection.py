@@ -8,6 +8,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
 
 _BASE = "http://test"
@@ -87,10 +88,10 @@ class TestWorkspaceDriftAttributes:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
     async def test_workspace_includes_drift_attributes(self, mock_resolve, *mocks):
         """GET workspace includes drift fields in response."""
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         ws = _mock_workspace(drift_detection_enabled=True, drift_status="no_drift")
 
         app, mock_db = _make_app(_user())
@@ -111,10 +112,10 @@ class TestWorkspaceDriftAttributes:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
     async def test_update_drift_settings(self, mock_resolve, *mocks):
         """PATCH workspace drift-detection-enabled updates model."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace()
 
         app, mock_db = _make_app(_user())
@@ -143,10 +144,10 @@ class TestWorkspaceDriftAttributes:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
     async def test_drift_interval_minimum_enforced(self, mock_resolve, *mocks):
         """Interval below minimum is clamped to configured floor."""
-        mock_resolve.return_value = "admin"
+        mock_resolve.return_value = caps_for_level("admin")
         ws = _mock_workspace()
 
         app, mock_db = _make_app(_user())
@@ -179,10 +180,10 @@ class TestRunDriftAttributes:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.runs.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
     async def test_run_includes_drift_fields(self, mock_resolve, *mocks):
         """GET run includes is-drift-detection and has-changes."""
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         run_id = uuid.uuid4()
         ws_id = uuid.uuid4()
         run = MagicMock()
@@ -257,12 +258,12 @@ class TestDismissDriftAction:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.workspace_extensions.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.workspace_extensions.resolve_workspace_capabilities_for")
     async def test_dismiss_drift_clears_state_and_keeps_detection_enabled(
         self, mock_resolve, *mocks
     ):
         """drift_status and drift_last_checked_at reset; drift_detection_enabled unchanged."""
-        mock_resolve.return_value = "plan"
+        mock_resolve.return_value = caps_for_level("plan")
         ws = _mock_workspace(
             drift_detection_enabled=True,
             drift_status="drifted",
@@ -293,10 +294,10 @@ class TestDismissDriftAction:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.workspace_extensions.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.workspace_extensions.resolve_workspace_capabilities_for")
     async def test_dismiss_drift_requires_plan_permission(self, mock_resolve, *mocks):
         """Read-only users cannot dismiss drift."""
-        mock_resolve.return_value = "read"
+        mock_resolve.return_value = caps_for_level("read")
         ws = _mock_workspace(drift_status="drifted")
 
         app, mock_db = _make_app(_user())
@@ -317,10 +318,10 @@ class TestDismissDriftAction:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
-    @patch("terrapod.api.routers.workspace_extensions.resolve_workspace_permission_for")
+    @patch("terrapod.api.routers.workspace_extensions.resolve_workspace_capabilities_for")
     async def test_dismiss_drift_is_idempotent(self, mock_resolve, *mocks):
         """Dismissing a workspace with no drift reported is a no-op (still 200)."""
-        mock_resolve.return_value = "plan"
+        mock_resolve.return_value = caps_for_level("plan")
         ws = _mock_workspace(
             drift_detection_enabled=True,
             drift_status="",

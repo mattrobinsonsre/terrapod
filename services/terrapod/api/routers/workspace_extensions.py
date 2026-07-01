@@ -18,11 +18,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.auth import capabilities as cap
+from terrapod.auth.capabilities import has_capability
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services.workspace_rbac_service import (
-    has_permission,
-    resolve_workspace_permission_for,
+    resolve_workspace_capabilities_for,
 )
 
 router = APIRouter(tags=["workspace-extensions"])
@@ -95,11 +96,11 @@ async def list_vcs_refs(
     )
 
     ws = await _get_workspace_by_id(workspace_id, db)
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "read"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.WORKSPACE_READ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Requires read permission on workspace",
+            detail="Requires workspace:read capability on workspace",
         )
 
     if not ws.vcs_connection_id or not ws.vcs_repo_url:
@@ -148,11 +149,11 @@ async def dismiss_drift(
     from terrapod.api.routers.tfe_v2 import _get_workspace_by_id
 
     ws = await _get_workspace_by_id(workspace_id, db)
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "plan"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.DRIFT_DISMISS):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Requires plan permission on workspace",
+            detail="Requires drift:dismiss capability on workspace",
         )
 
     ws.drift_status = ""

@@ -8,6 +8,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
 
 _BASE = "http://test"
@@ -95,12 +96,12 @@ class TestWorkspacePoolAssignment:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch(
-        "terrapod.api.routers.tfe_v2.resolve_pool_permission_for",
+        "terrapod.api.routers.tfe_v2.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     @patch("terrapod.api.routers.tfe_v2._agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.services.workspace_rbac_service.resolve_workspace_permission",
+        "terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_assign_pool_with_write_permission(
@@ -111,9 +112,9 @@ class TestWorkspacePoolAssignment:
         pool = _mock_pool(name="prod-pool")
         ws = _mock_workspace()
 
-        mock_ws_perm.return_value = "admin"
+        mock_ws_perm.return_value = caps_for_level("admin")
         mock_get_pool.return_value = pool
-        mock_pool_perm.return_value = "write"
+        mock_pool_perm.return_value = caps_for_level("write")
 
         app, mock_db = _make_app(user)
 
@@ -143,25 +144,25 @@ class TestWorkspacePoolAssignment:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch(
-        "terrapod.api.routers.tfe_v2.resolve_pool_permission_for",
+        "terrapod.api.routers.tfe_v2.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     @patch("terrapod.api.routers.tfe_v2._agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.services.workspace_rbac_service.resolve_workspace_permission",
+        "terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_assign_pool_without_write_permission_403(
         self, mock_ws_perm, mock_get_pool, mock_pool_perm, *mocks
     ):
-        """User without write on pool gets 403."""
+        """User without pool:assign capability gets 403."""
         user = _user(roles=["everyone"])
         pool = _mock_pool(name="restricted-pool")
         ws = _mock_workspace()
 
-        mock_ws_perm.return_value = "admin"
+        mock_ws_perm.return_value = caps_for_level("admin")
         mock_get_pool.return_value = pool
-        mock_pool_perm.return_value = "read"  # Only read, not write
+        mock_pool_perm.return_value = caps_for_level("read")  # Only read, no pool:assign
 
         app, mock_db = _make_app(user)
 
@@ -189,7 +190,7 @@ class TestWorkspacePoolAssignment:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch(
-        "terrapod.services.workspace_rbac_service.resolve_workspace_permission",
+        "terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_clear_pool_no_permission_check(self, mock_ws_perm, *mocks):
@@ -197,7 +198,7 @@ class TestWorkspacePoolAssignment:
         user = _user(roles=["everyone"])
         ws = _mock_workspace(pool_id=uuid.uuid4())
 
-        mock_ws_perm.return_value = "admin"
+        mock_ws_perm.return_value = caps_for_level("admin")
 
         app, mock_db = _make_app(user)
 
@@ -226,12 +227,12 @@ class TestWorkspacePoolAssignment:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     @patch(
-        "terrapod.api.routers.tfe_v2.resolve_pool_permission_for",
+        "terrapod.api.routers.tfe_v2.resolve_pool_capabilities_for",
         new_callable=AsyncMock,
     )
     @patch("terrapod.api.routers.tfe_v2._agent_pool_service.get_pool", new_callable=AsyncMock)
     @patch(
-        "terrapod.services.workspace_rbac_service.resolve_workspace_permission",
+        "terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for",
         new_callable=AsyncMock,
     )
     async def test_platform_admin_bypasses_pool_check(
@@ -242,9 +243,9 @@ class TestWorkspacePoolAssignment:
         pool = _mock_pool(name="restricted-pool")
         ws = _mock_workspace()
 
-        mock_ws_perm.return_value = "admin"
+        mock_ws_perm.return_value = caps_for_level("admin")
         mock_get_pool.return_value = pool
-        mock_pool_perm.return_value = "admin"  # admin resolves to admin
+        mock_pool_perm.return_value = caps_for_level("admin")  # admin resolves to admin
 
         app, mock_db = _make_app(user)
 

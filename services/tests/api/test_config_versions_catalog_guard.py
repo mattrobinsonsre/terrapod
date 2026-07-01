@@ -13,6 +13,7 @@ from httpx import ASGITransport, AsyncClient
 
 from terrapod.api.app import create_application as create_app
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.auth.capabilities import caps_for_level
 from terrapod.db.session import get_db
 
 _BASE = "http://test"
@@ -66,13 +67,13 @@ async def test_cv_create_rejected_on_catalog_ws(*mocks):
 
 
 @patch("terrapod.api.routers.config_versions.run_service.create_configuration_version")
-@patch("terrapod.api.routers.config_versions.resolve_workspace_permission_for")
+@patch("terrapod.api.routers.config_versions.resolve_workspace_capabilities_for")
 @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
 @patch("terrapod.api.app.init_redis")
 @patch("terrapod.api.app.init_db")
 async def test_cv_create_allowed_on_normal_ws(_db, _redis, _storage, mock_resolve, mock_create):
     ws = _mock_workspace(catalog_item_id=None)
-    mock_resolve.return_value = "write"
+    mock_resolve.return_value = caps_for_level("write")
     cv = MagicMock()
     cv.id = uuid.uuid4()
     cv.workspace_id = ws.id

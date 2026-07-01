@@ -29,14 +29,15 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.api.dependencies import AuthenticatedUser, get_current_user
+from terrapod.auth import capabilities as cap
 from terrapod.auth import download_tickets
+from terrapod.auth.capabilities import has_capability
 from terrapod.db.models import ConfigurationVersion, Run, Workspace
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import cv_diff_service, run_service
 from terrapod.services.workspace_rbac_service import (
-    has_permission,
-    resolve_workspace_permission_for,
+    resolve_workspace_capabilities_for,
 )
 from terrapod.storage import get_storage
 from terrapod.storage.keys import config_version_key
@@ -126,8 +127,8 @@ async def create_configuration_version(
                 "uploading configuration versions."
             ),
         )
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "write"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.CONFIG_UPLOAD):
         raise HTTPException(status_code=403, detail="Requires write permission on workspace")
 
     attrs = body.get("data", {}).get("attributes", {})
@@ -173,8 +174,8 @@ async def list_configuration_versions(
     RBAC: requires `read` on the workspace.
     """
     ws = await _get_workspace(workspace_id, db)
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "read"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.CONFIG_READ):
         raise HTTPException(status_code=404, detail="Workspace not found")
 
     total = await db.scalar(
@@ -253,8 +254,8 @@ async def download_configuration_version(
     if ws is None:
         # Workspace deleted out from under us — treat as gone.
         raise HTTPException(status_code=404, detail="Configuration version not found")
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "read"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.CONFIG_READ):
         raise HTTPException(status_code=404, detail="Configuration version not found")
 
     storage = get_storage()
@@ -310,8 +311,8 @@ async def mint_download_ticket(
     ws = await db.get(Workspace, cv.workspace_id)
     if ws is None:
         raise HTTPException(status_code=404, detail="Configuration version not found")
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "read"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.CONFIG_READ):
         raise HTTPException(status_code=404, detail="Configuration version not found")
 
     attrs = (body or {}).get("data", {}).get("attributes", {}) if body else {}
@@ -456,8 +457,8 @@ async def diff_configuration_versions(
     ws = await db.get(Workspace, from_cv.workspace_id)
     if ws is None:
         raise HTTPException(status_code=404, detail="Configuration version not found")
-    perm = await resolve_workspace_permission_for(db, user, ws)
-    if not has_permission(perm, "read"):
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+    if not has_capability(caps, cap.CONFIG_READ):
         raise HTTPException(status_code=404, detail="Configuration version not found")
 
     if from_cv.status != "uploaded" or to_cv.status != "uploaded":

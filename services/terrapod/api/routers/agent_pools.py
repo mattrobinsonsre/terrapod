@@ -40,14 +40,14 @@ from terrapod.api.dependencies import (
     require_admin,
 )
 from terrapod.api.labels import validate_labels as _validate_labels
+from terrapod.auth import capabilities as cap
+from terrapod.auth.capabilities import has_capability
 from terrapod.db.session import get_db
 from terrapod.logging_config import get_logger
 from terrapod.services import agent_pool_service
 from terrapod.services.pool_rbac_service import (
-    POOL_PERMISSION_HIERARCHY,
     fetch_custom_roles,
-    has_pool_permission,
-    resolve_pool_permission_for,
+    resolve_pool_capabilities_for,
 )
 
 router = APIRouter(tags=["agent-pools"])
@@ -230,26 +230,41 @@ async def _get_pool(pool_id: str, db: AsyncSession):
     return pool
 
 
-async def _require_pool_permission(
-    pool, user: AuthenticatedUser, db: AsyncSession, required: str
-) -> str:
-    """Resolve user's pool permission and require at least `required` level.
+def _pool_permission_summary(caps: frozenset[str]) -> str | None:
+    """Derive the legacy pool level (read/write/admin) from a capability set for
+    the JSON:API `permission` field. Returns None when the set grants no pool
+    capability (no access)."""
+    if cap.POOL_MANAGE in caps:
+        return "admin"
+    if cap.POOL_ASSIGN in caps:
+        return "write"
+    if cap.POOL_READ in caps:
+        return "read"
+    return None
 
-    Returns the effective permission. Raises 404 if no access, 403 if
-    insufficient.
+
+async def _require_pool_capability(
+    pool, user: AuthenticatedUser, db: AsyncSession, required_cap: str
+) -> str:
+    """Resolve the user's pool capabilities and require `required_cap`.
+
+    Returns the derived permission-level summary (for the response body). Raises
+    404 if the caller holds no pool capability at all, 403 if they hold some but
+    not the required one.
     """
-    perm = await resolve_pool_permission_for(
+    caps = await resolve_pool_capabilities_for(
         db,
         user,
         pool_name=pool.name,
         pool_labels=pool.labels or {},
         owner_email=pool.owner_email or "",
     )
-    if perm is None:
+    summary = _pool_permission_summary(caps)
+    if summary is None:
         raise HTTPException(status_code=404, detail="Agent pool not found")
-    if not has_pool_permission(perm, required):
-        raise HTTPException(status_code=403, detail=f"Requires {required} permission on pool")
-    return perm
+    if not has_capability(caps, required_cap):
+        raise HTTPException(status_code=403, detail="Insufficient permission on pool")
+    return summary
 
 
 # ── Agent Pools ──────────────────────────────────────────────────────────
@@ -266,7 +281,7 @@ async def list_pools(
     custom_roles = await fetch_custom_roles(db, user.roles)
     result = []
     for p in pools:
-        perm = await resolve_pool_permission_for(
+        caps = await resolve_pool_capabilities_for(
             db,
             user,
             pool_name=p.name,
@@ -274,6 +289,7 @@ async def list_pools(
             owner_email=p.owner_email or "",
             preloaded_roles=custom_roles,
         )
+        perm = _pool_permission_summary(caps)
         if perm is None:
             continue
         listeners = await agent_pool_service.list_listeners(p.id)
@@ -320,7 +336,7 @@ async def show_pool(
 ) -> JSONResponse:
     """Show an agent pool (requires read permission)."""
     pool = await _get_pool(pool_id, db)
-    perm = await _require_pool_permission(pool, user, db, "read")
+    perm = await _require_pool_capability(pool, user, db, cap.POOL_READ)
     listeners = await agent_pool_service.list_listeners(pool.id)
     status = _derive_pool_status(listeners)
     return JSONResponse(content={"data": _pool_json(pool, status=status, permission=perm)})
@@ -335,7 +351,14 @@ async def update_pool(
 ) -> JSONResponse:
     """Update an agent pool (requires admin permission on pool)."""
     pool = await _get_pool(pool_id, db)
-    perm = await _require_pool_permission(pool, user, db, "admin")
+    await _require_pool_capability(pool, user, db, cap.POOL_MANAGE)
+    old_caps = await resolve_pool_capabilities_for(
+        db,
+        user,
+        pool_name=pool.name,
+        pool_labels=pool.labels or {},
+        owner_email=pool.owner_email or "",
+    )
 
     attrs = body.get("data", {}).get("attributes", {})
 
@@ -352,23 +375,23 @@ async def update_pool(
     if "labels" in attrs:
         labels_arg = _validate_labels(attrs["labels"]) if attrs["labels"] else {}
 
-    # Self-lockout check: warn if label/owner change would reduce user's access.
+    # Self-lockout check: warn if label/owner change would remove any capability
+    # the caller currently holds on this pool. Capability sets are a partial
+    # order, so we compare by set difference rather than a total-order level drop.
     # Platform admins are immune (their access doesn't depend on labels/owner).
     if "admin" not in effective_platform_roles(user) and not attrs.get("force"):
         new_labels = labels_arg if labels_arg is not _UNSET else (pool.labels or {})
         new_owner = (owner_arg or None) if owner_arg is not _UNSET else pool.owner_email
         if new_labels != (pool.labels or {}) or new_owner != pool.owner_email:
-            new_perm = await resolve_pool_permission_for(
+            new_caps = await resolve_pool_capabilities_for(
                 db,
                 user,
                 pool_name=attrs.get("name") or pool.name,
                 pool_labels=new_labels,
                 owner_email=new_owner or "",
             )
-            if new_perm is None or POOL_PERMISSION_HIERARCHY.get(
-                new_perm, -1
-            ) < POOL_PERMISSION_HIERARCHY.get(perm, -1):
-                new_level = new_perm or "none"
+            removed = old_caps - new_caps
+            if removed:
                 return JSONResponse(
                     status_code=409,
                     content={
@@ -377,9 +400,9 @@ async def update_pool(
                                 "status": "409",
                                 "title": "Label/owner change would reduce your access",
                                 "detail": (
-                                    f"This change would reduce your access from "
-                                    f"{perm} to {new_level} on this pool. "
-                                    f'Re-submit with "force": true to confirm.'
+                                    "This change would remove capabilities you "
+                                    f"currently hold on this pool ({', '.join(sorted(removed))}). "
+                                    'Re-submit with "force": true to confirm.'
                                 ),
                             }
                         ]
@@ -408,7 +431,7 @@ async def delete_pool(
 ) -> None:
     """Delete an agent pool (requires admin permission on pool)."""
     pool = await _get_pool(pool_id, db)
-    await _require_pool_permission(pool, user, db, "admin")
+    await _require_pool_capability(pool, user, db, cap.POOL_MANAGE)
     # Clean up all listener Redis keys for this pool before DB delete
     await agent_pool_service.delete_pool_listeners(pool.id)
     await agent_pool_service.delete_pool(db, pool)
@@ -426,7 +449,7 @@ async def list_pool_tokens(
 ) -> JSONResponse:
     """List join tokens for an agent pool (requires admin on pool)."""
     pool = await _get_pool(pool_id, db)
-    await _require_pool_permission(pool, user, db, "admin")
+    await _require_pool_capability(pool, user, db, cap.POOL_MANAGE)
     tokens = await agent_pool_service.list_pool_tokens(db, pool.id)
     return JSONResponse(content={"data": [_token_json(t) for t in tokens]})
 
@@ -440,7 +463,7 @@ async def create_pool_token(
 ) -> JSONResponse:
     """Create a join token for an agent pool (requires admin on pool)."""
     pool = await _get_pool(pool_id, db)
-    await _require_pool_permission(pool, user, db, "admin")
+    await _require_pool_capability(pool, user, db, cap.POOL_MANAGE)
 
     attrs = body.get("data", {}).get("attributes", {})
 
@@ -469,7 +492,7 @@ async def delete_pool_token(
 ) -> None:
     """Delete/revoke a join token (requires admin on pool)."""
     pool = await _get_pool(pool_id, db)
-    await _require_pool_permission(pool, user, db, "admin")
+    await _require_pool_capability(pool, user, db, cap.POOL_MANAGE)
     token_uuid = uuid.UUID(token_id.removeprefix("at-"))
 
     from sqlalchemy import select
@@ -594,7 +617,7 @@ async def list_pool_listeners(
     the actual fleet size.
     """
     pool = await _get_pool(pool_id, db)
-    await _require_pool_permission(pool, user, db, "read")
+    await _require_pool_capability(pool, user, db, cap.POOL_READ)
     listeners = await agent_pool_service.list_listeners(pool.id)
     # Only fetch replica counts for listeners that actually track pods. A
     # listener on a pre-0.19.0 image doesn't write per-pod keys, so its SCAN
@@ -640,7 +663,7 @@ async def pool_events(
 
     async with get_db_session() as db:
         pool = await _get_pool(pool_id, db)
-        await _require_pool_permission(pool, user, db, "read")
+        await _require_pool_capability(pool, user, db, cap.POOL_READ)
         pool_uuid = str(pool.id)
 
     channel = f"{POOL_EVENTS_PREFIX}{pool_uuid}"
@@ -695,7 +718,7 @@ async def delete_listener(
             if "admin" not in effective_platform_roles(user):
                 raise HTTPException(status_code=403, detail="Admin access required")
         else:
-            await _require_pool_permission(pool, user, db, "admin")
+            await _require_pool_capability(pool, user, db, cap.POOL_MANAGE)
     await agent_pool_service.delete_listener(listener["id"], listener["name"], pool_id_str)
 
 
