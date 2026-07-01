@@ -246,6 +246,28 @@ def has_capability(caps: frozenset[str] | set[str], required: str) -> bool:
     return required in caps
 
 
+# Public per-axis level maps, keyed by short axis name — for the capability
+# resolver (union / read-floor / full-set per axis). Values are the SAME frozen
+# sets as the private maps above.
+AXIS_LEVEL_MAPS: dict[str, dict[str, frozenset[str]]] = {
+    "workspace": _WORKSPACE_LEVELS,
+    "pool": _POOL_LEVELS,
+    "registry": _REGISTRY_LEVELS,
+    "catalog": _CATALOG_LEVELS,
+}
+
+
+def axis_read_caps(axis: str) -> frozenset[str]:
+    """The read-floor capability set for an axis (empty for catalog — no floor)."""
+    return AXIS_LEVEL_MAPS[axis].get("read", frozenset())
+
+
+def axis_all_caps(axis: str) -> frozenset[str]:
+    """Every capability the axis can grant (its top preset)."""
+    levels = AXIS_LEVEL_MAPS[axis]
+    return frozenset().union(*levels.values()) if levels else frozenset()
+
+
 def expand_preset(
     *,
     workspace_permission: str | None,
