@@ -40,7 +40,7 @@ from __future__ import annotations
 # enumeration; new endpoints map onto an existing capability or add one here
 # deliberately. Net-new capabilities that no legacy preset grants until an admin
 # opts in (state:read-outputs / state:read-sensitive tier; the scoped platform:*
-# split #642; maker-checker #643) are introduced by their own follow-ups.
+# split #642) are introduced by their own follow-ups.
 
 # ── Workspace / runs — read tier ────────────────────────────────────────────
 # Per-resource read caps (each paired with a write/manage cap below, so an

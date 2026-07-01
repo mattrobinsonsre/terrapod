@@ -57,10 +57,10 @@ grantable or enforced in this feature.
 
 Net-new capabilities that **no preset grants** (so no existing role gains them)
 are also out of scope here and tracked separately: a finer state-read tier
-(`state:read-outputs` / `state:read-sensitive`), separable
+(`state:read-outputs` / `state:read-sensitive`) and separable
 `run:apply-destroy` *enforcement* (the token exists and sits in the `write`
 preset for faithfulness; gating destroy on it independently is the granular
-win, landed with enforcement), and maker-checker (#643).
+win, landed with enforcement).
 
 ---
 
