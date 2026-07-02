@@ -1360,10 +1360,15 @@ jobs:
 
           # Install syft: fetch the installer pinned to a release tag (not main)
           # to a file, then run it (no curl|sh pipe), installing a pinned version.
+          # NOTE: `-s --` belongs ONLY to the piped `curl | sh -s -- ARGS` idiom
+          # (where `-s` tells sh to read the script from stdin). When running the
+          # installer as a FILE, the args go straight to syft's install.sh, whose
+          # usage is `install.sh [-v] [-b DIR] [-d] [TAG]` — so pass `-b DIR TAG`
+          # directly; `-s` is rejected as an illegal option.
           SYFT_VERSION=v1.46.0
           curl -sSfL -o "$RUNNER_TEMP/syft-install.sh" \
             "https://raw.githubusercontent.com/anchore/syft/${SYFT_VERSION}/install.sh"
-          sh "$RUNNER_TEMP/syft-install.sh" -s -- -b /usr/local/bin "$SYFT_VERSION"
+          sh "$RUNNER_TEMP/syft-install.sh" -b /usr/local/bin "$SYFT_VERSION"
 
           for image in terrapod-api terrapod-web terrapod-runner terrapod-listener terrapod-migrations; do
             echo "Generating SBOM for $image:$version"
