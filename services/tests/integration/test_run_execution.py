@@ -1009,3 +1009,37 @@ class TestPlanStaleness:
         after = (await _get_run(client, run["id"]))["attributes"]
         assert after["status"] == "discarded"
         assert "plan expired" in (after["discard-reason"] or "")
+
+    async def test_confirm_time_guard_409s_and_discards(self, app, client, setup):
+        """Confirm-time backstop (#647): if state moved but the event hook did not
+        discard this run (e.g. it was still `planning` when the version landed),
+        confirming returns 409 AND the run is left `discarded` — the discard is
+        committed before the 409 raises, not rolled back with the errored request."""
+        import uuid as _uuid
+
+        from terrapod.db.models import StateVersion
+        from terrapod.db.session import get_db_session
+
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "confirm-stale-ws")
+        ws_uuid = _uuid.UUID(ws_id.removeprefix("ws-"))
+
+        # Baseline serial 1, then plan against it.
+        async with get_db_session() as db:
+            db.add(StateVersion(workspace_id=ws_uuid, serial=1, lineage="x"))
+            await db.commit()
+        run = await _create_run(client, ws_id)
+        await _run_plan_lifecycle(client, listener_id, run["id"])
+
+        # Advance the state serial WITHOUT the discard hook, so the run is still
+        # `planned` when we try to confirm it (simulates the hook-missed race).
+        async with get_db_session() as db:
+            db.add(StateVersion(workspace_id=ws_uuid, serial=2, lineage="x"))
+            await db.commit()
+
+        resp = await client.post(f"/api/v2/runs/{run['id']}/actions/apply", headers=AUTH)
+        assert resp.status_code == 409
+        assert "state changed" in resp.text
+        after = (await _get_run(client, run["id"]))["attributes"]
+        assert after["status"] == "discarded"
+        assert "state changed" in (after["discard-reason"] or "")

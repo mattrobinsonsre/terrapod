@@ -1222,6 +1222,11 @@ async def confirm_run(db: AsyncSession, run: Run) -> Run:
     stale = await _staleness_reason(db, run, workspace)
     if stale is not None:
         await discard_run(db, run, reason=stale)
+        # Commit the discard before raising: the ValueError below surfaces as a
+        # 409, and the router's error path would otherwise roll back the session,
+        # losing the discard and leaving the run stuck `planned`. Persist it so
+        # the caller both sees the 409 and finds the run correctly discarded.
+        await db.commit()
         raise ValueError(f"{stale} — re-plan required")
     await _check_mergeability_or_block(db, run)
     return await transition_run(db, run, "confirmed")
