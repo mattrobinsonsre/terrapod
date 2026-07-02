@@ -154,3 +154,35 @@ class TestStateVersionSitesInvalidateStalePlans:
             "router(s) create a StateVersion without invalidating stale plans "
             f"via discard_stale_plans_for_state_change: {offenders}"
         )
+
+
+class TestDiscardHookIsBestEffort:
+    """The state-version discard hook must never propagate — it runs inside a
+    state-version write transaction, and a state write must not be lost because
+    a stale-plan cleanup failed on one run (#665)."""
+
+    async def test_discard_failure_does_not_propagate_and_continues(self):
+        import uuid
+        from unittest.mock import MagicMock, patch
+
+        run_a = SimpleNamespace(id=uuid.uuid4(), status="planned", plan_state_serial=1)
+        run_b = SimpleNamespace(id=uuid.uuid4(), status="planned", plan_state_serial=1)
+
+        db = AsyncMock()
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = [run_a, run_b]
+        db.execute.return_value = result
+
+        calls = []
+
+        async def _boom(db_, run, reason):
+            calls.append(run)
+            if run is run_a:
+                raise RuntimeError("transient discard failure")
+
+        with patch.object(run_service, "discard_run", new=_boom):
+            # Must NOT raise even though run_a's discard blows up.
+            discarded = await run_service.discard_stale_plans_for_state_change(db, uuid.uuid4(), 2)
+
+        assert calls == [run_a, run_b]  # kept going past the failure
+        assert discarded == 1  # only the successful discard counted

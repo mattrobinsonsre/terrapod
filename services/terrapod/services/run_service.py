@@ -463,9 +463,17 @@ async def discard_stale_plans_for_state_change(
         try:
             await discard_run(db, run, reason=reason)
             discarded += 1
-        except ValueError:
+        except Exception:
+            # Best-effort cleanup: a failure discarding ONE stale plan must never
+            # abort the sweep OR propagate out to the caller — this hook runs
+            # inside a state-version write transaction, and a state write must
+            # not be lost because a stale-plan cleanup hiccupped (#665). Log and
+            # move on to the next stale run.
             logger.warning(
-                "Skipped discarding stale-state run", run_id=str(run.id), status=run.status
+                "Skipped discarding stale-state run",
+                run_id=str(run.id),
+                status=run.status,
+                exc_info=True,
             )
     if discarded:
         logger.info(
