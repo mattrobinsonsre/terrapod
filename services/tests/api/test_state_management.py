@@ -232,9 +232,13 @@ class TestRollbackStateVersion:
         }
 
         mock_db = AsyncMock()
+        # 3rd execute: the #647 discard-stale-plans hook (returns no planned runs).
+        _no_runs = MagicMock()
+        _no_runs.scalars.return_value.all.return_value = []
         mock_db.execute.side_effect = [
             _scalar_result(sv),  # get state version
             _scalar_result(3),  # get max serial
+            _no_runs,  # discard_stale_plans_for_state_change query
         ]
         mock_db.get.return_value = ws
 

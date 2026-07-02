@@ -85,6 +85,7 @@ How each capability is turned on. **Platform-level** features are Helm values un
 | SSO (OIDC/SAML) | `api.config.auth.sso.*` + client secrets via K8s Secret `secretKeyRef` | [authentication.md](docs/authentication.md) |
 | VCS integration | Admin creates a VCS connection, then sets the workspace's `vcs_*` fields | [vcs-integration.md](docs/vcs-integration.md) |
 | Drift detection | Per-workspace setting (enable + interval) via API/UI/provider | [drift-detection.md](docs/drift-detection.md) |
+| Stale-plan guards | State-drift auto-discard (#647) is always on; time-based plan expiry (#646) is per-workspace `plan_expiry_seconds` (off by default) | [api-reference.md](docs/api-reference.md) |
 | Notifications / Run tasks | Per-workspace config via API/UI/provider | [notifications.md](docs/notifications.md), [run-tasks.md](docs/run-tasks.md) |
 | Policy-as-code | Create a policy set, attach to workspaces by label | [policies.md](docs/policies.md) |
 | Autodiscovery | Per-VCS-connection rules (glob patterns + workspace template) | [autodiscovery.md](docs/autodiscovery.md) |

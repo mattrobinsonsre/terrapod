@@ -257,6 +257,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         description="Retry failed catalog/autodiscovery lifecycle destroy runs",
     )
 
+    # Plan expiry sweep (#646): discard apply-capable planned runs that have aged
+    # past their workspace's plan_expiry_seconds TTL. No-op when no workspace sets
+    # a TTL (the default). Cheap query gated on plan_expiry_seconds > 0.
+    from terrapod.services.run_service import expire_stale_plans_cycle
+
+    register_periodic_task(
+        "plan_expiry_sweep",
+        interval_seconds=60,
+        handler=expire_stale_plans_cycle,
+        description="Discard planned runs past their workspace plan-expiry TTL",
+    )
+
     # Audit log retention (daily)
     async def _audit_retention() -> None:
         from terrapod.services.audit_service import purge_old_entries

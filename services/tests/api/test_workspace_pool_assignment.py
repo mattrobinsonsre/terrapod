@@ -57,6 +57,7 @@ def _mock_workspace(ws_id=None, pool_id=None):
     ws.drift_ignore_rules = []
     ws.drift_detection_enabled = False
     ws.drift_detection_interval_seconds = 86400
+    ws.plan_expiry_seconds = None
     ws.drift_last_checked_at = None
     ws.drift_status = ""
     ws.state_diverged = False

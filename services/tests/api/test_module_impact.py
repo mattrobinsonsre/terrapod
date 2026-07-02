@@ -114,6 +114,8 @@ def _mock_run(
     run.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     run.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
     run.plan_started_at = None
+    run.plan_state_serial = None
+    run.discard_reason = None
     run.plan_finished_at = None
     run.apply_started_at = None
     run.apply_finished_at = None

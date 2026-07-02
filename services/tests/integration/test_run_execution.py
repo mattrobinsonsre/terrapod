@@ -924,3 +924,88 @@ class TestRunSerializationAndLocking:
         resp = await client.post(f"/api/v2/runs/{run_id}/actions/apply", headers=AUTH)
         assert resp.status_code == 200, resp.text
         assert (await _get_run(client, run_id))["attributes"]["status"] == "confirmed"
+
+
+class TestPlanStaleness:
+    """State-drift (#647, always on) and time-based expiry (#646, per-workspace)
+    auto-discard of stale apply-capable planned runs — against real Postgres
+    through the real state machine, the state-version discard hook, and the
+    expiry sweep. Composes with supersede (a separate reason)."""
+
+    async def test_new_state_version_discards_stale_plan(self, app, client, setup):
+        """A planned run whose plan predates a newly-landed state version is
+        auto-discarded with a state-changed reason (#647)."""
+        import uuid as _uuid
+
+        from terrapod.db.models import StateVersion
+        from terrapod.db.session import get_db_session
+        from terrapod.services import run_service
+
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "stale-state-ws")
+        ws_uuid = _uuid.UUID(ws_id.removeprefix("ws-"))
+
+        # Seed a baseline state version (serial 1) so the plan has something to
+        # be measured stale against. (No auto_apply → B stays `planned`.)
+        async with get_db_session() as db:
+            db.add(StateVersion(workspace_id=ws_uuid, serial=1, lineage="x"))
+            await db.commit()
+
+        # Run B plans against serial 1, then awaits confirmation.
+        run_b = await _create_run(client, ws_id)
+        await _run_plan_lifecycle(client, listener_id, run_b["id"])
+        assert (await _get_run(client, run_b["id"]))["attributes"]["status"] == "planned"
+
+        # A new state version (serial 2) lands → the hook discards B.
+        async with get_db_session() as db:
+            db.add(StateVersion(workspace_id=ws_uuid, serial=2, lineage="x"))
+            await db.flush()
+            await run_service.discard_stale_plans_for_state_change(db, ws_uuid, 2)
+            await db.commit()
+
+        b_after = (await _get_run(client, run_b["id"]))["attributes"]
+        assert b_after["status"] == "discarded"
+        assert "state changed" in (b_after["discard-reason"] or "")
+
+    async def test_plan_with_no_baseline_is_not_stale(self, app, client, setup):
+        """A first apply (no prior state version) has no baseline → the state
+        guard never fires and the plan confirms normally (#647)."""
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "no-baseline-ws")
+
+        run = await _create_run(client, ws_id)
+        await _run_plan_lifecycle(client, listener_id, run["id"])
+        resp = await client.post(f"/api/v2/runs/{run['id']}/actions/apply", headers=AUTH)
+        assert resp.status_code == 200, resp.text
+        assert (await _get_run(client, run["id"]))["attributes"]["status"] == "confirmed"
+
+    async def test_plan_expiry_sweep_discards_aged_plan(self, app, client, setup):
+        """The periodic sweep discards a planned run older than the workspace's
+        plan-expiry TTL (#646)."""
+        import uuid as _uuid
+        from datetime import timedelta
+
+        from terrapod.db.models import Run, Workspace, now_utc
+        from terrapod.db.session import get_db_session
+        from terrapod.services import run_service
+
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(client, pool_id, "expiry-ws")
+
+        run = await _create_run(client, ws_id)
+        await _run_plan_lifecycle(client, listener_id, run["id"])
+        assert (await _get_run(client, run["id"]))["attributes"]["status"] == "planned"
+
+        # Enable a TTL and age the plan past it, then run the sweep.
+        async with get_db_session() as db:
+            ws = await db.get(Workspace, _uuid.UUID(ws_id.removeprefix("ws-")))
+            ws.plan_expiry_seconds = 3600
+            r = await db.get(Run, _uuid.UUID(run["id"].removeprefix("run-")))
+            r.plan_finished_at = now_utc() - timedelta(seconds=7200)
+            await db.commit()
+
+        await run_service.expire_stale_plans_cycle()
+
+        after = (await _get_run(client, run["id"]))["attributes"]
+        assert after["status"] == "discarded"
+        assert "plan expired" in (after["discard-reason"] or "")

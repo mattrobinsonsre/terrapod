@@ -60,6 +60,10 @@ def _mock_run(
     run.plan_finished_at = None
     run.apply_started_at = None
     run.apply_finished_at = None
+    # #647/#646: no state snapshot / discard reason by default (no baseline →
+    # the staleness guard never fires; None serialises cleanly).
+    run.plan_state_serial = None
+    run.discard_reason = None
     run.listener_id = None
     run.target_addrs = None
     run.replace_addrs = None
@@ -103,6 +107,9 @@ def _mock_workspace(ws_id=None, name="test-ws", catalog_item_id=None):
     # Explicit None so MagicMock doesn't auto-return a truthy attribute and
     # trip the catalog config-managed guardrail (#535).
     ws.catalog_item_id = catalog_item_id
+    # #646: plan expiry disabled by default (None) so the confirm-time TTL guard
+    # doesn't mis-fire on a truthy MagicMock.
+    ws.plan_expiry_seconds = None
     return ws
 
 

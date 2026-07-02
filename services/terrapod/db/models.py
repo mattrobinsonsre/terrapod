@@ -359,6 +359,11 @@ class Workspace(Base):
         String(20), nullable=False, server_default="merge", default="merge"
     )  # merge, squash, rebase
 
+    # Plan expiry (#646): an apply-capable run that has sat in `planned` longer than
+    # this TTL (from plan_finished_at) can no longer be applied — it is auto-discarded
+    # and must be re-planned. NULL / 0 = disabled (default) = current behaviour.
+    plan_expiry_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     # Drift detection
     drift_detection_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     drift_detection_interval_seconds: Mapped[int] = mapped_column(
@@ -1463,6 +1468,14 @@ class Run(Base):
     plan_finished_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # The workspace state-version serial this run planned against, captured when the
+    # run enters `planning` (#647). NULL = no baseline (first apply, or a plan-only
+    # run) → the state-staleness guard never fires. If the workspace's current serial
+    # later advances past this, the plan is stale and the run is auto-discarded.
+    plan_state_serial: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Human-readable reason a run was discarded (state changed / plan expired /
+    # superseded), surfaced as `discard-reason` in the run serializer (#646/#647).
+    discard_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
     apply_started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

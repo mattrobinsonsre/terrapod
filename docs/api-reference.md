@@ -339,6 +339,7 @@ Workspaces support the following drift detection attributes (settable on create 
 |---|---|---|---|
 | `drift-detection-enabled` | boolean | `true` (VCS) / `false` (non-VCS) | Enable or disable automatic drift detection. Auto-enabled when a VCS connection is set |
 | `drift-detection-interval-seconds` | integer | `86400` | How often to run drift detection checks (minimum: 3600 seconds / 1 hour) |
+| `plan-expiry-seconds` | integer / null | `null` | Per-workspace plan-expiry TTL (#646). When set, an apply-capable run that has sat in `planned` longer than this (from plan completion) is auto-discarded and must be re-planned. `null` / `0` = disabled (default) |
 | `drift-ignore-rules` | list[string] | `[]` | Glob-aware patterns silenced by the drift-result classifier (#482). Each rule is a Terraform address optionally suffixed with a dotted attribute path; `*` matches zero or more non-`.` chars (spans `[N]` indices), `[*]` matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys — so use carefully. Max 50 entries, ≤ 500 chars each. Examples: `aws_iam_role.foo.tags.Environment`, `aws_autoscaling_group.workers[*].desired_capacity`, `module.eks*.argocd_cluster.*.config.tls_client_config.ca_data`. Affects drift-detection runs only — regular plan/apply is untouched. See [drift-ignore-rules.md](drift-ignore-rules.md) for the full grammar and recipes |
 
 ### Terragrunt Attributes
@@ -610,6 +611,15 @@ Apply-capable (plan+apply) runs are **serialized per workspace** — only one ex
 **Plan-only runs are exempt** — speculative PR plans, CLI `plan`, and drift checks never mutate state, so they run concurrently and neither supersede nor are superseded. (Speculative PR runs are still superseded per-PR by the VCS poller on a new commit.)
 
 This is enforced server-side regardless of run source (VCS, CLI/API, UI), so the same guarantees hold for `terraform`/`tofu` CLI-driven runs as for VCS-driven runs.
+
+#### Stale-plan guards: state drift (#647) & expiry (#646)
+
+Beyond supersede (a *newer run* case), two guards protect against applying a plan that no longer reflects reality. Both resolve an apply-capable `planned` run to `discarded`, unlock the workspace, and surface the reason in the run's **`discard-reason`** attribute; confirming a stale plan returns **409** (re-plan required). Plan-only / drift / speculative runs are exempt.
+
+- **State-version drift (#647, always on)** — a plan is snapshotted against the workspace's state serial when it starts. If the current state serial advances before the plan is applied — another apply, a CLI `state push`, a rollback, a manual upload — the plan is stale and is auto-discarded (`discard-reason: state changed since plan (serial N -> M)`). This runs even in agent mode, where the server drives the apply and there is no client to catch it. A first apply (no prior state) has no baseline and is never stale.
+- **Time-based expiry (#646, per-workspace, off by default)** — when a workspace sets `plan-expiry-seconds`, a plan older than that TTL (from completion) is auto-discarded by a periodic sweep and at confirm time (`discard-reason: plan expired after {ttl}s`).
+
+Whichever reason fires first wins, and both compose with supersede.
 
 #### Configuration version resolution
 

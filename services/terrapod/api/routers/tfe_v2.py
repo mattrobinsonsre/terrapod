@@ -283,6 +283,22 @@ def _clamp_drift_interval(value: int) -> int:
     return max(int(value), settings.drift_detection.min_workspace_interval_seconds)
 
 
+def _parse_plan_expiry(value) -> int | None:
+    """Validate a plan-expiry TTL (#646). None / 0 → disabled (stored NULL); a
+    positive integer is seconds. Rejects negatives / non-ints with 422."""
+    if value is None:
+        return None
+    try:
+        seconds = int(value)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=422, detail="plan-expiry-seconds must be an integer"
+        ) from None
+    if seconds < 0:
+        raise HTTPException(status_code=422, detail="plan-expiry-seconds must not be negative")
+    return seconds or None
+
+
 async def _update_state_index(
     workspace_name: str,
     workspace_id: str,
@@ -662,6 +678,8 @@ def _workspace_json(
                 "ai-summary-context": ws.ai_summary_context,
                 "drift-detection-enabled": ws.drift_detection_enabled,
                 "drift-detection-interval-seconds": ws.drift_detection_interval_seconds,
+                # Per-workspace plan expiry TTL (#646); null = disabled (default).
+                "plan-expiry-seconds": ws.plan_expiry_seconds,
                 "drift-last-checked-at": _rfc3339(ws.drift_last_checked_at),
                 "drift-status": ws.drift_status,
                 "drift-latest-run-id": (
@@ -984,6 +1002,7 @@ async def create_workspace(
         drift_detection_interval_seconds=_clamp_drift_interval(
             attrs.get("drift-detection-interval-seconds", 86400)
         ),
+        plan_expiry_seconds=_parse_plan_expiry(attrs.get("plan-expiry-seconds")),
     )
     db.add(ws)
     await db.commit()
@@ -1492,6 +1511,8 @@ async def update_workspace(
         ws.drift_detection_interval_seconds = _clamp_drift_interval(
             attrs["drift-detection-interval-seconds"]
         )
+    if "plan-expiry-seconds" in attrs:
+        ws.plan_expiry_seconds = _parse_plan_expiry(attrs["plan-expiry-seconds"])
 
     # AI plan summary opt-in (#401). The mode is a three-state enum
     # constrained by a DB CHECK; reject other values up-front rather than
@@ -1898,6 +1919,16 @@ async def create_state_version(
         run_id=run_uuid,
     )
     db.add(sv)
+    await db.flush()
+
+    # A new state version landed → any other apply-capable planned run on this
+    # workspace now has a stale plan; auto-discard them (#647).
+    from terrapod.services import run_service
+
+    await run_service.discard_stale_plans_for_state_change(
+        db, ws.id, serial, exclude_run_id=run_uuid
+    )
+
     await db.commit()
     await db.refresh(sv)
 

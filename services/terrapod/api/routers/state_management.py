@@ -206,6 +206,12 @@ async def rollback_state_version(
     db.add(new_sv)
     await db.flush()
 
+    # A rollback advances the state serial → any apply-capable planned run now has
+    # a stale plan; auto-discard them (#647).
+    from terrapod.services import run_service
+
+    await run_service.discard_stale_plans_for_state_change(db, sv.workspace_id, new_serial)
+
     # Store state bytes at new key (re-encrypted under the active DEK when on)
     new_key = state_key(str(sv.workspace_id), str(new_sv.id))
     await storage.put(new_key, await encrypt_state_bytes(state_bytes))
@@ -308,6 +314,12 @@ async def upload_state_manual(
             await storage.put_stream(
                 key, file_chunks(tmp_path), content_type="application/octet-stream"
             )
+
+        # A manual upload advances the state serial → any apply-capable planned
+        # run now has a stale plan; auto-discard them (#647).
+        from terrapod.services import run_service
+
+        await run_service.discard_stale_plans_for_state_change(db, ws.id, new_serial)
 
         await db.commit()
         await db.refresh(sv)

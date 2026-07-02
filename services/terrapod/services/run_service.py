@@ -18,6 +18,7 @@ from terrapod.db.models import (
     ConfigurationVersion,
     Run,
     RunTrigger,
+    StateVersion,
     VCSConnection,
     Workspace,
     now_utc,
@@ -352,9 +353,9 @@ async def supersede_stale_runs(db: AsyncSession, newer: Run) -> int:
         old.message = reason
         try:
             if old.status == "planned":
-                await discard_run(db, old)
+                await discard_run(db, old, reason=reason)
             else:  # pending / queued
-                await cancel_run(db, old, force=True)
+                await cancel_run(db, old, force=True, reason=reason)
             superseded += 1
         except ValueError:
             # The run changed state under us (e.g. it just dispatched).
@@ -373,6 +374,143 @@ async def supersede_stale_runs(db: AsyncSession, newer: Run) -> int:
             count=superseded,
         )
     return superseded
+
+
+# ── Plan staleness guards (#646 time-based expiry, #647 state-version drift) ──
+#
+# A plan is computed against one state snapshot. Applying it later is unsafe if
+# either the state has moved (correctness — #647, always on) or the plan has
+# simply aged past a per-workspace TTL (policy — #646, opt-in). Both resolve an
+# apply-capable `planned` run to `discarded` with a reason; whichever fires first
+# wins, and they compose with supersede (the newer-run case).
+
+
+async def current_state_serial(db: AsyncSession, workspace_id) -> int | None:
+    """The latest state-version serial for a workspace, or None when it has no
+    state yet (first apply — no baseline to compare a plan against)."""
+    return await db.scalar(
+        select(StateVersion.serial)
+        .where(StateVersion.workspace_id == workspace_id)
+        .order_by(StateVersion.serial.desc())
+        .limit(1)
+    )
+
+
+async def _state_moved_since_plan(db: AsyncSession, run: Run) -> int | None:
+    """If the workspace's current state serial has advanced past the serial this
+    run planned against, return the current serial (the plan is stale, #647).
+    None when still current — including the no-baseline case (``plan_state_serial``
+    is None ⇒ first apply, never stale)."""
+    if run.plan_state_serial is None:
+        return None
+    current = await current_state_serial(db, run.workspace_id)
+    if current is not None and current > run.plan_state_serial:
+        return current
+    return None
+
+
+def _plan_expired(run: Run, workspace: Workspace | None) -> bool:
+    """Whether an apply-capable planned run has aged past its workspace's plan
+    expiry TTL (#646). Off (never expired) when the TTL is unset/0, when there is
+    no ``plan_finished_at``, or for plan-only runs."""
+    if workspace is None or run.plan_only:
+        return False
+    ttl = workspace.plan_expiry_seconds
+    if not ttl or ttl <= 0 or run.plan_finished_at is None:
+        return False
+    return (now_utc() - run.plan_finished_at).total_seconds() > ttl
+
+
+async def _staleness_reason(db: AsyncSession, run: Run, workspace: Workspace | None) -> str | None:
+    """The reason an apply-capable planned run may no longer be applied, or None
+    if it is still fresh. State drift (#647) is a correctness guard checked first;
+    time-based expiry (#646) second. Plan-only / drift / speculative runs never
+    go stale (they never apply)."""
+    if not _is_supersedeable_kind(run):
+        return None
+    moved_to = await _state_moved_since_plan(db, run)
+    if moved_to is not None:
+        return f"state changed since plan (serial {run.plan_state_serial} -> {moved_to})"
+    if _plan_expired(run, workspace):
+        return f"plan expired after {workspace.plan_expiry_seconds}s"
+    return None
+
+
+async def discard_stale_plans_for_state_change(
+    db: AsyncSession, workspace_id, new_serial: int, *, exclude_run_id=None
+) -> int:
+    """Event-driven counterpart to the confirm-time guard (#647): when a new state
+    version lands for a workspace, auto-discard every *other* apply-capable
+    ``planned`` run whose snapshot predates it (its plan is now stale). Composes
+    with supersede (which handles the newer-run case); this handles the
+    state-moved-underneath case — a CLI local apply pushing state, a rollback, a
+    manual upload, or another run's apply completing."""
+    conditions = [
+        Run.workspace_id == workspace_id,
+        Run.status == "planned",
+        Run.plan_only.is_(False),
+        Run.is_drift_detection.is_(False),
+        Run.vcs_pull_request_number.is_(None),
+        Run.plan_state_serial.isnot(None),
+        Run.plan_state_serial < new_serial,
+    ]
+    if exclude_run_id is not None:
+        conditions.append(Run.id != exclude_run_id)
+    result = await db.execute(select(Run).where(*conditions))
+    discarded = 0
+    for run in result.scalars().all():
+        reason = f"state changed since plan (serial {run.plan_state_serial} -> {new_serial})"
+        try:
+            await discard_run(db, run, reason=reason)
+            discarded += 1
+        except ValueError:
+            logger.warning(
+                "Skipped discarding stale-state run", run_id=str(run.id), status=run.status
+            )
+    if discarded:
+        logger.info(
+            "Discarded plans stale against new state",
+            workspace_id=str(workspace_id),
+            new_serial=new_serial,
+            count=discarded,
+        )
+    return discarded
+
+
+async def expire_stale_plans_cycle() -> None:
+    """Periodic task (#646): discard apply-capable ``planned`` runs that have aged
+    past their workspace's ``plan_expiry_seconds``, so the run list reflects expiry
+    promptly rather than only lazily at confirm time. Multi-replica-safe via the
+    distributed scheduler's claim; opens its own short-lived session."""
+    from terrapod.db.session import get_db_session
+
+    async with get_db_session() as db:
+        result = await db.execute(
+            select(Run, Workspace)
+            .join(Workspace, Run.workspace_id == Workspace.id)
+            .where(
+                Run.status == "planned",
+                Run.plan_only.is_(False),
+                Run.is_drift_detection.is_(False),
+                Run.vcs_pull_request_number.is_(None),
+                Run.plan_finished_at.isnot(None),
+                Workspace.plan_expiry_seconds.isnot(None),
+                Workspace.plan_expiry_seconds > 0,
+            )
+        )
+        discarded = 0
+        for run, ws in result.all():
+            if _plan_expired(run, ws):
+                try:
+                    await discard_run(
+                        db, run, reason=f"plan expired after {ws.plan_expiry_seconds}s"
+                    )
+                    discarded += 1
+                except ValueError:
+                    pass
+        if discarded:
+            await db.commit()
+            logger.info("Expired stale plans", count=discarded)
 
 
 async def create_run(
@@ -507,6 +645,11 @@ async def transition_run(
     # Track phase timestamps
     if target_status == "planning":
         run.plan_started_at = now
+        # Snapshot the state version this plan is computed against (#647): the
+        # runner downloads the current state at plan start, so if the workspace's
+        # serial later advances the plan is stale and the apply is blocked. None =
+        # no baseline yet (first apply) → the state-staleness guard never fires.
+        run.plan_state_serial = await current_state_serial(db, run.workspace_id)
     elif (
         target_status in ("planned", "errored") and run.plan_started_at and not run.plan_finished_at
     ):
@@ -741,10 +884,18 @@ async def complete_plan(
         return run
 
     if run.auto_apply and not run.plan_only:
+        locked_ws = await db.get(Workspace, run.workspace_id)
+        # Defensive staleness guard on the auto-apply path (#646/#647): if the
+        # state moved or the TTL lapsed between plan completion and this
+        # transition, discard rather than auto-apply a stale plan.
+        stale = await _staleness_reason(db, run, locked_ws)
+        if stale is not None:
+            run = await discard_run(db, run, reason=stale)
+            logger.info("Auto-apply plan stale — discarded", run_id=str(run.id), reason=stale)
+            return run
         # Respect a manual workspace lock even on auto-apply: leave the run
         # `planned` for a human to apply after unlocking, rather than
         # auto-applying past the operator's lock.
-        locked_ws = await db.get(Workspace, run.workspace_id)
         if locked_ws is None or not locked_ws.locked:
             run = await transition_run(db, run, "confirmed")
 
@@ -1064,14 +1215,25 @@ async def confirm_run(db: AsyncSession, run: Run) -> Run:
         raise ValueError(
             f'workspace is locked (lock ID: "{workspace.lock_id}") — unlock before applying'
         )
+    # Staleness guards (#646 expiry, #647 state drift): a plan that no longer
+    # reflects the current state, or has aged past the workspace TTL, must not be
+    # applied. Auto-discard it (unlocking the workspace) and surface a 409 so the
+    # caller re-plans. State drift is the always-on correctness guard.
+    stale = await _staleness_reason(db, run, workspace)
+    if stale is not None:
+        await discard_run(db, run, reason=stale)
+        raise ValueError(f"{stale} — re-plan required")
     await _check_mergeability_or_block(db, run)
     return await transition_run(db, run, "confirmed")
 
 
-async def discard_run(db: AsyncSession, run: Run) -> Run:
-    """Discard a planned run."""
+async def discard_run(db: AsyncSession, run: Run, *, reason: str | None = None) -> Run:
+    """Discard a planned run. ``reason`` (state changed / plan expired /
+    superseded) is recorded on the run and surfaced to the UI/SDK."""
     if run.status != "planned":
         raise ValueError(f"Can only discard runs in 'planned' status, got '{run.status}'")
+    if reason:
+        run.discard_reason = reason
     # Unlock workspace
     workspace = await db.get(Workspace, run.workspace_id)
     if workspace and workspace.locked:
@@ -1092,13 +1254,16 @@ async def discard_run(db: AsyncSession, run: Run) -> Run:
 CANCELABLE_STATES = frozenset({"pending", "queued", "planning", "confirmed", "applying"})
 
 
-async def cancel_run(db: AsyncSession, run: Run, *, force: bool = False) -> Run:
+async def cancel_run(
+    db: AsyncSession, run: Run, *, force: bool = False, reason: str | None = None
+) -> Run:
     """Cancel a run.
 
     By default only in-progress states (`CANCELABLE_STATES`) are cancelable.
     Pass `force=True` to bypass that check — only for internal callers
     that need to cancel superseded `planned` runs as part of cleanup.
-    Terminal states are always rejected.
+    Terminal states are always rejected. ``reason`` (e.g. "superseded by …") is
+    recorded on the run and surfaced to the UI/SDK.
 
     Behaviour by source state:
 
@@ -1120,6 +1285,8 @@ async def cancel_run(db: AsyncSession, run: Run, *, force: bool = False) -> Run:
         raise ValueError(f"Cannot cancel run in terminal state '{run.status}'")
     if not force and run.status not in CANCELABLE_STATES:
         raise ValueError(f"Cannot cancel run in state '{run.status}'")
+    if reason:
+        run.discard_reason = reason
 
     # Choose the target status. `applying` is the only state where a
     # Job may already be mutating real infrastructure; everything else

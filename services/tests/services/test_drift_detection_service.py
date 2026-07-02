@@ -11,6 +11,7 @@ def _mock_workspace(**overrides):
     ws.name = overrides.get("name", "test-ws")
     ws.drift_detection_enabled = overrides.get("drift_detection_enabled", True)
     ws.drift_detection_interval_seconds = overrides.get("drift_detection_interval_seconds", 86400)
+    ws.plan_expiry_seconds = overrides.get("plan_expiry_seconds")
     ws.drift_last_checked_at = overrides.get("drift_last_checked_at", None)
     ws.drift_status = overrides.get("drift_status", "")
     ws.drift_latest_run_id = overrides.get("drift_latest_run_id", None)

@@ -125,6 +125,9 @@ def _run_json(
             "attributes": {
                 "status": run.status,
                 "message": run.message,
+                # Why a run was discarded (state changed / plan expired /
+                # superseded), null otherwise (#646/#647).
+                "discard-reason": run.discard_reason,
                 "is-destroy": run.is_destroy,
                 "auto-apply": run.auto_apply,
                 "plan-only": run.plan_only,

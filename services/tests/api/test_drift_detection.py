@@ -47,6 +47,7 @@ def _mock_workspace(ws_id=None, name="test-ws", **overrides):
     ws.owner_email = "test@example.com"
     ws.drift_detection_enabled = overrides.get("drift_detection_enabled", False)
     ws.drift_detection_interval_seconds = overrides.get("drift_detection_interval_seconds", 86400)
+    ws.plan_expiry_seconds = overrides.get("plan_expiry_seconds")
     ws.drift_last_checked_at = overrides.get("drift_last_checked_at", None)
     ws.drift_status = overrides.get("drift_status", "")
     ws.state_diverged = overrides.get("state_diverged", False)
@@ -208,6 +209,8 @@ class TestRunDriftAttributes:
         run.created_at = datetime(2026, 1, 1, tzinfo=UTC)
         run.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
         run.plan_started_at = datetime(2026, 1, 1, 0, 0, 1, tzinfo=UTC)
+        run.plan_state_serial = None
+        run.discard_reason = None
         run.plan_finished_at = datetime(2026, 1, 1, 0, 0, 30, tzinfo=UTC)
         run.apply_started_at = None
         run.apply_finished_at = None

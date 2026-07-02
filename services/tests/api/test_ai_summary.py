@@ -71,6 +71,7 @@ def _mock_workspace(ws_id=None, **overrides):
     ws.autodiscovery_pr_number = None
     ws.drift_detection_enabled = False
     ws.drift_detection_interval_seconds = 86400
+    ws.plan_expiry_seconds = None
     ws.drift_last_checked_at = None
     ws.drift_status = ""
     ws.state_diverged = False

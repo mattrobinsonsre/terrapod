@@ -54,6 +54,10 @@ type Workspace struct {
 	DriftIgnoreRules              []string `json:"drift-ignore-rules,omitempty"`
 	DriftDetectionEnabled         bool     `json:"drift-detection-enabled"`
 	DriftDetectionIntervalSeconds *int64   `json:"drift-detection-interval-seconds,omitempty"`
+	// PlanExpirySeconds is the per-workspace plan-expiry TTL (#646); nil =
+	// disabled (the default). An apply-capable plan older than this is
+	// auto-discarded and must be re-planned.
+	PlanExpirySeconds             *int64   `json:"plan-expiry-seconds,omitempty"`
 	DriftStatus                   string   `json:"drift-status,omitempty"`
 	DriftLastCheckedAt            string   `json:"drift-last-checked-at,omitempty"`
 	// DriftLatestRunID is the ID (prefixed `run-…`) of the drift run that
@@ -129,6 +133,7 @@ type CreateWorkspaceRequest struct {
 	DriftIgnoreRules              []string          `json:"drift-ignore-rules,omitempty"`
 	DriftDetectionEnabled         *bool             `json:"drift-detection-enabled,omitempty"`
 	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
+	PlanExpirySeconds             *int64            `json:"plan-expiry-seconds,omitempty"`
 	// AISummaryMode is the three-state per-workspace override (#401):
 	// "default" | "enabled" | "disabled". Empty string omits the field
 	// (server-side default applies — "default").
@@ -171,6 +176,7 @@ type UpdateWorkspaceRequest struct {
 	DriftIgnoreRules              []string          `json:"drift-ignore-rules,omitempty"`
 	DriftDetectionEnabled         *bool             `json:"drift-detection-enabled,omitempty"`
 	DriftDetectionIntervalSeconds *int64            `json:"drift-detection-interval-seconds,omitempty"`
+	PlanExpirySeconds             *int64            `json:"plan-expiry-seconds,omitempty"`
 	// AISummaryMode see CreateWorkspaceRequest. On UPDATE, empty string
 	// leaves the existing value untouched — to explicitly set "follow
 	// deployment default", pass "default".
@@ -392,6 +398,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.DriftDetectionIntervalSeconds != nil {
 		attrs["drift-detection-interval-seconds"] = *req.DriftDetectionIntervalSeconds
 	}
+	if req.PlanExpirySeconds != nil {
+		attrs["plan-expiry-seconds"] = *req.PlanExpirySeconds
+	}
 	if req.AISummaryMode != "" {
 		attrs["ai-summary-mode"] = req.AISummaryMode
 	}
@@ -473,6 +482,9 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	}
 	if req.DriftDetectionIntervalSeconds != nil {
 		attrs["drift-detection-interval-seconds"] = *req.DriftDetectionIntervalSeconds
+	}
+	if req.PlanExpirySeconds != nil {
+		attrs["plan-expiry-seconds"] = *req.PlanExpirySeconds
 	}
 	if req.AISummaryMode != "" {
 		attrs["ai-summary-mode"] = req.AISummaryMode

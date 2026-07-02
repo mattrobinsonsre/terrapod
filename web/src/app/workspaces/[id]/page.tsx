@@ -63,6 +63,7 @@ interface WorkspaceAttrs {
   'ai-summary-context': string
   'drift-detection-enabled': boolean
   'drift-detection-interval-seconds': number
+  'plan-expiry-seconds': number | null
   'drift-last-checked-at': string
   'drift-status': string
   'state-diverged': boolean
@@ -347,6 +348,7 @@ function WorkspaceDetailContent() {
 
   // Drift detection
   const [savingDrift, setSavingDrift] = useState(false)
+  const [savingPlanExpiry, setSavingPlanExpiry] = useState(false)
   const [checkingDrift, setCheckingDrift] = useState(false)
   const [dismissingDrift, setDismissingDrift] = useState(false)
 
@@ -1115,6 +1117,30 @@ function WorkspaceDetailContent() {
     }
   }
 
+  // Plan expiry TTL (#646): 0 / empty disables (sent as null).
+  async function handlePlanExpiryChange(seconds: number) {
+    setSavingPlanExpiry(true)
+    try {
+      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: {
+            type: 'workspaces',
+            attributes: { 'plan-expiry-seconds': seconds > 0 ? seconds : null },
+          },
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to update plan expiry')
+      const data = await res.json()
+      setWorkspace(data.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update plan expiry')
+    } finally {
+      setSavingPlanExpiry(false)
+    }
+  }
+
   async function handleCheckDriftNow() {
     setCheckingDrift(true)
     setError('')
@@ -1503,6 +1529,17 @@ function WorkspaceDetailContent() {
     { label: '12 hours', value: 43200 },
     { label: '24 hours', value: 86400 },
     { label: '48 hours', value: 172800 },
+    { label: '7 days', value: 604800 },
+  ]
+
+  // #646 plan-expiry TTL choices; 0 = disabled (the default).
+  const PLAN_EXPIRY_OPTIONS = [
+    { label: 'Disabled', value: 0 },
+    { label: '1 hour', value: 3600 },
+    { label: '4 hours', value: 14400 },
+    { label: '12 hours', value: 43200 },
+    { label: '24 hours', value: 86400 },
+    { label: '3 days', value: 259200 },
     { label: '7 days', value: 604800 },
   ]
 
@@ -2205,6 +2242,35 @@ function WorkspaceDetailContent() {
                     </button>
                   </div>
                 )}
+              </dl>
+            </div>
+
+            {/* Plan Expiry (#646) */}
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-slate-300">Plan Expiry</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Auto-discard an unconfirmed plan once it is older than this, so a stale
+                  plan can&apos;t be applied against a moved world. Off by default; the plan
+                  must then be re-run. (Applies to apply-capable runs only.)
+                </p>
+              </div>
+              <dl>
+                <div>
+                  <dt className="text-xs text-slate-500">Expire after</dt>
+                  <dd className="mt-1">
+                    <select
+                      value={attrs['plan-expiry-seconds'] || 0}
+                      onChange={(e) => handlePlanExpiryChange(Number(e.target.value))}
+                      disabled={savingPlanExpiry}
+                      className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    >
+                      {PLAN_EXPIRY_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  </dd>
+                </div>
               </dl>
             </div>
 

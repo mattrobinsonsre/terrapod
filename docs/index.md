@@ -26,6 +26,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | **Agent Pools** | Named groups of runner listeners; join token → certificate exchange for auth |
 | **SSO (OIDC / SAML)** | Pluggable identity providers (Auth0, Okta, Azure AD, etc.) |
 | **Run Triggers** | Cross-workspace dependency chains -- source apply triggers downstream runs |
+| **Stale-plan Guards** | Auto-discard a plan that no longer reflects reality: state-version drift (always on) + optional per-workspace time-based plan expiry |
 | **Audit Logging** | Immutable event log with configurable retention |
 | **Notifications** | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
 | **Run Tasks** | Pre/post-plan webhook hooks for external validation |

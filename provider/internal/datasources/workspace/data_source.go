@@ -46,6 +46,7 @@ type workspaceDataSourceModel struct {
 	DriftIgnoreRules              types.List   `tfsdk:"drift_ignore_rules"`
 	DriftDetectionEnabled         types.Bool   `tfsdk:"drift_detection_enabled"`
 	DriftDetectionIntervalSeconds types.Int64  `tfsdk:"drift_detection_interval_seconds"`
+	PlanExpirySeconds             types.Int64  `tfsdk:"plan_expiry_seconds"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
 	AISummaryContext              types.String `tfsdk:"ai_summary_context"`
 	OwnerEmail                    types.String `tfsdk:"owner_email"`
@@ -99,6 +100,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"drift_ignore_rules":               computedList("Glob-aware patterns suppressed by the drift-result classifier (#482). See the resource attribute docs for syntax."),
 			"drift_detection_enabled":          computedBool("Drift detection enabled."),
 			"drift_detection_interval_seconds": computedInt64("Drift detection interval."),
+			"plan_expiry_seconds":              computedInt64("Per-workspace plan expiry TTL in seconds (#646); null/0 = disabled."),
 			"ai_summary_mode":                  computedString("Per-workspace AI plan-summary mode: 'default' (follow deployment global), 'enabled' (always summarise), or 'disabled' (never summarise)."),
 			"ai_summary_context":               computedString("Workspace-specific context appended to the AI summariser prompt."),
 			"owner_email":                      computedString("Owner email."),
@@ -212,6 +214,12 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 		m.DriftDetectionIntervalSeconds = types.Int64Value(v)
 	} else {
 		m.DriftDetectionIntervalSeconds = types.Int64Null()
+	}
+
+	if v := terrapod.GetIntAttr(res, "plan-expiry-seconds"); v > 0 {
+		m.PlanExpirySeconds = types.Int64Value(v)
+	} else {
+		m.PlanExpirySeconds = types.Int64Null()
 	}
 
 	if varFiles := terrapod.GetListAttr(res, "var-files"); len(varFiles) > 0 {

@@ -202,6 +202,14 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
+			"plan_expiry_seconds": schema.Int64Attribute{
+				Description: "Per-workspace plan expiry TTL in seconds (#646). An apply-capable planned run older than this is auto-discarded and must be re-planned. Unset / 0 = disabled (the default).",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
+			},
 			"ai_summary_mode": schema.StringAttribute{
 				Description: "Per-workspace AI plan-summary opt-in (#401). One of \"default\" (follow the deployment's global `ai_summary.enabled` setting), \"enabled\" (always summarise this workspace's plans), or \"disabled\" (never summarise — overrides global). Defaults to \"default\".",
 				Optional:    true,
@@ -592,6 +600,10 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.DriftDetectionIntervalSeconds.ValueInt64()
 		req.DriftDetectionIntervalSeconds = &v
 	}
+	if !m.PlanExpirySeconds.IsNull() && !m.PlanExpirySeconds.IsUnknown() {
+		v := m.PlanExpirySeconds.ValueInt64()
+		req.PlanExpirySeconds = &v
+	}
 	if !m.AISummaryMode.IsNull() && !m.AISummaryMode.IsUnknown() {
 		req.AISummaryMode = m.AISummaryMode.ValueString()
 	}
@@ -700,6 +712,10 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 		v := m.DriftDetectionIntervalSeconds.ValueInt64()
 		req.DriftDetectionIntervalSeconds = &v
 	}
+	if !m.PlanExpirySeconds.IsNull() && !m.PlanExpirySeconds.IsUnknown() {
+		v := m.PlanExpirySeconds.ValueInt64()
+		req.PlanExpirySeconds = &v
+	}
 	if !m.AISummaryMode.IsNull() && !m.AISummaryMode.IsUnknown() {
 		req.AISummaryMode = m.AISummaryMode.ValueString()
 	}
@@ -772,6 +788,11 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		m.DriftDetectionIntervalSeconds = types.Int64Value(*ws.DriftDetectionIntervalSeconds)
 	} else {
 		m.DriftDetectionIntervalSeconds = types.Int64Null()
+	}
+	if ws.PlanExpirySeconds != nil && *ws.PlanExpirySeconds > 0 {
+		m.PlanExpirySeconds = types.Int64Value(*ws.PlanExpirySeconds)
+	} else {
+		m.PlanExpirySeconds = types.Int64Null()
 	}
 	if ws.DriftStatus != "" {
 		m.DriftStatus = types.StringValue(ws.DriftStatus)

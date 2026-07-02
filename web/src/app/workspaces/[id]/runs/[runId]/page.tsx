@@ -28,6 +28,7 @@ interface RunAttrs {
   status: string
   source: string
   message: string
+  'discard-reason': string | null
   'error-message': string | null
   'execution-backend': string
   'created-at': string
@@ -649,6 +650,14 @@ function RunDetailPageInner() {
           <div className="mb-6 p-4 bg-red-900/20 rounded-lg border border-red-800/50">
             <h3 className="text-sm font-medium text-red-400 mb-1">Error</h3>
             <pre className="text-sm text-red-300 whitespace-pre-wrap font-mono">{attrs['error-message']}</pre>
+          </div>
+        )}
+
+        {/* Discard reason (#646/#647): why a discarded plan can no longer apply. */}
+        {attrs.status === 'discarded' && attrs['discard-reason'] && (
+          <div className="mb-6 p-4 bg-amber-900/20 rounded-lg border border-amber-800/50">
+            <h3 className="text-sm font-medium text-amber-400 mb-1">Discarded — re-plan required</h3>
+            <p className="text-sm text-amber-200">{attrs['discard-reason']}</p>
           </div>
         )}
 

@@ -589,6 +589,15 @@ async def _persist_runner_state(
     if ws and ws.state_diverged:
         ws.state_diverged = False
 
+    # This apply advanced the workspace state → any OTHER apply-capable planned
+    # run now has a stale plan; auto-discard them (#647). The applying run itself
+    # is not `planned`, but exclude it explicitly for clarity.
+    from terrapod.services import run_service
+
+    await run_service.discard_stale_plans_for_state_change(
+        db, run.workspace_id, serial, exclude_run_id=run.id
+    )
+
     await db.commit()
     logger.info(
         "state_version_created_from_runner",
