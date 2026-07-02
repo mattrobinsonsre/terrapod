@@ -1531,16 +1531,20 @@ async def update_run_status(
         run.has_changes = has_changes
 
     try:
-        run = await run_service.transition_run(db, run, target_status, error_message=error_message)
-
-        # No-op short-circuit: a plan with has_changes=False has nothing for an
-        # apply Job to do. Use the shared helper so this path stays in lockstep
-        # with the reconciler's `_handle_succeeded` no-op skip.
-        if target_status == "planned" and not run.plan_only and run.has_changes is False:
-            run = await run_service.complete_planned_as_noop(db, run)
-        # Auto-apply if configured
-        elif target_status == "planned" and run.auto_apply and not run.plan_only:
-            run = await run_service.transition_run(db, run, "confirmed")
+        if target_status == "planned" and not run.plan_only:
+            # Route a plan completion through the shared, guarded path — the
+            # SAME one the plan-result endpoint (report_plan_result) and the
+            # reconciler use — so it applies the post-plan gates, the no-op
+            # short-circuit, AND the #646/#647 auto-apply staleness +
+            # manual-lock guards. A bare transition_run(..., "confirmed") here
+            # bypassed those guards and could auto-apply a plan against state
+            # that moved since it was computed (#665). complete_plan is
+            # idempotent (no-ops unless the run is still `planning`).
+            run = await run_service.complete_plan(db, run, has_changes=has_changes)
+        else:
+            run = await run_service.transition_run(
+                db, run, target_status, error_message=error_message
+            )
 
         # Unlock workspace when plan-only run reaches planned
         # (plan-only runs don't mutate state, so no need to hold the lock)

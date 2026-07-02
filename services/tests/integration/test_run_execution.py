@@ -1043,3 +1043,47 @@ class TestPlanStaleness:
         after = (await _get_run(client, run["id"]))["attributes"]
         assert after["status"] == "discarded"
         assert "state changed" in (after["discard-reason"] or "")
+
+    async def test_listener_status_report_respects_state_drift_guard(self, app, client, setup):
+        """The listener status-report PATCH (update_run_status) must route an
+        auto-apply plan completion through the guarded complete_plan path — it
+        must NOT bare-transition a stale plan straight to confirmed/applying
+        against state that moved since the plan was computed (#665)."""
+        import uuid as _uuid
+
+        from terrapod.db.models import StateVersion
+        from terrapod.db.session import get_db_session
+
+        pool_id, listener_id = setup
+        ws_id = await _create_remote_workspace(
+            client, pool_id, "listener-stale-ws", auto_apply=True
+        )
+        ws_uuid = _uuid.UUID(ws_id.removeprefix("ws-"))
+
+        # Baseline serial 1 — the plan is measured stale against it.
+        async with get_db_session() as db:
+            db.add(StateVersion(workspace_id=ws_uuid, serial=1, lineage="x"))
+            await db.commit()
+
+        # Claim the run so it enters `planning` and snapshots plan_state_serial=1.
+        run = await _create_run(client, ws_id)
+        claimed = await _claim_run(client, listener_id)
+        assert claimed is not None
+        assert (await _get_run(client, run["id"]))["attributes"]["status"] == "planning"
+
+        # State advances to serial 2 before the listener reports the plan done.
+        async with get_db_session() as db:
+            db.add(StateVersion(workspace_id=ws_uuid, serial=2, lineage="x"))
+            await db.commit()
+
+        # Listener reports the plan finished via the PATCH status endpoint.
+        resp = await client.patch(
+            f"/api/terrapod/v1/listeners/{listener_id}/runs/{run['id']}",
+            json={"status": "planned", "has_changes": True},
+        )
+        assert resp.status_code == 200, resp.text
+
+        after = (await _get_run(client, run["id"]))["attributes"]
+        # Guarded: discarded as stale — NOT auto-applied (confirmed/applying).
+        assert after["status"] == "discarded", after["status"]
+        assert "state changed" in (after["discard-reason"] or "")
