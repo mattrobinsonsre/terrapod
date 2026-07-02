@@ -235,9 +235,6 @@ class TestSealedRetentionSkip:
 
         called: list[str] = []
 
-        async def _spy(db, storage, threshold, batch):  # noqa: ANN001
-            return 0
-
         with (
             _sealed(),
             patch.object(ars.settings.artifact_retention, "enabled", True),

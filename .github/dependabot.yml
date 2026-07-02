@@ -5,6 +5,10 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    # Wait 7 days after a release before proposing it — lets freshly-published
+    # (possibly compromised or broken) versions be caught/yanked upstream first.
+    cooldown:
+      default-days: 7
     labels: [dependencies, python]
     commit-message:
       prefix: "deps(python):"
@@ -21,6 +25,10 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    # Wait 7 days after a release before proposing it — lets freshly-published
+    # (possibly compromised or broken) versions be caught/yanked upstream first.
+    cooldown:
+      default-days: 7
     labels: [dependencies, web]
     commit-message:
       prefix: "deps(web):"
@@ -42,6 +50,10 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    # Wait 7 days after a release before proposing it — lets freshly-published
+    # (possibly compromised or broken) versions be caught/yanked upstream first.
+    cooldown:
+      default-days: 7
     labels: [dependencies, docker]
     commit-message:
       prefix: "deps(docker):"
@@ -60,6 +72,10 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    # Wait 7 days after a release before proposing it — lets freshly-published
+    # (possibly compromised or broken) versions be caught/yanked upstream first.
+    cooldown:
+      default-days: 7
     labels: [dependencies, ci]
     commit-message:
       prefix: "deps(ci):"

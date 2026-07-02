@@ -65,7 +65,7 @@ async def _migrate_column(db: AsyncSession, table: str, col: str, mode: str) -> 
 
     rows = (
         await db.execute(
-            text(f"SELECT id, {col} AS v FROM {table} WHERE {col} IS NOT NULL AND {col} <> ''")  # noqa: S608
+            text(f"SELECT id, {col} AS v FROM {table} WHERE {col} IS NOT NULL AND {col} <> ''")  # noqa: S608  # nosemgrep: avoid-sqlalchemy-text -- identifiers come from the compile-time ENCRYPTED_COLUMNS allowlist, not user input; values are bound params
         )
     ).all()
 
@@ -77,14 +77,14 @@ async def _migrate_column(db: AsyncSession, table: str, col: str, mode: str) -> 
             continue
 
         await db.execute(
-            text(f"UPDATE {table} SET {col} = :v WHERE id = :id"),  # noqa: S608
+            text(f"UPDATE {table} SET {col} = :v WHERE id = :id"),  # noqa: S608  # nosemgrep: avoid-sqlalchemy-text -- identifiers come from the compile-time ENCRYPTED_COLUMNS allowlist, not user input; values are bound params
             {"v": new_value, "id": rid},
         )
 
         # Verify-readback BEFORE trusting the write.
         check = (
             await db.execute(
-                text(f"SELECT {col} AS v FROM {table} WHERE id = :id"),  # noqa: S608
+                text(f"SELECT {col} AS v FROM {table} WHERE id = :id"),  # noqa: S608  # nosemgrep: avoid-sqlalchemy-text -- identifiers come from the compile-time ENCRYPTED_COLUMNS allowlist, not user input; values are bound params
                 {"id": rid},
             )
         ).scalar_one()
