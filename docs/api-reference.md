@@ -331,6 +331,16 @@ POST /api/v2/workspaces/{id}/actions/unlock
 
 **Required permission:** `plan` on the workspace (own locks only).
 
+### Force-Unlock Workspace
+
+```
+POST /api/v2/workspaces/{id}/actions/force-unlock
+```
+
+**Required permission:** `admin` on the workspace (the `workspace:force-unlock` capability).
+
+Clears the state lock **regardless of the lock ID** — the endpoint `terraform`/`tofu force-unlock` calls. Use it to release a lock held by another user or a lock stranded when a CLI operation crashed mid-run. Idempotent: force-unlocking an already-unlocked workspace returns 200.
+
 ### Drift Detection Attributes
 
 Workspaces support the following drift detection attributes (settable on create and update):

@@ -58,7 +58,7 @@ Terrapod is single-organization with no project concept. Both endpoints return `
 | GET | `/api/v2/workspaces/{id}/effective-tag-bindings` | `Workspaces.ListEffectiveTagBindings` | tag display |
 | POST | `/api/v2/workspaces/{id}/actions/lock` | `Workspaces.Lock` | `remote/backend_state.go:164` |
 | POST | `/api/v2/workspaces/{id}/actions/unlock` | `Workspaces.Unlock` | `remote/backend_state.go:201` |
-| POST | `/api/v2/workspaces/{id}/actions/force-unlock` | `Workspaces.ForceUnlock` | `remote/backend_state.go:222` (gap — see #279) |
+| POST | `/api/v2/workspaces/{id}/actions/force-unlock` | `Workspaces.ForceUnlock` | `remote/backend_state.go:222` |
 | GET | `/api/v2/workspaces/{id}/runs` | `Runs.List` | `cloud/backend_common.go:119`, `remote/backend_common.go:121` |
 | GET | `/api/v2/workspaces/{id}/vars` | `Variables.List` | `cloud/backend_context.go:122`, `remote/backend_context.go:123` (read-only — sensitive-var warnings) |
 

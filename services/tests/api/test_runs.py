@@ -334,6 +334,106 @@ class TestCreateRun:
         assert mock_create_run.await_args.kwargs["configuration_version_id"] == cv.id
 
 
+# ── CLI plan on a VCS-connected workspace (#661) ───────────────────────
+
+
+class TestVCSSpeculativePlan:
+    """CLI `tofu plan` on a VCS-connected agent workspace uploads a
+    *speculative* configuration version and creates a run without explicitly
+    setting `plan-only`. Terrapod must infer plan-only from the CV's
+    `speculative` flag (TFE parity) so the run isn't mis-read as an apply."""
+
+    def _vcs_agent_ws(self):
+        ws = _mock_workspace()
+        ws.execution_mode = "agent"
+        ws.vcs_connection_id = uuid.uuid4()
+        ws.vcs_repo_url = "https://example.com/org/repo"
+        return ws
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.run_service.queue_run")
+    @patch("terrapod.api.routers.runs.run_service.create_run")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_speculative_cv_allowed_as_plan_only(
+        self, mock_resolve, mock_create_run, mock_queue, *mocks
+    ):
+        """Speculative CV + no explicit plan-only → allowed (201), created as
+        plan-only — NOT the 422 'apply not allowed' the guard would raise."""
+        mock_resolve.return_value = caps_for_level("write")
+        ws = self._vcs_agent_ws()
+        run = _mock_run(ws_id=ws.id, plan_only=True, status="queued")
+        mock_create_run.return_value = run
+        mock_queue.return_value = run
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+        spec_cv = MagicMock()
+        spec_cv.speculative = True
+        mock_db.get = AsyncMock(return_value=spec_cv)
+
+        cv_id = uuid.uuid4()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        # NOTE: no "plan-only" attribute — the cloud backend
+                        # relies on the speculative CV to signal plan-only.
+                        "attributes": {},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}"}},
+                            "configuration-version": {"data": {"id": f"cv-{cv_id}"}},
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 201
+        # Forced plan-only despite the request omitting the attribute.
+        assert mock_create_run.await_args.kwargs["plan_only"] is True
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_nonspeculative_cv_apply_still_blocked(self, mock_resolve, *mocks):
+        """Non-speculative CV + plan-only:false on a VCS workspace = an apply
+        from the CLI — still rejected (422). The #661 fix must not weaken this."""
+        mock_resolve.return_value = caps_for_level("write")
+        ws = self._vcs_agent_ws()
+
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+        real_cv = MagicMock()
+        real_cv.speculative = False
+        mock_db.get = AsyncMock(return_value=real_cv)
+
+        cv_id = uuid.uuid4()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"plan-only": False},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}"}},
+                            "configuration-version": {"data": {"id": f"cv-{cv_id}"}},
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+        assert "Apply is not allowed" in resp.json()["detail"]
+
+
 # ── Catalog config-managed guardrail (#535) ────────────────────────────
 
 
@@ -788,6 +888,11 @@ class TestCLIApplyGuard:
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = ws
         mock_db.execute.return_value = mock_result
+        # A real `tofu apply` uploads a NON-speculative CV (#661): the run stays
+        # apply-capable, so the VCS apply guard must still fire.
+        _apply_cv = MagicMock()
+        _apply_cv.speculative = False
+        mock_db.get = AsyncMock(return_value=_apply_cv)
 
         cv_id = uuid.uuid4()
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
@@ -822,6 +927,9 @@ class TestCLIApplyGuard:
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = ws
         mock_db.execute.return_value = mock_result
+        _apply_cv = MagicMock()
+        _apply_cv.speculative = False
+        mock_db.get = AsyncMock(return_value=_apply_cv)
 
         cv_id = uuid.uuid4()
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:

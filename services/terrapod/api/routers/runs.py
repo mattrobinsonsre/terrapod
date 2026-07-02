@@ -406,7 +406,20 @@ async def create_run(
     # Runs without a CV (UI-queued) will fetch code from VCS downstream.
     plan_only = attrs.get("plan-only", False)
     cv_data = relationships.get("configuration-version", {}).get("data", {})
-    has_cv = bool(cv_data.get("id", "") if cv_data else "")
+    cv_id_raw = cv_data.get("id", "") if cv_data else ""
+    has_cv = bool(cv_id_raw)
+    # A run against a speculative configuration version is ALWAYS plan-only
+    # (TFE/HCP parity). The cloud backend uploads a speculative CV for
+    # `tofu plan` and relies on the server to infer plan-only rather than
+    # always setting the run's `plan-only` attribute. Without honoring the CV
+    # flag, a CLI `plan` on a VCS-connected workspace is mis-read as an apply
+    # and rejected by the guard below (#661).
+    if has_cv:
+        from terrapod.db.models import ConfigurationVersion
+
+        _spec_cv = await db.get(ConfigurationVersion, uuid.UUID(cv_id_raw.removeprefix("cv-")))
+        if _spec_cv is not None and _spec_cv.speculative:
+            plan_only = True
     # Config-managed guardrail (#535): a catalog-managed workspace runs only the
     # wrapper config the catalog generated for it. A run that pins a different
     # configuration version would diverge it from its catalog item — reject.

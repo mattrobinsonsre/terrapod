@@ -506,6 +506,58 @@ class TestUnlockWorkspace:
         assert resp.status_code == 200
 
 
+# ── Force-unlock (TFE `terraform force-unlock`, #662) ──────────────────
+
+
+class TestForceUnlockWorkspace:
+    """The dedicated `actions/force-unlock` endpoint the cloud/remote backend
+    calls. Clears the lock regardless of lock ID; gated on force-unlock."""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_force_unlock_clears_lock_regardless_of_id(self, mock_resolve, *mocks):
+        """Admin force-unlocks a lock held under a server-generated lock ID
+        (e.g. the cloud backend's `default/<ws>`), without matching it."""
+        mock_resolve.return_value = caps_for_level("admin")
+        ws = _mock_workspace(locked=True, lock_id="default/some-workspace")
+        app, mock_db = _make_app(_user(roles=["admin"]))
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+        mock_db.refresh = AsyncMock()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/v2/workspaces/ws-{ws.id}/actions/force-unlock",
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200
+        assert ws.locked is False
+        assert ws.lock_id is None
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.tfe_v2.resolve_workspace_capabilities_for")
+    async def test_force_unlock_requires_force_unlock_capability(self, mock_resolve, *mocks):
+        """A plan-level (non-admin) user cannot force-unlock — 403."""
+        mock_resolve.return_value = caps_for_level("plan")
+        ws = _mock_workspace(locked=True, lock_id="default/some-workspace")
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"/api/v2/workspaces/ws-{ws.id}/actions/force-unlock",
+                headers=_AUTH,
+            )
+        assert resp.status_code == 403
+
+
 # ── Permissions block ─────────────────────────────────────────────────
 
 

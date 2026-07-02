@@ -2164,3 +2164,39 @@ async def unlock_workspace(
     await publish_workspace_event(str(ws.id), "workspace_lock_change", {"locked": False})
 
     return JSONResponse(content=_workspace_json(ws, caps), headers=_tfe_headers())
+
+
+@router.post("/workspaces/{workspace_id}/actions/force-unlock")
+async def force_unlock_workspace(
+    workspace_id: str = Path(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Force-unlock a workspace, clearing the state lock regardless of lock ID.
+
+    TFE parity: `terraform force-unlock` (the cloud/remote backend) calls this
+    endpoint. Unlike `unlock` — which the lock owner uses to release their own
+    lock — force-unlock clears a lock held by anyone (e.g. a lock stranded when
+    a CLI operation crashed mid-run), so it does NOT require the client's lock
+    ID to match and is gated on the workspace:force-unlock capability (#662).
+    """
+    ws = await _get_workspace_by_id(workspace_id, db)
+    caps = await resolve_workspace_capabilities_for(db, user, ws)
+
+    if not has_capability(caps, cap.WORKSPACE_FORCE_UNLOCK):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires admin permission to force-unlock a workspace",
+        )
+
+    # Idempotent: force-unlocking an already-unlocked workspace is a no-op 200.
+    ws.locked = False
+    ws.lock_id = None
+    await db.commit()
+    await db.refresh(ws)
+
+    from terrapod.redis.client import publish_workspace_event
+
+    await publish_workspace_event(str(ws.id), "workspace_lock_change", {"locked": False})
+
+    return JSONResponse(content=_workspace_json(ws, caps), headers=_tfe_headers())
