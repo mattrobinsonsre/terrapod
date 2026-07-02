@@ -221,6 +221,36 @@ For detailed state recovery procedures, see [disaster-recovery.md](disaster-reco
 
 ---
 
+## Planned Run Auto-Discarded (Stale Plan)
+
+A run sitting in `planned` (waiting for a confirm) was automatically moved to `discarded` — this is **expected behaviour**, not a fault. Terrapod invalidates a saved plan once it can no longer be applied safely, so a stale plan can never apply outdated config.
+
+### Symptoms
+
+- A `planned` run flips to `discarded` without anyone clicking Discard.
+- The run carries a `discard-reason`, e.g. `state changed since plan (serial 6 → 7)` or `plan expired (older than 3600s)`.
+- A confirm attempt (`POST /api/v2/runs/{id}/actions/apply`) returns **409** with the same reason.
+
+### Diagnosis
+
+Two guards discard stale plans:
+
+1. **State drift (always on, #647)** — the workspace's state version advanced (a newer apply, a rollback, or a manual/CLI state upload) *after* this run was planned, so the plan was computed against an older state. Reason: `state changed since plan (serial N → M)`.
+2. **Plan expiry (opt-in, #646)** — the workspace sets `plan-expiry-seconds` and the plan is older than that TTL. Reason: `plan expired (older than <N>s)`. Off unless configured per workspace.
+
+In-flight `confirmed`/`applying` runs are never discarded; only waiting `planned`/`pending`/`queued` apply-capable runs are. Plan-only/speculative/drift runs are exempt.
+
+### Resolution
+
+- **This is normal** — just **re-plan** (queue a new run) and confirm that one. The new plan reflects current state.
+- If plan expiry is firing too aggressively for a workspace with a slow human approval loop, raise or clear `plan-expiry-seconds` on that workspace (it is per-workspace; unset = no time-based expiry).
+
+### Verification
+
+- The freshly queued run reaches `planned` against the current state serial and applies cleanly.
+
+---
+
 ## Scheduler Stall
 
 All background tasks (reconciler, VCS poller, drift detection, audit retention) are coordinated via the distributed scheduler using Redis. If the scheduler stalls, no periodic tasks run across any replica.

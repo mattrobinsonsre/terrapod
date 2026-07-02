@@ -128,3 +128,29 @@ async def test_staleness_reason_none_when_fresh():
     db.scalar.return_value = 5
     run = _run(plan_state_serial=5, workspace_id="w", plan_finished_at=now_utc())
     assert await run_service._staleness_reason(db, run, _ws(None)) is None
+
+
+class TestStateVersionSitesInvalidateStalePlans:
+    """Source-introspection invariant (#647): EVERY API router that constructs a
+    new StateVersion (which bumps the workspace's serial) MUST also call
+    `discard_stale_plans_for_state_change`, so a state change from any path —
+    CLI state-version create, runner post-apply, rollback, manual upload — kills
+    stale planned runs. A future creation site added without the hook fails here
+    loudly rather than silently letting a stale plan apply outdated config.
+    """
+
+    def test_every_state_version_creation_site_calls_the_discard_hook(self):
+        import pathlib
+
+        routers_dir = pathlib.Path(run_service.__file__).parent.parent / "api" / "routers"
+        offenders = []
+        for path in sorted(routers_dir.glob("*.py")):
+            src = path.read_text()
+            constructs_sv = "StateVersion(" in src
+            calls_hook = "discard_stale_plans_for_state_change" in src
+            if constructs_sv and not calls_hook:
+                offenders.append(path.name)
+        assert offenders == [], (
+            "router(s) create a StateVersion without invalidating stale plans "
+            f"via discard_stale_plans_for_state_change: {offenders}"
+        )

@@ -408,16 +408,28 @@ async def create_run(
     cv_data = relationships.get("configuration-version", {}).get("data", {})
     cv_id_raw = cv_data.get("id", "") if cv_data else ""
     has_cv = bool(cv_id_raw)
+    # Parse the CV id ONCE, up front, with a guard: a malformed id is a client
+    # error (422), not a 500. Reused below for the speculative check and the
+    # run's configuration_version_id.
+    cv_uuid: uuid.UUID | None = None
+    if has_cv:
+        try:
+            cv_uuid = uuid.UUID(cv_id_raw.removeprefix("cv-"))
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Invalid configuration-version id",
+            ) from exc
     # A run against a speculative configuration version is ALWAYS plan-only
     # (TFE/HCP parity). The cloud backend uploads a speculative CV for
     # `tofu plan` and relies on the server to infer plan-only rather than
     # always setting the run's `plan-only` attribute. Without honoring the CV
     # flag, a CLI `plan` on a VCS-connected workspace is mis-read as an apply
     # and rejected by the guard below (#661).
-    if has_cv:
+    if cv_uuid is not None:
         from terrapod.db.models import ConfigurationVersion
 
-        _spec_cv = await db.get(ConfigurationVersion, uuid.UUID(cv_id_raw.removeprefix("cv-")))
+        _spec_cv = await db.get(ConfigurationVersion, cv_uuid)
         if _spec_cv is not None and _spec_cv.speculative:
             plan_only = True
     # Config-managed guardrail (#535): a catalog-managed workspace runs only the
@@ -456,12 +468,8 @@ async def create_run(
             detail=f"Requires '{required_cap}' capability on workspace",
         )
 
-    # Configuration version (optional — provided by CLI uploads)
-    cv_data = relationships.get("configuration-version", {}).get("data", {})
-    cv_id = cv_data.get("id", "") if cv_data else ""
-    cv_uuid = None
-    if cv_id:
-        cv_uuid = uuid.UUID(cv_id.removeprefix("cv-"))
+    # Configuration version (optional) — cv_uuid was parsed + validated above
+    # from the same relationship (422 on a malformed id).
 
     # VCS ref override: plan against an arbitrary branch/tag (always plan-only)
     vcs_ref = attrs.get("vcs-ref", "")

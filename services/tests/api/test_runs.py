@@ -433,6 +433,37 @@ class TestVCSSpeculativePlan:
         assert resp.status_code == 422
         assert "Apply is not allowed" in resp.json()["detail"]
 
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    async def test_malformed_cv_id_returns_422_not_500(self, mock_resolve, *mocks):
+        """A non-UUID configuration-version id is a client error (422), not a
+        500 from an unguarded uuid.UUID() parse."""
+        mock_resolve.return_value = caps_for_level("write")
+        ws = _mock_workspace()
+        app, mock_db = _make_app(_user())
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = ws
+        mock_db.execute.return_value = mock_result
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                "/api/v2/runs",
+                json={
+                    "data": {
+                        "attributes": {"plan-only": True},
+                        "relationships": {
+                            "workspace": {"data": {"id": f"ws-{ws.id}"}},
+                            "configuration-version": {"data": {"id": "cv-not-a-uuid"}},
+                        },
+                    }
+                },
+                headers=_AUTH,
+            )
+        assert resp.status_code == 422
+        assert "configuration-version id" in resp.json()["detail"]
+
 
 # ── Catalog config-managed guardrail (#535) ────────────────────────────
 
