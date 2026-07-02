@@ -58,14 +58,21 @@ def _plan_row(stored: str, mode: str, active: int | None, svc) -> tuple[str | No
 
 
 async def _migrate_column(db: AsyncSession, table: str, col: str, mode: str) -> tuple[int, int]:
-    """Return (rewritten, skipped) for one column."""
+    """Return (rewritten, skipped) for one column.
+
+    The raw ``text()`` queries below interpolate ``table``/``col`` as identifiers
+    because SQL can't parameterise them — but they come from the compile-time
+    ``ENCRYPTED_COLUMNS`` allowlist (never user input), and every value is a bound
+    parameter. The ``# nosemgrep`` on those lines suppresses the avoid-sqlalchemy-text
+    finding for exactly that reason (they also carry ``# noqa: S608``).
+    """
     svc = get_encryption()
     active = svc._active_version
     rewritten = skipped = 0
 
     rows = (
         await db.execute(
-            text(f"SELECT id, {col} AS v FROM {table} WHERE {col} IS NOT NULL AND {col} <> ''")  # noqa: S608  # nosemgrep: avoid-sqlalchemy-text -- identifiers come from the compile-time ENCRYPTED_COLUMNS allowlist, not user input; values are bound params
+            text(f"SELECT id, {col} AS v FROM {table} WHERE {col} IS NOT NULL AND {col} <> ''")  # noqa: S608  # nosemgrep
         )
     ).all()
 
@@ -77,14 +84,14 @@ async def _migrate_column(db: AsyncSession, table: str, col: str, mode: str) -> 
             continue
 
         await db.execute(
-            text(f"UPDATE {table} SET {col} = :v WHERE id = :id"),  # noqa: S608  # nosemgrep: avoid-sqlalchemy-text -- identifiers come from the compile-time ENCRYPTED_COLUMNS allowlist, not user input; values are bound params
+            text(f"UPDATE {table} SET {col} = :v WHERE id = :id"),  # noqa: S608  # nosemgrep
             {"v": new_value, "id": rid},
         )
 
         # Verify-readback BEFORE trusting the write.
         check = (
             await db.execute(
-                text(f"SELECT {col} AS v FROM {table} WHERE id = :id"),  # noqa: S608  # nosemgrep: avoid-sqlalchemy-text -- identifiers come from the compile-time ENCRYPTED_COLUMNS allowlist, not user input; values are bound params
+                text(f"SELECT {col} AS v FROM {table} WHERE id = :id"),  # noqa: S608  # nosemgrep
                 {"id": rid},
             )
         ).scalar_one()
