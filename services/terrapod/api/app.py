@@ -36,6 +36,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     await init_db()
     logger.info("Database initialized")
 
+    # App ↔ schema skew guard (#544): warm the code-head cache and loudly warn
+    # if the DB schema is behind this app's expected migration head. Doesn't
+    # raise — a schema-behind pod boots and reports NOT READY via /ready.
+    from terrapod.db.schema_version import check_schema_at_startup
+
+    await check_schema_at_startup()
+
     await init_redis()
     logger.info("Redis initialized")
 

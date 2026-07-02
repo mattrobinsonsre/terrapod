@@ -1107,21 +1107,22 @@ Fires from the bundled `TerrapodAPIDown` alert: no `terrapod-api` scrape target 
    kubectl describe pod <api-pod> -n <ns>
    ```
    Look for `CrashLoopBackOff`, `OOMKilled`, failing readiness probes, or `Pending` (unschedulable).
-2. **Readiness detail** — `/ready` checks DB + Redis. Hit it from inside the cluster:
+2. **Readiness detail** — `/ready` checks DB + Redis + storage + **migrations** and reports each in a `checks` map. Hit it from inside the cluster:
    ```bash
    kubectl exec -n <ns> deploy/terrapod-api -- python -c "import urllib.request;print(urllib.request.urlopen('http://localhost:8000/ready').read())" 2>&1 || true
    ```
-   A failing `/ready` with healthy pods almost always means a dependency is down — see [DB Pool Exhaustion](#db-pool-exhaustion) / [Redis Connection Loss](#redis-connection-loss).
+   Read the `checks` map: a `database`/`redis` down almost always means a dependency is down — see [DB Pool Exhaustion](#db-pool-exhaustion) / [Redis Connection Loss](#redis-connection-loss). A `"migrations": "behind: ..."` means **app ↔ schema skew** (#544) — this pod's code expects a migration the DB hasn't got, so it deliberately reports NOT READY (and is pulled from the LB) instead of 500-ing every request against the missing column. Startup also logs a loud `SCHEMA SKEW` warning.
 3. **Recent rollout:**
    ```bash
    kubectl rollout history deploy/terrapod-api -n <ns>
    ```
    A bad image/config (e.g. a migration that didn't run) often correlates with the outage start.
-4. **Migrations** — a schema/app skew makes the API refuse to start. Confirm the migration Job for the current version succeeded.
+4. **Migrations** — if `checks.migrations` is `behind`, the migration Job for the current version did not apply (failed pre-upgrade hook that let the rollout proceed, a bare `kubectl set image`, or ArgoCD sync ordering). The `detail` names the DB revision vs the code head.
 
 ### Resolution
 
 - **Dependency down** → restore Postgres/Redis (their runbooks above); the API recovers on the next readiness probe.
+- **Schema skew (`checks.migrations` behind)** → run the Alembic migration Job (`helm upgrade` re-runs the pre-upgrade hook, or trigger the migration Job directly). Once the DB reaches the code head, the pods flip to ready on the next probe with no restart needed.
 - **Bad rollout** → `kubectl rollout undo deploy/terrapod-api -n <ns>`.
 - **OOM/crash** → check `kubectl logs --previous`; raise `api.resources` if genuinely under-provisioned (confirm with the OOM `reason` field, don't assume).
 - **Unschedulable** → free capacity or fix nodeSelector/taints.

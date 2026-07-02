@@ -326,6 +326,45 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - run: scripts/test.sh python -- ${{ matrix.slice.pytest_args }} ${{ matrix.slice.paths }}
 
+  # ── Migration smoke (#544) ────────────────────────────
+  # The Python test tiers build the schema with `Base.metadata.create_all`, so
+  # the migration files are never executed by any test. This one-shot job runs
+  # the REAL `alembic upgrade head` against a Postgres, then seeds + queries
+  # representative rows — catching a bad backfill / NOT-NULL-without-default on a
+  # populated table that create_all would never exercise. Always-on (cheap,
+  # ~2 min) rather than path-gated, so a models.py change that needs a migration
+  # can't slip through by touching a file the filter missed.
+  migration-check:
+    name: Migration Smoke
+    needs: prepare
+    if: needs.prepare.outputs.images_exist != 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: terrapod
+          POSTGRES_PASSWORD: terrapod
+          POSTGRES_DB: terrapod
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U terrapod"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgresql+asyncpg://terrapod:terrapod@localhost:5432/terrapod
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Build migrations image
+        run: docker build -f docker/Dockerfile.migrations -t tp-migrations:ci .
+      - name: Run migrations (alembic upgrade head — the real migration files)
+        run: docker run --rm --network host -e DATABASE_URL="$DATABASE_URL" tp-migrations:ci
+      - name: Seed representative rows + query the migrated schema
+        run: |
+          docker run --rm --network host -e DATABASE_URL="$DATABASE_URL" \
+            -v "$PWD/scripts/migration_smoke.py:/app/scripts/migration_smoke.py:ro" \
+            --entrypoint python tp-migrations:ci scripts/migration_smoke.py
+
   # ── Dependency Audit (Python) ─────────────────────────
   python-audit:
     name: Python Audit
@@ -1747,6 +1786,7 @@ jobs:
       - publish-lint
       - publish-test
       - python-test
+      - migration-check
       - python-audit
       - npm-audit
       - secret-scan
@@ -1786,6 +1826,7 @@ jobs:
             "${{ needs.publish-lint.result }}"
             "${{ needs.publish-test.result }}"
             "${{ needs.python-test.result }}"
+            "${{ needs.migration-check.result }}"
             "${{ needs.python-audit.result }}"
             "${{ needs.npm-audit.result }}"
             "${{ needs.secret-scan.result }}"

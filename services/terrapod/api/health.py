@@ -6,6 +6,7 @@ Provides /health (liveness) and /ready (readiness) endpoints.
 
 from fastapi import APIRouter, Response, status
 
+from terrapod.db.schema_version import schema_is_current
 from terrapod.db.session import get_db_health
 from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_health
@@ -37,6 +38,14 @@ async def ready(response: Response) -> dict[str, str | dict[str, str]]:
 
     storage = get_storage_or_none()
     checks["storage"] = "healthy" if storage is not None else "unhealthy"
+
+    # App ↔ schema skew guard (#544): a pod whose code expects a migration the
+    # DB hasn't got must report NOT READY (and get pulled from the LB) rather
+    # than 500 every request against the missing column. Only meaningful once
+    # the DB is reachable — a DB-down failure already fails readiness above.
+    if checks["database"] == "healthy":
+        schema_ok, schema_detail = await schema_is_current()
+        checks["migrations"] = "healthy" if schema_ok else f"behind: {schema_detail}"
 
     all_healthy = all(v == "healthy" for v in checks.values())
 
