@@ -13,9 +13,11 @@ import (
 // Terrapod-specific quirk — historical from before the role
 // management API was tidied).
 //
-// AllowLabels/AllowNames grant the role's workspace_permission to
-// matching workspaces; DenyLabels/DenyNames override. Resolution
-// rules are documented in the platform CLAUDE.md.
+// AllowLabels/AllowNames scope the role's Capabilities to matching
+// workspaces (and pools/registry/catalog items); DenyLabels/DenyNames
+// override. Capabilities are the grant (see the Capabilities field);
+// resolution rules are documented in docs/rbac.md and
+// docs/rbac-capabilities.md.
 type Role struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`

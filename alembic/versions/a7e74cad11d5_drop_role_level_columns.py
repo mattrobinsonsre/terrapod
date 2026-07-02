@@ -33,6 +33,10 @@ def downgrade() -> None:
     # Re-add the columns and best-effort backfill from the capability summary
     # (lossy: a granular set with no matching preset restores as the literal
     # "custom", and the exact original preset choice is not recoverable).
+    # ``capabilities`` is left intact here, so a single down/up round-trip at
+    # THIS revision preserves the grant. The genuinely lossy case is downgrading
+    # further past e31a11e302fe (which drops ``capabilities``) and then
+    # re-upgrading — see that revision's downgrade() note.
     op.add_column(
         "roles",
         sa.Column("workspace_permission", sa.String(20), nullable=False, server_default="read"),

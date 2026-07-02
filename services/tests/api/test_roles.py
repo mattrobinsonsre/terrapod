@@ -896,3 +896,39 @@ class TestCapabilityAuthoring:
         assert attrs["workspace-permission"] == "admin"
         # The effective caps now reflect admin (a delete cap the old "read" lacked).
         assert cap.WORKSPACE_DELETE in attrs["capabilities"]
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_partial_level_edit_preserves_granular_caps_on_other_axes(self, *mocks):
+        from terrapod.auth import capabilities as cap
+
+        # The headline authoring behaviour: a role holding a GRANULAR workspace
+        # set (plan-but-not-apply — matches no preset) gets a level edit on a
+        # DIFFERENT axis (pool → admin). The pool axis must be replaced while the
+        # granular workspace capabilities survive untouched.
+        role = _mock_role(name="dev-team")
+        role.capabilities = [cap.WORKSPACE_READ, cap.RUN_READ, cap.RUN_PLAN, cap.VAR_READ]
+        app, mock_db = _make_app(_user())
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = role
+        mock_db.execute.return_value = result
+        mock_db.refresh = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.patch(
+                "/api/terrapod/v1/roles/dev-team",
+                json={"data": {"attributes": {"pool-permission": "admin"}}},
+                headers=_AUTH,
+            )
+        assert resp.status_code == 200
+        attrs = resp.json()["data"]["attributes"]
+        caps = set(attrs["capabilities"])
+        # Pool axis was replaced with the admin set.
+        assert cap.POOL_MANAGE in caps
+        assert attrs["pool-permission"] == "admin"
+        # The granular workspace capabilities are preserved: plan yes, apply no.
+        assert cap.RUN_PLAN in caps
+        assert cap.RUN_APPLY not in caps
+        assert cap.WORKSPACE_DELETE not in caps
+        # Workspace axis stays non-preset → derived summary is "custom".
+        assert attrs["workspace-permission"] == "custom"

@@ -79,7 +79,7 @@ When `catalog.enabled` is `false`, every catalog API endpoint returns `404` and 
 
 ## RBAC: the `catalog_permission` axis
 
-Catalog access is a **dedicated, opt-in permission axis** — like `pool_permission` and `registry_permission`, each custom role carries its own `catalog_permission` scalar, independent of the others. It is **label-scoped**: a role's allow/deny labels and names decide which catalog items the permission applies to, exactly as for workspaces, pools, and registry resources.
+Catalog access is a **dedicated, opt-in permission axis** — like the pool and registry axes, it is carried in the role's `capabilities` set as `catalog:*` tokens (#585). The `catalog-permission` level (`none`/`read`/`use`/`admin`) is authoring shorthand for that slice of the capabilities and a derived read-only summary — it is not a stored scalar. Each axis's capabilities are managed independently, so a role can grant catalog `use` without any workspace access. It is **label-scoped**: a role's allow/deny labels and names decide which catalog items the permission applies to, exactly as for workspaces, pools, and registry resources.
 
 | Level | Grants |
 |---|---|

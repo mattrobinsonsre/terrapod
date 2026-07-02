@@ -61,4 +61,16 @@ def downgrade() -> None:
     # Lossy by nature (a customised capability set can't be represented as a
     # single level); the role's level columns are untouched, so collapsing back
     # to them is the intended behaviour.
+    #
+    # ROUND-TRIP DATA LOSS (documented, deliberate): if this is run AFTER
+    # a7e74cad11d5 has already been downgraded — which re-adds the level columns
+    # with the literal "custom" for any granular role — then dropping
+    # ``capabilities`` here discards the only faithful record of that role's
+    # grant. A subsequent re-upgrade backfills from levels, and
+    # ``expand_preset("custom")`` contributes nothing, so a granular role comes
+    # back with an EMPTY capability set (a silent privilege reduction). Only a
+    # full down-past-this-revision-then-up sequence is affected; the normal
+    # forward-only path and a single a7e74cad11d5 down/up round-trip preserve
+    # capabilities. Operators rolling the schema back across the #585 boundary
+    # must restore roles from a backup rather than re-upgrading in place.
     op.drop_column("roles", "capabilities")

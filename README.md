@@ -57,7 +57,7 @@ quickstart pulls released images, so the only wait is the image download.
 | Agent Execution | Implemented | Plan/apply runs on the server via K8s Job-based runner infrastructure |
 | VCS Integration | Implemented | GitHub (App) and GitLab (access token); inbound webhooks supported (GitHub HMAC + GitLab token) for instant triggers, with outbound polling as the resilient default so webhooks are optional, never required |
 | Variables & Secrets | Implemented | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets |
-| RBAC | Implemented | Label-based role system with hierarchical workspace permissions (read/plan/write/admin) |
+| RBAC | Implemented | Label-based roles with granular capabilities (`resource:verb`, e.g. `run:plan` without `run:apply`); permission levels (read/plan/write/admin) remain as authoring shorthand |
 | Private Module Registry | Implemented | Publish, version, and share modules internally |
 | Private Provider Registry | Implemented | Publish, version, and share providers with GPG signing and network mirror caching |
 | Binary Caching | Implemented | Pull-through cache for terraform/tofu/terragrunt CLI binaries |

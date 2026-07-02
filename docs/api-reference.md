@@ -2050,7 +2050,7 @@ Returns built-in and custom roles.
 POST /api/terrapod/v1/roles
 ```
 
-**Request body:**
+**Request body (capability authoring — recommended):**
 ```json
 {
   "data": {
@@ -2058,10 +2058,7 @@ POST /api/terrapod/v1/roles
     "attributes": {
       "name": "developer",
       "description": "Development workspace access",
-      "workspace-permission": "write",
-      "pool-permission": "read",
-      "registry-permission": "read",
-      "catalog-permission": "use",
+      "capabilities": ["workspace:read", "run:read", "run:plan", "var:read"],
       "allow-labels": {"env": "dev"},
       "allow-names": [],
       "deny-labels": {},
@@ -2071,7 +2068,29 @@ POST /api/terrapod/v1/roles
 }
 ```
 
-A role carries four independent permission scalars: `workspace-permission` (`read`/`plan`/`write`/`admin`), `pool-permission` (`read`/`write`/`admin`), `registry-permission` (`read`/`write`/`admin`, covering both modules and providers), and `catalog-permission` (`none`/`read`/`use`/`admin`, default `none`). The first three default to `read`; `catalog-permission` defaults to `none` (catalog access is opt-in, with no `everyone` floor). All are independent, so a role can grant registry write (e.g. provider-publish CI) or catalog `use` (self-service provisioning) without any workspace access. See [Service Catalog](service-catalog.md#rbac-the-catalog_permission-axis).
+A role's grant is its **`capabilities`** set — a list of `resource:verb` tokens (e.g. `run:plan`, `run:apply`, `run:apply-destroy`, `workspace:delete`, `var:write`, `state:read`) and **the single stored source of truth for enforcement** (#585). Capabilities express grants the old hierarchical levels could not — for example `run:plan` *without* `run:apply` ("plan but not apply"). Only tokens in the grantable set are accepted; `platform:*` and unknown tokens are rejected with `422`.
+
+**Request body (level shorthand — convenience):** you may instead send the four permission-level fields and the server **expands them into capabilities** on write:
+```json
+{
+  "data": {
+    "type": "roles",
+    "attributes": {
+      "name": "developer",
+      "workspace-permission": "write",
+      "pool-permission": "read",
+      "registry-permission": "read",
+      "catalog-permission": "use",
+      "allow-labels": {"env": "dev"}
+    }
+  }
+}
+```
+- `workspace-permission` (`read`/`plan`/`write`/`admin`), `pool-permission` (`read`/`write`/`admin`), `registry-permission` (`read`/`write`/`admin`, modules + providers) default to `read`; `catalog-permission` (`none`/`read`/`use`/`admin`) defaults to `none` (opt-in, no `everyone` floor).
+- The levels are **not persisted**. On a create/update they are expanded into `capabilities`; on a **PATCH**, a level field replaces only that axis's capabilities, preserving granular capabilities on the other axes.
+- If both `capabilities` and level fields are sent, **`capabilities` wins** (the levels are ignored).
+
+**Response:** every roles response includes the stored `capabilities` list **and** a derived, read-only permission-level summary (`workspace-permission`, `pool-permission`, `registry-permission`, `catalog-permission`) computed from the capabilities — each is the matching preset name, or the literal `"custom"` when the capability set matches no preset. Consumers that write levels must tolerate reading back `"custom"`.
 
 **Required permission:** Platform `admin`.
 

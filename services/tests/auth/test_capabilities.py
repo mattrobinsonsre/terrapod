@@ -232,3 +232,51 @@ def test_builtin_capability_sets():
     # everyone = the read floor.
     assert everyone == _ws("read")
     assert cap.STATE_READ not in everyone
+
+
+def test_caps_for_level_unions_across_axes():
+    # A preset level unions every axis's capability set, so it is a faithful
+    # stand-in for any single-axis resolver at that level (the test-mock oracle).
+    write = cap.caps_for_level("write")
+    assert cap.RUN_APPLY in write  # workspace axis write tier
+    assert cap.VAR_WRITE in write  # workspace axis write tier
+    assert cap.POOL_ASSIGN in write  # pool axis write tier
+    assert cap.REGISTRY_WRITE in write  # registry axis
+    assert cap.CATALOG_USE in write  # catalog axis (write → use)
+    # It equals the union of the four single-axis expansions for that level.
+    expected = set(
+        cap.expand_preset(
+            workspace_permission="write",
+            pool_permission="write",
+            registry_permission="write",
+            catalog_permission="use",
+        )
+    )
+    assert set(write) == expected
+    # Strictly cumulative across the union: read ⊂ write.
+    assert cap.caps_for_level("read") < write
+
+
+def test_caps_for_level_use_is_catalog_only():
+    # "use" is a catalog-only level: it grants catalog caps and nothing else.
+    caps = cap.caps_for_level("use")
+    assert cap.CATALOG_USE in caps
+    assert not (caps & cap.axis_all_caps("workspace"))
+    assert not (caps & cap.axis_all_caps("pool"))
+    assert not (caps & cap.axis_all_caps("registry"))
+
+
+def test_caps_for_level_none_and_unknown_are_empty():
+    assert cap.caps_for_level("none") == frozenset()
+    assert cap.caps_for_level(None) == frozenset()
+    assert cap.caps_for_level("bogus") == frozenset()
+    assert cap.caps_for_level("") == frozenset()
+
+
+def test_capabilities_for_builtin_unknown_is_empty():
+    assert cap.capabilities_for_builtin("nope") == []
+
+
+def test_has_capability_empty_set_grants_nothing():
+    assert cap.has_capability(frozenset(), cap.RUN_READ) is False
+    assert cap.has_capability(frozenset(), cap.WORKSPACE_READ) is False

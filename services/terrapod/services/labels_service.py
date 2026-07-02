@@ -22,12 +22,12 @@ for mass-mutating workspaces / pools / modules / providers.
 
 RBAC
 ----
-Each entity type has its own permission resolver
-(`resolve_workspace_permission`, `resolve_pool_permission`,
-`resolve_registry_permission`). We only surface labels on entities
-the caller has at least `read` on. The four resolvers each support
-`preloaded_roles=` to avoid an N+1 DB hit when iterating over many
-entities; we pre-load roles once per entity type.
+Each entity type has its own capability resolver
+(`resolve_workspace_capabilities_for`, `resolve_pool_capabilities_for`,
+`resolve_registry_capabilities_for`). We only surface labels on entities
+the caller holds the axis read capability on (`has_capability(caps, *_READ)`).
+The resolvers each support `preloaded_roles=` to avoid an N+1 DB hit when
+iterating over many entities; we pre-load roles once per entity type.
 """
 
 from __future__ import annotations

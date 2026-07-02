@@ -133,18 +133,25 @@ When a user accesses a workspace, permissions are resolved in this order. The fi
      a. Check allow rules (labels + names)
      b. Check deny rules (labels + names)
      c. If workspace matches allow AND does NOT match deny:
-        collect that role's workspace_permission
-   Take the HIGHEST collected permission
+        add that role's capabilities (scoped to this axis) to the set
+   Union the capabilities collected across all matching roles
    |
-   v (if any permission found, use it)
+   v (if any capability granted, use the union)
 
 5. "everyone" role:
-   If workspace has label "access: everyone" --> read permission
+   If workspace has label "access: everyone" --> read-floor capabilities
    |
    v (otherwise)
 
 6. Default: no access (403)
 ```
+
+> **Capabilities, not a scalar max.** Since #585 the enforced grant is the
+> **union of capabilities** across every matching role — not the single highest
+> permission *level*. Two roles granting `run:plan` and `run:apply` respectively
+> combine to plan+apply. The permission *levels* (read/plan/write/admin) are
+> authoring shorthand and a derived read-only summary, not the stored/enforced
+> grant. See [Capability-based RBAC](rbac-capabilities.md).
 
 ---
 
@@ -180,8 +187,9 @@ curl -X POST https://terrapod.example.com/api/terrapod/v1/roles \
 |---|---|---|
 | `name` | string | Unique role name (lowercase, alphanumeric + hyphens) |
 | `description` | string | Human-readable description |
-| `workspace-permission` | string | One of: `read`, `plan`, `write`, `admin` |
-| `pool-permission` | string | One of: `read`, `write`, `admin` (default: `read`) |
+| `capabilities` | array | The role's grant — a list of `resource:verb` tokens (e.g. `run:plan`, `run:apply`, `workspace:delete`). The single stored source of truth for enforcement (#585). On write, sending `capabilities` takes precedence over the level fields; on read it is always returned. See [Capability-based RBAC](rbac-capabilities.md). |
+| `workspace-permission` | string | Authoring shorthand + derived summary. One of: `read`, `plan`, `write`, `admin`, or `custom` (read-only, when the capabilities match no preset) |
+| `pool-permission` | string | Authoring shorthand + derived summary. One of: `read`, `write`, `admin` (default: `read`), or `custom` |
 | `allow-labels` | object | Label key-value pairs that grant access |
 | `allow-names` | array | Explicit workspace names that grant access |
 | `deny-labels` | object | Label key-value pairs that deny access (overrides allow) |
