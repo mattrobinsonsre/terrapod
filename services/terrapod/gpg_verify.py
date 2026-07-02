@@ -14,6 +14,7 @@ from __future__ import annotations
 import warnings
 
 import pgpy
+from pgpy.constants import SignatureType
 
 # pgpy prints static `UserWarning` TODO banners on EVERY ``key.verify()`` —
 # "Self-sigs verification is not yet working", "Revocation checks are not yet
@@ -23,12 +24,45 @@ import pgpy
 # UserWarnings here (the one module that touches pgpy). This does NOT weaken
 # verification: a bad/wrong-key signature still fails closed.
 #
-# Caveat worth keeping visible: the *revocation* TODO is a real pgpy limitation
-# — a revoked signing key's signatures would still verify. Terrapod's trust is
-# anchored in the registered/pinned public key (self-sig + disabled-flag gaps
-# don't apply to that model), and the operator mitigation is removing a revoked
-# key from the registered set. Tracked for a proper fix in issue #640.
+# The self-sig and disabled-flag gaps don't apply to Terrapod's trust model
+# (we anchor on the registered/pinned public key, not on self-certs). The
+# *revocation* gap DID have security weight — pgpy parses revocation signatures
+# but does not act on them, so a self-revoked key's signatures would still
+# verify. We close that gap ourselves in ``is_revoked`` below (pure pgpy, no
+# gpg binary / subprocess) and fail closed on a revoked key (#640).
 warnings.filterwarnings("ignore", category=UserWarning, module=r"pgpy")
+
+
+def is_revoked(key: pgpy.PGPKey) -> bool:
+    """Return True if ``key`` carries a valid self-revocation signature.
+
+    pgpy parses key-revocation signatures but does not honor them during
+    ``verify`` (#640). We check them ourselves: a key is revoked if it has at
+    least one ``KeyRevocation`` (0x20) signature that cryptographically
+    verifies as a self-signature by the key itself — i.e. the key's owner
+    revoked it. A forged/cross-key revocation packet does NOT verify as a
+    self-signature and is ignored, so this never false-positives a legitimate
+    key; a genuine self-revocation always trips it.
+
+    Pure pgpy — no gpg binary, no subprocess. Synchronous/CPU-bound; callers in
+    async contexts must dispatch to a thread.
+    """
+    try:
+        for sig in key.revocation_signatures:
+            if getattr(sig, "type", None) != SignatureType.KeyRevocation:
+                continue
+            try:
+                if key.verify(key, sig):
+                    return True
+            except Exception:
+                # A candidate revocation that won't verify as a self-signature
+                # is not a real revocation — skip it, don't block the key.
+                continue
+    except Exception:
+        # Can't enumerate revocations → don't over-reject; the caller's normal
+        # signature verification still fails closed on a bad/wrong-key sig.
+        return False
+    return False
 
 
 def parse_sha256sums(text: str) -> dict[str, str]:
@@ -71,6 +105,8 @@ def verify_detached(manifest: bytes, signature: bytes, key: pgpy.PGPKey) -> bool
     Synchronous/CPU-bound; callers in async contexts must dispatch to a thread.
     """
     try:
+        if is_revoked(key):
+            return False
         sig = pgpy.PGPSignature.from_blob(signature)
         return bool(key.verify(manifest, sig))
     except Exception:

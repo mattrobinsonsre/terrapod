@@ -26,3 +26,68 @@ def test_parse_sha256sums_tolerates_formatting():
         "garbage\n"  # short line, skipped
     )
     assert out == {"file.zip": "abc123", "other.bin": "def456"}
+
+
+# ── Key revocation (#640) ──────────────────────────────────────────────
+
+
+def _new_signing_key():
+    """A fresh Ed25519 signing key (fast to generate)."""
+    import pgpy
+    from pgpy.constants import (
+        CompressionAlgorithm,
+        EllipticCurveOID,
+        HashAlgorithm,
+        KeyFlags,
+        PubKeyAlgorithm,
+        SymmetricKeyAlgorithm,
+    )
+
+    key = pgpy.PGPKey.new(PubKeyAlgorithm.EdDSA, EllipticCurveOID.Ed25519)
+    key.add_uid(
+        pgpy.PGPUID.new("Test <test@example.com>"),
+        usage={KeyFlags.Sign},
+        hashes=[HashAlgorithm.SHA256],
+        ciphers=[SymmetricKeyAlgorithm.AES256],
+        compression=[CompressionAlgorithm.ZLIB],
+    )
+    return key
+
+
+def _self_revoke(key):
+    """Attach a self key-revocation signature and re-parse the public key."""
+    import pgpy
+    from pgpy.constants import RevocationReason, SignatureType
+
+    rev = key.revoke(
+        key,
+        sigtype=SignatureType.KeyRevocation,
+        reason=RevocationReason.Compromised,
+        comment="test",
+    )
+    key |= rev
+    revoked, _ = pgpy.PGPKey.from_blob(str(key.pubkey))
+    return revoked
+
+
+def test_is_revoked_false_for_fresh_key():
+    assert gpg_verify.is_revoked(_new_signing_key().pubkey) is False
+
+
+def test_is_revoked_true_for_self_revoked_key():
+    assert gpg_verify.is_revoked(_self_revoke(_new_signing_key())) is True
+
+
+def test_verify_detached_fails_closed_on_revoked_key():
+    """A signature that verifies under a key must STOP verifying once that key
+    carries a valid self-revocation (#640) — pgpy alone would still accept it."""
+    key = _new_signing_key()
+    msg = b"payload-to-sign"
+    sig_bytes = str(key.sign(msg)).encode()
+
+    # Sanity: verifies under the live key.
+    assert gpg_verify.verify_detached(msg, sig_bytes, key.pubkey) is True
+
+    # After self-revocation, the SAME good signature must fail closed.
+    revoked = _self_revoke(key)
+    assert gpg_verify.verify_detached(msg, sig_bytes, revoked) is False

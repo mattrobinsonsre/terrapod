@@ -164,6 +164,67 @@ class TestShow:
         assert resp.status_code == 404
 
 
+def _revoke_body():
+    return {
+        "data": {
+            "type": "gpg-key-revocations",
+            "attributes": {
+                "revocation-certificate": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n...\n-----END...",
+            },
+        }
+    }
+
+
+class TestRevoke:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.gpg_keys.revoke_gpg_key", new_callable=AsyncMock)
+    async def test_revoke_happy_200(self, mock_revoke, *mocks):
+        key = _mock_key()
+        mock_revoke.return_value = key
+        app = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(f"{_KEYS}/{key.id}/revoke", json=_revoke_body(), headers=_AUTH)
+        assert resp.status_code == 200
+        assert resp.json()["data"]["attributes"]["key-id"] == "1C11AB2FF1189D6C"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.gpg_keys.revoke_gpg_key", new_callable=AsyncMock)
+    async def test_revoke_invalid_cert_422(self, mock_revoke, *mocks):
+        mock_revoke.side_effect = ValueError("not a valid self-revocation certificate for this key")
+        app = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"{_KEYS}/{uuid.uuid4()}/revoke", json=_revoke_body(), headers=_AUTH
+            )
+        assert resp.status_code == 422
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.gpg_keys.revoke_gpg_key", new_callable=AsyncMock)
+    async def test_revoke_not_found_404(self, mock_revoke, *mocks):
+        mock_revoke.return_value = None
+        app = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(
+                f"{_KEYS}/{uuid.uuid4()}/revoke", json=_revoke_body(), headers=_AUTH
+            )
+        assert resp.status_code == 404
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_revoke_bad_uuid_404(self, *mocks):
+        app = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.post(f"{_KEYS}/xyz/revoke", json=_revoke_body(), headers=_AUTH)
+        assert resp.status_code == 404
+
+
 class TestDelete:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

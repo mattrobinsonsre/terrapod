@@ -89,6 +89,24 @@ func (c *Client) DeleteGPGKey(ctx context.Context, id string) error {
 	return c.Delete(ctx, "/api/terrapod/v1/gpg-keys/"+url.PathEscape(id))
 }
 
+// RevokeGPGKey applies an owner-issued revocation certificate to a
+// registered key (the armored output of `gpg --gen-revoke`). The key
+// stays registered but every provider/runner signature verification
+// fails closed for it afterward. Errors (ValidationError) if the
+// certificate is not a valid self-revocation for the key.
+func (c *Client) RevokeGPGKey(ctx context.Context, id, revocationCertificate string) (*GPGKey, error) {
+	attrs := map[string]any{"revocation-certificate": revocationCertificate}
+	body, err := MarshalResource("gpg-key-revocations", attrs, nil)
+	if err != nil {
+		return nil, fmt.Errorf("marshal revoke gpg-key: %w", err)
+	}
+	data, err := c.Post(ctx, "/api/terrapod/v1/gpg-keys/"+url.PathEscape(id)+"/revoke", body)
+	if err != nil {
+		return nil, err
+	}
+	return parseGPGKey(data)
+}
+
 // ── Internal helpers ─────────────────────────────────────────────────
 
 func parseGPGKey(body []byte) (*GPGKey, error) {
