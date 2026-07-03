@@ -62,6 +62,11 @@ setting so there's nothing to decide.
    (JSON tab) — the operator will send you this file, or grab it from the
    Terrapod repo. Review and **Create**.
 
+**Set the app icon** (recommended, so `@terrapod` posts are recognisable): the
+manifest can't carry an icon, so upload one in the UI — **Basic Information →
+Display Information → App icon** → upload [`images/slack-app-icon.png`](images/slack-app-icon.png)
+(the Terrapod mark, 512×512, shipped in the repo) → **Save Changes**.
+
 ### A2. Generate the three tokens
 
 All three come from the app you just created (left sidebar of the app's page):
