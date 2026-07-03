@@ -27,6 +27,20 @@ from terrapod.services import execution_hook_service
 
 router = APIRouter(tags=["execution-hooks"])
 
+# A hook script is delivered verbatim in the per-run vars Secret; bound it so a
+# runaway value can't bloat the Secret. 64 KiB is far above any real hook.
+_MAX_SCRIPT_LEN = 64 * 1024
+
+
+def _validate_script(script: str) -> str:
+    """Reject an over-long hook script with 422 (never store an unbounded blob)."""
+    if len(script) > _MAX_SCRIPT_LEN:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Execution hook script exceeds the {_MAX_SCRIPT_LEN}-byte limit",
+        )
+    return script
+
 
 def _coerce_priority(raw) -> int:
     """Parse the priority attribute, returning 422 (not 500) on non-numeric input."""
@@ -122,7 +136,7 @@ async def create_hook(
         name=name,
         description=attrs.get("description", ""),
         hook_point=hook_point,
-        script=attrs.get("script", ""),
+        script=_validate_script(attrs.get("script", "")),
         enabled=bool(attrs.get("enabled", True)),
         priority=_coerce_priority(attrs.get("priority", 0)),
     )
@@ -170,7 +184,7 @@ async def update_hook(
         execution_hook_service.validate_hook_point(attrs["hook-point"])
         hook.hook_point = attrs["hook-point"]
     if "script" in attrs:
-        hook.script = attrs["script"]
+        hook.script = _validate_script(attrs["script"] or "")
     if "enabled" in attrs:
         hook.enabled = bool(attrs["enabled"])
     if "priority" in attrs:

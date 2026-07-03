@@ -428,6 +428,59 @@ class TestClaimRun:
         env = {v["key"]: v for v in data["attributes"]["env-vars"]}
         assert env["MY_ENV"]["value"] == "envval"
 
+    async def test_execution_hooks_killswitch_enforced_server_side(
+        self, app, client, setup, monkeypatch
+    ):
+        """The API serves NO execution hooks when the kill-switch is off (#678),
+        so a listener that ignores the flag still never receives a hook script.
+        Enabled (default) delivers the associated hook; disabled delivers []."""
+        from types import SimpleNamespace
+
+        pool_id, listener_id = setup
+
+        async def _mk_hook_ws(suffix):
+            ws_id = await _create_remote_workspace(client, pool_id, f"hook-ks-{suffix}")
+            r = await client.post(
+                "/api/terrapod/v1/execution-hooks",
+                json={
+                    "data": {
+                        "type": "execution-hooks",
+                        "attributes": {
+                            "name": f"ks-{suffix}",
+                            "hook-point": "pre_init",
+                            "script": "echo hi",
+                        },
+                    }
+                },
+                headers=AUTH,
+            )
+            assert r.status_code == 201, r.text
+            hook_id = r.json()["data"]["id"]
+            r = await client.post(
+                f"/api/terrapod/v1/execution-hooks/{hook_id}/relationships/workspaces",
+                json={"data": [{"id": ws_id, "type": "workspaces"}]},
+                headers=AUTH,
+            )
+            assert r.status_code == 204, r.text
+            return ws_id
+
+        # Enabled (default): the associated hook is delivered to the runner.
+        ws_on = await _mk_hook_ws("on")
+        await _create_run(client, ws_on)
+        data_on, _ = await _claim_run(client, listener_id)
+        assert len(data_on["attributes"]["execution-hooks"]) == 1
+
+        # Kill-switch off: the API serves no hooks even though one is associated.
+        from terrapod import config as _cfg
+
+        monkeypatch.setattr(
+            _cfg, "load_runner_config", lambda *a, **k: SimpleNamespace(hooks_enabled=False)
+        )
+        ws_off = await _mk_hook_ws("off")
+        await _create_run(client, ws_off)
+        data_off, _ = await _claim_run(client, listener_id)
+        assert data_off["attributes"]["execution-hooks"] == []
+
 
 class TestPlanOnlyLifecycle:
     async def test_plan_only_full_lifecycle(self, app, client, setup):

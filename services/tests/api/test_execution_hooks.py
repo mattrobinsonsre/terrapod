@@ -110,6 +110,25 @@ class TestCreateHook:
             r = await c.post(_HOOKS, json=body, headers=_AUTH)
         assert r.status_code == 422
 
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_oversized_script_422(self, *_mocks) -> None:
+        # A script beyond the 64 KiB bound must be a 422, not stored unbounded.
+        app, _db = _make_app(_user())
+        body = {
+            "data": {
+                "attributes": {
+                    "name": "big",
+                    "hook-point": "pre_init",
+                    "script": "x" * (64 * 1024 + 1),
+                }
+            }
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            r = await c.post(_HOOKS, json=body, headers=_AUTH)
+        assert r.status_code == 422
+
 
 class TestListHooks:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)

@@ -1475,11 +1475,19 @@ async def next_run(
     # Resolve execution hooks associated with this workspace (#619). Delivered
     # alongside the vars via the per-run Secret; the runner runs each hook_point
     # at its boundary. Enforced-empty for local execution never reaches here
-    # (next_run is the agent-mode listener endpoint). The listener applies the
-    # runners.hooks.enabled kill-switch when building the Job.
+    # (next_run is the agent-mode listener endpoint).
+    #
+    # Kill-switch (#678): enforce `runners.hooksEnabled` HERE, server-side and
+    # authoritatively — when disabled the API serves NO hooks, so a custom
+    # listener that ignores the flag still never receives any hook script. The
+    # bundled listener also drops hooks when building the Job (defense in depth).
+    from terrapod.config import load_runner_config
     from terrapod.services.execution_hook_service import resolve_hooks_for_workspace
 
-    execution_hooks = await resolve_hooks_for_workspace(db, run.workspace_id)
+    if load_runner_config().hooks_enabled:
+        execution_hooks = await resolve_hooks_for_workspace(db, run.workspace_id)
+    else:
+        execution_hooks = []
 
     await db.commit()
 

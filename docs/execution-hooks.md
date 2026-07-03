@@ -56,14 +56,20 @@ trust boundary is the same as "who can run `terraform` here", so:
 ## Enabling / kill-switch
 
 Execution hooks are available by default. The platform kill-switch is the Helm
-value **`runners.hooksEnabled`** (default `true`); set it to `false` to stop the
-listener from ever delivering hooks to runner Jobs — for sealed or
-security-conscious deployments that want to disallow custom-shell hooks:
+value **`runners.hooksEnabled`** (default `true`); set it to `false` to disallow
+custom-shell hooks entirely — for sealed or security-conscious deployments:
 
 ```yaml
 runners:
   hooksEnabled: false
 ```
+
+When disabled, the switch is enforced in two places: the **API** serves no hooks
+in the run payload (authoritative — a custom listener that ignores the flag still
+receives nothing), and the bundled **listener** also drops hooks when building
+the Job (defense in depth).
+
+A hook `script` is capped at **64 KiB** (larger values are rejected with `422`).
 
 ## Managing hooks
 
