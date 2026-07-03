@@ -1,8 +1,9 @@
 """workspace slack_channel (#556)
 
-Per-workspace Slack channel for interactive run-approval / auto-apply / drift
-notifications. Empty default → falls back to the config-level default channel.
-Additive; no behaviour change for existing workspaces.
+Per-workspace Slack channel for interactive run-approval / auto-apply / errored /
+drift notifications. Opt-in: empty default → this workspace posts nothing (there
+is no config-level fan-out). Additive; no behaviour change for existing
+workspaces.
 
 Revision ID: 5cf23a543399
 Revises: 526699f9e991

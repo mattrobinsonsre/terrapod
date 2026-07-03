@@ -529,3 +529,8 @@ async def _enqueue_drift_notification(run: Run) -> None:
         )
     except Exception as e:
         logger.warning("Failed to enqueue drift notification", error=str(e))
+
+    # Mirror to the Slack app (#556) — no-ops unless the workspace opted in.
+    from terrapod.services.slack_notify_service import enqueue_slack_notify
+
+    await enqueue_slack_notify(run, "run:drift_detected")

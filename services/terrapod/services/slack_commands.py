@@ -5,8 +5,8 @@ mints a signed, single-use state and returns an ephemeral "Connect your Terrapod
 account" link that drives the user through Terrapod's own login; `status` /
 `unlink` operate on the caller's existing binding.
 
-Interaction payloads (approve/discard buttons) are ack'd here too but not yet
-acted on — that lands with the interactive-approval slice.
+Interactive payloads (approve/discard buttons) are ack'd here and dispatched to
+``slack_interactions.handle_block_actions`` for the live RBAC + confirm/discard.
 """
 
 from __future__ import annotations
@@ -119,8 +119,19 @@ async def handle_socket_request(client, req) -> None:
             SocketModeResponse(envelope_id=req.envelope_id, payload=payload)
         )
 
+    if req.type == "interactive":
+        # Ack within Slack's 3s window FIRST, then do the (slower) RBAC + apply
+        # work — Slack only needs the ack to dismiss the button spinner.
+        await _ack()
+        payload = req.payload or {}
+        if payload.get("type") == "block_actions":
+            from terrapod.services.slack_interactions import handle_block_actions
+
+            await handle_block_actions(payload)
+        return
+
     if req.type != "slash_commands":
-        await _ack()  # ack interactions/events; handled in a later slice
+        await _ack()  # ack other events; nothing to act on
         return
 
     payload = req.payload or {}

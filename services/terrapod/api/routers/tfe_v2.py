@@ -676,6 +676,8 @@ def _workspace_json(
                 "drift-ignore-rules": ws.drift_ignore_rules or [],
                 "ai-summary-mode": ws.ai_summary_mode,
                 "ai-summary-context": ws.ai_summary_context,
+                # Slack app opt-in channel (#556); empty = this workspace posts nothing.
+                "slack-channel": ws.slack_channel,
                 "drift-detection-enabled": ws.drift_detection_enabled,
                 "drift-detection-interval-seconds": ws.drift_detection_interval_seconds,
                 # Per-workspace plan expiry TTL (#646); null = disabled (default).
@@ -1003,6 +1005,8 @@ async def create_workspace(
             attrs.get("drift-detection-interval-seconds", 86400)
         ),
         plan_expiry_seconds=_parse_plan_expiry(attrs.get("plan-expiry-seconds")),
+        # Slack opt-in channel (#556): empty = silent for this workspace.
+        slack_channel=(attrs.get("slack-channel") or "").strip()[:128],
     )
     db.add(ws)
     await db.commit()
@@ -1412,6 +1416,9 @@ async def update_workspace(
         ws.execution_backend = backend
     if "terraform-version" in attrs:
         ws.terraform_version = attrs["terraform-version"]
+    if "slack-channel" in attrs:
+        # Slack opt-in channel (#556): empty clears it (workspace goes silent).
+        ws.slack_channel = (attrs["slack-channel"] or "").strip()[:128]
     if "terragrunt-enabled" in attrs:
         ws.terragrunt_enabled = bool(attrs["terragrunt-enabled"])
     if "terragrunt-version" in attrs:

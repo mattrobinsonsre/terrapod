@@ -159,6 +159,41 @@ also view/remove your links from the Terrapod web UI. Under the hood the connect
 link carries a Terrapod-signed, single-use token, so no one can forge a binding
 for someone else's Slack id.
 
+## Run notifications (opt-in, per workspace)
+
+Run notifications are **opt-in per workspace** — set the workspace's **Slack
+channel** (Workspace → Settings → *Slack notifications*, the `slack-channel` API
+attribute, or `slack_channel` on the `terrapod_workspace` resource) and that
+workspace posts to it. Leave it empty and the workspace stays silent. There is
+**no deployment-wide fan-out**: `slack.default_channel` is only the startup
+connectivity check, never a fallback for run traffic — so a channel receives
+traffic solely because someone pointed a workspace at it. The Slack app must
+already be a member of the channel.
+
+A workspace with a channel set posts on four events, each once:
+
+| Event | Message |
+|---|---|
+| **Needs approval** | A run reached `planned` and is awaiting a manual apply. Interactive **Approve** / **Discard** buttons; the AI review (where enabled) and the plan output (attached as a `.txt` file) ride along. |
+| **Applied** | An apply completed. If the run had an approval message, it's **edited in place** to record the outcome rather than posting anew. |
+| **Errored** | A run errored, with the AI failure analysis (where enabled). |
+| **Drift detected** | A drift-detection run found changes. |
+
+Speculative/PR plan-only runs, intermediate states, and drift-with-no-changes are
+deliberately suppressed to keep channels quiet. Deep links in every message use
+the external users' URL (`external_url`) only — never an internal machine-to-
+machine host — and are omitted if `external_url` is unset.
+
+### Approving from Slack (RBAC)
+
+Clicking **Approve** / **Discard** carries no standing permission. Every click is
+authorised live: Terrapod resolves your linked identity → your **current**
+Terrapod roles → your capabilities on that workspace, and requires `run:apply`
+before it confirms or discards. If you haven't linked, you get an ephemeral nudge
+to `/terrapod link`; if you're linked but lack permission on that workspace, an
+ephemeral "no permission" — neither touches the run. On success the message is
+edited to record who approved, so a button can't be pressed twice.
+
 ## Reference
 
 **Helm values** (`api.config.slack`):

@@ -196,6 +196,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         description="Deliver workspace notification on run state change",
     )
 
+    # Slack app run notifications (#556) — approval / applied / errored / drift.
+    # Registered only when the Slack app is enabled; the handler also no-ops
+    # unless the target workspace opted in with its own channel.
+    if settings.slack.enabled:
+        from terrapod.services.slack_notify_service import handle_slack_run_notify
+
+        register_trigger_handler(
+            "slack_run_notify",
+            handler=handle_slack_run_notify,
+            description="Post/update the Slack run message for a run event",
+        )
+
     # Run task webhook delivery handler
     from terrapod.services.run_task_dispatcher import handle_run_task_call
 

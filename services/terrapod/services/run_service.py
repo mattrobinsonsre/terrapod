@@ -120,6 +120,14 @@ async def _enqueue_notification(run: Run, target_status: str) -> None:
         # Never let notification enqueuing break the run state machine
         logger.warning("Failed to enqueue notification", error=str(e))
 
+    # Mirror the actionable/terminal subset to the Slack app (#556). The handler
+    # self-filters to needs_attention/completed/errored and no-ops unless the
+    # workspace opted in with its own `slack_channel`, so this is safe to call
+    # for every trigger.
+    from terrapod.services.slack_notify_service import enqueue_slack_notify
+
+    await enqueue_slack_notify(run, trigger)
+
 
 async def _enqueue_vcs_status(run: Run, target_status: str) -> None:
     """Enqueue a VCS commit status update for a run state change.

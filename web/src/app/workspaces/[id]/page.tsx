@@ -61,6 +61,7 @@ interface WorkspaceAttrs {
   'auto-merge-strategy': 'merge' | 'squash' | 'rebase'
   'ai-summary-mode': 'default' | 'enabled' | 'disabled'
   'ai-summary-context': string
+  'slack-channel': string
   'drift-detection-enabled': boolean
   'drift-detection-interval-seconds': number
   'plan-expiry-seconds': number | null
@@ -357,6 +358,11 @@ function WorkspaceDetailContent() {
   // dropdown change directly.
   const [savingAiSummary, setSavingAiSummary] = useState(false)
   const [aiSummaryContextDraft, setAiSummaryContextDraft] = useState<string | null>(null)
+
+  // Slack run notifications (#556). Local draft for the channel input,
+  // autosaved on blur. Opt-in: empty channel = this workspace stays silent.
+  const [savingSlackChannel, setSavingSlackChannel] = useState(false)
+  const [slackChannelDraft, setSlackChannelDraft] = useState<string | null>(null)
 
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -1072,6 +1078,32 @@ function WorkspaceDetailContent() {
       setError(err instanceof Error ? err.message : 'Failed to update AI summary settings')
     } finally {
       setSavingAiSummary(false)
+    }
+  }
+
+  // Slack run notifications (#556)
+  async function handleSlackChannelUpdate(channel: string) {
+    if (!workspace) return
+    setSavingSlackChannel(true)
+    try {
+      const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: { type: 'workspaces', attributes: { 'slack-channel': channel } },
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(body || 'Failed to update Slack channel')
+      }
+      const data = await res.json()
+      setWorkspace(data.data)
+      setSlackChannelDraft(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update Slack channel')
+    } finally {
+      setSavingSlackChannel(false)
     }
   }
 
@@ -2345,6 +2377,53 @@ function WorkspaceDetailContent() {
                     <p className="text-xs text-slate-500 mt-1">
                       Added on top of deployment-wide context. Max 4000 characters.
                       {savingAiSummary && <span className="ml-2 text-brand-400">Saving…</span>}
+                    </p>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+
+            {/* Slack notifications (#556) */}
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
+              <h3 className="text-sm font-medium text-slate-200">Slack notifications</h3>
+              <p className="text-sm text-slate-400 mt-1">
+                Opt this workspace into Slack run notifications — approval requests, applies,
+                errors, and drift. Leave the channel empty and this workspace stays silent
+                (there is no deployment-wide fan-out). Requires the Slack app to be enabled
+                by an administrator.
+              </p>
+              <dl className="mt-4">
+                <div>
+                  <dt className="text-xs text-slate-500">Channel</dt>
+                  <dd className="mt-1">
+                    {perms['can-update'] ? (
+                      <input
+                        type="text"
+                        value={slackChannelDraft ?? attrs['slack-channel'] ?? ''}
+                        onChange={(e) => setSlackChannelDraft(e.target.value)}
+                        onBlur={() => {
+                          if (
+                            slackChannelDraft !== null &&
+                            slackChannelDraft !== (attrs['slack-channel'] ?? '')
+                          ) {
+                            handleSlackChannelUpdate(slackChannelDraft.trim())
+                          } else {
+                            setSlackChannelDraft(null)
+                          }
+                        }}
+                        placeholder="#deploys or a channel ID (e.g. C0123ABCD)"
+                        maxLength={128}
+                        disabled={savingSlackChannel}
+                        className="w-full sm:w-96 px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono"
+                      />
+                    ) : attrs['slack-channel'] ? (
+                      <p className="text-sm text-slate-200 font-mono">{attrs['slack-channel']}</p>
+                    ) : (
+                      <p className="text-sm text-slate-500 italic">Not set — silent.</p>
+                    )}
+                    <p className="text-xs text-slate-500 mt-1">
+                      The Slack app must already be a member of the channel.
+                      {savingSlackChannel && <span className="ml-2 text-brand-400">Saving…</span>}
                     </p>
                   </dd>
                 </div>

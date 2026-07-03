@@ -81,6 +81,7 @@ type workspaceModel struct {
 	PlanExpirySeconds             types.Int64  `tfsdk:"plan_expiry_seconds"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
 	AISummaryContext              types.String `tfsdk:"ai_summary_context"`
+	SlackChannel                  types.String `tfsdk:"slack_channel"`
 
 	// Set of workspace IDs authorized to read this workspace's state
 	// via `terraform_remote_state` (#344). Producer-controlled

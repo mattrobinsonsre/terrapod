@@ -97,8 +97,11 @@ type Workspace struct {
 	// AISummaryContext is workspace-specific facts added on top of the
 	// deployment-wide fleet_context when the summariser builds its prompt.
 	AISummaryContext string `json:"ai-summary-context,omitempty"`
-	CreatedAt        string `json:"created-at,omitempty"`
-	UpdatedAt        string `json:"updated-at,omitempty"`
+	// SlackChannel is the opt-in Slack channel this workspace's run
+	// notifications post to (#556). Empty means the workspace is silent.
+	SlackChannel string `json:"slack-channel,omitempty"`
+	CreatedAt    string `json:"created-at,omitempty"`
+	UpdatedAt    string `json:"updated-at,omitempty"`
 }
 
 // CreateWorkspaceRequest is the input shape for Client.CreateWorkspace.
@@ -141,6 +144,9 @@ type CreateWorkspaceRequest struct {
 	// AISummaryContext is workspace-specific context added to the model
 	// prompt. Capped at 4000 chars server-side.
 	AISummaryContext string `json:"ai-summary-context,omitempty"`
+	// SlackChannel opts this workspace into Slack run notifications (#556)
+	// on the given channel. Empty means silent.
+	SlackChannel string `json:"slack-channel,omitempty"`
 }
 
 // UpdateWorkspaceRequest is the input shape for Client.UpdateWorkspace.
@@ -185,6 +191,10 @@ type UpdateWorkspaceRequest struct {
 	// context, set this to "" — but note empty string also means
 	// "leave alone" (a Terrapod-side limitation; clear via the UI).
 	AISummaryContext *string `json:"ai-summary-context,omitempty"`
+	// SlackChannel opts this workspace into Slack run notifications (#556).
+	// Pointer-typed so "" (clear/go-silent) is distinguishable from nil
+	// (leave alone).
+	SlackChannel *string `json:"slack-channel,omitempty"`
 }
 
 // WorkspaceListOptions filters and paginates ListWorkspaces. Zero
@@ -407,6 +417,9 @@ func workspaceCreateAttrs(req CreateWorkspaceRequest) map[string]any {
 	if req.AISummaryContext != "" {
 		attrs["ai-summary-context"] = req.AISummaryContext
 	}
+	if req.SlackChannel != "" {
+		attrs["slack-channel"] = req.SlackChannel
+	}
 	return attrs
 }
 
@@ -492,6 +505,10 @@ func workspaceUpdateAttrs(req UpdateWorkspaceRequest) map[string]any {
 	if req.AISummaryContext != nil {
 		// *string so callers can explicitly clear the context with &"".
 		attrs["ai-summary-context"] = *req.AISummaryContext
+	}
+	if req.SlackChannel != nil {
+		// *string so callers can explicitly go silent with &"".
+		attrs["slack-channel"] = *req.SlackChannel
 	}
 	return attrs
 }

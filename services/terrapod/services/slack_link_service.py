@@ -112,15 +112,25 @@ async def verify_and_consume_state(state: str) -> tuple[str, str, str]:
     return str(payload["t"]), str(payload["u"]), response_url
 
 
-async def post_response_url(response_url: str, text: str) -> None:
-    """Best-effort follow-up to a Slack slash-command response_url (no scope needed)."""
+async def post_response_url(response_url: str, text: str, *, replace_original: bool = True) -> None:
+    """Best-effort follow-up to a Slack response_url (no scope needed).
+
+    ``replace_original=True`` overwrites the message the response_url belongs to
+    (right for a slash command's own ephemeral reply). For a button click on a
+    *posted channel message*, pass ``replace_original=False`` — otherwise the
+    ephemeral nudge would clobber the shared approval message for everyone.
+    """
     import httpx
 
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             await client.post(
                 response_url,
-                json={"response_type": "ephemeral", "replace_original": True, "text": text},
+                json={
+                    "response_type": "ephemeral",
+                    "replace_original": replace_original,
+                    "text": text,
+                },
             )
     except Exception:  # noqa: BLE001
         pass

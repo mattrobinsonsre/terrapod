@@ -860,7 +860,11 @@ class SlackConfig(BaseModel):
     )
     default_channel: str = Field(
         default="",
-        description="Channel for the connectivity check / fallback posts (e.g. #integration).",
+        description=(
+            "Channel for the startup connectivity check only (e.g. #integration). "
+            "Run notifications are opt-in per workspace via the workspace's own "
+            "slack_channel — there is deliberately no deployment-wide fan-out here."
+        ),
     )
     # --- secrets: delivered via secretKeyRef → env, never rendered to the ConfigMap ---
     bot_token: str = Field(default="", description="Bot User OAuth Token (xoxb-…)")

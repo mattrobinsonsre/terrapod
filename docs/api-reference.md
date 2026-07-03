@@ -369,6 +369,7 @@ Workspaces carry two attributes that govern the optional AI plan-summary feature
 |---|---|---|---|
 | `ai-summary-mode` | string | `"default"` | Per-workspace override. One of `"default"` (follow the global toggle), `"enabled"` (always summarise this workspace's plans), or `"disabled"` (never summarise this workspace — overrides global). |
 | `ai-summary-context` | string | `""` | Free text up to 4000 characters appended to the model's prompt as workspace-specific facts (e.g. "Fronts the vault for service X — destroying the KMS key causes a global outage."). Additive to the deployment-wide `fleet_context`. |
+| `slack-channel` | string | `""` | Opt-in Slack channel (name or ID) this workspace's run notifications post to (#556) — approval requests, applies, errors, drift. Empty = silent (there is no deployment-wide fan-out). Only effective when the Slack app is enabled server-side (`api.config.slack.enabled`). See [slack-integration.md](slack-integration.md). |
 
 422 errors:
 - `ai-summary-mode` outside the enum

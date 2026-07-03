@@ -226,6 +226,14 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"slack_channel": schema.StringAttribute{
+				Description: "Slack channel this workspace's run notifications post to (#556) — approval / applied / errored / drift. Opt-in: leave empty and the workspace stays silent (there is no deployment-wide fan-out). Requires the Slack app to be enabled server-side.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"remote_state_consumers": schema.SetAttribute{
 				Description: "Workspace IDs authorized to read this workspace's state via `terraform_remote_state` (#344). Optional + Computed: leave null to opt out of managing the set here (server side is left intact — useful when consumers are managed via standalone `terrapod_remote_state_consumer` resources elsewhere). Set to `[]` to explicitly remove all consumers. **Do not mix this attribute with standalone `terrapod_remote_state_consumer` resources targeting the same producer** — the two will drift on every plan and fight each other. Mutations require admin/write on this (producer) workspace; a consumer team cannot self-grant.",
 				Optional:    true,
@@ -610,6 +618,9 @@ func buildCreateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.AISummaryContext.IsNull() && !m.AISummaryContext.IsUnknown() {
 		req.AISummaryContext = m.AISummaryContext.ValueString()
 	}
+	if !m.SlackChannel.IsNull() && !m.SlackChannel.IsUnknown() {
+		req.SlackChannel = m.SlackChannel.ValueString()
+	}
 	return req, diags
 }
 
@@ -722,6 +733,10 @@ func buildUpdateWorkspaceRequest(ctx context.Context, m *workspaceModel) (terrap
 	if !m.AISummaryContext.IsNull() && !m.AISummaryContext.IsUnknown() {
 		v := m.AISummaryContext.ValueString()
 		req.AISummaryContext = &v
+	}
+	if !m.SlackChannel.IsNull() && !m.SlackChannel.IsUnknown() {
+		v := m.SlackChannel.ValueString()
+		req.SlackChannel = &v
 	}
 	return req, diags
 }
@@ -861,6 +876,7 @@ func readWorkspaceIntoModel(ctx context.Context, ws *terrapod.Workspace, m *work
 		m.AISummaryMode = types.StringValue("default")
 	}
 	m.AISummaryContext = types.StringValue(ws.AISummaryContext)
+	m.SlackChannel = types.StringValue(ws.SlackChannel)
 
 	// Var files — same null-vs-empty rule as trigger_prefixes above.
 	if m.VarFiles.IsNull() && len(ws.VarFiles) == 0 {

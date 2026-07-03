@@ -49,6 +49,7 @@ type workspaceDataSourceModel struct {
 	PlanExpirySeconds             types.Int64  `tfsdk:"plan_expiry_seconds"`
 	AISummaryMode                 types.String `tfsdk:"ai_summary_mode"`
 	AISummaryContext              types.String `tfsdk:"ai_summary_context"`
+	SlackChannel                  types.String `tfsdk:"slack_channel"`
 	OwnerEmail                    types.String `tfsdk:"owner_email"`
 	DriftStatus                   types.String `tfsdk:"drift_status"`
 	DriftLastCheckedAt            types.String `tfsdk:"drift_last_checked_at"`
@@ -103,6 +104,7 @@ func (d *workspaceDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"plan_expiry_seconds":              computedInt64("Per-workspace plan expiry TTL in seconds (#646); null/0 = disabled."),
 			"ai_summary_mode":                  computedString("Per-workspace AI plan-summary mode: 'default' (follow deployment global), 'enabled' (always summarise), or 'disabled' (never summarise)."),
 			"ai_summary_context":               computedString("Workspace-specific context appended to the AI summariser prompt."),
+			"slack_channel":                    computedString("Opt-in Slack channel for this workspace's run notifications (#556); empty = silent."),
 			"owner_email":                      computedString("Owner email."),
 			"drift_status":                     computedString("Drift status."),
 			"drift_last_checked_at":            computedString("Last drift check."),
@@ -185,6 +187,7 @@ func readDataSourceModel(ctx context.Context, res *terrapod.Resource, m *workspa
 	}
 	m.AISummaryMode = types.StringValue(mode)
 	m.AISummaryContext = types.StringValue(terrapod.GetStringAttr(res, "ai-summary-context"))
+	m.SlackChannel = types.StringValue(terrapod.GetStringAttr(res, "slack-channel"))
 
 	setOptionalString(&m.TerraformVersion, terrapod.GetStringAttr(res, "terraform-version"))
 	m.TerragruntEnabled = types.BoolValue(terrapod.GetBoolAttr(res, "terragrunt-enabled"))

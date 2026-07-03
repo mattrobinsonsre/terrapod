@@ -400,8 +400,10 @@ class Workspace(Base):
     state_diverged: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
     # Slack app run notifications (#556): channel this workspace's interactive
-    # approval / auto-apply / drift messages post to. Empty → fall back to the
-    # config-level `slack.default_channel`. Only used when the Slack app is enabled.
+    # approval / auto-apply / errored / drift messages post to. Opt-in — empty
+    # means this workspace posts NOTHING; there is no config-level fan-out
+    # (`slack.default_channel` is only the connectivity check). Only used when
+    # the Slack app is enabled.
     slack_channel: Mapped[str] = mapped_column(String(128), nullable=False, server_default="")
 
     # AI plan summary (#401). `ai_summary_mode` is a three-state opt-in:

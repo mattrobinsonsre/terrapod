@@ -69,6 +69,7 @@ def _mock_workspace(ws_id=None, pool_id=None):
     ws.autodiscovery_pr_number = None
     ws.ai_summary_mode = "default"
     ws.ai_summary_context = ""
+    ws.slack_channel = ""
     ws.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     ws.updated_at = datetime(2026, 1, 1, tzinfo=UTC)
     return ws
