@@ -76,7 +76,7 @@ class TestLinkAccount:
     @patch("terrapod.api.app.init_redis")
     @patch("terrapod.api.app.init_db")
     async def test_link_happy_binds_current_user(self, _idb, _ir, _is, verify, create):
-        verify.return_value = ("T123", "U456")
+        verify.return_value = ("T123", "U456", "")
         create.return_value = _fake_link("alice@example.com")
         app, _db = _make_app(_user("alice@example.com"))
         async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:

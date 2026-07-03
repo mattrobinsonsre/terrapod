@@ -45,13 +45,21 @@ async def link_account(
     if not state:
         raise HTTPException(status_code=422, detail="Missing link state")
     try:
-        team_id, slack_user_id = await slack_link_service.verify_and_consume_state(state)
+        team_id, slack_user_id, response_url = await slack_link_service.verify_and_consume_state(
+            state
+        )
     except slack_link_service.LinkStateError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     link = await slack_link_service.create_link(
         db, team_id=team_id, user_id=slack_user_id, email=user.email
     )
+    # Confirm back in the Slack conversation the /terrapod link came from, so the
+    # user gets closure in Slack (not only in the browser). Best-effort.
+    if response_url:
+        await slack_link_service.post_response_url(
+            response_url, f":white_check_mark: Linked to Terrapod as *{user.email}*."
+        )
     return JSONResponse(content={"data": _link_json(link)})
 
 

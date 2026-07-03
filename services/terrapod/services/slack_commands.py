@@ -23,10 +23,10 @@ def _connect_url(state: str) -> str:
     return f"{base}/slack/link?state={state}"
 
 
-async def _handle_link(team_id: str, user_id: str) -> dict:
+async def _handle_link(team_id: str, user_id: str, response_url: str = "") -> dict:
     from terrapod.services.slack_link_service import mint_link_state
 
-    url = _connect_url(await mint_link_state(team_id, user_id))
+    url = _connect_url(await mint_link_state(team_id, user_id, response_url))
     return {
         "response_type": "ephemeral",
         "blocks": [
@@ -89,12 +89,14 @@ async def _handle_unlink(team_id: str, user_id: str) -> dict:
     return {"response_type": "ephemeral", "text": "You had no Terrapod link to remove."}
 
 
-async def build_slash_response(text: str, team_id: str, user_id: str) -> dict:
+async def build_slash_response(
+    text: str, team_id: str, user_id: str, response_url: str = ""
+) -> dict:
     """Dispatch a `/terrapod <sub>` command to an ephemeral response payload."""
     parts = (text or "").strip().split()
     sub = parts[0].lower() if parts else "help"
     if sub == "link":
-        return await _handle_link(team_id, user_id)
+        return await _handle_link(team_id, user_id, response_url)
     if sub == "status":
         return await _handle_status(team_id, user_id)
     if sub == "unlink":
@@ -128,7 +130,10 @@ async def handle_socket_request(client, req) -> None:
 
     try:
         response = await build_slash_response(
-            payload.get("text", ""), payload.get("team_id", ""), payload.get("user_id", "")
+            payload.get("text", ""),
+            payload.get("team_id", ""),
+            payload.get("user_id", ""),
+            payload.get("response_url", ""),
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning("slack.slash_command_failed", err=str(exc))

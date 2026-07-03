@@ -16,17 +16,18 @@ class FakeRedis:
         self.store[k] = v
         return True
 
-    async def delete(self, k):
-        return 1 if self.store.pop(k, None) is not None else 0
+    async def getdel(self, k):
+        return self.store.pop(k, None)
 
 
 @pytest.mark.asyncio
 async def test_state_roundtrip_and_single_use():
     fake = FakeRedis()
     with patch("terrapod.redis.client.get_redis_client", return_value=fake):
-        state = await svc.mint_link_state("T123", "U456")
-        team, user = await svc.verify_and_consume_state(state)
+        state = await svc.mint_link_state("T123", "U456", "https://hooks.slack/resp")
+        team, user, response_url = await svc.verify_and_consume_state(state)
         assert (team, user) == ("T123", "U456")
+        assert response_url == "https://hooks.slack/resp"
         # Nonce is burned — a replay must fail.
         with pytest.raises(svc.LinkStateError):
             await svc.verify_and_consume_state(state)

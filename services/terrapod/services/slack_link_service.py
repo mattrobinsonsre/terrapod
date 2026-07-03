@@ -53,22 +53,34 @@ def _sign(payload_b64: str) -> str:
     return _b64u(sig)
 
 
-async def mint_link_state(team_id: str, user_id: str) -> str:
-    """Mint a signed, single-use state token binding this Slack (team, user)."""
+async def mint_link_state(team_id: str, user_id: str, response_url: str = "") -> str:
+    """Mint a signed, single-use state token binding this Slack (team, user).
+
+    The originating slash command's ``response_url`` is stashed under the nonce so
+    the link-completion handler can post a confirmation back to the same Slack
+    conversation — no extra Slack scope needed.
+    """
     nonce = uuid.uuid4().hex
     payload = {"t": team_id, "u": user_id, "n": nonce, "exp": int(time.time()) + _STATE_TTL_SECONDS}
     payload_b64 = _b64u(json.dumps(payload, separators=(",", ":")).encode())
     token = f"{payload_b64}.{_sign(payload_b64)}"
 
     # Register the nonce for single-use redemption (TTL mirrors the token expiry).
+    # Value is the response_url ("-" sentinel when absent).
     from terrapod.redis.client import get_redis_client
 
-    await get_redis_client().set(f"{_NONCE_PREFIX}{nonce}", "1", ex=_STATE_TTL_SECONDS)
+    await get_redis_client().set(
+        f"{_NONCE_PREFIX}{nonce}", response_url or "-", ex=_STATE_TTL_SECONDS
+    )
     return token
 
 
-async def verify_and_consume_state(state: str) -> tuple[str, str]:
-    """Verify signature + expiry and BURN the nonce (single use). Returns (team, user)."""
+async def verify_and_consume_state(state: str) -> tuple[str, str, str]:
+    """Verify signature + expiry and BURN the nonce (single use).
+
+    Returns ``(team_id, user_id, response_url)`` — response_url is "" when none was
+    captured at mint time.
+    """
     try:
         payload_b64, sig = state.split(".", 1)
     except ValueError as exc:
@@ -88,12 +100,30 @@ async def verify_and_consume_state(state: str) -> tuple[str, str]:
     nonce = payload.get("n", "")
     from terrapod.redis.client import get_redis_client
 
-    # Atomic single-use: only the first redemption finds the nonce present.
-    burned = await get_redis_client().delete(f"{_NONCE_PREFIX}{nonce}")
-    if not burned:
+    # Atomic single-use: GETDEL returns the stored value (response_url) and removes
+    # the nonce in one op; a second redemption finds nothing.
+    stored = await get_redis_client().getdel(f"{_NONCE_PREFIX}{nonce}")
+    if stored is None:
         raise LinkStateError("link state already used or expired")
+    if isinstance(stored, bytes):
+        stored = stored.decode()
+    response_url = "" if stored == "-" else stored
 
-    return str(payload["t"]), str(payload["u"])
+    return str(payload["t"]), str(payload["u"]), response_url
+
+
+async def post_response_url(response_url: str, text: str) -> None:
+    """Best-effort follow-up to a Slack slash-command response_url (no scope needed)."""
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.post(
+                response_url,
+                json={"response_type": "ephemeral", "replace_original": True, "text": text},
+            )
+    except Exception:  # noqa: BLE001
+        pass
 
 
 async def create_link(
