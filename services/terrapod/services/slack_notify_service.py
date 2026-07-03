@@ -44,12 +44,30 @@ ACTION_APPROVE = "terrapod_run_approve"
 ACTION_DISCARD = "terrapod_run_discard"
 
 
-async def enqueue_slack_notify(run, trigger: str) -> None:
+# Events whose message carries a *freshly generated* AI review (the plan
+# summary / failure analysis). When AI is enabled, we defer these until the
+# summary settles so the message carries the review from its first post — the
+# summariser re-fires them with `_from_summariser=True`. `completed` is NOT here
+# (its summary is the plan summary, already ready by apply time), nor is
+# `drift_detected` (it has a suppress-no-changes gate that lives in the drift
+# handler, so it must fire from there).
+_AI_DEFERRABLE = frozenset({"run:needs_attention", "run:errored"})
+
+
+async def enqueue_slack_notify(run, trigger: str, *, _from_summariser: bool = False) -> None:
     """Enqueue a Slack run notification. Called alongside the existing
     notification-deliver enqueue; the handler no-ops if the workspace hasn't
-    opted in, so this is safe to fire unconditionally for the four triggers."""
+    opted in, so this is safe to fire unconditionally for the four triggers.
+
+    When AI plan summaries are enabled, the fresh-AI events are deferred to the
+    summariser's completion (see `_AI_DEFERRABLE`) so the message includes the
+    review from the first post rather than racing it."""
     if trigger not in _SLACK_TRIGGERS:
         return
+    from terrapod.config import settings
+
+    if not _from_summariser and settings.ai_summary.enabled and trigger in _AI_DEFERRABLE:
+        return  # the summariser will re-fire this once the AI review settles
     from terrapod.services.scheduler import enqueue_trigger
 
     try:

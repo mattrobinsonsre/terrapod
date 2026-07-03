@@ -1152,13 +1152,51 @@ async def _upsert_summary(
     await db.execute(stmt)
 
 
+def _slack_trigger_for(run, kind: str) -> str | None:
+    """Which deferred Slack event this run's *settled* AI summary should fire
+    (#556). Only the fresh-AI, always-posted events — needs_attention and
+    errored. Drift / auto-apply / plan-only return None (drift posts from its
+    own handler with a no-changes gate; the rest aren't approval events)."""
+    if kind == "failure_analysis":
+        return "run:errored"
+    if getattr(run, "is_drift_detection", False):
+        return None
+    if run.status == "planned" and not run.auto_apply and not run.plan_only:
+        return "run:needs_attention"
+    return None
+
+
 async def handle_ai_plan_summary(payload: dict) -> None:
-    """Triggered handler: summarise (or analyse the failure of) one plan.
+    """Triggered handler: summarise a plan, then fire any deferred Slack post.
 
     Payload: ``{"run_id": "<uuid>", "kind": "plan_summary" | "failure_analysis"}``.
     Enqueued from ``run_service.transition_run`` on plan-phase terminal
     transitions when the feature is globally enabled.
+
+    The deferred Slack post (#556) is fired in a ``finally`` so a slow or failed
+    model never blocks the approval message: as soon as the summary settles
+    (ready OR errored), the deferred needs_attention/errored message posts with
+    the review included.
     """
+    holder: dict = {}
+    try:
+        await _summarise_one(payload, holder)
+    finally:
+        run_stub = holder.get("run")
+        trigger = holder.get("trigger")
+        if run_stub is not None and trigger:
+            try:
+                from terrapod.services.slack_notify_service import enqueue_slack_notify
+
+                await enqueue_slack_notify(run_stub, trigger, _from_summariser=True)
+            except Exception as e:  # noqa: BLE001
+                logger.debug("slack notify after summary failed", error=str(e))
+
+
+async def _summarise_one(payload: dict, _slack: dict) -> None:
+    """The summarisation body. Populates ``_slack`` with the deferred Slack
+    target (a run stub + trigger) as soon as the run is loaded, so the wrapper's
+    ``finally`` can post even if summarisation raises."""
     cfg = settings.ai_summary
     if not cfg.enabled:
         return
@@ -1184,6 +1222,14 @@ async def handle_ai_plan_summary(payload: dict) -> None:
         ).scalar_one_or_none()
         if ws is None:
             return
+
+        # Capture the deferred Slack target now, while the run is loaded and
+        # fresh, so the wrapper's `finally` can post regardless of how
+        # summarisation ends (#556).
+        from types import SimpleNamespace
+
+        _slack["run"] = SimpleNamespace(id=str(run.id), workspace_id=str(run.workspace_id))
+        _slack["trigger"] = _slack_trigger_for(run, kind)
 
         # Upsert a `pending` row + emit `plan_summary_pending` so the UI
         # shows a placeholder from the moment the handler starts (#463

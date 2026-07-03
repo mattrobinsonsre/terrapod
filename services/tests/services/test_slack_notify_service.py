@@ -55,6 +55,49 @@ async def test_enqueue_passes_the_four_slack_triggers():
 
 
 @pytest.mark.asyncio
+async def test_ai_enabled_defers_needs_attention_and_errored():
+    """With AI on, the fresh-AI events are deferred to the summariser; the
+    immediate events (completed/drift) still enqueue."""
+    enq = AsyncMock()
+    with (
+        patch.object(settings.ai_summary, "enabled", True),
+        patch("terrapod.services.scheduler.enqueue_trigger", enq),
+    ):
+        await sn.enqueue_slack_notify(_run(), "run:needs_attention")
+        await sn.enqueue_slack_notify(_run(), "run:errored")
+        await sn.enqueue_slack_notify(_run(), "run:completed")
+        await sn.enqueue_slack_notify(_run(), "run:drift_detected")
+    assert enq.await_count == 2  # only completed + drift_detected
+    triggers = {c.args[1]["trigger"] for c in enq.await_args_list}
+    assert triggers == {"run:completed", "run:drift_detected"}
+
+
+@pytest.mark.asyncio
+async def test_summariser_bypass_re_fires_deferred_event():
+    """The summariser re-fires the deferred event via _from_summariser=True."""
+    enq = AsyncMock()
+    with (
+        patch.object(settings.ai_summary, "enabled", True),
+        patch("terrapod.services.scheduler.enqueue_trigger", enq),
+    ):
+        await sn.enqueue_slack_notify(_run(), "run:needs_attention", _from_summariser=True)
+    enq.assert_awaited_once()
+    assert enq.await_args.args[1]["trigger"] == "run:needs_attention"
+
+
+@pytest.mark.asyncio
+async def test_ai_disabled_enqueues_everything_immediately():
+    enq = AsyncMock()
+    with (
+        patch.object(settings.ai_summary, "enabled", False),
+        patch("terrapod.services.scheduler.enqueue_trigger", enq),
+    ):
+        for t in ("run:needs_attention", "run:errored", "run:completed", "run:drift_detected"):
+            await sn.enqueue_slack_notify(_run(), t)
+    assert enq.await_count == 4
+
+
+@pytest.mark.asyncio
 async def test_needs_attention_message_has_approve_discard_buttons():
     db = _fake_db_no_ai()
     run = _run()

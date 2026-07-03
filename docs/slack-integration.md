@@ -184,6 +184,12 @@ deliberately suppressed to keep channels quiet. Deep links in every message use
 the external users' URL (`external_url`) only — never an internal machine-to-
 machine host — and are omitted if `external_url` is unset.
 
+**AI review timing:** where AI plan summaries are enabled, the *needs-approval*
+and *errored* messages **wait for the AI review to finish** before posting, so
+it's in the message from the first post rather than racing it. The wait is
+bounded by the model call's own timeout (the summary always settles), and if the
+model is disabled or fails the message still posts — just without the review.
+
 ### Approving from Slack (RBAC)
 
 Clicking **Approve** / **Discard** carries no standing permission. Every click is
