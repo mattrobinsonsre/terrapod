@@ -28,6 +28,16 @@ from terrapod.services import execution_hook_service
 router = APIRouter(tags=["execution-hooks"])
 
 
+def _coerce_priority(raw) -> int:
+    """Parse the priority attribute, returning 422 (not 500) on non-numeric input."""
+    try:
+        return int(raw or 0)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=422, detail="Execution hook priority must be an integer"
+        ) from exc
+
+
 def _rfc3339(dt) -> str:
     if dt is None:
         return ""
@@ -113,8 +123,8 @@ async def create_hook(
         description=attrs.get("description", ""),
         hook_point=hook_point,
         script=attrs.get("script", ""),
-        enabled=attrs.get("enabled", True),
-        priority=int(attrs.get("priority", 0) or 0),
+        enabled=bool(attrs.get("enabled", True)),
+        priority=_coerce_priority(attrs.get("priority", 0)),
     )
     db.add(hook)
     try:
@@ -164,7 +174,7 @@ async def update_hook(
     if "enabled" in attrs:
         hook.enabled = bool(attrs["enabled"])
     if "priority" in attrs:
-        hook.priority = int(attrs["priority"] or 0)
+        hook.priority = _coerce_priority(attrs["priority"])
 
     try:
         await db.commit()
@@ -213,8 +223,17 @@ async def add_hook_workspaces(
                 ExecutionHookWorkspace.workspace_id == ws_uuid,
             )
         )
-        if existing.scalar_one_or_none() is None:
-            db.add(ExecutionHookWorkspace(hook_id=hook.id, workspace_id=ws_uuid))
+        if existing.scalar_one_or_none() is not None:
+            continue
+        # Insert inside a SAVEPOINT so a concurrent request that created the same
+        # (hook, workspace) pair between our SELECT and INSERT is absorbed
+        # idempotently (409-worthy in general, but this endpoint is idempotent by
+        # contract) without a 500 or poisoning the rest of the batch.
+        try:
+            async with db.begin_nested():
+                db.add(ExecutionHookWorkspace(hook_id=hook.id, workspace_id=ws_uuid))
+        except IntegrityError:
+            pass
     await db.commit()
 
 

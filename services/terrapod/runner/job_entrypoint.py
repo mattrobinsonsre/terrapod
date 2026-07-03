@@ -329,6 +329,18 @@ def _run_plan_phase(
         except Exception as exc:  # noqa: BLE001
             log.warning("plan-json upload raised (non-fatal)", err=str(exc))
 
+    # post_plan execution hooks (#619) — after a successful plan and after its
+    # artifacts (plan file + show-json) are uploaded, so the hook can inspect
+    # the plan and the plan is visible in the UI regardless of the gate result.
+    # Runs last in the plan phase (mirroring post_apply): a failing hook returns
+    # non-zero, which errors the run and — for a plan+apply run — prevents the
+    # apply, the same way an OPA mandatory-set denial does.
+    try:
+        execution_hooks.run_point("post_plan", env=os.environ.copy())
+    except execution_hooks.HookError as exc:
+        log.error("post_plan hook failed", hook=exc.name, rc=exc.exit_code)
+        return exc.exit_code
+
     return 0
 
 

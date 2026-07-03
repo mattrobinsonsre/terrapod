@@ -41,8 +41,9 @@ run is marked errored with an "apply succeeded; post-apply hook failed" message
 ## Security
 
 A hook is operator-supplied shell that runs with the **runner's cloud identity**
-and can read the run's environment (including resolved variables). The trust
-boundary is the same as "who can run `terraform` here", so:
+and can read the run's environment — including resolved workspace variables
+(env-category secrets among them) and the short-lived runner API token. The
+trust boundary is the same as "who can run `terraform` here", so:
 
 - Managing hooks and their associations requires platform **`admin`**.
 - Every hook create/edit/associate is **audit-logged**.

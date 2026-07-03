@@ -327,3 +327,78 @@ class TestApplyPhaseExecutionHooks:
         assert rc == 3, "pre_apply failure errors the run"
         run_apply.assert_not_called()  # nothing applied
         up.assert_not_called()  # no state touched
+
+
+class TestPlanPhaseExecutionHooks:
+    """post_plan hook semantics (#619): a post_plan hook must actually be
+    invoked in the plan phase (regression for it being accepted+delivered but
+    never executed), and a failing post_plan hook must error the run — which,
+    for a plan+apply run, prevents the apply, mirroring an OPA denial. The plan
+    artifacts are finalized (plan-result posted) BEFORE the gate runs, so the
+    plan is visible in the UI regardless of the gate result."""
+
+    def _cfg(self):
+        from unittest.mock import MagicMock
+
+        cfg = MagicMock()
+        cfg.has_api = False  # skip lock-splice / plan-artifacts / upload blocks
+        cfg.plan_only = False
+        return cfg
+
+    def _plan_result(self):
+        from unittest.mock import MagicMock
+
+        pr = MagicMock()
+        pr.exit_code = 0
+        pr.has_changes = True
+        return pr
+
+    def test_post_plan_hook_invoked_and_failure_errors_run(self, tmp_path) -> None:
+        from unittest.mock import patch
+
+        from terrapod.runner.phases import execution_hooks as eh
+
+        points: list[str] = []
+
+        def _run_point(point, env=None):
+            points.append(point)
+            if point == "post_plan":
+                raise eh.HookError("post_plan", "gate denied", 7)
+
+        with (
+            patch.object(job_entrypoint.plan_apply, "run_plan", return_value=self._plan_result()),
+            patch.object(job_entrypoint.opa, "evaluate_policies"),
+            patch.object(job_entrypoint.uploads, "post_plan_result") as ppr,
+            patch.object(job_entrypoint.uploads, "upload_plan_json"),
+            patch.object(job_entrypoint.execution_hooks, "run_point", side_effect=_run_point),
+        ):
+            rc = job_entrypoint._run_plan_phase(
+                self._cfg(), binary="tofu", var_file_argv=[], strip_dir=tmp_path, child_grace=1.0
+            )
+
+        assert rc == 7, "a failing post_plan hook errors the run with its exit code"
+        assert "post_plan" in points, "post_plan hook must actually be invoked (#619 regression)"
+        assert points == ["pre_plan", "post_plan"]
+        ppr.assert_called_once()  # plan finalized/visible BEFORE the gate ran
+
+    def test_post_plan_hook_success_returns_zero(self, tmp_path) -> None:
+        from unittest.mock import patch
+
+        points: list[str] = []
+
+        def _run_point(point, env=None):
+            points.append(point)
+
+        with (
+            patch.object(job_entrypoint.plan_apply, "run_plan", return_value=self._plan_result()),
+            patch.object(job_entrypoint.opa, "evaluate_policies"),
+            patch.object(job_entrypoint.uploads, "post_plan_result"),
+            patch.object(job_entrypoint.uploads, "upload_plan_json"),
+            patch.object(job_entrypoint.execution_hooks, "run_point", side_effect=_run_point),
+        ):
+            rc = job_entrypoint._run_plan_phase(
+                self._cfg(), binary="tofu", var_file_argv=[], strip_dir=tmp_path, child_grace=1.0
+            )
+
+        assert rc == 0
+        assert points == ["pre_plan", "post_plan"]

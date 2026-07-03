@@ -99,6 +99,17 @@ class TestCreateHook:
             r = await c.post(_HOOKS, json=body, headers=_AUTH)
         assert r.status_code == 403
 
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_non_numeric_priority_422(self, *_mocks) -> None:
+        # A non-numeric priority must be a 422 (client error), never a 500.
+        app, _db = _make_app(_user())
+        body = {"data": {"attributes": {"name": "x", "hook-point": "pre_init", "priority": "high"}}}
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            r = await c.post(_HOOKS, json=body, headers=_AUTH)
+        assert r.status_code == 422
+
 
 class TestListHooks:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
