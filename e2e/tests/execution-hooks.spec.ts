@@ -47,7 +47,8 @@ test.describe('Execution Hooks', () => {
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.locator('text=Execution hook updated')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('dd:has-text("post_apply")')).toBeVisible();
-    await expect(page.locator('dd:has-text("7")')).toBeVisible();
+    // Exact match: the name dd carries a timestamp that can also contain "7".
+    await expect(page.locator('dd').filter({ hasText: /^7$/ })).toBeVisible();
 
     // Delete from the Settings tab.
     await page.click('button:has-text("Delete")');
