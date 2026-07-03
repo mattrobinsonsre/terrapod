@@ -132,6 +132,28 @@ If all three are true, the connection is live.
 
 ---
 
+## Account linking (`/terrapod`)
+
+Before anyone can act on runs from Slack (approve/discard, later), their Slack
+identity must be linked to their Terrapod identity. This is a **one-time,
+explicit login** — Slack membership alone never implies Terrapod permission.
+
+From any channel the bot is in:
+
+- **`/terrapod link`** — Terrapod replies (only to you) with a *Connect your
+  Terrapod account* button. Click it, log in to Terrapod as you normally would,
+  and the binding is recorded. The link is **single-use and expires in 10
+  minutes**.
+- **`/terrapod status`** — shows whether you're linked, and as whom.
+- **`/terrapod unlink`** — removes your binding.
+
+The binding is durable **identity**, not permission: every future Slack action
+re-checks your Terrapod RBAC live, so a link never grants standing access, and if
+your Terrapod permissions change the next action reflects it immediately. You can
+also view/remove your links from the Terrapod web UI. Under the hood the connect
+link carries a Terrapod-signed, single-use token, so no one can forge a binding
+for someone else's Slack id.
+
 ## Reference
 
 **Helm values** (`api.config.slack`):

@@ -64,6 +64,11 @@ async def start_slack(settings) -> None:
     web = AsyncWebClient(token=cfg.bot_token)
     _socket_client = SocketModeClient(app_token=cfg.app_token, web_client=web)
 
+    # Dispatch /terrapod slash commands (+ ack interactions) over the socket (#556).
+    from terrapod.services.slack_commands import handle_socket_request
+
+    _socket_client.socket_mode_request_listeners.append(handle_socket_request)
+
     try:
         await _socket_client.connect()
     except Exception as exc:  # noqa: BLE001
