@@ -11,8 +11,8 @@
     "slash_commands": [
       {
         "command": "/terrapod",
-        "description": "Query workspaces, runs, and pending approvals",
-        "usage_hint": "status | runs | approvals",
+        "description": "Link your Terrapod account and check link status",
+        "usage_hint": "link | status | unlink",
         "should_escape": false
       }
     ]
@@ -22,7 +22,8 @@
       "bot": [
         "chat:write",
         "chat:write.public",
-        "commands"
+        "commands",
+        "files:write"
       ]
     }
   },

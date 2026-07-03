@@ -508,7 +508,6 @@ api:
     slack:
       enabled: false
       socket_mode: true              # false → Request-URL mode (needs webhook ingress)
-      default_channel: ""            # e.g. "#integration" — connectivity check / fallback
       existingSecret: ""             # K8s Secret holding the three tokens
       existingSecretKeys:            # keys within that Secret
         botToken: bot-token

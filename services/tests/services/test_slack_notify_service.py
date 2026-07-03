@@ -61,7 +61,6 @@ async def test_needs_attention_message_has_approve_discard_buttons():
     ws = SimpleNamespace(id="ws-1", name="prod")
     with patch.object(settings, "external_url", "https://terrapod.example.com"):
         msg = await sn._build_message(db, run, ws, "run:needs_attention")
-    assert msg["interactive"] is True
     action_blocks = [b for b in msg["blocks"] if b.get("type") == "actions"]
     assert action_blocks, "needs_attention must carry an actions block"
     action_ids = {e["action_id"] for e in action_blocks[0]["elements"]}
@@ -78,7 +77,6 @@ async def test_terminal_messages_have_no_buttons():
     for trigger in ("run:completed", "run:errored", "run:drift_detected"):
         with patch.object(settings, "external_url", "https://terrapod.example.com"):
             msg = await sn._build_message(db, run, ws, trigger)
-        assert msg["interactive"] is False
         assert not [b for b in msg["blocks"] if b.get("type") == "actions"]
 
 
@@ -142,3 +140,74 @@ async def test_handler_noop_when_slack_disabled():
             {"run_id": "run-1", "workspace_id": "ws-1", "trigger": "run:needs_attention"}
         )
     bot.chat_postMessage.assert_not_called()
+
+
+def _db_cm(run, ws):
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = None  # no AI summary
+
+    class CM:
+        async def __aenter__(self):
+            return SimpleNamespace(
+                get=AsyncMock(side_effect=[run, ws]), execute=AsyncMock(return_value=result)
+            )
+
+        async def __aexit__(self, *a):
+            return False
+
+    return CM()
+
+
+@pytest.mark.asyncio
+async def test_needs_attention_posts_parent_stores_ref_and_threads_plan():
+    run = _run()
+    ws = SimpleNamespace(id="ws-1", name="prod", slack_channel="#deploys")
+    bot = MagicMock()
+    bot.chat_postMessage = AsyncMock(return_value={"ok": True, "channel": "C1", "ts": "111.2"})
+    redis = SimpleNamespace(
+        hset=AsyncMock(), expire=AsyncMock(), hgetall=AsyncMock(return_value={})
+    )
+    upload = AsyncMock()
+    with (
+        patch.object(settings.slack, "enabled", True),
+        patch.object(settings.slack, "bot_token", "xoxb-x"),
+        patch("terrapod.db.session.get_db_session", return_value=_db_cm(run, ws)),
+        patch("terrapod.redis.client.get_redis_client", return_value=redis),
+        patch("terrapod.services.slack_notify_service._bot_client", return_value=bot),
+        patch("terrapod.services.slack_notify_service._upload_plan_file", upload),
+    ):
+        await sn.handle_slack_run_notify(
+            {"run_id": "run-1", "workspace_id": "ws-1", "trigger": "run:needs_attention"}
+        )
+    # parent posted (top-level, not threaded), msgref stored, plan threaded under it
+    assert bot.chat_postMessage.await_args.kwargs.get("thread_ts") is None
+    redis.hset.assert_awaited_once()
+    assert redis.hset.await_args.kwargs["mapping"] == {"channel": "C1", "ts": "111.2"}
+    upload.assert_awaited_once()
+    assert upload.await_args.kwargs.get("thread_ts") == "111.2"
+
+
+@pytest.mark.asyncio
+async def test_completed_threads_under_the_approval_parent():
+    run = _run()
+    ws = SimpleNamespace(id="ws-1", name="prod", slack_channel="#deploys")
+    bot = MagicMock()
+    bot.chat_postMessage = AsyncMock(return_value={"ok": True, "channel": "C1", "ts": "999.9"})
+    # parent approval message exists in the ref
+    redis = SimpleNamespace(hgetall=AsyncMock(return_value={"channel": "C1", "ts": "111.2"}))
+    upload = AsyncMock()
+    with (
+        patch.object(settings.slack, "enabled", True),
+        patch.object(settings.slack, "bot_token", "xoxb-x"),
+        patch("terrapod.db.session.get_db_session", return_value=_db_cm(run, ws)),
+        patch("terrapod.redis.client.get_redis_client", return_value=redis),
+        patch("terrapod.services.slack_notify_service._bot_client", return_value=bot),
+        patch("terrapod.services.slack_notify_service._upload_plan_file", upload),
+    ):
+        await sn.handle_slack_run_notify(
+            {"run_id": "run-1", "workspace_id": "ws-1", "trigger": "run:completed"}
+        )
+    # result threads under the parent (the follow-up ping), no standalone plan upload
+    bot.chat_postMessage.assert_awaited_once()
+    assert bot.chat_postMessage.await_args.kwargs.get("thread_ts") == "111.2"
+    upload.assert_not_awaited()

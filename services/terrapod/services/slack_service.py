@@ -28,9 +28,6 @@ logger = structlog.get_logger(__name__)
 # Module-global handle so the lifespan can disconnect cleanly on shutdown.
 _socket_client = None
 
-_HELLO_DEDUP_KEY = "tp:slack:hello_posted"
-_HELLO_DEDUP_TTL = 300  # seconds — one greeting per deployment start window
-
 
 async def start_slack(settings) -> None:
     """Open the Socket Mode connection if Slack is enabled and configured.
@@ -78,32 +75,15 @@ async def start_slack(settings) -> None:
 
     logger.info("slack.socket_mode_connected")
 
-    if cfg.default_channel:
-        await _post_hello(web, cfg.default_channel)
-
-
-async def _post_hello(web, channel: str) -> None:
-    """Post a one-time connectivity check, de-duplicated across replicas."""
+    # Connectivity check — verify the bot token via `auth.test`, logged only.
+    # We deliberately do NOT post a "connected" message to any channel: the API
+    # restarts routinely, and a startup banner in a shared channel is pure noise.
+    # The Socket Mode connect above already validated the app-level token.
     try:
-        from terrapod.redis.client import get_redis_client
-
-        redis = get_redis_client()
-        # Only the replica that wins the SET NX greets the channel.
-        won = await redis.set(_HELLO_DEDUP_KEY, "1", nx=True, ex=_HELLO_DEDUP_TTL)
-        if not won:
-            return
+        auth = await web.auth_test()
+        logger.info("slack.bot_authenticated", team=auth.get("team"), bot_user=auth.get("user"))
     except Exception as exc:  # noqa: BLE001
-        # If Redis is unavailable, greet anyway (dev/single-replica) — the
-        # connectivity check matters more than perfect de-duplication.
-        logger.debug("slack.hello_dedup_unavailable", err=str(exc))
-
-    try:
-        await web.chat_postMessage(
-            channel=channel,
-            text=":white_check_mark: Terrapod is connected to Slack (Socket Mode).",
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("slack.hello_post_failed", channel=channel, err=str(exc))
+        logger.warning("slack.bot_auth_test_failed", err=str(exc))
 
 
 async def stop_slack() -> None:

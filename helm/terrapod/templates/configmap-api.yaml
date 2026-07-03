@@ -300,7 +300,6 @@ data:
       # never rendered here.
       enabled: {{ .Values.api.config.slack.enabled }}
       socket_mode: {{ .Values.api.config.slack.socket_mode }}
-      default_channel: {{ .Values.api.config.slack.default_channel | default "" | quote }}
     {{- end }}
     {{- if .Values.api.config.notifications }}
     notifications:

@@ -165,19 +165,19 @@ Run notifications are **opt-in per workspace** — set the workspace's **Slack
 channel** (Workspace → Settings → *Slack notifications*, the `slack-channel` API
 attribute, or `slack_channel` on the `terrapod_workspace` resource) and that
 workspace posts to it. Leave it empty and the workspace stays silent. There is
-**no deployment-wide fan-out**: `slack.default_channel` is only the startup
-connectivity check, never a fallback for run traffic — so a channel receives
-traffic solely because someone pointed a workspace at it. The Slack app must
-already be a member of the channel.
+**no deployment-wide fan-out** — a channel receives traffic solely because
+someone pointed a workspace at it. The Slack app must already be a member of the
+channel (and needs the `files:write` scope to attach plan output — see
+Troubleshooting).
 
-A workspace with a channel set posts on four events, each once:
+Everything about one run lives in **one thread**, so the channel stays quiet:
 
 | Event | Message |
 |---|---|
-| **Needs approval** | A run reached `planned` and is awaiting a manual apply. Interactive **Approve** / **Discard** buttons; the AI review (where enabled) and the plan output (attached as a `.txt` file) ride along. |
-| **Applied** | An apply completed. If the run had an approval message, it's **edited in place** to record the outcome rather than posting anew. |
-| **Errored** | A run errored, with the AI failure analysis (where enabled). |
-| **Drift detected** | A drift-detection run found changes. |
+| **Needs approval** | A run reached `planned` and awaits a manual apply. Posts a **parent** message with interactive **Approve** / **Discard** buttons and the AI review (where enabled); the **plan output** (`.txt`) is attached as a threaded reply. |
+| **Approve / Discard clicked** | The parent is edited to drop the buttons and record **who acted** (*Approved by …*). |
+| **Applied / Errored** | The result threads **under** the approval message as a reply (so approvers get pinged) — with the AI failure analysis on errors. Auto-applied runs (no approval step) post a single standalone message instead. |
+| **Drift detected** | A standalone message with the plan threaded under it. |
 
 Speculative/PR plan-only runs, intermediate states, and drift-with-no-changes are
 deliberately suppressed to keep channels quiet. Deep links in every message use
@@ -221,7 +221,8 @@ edited to record who approved, so a button can't be pressed twice.
 | Symptom | Likely cause |
 |---|---|
 | Bot shows offline; no `slack.socket_mode_connected` log | App-level token missing or lacks `connections:write`; `enabled` false; wrong Secret name. |
-| Connected, but no channel message | Bot not invited to the channel (`/invite @terrapod`), or `defaultChannel` wrong/empty. |
+| A workspace's run notifications never appear | The workspace's **Slack channel** is unset (notifications are opt-in per workspace), or the bot isn't in that channel (`/invite @terrapod`). |
+| Messages post but the plan `.txt` never attaches | The app is missing the **`files:write`** bot scope. Add it under **OAuth & Permissions → Scopes**, then **Reinstall** the app (scope changes require reinstall). Apps created from the current manifest already include it. |
 | `not_in_channel` / `channel_not_found` in logs | Invite the bot to the channel, or use a channel the bot can post to (`chat:write.public` covers public channels). |
 | `invalid_auth` in logs | Bot token wrong or revoked — reinstall the app and update the Secret. |
 | Log shows tokens missing while `enabled: true` | The Secret isn't wired: check `existingSecret` and that the Secret has all three keys. |

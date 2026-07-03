@@ -89,7 +89,6 @@ api:
     slack:
       enabled: true
       socket_mode: true
-      default_channel: "#integration"
       existingSecret: terrapod-slack
     # Fast cert renewal cycle for Tilt — listener cert valid for 5min so the
     # full bootstrap → renew → rotate loop is observable in a few minutes

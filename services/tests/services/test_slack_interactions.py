@@ -64,14 +64,20 @@ def _patches(
         patch("terrapod.services.run_service.confirm_run", confirm or AsyncMock()),
         patch("terrapod.services.run_service.discard_run", discard or AsyncMock()),
         patch("terrapod.services.slack_link_service.post_response_url", nudge or AsyncMock()),
-        patch("terrapod.services.slack_interactions._update_message", update or AsyncMock()),
+        patch("terrapod.services.slack_interactions._resolve_parent", update or AsyncMock()),
     ]
 
 
 @pytest.mark.asyncio
 async def test_unlinked_click_nudges_and_never_mutates():
     """No binding → ephemeral nudge to /terrapod link, run untouched."""
-    run = SimpleNamespace(id="run-1", workspace_id="ws-1")
+    run = SimpleNamespace(
+        id="run-1",
+        workspace_id="ws-1",
+        resource_additions=1,
+        resource_changes=0,
+        resource_destructions=0,
+    )
     ws = SimpleNamespace(id="ws-1", name="prod")
     db = _db_with(run, ws)
     confirm, discard, nudge = AsyncMock(), AsyncMock(), AsyncMock()
@@ -94,7 +100,13 @@ async def test_unlinked_click_nudges_and_never_mutates():
 @pytest.mark.asyncio
 async def test_linked_but_unauthorised_is_denied_without_mutation():
     """Binding exists but the live capability set lacks run:apply → denied."""
-    run = SimpleNamespace(id="run-1", workspace_id="ws-1")
+    run = SimpleNamespace(
+        id="run-1",
+        workspace_id="ws-1",
+        resource_additions=1,
+        resource_changes=0,
+        resource_destructions=0,
+    )
     ws = SimpleNamespace(id="ws-1", name="prod")
     db = _db_with(run, ws)
     link = SimpleNamespace(terrapod_email="dev@example.com")
@@ -115,7 +127,13 @@ async def test_linked_but_unauthorised_is_denied_without_mutation():
 
 @pytest.mark.asyncio
 async def test_authorised_approve_confirms_commits_and_updates_message():
-    run = SimpleNamespace(id="run-1", workspace_id="ws-1")
+    run = SimpleNamespace(
+        id="run-1",
+        workspace_id="ws-1",
+        resource_additions=1,
+        resource_changes=0,
+        resource_destructions=0,
+    )
     ws = SimpleNamespace(id="ws-1", name="prod")
     db = _db_with(run, ws)
     link = SimpleNamespace(terrapod_email="lead@example.com")
@@ -132,13 +150,19 @@ async def test_authorised_approve_confirms_commits_and_updates_message():
     db.commit.assert_awaited_once()
     update.assert_awaited_once()
     # the in-place edit records who approved
-    assert "lead@example.com" in update.await_args.args[3]
-    assert "Approved" in update.await_args.args[3]
+    assert "lead@example.com" in update.await_args.args[4]
+    assert "Approved" in update.await_args.args[4]
 
 
 @pytest.mark.asyncio
 async def test_authorised_discard_calls_discard_run():
-    run = SimpleNamespace(id="run-1", workspace_id="ws-1")
+    run = SimpleNamespace(
+        id="run-1",
+        workspace_id="ws-1",
+        resource_additions=1,
+        resource_changes=0,
+        resource_destructions=0,
+    )
     ws = SimpleNamespace(id="ws-1", name="prod")
     db = _db_with(run, ws)
     link = SimpleNamespace(terrapod_email="lead@example.com")
@@ -160,13 +184,19 @@ async def test_authorised_discard_calls_discard_run():
             p.stop()
     discard.assert_awaited_once()
     confirm.assert_not_awaited()
-    assert "Discarded" in update.await_args.args[3]
+    assert "Discarded" in update.await_args.args[4]
 
 
 @pytest.mark.asyncio
 async def test_stale_run_valueerror_is_surfaced_not_crashed():
     """A stale button (run already resolved) → ValueError → ephemeral, no 500."""
-    run = SimpleNamespace(id="run-1", workspace_id="ws-1")
+    run = SimpleNamespace(
+        id="run-1",
+        workspace_id="ws-1",
+        resource_additions=1,
+        resource_changes=0,
+        resource_destructions=0,
+    )
     ws = SimpleNamespace(id="ws-1", name="prod")
     db = _db_with(run, ws)
     link = SimpleNamespace(terrapod_email="lead@example.com")

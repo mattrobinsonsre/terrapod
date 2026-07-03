@@ -891,7 +891,6 @@
           "properties": {
             "enabled": { "type": "boolean" },
             "socket_mode": { "type": "boolean" },
-            "default_channel": { "type": "string" },
             "existingSecret": { "type": "string" },
             "existingSecretKeys": {
               "type": "object",

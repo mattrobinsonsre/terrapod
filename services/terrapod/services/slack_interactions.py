@@ -109,7 +109,7 @@ async def _act(
             kind="interactive",
         )
 
-        ws_name = workspace.name  # capture before commit expires attributes
+        ws_name = workspace.name  # captured for the deny message + parent edit
 
         # 3. Live capability check — the same gate the API/UI use.
         caps = await resolve_workspace_capabilities_for(db, user, workspace)
@@ -119,6 +119,13 @@ async def _act(
                 f"You ({email}) don't have permission to apply runs on *{ws_name}*.",
             )
             return
+
+        # Capture the rest of the parent-edit primitives BEFORE commit
+        # (expire_on_commit would detach these once the session closes).
+        from terrapod.services.slack_notify_service import counts_text, run_url
+
+        counts = counts_text(run)
+        url = run_url(workspace.id, run.id)
 
         # 4. Confirm / discard. A stale button (run already resolved) raises
         #    ValueError — surface it ephemerally, don't 500.
@@ -132,26 +139,28 @@ async def _act(
             await _nudge(response_url, f"Couldn't {verb.lower()} this run: {exc}")
             return
 
-    # 5. Edit the shared message in place: replace the buttons with the outcome.
-    outcome = (
-        f":white_check_mark: *Approved* by {email}"
+    # 5. Edit the PARENT approval message: drop the buttons (no re-click) and
+    #    record who acted. The apply/errored *result* arrives separately as a
+    #    threaded reply from the notify handler, so this is the decision, not the
+    #    outcome.
+    status_line = (
+        f":white_check_mark: Approved by {email} — applying…"
         if approve
-        else f":wastebasket: *Discarded* by {email}"
+        else f":wastebasket: Discarded by {email}"
     )
-    await _update_message(channel, message_ts, ws_name, outcome)
+    await _resolve_parent(channel, message_ts, ws_name, counts, status_line, url)
 
 
-async def _update_message(channel: str, ts: str, ws_name: str, outcome: str) -> None:
+async def _resolve_parent(
+    channel: str, ts: str, ws_name: str, counts: str, status_line: str, url: str
+) -> None:
     if not channel or not ts:
         return
-    from terrapod.services.slack_notify_service import _bot_client
+    from terrapod.services.slack_notify_service import _bot_client, resolved_parent_blocks
 
     client = _bot_client()
-    blocks = [
-        {"type": "section", "text": {"type": "mrkdwn", "text": f"*{ws_name}* — run approval"}},
-        {"type": "context", "elements": [{"type": "mrkdwn", "text": outcome}]},
-    ]
+    blocks = resolved_parent_blocks(ws_name, counts, status_line, url)
     try:
-        await client.chat_update(channel=channel, ts=ts, blocks=blocks, text=outcome)
+        await client.chat_update(channel=channel, ts=ts, blocks=blocks, text=status_line)
     except Exception as exc:  # noqa: BLE001
         logger.warning("slack.message_update_failed", err=str(exc))
