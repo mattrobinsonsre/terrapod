@@ -20,6 +20,7 @@ const ADMIN_LINKS = [
   '/admin/roles',
   '/admin/vcs-connections',
   '/admin/variable-sets',
+  '/admin/execution-hooks',
   '/admin/binary-cache',
   '/admin/bulk-update',
   '/admin/catalog',

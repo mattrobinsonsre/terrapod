@@ -90,6 +90,11 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      name: 'execution-hooks',
+      testMatch: 'execution-hooks.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       name: 'runs',
       testMatch: 'runs.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
