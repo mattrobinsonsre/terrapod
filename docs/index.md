@@ -30,6 +30,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 | **Audit Logging** | Immutable event log with configurable retention |
 | **Notifications** | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
 | **Run Tasks** | Pre/post-plan webhook hooks for external validation |
+| **Execution Hooks** | Admin-managed custom shell steps run in the runner Job at five lifecycle points, associated with workspaces |
 | **Policy-as-Code** | OPA/Rego policy sets evaluated on every run; advisory or mandatory enforcement, label-scoped |
 | **Drift Detection** | Scheduled plan-only runs to detect out-of-band infrastructure changes |
 | **Workspace Health** | Per-workspace health conditions with status indicators on workspace list |
@@ -117,6 +118,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [AI Plan Summary](ai-plan-summary.md) | LLM-generated change summary + risk assessment on every plan; failure analysis on errored plans. Bedrock, OpenAI, Anthropic, Gemini, vLLM — any provider via LiteLLM |
 | [Notifications](notifications.md) | Webhook, Slack, and email alerts on run events |
 | [Run Tasks](run-tasks.md) | Pre/post-plan webhook hooks for external validation |
+| [Execution Hooks](execution-hooks.md) | Custom shell steps in the runner Job at five lifecycle points |
 | [Policy-as-Code](policies.md) | OPA/Rego policy sets, advisory/mandatory enforcement, label scoping |
 | [Audit Logging](audit-logging.md) | Immutable event log, query API, retention |
 | [Artifact Retention](artifact-retention.md) | Automated cleanup of old state versions, run logs, cache entries |

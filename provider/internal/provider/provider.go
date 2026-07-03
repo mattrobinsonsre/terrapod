@@ -23,6 +23,8 @@ import (
 	autodiscoveryRuleRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/autodiscovery_rule"
 	catalogInstanceRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/catalog_instance"
 	catalogItemRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/catalog_item"
+	executionHookRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/execution_hook"
+	executionHookWsRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/execution_hook_workspace"
 	gpgKeyRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/gpg_key"
 	moduleWorkspaceLinkRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/module_workspace_link"
 	notificationConfigRes "github.com/mattrobinsonsre/terrapod/provider/internal/resources/notification_configuration"
@@ -131,6 +133,8 @@ func (p *terrapodProvider) Resources(_ context.Context) []func() resource.Resour
 		variableSetRes.NewResource,
 		variableSetVarRes.NewResource,
 		variableSetWsRes.NewResource,
+		executionHookRes.NewResource,
+		executionHookWsRes.NewResource,
 		runTriggerRes.NewResource,
 		remoteStateConsumerRes.NewResource,
 		notificationConfigRes.NewResource,

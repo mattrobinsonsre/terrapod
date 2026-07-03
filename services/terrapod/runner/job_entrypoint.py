@@ -48,7 +48,6 @@ from terrapod.runner.phases import (
     opa,
     plan_apply,
     resource_profile,
-    setup_script,
     terragrunt,
     tf_args,
     tfvars,
@@ -605,15 +604,11 @@ def _run_body(cfg: RunnerConfig, work_dir: Path) -> int:
     if cfg.phase == "apply":
         reuse_plan_lock_file(cfg, strip_dir=cwd)
 
-    # 7. Setup script (operator-supplied tfvars / cloud auth / etc.).
-    try:
-        setup_script.run(cfg.setup_script, env=os.environ.copy())
-    except setup_script.SetupScriptError as exc:
-        log.error("setup script failed", rc=exc.exit_code)
-        return exc.exit_code
-
-    # 7b. pre_init execution hooks (#619) — run for BOTH phases, after the
-    # legacy setup_script slot, before init. A failing hook fails the run.
+    # 7. pre_init execution hooks (#619) — operator-supplied setup steps
+    # (cloud/secret auth, /etc/hosts entries, extra tooling) run for BOTH
+    # phases, before init. This supersedes the removed setup_script /
+    # TP_SETUP_SCRIPT slot (which was never wired to a delivery path). A
+    # failing hook fails the run.
     try:
         execution_hooks.run_point("pre_init", env=os.environ.copy())
     except execution_hooks.HookError as exc:

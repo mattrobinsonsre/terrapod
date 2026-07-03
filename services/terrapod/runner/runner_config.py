@@ -58,7 +58,6 @@ class RunnerConfig:
     plan_only: bool
 
     # Misc behaviours
-    setup_script: str
     termination_grace_period_seconds: int
     upload_timeout_seconds: int
     download_retries: int
@@ -131,7 +130,6 @@ class RunnerConfig:
             allow_empty_apply=_bool("TP_ALLOW_EMPTY_APPLY"),
             destroy=_bool("TP_DESTROY"),
             plan_only=_bool("TP_PLAN_ONLY"),
-            setup_script=e.get("TP_SETUP_SCRIPT", ""),
             termination_grace_period_seconds=_int("TP_TERMINATION_GRACE", 120),
             upload_timeout_seconds=_int("TP_UPLOAD_TIMEOUT", 60),
             download_retries=_int("TP_DOWNLOAD_RETRIES", 3),

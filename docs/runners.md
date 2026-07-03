@@ -158,6 +158,7 @@ All runner Jobs inherit the following settings from `runners.*` in Helm values:
 | `runners.ttlSecondsAfterFinished` | `600` | Clean up completed Jobs after this many seconds |
 | `runners.terminationGracePeriodSeconds` | `120` | Time budget for graceful shutdown + artifact uploads |
 | `runners.tokenTTLSeconds` | `3600` | Runner token TTL (1 hour) |
+| `runners.hooksEnabled` | `true` | Master kill-switch for execution hooks. When `false`, the listener never delivers execution hooks to runner Jobs (for sealed/security-conscious deployments) |
 | `runners.maxTokenTTLSeconds` | `7200` | Maximum runner token TTL (2 hours) |
 | `runners.staleTimeoutSeconds` | `3600` | Mark run as errored if no Job status after this long |
 | `runners.driftMaxDurationSeconds` | `1800` | Max time a drift run may spend in `planning` before the reconciler errors it. Independent of `staleTimeoutSeconds` (which fires on dead listeners) — this one fires on terraform legitimately running too long for a background plan-only check. Set to `0` to disable |

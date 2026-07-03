@@ -470,6 +470,7 @@ listener:
 | `runners.serviceAccount.create` | `true` | Create ServiceAccount for runner Jobs |
 | `runners.serviceAccount.name` | `""` | SA name (cloud identity) |
 | `runners.serviceAccount.annotations` | `{}` | SA annotations (for IRSA, GCP WIF, Azure WI) |
+| `runners.hooksEnabled` | `true` | Master kill-switch: when false, execution hooks are never delivered to runner Jobs |
 
 ### Ingress
 

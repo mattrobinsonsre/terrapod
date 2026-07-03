@@ -2749,6 +2749,94 @@ Sends a test payload to the configured destination and returns the delivery resp
 
 ---
 
+## Execution Hooks
+
+Reusable custom-shell steps run inside the runner Job at fixed points
+(`pre_init`, `pre_plan`, `post_plan`, `pre_apply`, `post_apply`). A hook is an
+admin-managed library entry, associated with the workspaces that use it — there
+is no global scope. See [Execution Hooks](execution-hooks.md) for the full
+guide. Delivery is gated by the platform kill-switch `runners.hooksEnabled`
+(Helm, default `true`).
+
+### Create Execution Hook
+
+```
+POST /api/terrapod/v1/execution-hooks
+```
+
+**Request body:**
+```json
+{
+  "data": {
+    "type": "execution-hooks",
+    "attributes": {
+      "name": "internal-hosts-entry",
+      "description": "Add an internal registry host before init",
+      "hook-point": "pre_init",
+      "script": "echo '10.0.0.5 registry.internal' >> /etc/hosts",
+      "enabled": true,
+      "priority": 0
+    }
+  }
+}
+```
+
+**Valid hook-point:** `pre_init`, `pre_plan`, `post_plan`, `pre_apply`, `post_apply`. An unknown point returns 422; a duplicate name returns 409.
+
+**Required permission:** `admin`.
+
+### List Execution Hooks
+
+```
+GET /api/terrapod/v1/execution-hooks
+```
+
+**Required permission:** `admin`.
+
+### Show Execution Hook
+
+```
+GET /api/terrapod/v1/execution-hooks/{id}
+```
+
+**Required permission:** `admin`.
+
+### Update Execution Hook
+
+```
+PATCH /api/terrapod/v1/execution-hooks/{id}
+```
+
+Same body format as create; include only the attributes to change.
+
+**Required permission:** `admin`.
+
+### Delete Execution Hook
+
+```
+DELETE /api/terrapod/v1/execution-hooks/{id}
+```
+
+Removes the hook and all its workspace associations.
+
+**Required permission:** `admin`.
+
+### Associate / Dissociate Workspaces
+
+```
+POST   /api/terrapod/v1/execution-hooks/{id}/relationships/workspaces
+DELETE /api/terrapod/v1/execution-hooks/{id}/relationships/workspaces
+```
+
+**Request body** (both verbs, idempotent):
+```json
+{ "data": [{ "id": "ws-...", "type": "workspaces" }] }
+```
+
+**Required permission:** `admin`.
+
+---
+
 ## Policy Sets
 
 OPA policy-as-code enforcement. Policy sets and their policies are admin-managed; per-run policy evaluations are readable by anyone with read on the run's workspace. See [policies.md](policies.md) for the Rego authoring contract.

@@ -78,6 +78,7 @@ quickstart pulls released images, so the only wait is the image download.
 | **Policy-as-Code (OPA)** | **Implemented** | **Rego-based policy enforcement on plan output — the open-source equivalent of Sentinel. Advisory or mandatory sets, label-scoped to workspaces, evaluated on the runner against plan JSON, with admin-override on mandatory blocks. Author Rego, attach to workspaces by label, see pass/fail per policy on every run.** |
 | Notifications | Implemented | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
 | Run Tasks | Implemented | Pre/post-plan webhook hooks for external validation |
+| Execution Hooks | Implemented | Admin-managed custom shell steps run in the runner Job at pre_init/pre_plan/post_plan/pre_apply/post_apply, associated with workspaces (Helm kill-switch `runners.hooksEnabled`) |
 | Workspace Health | Implemented | Per-workspace health conditions, VCS polling status, drift detection indicators |
 | Workspace Autodiscovery | Implemented | Atlantis-style monorepo autodiscovery — pattern-matched rules auto-create workspaces on PRs to new directories |
 | Cloud Credentials | Implemented | Dynamic provider credentials via K8s workload identity (AWS IRSA, GCP WIF, Azure WI) |
@@ -285,6 +286,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [AI Plan Summary](docs/ai-plan-summary.md) | LLM plan summaries, risk assessment, failure analysis, chat |
 | [Notifications](docs/notifications.md) | Webhook, Slack, and email alerts on run events |
 | [Run Tasks](docs/run-tasks.md) | Pre/post-plan webhook hooks for external validation |
+| [Execution Hooks](docs/execution-hooks.md) | Custom shell steps run in the runner Job at pre_init/pre_plan/post_plan/pre_apply/post_apply, associated with workspaces |
 | [Audit Logging](docs/audit-logging.md) | Immutable event log, query API, retention |
 | [Artifact Retention](docs/artifact-retention.md) | Retention + purge of run logs, plans, and config tarballs |
 | [Runners](docs/runners.md) | Agent pools, the listener/runner ARC model, custom runner images |

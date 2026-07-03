@@ -34,7 +34,6 @@ def _runner_config():
 
     default_def = MagicMock()
     default_def.name = "default"
-    default_def.setup_script = ""
     cfg.definitions = [default_def]
 
     return cfg

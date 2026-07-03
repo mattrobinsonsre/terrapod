@@ -760,7 +760,7 @@ postgresql:
 
 ### Vault *dynamic* secrets for runner cloud creds is not wired up today (honest gap)
 
-A common Vault use-case is **dynamic secrets** — a runner fetching short-lived, per-run cloud credentials with something like `vault read aws/creds/my-role` just before `init`. Terrapod's runner does have a setup-script hook (`TP_SETUP_SCRIPT` → an early `/bin/sh -c` step before `init`) that *could* run such a command, **but it is not wired to any configuration surface**: there is no Helm value, no workspace field, and nothing injects `TP_SETUP_SCRIPT` onto the runner Job. So there is **no turnkey way today** to have a run fetch Vault dynamic secrets.
+A common Vault use-case is **dynamic secrets** — a runner fetching short-lived, per-run cloud credentials with something like `vault read aws/creds/my-role` just before `init`. Terrapod supports this via [execution hooks](execution-hooks.md): define a `pre_init` hook whose script fetches the dynamic secret and exports it into the run environment, and associate it with the workspaces that need it. (Execution hooks supersede the earlier, never-fully-wired `setup_script`/`TP_SETUP_SCRIPT` runner slot.)
 
 **The supported way for runs to reach cloud APIs is workload identity** (IRSA/WIF/WI on the runner SA), documented above. A configurable runner setup script — the surface that would enable Vault dynamic secrets and other per-run credential fetching — is future work. This section will be updated if and when that configuration surface ships.
 

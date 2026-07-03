@@ -59,6 +59,7 @@ Build/lint/test all run in Docker via `make` (`make test`, `make lint`, `make de
 - [Run Triggers](docs/run-triggers.md): cross-workspace dependency chains.
 - [Policy-as-Code (OPA)](docs/policies.md): **Open Policy Agent / Rego** policy sets — the open-source equivalent of TFE's Sentinel — evaluated on the runner against the plan JSON, with advisory/mandatory enforcement, label-scoped to workspaces, and admin-override on mandatory blocks.
 - [Run Tasks](docs/run-tasks.md): pre/post-plan external webhook validation hooks.
+- [Execution Hooks](docs/execution-hooks.md): admin-managed custom shell steps run in the runner Job at five lifecycle points (pre_init/pre_plan/post_plan/pre_apply/post_apply), associated with workspaces.
 - [Notifications](docs/notifications.md): webhook (HMAC), Slack Block Kit, email on run events.
 - [AI Plan Summary](docs/ai-plan-summary.md): LLM change summary + risk + failure analysis, provider-agnostic via LiteLLM (Bedrock/OpenAI/Anthropic/Gemini/vLLM).
 - [Audit Logging](docs/audit-logging.md), [Monitoring](docs/monitoring.md), [Artifact Retention](docs/artifact-retention.md): immutable event log, Prometheus metrics + shipped Grafana dashboard + alert rules with per-alert runbooks, automated cleanup.
@@ -87,6 +88,7 @@ How each capability is turned on. **Platform-level** features are Helm values un
 | Drift detection | Per-workspace setting (enable + interval) via API/UI/provider | [drift-detection.md](docs/drift-detection.md) |
 | Stale-plan guards | State-drift auto-discard (#647) is always on; time-based plan expiry (#646) is per-workspace `plan_expiry_seconds` (off by default) | [api-reference.md](docs/api-reference.md) |
 | Notifications / Run tasks | Per-workspace config via API/UI/provider | [notifications.md](docs/notifications.md), [run-tasks.md](docs/run-tasks.md) |
+| Execution hooks | Admin defines hooks + associates workspaces via API/UI/provider; runner Helm kill-switch `runners.hooksEnabled` (default true) gates delivery | [execution-hooks.md](docs/execution-hooks.md) |
 | Policy-as-code | Create a policy set, attach to workspaces by label | [policies.md](docs/policies.md) |
 | Autodiscovery | Per-VCS-connection rules (glob patterns + workspace template) | [autodiscovery.md](docs/autodiscovery.md) |
 | Run triggers | Link source→destination workspaces | [run-triggers.md](docs/run-triggers.md) |
