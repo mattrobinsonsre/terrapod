@@ -634,6 +634,21 @@ class RunnerListener:
             {"key": v["key"], "value": v["value"], "hcl": bool(v.get("hcl"))}
             for v in attrs.get("terraform-vars", [])
         ]
+        # Execution hooks (#619). The kill-switch (runners.hooks.enabled) is
+        # enforced HERE at the Job-build boundary: when disabled, drop all hooks
+        # so no hooks file is written and the runner has nothing to run.
+        execution_hooks = (
+            [
+                {
+                    "hook_point": h.get("hook_point", ""),
+                    "name": h.get("name", ""),
+                    "script": h.get("script", ""),
+                }
+                for h in attrs.get("execution-hooks", [])
+            ]
+            if self.runner_config.hooks_enabled
+            else []
+        )
 
         run_short = run_id[:16]
         # Phase is part of the Secret name to avoid a 409 AlreadyExists when
@@ -648,7 +663,11 @@ class RunnerListener:
         # terraform vars as a tfvars file and sources env vars via secretKeyRef,
         # so no variable value is ever plaintext in the Job spec. Per-phase name
         # mirrors the auth Secret; ownerReference GCs it with the Job.
-        vars_secret_name = f"tprun-{run_short}-{phase}-vars" if (env_vars or terraform_vars) else ""
+        vars_secret_name = (
+            f"tprun-{run_short}-{phase}-vars"
+            if (env_vars or terraform_vars or execution_hooks)
+            else ""
+        )
         # Per-run CA Secret (#592): ships the custom outbound CA into the runner
         # namespace so the Job's init container can merge it with the runner
         # image's system roots. Only when a CA bundle is configured AND the
@@ -664,6 +683,7 @@ class RunnerListener:
             vars_secret_name=vars_secret_name,
             env_vars=env_vars,
             terraform_vars=terraform_vars,
+            execution_hooks=execution_hooks,
             resource_cpu=attrs.get("resource-cpu", "1"),
             resource_memory=attrs.get("resource-memory", "2Gi"),
             terraform_version=attrs.get("terraform-version", ""),
@@ -708,7 +728,13 @@ class RunnerListener:
         if vars_secret_name:
             try:
                 await self._create_vars_secret(
-                    vars_secret_name, run_id, terraform_vars, env_vars, job_name, job_uid
+                    vars_secret_name,
+                    run_id,
+                    terraform_vars,
+                    env_vars,
+                    job_name,
+                    job_uid,
+                    execution_hooks=execution_hooks,
                 )
             except Exception as e:
                 logger.error("Failed to create vars secret", run_id=run_id, error=str(e))
@@ -1000,6 +1026,7 @@ class RunnerListener:
         env_vars: list[dict],
         job_name: str,
         job_uid: str,
+        execution_hooks: list[dict] | None = None,
     ) -> None:
         """Create a K8s Secret holding all workspace variable values, with an
         ownerReference to the Job (cascade-GC'd with it, like the auth Secret).
@@ -1007,6 +1034,8 @@ class RunnerListener:
         Data keys:
           - `terraform.tfvars.json`: JSON blob [{key, value, hcl}] — mounted as
             a file; the entrypoint renders terrapod.auto.tfvars from it.
+          - `execution-hooks.json`: JSON blob [{hook_point, name, script}] (#619)
+            — mounted as a file; the entrypoint runs each hook at its boundary.
           - one key per env-category var — sourced via secretKeyRef in the Job.
 
         Values never appear in the Job spec, so they aren't readable via
@@ -1024,6 +1053,17 @@ class RunnerListener:
                 [
                     {"key": v["key"], "value": v["value"], "hcl": bool(v.get("hcl"))}
                     for v in terraform_vars
+                ]
+            )
+        if execution_hooks:
+            string_data["execution-hooks.json"] = json.dumps(
+                [
+                    {
+                        "hook_point": h.get("hook_point", ""),
+                        "name": h.get("name", ""),
+                        "script": h.get("script", ""),
+                    }
+                    for h in execution_hooks
                 ]
             )
         for var in env_vars:

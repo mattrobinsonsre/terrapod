@@ -979,6 +979,14 @@ runners:
   lifecycleDestroyRetries: 2            # retries after the first failure (3 attempts total)
   lifecycleDestroyRetryBackoffSeconds: 45  # wait after an error before retrying
 
+  # Execution hooks (#619): kill-switch for operator-defined custom-shell steps
+  # run inside runner Jobs at fixed points (pre_init/pre_plan/post_plan/
+  # pre_apply/post_apply). Hooks are an admin-managed library associated with
+  # workspaces via the API. When false, the listener drops all resolved hooks
+  # before building the Job, so no custom shell runs in the runner — for
+  # security-conscious / sealed deployments that forbid arbitrary hook scripts.
+  hooksEnabled: true
+
   # Maximum size in bytes of the plan-phase workspace-diff tarball that
   # the runner uploads at end of plan and downloads at start of apply.
   # That tarball restores files plan generated on disk (data.archive_file

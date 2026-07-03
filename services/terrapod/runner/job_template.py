@@ -8,11 +8,16 @@ from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# Per-run vars Secret (mounted file). Keep in sync with
-# runner/job_entrypoint.py which reads the same path.
+# Per-run vars Secret (mounted files). Keep in sync with
+# runner/job_entrypoint.py + runner/phases/execution_hooks.py which read the
+# same paths.
 _TFVARS_SECRET_KEY = "terraform.tfvars.json"
 _TFVARS_FILENAME = "terraform.tfvars.json"
 _TFVARS_MOUNT_DIR = "/var/run/terrapod/vars"
+# Execution hooks (#619) — shipped as an extra key in the same per-run vars
+# Secret, mounted alongside the tfvars file.
+_HOOKS_SECRET_KEY = "execution-hooks.json"
+_HOOKS_FILENAME = "execution-hooks.json"
 
 # Custom outbound CA trust bundle (#592). The listener ships the raw custom CA
 # into a per-run Secret under this key; an init container merges it with the
@@ -59,6 +64,7 @@ def build_job_spec(
     auth_secret_name: str,
     env_vars: list[dict[str, str]],
     terraform_vars: list[dict[str, str]],
+    execution_hooks: list[dict] | None = None,
     vars_secret_name: str = "",
     resource_cpu: str = "1",
     resource_memory: str = "2Gi",
@@ -386,17 +392,23 @@ def build_job_spec(
         },
     }
 
-    # Per-run vars Secret: mount the terraform variables as a read-only file.
-    # The listener creates the Secret with an ownerReference to this Job, so it
-    # cascade-deletes when the Job is GC'd (same lifecycle as the auth Secret).
-    if vars_secret_name and terraform_vars:
+    # Per-run vars Secret: mount the terraform variables (and execution-hook
+    # scripts, #619) as read-only files. The listener creates the Secret with an
+    # ownerReference to this Job, so it cascade-deletes when the Job is GC'd
+    # (same lifecycle as the auth Secret).
+    secret_items = []
+    if terraform_vars:
+        secret_items.append({"key": _TFVARS_SECRET_KEY, "path": _TFVARS_FILENAME})
+    if execution_hooks:
+        secret_items.append({"key": _HOOKS_SECRET_KEY, "path": _HOOKS_FILENAME})
+    if vars_secret_name and secret_items:
         pod = job_spec["spec"]["template"]["spec"]
         pod["volumes"].append(
             {
                 "name": "tfvars",
                 "secret": {
                     "secretName": vars_secret_name,
-                    "items": [{"key": _TFVARS_SECRET_KEY, "path": _TFVARS_FILENAME}],
+                    "items": secret_items,
                 },
             }
         )

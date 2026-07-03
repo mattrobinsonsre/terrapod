@@ -1316,6 +1316,81 @@ class VariableSetWorkspace(Base):
     workspace: Mapped["Workspace"] = relationship(lazy="joined")
 
 
+# --- Execution Hooks (#619) ---
+
+# Valid hook points, in execution order. A hook fires inside the runner Job at
+# one of these boundaries with the run's env, working dir, and cloud identity
+# already established.
+EXECUTION_HOOK_POINTS = (
+    "pre_init",
+    "pre_plan",
+    "post_plan",
+    "pre_apply",
+    "post_apply",
+)
+
+
+class ExecutionHook(Base):
+    """A reusable custom-shell hook run inside the runner Job at a fixed point.
+
+    Mirrors the variable-set model (a reusable library entry associated with
+    workspaces), but with NO `global` flag — a hook only runs on workspaces it
+    is explicitly associated with via ``ExecutionHookWorkspace``. That bounds
+    the blast radius: no single hook object can touch every workspace's secrets
+    or state. Managing hooks is platform-admin-gated. The script body is
+    non-sensitive by contract (secrets a hook needs come via the per-run vars
+    Secret, never inlined here).
+    """
+
+    __tablename__ = "execution_hooks"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # One of EXECUTION_HOOK_POINTS. Validated at the service layer (422).
+    hook_point: Mapped[str] = mapped_column(String(20), nullable=False)
+    # Operator-supplied shell body, run via `/bin/sh -c`. Non-sensitive.
+    script: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Deterministic ordering when several associated hooks share a point:
+    # (priority ASC, name ASC).
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now_utc, onupdate=now_utc, nullable=False
+    )
+
+    workspace_assignments: Mapped[list["ExecutionHookWorkspace"]] = relationship(
+        cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (sa.UniqueConstraint("name", name="uq_execution_hooks"),)
+
+
+class ExecutionHookWorkspace(Base):
+    """Junction table associating execution hooks with workspaces."""
+
+    __tablename__ = "execution_hook_workspaces"
+
+    hook_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("execution_hooks.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    workspace: Mapped["Workspace"] = relationship(lazy="joined")
+
+
 # --- Configuration Versions ---
 
 

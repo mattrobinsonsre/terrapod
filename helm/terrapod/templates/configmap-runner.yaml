@@ -26,6 +26,10 @@ data:
     default_terraform_version: {{ .Values.runners.defaultTerraformVersion | default "1.12" | quote }}
     default_execution_backend: {{ .Values.runners.defaultExecutionBackend | default "tofu" | quote }}
     launch_timeout_seconds: {{ .Values.runners.launchTimeoutSeconds | default 300 }}
+    {{- /* Execution-hooks kill-switch (#619). `dig` gives a correct default-true
+       bool: an explicit `hooksEnabled: false` is preserved (a `| default true`
+       would wrongly coerce it back to true). */}}
+    hooks_enabled: {{ dig "hooksEnabled" true .Values.runners }}
     {{- /*
     Listener operational settings (#617): non-sensitive, so they flow through
     this ConfigMap instead of TERRAPOD_* env on the listener Deployment. The

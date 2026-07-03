@@ -149,6 +149,7 @@
         "driftMaxDurationSeconds": { "type": "integer", "minimum": 0 },
         "lifecycleDestroyRetries": { "type": "integer", "minimum": 0 },
         "lifecycleDestroyRetryBackoffSeconds": { "type": "integer", "minimum": 0 },
+        "hooksEnabled": { "type": "boolean" },
         "planArtifactsMaxBytes": { "type": "integer", "minimum": 10240 },
         "serviceAccount": { "$ref": "#/$defs/serviceAccountSpec" },
         "azureWorkloadIdentity": { "type": "boolean" }

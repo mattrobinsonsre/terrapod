@@ -516,7 +516,10 @@ jobs:
           echo "$out" | grep -q "kind: Ingress" || { echo "FAIL: stock install rendered no Ingress"; exit 1; }
           echo "$out" | grep -q "app.kubernetes.io/component: web" || { echo "FAIL: web Deployment not rendered (broken default?)"; exit 1; }
           echo "$out" | grep -q "app.kubernetes.io/component: bootstrap" || { echo "FAIL: bootstrap Job not rendered"; exit 1; }
-          echo "Stock install renders web + Ingress + bootstrap OK"
+          # Execution-hooks kill-switch (#619) renders into runners.yaml on by
+          # default (config-channel contract).
+          echo "$out" | grep -q "hooks_enabled: true" || { echo "FAIL: runners.yaml hooks_enabled not rendered"; exit 1; }
+          echo "Stock install renders web + Ingress + bootstrap + hooks_enabled OK"
       - name: Local dev values render
         run: |
           docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \

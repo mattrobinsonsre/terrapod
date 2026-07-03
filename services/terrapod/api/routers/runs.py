@@ -1472,11 +1472,21 @@ async def next_run(
         if v.category == "terraform"
     ]
 
+    # Resolve execution hooks associated with this workspace (#619). Delivered
+    # alongside the vars via the per-run Secret; the runner runs each hook_point
+    # at its boundary. Enforced-empty for local execution never reaches here
+    # (next_run is the agent-mode listener endpoint). The listener applies the
+    # runners.hooks.enabled kill-switch when building the Job.
+    from terrapod.services.execution_hook_service import resolve_hooks_for_workspace
+
+    execution_hooks = await resolve_hooks_for_workspace(db, run.workspace_id)
+
     await db.commit()
 
     run_data = _run_json(run)
     run_data["data"]["attributes"]["env-vars"] = env_vars
     run_data["data"]["attributes"]["terraform-vars"] = terraform_vars
+    run_data["data"]["attributes"]["execution-hooks"] = execution_hooks
     run_data["data"]["attributes"]["var-files"] = ws.var_files if ws and ws.var_files else []
     run_data["data"]["attributes"]["working-directory"] = ws.working_directory if ws else ""
     run_data["data"]["attributes"]["phase"] = phase

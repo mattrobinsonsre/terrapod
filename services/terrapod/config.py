@@ -239,6 +239,15 @@ class RunnerConfig(BaseSettings):
             "settle before terraform tries the teardown again."
         ),
     )
+    hooks_enabled: bool = Field(
+        default=True,
+        description=(
+            "Kill-switch for execution hooks (#619). When false, the listener "
+            "drops all hooks resolved for a run before building the Job, so no "
+            "operator shell runs in the runner. For security-conscious / sealed "
+            "deployments that want to forbid custom-shell hooks entirely."
+        ),
+    )
 
     @classmethod
     def settings_customise_sources(

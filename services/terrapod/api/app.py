@@ -816,6 +816,14 @@ def create_application() -> FastAPI:
 
     include_terrapod(run_triggers_router)
 
+    # Execution hooks — Terrapod-native library of custom-shell steps run in the
+    # runner Job at fixed points (#619). Admin-managed; associated to workspaces.
+    from terrapod.api.routers.execution_hooks import (
+        router as execution_hooks_router,
+    )
+
+    include_terrapod(execution_hooks_router)
+
     # Remote-state consumer allowlist — Terrapod-native management of the
     # producer-controlled cross-workspace `terraform_remote_state` grants
     # (#344). The CLI never manages these; the read-path authorization

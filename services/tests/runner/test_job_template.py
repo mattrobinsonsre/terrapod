@@ -115,6 +115,61 @@ class TestVarFilesInjection:
         assert "TP_VAR_FILES" not in env_names
 
 
+class TestExecutionHooksMount:
+    """Execution hooks (#619) mount as an extra item in the per-run vars Secret."""
+
+    def _spec(self, *, execution_hooks, terraform_vars, vars_secret_name):
+        from terrapod.runner.job_template import build_job_spec
+
+        return build_job_spec(
+            run_id="abc123",
+            phase="plan",
+            runner_config=_runner_config(),
+            auth_secret_name="tprun-abc12345-auth",
+            env_vars=[],
+            terraform_vars=terraform_vars,
+            execution_hooks=execution_hooks,
+            vars_secret_name=vars_secret_name,
+        )
+
+    def _tfvars_volume(self, spec):
+        vols = spec["spec"]["template"]["spec"]["volumes"]
+        return next((v for v in vols if v["name"] == "tfvars"), None)
+
+    def test_hooks_added_as_secret_item(self):
+        spec = self._spec(
+            execution_hooks=[{"hook_point": "pre_init", "name": "a", "script": "true"}],
+            terraform_vars=[],
+            vars_secret_name="tprun-abc12345-plan-vars",
+        )
+        vol = self._tfvars_volume(spec)
+        assert vol is not None
+        keys = {i["key"] for i in vol["secret"]["items"]}
+        assert "execution-hooks.json" in keys
+        # No terraform vars → only the hooks item.
+        assert "terraform.tfvars.json" not in keys
+        mounts = spec["spec"]["template"]["spec"]["containers"][0]["volumeMounts"]
+        assert any(m["mountPath"] == "/var/run/terrapod/vars" for m in mounts)
+
+    def test_hooks_and_tfvars_both_mounted(self):
+        spec = self._spec(
+            execution_hooks=[{"hook_point": "pre_plan", "name": "a", "script": "true"}],
+            terraform_vars=[{"key": "region", "value": "eu", "hcl": False}],
+            vars_secret_name="tprun-abc12345-plan-vars",
+        )
+        vol = self._tfvars_volume(spec)
+        keys = {i["key"] for i in vol["secret"]["items"]}
+        assert keys == {"terraform.tfvars.json", "execution-hooks.json"}
+
+    def test_no_volume_when_no_hooks_no_vars(self):
+        spec = self._spec(
+            execution_hooks=[],
+            terraform_vars=[],
+            vars_secret_name="",
+        )
+        assert self._tfvars_volume(spec) is None
+
+
 class TestPodFailurePolicy:
     """Phase-conditional pod failure policy.
 
