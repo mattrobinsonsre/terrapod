@@ -66,6 +66,14 @@ async def enqueue_slack_notify(run, trigger: str, *, _from_summariser: bool = Fa
         return
     from terrapod.config import settings
 
+    # The `slack_run_notify` trigger handler is only registered when the Slack
+    # app is enabled (app.py). Enqueuing when it's disabled would land an item
+    # with no handler — a "No handler for trigger type" warning on *every* run
+    # for every non-Slack deployment. Gate here (this fires from the run state
+    # machine + drift on every transition, Slack-configured or not).
+    if not settings.slack.enabled:
+        return
+
     if not _from_summariser and settings.ai_summary.enabled and trigger in _AI_DEFERRABLE:
         return  # the summariser will re-fire this once the AI review settles
     from terrapod.services.scheduler import enqueue_trigger

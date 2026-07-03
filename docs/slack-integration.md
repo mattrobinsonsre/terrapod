@@ -9,10 +9,10 @@ set this up**: a **Slack admin** (often IT, who owns the Slack workspace) and a
 **Terrapod operator** (the SRE running the platform). Neither needs access to
 the other's system. Each part below says who does it.
 
-> **Phase status.** Today the integration establishes the connection and posts
-> a connectivity check to a channel. Interactive approve/discard and the
-> `/terrapod` slash command build on this same app and connection — no Slack
-> reconfiguration is needed when they land, so setting this up now is not throwaway work.
+> **What you get.** An outbound Socket Mode connection, the `/terrapod` account
+> linking command, and opt-in per-workspace run notifications with interactive,
+> RBAC-checked Approve/Discard — all on one app and connection. Startup does a
+> logged connectivity check (`auth.test`); it does **not** post to any channel.
 
 ---
 
@@ -36,12 +36,13 @@ Socket Mode is the default and needs none of that.)
 | Step | Slack admin (owns the Slack workspace) | Terrapod operator (owns the deployment) |
 |---|---|---|
 | 1 | Create the Slack app from the manifest | — |
-| 2 | Install it and collect the **three tokens** + channel | — |
+| 2 | Install it and collect the **three tokens** | — |
 | 3 | — | Store the three tokens in a Kubernetes Secret |
 | 4 | — | Turn the integration on in Helm values and deploy |
-| 5 | — | Verify the bot is online and greeted the channel |
+| 5 | — | Verify the bot is online (API logs show `slack.bot_authenticated`) |
 
-The handoff between them is exactly three secret strings and one channel name.
+The handoff between them is exactly three secret strings. (Channels are opt-in
+per workspace afterwards — see [Run notifications](#run-notifications-opt-in-per-workspace).)
 
 ---
 
@@ -120,8 +121,7 @@ api:
   config:
     slack:
       enabled: true
-      socketMode: true                 # outbound WebSocket; no ingress change
-      defaultChannel: "#integration"   # the channel from A3
+      socket_mode: true                # outbound WebSocket; no ingress change
       existingSecret: terrapod-slack   # the Secret from B1
 ```
 
@@ -130,8 +130,8 @@ Apply with `helm upgrade` (or your GitOps flow).
 ### B3. Verify
 
 - In Slack, the **Terrapod** app shows as **online**.
-- The channel receives a **connectivity message** from Terrapod shortly after the API pod starts.
-- API logs show `slack.socket_mode_connected`.
+- API logs show `slack.socket_mode_connected` then `slack.bot_authenticated`
+  (the connectivity check is logged, not posted to any channel).
 
 If all three are true, the connection is live.
 
@@ -207,8 +207,7 @@ edited to record who approved, so a button can't be pressed twice.
 | Value | Default | Purpose |
 |---|---|---|
 | `enabled` | `false` | Master switch for the integration. |
-| `socketMode` | `true` | Outbound Socket Mode. `false` → Request-URL mode (needs the webhook ingress). |
-| `defaultChannel` | `""` | Channel for the connectivity check / fallback posts. |
+| `socket_mode` | `true` | Outbound Socket Mode (the only supported mode today). |
 | `existingSecret` | `""` | Name of the K8s Secret holding the three tokens. |
 | `existingSecretKeys.botToken` / `.appToken` / `.signingSecret` | `bot-token` / `app-token` / `signing-secret` | Keys within that Secret. |
 
@@ -244,7 +243,7 @@ edited to record who approved, so a button can't be pressed twice.
   the bot and app-level tokens like any credential; rotate them (regenerate in
   the Slack app, update the Secret) if exposed.
 - **Least privilege.** The manifest requests only `chat:write`,
-  `chat:write.public`, and `commands`. Interactive approvals (a later phase) are
-  authorised against the acting user's **Terrapod** identity and RBAC, not by
-  Slack channel membership — so being in the channel never implies permission to
-  apply.
+  `chat:write.public`, `commands`, and `files:write` (the last for the plan-output
+  attachment). Interactive approvals are authorised against the acting user's
+  **Terrapod** identity and RBAC, not by Slack channel membership — so being in
+  the channel never implies permission to apply.

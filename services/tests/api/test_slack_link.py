@@ -88,3 +88,58 @@ class TestLinkAccount:
         # The binding is attributed to the AUTHENTICATED user, not the payload.
         _args, kwargs = create.call_args
         assert kwargs["email"] == "alice@example.com"
+
+
+class TestListLinks:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_list_returns_callers_links(self, *_m):
+        app, db = _make_app(_user("alice@example.com"))
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = [_fake_link("alice@example.com")]
+        db.execute = AsyncMock(return_value=result)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            r = await c.get("/api/terrapod/v1/slack/links", headers=_AUTH)
+        assert r.status_code == 200
+        assert r.json()["data"][0]["email"] == "alice@example.com"
+
+
+class TestUnlink:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_unlink_own_link_deletes(self, *_m):
+        app, db = _make_app(_user("alice@example.com"))
+        link = _fake_link("alice@example.com")
+        db.get = AsyncMock(return_value=link)
+        db.delete = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            r = await c.delete(f"/api/terrapod/v1/slack/links/slk-{link.id}", headers=_AUTH)
+        assert r.status_code == 204
+        db.delete.assert_awaited_once_with(link)
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_unlink_someone_elses_link_404_no_delete(self, *_m):
+        """Ownership gate: a user cannot unlink another user's binding."""
+        app, db = _make_app(_user("alice@example.com"))
+        link = _fake_link("bob@example.com")  # owned by someone else
+        db.get = AsyncMock(return_value=link)
+        db.delete = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            r = await c.delete(f"/api/terrapod/v1/slack/links/slk-{link.id}", headers=_AUTH)
+        assert r.status_code == 404
+        db.delete.assert_not_awaited()
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_unlink_malformed_id_404(self, *_m):
+        app, db = _make_app(_user())
+        db.get = AsyncMock()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            r = await c.delete("/api/terrapod/v1/slack/links/not-a-uuid", headers=_AUTH)
+        assert r.status_code == 404
+        db.get.assert_not_awaited()

@@ -40,9 +40,26 @@ async def test_enqueue_filters_non_slack_triggers():
 
 
 @pytest.mark.asyncio
+async def test_enqueue_noop_when_slack_disabled():
+    """Slack off (the default) → nothing enqueued, so no orphan trigger lands
+    with no handler (which would log-spam every run)."""
+    enq = AsyncMock()
+    with (
+        patch.object(settings.slack, "enabled", False),
+        patch("terrapod.services.scheduler.enqueue_trigger", enq),
+    ):
+        for t in ("run:needs_attention", "run:completed", "run:errored", "run:drift_detected"):
+            await sn.enqueue_slack_notify(_run(), t)
+    enq.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_enqueue_passes_the_four_slack_triggers():
     enq = AsyncMock()
-    with patch("terrapod.services.scheduler.enqueue_trigger", enq):
+    with (
+        patch.object(settings.slack, "enabled", True),
+        patch("terrapod.services.scheduler.enqueue_trigger", enq),
+    ):
         for t in ("run:needs_attention", "run:completed", "run:errored", "run:drift_detected"):
             await sn.enqueue_slack_notify(_run(), t)
     assert enq.await_count == 4
@@ -60,6 +77,7 @@ async def test_ai_enabled_defers_needs_attention_and_errored():
     immediate events (completed/drift) still enqueue."""
     enq = AsyncMock()
     with (
+        patch.object(settings.slack, "enabled", True),
         patch.object(settings.ai_summary, "enabled", True),
         patch("terrapod.services.scheduler.enqueue_trigger", enq),
     ):
@@ -77,6 +95,7 @@ async def test_summariser_bypass_re_fires_deferred_event():
     """The summariser re-fires the deferred event via _from_summariser=True."""
     enq = AsyncMock()
     with (
+        patch.object(settings.slack, "enabled", True),
         patch.object(settings.ai_summary, "enabled", True),
         patch("terrapod.services.scheduler.enqueue_trigger", enq),
     ):
@@ -89,6 +108,7 @@ async def test_summariser_bypass_re_fires_deferred_event():
 async def test_ai_disabled_enqueues_everything_immediately():
     enq = AsyncMock()
     with (
+        patch.object(settings.slack, "enabled", True),
         patch.object(settings.ai_summary, "enabled", False),
         patch("terrapod.services.scheduler.enqueue_trigger", enq),
     ):

@@ -75,3 +75,23 @@ async def test_socket_request_acks_foreign_command_without_reply():
     # Ack'd, but with no reply payload (not our command).
     sent = client.send_socket_mode_response.await_args.args[0]
     assert sent.payload is None
+
+
+@pytest.mark.asyncio
+async def test_interactive_block_actions_acks_then_dispatches():
+    """A button click acks within Slack's 3s window, then dispatches to the
+    interaction handler (the RBAC + confirm/discard spine)."""
+    from unittest.mock import patch
+
+    client = MagicMock()
+    client.send_socket_mode_response = AsyncMock()
+    payload = {"type": "block_actions", "actions": [{"action_id": "terrapod_run_approve"}]}
+    req = SimpleNamespace(type="interactive", envelope_id="e3", payload=payload)
+    with patch(
+        "terrapod.services.slack_interactions.handle_block_actions", new_callable=AsyncMock
+    ) as hba:
+        await sc.handle_socket_request(client, req)
+    # ack'd (empty payload) AND dispatched to the interaction handler
+    sent = client.send_socket_mode_response.await_args.args[0]
+    assert sent.payload is None
+    hba.assert_awaited_once_with(payload)
