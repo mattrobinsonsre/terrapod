@@ -83,6 +83,14 @@ api:
     # surface are exercised in Tilt. Production defaults to off.
     catalog:
       enabled: true
+    # Interactive Slack integration (#556) on in local dev. Tokens live in the
+    # hand-created `terrapod-slack` K8s Secret (see docs/slack-integration.md);
+    # Socket Mode means no ingress/tunnel is needed for the dev loop.
+    slack:
+      enabled: true
+      socket_mode: true
+      default_channel: "#integration"
+      existingSecret: terrapod-slack
     # Fast cert renewal cycle for Tilt — listener cert valid for 5min so the
     # full bootstrap → renew → rotate loop is observable in a few minutes
     # instead of an hour. Production stays at the 1h default.

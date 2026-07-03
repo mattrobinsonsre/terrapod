@@ -1,0 +1,37 @@
+{
+  "display_information": {
+    "name": "Terrapod",
+    "description": "Interactive Terraform run approvals and status from Slack"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "terrapod",
+      "always_online": true
+    },
+    "slash_commands": [
+      {
+        "command": "/terrapod",
+        "description": "Query workspaces, runs, and pending approvals",
+        "usage_hint": "status | runs | approvals",
+        "should_escape": false
+      }
+    ]
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "chat:write",
+        "chat:write.public",
+        "commands"
+      ]
+    }
+  },
+  "settings": {
+    "interactivity": {
+      "is_enabled": true
+    },
+    "socket_mode_enabled": true,
+    "org_deploy_enabled": false,
+    "token_rotation_enabled": false
+  }
+}

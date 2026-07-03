@@ -519,14 +519,21 @@ jobs:
           # Execution-hooks kill-switch (#619) renders into runners.yaml on by
           # default (config-channel contract).
           echo "$out" | grep -q "hooks_enabled: true" || { echo "FAIL: runners.yaml hooks_enabled not rendered"; exit 1; }
+          # Slack integration (#556) is OFF by default: config renders but no
+          # secret env is injected (no existingSecret) — config-channel contract.
+          echo "$out" | grep -q "TERRAPOD_SLACK__" && { echo "FAIL: Slack secret env injected when disabled"; exit 1; }
           echo "Stock install renders web + Ingress + bootstrap + hooks_enabled OK"
       - name: Local dev values render
         run: |
-          docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
             template terrapod helm/terrapod \
               --values helm/terrapod/values.yaml \
-              --values helm/terrapod/values-local.yaml > /dev/null
-          echo "values-local renders OK"
+              --values helm/terrapod/values-local.yaml)
+          # Slack config-channel: non-secret settings render into config.yaml,
+          # secret tokens arrive via secretKeyRef env (never the ConfigMap).
+          echo "$out" | grep -q 'default_channel: "#integration"' || { echo "FAIL: slack config not rendered into config.yaml"; exit 1; }
+          echo "$out" | grep -q "TERRAPOD_SLACK__BOT_TOKEN" || { echo "FAIL: slack bot-token secretKeyRef env missing"; exit 1; }
+          echo "values-local renders OK (incl. Slack config + secretKeyRef)"
       - name: Eval values render (embedded Postgres/Redis)
         run: |
           out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \

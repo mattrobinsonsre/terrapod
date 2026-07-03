@@ -885,6 +885,26 @@
           }
         },
 
+        "slack": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "socket_mode": { "type": "boolean" },
+            "default_channel": { "type": "string" },
+            "existingSecret": { "type": "string" },
+            "existingSecretKeys": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "botToken": { "type": "string" },
+                "appToken": { "type": "string" },
+                "signingSecret": { "type": "string" }
+              }
+            }
+          }
+        },
+
         "notifications": {
           "type": "object",
           "additionalProperties": false,

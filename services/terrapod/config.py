@@ -833,6 +833,43 @@ class DriftDetectionConfig(BaseModel):
     )
 
 
+# --- Slack Integration ---
+
+
+class SlackConfig(BaseModel):
+    """Interactive Slack integration (#556).
+
+    Phase 1 wires the connection: an outbound **Socket Mode** WebSocket to Slack
+    (no public/inbound URL required, matching the restricted-network execution
+    model) plus a connectivity check. Later phases add action buttons, the
+    `/terrapod` slash command, and account-linked, RBAC-checked approve/discard.
+
+    The three tokens are **secrets** and arrive via env (secretKeyRef), never the
+    ConfigMap — `TERRAPOD_SLACK__BOT_TOKEN` / `__APP_TOKEN` / `__SIGNING_SECRET`.
+    Full operator setup (incl. the Slack-admin ↔ operator handoff): see
+    docs/slack-integration.md.
+    """
+
+    enabled: bool = Field(default=False, description="Enable the Slack integration")
+    socket_mode: bool = Field(
+        default=True,
+        description=(
+            "Use Socket Mode — an outbound WebSocket, no public URL. When false, "
+            "Slack reaches the Request-URL endpoint via the public webhook ingress."
+        ),
+    )
+    default_channel: str = Field(
+        default="",
+        description="Channel for the connectivity check / fallback posts (e.g. #integration).",
+    )
+    # --- secrets: delivered via secretKeyRef → env, never rendered to the ConfigMap ---
+    bot_token: str = Field(default="", description="Bot User OAuth Token (xoxb-…)")
+    app_token: str = Field(
+        default="", description="App-Level Token with connections:write (xapp-…), for Socket Mode"
+    )
+    signing_secret: str = Field(default="", description="Slack app signing secret")
+
+
 # --- CORS Configuration ---
 
 
@@ -1543,6 +1580,9 @@ class Settings(BaseSettings):
 
     # Drift Detection
     drift_detection: DriftDetectionConfig = Field(default_factory=DriftDetectionConfig)
+
+    # Slack integration (#556)
+    slack: SlackConfig = Field(default_factory=SlackConfig)
 
     # CORS
     cors: CORSConfig = Field(default_factory=CORSConfig)

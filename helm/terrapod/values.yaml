@@ -499,6 +499,22 @@ api:
       poll_interval_seconds: 300
       min_workspace_interval_seconds: 3600
 
+    # Interactive Slack integration (#556). OFF by default. Transport is Socket
+    # Mode — an OUTBOUND WebSocket to Slack, so no public URL / ingress change is
+    # needed (matches the restricted-network execution model). The bot/app/signing
+    # tokens are SECRETS: put them in a K8s Secret and reference it via
+    # `existingSecret` — they are injected via secretKeyRef, never rendered into
+    # the ConfigMap. See docs/slack-integration.md for the full setup.
+    slack:
+      enabled: false
+      socket_mode: true              # false → Request-URL mode (needs webhook ingress)
+      default_channel: ""            # e.g. "#integration" — connectivity check / fallback
+      existingSecret: ""             # K8s Secret holding the three tokens
+      existingSecretKeys:            # keys within that Secret
+        botToken: bot-token
+        appToken: app-token
+        signingSecret: signing-secret
+
     # Notifications
     notifications:
       enabled: true

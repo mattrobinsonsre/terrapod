@@ -130,6 +130,24 @@ spec:
                   name: {{ .Values.api.config.vcs.github.existingSecret }}
                   key: {{ .Values.api.config.vcs.github.existingSecretKey | default "webhook_secret" }}
             {{- end }}
+            {{- if (.Values.api.config.slack).existingSecret }}
+            # Slack integration (#556) — bot/app/signing tokens via secretKeyRef.
+            - name: TERRAPOD_SLACK__BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.config.slack.existingSecret }}
+                  key: {{ (.Values.api.config.slack.existingSecretKeys).botToken | default "bot-token" }}
+            - name: TERRAPOD_SLACK__APP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.config.slack.existingSecret }}
+                  key: {{ (.Values.api.config.slack.existingSecretKeys).appToken | default "app-token" }}
+            - name: TERRAPOD_SLACK__SIGNING_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.config.slack.existingSecret }}
+                  key: {{ (.Values.api.config.slack.existingSecretKeys).signingSecret | default "signing-secret" }}
+            {{- end }}
             {{- if and .Values.api.config.vcs.gitlab .Values.api.config.vcs.gitlab.existingSecret }}
             - name: TERRAPOD_VCS__GITLAB__WEBHOOK_SECRET
               valueFrom:

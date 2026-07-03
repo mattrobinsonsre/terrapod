@@ -326,7 +326,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     await start_scheduler()
     logger.info("Distributed scheduler started")
 
+    # Slack integration (#556) — best-effort outbound Socket Mode connection.
+    # Never fails startup: a misconfigured/disabled Slack just logs and skips.
+    from terrapod.services.slack_service import start_slack
+
+    await start_slack(settings)
+
     yield
+
+    # Stop Slack connection
+    from terrapod.services.slack_service import stop_slack
+
+    await stop_slack()
 
     # Stop scheduler
     await stop_scheduler()

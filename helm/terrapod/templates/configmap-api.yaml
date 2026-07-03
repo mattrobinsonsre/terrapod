@@ -293,6 +293,15 @@ data:
       poll_interval_seconds: {{ .Values.api.config.drift_detection.poll_interval_seconds | default 300 }}
       min_workspace_interval_seconds: {{ .Values.api.config.drift_detection.min_workspace_interval_seconds | default 3600 }}
     {{- end }}
+    {{- if .Values.api.config.slack }}
+    slack:
+      # Non-secret Slack settings only. The bot/app/signing tokens are secrets
+      # and are injected via secretKeyRef on the Deployment (see deployment-api.yaml),
+      # never rendered here.
+      enabled: {{ .Values.api.config.slack.enabled }}
+      socket_mode: {{ .Values.api.config.slack.socket_mode }}
+      default_channel: {{ .Values.api.config.slack.default_channel | default "" | quote }}
+    {{- end }}
     {{- if .Values.api.config.notifications }}
     notifications:
       enabled: {{ .Values.api.config.notifications.enabled }}
