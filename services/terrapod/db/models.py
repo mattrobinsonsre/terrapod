@@ -1100,6 +1100,9 @@ class AutodiscoveryRule(Base):
     notification_templates: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, default=list, nullable=False
     )
+    # #672: execution hooks (by id) to associate with every workspace this rule
+    # materialises, so discovered workspaces inherit their hooks automatically.
+    execution_hook_templates: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     # #314 deletion lifecycle: what to do when a discovered directory is
     # removed on the tracked branch. "flag" (default, safe) marks the
     # workspace pending_deletion and requires an explicit operator

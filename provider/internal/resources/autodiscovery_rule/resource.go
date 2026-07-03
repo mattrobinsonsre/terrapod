@@ -101,9 +101,10 @@ type autodiscoveryRuleModel struct {
 	OwnerEmail        types.String `tfsdk:"owner_email"`
 	OnDirectoryDelete types.String `tfsdk:"on_directory_delete"`
 
-	VarFiles              types.List `tfsdk:"var_files"`
-	RunTaskTemplates      types.List `tfsdk:"run_task_templates"`
-	NotificationTemplates types.List `tfsdk:"notification_templates"`
+	VarFiles               types.List `tfsdk:"var_files"`
+	RunTaskTemplates       types.List `tfsdk:"run_task_templates"`
+	NotificationTemplates  types.List `tfsdk:"notification_templates"`
+	ExecutionHookTemplates types.List `tfsdk:"execution_hook_templates"`
 
 	CreatedAt types.String `tfsdk:"created_at"`
 	UpdatedAt types.String `tfsdk:"updated_at"`
@@ -278,6 +279,11 @@ func (r *autodiscoveryRuleResource) Schema(_ context.Context, _ resource.SchemaR
 
 			"var_files": schema.ListAttribute{
 				Description: "List of .tfvars file paths inherited by created workspaces as -var-file arguments.",
+				Optional:    true,
+				ElementType: types.StringType,
+			},
+			"execution_hook_templates": schema.ListAttribute{
+				Description: "Execution hook ids (hook-<uuid>) associated with every workspace this rule creates.",
 				Optional:    true,
 				ElementType: types.StringType,
 			},
@@ -592,6 +598,14 @@ func buildAutodiscoveryRuleAttrs(m *autodiscoveryRuleModel) map[string]any {
 		attrs["var-files"] = varFiles
 	}
 
+	if !m.ExecutionHookTemplates.IsNull() && !m.ExecutionHookTemplates.IsUnknown() {
+		hooks := make([]string, 0, len(m.ExecutionHookTemplates.Elements()))
+		for _, v := range m.ExecutionHookTemplates.Elements() {
+			hooks = append(hooks, v.(types.String).ValueString())
+		}
+		attrs["execution-hook-templates"] = hooks
+	}
+
 	if !m.RunTaskTemplates.IsNull() && !m.RunTaskTemplates.IsUnknown() {
 		tasks := make([]map[string]any, 0, len(m.RunTaskTemplates.Elements()))
 		for _, e := range m.RunTaskTemplates.Elements() {
@@ -726,6 +740,14 @@ func readAutodiscoveryRuleIntoModel(ctx context.Context, res *terrapod.Resource,
 		m.VarFiles = v
 	} else {
 		m.VarFiles = types.ListNull(types.StringType)
+	}
+
+	if hooks := terrapod.GetListAttr(res, "execution-hook-templates"); len(hooks) > 0 {
+		v, d := types.ListValueFrom(ctx, types.StringType, hooks)
+		diags.Append(d...)
+		m.ExecutionHookTemplates = v
+	} else {
+		m.ExecutionHookTemplates = types.ListNull(types.StringType)
 	}
 
 	rtObjType := types.ObjectType{AttrTypes: runTaskTemplateAttrTypes}

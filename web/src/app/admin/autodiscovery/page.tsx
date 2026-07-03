@@ -42,6 +42,7 @@ interface AutodiscoveryRule {
     labels: Record<string, string>
     'owner-email': string
     'var-files': string[]
+    'execution-hook-templates'?: string[]
     'run-task-templates': RunTaskSpec[]
     'notification-templates': NotificationSpec[]
     'created-at': string
@@ -92,6 +93,7 @@ export default function AutodiscoveryPage() {
   const [labels, setLabels] = useState<Record<string, string>>({})
   const [ownerEmail, setOwnerEmail] = useState('')
   const [varFiles, setVarFiles] = useState<string[]>([])
+  const [executionHookTemplates, setExecutionHookTemplates] = useState<string[]>([])
   const [runTaskTemplates, setRunTaskTemplates] = useState<RunTaskSpec[]>([])
   const [notificationTemplates, setNotificationTemplates] = useState<NotificationSpec[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -216,6 +218,7 @@ export default function AutodiscoveryPage() {
     setLabels(a.labels || {})
     setOwnerEmail(a['owner-email'] || '')
     setVarFiles(a['var-files'] || [])
+    setExecutionHookTemplates(a['execution-hook-templates'] || [])
     setRunTaskTemplates(a['run-task-templates'] || [])
     setNotificationTemplates(a['notification-templates'] || [])
     setShowForm(true)
@@ -252,6 +255,7 @@ export default function AutodiscoveryPage() {
       labels,
       'owner-email': ownerEmail,
       'var-files': varFiles.map(s => s.trim()).filter(Boolean),
+      'execution-hook-templates': executionHookTemplates.map(s => s.trim()).filter(Boolean),
       'run-task-templates': runTaskTemplates,
       'notification-templates': notificationTemplates,
     }
@@ -648,6 +652,16 @@ export default function AutodiscoveryPage() {
                   onChange={setVarFiles}
                   placeholder="env/prod.tfvars"
                   addLabel="Add var file"
+                />
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <label className="block text-sm text-slate-300 mb-1">Execution hook ids (associated with each new workspace)</label>
+                <p className="text-xs text-slate-500 mb-2">Existing execution hook ids (<code>hook-…</code>) from the Execution Hooks admin page.</p>
+                <StringListEditor
+                  values={executionHookTemplates}
+                  onChange={setExecutionHookTemplates}
+                  placeholder="hook-0190…"
+                  addLabel="Add hook id"
                 />
               </div>
               <div className="mt-4 pt-4 border-t border-slate-800">

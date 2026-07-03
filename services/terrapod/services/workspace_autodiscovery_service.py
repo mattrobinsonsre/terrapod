@@ -38,6 +38,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import (
     AutodiscoveryRule,
+    ExecutionHook,
+    ExecutionHookWorkspace,
     NotificationConfiguration,
     RunTask,
     Workspace,
@@ -321,6 +323,21 @@ async def find_or_autocreate_workspace(
         db.add(RunTask(workspace_id=ws.id, **spec))
     for spec in rule.notification_templates or []:
         db.add(NotificationConfiguration(workspace_id=ws.id, **spec))
+
+    # #672: associate the rule's execution-hook templates with the new
+    # workspace. Non-interactive path — skip (log) any hook that no longer
+    # exists rather than aborting the poll cycle.
+    for hook_id_str in rule.execution_hook_templates or []:
+        try:
+            hook_uuid = uuid.UUID(str(hook_id_str).removeprefix("hook-"))
+        except ValueError:
+            logger.warning("autodiscovery: skipping invalid hook id", hook_id=hook_id_str)
+            continue
+        hook = await db.get(ExecutionHook, hook_uuid)
+        if hook is None:
+            logger.warning("autodiscovery: skipping missing hook", hook_id=hook_id_str)
+            continue
+        db.add(ExecutionHookWorkspace(hook_id=hook_uuid, workspace_id=ws.id))
 
     await db.commit()
 

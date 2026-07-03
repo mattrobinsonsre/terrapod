@@ -81,6 +81,9 @@ def _rule_json(rule: AutodiscoveryRule) -> dict:
             "var-files": list(rule.var_files or []),
             "run-task-templates": list(rule.run_task_templates or []),
             "notification-templates": list(rule.notification_templates or []),
+            "execution-hook-templates": [
+                f"hook-{h}" for h in (rule.execution_hook_templates or [])
+            ],
             "created-at": _rfc3339(rule.created_at),
             "updated-at": _rfc3339(rule.updated_at),
         },
@@ -245,6 +248,23 @@ def _coerce_attrs(attrs: dict, *, on_create: bool) -> dict[str, Any]:
         out["run_task_templates"] = validate_run_task_specs(attrs["run-task-templates"])
     if "notification-templates" in attrs:
         out["notification_templates"] = validate_notification_specs(attrs["notification-templates"])
+    # #672: execution-hook ids to associate with every materialised workspace.
+    # Stored as bare UUIDs; accepts hook-<uuid> or bare uuid. Existence is
+    # checked at materialisation (skip-if-missing), not here.
+    if "execution-hook-templates" in attrs:
+        eht = attrs["execution-hook-templates"]
+        if not isinstance(eht, list):
+            raise HTTPException(status_code=422, detail="execution-hook-templates must be a list")
+        ids: list[str] = []
+        for item in eht:
+            try:
+                ids.append(str(uuid.UUID(str(item).removeprefix("hook-"))))
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Invalid execution hook id: {item}",
+                ) from exc
+        out["execution_hook_templates"] = ids
 
     return out
 
