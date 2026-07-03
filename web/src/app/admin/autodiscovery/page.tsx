@@ -60,6 +60,11 @@ interface AgentPool {
   attributes: { name: string }
 }
 
+interface ExecutionHookRef {
+  id: string
+  attributes: { name: string; 'hook-point': string; enabled: boolean }
+}
+
 type SortKey = 'name' | 'repo' | 'pattern' | 'enabled' | 'created'
 
 export default function AutodiscoveryPage() {
@@ -67,6 +72,7 @@ export default function AutodiscoveryPage() {
   const [rules, setRules] = useState<AutodiscoveryRule[]>([])
   const [connections, setConnections] = useState<VCSConnection[]>([])
   const [pools, setPools] = useState<AgentPool[]>([])
+  const [hooks, setHooks] = useState<ExecutionHookRef[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -143,10 +149,11 @@ export default function AutodiscoveryPage() {
 
   async function loadAll() {
     try {
-      const [rulesRes, connsRes, poolsRes] = await Promise.all([
+      const [rulesRes, connsRes, poolsRes, hooksRes] = await Promise.all([
         apiFetch('/api/terrapod/v1/autodiscovery-rules'),
         apiFetch('/api/terrapod/v1/vcs-connections'),
         apiFetch('/api/terrapod/v1/agent-pools'),
+        apiFetch('/api/terrapod/v1/execution-hooks'),
       ])
       if (!rulesRes.ok) throw new Error('Failed to load autodiscovery rules')
       const rulesData = await rulesRes.json()
@@ -158,6 +165,10 @@ export default function AutodiscoveryPage() {
       if (poolsRes.ok) {
         const pd = await poolsRes.json()
         setPools(pd.data || [])
+      }
+      if (hooksRes.ok) {
+        const hd = await hooksRes.json()
+        setHooks(hd.data || [])
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
@@ -187,6 +198,7 @@ export default function AutodiscoveryPage() {
     setLabels({})
     setOwnerEmail('')
     setVarFiles([])
+    setExecutionHookTemplates([])
     setRunTaskTemplates([])
     setNotificationTemplates([])
   }
@@ -655,14 +667,62 @@ export default function AutodiscoveryPage() {
                 />
               </div>
               <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">Execution hook ids (associated with each new workspace)</label>
-                <p className="text-xs text-slate-500 mb-2">Existing execution hook ids (<code>hook-…</code>) from the Execution Hooks admin page.</p>
-                <StringListEditor
-                  values={executionHookTemplates}
-                  onChange={setExecutionHookTemplates}
-                  placeholder="hook-0190…"
-                  addLabel="Add hook id"
-                />
+                <label className="block text-sm text-slate-300 mb-1">Execution hooks (associated with each new workspace)</label>
+                <p className="text-xs text-slate-500 mb-2">
+                  Pick from hooks defined on the{' '}
+                  <span className="text-slate-400">Execution Hooks</span> admin page — each selected hook is
+                  associated with every workspace this rule creates.
+                </p>
+                {hooks.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic">
+                    No execution hooks defined yet. Create one on the Execution Hooks admin page first.
+                  </p>
+                ) : (
+                  <div className="space-y-1.5 rounded-lg border border-slate-800 bg-slate-900/40 p-3 max-h-56 overflow-y-auto">
+                    {hooks.map(h => {
+                      const checked = executionHookTemplates.includes(h.id)
+                      return (
+                        <label key={h.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={e => {
+                              setExecutionHookTemplates(prev =>
+                                e.target.checked
+                                  ? [...prev, h.id]
+                                  : prev.filter(id => id !== h.id),
+                              )
+                            }}
+                            className="rounded border-slate-600 bg-slate-800 text-brand-500 focus:ring-brand-500"
+                          />
+                          <span className="text-slate-200">{h.attributes.name}</span>
+                          <span className="font-mono text-xs text-slate-500">{h.attributes['hook-point']}</span>
+                          {!h.attributes.enabled && (
+                            <span className="text-xs text-amber-400/80">(disabled)</span>
+                          )}
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+                {/* Preserve any templated hook id no longer present in the library (e.g. a
+                    since-deleted hook) so editing an existing rule doesn't silently drop it. */}
+                {executionHookTemplates
+                  .filter(id => !hooks.some(h => h.id === id))
+                  .map(id => (
+                    <label key={id} className="flex items-center gap-2 text-xs mt-1.5 text-slate-500">
+                      <input
+                        type="checkbox"
+                        checked
+                        onChange={() =>
+                          setExecutionHookTemplates(prev => prev.filter(x => x !== id))
+                        }
+                        className="rounded border-slate-600 bg-slate-800 text-brand-500 focus:ring-brand-500"
+                      />
+                      <span className="font-mono">{id}</span>
+                      <span className="text-amber-400/80">(not in library — untick to remove)</span>
+                    </label>
+                  ))}
               </div>
               <div className="mt-4 pt-4 border-t border-slate-800">
                 <label className="block text-sm text-slate-300 mb-1">Run task templates (created on each new workspace)</label>
