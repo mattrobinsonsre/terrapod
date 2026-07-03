@@ -1622,14 +1622,25 @@ All provider responses (show and list) include a `permissions` object:
 ```
 GET    /api/terrapod/v1/gpg-keys
 POST   /api/terrapod/v1/gpg-keys
-GET    /api/terrapod/v1/gpg-keys/{namespace}/{key_id}
-DELETE /api/terrapod/v1/gpg-keys/{namespace}/{key_id}
+GET    /api/terrapod/v1/gpg-keys/{id}
+POST   /api/terrapod/v1/gpg-keys/{id}/revoke
+DELETE /api/terrapod/v1/gpg-keys/{id}
 ```
 
 The **public** key registered here is the trust anchor for client-signed
 provider publishing: `PUT .../shasums.sig` is verified against it. Register
 a key before publishing a provider (or use the `terrapod_gpg_key` provider
 resource). See [Publishing to the Private Registry](registry-publishing.md).
+
+**Revoke a key** (`.../gpg-keys/{id}/revoke`) — POST an owner-issued revocation
+certificate (the armored output of `gpg --gen-revoke`) as the
+`revocation-certificate` attribute. Terrapod verifies it is a valid **self**
+key-revocation for the registered key, then stores the revoked key so **all**
+provider and runner signature verification fails closed for it — a revoked
+signing key can no longer verify anything, even already-published artifacts it
+signed. The key stays registered (auditable) rather than being deleted. Returns
+422 if the certificate is not a genuine self-revocation for the key. (Signature
+verification honors revocation without shelling out to `gpg`; #640.)
 
 ---
 

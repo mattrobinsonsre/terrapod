@@ -9,10 +9,11 @@ The historical TFE-shaped path was `/api/registry/private/v2/gpg-keys`;
 it was removed in v0.24.0 (see #278) and is no longer routable.
 
 Endpoints (canonical):
-    POST   /api/terrapod/v1/gpg-keys              — create
-    GET    /api/terrapod/v1/gpg-keys               — list
-    GET    /api/terrapod/v1/gpg-keys/{key_id}      — show
-    DELETE /api/terrapod/v1/gpg-keys/{key_id}      — delete
+    POST   /api/terrapod/v1/gpg-keys                  — create
+    GET    /api/terrapod/v1/gpg-keys                   — list
+    GET    /api/terrapod/v1/gpg-keys/{key_id}          — show
+    POST   /api/terrapod/v1/gpg-keys/{key_id}/revoke   — revoke (#640)
+    DELETE /api/terrapod/v1/gpg-keys/{key_id}          — delete
 """
 
 import uuid
@@ -31,6 +32,7 @@ from terrapod.services.gpg_key_service import (
     delete_gpg_key,
     get_gpg_key,
     list_gpg_keys,
+    revoke_gpg_key,
 )
 
 router = APIRouter(tags=["gpg-keys"])
@@ -58,6 +60,19 @@ class CreateGPGKeyRequest(BaseModel):
             model_config = {"populate_by_name": True}
 
         type: str = "gpg-keys"
+        attributes: Attributes
+
+    data: Data
+
+
+class RevokeGPGKeyRequest(BaseModel):
+    class Data(BaseModel):
+        class Attributes(BaseModel):
+            revocation_certificate: str = Field(..., alias="revocation-certificate")
+
+            model_config = {"populate_by_name": True}
+
+        type: str = "gpg-key-revocations"
         attributes: Attributes
 
     data: Data
@@ -143,6 +158,33 @@ async def show_gpg_key_endpoint(
     if key is None:
         raise HTTPException(status_code=404, detail="GPG key not found")
 
+    return JSONResponse(content={"data": _gpg_key_to_jsonapi(key)})
+
+
+@router.post("/gpg-keys/{key_id}/revoke")
+async def revoke_gpg_key_endpoint(
+    key_id: str,
+    body: RevokeGPGKeyRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Revoke a registered GPG key by applying an owner-issued revocation
+    certificate (#640). The key stays registered but all signature verification
+    fails closed for it. 422 if the certificate is not a valid self-revocation."""
+    try:
+        key_uuid = uuid.UUID(key_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="GPG key not found") from None
+
+    try:
+        key = await revoke_gpg_key(db, key_uuid, body.data.attributes.revocation_certificate)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+
+    if key is None:
+        raise HTTPException(status_code=404, detail="GPG key not found")
+
+    await db.commit()
     return JSONResponse(content={"data": _gpg_key_to_jsonapi(key)})
 
 

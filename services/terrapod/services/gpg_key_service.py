@@ -14,12 +14,14 @@ from pgpy.constants import (
     HashAlgorithm,
     KeyFlags,
     PubKeyAlgorithm,
+    SignatureType,
     SymmetricKeyAlgorithm,
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.db.models import GPGKey
+from terrapod.gpg_verify import is_revoked
 from terrapod.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -105,6 +107,10 @@ async def extract_signature_key_id(sig_bytes: bytes) -> str | None:
 def _verify_detached_signature_sync(public_key_armor: str, data: bytes, sig_bytes: bytes) -> bool:
     try:
         pub, _ = pgpy.PGPKey.from_blob(public_key_armor)
+        # Honor key revocation (#640): a self-revoked signing key must not
+        # verify, even though pgpy would otherwise accept its signatures.
+        if is_revoked(pub):
+            return False
         sig = pgpy.PGPSignature.from_blob(sig_bytes)
         return bool(pub.verify(data, sig))
     except Exception:
@@ -157,6 +163,57 @@ async def create_gpg_key(
 
     logger.info("GPG key created", key_id=key_id)
     return gpg_key
+
+
+def _apply_revocation_sync(stored_armor: str, revocation_cert: str) -> str | None:
+    """Merge an armored revocation certificate into the stored public key (#640).
+
+    Accepts a standalone key-revocation certificate (the armored detached
+    signature `gpg --gen-revoke` produces). Returns the new ASCII-armored public
+    key — now carrying the revocation, so ``is_revoked`` and every verify path
+    reject it — only if the certificate is a valid *self* key-revocation for the
+    stored key. Returns None otherwise (wrong key, wrong signature type, or not
+    a genuine self-revocation). Pure pgpy — no gpg binary / subprocess.
+    """
+    try:
+        key, _ = pgpy.PGPKey.from_blob(stored_armor)
+        sig = pgpy.PGPSignature.from_blob(revocation_cert)
+        # Must be a key-revocation signature AND verify as a self-signature by
+        # this exact key — a forged/other-key certificate is rejected here.
+        if getattr(sig, "type", None) != SignatureType.KeyRevocation:
+            return None
+        if not key.verify(key, sig):
+            return None
+        key |= sig
+        pub = key if key.is_public else key.pubkey
+        new_armor = str(pub)
+        # Belt-and-braces: the merged key must now read as revoked.
+        reloaded, _ = pgpy.PGPKey.from_blob(new_armor)
+        return new_armor if is_revoked(reloaded) else None
+    except Exception:
+        return None
+
+
+async def revoke_gpg_key(
+    db: AsyncSession, key_uuid: uuid.UUID, revocation_cert: str
+) -> GPGKey | None:
+    """Revoke a registered GPG key by applying an owner-issued revocation cert.
+
+    The key stays registered (auditable) but its stored armor now carries the
+    revocation, so all provider/runner signature verification fails closed for
+    it. Returns None if no such key; raises ValueError if the certificate is not
+    a valid self-revocation for the key (router maps to 422).
+    """
+    key = await get_gpg_key(db, key_uuid)
+    if key is None:
+        return None
+    new_armor = await asyncio.to_thread(_apply_revocation_sync, key.ascii_armor, revocation_cert)
+    if new_armor is None:
+        raise ValueError("not a valid self-revocation certificate for this key")
+    key.ascii_armor = new_armor
+    await db.flush()
+    logger.info("GPG key revoked", key_id=key.key_id)
+    return key
 
 
 async def import_signing_key(

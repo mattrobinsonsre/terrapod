@@ -122,6 +122,16 @@ signature is always checked against the pinned key baked into the runner image,
 so even a compromised cache cannot forge a valid publisher signature for a
 tampered binary.
 
+### Key revocation
+
+Signature verification honors OpenPGP **key revocation** (pure Python, no `gpg`
+binary): a signing key that carries a valid self-revocation stops verifying
+everything and fails closed. For a **private-registry** provider key, an operator
+applies the owner's revocation certificate (the armored output of
+`gpg --gen-revoke`) via `POST /api/terrapod/v1/gpg-keys/{id}/revoke` — the key
+stays registered but every signature it made now fails, including
+already-published artifacts. See the [API reference](api-reference.md#gpg-keys).
+
 ## Configuration
 
 Both layers share a three-level knob (default `signature`):
