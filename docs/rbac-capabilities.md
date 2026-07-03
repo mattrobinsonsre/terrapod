@@ -190,7 +190,7 @@ catalog-RBAC.
 `platform:registry-admin`, `platform:varset-admin`, `platform:user-admin`,
 `platform:audit-admin`, `platform:policy-admin`,
 `platform:autodiscovery-admin`, `platform:catalog-admin`,
-`platform:bulk-admin`, `platform:settings-admin`.
+`platform:bulk-admin`, `platform:settings-admin`, `platform:hook-admin`.
 
 These enumerate every `require_admin` / `require_admin_or_audit` surface in the
 API (roles, role-assignments, vcs-connections, pool create, binary/provider
