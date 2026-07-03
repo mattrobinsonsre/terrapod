@@ -222,6 +222,9 @@ def test_builtin_capability_sets():
     # admin = superuser: every grantable capability + every platform capability.
     assert cap.PLATFORM_CAPABILITIES <= admin
     assert cap.GRANTABLE_CAPABILITIES <= admin
+    # execution-hooks management (#619/#673) is part of the platform vocabulary,
+    # so admin's advertised capability set names it.
+    assert cap.PLATFORM_HOOK_ADMIN in admin
     # audit = read-only everywhere + the (read-only) audit-log power; no
     # write/manage caps and no platform capability other than audit-admin.
     assert {cap.WORKSPACE_READ, cap.POOL_READ, cap.REGISTRY_READ, cap.CATALOG_READ} <= audit

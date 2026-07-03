@@ -112,6 +112,7 @@ PLATFORM_AUTODISCOVERY_ADMIN = "platform:autodiscovery-admin"  # autodiscovery r
 PLATFORM_CATALOG_ADMIN = "platform:catalog-admin"  # catalog item + provider-template authoring
 PLATFORM_BULK_ADMIN = "platform:bulk-admin"  # bulk workspace operations
 PLATFORM_SETTINGS_ADMIN = "platform:settings-admin"  # platform settings (e.g. state-encryption)
+PLATFORM_HOOK_ADMIN = "platform:hook-admin"  # execution hooks + workspace association
 
 PLATFORM_CAPABILITIES: frozenset[str] = frozenset(
     {
@@ -127,6 +128,7 @@ PLATFORM_CAPABILITIES: frozenset[str] = frozenset(
         PLATFORM_CATALOG_ADMIN,
         PLATFORM_BULK_ADMIN,
         PLATFORM_SETTINGS_ADMIN,
+        PLATFORM_HOOK_ADMIN,
     }
 )
 

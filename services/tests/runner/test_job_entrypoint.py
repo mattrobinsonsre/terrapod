@@ -228,3 +228,102 @@ class TestModuleSurface:
     def test_no_bash_entrypoint_path_constant(self) -> None:
         # The bash-handoff escape hatch is gone in v0.32.1.
         assert not hasattr(job_entrypoint, "_BASH_ENTRYPOINT_PATH")
+
+
+class TestApplyPhaseExecutionHooks:
+    """post_apply hook semantics (#619 / #671): a failing post_apply hook must
+    error the run, but only AFTER state has been uploaded — the run surfaces as
+    errored while the applied state is safely persisted."""
+
+    def _cfg(self):
+        from unittest.mock import MagicMock
+
+        cfg = MagicMock()
+        cfg.has_api = False  # skip plan-file download + plan-artifacts blocks
+        return cfg
+
+    def test_post_apply_failure_errors_run_after_state_upload(self, tmp_path) -> None:
+        from unittest.mock import patch
+
+        from terrapod.runner.phases import execution_hooks as eh
+
+        strip = tmp_path
+        points: list[str] = []
+
+        def _apply(*_a, **_k):
+            # apply writes state (so the upload branch runs, not the
+            # serial-neutral skip).
+            (strip / "terraform.tfstate").write_text('{"serial":1}')
+            return 0
+
+        def _run_point(point, env=None):
+            points.append(point)
+            if point == "post_apply":
+                raise eh.HookError("post_apply", "boom", 5)
+
+        with (
+            patch.object(job_entrypoint.plan_apply, "run_apply", side_effect=_apply),
+            patch.object(job_entrypoint.uploads, "upload_state", return_value=True) as up,
+            patch.object(job_entrypoint.uploads, "post_apply_result") as par,
+            patch.object(job_entrypoint.execution_hooks, "run_point", side_effect=_run_point),
+        ):
+            rc = job_entrypoint._run_apply_phase(
+                self._cfg(), binary="tofu", var_file_argv=[], strip_dir=strip, child_grace=1.0
+            )
+
+        assert rc == 5, "run must error with the post_apply hook's exit code"
+        up.assert_called_once()  # state WAS persisted before the failure
+        par.assert_not_called()  # apply-result NOT posted (hook failed first)
+        assert points == ["pre_apply", "post_apply"]
+
+    def test_post_apply_success_posts_apply_result(self, tmp_path) -> None:
+        from unittest.mock import patch
+
+        strip = tmp_path
+        points: list[str] = []
+
+        def _apply(*_a, **_k):
+            (strip / "terraform.tfstate").write_text('{"serial":1}')
+            return 0
+
+        def _run_point(point, env=None):
+            points.append(point)
+
+        with (
+            patch.object(job_entrypoint.plan_apply, "run_apply", side_effect=_apply),
+            patch.object(job_entrypoint.uploads, "upload_state", return_value=True) as up,
+            patch.object(job_entrypoint.uploads, "post_apply_result") as par,
+            patch.object(job_entrypoint.execution_hooks, "run_point", side_effect=_run_point),
+        ):
+            rc = job_entrypoint._run_apply_phase(
+                self._cfg(), binary="tofu", var_file_argv=[], strip_dir=strip, child_grace=1.0
+            )
+
+        assert rc == 0
+        up.assert_called_once()
+        par.assert_called_once()  # apply succeeded + hook passed → result posted
+        assert points == ["pre_apply", "post_apply"]
+
+    def test_pre_apply_failure_errors_run_before_apply(self, tmp_path) -> None:
+        from unittest.mock import patch
+
+        from terrapod.runner.phases import execution_hooks as eh
+
+        strip = tmp_path
+
+        def _run_point(point, env=None):
+            if point == "pre_apply":
+                raise eh.HookError("pre_apply", "nope", 3)
+
+        with (
+            patch.object(job_entrypoint.plan_apply, "run_apply") as run_apply,
+            patch.object(job_entrypoint.uploads, "upload_state") as up,
+            patch.object(job_entrypoint.execution_hooks, "run_point", side_effect=_run_point),
+        ):
+            rc = job_entrypoint._run_apply_phase(
+                self._cfg(), binary="tofu", var_file_argv=[], strip_dir=strip, child_grace=1.0
+            )
+
+        assert rc == 3, "pre_apply failure errors the run"
+        run_apply.assert_not_called()  # nothing applied
+        up.assert_not_called()  # no state touched
