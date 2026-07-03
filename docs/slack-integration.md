@@ -190,6 +190,13 @@ it's in the message from the first post rather than racing it. The wait is
 bounded by the model call's own timeout (the summary always settles), and if the
 model is disabled or fails the message still posts — just without the review.
 
+**Delivery is guaranteed.** The approval prompt is never lost to that wait: a
+background safety net posts any needs-approval message that the AI step didn't
+deliver within a few minutes (e.g. a runner that died mid-plan), without the
+review if it genuinely never arrived. So a run that needs approval always
+reaches the channel — worst case a couple of minutes later and review-less —
+rather than waiting silently.
+
 ### Approving from Slack (RBAC)
 
 Clicking **Approve** / **Discard** carries no standing permission. Every click is
@@ -226,6 +233,8 @@ edited to record who approved, so a button can't be pressed twice.
 | Symptom | Likely cause |
 |---|---|
 | Bot shows offline; no `slack.socket_mode_connected` log | App-level token missing or lacks `connections:write`; `enabled` false; wrong Secret name. |
+| `enabled: true` but nothing connects; log shows `slack.disabled_socket_mode_off_unsupported` | `socket_mode` is set to `false`. Socket Mode is the only supported mode — set `socket_mode: true`. |
+| Clicked Approve/Discard, the run acted, but the message still shows the buttons | The action succeeded in Terrapod; only the in-place message edit (which drops the buttons / adds *Approved by …*) failed — a transient Slack error. Re-clicking is a no-op (the run has already moved on); check the run in the UI. |
 | A workspace's run notifications never appear | The workspace's **Slack channel** is unset (notifications are opt-in per workspace), or the bot isn't in that channel (`/invite @terrapod`). |
 | Messages post but the plan `.txt` never attaches | The app is missing the **`files:write`** bot scope. Add it under **OAuth & Permissions → Scopes**, then **Reinstall** the app (scope changes require reinstall). Apps created from the current manifest already include it. |
 | `not_in_channel` / `channel_not_found` in logs | Invite the bot to the channel, or use a channel the bot can post to (`chat:write.public` covers public channels). |

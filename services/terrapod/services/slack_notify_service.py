@@ -308,6 +308,11 @@ async def handle_slack_run_notify(payload: dict) -> None:
 
     try:
         if trigger == "run:needs_attention":
+            # Idempotent: the approval parent may be posted by the summariser
+            # (deferred, AI-bearing) OR by the backfill safety net. Whichever
+            # runs first wins; a second fire must not post a duplicate parent.
+            if await redis.hgetall(ref_key):
+                return
             resp = await client.chat_postMessage(
                 channel=channel, blocks=message["blocks"], text=message["text"]
             )
@@ -342,3 +347,65 @@ async def handle_slack_run_notify(payload: dict) -> None:
             )
     except Exception as exc:  # noqa: BLE001
         logger.warning("slack.run_notify_failed", trigger=trigger, err=str(exc))
+
+
+# When AI plan summaries are enabled, the needs-approval post is deferred to the
+# summariser (so the AI review is in the first render). But the summariser is
+# enqueued off the plan-JSON upload — if the runner dies between the plan-result
+# POST and that upload, the summariser never runs and the approval prompt is
+# never posted, leaving the approver waiting silently (#687). This backfill is
+# the safety net: a run that has sat in `planned` awaiting manual apply for
+# longer than the grace window (so we're past the happy-path race with the
+# summariser) with no parent message yet gets posted now — without the AI review
+# if it genuinely never arrived. Delivery is guaranteed; the AI review is not.
+_BACKFILL_GRACE_SECONDS = 180
+
+
+async def slack_approval_backfill_cycle() -> None:
+    """Periodic safety net: post any deferred needs-approval message the
+    summariser never fired (see the note above). Registered only when the Slack
+    app is on; short-circuits when AI is off (nothing is deferred then)."""
+    from datetime import timedelta
+    from types import SimpleNamespace
+
+    from terrapod.config import settings
+    from terrapod.db.models import Run, Workspace, now_utc
+    from terrapod.db.session import get_db_session
+    from terrapod.redis.client import get_redis_client
+
+    if not settings.slack.enabled or not settings.ai_summary.enabled:
+        return  # deferral only happens with AI on → nothing to back-fill otherwise
+
+    cutoff = now_utc() - timedelta(seconds=_BACKFILL_GRACE_SECONDS)
+    async with get_db_session() as db:
+        rows = (
+            await db.execute(
+                select(Run.id, Run.workspace_id)
+                .join(Workspace, Workspace.id == Run.workspace_id)
+                .where(
+                    Run.status == "planned",
+                    Run.auto_apply.is_(False),
+                    Run.plan_only.is_(False),
+                    Run.is_drift_detection.is_(False),
+                    Run.plan_finished_at.is_not(None),
+                    Run.plan_finished_at < cutoff,
+                    Workspace.slack_channel != "",
+                )
+                .limit(200)
+            )
+        ).all()
+
+    if not rows:
+        return
+    redis = get_redis_client()
+    for run_id, ws_id in rows:
+        if await redis.hgetall(f"{_MSGREF_PREFIX}{run_id}"):
+            continue  # already posted (by the summariser or a prior backfill)
+        logger.info("slack.approval_backfill", run_id=str(run_id))
+        # _from_summariser=True bypasses the AI-defer so it posts now; the
+        # handler is idempotent, so a late summariser fire won't double-post.
+        await enqueue_slack_notify(
+            SimpleNamespace(id=run_id, workspace_id=ws_id),
+            "run:needs_attention",
+            _from_summariser=True,
+        )

@@ -251,6 +251,83 @@ async def test_needs_attention_posts_parent_stores_ref_and_threads_plan():
 
 
 @pytest.mark.asyncio
+async def test_needs_attention_idempotent_when_ref_already_exists():
+    """Idempotency (#687): if a parent approval message already exists (posted by
+    the summariser or a prior backfill), a second fire must NOT post a duplicate."""
+    run = _run()
+    ws = SimpleNamespace(id="ws-1", name="prod", slack_channel="#deploys")
+    bot = MagicMock()
+    bot.chat_postMessage = AsyncMock()
+    # ref already present → already posted
+    redis = SimpleNamespace(hgetall=AsyncMock(return_value={"channel": "C1", "ts": "111.2"}))
+    with (
+        patch.object(settings.slack, "enabled", True),
+        patch.object(settings.slack, "bot_token", "xoxb-x"),
+        patch("terrapod.db.session.get_db_session", return_value=_db_cm(run, ws)),
+        patch("terrapod.redis.client.get_redis_client", return_value=redis),
+        patch("terrapod.services.slack_notify_service._bot_client", return_value=bot),
+    ):
+        await sn.handle_slack_run_notify(
+            {"run_id": "run-1", "workspace_id": "ws-1", "trigger": "run:needs_attention"}
+        )
+    bot.chat_postMessage.assert_not_called()
+
+
+def _backfill_db(rows):
+    result = MagicMock()
+    result.all.return_value = rows
+
+    class CM:
+        async def __aenter__(self):
+            return SimpleNamespace(execute=AsyncMock(return_value=result))
+
+        async def __aexit__(self, *a):
+            return False
+
+    return CM()
+
+
+@pytest.mark.asyncio
+async def test_backfill_noop_when_ai_disabled():
+    """Nothing is deferred unless AI is on, so the backfill short-circuits."""
+    enq = AsyncMock()
+    with (
+        patch.object(settings.slack, "enabled", True),
+        patch.object(settings.ai_summary, "enabled", False),
+        patch("terrapod.services.slack_notify_service.enqueue_slack_notify", enq),
+    ):
+        await sn.slack_approval_backfill_cycle()
+    enq.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_backfill_posts_overdue_unposted_and_skips_already_posted():
+    """Overdue planned-approval runs with no parent get re-fired (bypassing the
+    AI defer); ones that already have a parent are skipped."""
+    rows = [("run-unposted", "ws-1"), ("run-posted", "ws-2")]
+
+    async def _hgetall(key):
+        return {"channel": "C", "ts": "1"} if "run-posted" in key else {}
+
+    redis = SimpleNamespace(hgetall=AsyncMock(side_effect=_hgetall))
+    enq = AsyncMock()
+    with (
+        patch.object(settings.slack, "enabled", True),
+        patch.object(settings.ai_summary, "enabled", True),
+        patch("terrapod.db.session.get_db_session", return_value=_backfill_db(rows)),
+        patch("terrapod.redis.client.get_redis_client", return_value=redis),
+        patch("terrapod.services.slack_notify_service.enqueue_slack_notify", enq),
+    ):
+        await sn.slack_approval_backfill_cycle()
+    # only the unposted run is re-fired, as a summariser-bypass needs_attention
+    enq.assert_awaited_once()
+    posted_run, trigger = enq.await_args.args[0], enq.await_args.args[1]
+    assert str(posted_run.id) == "run-unposted"
+    assert trigger == "run:needs_attention"
+    assert enq.await_args.kwargs.get("_from_summariser") is True
+
+
+@pytest.mark.asyncio
 async def test_completed_threads_under_the_approval_parent():
     run = _run()
     ws = SimpleNamespace(id="ws-1", name="prod", slack_channel="#deploys")

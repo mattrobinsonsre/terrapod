@@ -200,12 +200,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # Registered only when the Slack app is enabled; the handler also no-ops
     # unless the target workspace opted in with its own channel.
     if settings.slack.enabled:
-        from terrapod.services.slack_notify_service import handle_slack_run_notify
+        from terrapod.services.slack_notify_service import (
+            handle_slack_run_notify,
+            slack_approval_backfill_cycle,
+        )
 
         register_trigger_handler(
             "slack_run_notify",
             handler=handle_slack_run_notify,
             description="Post/update the Slack run message for a run event",
+        )
+        # Safety net (#687): post any needs-approval message that was deferred
+        # to the AI summariser but never fired (e.g. the runner died before the
+        # plan-JSON upload). No-ops unless AI is on (nothing is deferred then).
+        register_periodic_task(
+            "slack_approval_backfill",
+            interval_seconds=60,
+            handler=slack_approval_backfill_cycle,
+            description="Backfill deferred Slack approval posts the summariser missed",
         )
 
     # Run task webhook delivery handler

@@ -39,8 +39,11 @@ async def start_slack(settings) -> None:
     if not cfg.enabled:
         return
     if not cfg.socket_mode:
-        # Request-URL mode is wired at the ingress/receiver layer, not here.
-        logger.info("slack.request_url_mode_selected_socket_start_skipped")
+        # Socket Mode is the only mode Terrapod wires up today. With it off the
+        # integration is inert — no outbound connection, no slash command, no
+        # interactive approvals — even though `enabled: true`. Warn loudly rather
+        # than skip silently so a mis-set `socket_mode: false` is diagnosable.
+        logger.warning("slack.disabled_socket_mode_off_unsupported")
         return
     if not (cfg.app_token and cfg.bot_token):
         logger.warning(
