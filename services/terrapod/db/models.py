@@ -399,6 +399,11 @@ class Workspace(Base):
     # State divergence — set when an apply Job succeeds but state upload fails
     state_diverged: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
+    # Slack app run notifications (#556): channel this workspace's interactive
+    # approval / auto-apply / drift messages post to. Empty → fall back to the
+    # config-level `slack.default_channel`. Only used when the Slack app is enabled.
+    slack_channel: Mapped[str] = mapped_column(String(128), nullable=False, server_default="")
+
     # AI plan summary (#401). `ai_summary_mode` is a three-state opt-in:
     # - "default": follow the global ai_summary.enabled toggle
     # - "enabled": always summarise (no-op if global is disabled — the UI
