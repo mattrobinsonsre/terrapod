@@ -72,7 +72,7 @@ async def test_enabled_with_tokens_connects_and_greets():
 
     with (
         patch.dict(sys.modules, fake_modules),
-        patch("terrapod.redis.client.get_redis", return_value=fake_redis),
+        patch("terrapod.redis.client.get_redis_client", return_value=fake_redis),
     ):
         await slack_service.start_slack(
             _settings(

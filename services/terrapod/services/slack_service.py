@@ -80,9 +80,9 @@ async def start_slack(settings) -> None:
 async def _post_hello(web, channel: str) -> None:
     """Post a one-time connectivity check, de-duplicated across replicas."""
     try:
-        from terrapod.redis.client import get_redis
+        from terrapod.redis.client import get_redis_client
 
-        redis = get_redis()
+        redis = get_redis_client()
         # Only the replica that wins the SET NX greets the channel.
         won = await redis.set(_HELLO_DEDUP_KEY, "1", nx=True, ex=_HELLO_DEDUP_TTL)
         if not won:
