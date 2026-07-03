@@ -835,6 +835,11 @@ def create_application() -> FastAPI:
 
     include_terrapod(execution_hooks_router)
 
+    # Slack account-linking — bind a Slack identity to a Terrapod identity (#556).
+    from terrapod.api.routers.slack import router as slack_router
+
+    include_terrapod(slack_router)
+
     # Remote-state consumer allowlist — Terrapod-native management of the
     # producer-controlled cross-workspace `terraform_remote_state` grants
     # (#344). The CLI never manages these; the read-path authorization

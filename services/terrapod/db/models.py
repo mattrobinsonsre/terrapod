@@ -23,6 +23,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -1392,6 +1393,36 @@ class ExecutionHookWorkspace(Base):
     )
 
     workspace: Mapped["Workspace"] = relationship(lazy="joined")
+
+
+# --- Slack identity linking (#556) ---
+
+
+class SlackIdentityLink(Base):
+    """Durable binding of a Slack user to a Terrapod identity (#556).
+
+    Established once via an explicit login (the "connect your account" flow), then
+    reused for every subsequent Slack-initiated action. Long-lived **identity**,
+    never entitlement: authorization (RBAC) is re-checked live on each action, so a
+    persistent binding never grants standing permission. Keyed by
+    (team, user) so one Terrapod can serve multiple Slack workspaces.
+    """
+
+    __tablename__ = "slack_identity_links"
+    __table_args__ = (UniqueConstraint("slack_team_id", "slack_user_id", name="uq_slack_identity"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=generate_uuid7
+    )
+    slack_team_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    slack_user_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    # The bound Terrapod principal. Email-first identity; no FK (a user row may not
+    # exist for SSO-only identities, mirroring role_assignments' email keying).
+    terrapod_email: Mapped[str] = mapped_column(String(320), nullable=False)
+    linked_via: Mapped[str] = mapped_column(String(32), nullable=False, default="slash_command")
+    linked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=now_utc
+    )
 
 
 # --- Configuration Versions ---

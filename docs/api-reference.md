@@ -2750,6 +2750,41 @@ Sends a test payload to the configured destination and returns the delivery resp
 
 ---
 
+## Slack account linking
+
+Binds a Slack identity (team + user) to a Terrapod identity, established once via
+an explicit login (the "connect your Terrapod account" flow) and reused for every
+subsequent Slack-initiated action. The binding is long-lived **identity**, never
+entitlement — RBAC is re-checked live on each action. See
+[Slack integration](slack-integration.md) (#556).
+
+### Link account
+
+```
+POST /api/terrapod/v1/slack/link
+```
+
+Body `{"state": "<signed-state>"}`. Requires an authenticated Terrapod user;
+verifies + consumes the single-use signed state (minted by the `/terrapod link`
+flow) and binds the **acting** user's identity to the Slack (team, user) in the
+state. `422` if the state is missing, `400` if it is invalid/expired/already used.
+
+### List my Slack links
+
+```
+GET /api/terrapod/v1/slack/links
+```
+
+Returns the current user's Slack identity links.
+
+### Unlink
+
+```
+DELETE /api/terrapod/v1/slack/links/{link_id}
+```
+
+Removes one of the current user's own links (`404` if it isn't theirs).
+
 ## Execution Hooks
 
 Reusable custom-shell steps run inside the runner Job at fixed points
