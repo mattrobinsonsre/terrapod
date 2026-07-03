@@ -1,5 +1,7 @@
 # Split-networking deployments
 
+> Part of Terrapod's **restricted-network & multi-cluster execution** design focus — see [Why Terrapod](../README.md#why-terrapod). Related: the [ARC execution model](architecture.md#runner-architecture-arc-pattern), the [webhook split](deployment-webhook-ingress.md), and [forward-proxy support](deployment-proxy.md).
+
 By default, every Terrapod consumer — a human's browser, the `terraform` CLI cloud block, listener pods in remote clusters, runner Jobs uploading state — reaches the API through a single `Ingress`. That works fine when the management plane is freely reachable from every network the consumers live in.
 
 It often isn't. Common shapes where it isn't:

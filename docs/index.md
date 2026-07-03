@@ -10,6 +10,16 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
 ---
 
+## Why Terrapod
+
+Beyond broad TFE compatibility, Terrapod is built with three deliberate design foci:
+
+- **Restricted-network & multi-cluster execution.** Runner listeners connect *outbound* over SSE and create Kubernetes Jobs locally, so the API never needs inbound reach into the clusters where runs happen. VCS is polling-first (webhooks optional), and a pull-through provider mirror + CLI binary cache — with an air-gap **sealed mode** — let runners resolve providers and binaries with no upstream internet for cached platforms. See [Split-networking deployments](deployment-network-isolation.md) and the [ARC execution model](architecture.md#runner-architecture-arc-pattern).
+- **An AI-augmented review layer.** Every plan can carry an LLM-generated change summary and risk assessment, with failure analysis on errored plans and a chat to interrogate a run — provider-agnostic via LiteLLM, and **disabled by default**. See [AI Plan Summary](ai-plan-summary.md).
+- **A low contribution barrier.** The platform core is **Python** (FastAPI + async SQLAlchemy); the consumer ecosystem (Go SDK, Terraform provider, migration/publish CLIs) is **Go**. AI-assisted contributions are welcome — see [`llms.txt`](../llms.txt), [AGENTS.md](../AGENTS.md), and [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+---
+
 ## Features
 
 | Feature | Description |
