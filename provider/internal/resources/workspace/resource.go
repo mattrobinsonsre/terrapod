@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
@@ -173,18 +174,39 @@ func (r *workspaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 			"var_files": schema.ListAttribute{
 				Description: "List of .tfvars file paths passed as -var-file arguments to plan/apply.",
+				// Optional + Computed with UseStateForUnknown — same rationale as
+				// drift_ignore_rules (#684): tolerate a server-held value the
+				// config doesn't set. Set `= []` to clear.
 				Optional:    true,
+				Computed:    true,
 				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"trigger_prefixes": schema.ListAttribute{
 				Description: "Repo-root-relative directories to include in the sparse VCS fetch in addition to `working_directory`. Required when the workspace's terraform crosses directory boundaries via relative module sources (`module \"foo\" { source = \"../foo\" }`) — sparse-checkout cone mode includes parents of the listed directories but NOT siblings, so the referenced sibling must be declared here or the runner will error with `Unable to evaluate directory symlink`.",
 				Optional:    true,
+				Computed:    true,
 				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"drift_ignore_rules": schema.ListAttribute{
 				Description: "Glob-aware patterns suppressed by the drift-result classifier (#482). Each entry is a Terraform resource address optionally suffixed with a dotted attribute path; `*` matches zero or more non-`.` characters (so it can span `[N]` indices but not segment boundaries), and `[*]` matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys — so use carefully. Examples: `aws_iam_role.foo.tags.Environment`, `aws_autoscaling_group.workers[*].desired_capacity`, `module.eks*.argocd_cluster.*.config.tls_client_config.ca_data`, `aws_iam_role.foo`. Empty list (the default) means classic drift behaviour: every plan diff counts. Affects drift-detection runs only — regular plan/apply is untouched.",
+				// Optional + Computed: the server may hold a value this config
+				// doesn't set (e.g. set out-of-band via the bulk-update endpoint),
+				// so omitting it must mean "leave alone" (plan = unknown), not
+				// "force null" — otherwise the read-back's non-null value fails
+				// the framework's "inconsistent result after apply" check (#684).
+				// Set `= []` to explicitly clear.
 				Optional:    true,
+				Computed:    true,
 				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"drift_detection_enabled": schema.BoolAttribute{
 				Description: "Enable drift detection for this workspace. Defaults to true for VCS-connected workspaces, false otherwise.",
