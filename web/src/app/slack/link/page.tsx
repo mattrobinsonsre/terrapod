@@ -47,21 +47,17 @@ function SlackLinkInner() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ state }),
         })
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}))
-          throw new Error(
-            data.detail ||
-              'This link is invalid, expired, or already used. Run `/terrapod link` again.',
-          )
-        }
+        if (!res.ok) throw new Error('preview rejected')
         const data = await res.json()
         setSlackTeam(data?.data?.['slack-team-id'] || '')
         setSlackUser(data?.data?.['slack-user-id'] || '')
         setEmail(data?.data?.email || auth.email)
         setStatus('confirm')
-      } catch (e) {
+      } catch {
+        // Any preview failure (invalid signature, expired, already used) is the
+        // same to the user — one friendly message, never a raw server detail.
         setStatus('error')
-        setMessage(e instanceof Error ? e.message : 'Could not check this link.')
+        setMessage('This link is invalid, expired, or already used. Run `/terrapod link` again.')
       }
     })()
   }, [state])
