@@ -75,12 +75,9 @@ async def mint_link_state(team_id: str, user_id: str, response_url: str = "") ->
     return token
 
 
-async def verify_and_consume_state(state: str) -> tuple[str, str, str]:
-    """Verify signature + expiry and BURN the nonce (single use).
-
-    Returns ``(team_id, user_id, response_url)`` — response_url is "" when none was
-    captured at mint time.
-    """
+def _decode_verified_payload(state: str) -> dict:
+    """Verify the signature + expiry of a link state and return its payload.
+    Does NOT touch the single-use nonce — callers decide whether to peek or burn."""
     try:
         payload_b64, sig = state.split(".", 1)
     except ValueError as exc:
@@ -96,7 +93,31 @@ async def verify_and_consume_state(state: str) -> tuple[str, str, str]:
 
     if int(payload.get("exp", 0)) < int(time.time()):
         raise LinkStateError("link state expired")
+    return payload
 
+
+async def peek_link_state(state: str) -> tuple[str, str]:
+    """Verify the state and confirm its nonce is still live WITHOUT consuming it —
+    so the browser confirm screen can show *which* Slack identity a state would
+    bind before the user commits (confused-deputy defence). Returns
+    ``(team_id, user_id)``. Consumption still happens in
+    ``verify_and_consume_state`` when the user confirms."""
+    payload = _decode_verified_payload(state)
+    nonce = payload.get("n", "")
+    from terrapod.redis.client import get_redis_client
+
+    if not await get_redis_client().exists(f"{_NONCE_PREFIX}{nonce}"):
+        raise LinkStateError("link state already used or expired")
+    return str(payload["t"]), str(payload["u"])
+
+
+async def verify_and_consume_state(state: str) -> tuple[str, str, str]:
+    """Verify signature + expiry and BURN the nonce (single use).
+
+    Returns ``(team_id, user_id, response_url)`` — response_url is "" when none was
+    captured at mint time.
+    """
+    payload = _decode_verified_payload(state)
     nonce = payload.get("n", "")
     from terrapod.redis.client import get_redis_client
 

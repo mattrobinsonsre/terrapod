@@ -136,5 +136,10 @@ export default defineConfig({
       testMatch: 'sse-live-update.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
+    {
+      name: 'slack',
+      testMatch: 'slack.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
   ],
 });

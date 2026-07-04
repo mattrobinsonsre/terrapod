@@ -90,6 +90,47 @@ class TestLinkAccount:
         assert kwargs["email"] == "alice@example.com"
 
 
+class TestPreviewLink:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_missing_state_422(self, *_m):
+        app, _db = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            r = await c.post(f"{_LINK}/preview", json={}, headers=_AUTH)
+        assert r.status_code == 422
+
+    @patch("terrapod.services.slack_link_service.peek_link_state", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_bad_state_400(self, _idb, _ir, _is, peek):
+        from terrapod.services.slack_link_service import LinkStateError
+
+        peek.side_effect = LinkStateError("link state already used or expired")
+        app, _db = _make_app(_user())
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            r = await c.post(f"{_LINK}/preview", json={"state": "bad"}, headers=_AUTH)
+        assert r.status_code == 400
+
+    @patch("terrapod.services.slack_link_service.peek_link_state", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_preview_describes_identity_against_caller(self, _idb, _ir, _is, peek):
+        """Preview shows WHICH Slack identity would bind + the caller's email, and
+        does NOT consume the state (that only happens on confirm)."""
+        peek.return_value = ("T123", "U456")
+        app, _db = _make_app(_user("alice@example.com"))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            r = await c.post(f"{_LINK}/preview", json={"state": "good"}, headers=_AUTH)
+        assert r.status_code == 200
+        attrs = r.json()["data"]
+        assert attrs["slack-team-id"] == "T123"
+        assert attrs["slack-user-id"] == "U456"
+        assert attrs["email"] == "alice@example.com"
+
+
 class TestListLinks:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

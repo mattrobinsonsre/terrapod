@@ -147,8 +147,10 @@ From any channel the bot is in:
 
 - **`/terrapod link`** — Terrapod replies (only to you) with a *Connect your
   Terrapod account* button. Click it, log in to Terrapod as you normally would,
-  and the binding is recorded. The link is **single-use and expires in 10
-  minutes**.
+  and you land on a **confirmation screen** that names the Slack user + team
+  being linked to your Terrapod account. The binding is recorded only when you
+  click **Confirm & link** — so opening someone else's link never binds your
+  account silently. The link is **single-use and expires in 10 minutes**.
 - **`/terrapod status`** — shows whether you're linked, and as whom.
 - **`/terrapod unlink`** — removes your binding.
 
@@ -157,7 +159,9 @@ re-checks your Terrapod RBAC live, so a link never grants standing access, and i
 your Terrapod permissions change the next action reflects it immediately. You can
 also view/remove your links from the Terrapod web UI. Under the hood the connect
 link carries a Terrapod-signed, single-use token, so no one can forge a binding
-for someone else's Slack id.
+for someone else's Slack id; and because the browser shows the Slack identity on
+an explicit confirm step before binding, a link tricked into someone else's
+browser can't silently bind their Terrapod account to an attacker's Slack user.
 
 ## Run notifications (opt-in, per workspace)
 

@@ -34,6 +34,34 @@ def _link_json(link: SlackIdentityLink) -> dict:
     }
 
 
+@router.post("/slack/link/preview")
+async def preview_link(
+    body: dict = Body(...),
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> JSONResponse:
+    """Describe (without consuming) the Slack identity a signed state would bind,
+    so the browser can show a confirm screen before committing. This is the
+    confused-deputy defence: binding is a deliberate act on a page that names the
+    Slack user + team being linked to *your* Terrapod account, not an automatic
+    bind on page load."""
+    state = (body.get("state") or "").strip()
+    if not state:
+        raise HTTPException(status_code=422, detail="Missing link state")
+    try:
+        team_id, slack_user_id = await slack_link_service.peek_link_state(state)
+    except slack_link_service.LinkStateError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return JSONResponse(
+        content={
+            "data": {
+                "slack-team-id": team_id,
+                "slack-user-id": slack_user_id,
+                "email": user.email,
+            }
+        }
+    )
+
+
 @router.post("/slack/link")
 async def link_account(
     body: dict = Body(...),

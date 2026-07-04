@@ -5,18 +5,25 @@ import { useSearchParams } from 'next/navigation'
 import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 
-type Status = 'working' | 'success' | 'error'
+// The link is a deliberate act, not an automatic bind on page load: we first
+// PREVIEW which Slack identity the signed state would bind (without consuming
+// it), show it against the logged-in Terrapod account, and only bind when the
+// user clicks Confirm. This is the confused-deputy defence — a victim tricked
+// into opening someone else's link sees an unfamiliar Slack user and can bail.
+type Status = 'loading' | 'confirm' | 'linking' | 'success' | 'error'
 
 function SlackLinkInner() {
   const params = useSearchParams()
   const state = params.get('state') || ''
-  const [status, setStatus] = useState<Status>('working')
-  const [message, setMessage] = useState('Linking your Slack account…')
+  const [status, setStatus] = useState<Status>('loading')
+  const [message, setMessage] = useState('Checking your link…')
   const [email, setEmail] = useState('')
+  const [slackTeam, setSlackTeam] = useState('')
+  const [slackUser, setSlackUser] = useState('')
   const ran = useRef(false)
 
   useEffect(() => {
-    if (ran.current) return // link state is single-use — never POST it twice
+    if (ran.current) return
     ran.current = true
 
     if (!state) {
@@ -35,7 +42,7 @@ function SlackLinkInner() {
 
     ;(async () => {
       try {
-        const res = await apiFetch('/api/terrapod/v1/slack/link', {
+        const res = await apiFetch('/api/terrapod/v1/slack/link/preview', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ state }),
@@ -48,15 +55,42 @@ function SlackLinkInner() {
           )
         }
         const data = await res.json()
+        setSlackTeam(data?.data?.['slack-team-id'] || '')
+        setSlackUser(data?.data?.['slack-user-id'] || '')
         setEmail(data?.data?.email || auth.email)
-        setStatus('success')
-        setMessage('Your Slack account is now linked to Terrapod.')
+        setStatus('confirm')
       } catch (e) {
         setStatus('error')
-        setMessage(e instanceof Error ? e.message : 'Linking failed.')
+        setMessage(e instanceof Error ? e.message : 'Could not check this link.')
       }
     })()
   }, [state])
+
+  async function confirmLink() {
+    setStatus('linking')
+    setMessage('Linking your Slack account…')
+    try {
+      const res = await apiFetch('/api/terrapod/v1/slack/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(
+          data.detail ||
+            'This link is invalid, expired, or already used. Run `/terrapod link` again.',
+        )
+      }
+      const data = await res.json()
+      setEmail(data?.data?.email || email)
+      setStatus('success')
+      setMessage('Your Slack account is now linked to Terrapod.')
+    } catch (e) {
+      setStatus('error')
+      setMessage(e instanceof Error ? e.message : 'Linking failed.')
+    }
+  }
 
   const tone =
     status === 'success'
@@ -72,12 +106,48 @@ function SlackLinkInner() {
           Connect Slack to Terrapod
         </h1>
         <div className={`rounded-lg border p-6 text-sm ${tone}`}>
-          <p>{message}</p>
-          {status === 'success' && email && (
-            <p className="mt-2 text-slate-400">
-              Linked as <span className="font-medium text-slate-200">{email}</span>. You can close
-              this tab and return to Slack.
-            </p>
+          {status === 'confirm' ? (
+            <div>
+              <p className="text-slate-300">
+                Link this Slack account to <span className="font-medium text-slate-100">your</span>{' '}
+                Terrapod identity? Every future Slack action (approve/discard) will run as this
+                Terrapod user with their permissions.
+              </p>
+              <dl className="mt-4 space-y-2">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-xs text-slate-500">Slack user</dt>
+                  <dd className="text-slate-200 font-mono text-xs">{slackUser || 'unknown'}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-xs text-slate-500">Slack team</dt>
+                  <dd className="text-slate-200 font-mono text-xs">{slackTeam || 'unknown'}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-xs text-slate-500">Terrapod account</dt>
+                  <dd className="text-slate-200 font-medium">{email}</dd>
+                </div>
+              </dl>
+              <p className="mt-4 text-xs text-amber-400/90">
+                Only continue if you just ran <code>/terrapod link</code> in Slack yourself. If this
+                Slack user isn&apos;t you, close this tab and don&apos;t link.
+              </p>
+              <button
+                onClick={confirmLink}
+                className="mt-4 w-full rounded bg-brand-600 hover:bg-brand-500 px-4 py-2 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                Confirm &amp; link
+              </button>
+            </div>
+          ) : (
+            <>
+              <p>{message}</p>
+              {status === 'success' && email && (
+                <p className="mt-2 text-slate-400">
+                  Linked as <span className="font-medium text-slate-200">{email}</span>. You can
+                  close this tab and return to Slack.
+                </p>
+              )}
+            </>
           )}
         </div>
       </div>
