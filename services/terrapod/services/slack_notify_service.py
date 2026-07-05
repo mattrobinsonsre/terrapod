@@ -145,11 +145,18 @@ def counts_text(run) -> str:
 
 
 def _link_ctx(url: str) -> list:
-    return (
-        [{"type": "context", "elements": [{"type": "mrkdwn", "text": f"<{url}|Open in Terrapod>"}]}]
-        if url
-        else []
-    )
+    """Footer context: the deep link plus this deployment's label (#691), so a
+    shared Slack channel can tell multiple Terrapod deployments apart. Either
+    element is omitted when unset; the whole block drops if both are empty."""
+    from terrapod.config import settings
+
+    elements = []
+    if url:
+        elements.append({"type": "mrkdwn", "text": f"<{url}|Open in Terrapod>"})
+    label = (settings.slack.label or "").strip()
+    if label:
+        elements.append({"type": "mrkdwn", "text": f"Terrapod: *{label}*"})
+    return [{"type": "context", "elements": elements}] if elements else []
 
 
 def resolved_parent_blocks(ws_name: str, counts: str, status_line: str, url: str) -> list:

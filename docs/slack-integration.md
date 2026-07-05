@@ -211,6 +211,38 @@ to `/terrapod link`; if you're linked but lack permission on that workspace, an
 ephemeral "no permission" — neither touches the run. On success the message is
 edited to record who approved, so a button can't be pressed twice.
 
+## Running multiple Terrapod deployments in one Slack workspace
+
+Terrapod is single-org and self-hosted — a company often runs **several
+deployments** (per team, per environment). They can all talk to the **same
+Slack workspace**, but two Slack-workspace-level resources are singletons and
+must be made distinct per deployment:
+
+1. **The slash command.** A Slack workspace treats a slash command as unique, so
+   only one app can own `/terrapod`. Give each deployment's Slack app a distinct
+   command in its manifest (e.g. `/terrapod-prod`, `/terrapod-staging`) and set
+   the matching **`api.config.slack.command`** so Terrapod answers it.
+2. **The app identity.** Each deployment installs its own Slack app; give them
+   distinct **names** (and icons) in the manifest so `@terrapod-prod` vs
+   `@terrapod-staging` are recognisable. Set a short **`api.config.slack.label`**
+   (e.g. `prod`) — it's rendered in the footer of every run message and the
+   approval, so a **shared channel** clearly attributes each Terrapod.
+
+Everything else already isolates per deployment: each has its own database and
+account-link table, its own signing key, and its own outbound Socket Mode
+connection — so account linking, RBAC, approvals, and notifications never cross
+between deployments. Only the command name and app identity need to be unique.
+
+```yaml
+# deployment "prod"
+api:
+  config:
+    slack:
+      enabled: true
+      command: "/terrapod-prod"   # matches this app's manifest command
+      label: "prod"               # shown in every message footer
+```
+
 ## Reference
 
 **Helm values** (`api.config.slack`):
@@ -219,6 +251,8 @@ edited to record who approved, so a button can't be pressed twice.
 |---|---|---|
 | `enabled` | `false` | Master switch for the integration. |
 | `socket_mode` | `true` | Outbound Socket Mode (the only supported mode today). |
+| `command` | `/terrapod` | The slash command this deployment answers — must match the command in its Slack app manifest. Give each deployment sharing one Slack workspace a distinct command (see below). |
+| `label` | `""` | Short per-deployment label shown in every Slack message (e.g. `prod`), so a shared channel can tell deployments apart. Empty → omitted. |
 | `existingSecret` | `""` | Name of the K8s Secret holding the three tokens. |
 | `existingSecretKeys.botToken` / `.appToken` / `.signingSecret` | `bot-token` / `app-token` / `signing-secret` | Keys within that Secret. |
 

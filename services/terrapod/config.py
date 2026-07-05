@@ -858,6 +858,27 @@ class SlackConfig(BaseModel):
             "Slack reaches the Request-URL endpoint via the public webhook ingress."
         ),
     )
+    # Multi-deployment (#691): a Slack workspace treats a slash command as unique
+    # and every app is named "Terrapod", so several Terrapod deployments sharing
+    # one Slack workspace collide. Give each deployment a distinct `command`
+    # (matching the command set in its Slack app manifest) and a short `label`
+    # rendered in every message so a shared channel attributes each one.
+    command: str = Field(
+        default="/terrapod",
+        description=(
+            "The slash command this deployment answers (must match the command in "
+            "its Slack app manifest). Give each deployment sharing one Slack "
+            "workspace a distinct command, e.g. /terrapod-prod."
+        ),
+    )
+    label: str = Field(
+        default="",
+        description=(
+            "Short human label for this deployment (e.g. 'prod', 'us-west-2'), shown "
+            "in Slack run messages so a shared channel can tell deployments apart. "
+            "Empty → omitted."
+        ),
+    )
     # --- secrets: delivered via secretKeyRef → env, never rendered to the ConfigMap ---
     bot_token: str = Field(default="", description="Bot User OAuth Token (xoxb-…)")
     app_token: str = Field(

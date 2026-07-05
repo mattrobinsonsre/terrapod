@@ -891,6 +891,8 @@
           "properties": {
             "enabled": { "type": "boolean" },
             "socket_mode": { "type": "boolean" },
+            "command": { "type": "string" },
+            "label": { "type": "string" },
             "existingSecret": { "type": "string" },
             "existingSecretKeys": {
               "type": "object",

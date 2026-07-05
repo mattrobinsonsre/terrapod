@@ -300,6 +300,8 @@ data:
       # never rendered here.
       enabled: {{ .Values.api.config.slack.enabled }}
       socket_mode: {{ .Values.api.config.slack.socket_mode }}
+      command: {{ .Values.api.config.slack.command | default "/terrapod" | quote }}
+      label: {{ .Values.api.config.slack.label | default "" | quote }}
     {{- end }}
     {{- if .Values.api.config.notifications }}
     notifications:

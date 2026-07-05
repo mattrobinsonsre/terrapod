@@ -532,6 +532,7 @@ jobs:
           # Slack config-channel: non-secret settings render into config.yaml,
           # secret tokens arrive via secretKeyRef env (never the ConfigMap).
           echo "$out" | grep -q "socket_mode: true" || { echo "FAIL: slack config not rendered into config.yaml"; exit 1; }
+          echo "$out" | grep -q 'command: "/terrapod"' || { echo "FAIL: slack command not rendered into config.yaml (#691)"; exit 1; }
           echo "$out" | grep -q "TERRAPOD_SLACK__BOT_TOKEN" || { echo "FAIL: slack bot-token secretKeyRef env missing"; exit 1; }
           echo "values-local renders OK (incl. Slack config + secretKeyRef)"
       - name: Eval values render (embedded Postgres/Redis)

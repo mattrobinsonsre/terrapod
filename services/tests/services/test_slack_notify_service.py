@@ -118,6 +118,28 @@ async def test_ai_disabled_enqueues_everything_immediately():
 
 
 @pytest.mark.asyncio
+async def test_footer_shows_deployment_label_when_set():
+    """Multi-deployment (#691): a per-deployment label renders in the message
+    footer so a shared channel can attribute each Terrapod; absent when unset."""
+    db = _fake_db_no_ai()
+    run = _run()
+    ws = SimpleNamespace(id="ws-1", name="prod")
+    with (
+        patch.object(settings, "external_url", "https://terrapod.example.com"),
+        patch.object(settings.slack, "label", "us-west-2"),
+    ):
+        msg = await sn._build_message(db, run, ws, "run:completed")
+    assert "Terrapod: *us-west-2*" in str(msg["blocks"])
+
+    with (
+        patch.object(settings, "external_url", "https://terrapod.example.com"),
+        patch.object(settings.slack, "label", ""),
+    ):
+        msg2 = await sn._build_message(db, run, ws, "run:completed")
+    assert "Terrapod: *" not in str(msg2["blocks"])
+
+
+@pytest.mark.asyncio
 async def test_needs_attention_message_has_approve_discard_buttons():
     db = _fake_db_no_ai()
     run = _run()

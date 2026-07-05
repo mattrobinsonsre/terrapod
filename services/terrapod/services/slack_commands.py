@@ -69,9 +69,12 @@ async def _handle_status(team_id: str, user_id: str) -> dict:
             "response_type": "ephemeral",
             "text": f":white_check_mark: Linked to Terrapod as *{link.terrapod_email}*.",
         }
+    from terrapod.config import settings
+
+    cmd = settings.slack.command
     return {
         "response_type": "ephemeral",
-        "text": "Not linked yet. Run `/terrapod link` to connect your Terrapod account.",
+        "text": f"Not linked yet. Run `{cmd} link` to connect your Terrapod account.",
     }
 
 
@@ -101,9 +104,12 @@ async def build_slash_response(
         return await _handle_status(team_id, user_id)
     if sub == "unlink":
         return await _handle_unlink(team_id, user_id)
+    from terrapod.config import settings
+
+    cmd = settings.slack.command
     return {
         "response_type": "ephemeral",
-        "text": "Usage: `/terrapod link` · `/terrapod status` · `/terrapod unlink`",
+        "text": f"Usage: `{cmd} link` · `{cmd} status` · `{cmd} unlink`",
     }
 
 
@@ -134,8 +140,10 @@ async def handle_socket_request(client, req) -> None:
         await _ack()  # ack other events; nothing to act on
         return
 
+    from terrapod.config import settings
+
     payload = req.payload or {}
-    if payload.get("command") != "/terrapod":
+    if payload.get("command") != settings.slack.command:
         await _ack()
         return
 
