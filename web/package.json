@@ -10,7 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@radix-ui/react-dialog": "^1.1.17",
+    "@radix-ui/react-dialog": "^1.1.18",
     "@radix-ui/react-dropdown-menu": "^2.1.18",
     "@radix-ui/react-tabs": "^1.1.15",
     "@zxcvbn-ts/core": "^3.0.4",
