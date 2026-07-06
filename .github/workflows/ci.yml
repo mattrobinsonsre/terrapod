@@ -1491,35 +1491,35 @@ jobs:
       # `cosign verify-attestation`/`gh attestation verify` don't read as a
       # referrer; #549 follow-up.)
       - name: SBOM — terrapod-api
-        uses: actions/attest-sbom@bd218ad0dbcb3e146bd073d1d9c6d78e08aa8a0b # v2
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
           subject-name: ${{ env.REGISTRY }}/terrapod-api
           subject-digest: ${{ steps.digests.outputs.terrapod_api_digest }}
           sbom-path: dist/sbom-terrapod-api.spdx.json
           push-to-registry: true
       - name: SBOM — terrapod-web
-        uses: actions/attest-sbom@bd218ad0dbcb3e146bd073d1d9c6d78e08aa8a0b # v2
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
           subject-name: ${{ env.REGISTRY }}/terrapod-web
           subject-digest: ${{ steps.digests.outputs.terrapod_web_digest }}
           sbom-path: dist/sbom-terrapod-web.spdx.json
           push-to-registry: true
       - name: SBOM — terrapod-runner
-        uses: actions/attest-sbom@bd218ad0dbcb3e146bd073d1d9c6d78e08aa8a0b # v2
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
           subject-name: ${{ env.REGISTRY }}/terrapod-runner
           subject-digest: ${{ steps.digests.outputs.terrapod_runner_digest }}
           sbom-path: dist/sbom-terrapod-runner.spdx.json
           push-to-registry: true
       - name: SBOM — terrapod-listener
-        uses: actions/attest-sbom@bd218ad0dbcb3e146bd073d1d9c6d78e08aa8a0b # v2
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
           subject-name: ${{ env.REGISTRY }}/terrapod-listener
           subject-digest: ${{ steps.digests.outputs.terrapod_listener_digest }}
           sbom-path: dist/sbom-terrapod-listener.spdx.json
           push-to-registry: true
       - name: SBOM — terrapod-migrations
-        uses: actions/attest-sbom@bd218ad0dbcb3e146bd073d1d9c6d78e08aa8a0b # v2
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
         with:
           subject-name: ${{ env.REGISTRY }}/terrapod-migrations
           subject-digest: ${{ steps.digests.outputs.terrapod_migrations_digest }}
