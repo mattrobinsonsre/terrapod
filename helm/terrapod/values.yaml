@@ -509,8 +509,8 @@ api:
       enabled: false
       socket_mode: true              # false → Request-URL mode (needs webhook ingress)
       command: "/terrapod"           # slash command this deployment answers (must match the app manifest)
-      label: ""                      # short per-deployment label shown in messages (e.g. "prod"); disambiguates
-                                     # multiple Terrapods sharing one Slack workspace — see #691
+      label: ""                      # short per-deployment label shown in messages (e.g. "prod"), rendered as Slack
+                                     # mrkdwn; disambiguates multiple Terrapods sharing one Slack workspace — see #691
       existingSecret: ""             # K8s Secret holding the three tokens
       existingSecretKeys:            # keys within that Secret
         botToken: bot-token

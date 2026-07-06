@@ -81,9 +81,12 @@ async def _act(
         # 1. Durable identity binding → email. No binding → nudge, no mutation.
         link = await get_link(db, team_id, user_id)
         if link is None:
+            from terrapod.config import settings
+
+            cmd = settings.slack.command
             await _nudge(
                 response_url,
-                "You're not linked yet. Run `/terrapod link` to connect your Terrapod "
+                f"You're not linked yet. Run `{cmd} link` to connect your Terrapod "
                 "account, then try again.",
             )
             return

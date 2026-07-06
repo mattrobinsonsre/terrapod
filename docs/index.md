@@ -39,7 +39,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Stale-plan Guards** | Auto-discard a plan that no longer reflects reality: state-version drift (always on) + optional per-workspace time-based plan expiry |
 | **Audit Logging** | Immutable event log with configurable retention |
 | **Notifications** | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
-| **Interactive Slack app** | Outbound Socket Mode app: `/terrapod` account linking + opt-in per-workspace run notifications with RBAC-checked Approve/Discard buttons ([Slack integration](slack-integration.md)) |
+| **Interactive Slack app** | Outbound Socket Mode app: `/terrapod` account linking (explicit confirm step) + opt-in per-workspace run notifications with RBAC-checked Approve/Discard buttons; multiple deployments can share one Slack workspace via per-deployment `slack.command`/`slack.label` ([Slack integration](slack-integration.md)) |
 | **Run Tasks** | Pre/post-plan webhook hooks for external validation |
 | **Execution Hooks** | Admin-managed custom shell steps run in the runner Job at five lifecycle points, associated with workspaces |
 | **Policy-as-Code** | OPA/Rego policy sets evaluated on every run; advisory or mandatory enforcement, label-scoped |

@@ -865,10 +865,12 @@ class SlackConfig(BaseModel):
     # rendered in every message so a shared channel attributes each one.
     command: str = Field(
         default="/terrapod",
+        min_length=1,
         description=(
             "The slash command this deployment answers (must match the command in "
             "its Slack app manifest). Give each deployment sharing one Slack "
-            "workspace a distinct command, e.g. /terrapod-prod."
+            "workspace a distinct command, e.g. /terrapod-prod. Must be non-empty — "
+            "an empty command would silently ignore every slash command."
         ),
     )
     label: str = Field(

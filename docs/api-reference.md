@@ -2759,6 +2759,20 @@ subsequent Slack-initiated action. The binding is long-lived **identity**, never
 entitlement — RBAC is re-checked live on each action. See
 [Slack integration](slack-integration.md) (#556).
 
+### Preview link
+
+```
+POST /api/terrapod/v1/slack/link/preview
+```
+
+Body `{"state": "<signed-state>"}`. Requires an authenticated Terrapod user.
+Describes **which** Slack identity the signed state would bind — returns
+`{data: {slack-team-id, slack-user-id, email}}` (the caller's email) — **without
+consuming** the single-use state, so the browser can show an explicit confirm
+screen before binding (the confused-deputy defence). `422` if the state is
+missing, `400` if it is invalid/expired/already used. Binding still happens only
+on `POST /slack/link`.
+
 ### Link account
 
 ```

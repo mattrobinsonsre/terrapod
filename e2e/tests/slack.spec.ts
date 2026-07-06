@@ -49,7 +49,7 @@ test.describe('Slack account link page', () => {
   test('invalid state is rejected at the confirm/preview step', async ({ page }) => {
     await page.goto('/slack/link?state=not-a-valid-signed-state');
     // The preview call rejects a forged state → error card, never a confirm.
-    await expect(page.getByText(/invalid, expired, or already used|Could not check/i)).toBeVisible({
+    await expect(page.getByText(/invalid, expired, or already used/i)).toBeVisible({
       timeout: 10_000,
     });
     await expect(page.getByRole('button', { name: /Confirm/i })).toHaveCount(0);

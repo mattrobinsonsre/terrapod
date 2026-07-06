@@ -8,8 +8,10 @@ import { apiFetch } from '@/lib/api'
 // The link is a deliberate act, not an automatic bind on page load: we first
 // PREVIEW which Slack identity the signed state would bind (without consuming
 // it), show it against the logged-in Terrapod account, and only bind when the
-// user clicks Confirm. This is the confused-deputy defence — a victim tricked
-// into opening someone else's link sees an unfamiliar Slack user and can bail.
+// user clicks Confirm. This is the confused-deputy defence — the protection is
+// that binding now requires an explicit, deliberate confirm (never a silent
+// bind from merely opening a link) and is always to the *acting* user; showing
+// the Slack id is a secondary cue.
 type Status = 'loading' | 'confirm' | 'linking' | 'success' | 'error'
 
 function SlackLinkInner() {
@@ -28,7 +30,7 @@ function SlackLinkInner() {
 
     if (!state) {
       setStatus('error')
-      setMessage('Missing or invalid link. Run `/terrapod link` in Slack again.')
+      setMessage('Missing or invalid link. Start again with the Terrapod link command in Slack.')
       return
     }
 
@@ -57,7 +59,7 @@ function SlackLinkInner() {
         // Any preview failure (invalid signature, expired, already used) is the
         // same to the user — one friendly message, never a raw server detail.
         setStatus('error')
-        setMessage('This link is invalid, expired, or already used. Run `/terrapod link` again.')
+        setMessage('This link is invalid, expired, or already used. Start the link again from Slack.')
       }
     })()
   }, [state])
@@ -75,7 +77,7 @@ function SlackLinkInner() {
         const data = await res.json().catch(() => ({}))
         throw new Error(
           data.detail ||
-            'This link is invalid, expired, or already used. Run `/terrapod link` again.',
+            'This link is invalid, expired, or already used. Start the link again from Slack.',
         )
       }
       const data = await res.json()
@@ -124,8 +126,9 @@ function SlackLinkInner() {
                 </div>
               </dl>
               <p className="mt-4 text-xs text-amber-400/90">
-                Only continue if you just ran <code>/terrapod link</code> in Slack yourself. If this
-                Slack user isn&apos;t you, close this tab and don&apos;t link.
+                Only continue if you just started this link from Slack yourself. If you didn&apos;t,
+                close this tab and don&apos;t link — this binds the Slack account above to{' '}
+                <span className="font-medium">your</span> Terrapod identity.
               </p>
               <button
                 onClick={confirmLink}
