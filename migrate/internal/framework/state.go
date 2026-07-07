@@ -332,6 +332,26 @@ func (s *State) VarsetBySourceID(sourceID string) *VariableSetRecord {
 	return nil
 }
 
+// VarsetRollbackTargets returns the variable-set records `rollback` may
+// delete: those THIS migration created (CreatedByMigration) that still
+// carry a TerrapodID and haven't already been rolled back. Reused/
+// pre-existing varsets and already-rolled-back records are never
+// returned, so the caller can delete the full list without re-checking
+// provenance. Unlike workspaces, varsets are org-level config with no
+// state serial — there is no advanced-state guard; the provenance gate
+// is the safety boundary. The returned slice points into s.VariableSets
+// so the caller can mutate the records (mark rolled_back) and Save.
+func (s *State) VarsetRollbackTargets() []*VariableSetRecord {
+	var out []*VariableSetRecord
+	for i := range s.VariableSets {
+		r := &s.VariableSets[i]
+		if r.CreatedByMigration && r.TerrapodID != "" && r.State != "rolled_back" {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 // WorkspaceBySourceName returns the recorded workspace by source name,
 // or nil if not present. Used by the rewriter (Mode 1) to verify a
 // `cloud { workspaces { name = "..." } }` block references a migrated

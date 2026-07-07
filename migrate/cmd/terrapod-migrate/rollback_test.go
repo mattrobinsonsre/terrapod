@@ -17,9 +17,10 @@ import (
 // DELETE workspace (records the id). currentSerial maps a terrapod id
 // to the serial the destination currently reports; absent → 404.
 type rollbackFakeServer struct {
-	mu            sync.Mutex
-	currentSerial map[string]int64
-	deleted       []string
+	mu             sync.Mutex
+	currentSerial  map[string]int64
+	deleted        []string
+	deletedVarsets []string
 }
 
 func newRollbackServer(t *testing.T, currentSerial map[string]int64) (*rollbackFakeServer, *terrapod.Client) {
@@ -47,6 +48,12 @@ func newRollbackServer(t *testing.T, currentSerial map[string]int64) (*rollbackF
 			fs.deleted = append(fs.deleted, id)
 			fs.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/api/v2/varsets/"):
+			id := strings.TrimPrefix(r.URL.Path, "/api/v2/varsets/")
+			fs.mu.Lock()
+			fs.deletedVarsets = append(fs.deletedVarsets, id)
+			fs.mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
 		default:
 			http.Error(w, "unhandled "+r.Method+" "+r.URL.Path, http.StatusNotFound)
 		}
@@ -57,6 +64,53 @@ func newRollbackServer(t *testing.T, currentSerial map[string]int64) (*rollbackF
 		t.Fatal(err)
 	}
 	return fs, c
+}
+
+func TestRollback_Apply_DeletesMigrationCreatedVarsets_SkipsReused(t *testing.T) {
+	fs, c := newRollbackServer(t, map[string]int64{})
+	state := &framework.State{
+		VariableSets: []framework.VariableSetRecord{
+			{SourceID: "vs-1", Name: "global-tags", TerrapodID: "varset-a", State: "created", CreatedByMigration: true},
+			{SourceID: "vs-2", Name: "reused-set", TerrapodID: "varset-b", State: "created", CreatedByMigration: false},
+		},
+	}
+	report := runRollback(t.Context(), c, state, "", true /*apply*/, false)
+	if len(fs.deletedVarsets) != 1 || fs.deletedVarsets[0] != "varset-a" {
+		t.Fatalf("expected only varset-a deleted, got %v", fs.deletedVarsets)
+	}
+	if report.VarsetDeleted != 1 {
+		t.Fatalf("VarsetDeleted=%d", report.VarsetDeleted)
+	}
+	// Migration-created record marked rolled_back + id cleared.
+	if state.VariableSets[0].State != "rolled_back" || state.VariableSets[0].TerrapodID != "" {
+		t.Fatalf("varset record not marked rolled_back: %+v", state.VariableSets[0])
+	}
+	// Reused varset (not created by us) is never touched.
+	if state.VariableSets[1].State != "created" || state.VariableSets[1].TerrapodID != "varset-b" {
+		t.Fatalf("reused varset was modified: %+v", state.VariableSets[1])
+	}
+	// Idempotent: a re-run deletes nothing more.
+	fs.deletedVarsets = nil
+	report2 := runRollback(t.Context(), c, state, "", true, false)
+	if len(fs.deletedVarsets) != 0 || report2.VarsetDeleted != 0 {
+		t.Fatalf("second rollback not idempotent: deleted=%v count=%d", fs.deletedVarsets, report2.VarsetDeleted)
+	}
+}
+
+func TestRollback_DryRun_ListsVarsetsWithoutDeleting(t *testing.T) {
+	fs, c := newRollbackServer(t, map[string]int64{})
+	state := &framework.State{
+		VariableSets: []framework.VariableSetRecord{
+			{SourceID: "vs-1", Name: "global-tags", TerrapodID: "varset-a", State: "created", CreatedByMigration: true},
+		},
+	}
+	report := runRollback(t.Context(), c, state, "", false /*dry-run*/, false)
+	if len(fs.deletedVarsets) != 0 {
+		t.Fatalf("dry-run deleted varsets: %v", fs.deletedVarsets)
+	}
+	if report.VarsetDeleted != 1 || len(report.VariableSets) != 1 || report.VariableSets[0].Action != "would_delete" {
+		t.Fatalf("unexpected dry-run varset report: %+v", report.VariableSets)
+	}
 }
 
 func TestRollback_DryRun_ListsOnlyCreatedByMigration_NoDeletes(t *testing.T) {

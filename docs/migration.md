@@ -175,7 +175,9 @@ terrapod-migrate verify --target https://terrapod.example.com --token "$TERRAPOD
 
 **3. Roll back if it goes sideways.** `rollback` reads the state file and
 deletes the workspaces the migration created (cascading their variables
-and state). It is built to never destroy anything it shouldn't:
+and state) **and the variable sets it created** — variable sets first, the
+reverse of the create order. It is built to never destroy anything it
+shouldn't:
 
 ```bash
 terrapod-migrate rollback --target https://terrapod.example.com --token "$TERRAPOD_TOKEN"           # dry-run: lists what would be deleted

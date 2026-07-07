@@ -13,10 +13,13 @@ import (
 )
 
 // rollbackCmd reverses what a migration `apply` created. It reads the
-// migration state file and deletes the Terrapod workspaces THIS
-// migration created — making a migration reversible, which is what makes
-// it approvable: "we can undo it" removes the largest switching-cost
-// objection.
+// migration state file and deletes the Terrapod workspaces AND variable
+// sets THIS migration created — making a migration reversible, which is
+// what makes it approvable: "we can undo it" removes the largest
+// switching-cost objection. Variable sets are deleted first (the reverse
+// of the create order, workspaces → varsets); they are org-level config
+// with no state serial, so — unlike workspaces — they have no
+// advanced-state guard, only the provenance gate.
 //
 // Safety (this DELETES infrastructure-state-bearing resources, so it is
 // guarded like the apply path):
@@ -105,11 +108,22 @@ func rollbackCmd(args []string) int {
 type RollbackReport struct {
 	DryRun          bool                `json:"dry_run"`
 	Target          string              `json:"target"`
+	VariableSets    []RollbackVarset    `json:"variable_sets,omitempty"`
 	Workspaces      []RollbackWorkspace `json:"workspaces"`
 	ConnectionsLeft []string            `json:"connections_left_in_place,omitempty"`
 	DeletedCount    int                 `json:"deleted_count"`
+	VarsetDeleted   int                 `json:"varset_deleted_count"`
 	SkippedCount    int                 `json:"skipped_count"`
 	Errors          []string            `json:"errors,omitempty"`
+}
+
+// RollbackVarset is the per-variable-set rollback outcome. Action is one
+// of: "would_delete" (dry-run), "deleted", "already_gone", "errored".
+type RollbackVarset struct {
+	Name       string `json:"name"`
+	TerrapodID string `json:"terrapod_id,omitempty"`
+	Action     string `json:"action"`
+	Detail     string `json:"detail,omitempty"`
 }
 
 // RollbackWorkspace is the per-workspace rollback outcome. Action is one
@@ -131,6 +145,45 @@ func runRollback(ctx context.Context, c *terrapod.Client, state *framework.State
 	// pre-existing ones); never delete them. Report them as left in place.
 	for i := range state.VCSConnections {
 		report.ConnectionsLeft = append(report.ConnectionsLeft, state.VCSConnections[i].Name)
+	}
+
+	// Variable sets first — the reverse of the create order (workspaces →
+	// varsets). Varsets are org-level config with no state serial, so
+	// there is no advanced-state guard; the provenance gate is the whole
+	// safety boundary. Delete is 404-tolerant so re-runs stay clean.
+	for _, rec := range state.VarsetRollbackTargets() {
+		rv := RollbackVarset{Name: rec.Name, TerrapodID: rec.TerrapodID}
+		if !apply {
+			rv.Action = "would_delete"
+			report.VariableSets = append(report.VariableSets, rv)
+			report.VarsetDeleted++ // count of would-be deletions in dry-run
+			continue
+		}
+		if err := c.DeleteVariableSet(ctx, rec.TerrapodID); err != nil {
+			var nf *terrapod.NotFoundError
+			if errors.As(err, &nf) {
+				rv.Action = "already_gone"
+				rec.State = "rolled_back"
+				rec.TerrapodID = ""
+				report.VariableSets = append(report.VariableSets, rv)
+				report.VarsetDeleted++
+				_ = state.Save(statePath, Version)
+				continue
+			}
+			rv.Action = "errored"
+			rv.Detail = err.Error()
+			report.VariableSets = append(report.VariableSets, rv)
+			report.Errors = append(report.Errors, fmt.Sprintf("variable-set %q: delete failed: %v", rec.Name, err))
+			continue
+		}
+		rv.Action = "deleted"
+		rec.State = "rolled_back"
+		rec.TerrapodID = ""
+		report.VariableSets = append(report.VariableSets, rv)
+		report.VarsetDeleted++
+		if err := state.Save(statePath, Version); err != nil {
+			report.Errors = append(report.Errors, fmt.Sprintf("variable-set %q deleted but state save failed: %v", rec.Name, err))
+		}
 	}
 
 	targets := state.RollbackTargets()
@@ -221,11 +274,28 @@ func printRollbackSummary(r *RollbackReport, dryRun bool) {
 		fmt.Printf("  deleted:       %d\n", r.DeletedCount)
 		fmt.Printf("  skipped:       %d\n", r.SkippedCount)
 	}
+	if r.VarsetDeleted > 0 {
+		if dryRun {
+			fmt.Printf("  would delete:  %d variable set(s)\n", r.VarsetDeleted)
+		} else {
+			fmt.Printf("  variable sets deleted: %d\n", r.VarsetDeleted)
+		}
+	}
 	if len(r.ConnectionsLeft) > 0 {
 		fmt.Printf("  vcs connections left in place (operator-owned): %d\n", len(r.ConnectionsLeft))
 	}
 	if len(r.Errors) > 0 {
 		fmt.Printf("  errors:        %d\n", len(r.Errors))
+	}
+	for _, v := range r.VariableSets {
+		fmt.Printf("    [%-16s] varset %s", v.Action, v.Name)
+		if v.TerrapodID != "" {
+			fmt.Printf(" (%s)", v.TerrapodID)
+		}
+		fmt.Println()
+		if v.Detail != "" {
+			fmt.Printf("        - %s\n", v.Detail)
+		}
 	}
 	for _, w := range r.Workspaces {
 		fmt.Printf("    [%-16s] %s", w.Action, w.SourceName)
