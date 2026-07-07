@@ -106,21 +106,31 @@ func rollbackCmd(args []string) int {
 
 // RollbackReport is the structured result of a rollback run.
 type RollbackReport struct {
-	DryRun          bool                `json:"dry_run"`
-	Target          string              `json:"target"`
-	VariableSets    []RollbackVarset    `json:"variable_sets,omitempty"`
-	Workspaces      []RollbackWorkspace `json:"workspaces"`
-	ConnectionsLeft []string            `json:"connections_left_in_place,omitempty"`
-	DeletedCount    int                 `json:"deleted_count"`
-	VarsetDeleted   int                 `json:"varset_deleted_count"`
-	SkippedCount    int                 `json:"skipped_count"`
-	Errors          []string            `json:"errors,omitempty"`
+	DryRun            bool                 `json:"dry_run"`
+	Target            string               `json:"target"`
+	RunTriggers       []RollbackRunTrigger `json:"run_triggers,omitempty"`
+	VariableSets      []RollbackVarset     `json:"variable_sets,omitempty"`
+	Workspaces        []RollbackWorkspace  `json:"workspaces"`
+	ConnectionsLeft   []string             `json:"connections_left_in_place,omitempty"`
+	DeletedCount      int                  `json:"deleted_count"`
+	VarsetDeleted     int                  `json:"varset_deleted_count"`
+	RunTriggerDeleted int                  `json:"run_trigger_deleted_count"`
+	SkippedCount      int                  `json:"skipped_count"`
+	Errors            []string             `json:"errors,omitempty"`
 }
 
 // RollbackVarset is the per-variable-set rollback outcome. Action is one
 // of: "would_delete" (dry-run), "deleted", "already_gone", "errored".
 type RollbackVarset struct {
 	Name       string `json:"name"`
+	TerrapodID string `json:"terrapod_id,omitempty"`
+	Action     string `json:"action"`
+	Detail     string `json:"detail,omitempty"`
+}
+
+// RollbackRunTrigger is the per-run-trigger rollback outcome.
+type RollbackRunTrigger struct {
+	Pair       string `json:"pair"` // "source_ref → destination_ref"
 	TerrapodID string `json:"terrapod_id,omitempty"`
 	Action     string `json:"action"`
 	Detail     string `json:"detail,omitempty"`
@@ -147,7 +157,49 @@ func runRollback(ctx context.Context, c *terrapod.Client, state *framework.State
 		report.ConnectionsLeft = append(report.ConnectionsLeft, state.VCSConnections[i].Name)
 	}
 
-	// Variable sets first — the reverse of the create order (workspaces →
+	// Run triggers first — the reverse of the create order (workspaces →
+	// varsets → run triggers). Like varsets they're pure config with no
+	// state serial, so no advanced-state guard; the provenance gate is
+	// the whole safety boundary. Delete is 404-tolerant.
+	for _, rec := range state.RunTriggerRollbackTargets() {
+		rt := RollbackRunTrigger{
+			Pair:       fmt.Sprintf("%s → %s", rec.SourceWorkspaceRef, rec.DestinationWorkspaceRef),
+			TerrapodID: rec.TerrapodID,
+		}
+		if !apply {
+			rt.Action = "would_delete"
+			report.RunTriggers = append(report.RunTriggers, rt)
+			report.RunTriggerDeleted++
+			continue
+		}
+		if err := c.DeleteRunTrigger(ctx, rec.TerrapodID); err != nil {
+			var nf *terrapod.NotFoundError
+			if errors.As(err, &nf) {
+				rt.Action = "already_gone"
+				rec.State = "rolled_back"
+				rec.TerrapodID = ""
+				report.RunTriggers = append(report.RunTriggers, rt)
+				report.RunTriggerDeleted++
+				_ = state.Save(statePath, Version)
+				continue
+			}
+			rt.Action = "errored"
+			rt.Detail = err.Error()
+			report.RunTriggers = append(report.RunTriggers, rt)
+			report.Errors = append(report.Errors, fmt.Sprintf("run-trigger %s: delete failed: %v", rt.Pair, err))
+			continue
+		}
+		rt.Action = "deleted"
+		rec.State = "rolled_back"
+		rec.TerrapodID = ""
+		report.RunTriggers = append(report.RunTriggers, rt)
+		report.RunTriggerDeleted++
+		if err := state.Save(statePath, Version); err != nil {
+			report.Errors = append(report.Errors, fmt.Sprintf("run-trigger %s deleted but state save failed: %v", rt.Pair, err))
+		}
+	}
+
+	// Variable sets next — the reverse of the create order (workspaces →
 	// varsets). Varsets are org-level config with no state serial, so
 	// there is no advanced-state guard; the provenance gate is the whole
 	// safety boundary. Delete is 404-tolerant so re-runs stay clean.
@@ -281,11 +333,28 @@ func printRollbackSummary(r *RollbackReport, dryRun bool) {
 			fmt.Printf("  variable sets deleted: %d\n", r.VarsetDeleted)
 		}
 	}
+	if r.RunTriggerDeleted > 0 {
+		if dryRun {
+			fmt.Printf("  would delete:  %d run trigger(s)\n", r.RunTriggerDeleted)
+		} else {
+			fmt.Printf("  run triggers deleted: %d\n", r.RunTriggerDeleted)
+		}
+	}
 	if len(r.ConnectionsLeft) > 0 {
 		fmt.Printf("  vcs connections left in place (operator-owned): %d\n", len(r.ConnectionsLeft))
 	}
 	if len(r.Errors) > 0 {
 		fmt.Printf("  errors:        %d\n", len(r.Errors))
+	}
+	for _, t := range r.RunTriggers {
+		fmt.Printf("    [%-16s] run-trigger %s", t.Action, t.Pair)
+		if t.TerrapodID != "" {
+			fmt.Printf(" (%s)", t.TerrapodID)
+		}
+		fmt.Println()
+		if t.Detail != "" {
+			fmt.Printf("        - %s\n", t.Detail)
+		}
 	}
 	for _, v := range r.VariableSets {
 		fmt.Printf("    [%-16s] varset %s", v.Action, v.Name)

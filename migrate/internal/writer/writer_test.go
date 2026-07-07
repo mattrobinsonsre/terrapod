@@ -26,6 +26,7 @@ type fakeTerrapodServer struct {
 	varsetsCreated     int
 	varsetVarsCreated  int
 	varsetAssignments  int
+	runTriggersCreated int
 	// lastWorkspaceBody records the most recent workspace-create body
 	// so tests can verify field round-tripping.
 	lastWorkspaceBody []byte
@@ -64,6 +65,10 @@ func newFakeServer(t *testing.T) (*fakeTerrapodServer, *terrapod.Client) {
 		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/relationships/workspaces"):
 			fs.varsetAssignments++
 			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/run-triggers"):
+			fs.runTriggersCreated++
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"data":{"id":"rt-fixt","type":"run-triggers","attributes":{"workspace-id":"ws-fixt","sourceable-id":"ws-fixt"}}}`))
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/workspaces"):
 			fs.workspacesCreated++
 			fs.lastWorkspaceBody = body
@@ -297,6 +302,64 @@ func TestWriter_DryRun_VariableSet_NoAPICalls(t *testing.T) {
 	// reports one planned assignment (not unresolved).
 	if report.VariableSets[0].Assignments != 1 {
 		t.Errorf("planned assignments = %d (want 1)", report.VariableSets[0].Assignments)
+	}
+}
+
+func TestWriter_Apply_RunTrigger_CreatesInScope_SkipsOutOfScope(t *testing.T) {
+	fs, c := newFakeServer(t)
+	state := &framework.State{}
+	w := New(c, state, "")
+
+	plan := ir.Plan{
+		Source: "tfe",
+		Workspaces: []ir.Workspace{
+			{SourceID: "ws-src", Name: "networking"},
+			{SourceID: "ws-dst", Name: "app"},
+		},
+		RunTriggers: []ir.RunTrigger{
+			// Both endpoints migrated → created.
+			{SourceWorkspaceRef: "ws-src", DestinationWorkspaceRef: "ws-dst", SourceName: "networking", DestinationName: "app"},
+			// Source outside the migration scope → skipped, not created.
+			{SourceWorkspaceRef: "ws-external", DestinationWorkspaceRef: "ws-dst", SourceName: "external", DestinationName: "app"},
+		},
+	}
+
+	report, err := w.Run(t.Context(), plan, Options{})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(report.Errors) != 0 {
+		t.Fatalf("expected no errors, got: %+v", report.Errors)
+	}
+	if fs.runTriggersCreated != 1 {
+		t.Errorf("expected 1 run-trigger POST, got %d", fs.runTriggersCreated)
+	}
+	if len(report.RunTriggers) != 2 {
+		t.Fatalf("expected 2 run-trigger outcomes, got %d", len(report.RunTriggers))
+	}
+	if report.RunTriggers[0].State != "created" || report.RunTriggers[0].TerrapodID != "rt-fixt" {
+		t.Errorf("in-scope trigger: %+v", report.RunTriggers[0])
+	}
+	if report.RunTriggers[1].State != "skipped" {
+		t.Errorf("out-of-scope trigger should be skipped: %+v", report.RunTriggers[1])
+	}
+	// State records the created trigger with the provenance gate set.
+	rec := state.RunTriggerByPair("ws-src", "ws-dst")
+	if rec == nil || rec.TerrapodID != "rt-fixt" || !rec.CreatedByMigration {
+		t.Errorf("run-trigger state record: %+v", rec)
+	}
+
+	// Idempotent: a second run reuses (no new POST).
+	fs.runTriggersCreated = 0
+	report2, err := w.Run(t.Context(), plan, Options{})
+	if err != nil {
+		t.Fatalf("second Run: %v", err)
+	}
+	if fs.runTriggersCreated != 0 {
+		t.Errorf("run-trigger re-created on resume: %d", fs.runTriggersCreated)
+	}
+	if report2.RunTriggers[0].State != "reused" {
+		t.Errorf("expected reused, got: %+v", report2.RunTriggers[0])
 	}
 }
 

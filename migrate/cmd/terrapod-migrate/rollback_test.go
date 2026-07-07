@@ -17,10 +17,11 @@ import (
 // DELETE workspace (records the id). currentSerial maps a terrapod id
 // to the serial the destination currently reports; absent → 404.
 type rollbackFakeServer struct {
-	mu             sync.Mutex
-	currentSerial  map[string]int64
-	deleted        []string
-	deletedVarsets []string
+	mu                 sync.Mutex
+	currentSerial      map[string]int64
+	deleted            []string
+	deletedVarsets     []string
+	deletedRunTriggers []string
 }
 
 func newRollbackServer(t *testing.T, currentSerial map[string]int64) (*rollbackFakeServer, *terrapod.Client) {
@@ -52,6 +53,12 @@ func newRollbackServer(t *testing.T, currentSerial map[string]int64) (*rollbackF
 			id := strings.TrimPrefix(r.URL.Path, "/api/v2/varsets/")
 			fs.mu.Lock()
 			fs.deletedVarsets = append(fs.deletedVarsets, id)
+			fs.mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/api/terrapod/v1/run-triggers/"):
+			id := strings.TrimPrefix(r.URL.Path, "/api/terrapod/v1/run-triggers/")
+			fs.mu.Lock()
+			fs.deletedRunTriggers = append(fs.deletedRunTriggers, id)
 			fs.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
 		default:
@@ -94,6 +101,33 @@ func TestRollback_Apply_DeletesMigrationCreatedVarsets_SkipsReused(t *testing.T)
 	report2 := runRollback(t.Context(), c, state, "", true, false)
 	if len(fs.deletedVarsets) != 0 || report2.VarsetDeleted != 0 {
 		t.Fatalf("second rollback not idempotent: deleted=%v count=%d", fs.deletedVarsets, report2.VarsetDeleted)
+	}
+}
+
+func TestRollback_Apply_DeletesMigrationCreatedRunTriggers_SkipsReused(t *testing.T) {
+	fs, c := newRollbackServer(t, map[string]int64{})
+	state := &framework.State{
+		RunTriggers: []framework.RunTriggerRecord{
+			{SourceWorkspaceRef: "ws-a", DestinationWorkspaceRef: "ws-b", TerrapodID: "rt-a", State: "created", CreatedByMigration: true},
+			// A reused/pre-existing trigger (no id, not created by us) — never deleted.
+			{SourceWorkspaceRef: "ws-c", DestinationWorkspaceRef: "ws-b", State: "reused", CreatedByMigration: false},
+		},
+	}
+	report := runRollback(t.Context(), c, state, "", true /*apply*/, false)
+	if len(fs.deletedRunTriggers) != 1 || fs.deletedRunTriggers[0] != "rt-a" {
+		t.Fatalf("expected only rt-a deleted, got %v", fs.deletedRunTriggers)
+	}
+	if report.RunTriggerDeleted != 1 {
+		t.Fatalf("RunTriggerDeleted=%d", report.RunTriggerDeleted)
+	}
+	if state.RunTriggers[0].State != "rolled_back" || state.RunTriggers[0].TerrapodID != "" {
+		t.Fatalf("record not marked rolled_back: %+v", state.RunTriggers[0])
+	}
+	// Idempotent re-run.
+	fs.deletedRunTriggers = nil
+	report2 := runRollback(t.Context(), c, state, "", true, false)
+	if len(fs.deletedRunTriggers) != 0 || report2.RunTriggerDeleted != 0 {
+		t.Fatalf("second rollback not idempotent: %v", fs.deletedRunTriggers)
 	}
 }
 

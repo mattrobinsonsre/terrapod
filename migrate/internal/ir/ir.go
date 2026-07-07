@@ -53,6 +53,12 @@ type Plan struct {
 	// Terrapod IDs the workspace loop recorded.
 	VariableSets []VariableSet `json:"variable_sets,omitempty"`
 
+	// RunTriggers are cross-workspace dependencies (a source workspace's
+	// apply queues a run on the destination). Created after workspaces so
+	// both endpoints' Terrapod IDs are known; a trigger is created only
+	// when BOTH endpoints were migrated.
+	RunTriggers []RunTrigger `json:"run_triggers,omitempty"`
+
 	// Skipped collects items the source decided not to migrate, with a
 	// per-item reason. Surfaced in the dry-run report and the handover
 	// document; never written to Terrapod.
@@ -118,6 +124,19 @@ type VariableSet struct {
 	// workspace ID recorded during the workspace loop; refs outside the
 	// migration scope are reported as an unresolved assignment.
 	WorkspaceRefs []string `json:"workspace_refs,omitempty"`
+}
+
+// RunTrigger is a cross-workspace dependency: when the source workspace
+// completes an apply, a run is queued on the destination. Both refs are
+// SOURCE workspace IDs the writer resolves to Terrapod workspace IDs
+// after the workspace loop; the trigger is created only when both
+// endpoints were migrated (a ref outside the migration scope is
+// reported for manual follow-up). Names are carried for readable reports.
+type RunTrigger struct {
+	SourceWorkspaceRef      string `json:"source_workspace_ref"`
+	DestinationWorkspaceRef string `json:"destination_workspace_ref"`
+	SourceName              string `json:"source_name,omitempty"`
+	DestinationName         string `json:"destination_name,omitempty"`
 }
 
 // VCSConnection is a Terrapod-side VCS connection (one per source

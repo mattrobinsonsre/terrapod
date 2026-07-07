@@ -362,6 +362,11 @@ func loadTFEPlan(ctx context.Context, address, token, org string) (ir.Plan, writ
 	}
 	skipped = append(skipped, vsSkipped...)
 
+	runTriggers, err := c.RunTriggers(ctx, workspaces)
+	if err != nil {
+		return ir.Plan{}, nil, err
+	}
+
 	plan := ir.Plan{
 		Source: "tfe",
 		SourceMetadata: map[string]string{
@@ -372,6 +377,7 @@ func loadTFEPlan(ctx context.Context, address, token, org string) (ir.Plan, writ
 		VCSConnections: conns,
 		Workspaces:     workspaces,
 		VariableSets:   varsets,
+		RunTriggers:    runTriggers,
 		Skipped:        skipped,
 	}
 	return plan, c.StateReader(), nil
@@ -393,6 +399,7 @@ func printReportSummary(r *writer.Report, dryRun bool) {
 	fmt.Printf("  connections:   %d\n", len(r.Connections))
 	fmt.Printf("  workspaces:    %d\n", len(r.Workspaces))
 	fmt.Printf("  variable sets: %d\n", len(r.VariableSets))
+	fmt.Printf("  run triggers:  %d\n", len(r.RunTriggers))
 	fmt.Printf("  skipped:       %d\n", len(r.Skipped))
 	if len(r.Errors) > 0 {
 		fmt.Printf("  errors:        %d\n", len(r.Errors))
@@ -450,6 +457,24 @@ func printReportSummary(r *writer.Report, dryRun bool) {
 		fmt.Println("    them to the intended workspaces in Terrapod by hand.")
 		for _, u := range unresolved {
 			fmt.Printf("    - %s\n", u)
+		}
+	}
+
+	// Run triggers whose source or destination wasn't migrated can't be
+	// created automatically — the operator wires them up once both
+	// workspaces exist on Terrapod.
+	var skippedTriggers []string
+	for _, rt := range r.RunTriggers {
+		if rt.State == "skipped" {
+			skippedTriggers = append(skippedTriggers, fmt.Sprintf("%s → %s", rt.SourceName, rt.DestinationName))
+		}
+	}
+	if len(skippedTriggers) > 0 {
+		fmt.Printf("\n  run triggers needing operator action (%d):\n", len(skippedTriggers))
+		fmt.Println("    One or both endpoints were outside the migration scope. Recreate")
+		fmt.Println("    these source → destination triggers in Terrapod once both workspaces exist.")
+		for _, s := range skippedTriggers {
+			fmt.Printf("    - %s\n", s)
 		}
 	}
 }

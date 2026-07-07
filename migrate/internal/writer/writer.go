@@ -90,6 +90,7 @@ type Report struct {
 	Connections  []ConnectionOutcome `json:"connections,omitempty"`
 	Workspaces   []WorkspaceOutcome  `json:"workspaces,omitempty"`
 	VariableSets []VarsetOutcome     `json:"variable_sets,omitempty"`
+	RunTriggers  []RunTriggerOutcome `json:"run_triggers,omitempty"`
 	Skipped      []ir.SkippedItem    `json:"skipped,omitempty"`
 	Errors       []string            `json:"errors,omitempty"`
 }
@@ -151,6 +152,17 @@ type VarsetOutcome struct {
 	VarOutcomes []VarOutcome `json:"var_outcomes,omitempty"`
 	Assignments int          `json:"assignments,omitempty"`
 	Unresolved  []string     `json:"unresolved_workspace_refs,omitempty"`
+}
+
+// RunTriggerOutcome is the per-run-trigger result. State: "planned" |
+// "created" | "reused" | "skipped" | "errored". "skipped" means an
+// endpoint wasn't migrated (out of scope); Detail explains.
+type RunTriggerOutcome struct {
+	SourceName      string `json:"source_name"`
+	DestinationName string `json:"destination_name"`
+	State           string `json:"state"`
+	TerrapodID      string `json:"terrapod_id,omitempty"`
+	Detail          string `json:"detail,omitempty"`
 }
 
 // Writer is the entry point. Construct one per migration run and call
@@ -252,6 +264,17 @@ func (w *Writer) Run(ctx context.Context, plan ir.Plan, opts Options) (*Report, 
 		report.VariableSets = append(report.VariableSets, outcome)
 		if err := w.saveState(); err != nil {
 			return report, fmt.Errorf("save state after variable set %q: %w", vs.SourceID, err)
+		}
+	}
+
+	// Run triggers last: both endpoints must be migrated workspaces for
+	// the source→destination link to resolve to Terrapod IDs.
+	for i := range plan.RunTriggers {
+		rt := &plan.RunTriggers[i]
+		outcome := w.applyRunTrigger(ctx, rt, opts)
+		report.RunTriggers = append(report.RunTriggers, outcome)
+		if err := w.saveState(); err != nil {
+			return report, fmt.Errorf("save state after run trigger %s→%s: %w", rt.SourceName, rt.DestinationName, err)
 		}
 	}
 
@@ -920,6 +943,92 @@ func (w *Writer) recordVarset(vs *ir.VariableSet, state, errMsg string, varCount
 	})
 }
 
+// ── Run trigger handling ──────────────────────────────────────────────
+
+// applyRunTrigger registers a cross-workspace run trigger (source apply →
+// queue a run on the destination). Both endpoints must be migrated
+// workspaces; a trigger referencing a workspace outside the migration
+// scope is skipped and reported. Idempotent via the (source, destination)
+// pair recorded in the state file.
+func (w *Writer) applyRunTrigger(ctx context.Context, rt *ir.RunTrigger, opts Options) RunTriggerOutcome {
+	out := RunTriggerOutcome{SourceName: rt.SourceName, DestinationName: rt.DestinationName, State: "planned"}
+
+	if prior := w.state.RunTriggerByPair(rt.SourceWorkspaceRef, rt.DestinationWorkspaceRef); prior != nil && prior.TerrapodID != "" {
+		out.State = "reused"
+		out.TerrapodID = prior.TerrapodID
+		return out
+	}
+
+	// Both endpoints must be in the migration (recorded workspaces). In
+	// dry-run the workspaces are recorded as "planned" with empty
+	// TerrapodID, so presence is the check; in apply we also need the id.
+	src := w.state.WorkspaceBySourceID(rt.SourceWorkspaceRef)
+	dst := w.state.WorkspaceBySourceID(rt.DestinationWorkspaceRef)
+	inScope := src != nil && dst != nil
+	if !opts.DryRun {
+		inScope = inScope && src.TerrapodID != "" && dst.TerrapodID != ""
+	}
+	if !inScope {
+		out.State = "skipped"
+		out.Detail = "one or both endpoints are outside the migration scope; create this run trigger by hand once both workspaces exist on Terrapod"
+		w.recordRunTrigger(rt, "skipped", "", "")
+		return out
+	}
+
+	if opts.DryRun {
+		w.recordRunTrigger(rt, "planned", "", "")
+		return out
+	}
+
+	created, err := w.client.CreateRunTrigger(ctx, terrapod.CreateRunTriggerRequest{
+		DestinationWorkspaceID: dst.TerrapodID,
+		SourceWorkspaceID:      src.TerrapodID,
+	})
+	if err != nil {
+		// 409 → the link already exists (a prior run, or a pre-existing
+		// identical trigger). Treat as reused. We don't learn its id, so
+		// it won't be a rollback target — acceptable: rollback only
+		// deletes triggers it can positively identify as its own.
+		var conflict *terrapod.ConflictError
+		if errors.As(err, &conflict) {
+			out.State = "reused"
+			w.recordRunTrigger(rt, "reused", "", "")
+			return out
+		}
+		out.State = "errored"
+		out.Detail = err.Error()
+		w.recordRunTrigger(rt, "errored", "", err.Error())
+		return out
+	}
+	out.State = "created"
+	out.TerrapodID = created.ID
+	w.recordRunTrigger(rt, "created", created.ID, "")
+	return out
+}
+
+func (w *Writer) recordRunTrigger(rt *ir.RunTrigger, state, terrapodID, errMsg string) {
+	if rec := w.state.RunTriggerByPair(rt.SourceWorkspaceRef, rt.DestinationWorkspaceRef); rec != nil {
+		rec.State = state
+		rec.Error = errMsg
+		if terrapodID != "" {
+			rec.TerrapodID = terrapodID
+			rec.CreatedByMigration = true
+		}
+		return
+	}
+	rec := framework.RunTriggerRecord{
+		SourceWorkspaceRef:      rt.SourceWorkspaceRef,
+		DestinationWorkspaceRef: rt.DestinationWorkspaceRef,
+		State:                   state,
+		Error:                   errMsg,
+	}
+	if terrapodID != "" {
+		rec.TerrapodID = terrapodID
+		rec.CreatedByMigration = true
+	}
+	w.state.RunTriggers = append(w.state.RunTriggers, rec)
+}
+
 func (w *Writer) recordConnection(c *ir.VCSConnection, state, errMsg string) {
 	if rec := findConnectionRecord(w.state, c.SourceID); rec != nil {
 		rec.State = state
@@ -1003,6 +1112,11 @@ func collectErrors(r *Report) []string {
 			if v.Error != "" {
 				errs = append(errs, fmt.Sprintf("variable-set %q variable %q: %s", vs.Name, v.Key, v.Error))
 			}
+		}
+	}
+	for _, rt := range r.RunTriggers {
+		if rt.State == "errored" && rt.Detail != "" {
+			errs = append(errs, fmt.Sprintf("run-trigger %s→%s: %s", rt.SourceName, rt.DestinationName, rt.Detail))
 		}
 	}
 	return errs

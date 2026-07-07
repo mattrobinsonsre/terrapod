@@ -112,14 +112,19 @@ type State struct {
 	// per-workspace assignments could resolve.
 	VariableSets []VariableSetRecord `json:"variable_sets,omitempty"`
 
+	// RunTriggers is the cross-workspace-dependency mapping, keyed by the
+	// (source, destination) source-ID pair; TerrapodID is the created
+	// trigger id (needed for rollback).
+	RunTriggers []RunTriggerRecord `json:"run_triggers,omitempty"`
+
 	// SkippedItems records what didn't migrate, in the order the
 	// source emitted them. Surfaced in reports.
 	SkippedItems []SkippedRecord `json:"skipped_items,omitempty"`
 
-	// Subsequent increments add per-resource mappings for run triggers,
-	// notifications, agent pools, registry modules, registry providers.
-	// Each gets a Record type to keep the State struct narrow rather
-	// than embedding raw IR.
+	// Subsequent increments add per-resource mappings for notifications,
+	// agent pools, registry modules, registry providers. Each gets a
+	// Record type to keep the State struct narrow rather than embedding
+	// raw IR.
 }
 
 // WorkspaceRecord is what we remember about each migrated workspace.
@@ -186,6 +191,19 @@ type VariableSetRecord struct {
 	// re-reading the source.
 	ExpectedVarCount   int `json:"expected_var_count,omitempty"`
 	AssignedWorkspaces int `json:"assigned_workspaces,omitempty"`
+}
+
+// RunTriggerRecord is the SourceID-pair → TerrapodID mapping for a
+// migrated run trigger. The natural key is the (source, destination)
+// pair; TerrapodID is the created trigger id used for rollback.
+// CreatedByMigration gates rollback the same way as workspaces/varsets.
+type RunTriggerRecord struct {
+	SourceWorkspaceRef      string `json:"source_workspace_ref"`
+	DestinationWorkspaceRef string `json:"destination_workspace_ref"`
+	TerrapodID              string `json:"terrapod_id,omitempty"`
+	State                   string `json:"state"` // "created" | "reused" | "skipped" | "errored" | "rolled_back"
+	Error                   string `json:"error,omitempty"`
+	CreatedByMigration      bool   `json:"created_by_migration,omitempty"`
 }
 
 // SkippedRecord — operator-visible record of what we declined to
@@ -345,6 +363,35 @@ func (s *State) VarsetRollbackTargets() []*VariableSetRecord {
 	var out []*VariableSetRecord
 	for i := range s.VariableSets {
 		r := &s.VariableSets[i]
+		if r.CreatedByMigration && r.TerrapodID != "" && r.State != "rolled_back" {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// RunTriggerByPair returns the recorded run trigger for a (source,
+// destination) source-ID pair, or nil. Used by `apply` for idempotent
+// resume — a trigger a prior run already created is not re-created.
+func (s *State) RunTriggerByPair(sourceRef, destRef string) *RunTriggerRecord {
+	for i := range s.RunTriggers {
+		if s.RunTriggers[i].SourceWorkspaceRef == sourceRef &&
+			s.RunTriggers[i].DestinationWorkspaceRef == destRef {
+			return &s.RunTriggers[i]
+		}
+	}
+	return nil
+}
+
+// RunTriggerRollbackTargets returns the run-trigger records `rollback`
+// may delete: those THIS migration created (CreatedByMigration) that
+// still carry a TerrapodID and haven't been rolled back. Like varsets,
+// run triggers are pure config with no state serial — the provenance
+// gate is the whole safety boundary.
+func (s *State) RunTriggerRollbackTargets() []*RunTriggerRecord {
+	var out []*RunTriggerRecord
+	for i := range s.RunTriggers {
+		r := &s.RunTriggers[i]
 		if r.CreatedByMigration && r.TerrapodID != "" && r.State != "rolled_back" {
 			out = append(out, r)
 		}
