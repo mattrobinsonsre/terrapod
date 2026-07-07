@@ -122,13 +122,17 @@ type State struct {
 	// (needed for rollback).
 	Notifications []NotificationRecord `json:"notifications,omitempty"`
 
+	// AgentPools is the pool mapping, keyed by source pool ID; TerrapodID
+	// is the created pool id (needed for rollback).
+	AgentPools []AgentPoolRecord `json:"agent_pools,omitempty"`
+
 	// SkippedItems records what didn't migrate, in the order the
 	// source emitted them. Surfaced in reports.
 	SkippedItems []SkippedRecord `json:"skipped_items,omitempty"`
 
-	// Subsequent increments add per-resource mappings for agent pools,
-	// registry modules, registry providers. Each gets a Record type to
-	// keep the State struct narrow rather than embedding raw IR.
+	// Subsequent increments add per-resource mappings for registry
+	// modules, registry providers. Each gets a Record type to keep the
+	// State struct narrow rather than embedding raw IR.
 }
 
 // WorkspaceRecord is what we remember about each migrated workspace.
@@ -218,6 +222,18 @@ type NotificationRecord struct {
 	Name               string `json:"name"`
 	TerrapodID         string `json:"terrapod_id,omitempty"`
 	State              string `json:"state"` // "created" | "reused" | "skipped" | "errored" | "rolled_back"
+	Error              string `json:"error,omitempty"`
+	CreatedByMigration bool   `json:"created_by_migration,omitempty"`
+}
+
+// AgentPoolRecord is the source-pool-ID → TerrapodID mapping for a
+// migrated agent pool. TerrapodID is the created pool id used for
+// rollback; CreatedByMigration gates rollback.
+type AgentPoolRecord struct {
+	SourceID           string `json:"source_id"`
+	Name               string `json:"name"`
+	TerrapodID         string `json:"terrapod_id,omitempty"`
+	State              string `json:"state"` // "planned" | "created" | "reused" | "errored" | "rolled_back"
 	Error              string `json:"error,omitempty"`
 	CreatedByMigration bool   `json:"created_by_migration,omitempty"`
 }
@@ -436,6 +452,34 @@ func (s *State) NotificationRollbackTargets() []*NotificationRecord {
 	var out []*NotificationRecord
 	for i := range s.Notifications {
 		r := &s.Notifications[i]
+		if r.CreatedByMigration && r.TerrapodID != "" && r.State != "rolled_back" {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// AgentPoolBySourceID returns the recorded agent pool for a source pool
+// ID, or nil. Used by `apply` for idempotent resume — a pool a prior run
+// already created is not re-created.
+func (s *State) AgentPoolBySourceID(sourceID string) *AgentPoolRecord {
+	for i := range s.AgentPools {
+		if s.AgentPools[i].SourceID == sourceID {
+			return &s.AgentPools[i]
+		}
+	}
+	return nil
+}
+
+// AgentPoolRollbackTargets returns the agent-pool records `rollback` may
+// delete: those THIS migration created (CreatedByMigration) that still
+// carry a TerrapodID and haven't been rolled back. Deleting a pool
+// SET-NULLs any workspace still pointing at it (FK ondelete=SET NULL),
+// so there's no ordering hazard with the workspace deletes that follow.
+func (s *State) AgentPoolRollbackTargets() []*AgentPoolRecord {
+	var out []*AgentPoolRecord
+	for i := range s.AgentPools {
+		r := &s.AgentPools[i]
 		if r.CreatedByMigration && r.TerrapodID != "" && r.State != "rolled_back" {
 			out = append(out, r)
 		}

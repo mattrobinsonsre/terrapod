@@ -108,6 +108,7 @@ func rollbackCmd(args []string) int {
 type RollbackReport struct {
 	DryRun              bool                   `json:"dry_run"`
 	Target              string                 `json:"target"`
+	AgentPools          []RollbackAgentPool    `json:"agent_pools,omitempty"`
 	Notifications       []RollbackNotification `json:"notifications,omitempty"`
 	RunTriggers         []RollbackRunTrigger   `json:"run_triggers,omitempty"`
 	VariableSets        []RollbackVarset       `json:"variable_sets,omitempty"`
@@ -117,8 +118,20 @@ type RollbackReport struct {
 	VarsetDeleted       int                    `json:"varset_deleted_count"`
 	RunTriggerDeleted   int                    `json:"run_trigger_deleted_count"`
 	NotificationDeleted int                    `json:"notification_deleted_count"`
+	AgentPoolDeleted    int                    `json:"agent_pool_deleted_count"`
 	SkippedCount        int                    `json:"skipped_count"`
 	Errors              []string               `json:"errors,omitempty"`
+}
+
+// RollbackAgentPool is the per-agent-pool rollback outcome. Action is
+// one of: "would_delete" (dry-run), "deleted", "already_gone",
+// "errored". Deleting a pool SET-NULLs any workspace still pointing at
+// it, so there's no ordering hazard with the workspace deletes.
+type RollbackAgentPool struct {
+	Name       string `json:"name"`
+	TerrapodID string `json:"terrapod_id,omitempty"`
+	Action     string `json:"action"`
+	Detail     string `json:"detail,omitempty"`
 }
 
 // RollbackNotification is the per-notification-config rollback outcome.
@@ -170,11 +183,51 @@ func runRollback(ctx context.Context, c *terrapod.Client, state *framework.State
 		report.ConnectionsLeft = append(report.ConnectionsLeft, state.VCSConnections[i].Name)
 	}
 
-	// Notifications first — they were created last (workspaces → varsets
-	// → run triggers → notifications), so rollback deletes them in the
-	// reverse order. Pure per-workspace config with no state serial, so
-	// no advanced-state guard; the provenance gate is the whole safety
-	// boundary. Delete is 404-tolerant.
+	// Agent pools first — they were created last (workspaces → varsets →
+	// run triggers → notifications → agent pools), so rollback deletes
+	// them at the front of the reverse order. Deleting a pool SET-NULLs
+	// any workspace still pointing at it (FK ondelete=SET NULL), so there
+	// is no ordering hazard with the workspace deletes that follow. The
+	// provenance gate is the whole safety boundary. Delete is 404-tolerant.
+	for _, rec := range state.AgentPoolRollbackTargets() {
+		ap := RollbackAgentPool{Name: rec.Name, TerrapodID: rec.TerrapodID}
+		if !apply {
+			ap.Action = "would_delete"
+			report.AgentPools = append(report.AgentPools, ap)
+			report.AgentPoolDeleted++
+			continue
+		}
+		if err := c.DeleteAgentPool(ctx, rec.TerrapodID); err != nil {
+			var nf *terrapod.NotFoundError
+			if errors.As(err, &nf) {
+				ap.Action = "already_gone"
+				rec.State = "rolled_back"
+				rec.TerrapodID = ""
+				report.AgentPools = append(report.AgentPools, ap)
+				report.AgentPoolDeleted++
+				_ = state.Save(statePath, Version)
+				continue
+			}
+			ap.Action = "errored"
+			ap.Detail = err.Error()
+			report.AgentPools = append(report.AgentPools, ap)
+			report.Errors = append(report.Errors, fmt.Sprintf("agent-pool %q: delete failed: %v", ap.Name, err))
+			continue
+		}
+		ap.Action = "deleted"
+		rec.State = "rolled_back"
+		rec.TerrapodID = ""
+		report.AgentPools = append(report.AgentPools, ap)
+		report.AgentPoolDeleted++
+		if err := state.Save(statePath, Version); err != nil {
+			report.Errors = append(report.Errors, fmt.Sprintf("agent-pool %q deleted but state save failed: %v", ap.Name, err))
+		}
+	}
+
+	// Notifications next — created after run triggers, so deleted before
+	// them in the reverse order. Pure per-workspace config with no state
+	// serial, so no advanced-state guard; the provenance gate is the whole
+	// safety boundary. Delete is 404-tolerant.
 	for _, rec := range state.NotificationRollbackTargets() {
 		nt := RollbackNotification{
 			Workspace:  rec.WorkspaceRef,
@@ -404,11 +457,28 @@ func printRollbackSummary(r *RollbackReport, dryRun bool) {
 			fmt.Printf("  notification configs deleted: %d\n", r.NotificationDeleted)
 		}
 	}
+	if r.AgentPoolDeleted > 0 {
+		if dryRun {
+			fmt.Printf("  would delete:  %d agent pool(s)\n", r.AgentPoolDeleted)
+		} else {
+			fmt.Printf("  agent pools deleted: %d\n", r.AgentPoolDeleted)
+		}
+	}
 	if len(r.ConnectionsLeft) > 0 {
 		fmt.Printf("  vcs connections left in place (operator-owned): %d\n", len(r.ConnectionsLeft))
 	}
 	if len(r.Errors) > 0 {
 		fmt.Printf("  errors:        %d\n", len(r.Errors))
+	}
+	for _, a := range r.AgentPools {
+		fmt.Printf("    [%-16s] agent-pool %s", a.Action, a.Name)
+		if a.TerrapodID != "" {
+			fmt.Printf(" (%s)", a.TerrapodID)
+		}
+		fmt.Println()
+		if a.Detail != "" {
+			fmt.Printf("        - %s\n", a.Detail)
+		}
 	}
 	for _, n := range r.Notifications {
 		fmt.Printf("    [%-16s] notification %s / %s", n.Action, n.Workspace, n.Name)

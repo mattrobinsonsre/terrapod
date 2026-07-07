@@ -23,6 +23,7 @@ type rollbackFakeServer struct {
 	deletedVarsets       []string
 	deletedRunTriggers   []string
 	deletedNotifications []string
+	deletedAgentPools    []string
 }
 
 func newRollbackServer(t *testing.T, currentSerial map[string]int64) (*rollbackFakeServer, *terrapod.Client) {
@@ -66,6 +67,12 @@ func newRollbackServer(t *testing.T, currentSerial map[string]int64) (*rollbackF
 			id := strings.TrimPrefix(r.URL.Path, "/api/terrapod/v1/notification-configurations/")
 			fs.mu.Lock()
 			fs.deletedNotifications = append(fs.deletedNotifications, id)
+			fs.mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/api/terrapod/v1/agent-pools/"):
+			id := strings.TrimPrefix(r.URL.Path, "/api/terrapod/v1/agent-pools/")
+			fs.mu.Lock()
+			fs.deletedAgentPools = append(fs.deletedAgentPools, id)
 			fs.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
 		default:
@@ -165,6 +172,36 @@ func TestRollback_Apply_DeletesMigrationCreatedNotifications_SkipsReused(t *test
 	report2 := runRollback(t.Context(), c, state, "", true, false)
 	if len(fs.deletedNotifications) != 0 || report2.NotificationDeleted != 0 {
 		t.Fatalf("second rollback not idempotent: %v", fs.deletedNotifications)
+	}
+}
+
+func TestRollback_Apply_DeletesMigrationCreatedAgentPools_SkipsReused(t *testing.T) {
+	fs, c := newRollbackServer(t, map[string]int64{})
+	state := &framework.State{
+		AgentPools: []framework.AgentPoolRecord{
+			{SourceID: "pool-1", Name: "aws-prod", TerrapodID: "ap-a", State: "created", CreatedByMigration: true},
+			// A reused/pre-existing pool (no id, not created by us) — never deleted.
+			{SourceID: "pool-2", Name: "shared", State: "reused", CreatedByMigration: false},
+		},
+	}
+	report := runRollback(t.Context(), c, state, "", true /*apply*/, false)
+	if len(fs.deletedAgentPools) != 1 || fs.deletedAgentPools[0] != "ap-a" {
+		t.Fatalf("expected only ap-a deleted, got %v", fs.deletedAgentPools)
+	}
+	if report.AgentPoolDeleted != 1 {
+		t.Fatalf("AgentPoolDeleted=%d", report.AgentPoolDeleted)
+	}
+	if state.AgentPools[0].State != "rolled_back" || state.AgentPools[0].TerrapodID != "" {
+		t.Fatalf("record not marked rolled_back: %+v", state.AgentPools[0])
+	}
+	if state.AgentPools[1].State != "reused" {
+		t.Fatalf("reused pool was modified: %+v", state.AgentPools[1])
+	}
+	// Idempotent re-run.
+	fs.deletedAgentPools = nil
+	report2 := runRollback(t.Context(), c, state, "", true, false)
+	if len(fs.deletedAgentPools) != 0 || report2.AgentPoolDeleted != 0 {
+		t.Fatalf("second rollback not idempotent: %v", fs.deletedAgentPools)
 	}
 }
 

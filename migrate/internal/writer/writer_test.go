@@ -28,6 +28,8 @@ type fakeTerrapodServer struct {
 	varsetAssignments   int
 	runTriggersCreated  int
 	notificationCreated int
+	agentPoolsCreated   int
+	workspacePatches    int
 	// lastNotificationBody records the most recent notification-create body
 	lastNotificationBody []byte
 	// lastWorkspaceBody records the most recent workspace-create body
@@ -77,6 +79,14 @@ func newFakeServer(t *testing.T) (*fakeTerrapodServer, *terrapod.Client) {
 			fs.lastNotificationBody = body
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"nc-fixt","type":"notification-configurations","attributes":{"name":"nm","destination-type":"generic","enabled":true}}}`))
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/agent-pools"):
+			fs.agentPoolsCreated++
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"data":{"id":"ap-fixt","type":"agent-pools","attributes":{"name":"nm"}}}`))
+		case r.Method == http.MethodPatch && strings.Contains(r.URL.Path, "/api/v2/workspaces/"):
+			fs.workspacePatches++
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":{"id":"ws-fixt","type":"workspaces","attributes":{"name":"app","agent-pool-id":"ap-fixt"}}}`))
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/workspaces"):
 			fs.workspacesCreated++
 			fs.lastWorkspaceBody = body
@@ -439,6 +449,69 @@ func TestWriter_Apply_Notification_CreatesInScope_SkipsOutOfScope(t *testing.T) 
 	}
 	if report2.Notifications[0].State != "reused" {
 		t.Errorf("expected reused, got: %+v", report2.Notifications[0])
+	}
+}
+
+func TestWriter_Apply_AgentPool_CreatesAndRepointsWorkspaces(t *testing.T) {
+	fs, c := newFakeServer(t)
+	state := &framework.State{}
+	w := New(c, state, "")
+
+	plan := ir.Plan{
+		Source: "tfe",
+		Workspaces: []ir.Workspace{
+			{SourceID: "ws-a", Name: "app", ExecutionMode: "agent"},
+		},
+		AgentPools: []ir.AgentPool{
+			// One in-scope member (ws-a), one out-of-scope (ws-ext).
+			{SourceID: "pool-1", Name: "aws-prod", WorkspaceRefs: []string{"ws-a", "ws-ext"}},
+		},
+	}
+
+	report, err := w.Run(t.Context(), plan, Options{})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(report.Errors) != 0 {
+		t.Fatalf("expected no errors, got: %+v", report.Errors)
+	}
+	if fs.agentPoolsCreated != 1 {
+		t.Errorf("expected 1 agent-pool POST, got %d", fs.agentPoolsCreated)
+	}
+	// Only the in-scope member workspace gets re-pointed (one PATCH).
+	if fs.workspacePatches != 1 {
+		t.Errorf("expected 1 workspace PATCH, got %d", fs.workspacePatches)
+	}
+	if len(report.AgentPools) != 1 {
+		t.Fatalf("expected 1 agent-pool outcome, got %d", len(report.AgentPools))
+	}
+	ap := report.AgentPools[0]
+	if ap.State != "created" || ap.TerrapodID != "ap-fixt" {
+		t.Errorf("agent-pool outcome: %+v", ap)
+	}
+	if ap.Assignments != 1 {
+		t.Errorf("expected 1 assignment, got %d", ap.Assignments)
+	}
+	if len(ap.Unresolved) != 1 || ap.Unresolved[0] != "ws-ext" {
+		t.Errorf("expected ws-ext unresolved, got %+v", ap.Unresolved)
+	}
+	// State records the created pool with the provenance gate set.
+	rec := state.AgentPoolBySourceID("pool-1")
+	if rec == nil || rec.TerrapodID != "ap-fixt" || !rec.CreatedByMigration {
+		t.Errorf("agent-pool state record: %+v", rec)
+	}
+
+	// Idempotent: a second run reuses (no new pool POST).
+	fs.agentPoolsCreated = 0
+	report2, err := w.Run(t.Context(), plan, Options{})
+	if err != nil {
+		t.Fatalf("second Run: %v", err)
+	}
+	if fs.agentPoolsCreated != 0 {
+		t.Errorf("agent-pool re-created on resume: %d", fs.agentPoolsCreated)
+	}
+	if report2.AgentPools[0].State != "reused" {
+		t.Errorf("expected reused, got: %+v", report2.AgentPools[0])
 	}
 }
 

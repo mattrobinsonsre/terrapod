@@ -13,9 +13,10 @@
 //
 //   - Apply — actually writes. Order is dependency-first: VCS
 //     connections → workspaces (+ their variables + state) → variable
-//     sets → run triggers → notification configurations. The last three
-//     come after workspaces so their references resolve to the Terrapod
-//     IDs the workspace loop recorded. After each write the state file is
+//     sets → run triggers → notification configurations → agent pools.
+//     Everything after workspaces comes later so its references resolve to
+//     the Terrapod IDs the workspace loop recorded (agent pools also
+//     re-point their member workspaces). After each write the state file is
 //     saved so a crash mid-migration is resumable from the same state file.
 package writer
 
@@ -94,6 +95,7 @@ type Report struct {
 	VariableSets  []VarsetOutcome       `json:"variable_sets,omitempty"`
 	RunTriggers   []RunTriggerOutcome   `json:"run_triggers,omitempty"`
 	Notifications []NotificationOutcome `json:"notifications,omitempty"`
+	AgentPools    []AgentPoolOutcome    `json:"agent_pools,omitempty"`
 	Skipped       []ir.SkippedItem      `json:"skipped,omitempty"`
 	Errors        []string              `json:"errors,omitempty"`
 }
@@ -180,6 +182,22 @@ type NotificationOutcome struct {
 	TerrapodID    string `json:"terrapod_id,omitempty"`
 	NeedsToken    bool   `json:"needs_token,omitempty"`
 	Detail        string `json:"detail,omitempty"`
+}
+
+// AgentPoolOutcome is the per-agent-pool result. State: "planned" |
+// "created" | "reused" | "errored". Assignments is how many member
+// workspaces were re-pointed at the new pool; Unresolved lists source
+// workspace refs outside the migration scope (assign by hand). Every
+// created/reused pool needs a fresh join token + redeployed listeners
+// — TFE tokens are never portable — surfaced separately in the report.
+type AgentPoolOutcome struct {
+	SourceID    string   `json:"source_id"`
+	Name        string   `json:"name"`
+	State       string   `json:"state"`
+	TerrapodID  string   `json:"terrapod_id,omitempty"`
+	Error       string   `json:"error,omitempty"`
+	Assignments int      `json:"assignments,omitempty"`
+	Unresolved  []string `json:"unresolved_workspace_refs,omitempty"`
 }
 
 // Writer is the entry point. Construct one per migration run and call
@@ -303,6 +321,18 @@ func (w *Writer) Run(ctx context.Context, plan ir.Plan, opts Options) (*Report, 
 		report.Notifications = append(report.Notifications, outcome)
 		if err := w.saveState(); err != nil {
 			return report, fmt.Errorf("save state after notification %q on %s: %w", nc.Name, nc.WorkspaceName, err)
+		}
+	}
+
+	// Agent pools last: created after workspaces so their member
+	// assignments resolve to migrated Terrapod workspaces, which the
+	// writer then re-points at the new pool.
+	for i := range plan.AgentPools {
+		ap := &plan.AgentPools[i]
+		outcome := w.applyAgentPool(ctx, ap, opts)
+		report.AgentPools = append(report.AgentPools, outcome)
+		if err := w.saveState(); err != nil {
+			return report, fmt.Errorf("save state after agent pool %q: %w", ap.Name, err)
 		}
 	}
 
@@ -1153,6 +1183,114 @@ func (w *Writer) recordNotification(nc *ir.NotificationConfiguration, state, ter
 	w.state.Notifications = append(w.state.Notifications, rec)
 }
 
+// applyAgentPool creates a Terrapod agent pool and re-points every
+// migrated member workspace at it. Idempotent (reuses a prior record),
+// 409-tolerant. Only the pool's identity + workspace assignments
+// migrate — TFE agent tokens are write-only and never returned, so no
+// token is created; the report tells the operator to regenerate a join
+// token and redeploy listeners. Member workspaces outside the migration
+// scope are reported as unresolved.
+func (w *Writer) applyAgentPool(ctx context.Context, ap *ir.AgentPool, opts Options) AgentPoolOutcome {
+	out := AgentPoolOutcome{SourceID: ap.SourceID, Name: ap.Name, State: "planned"}
+
+	// Resolve the pool's Terrapod id — a prior run's, or a fresh create.
+	poolID := ""
+	if prior := w.state.AgentPoolBySourceID(ap.SourceID); prior != nil && prior.TerrapodID != "" {
+		poolID = prior.TerrapodID
+		out.State = "reused"
+		out.TerrapodID = poolID
+	}
+
+	if opts.DryRun {
+		out.Assignments, out.Unresolved = w.planPoolAssignments(ap)
+		if out.State != "reused" {
+			w.recordAgentPool(ap, "planned", "", "")
+		}
+		return out
+	}
+
+	if poolID == "" {
+		created, err := w.client.CreateAgentPool(ctx, terrapod.CreateAgentPoolRequest{
+			Name: ap.Name,
+		})
+		if err != nil {
+			// 409 → a pool with this name already exists (a prior run, or
+			// operator-created). We can't learn its id, so it won't be a
+			// rollback target — acceptable: rollback only deletes pools it
+			// can positively identify as its own. Skip re-pointing (we
+			// don't know the id) and report.
+			var conflict *terrapod.ConflictError
+			if errors.As(err, &conflict) {
+				out.State = "reused"
+				w.recordAgentPool(ap, "reused", "", "")
+				return out
+			}
+			out.State = "errored"
+			out.Error = err.Error()
+			w.recordAgentPool(ap, "errored", "", err.Error())
+			return out
+		}
+		poolID = created.ID
+		out.State = "created"
+		out.TerrapodID = poolID
+		w.recordAgentPool(ap, "created", poolID, "")
+	}
+
+	// Re-point each migrated member workspace at the new pool.
+	for _, ref := range ap.WorkspaceRefs {
+		ws := w.state.WorkspaceBySourceID(ref)
+		if ws == nil || ws.TerrapodID == "" {
+			out.Unresolved = append(out.Unresolved, ref)
+			continue
+		}
+		if _, err := w.client.UpdateWorkspace(ctx, ws.TerrapodID, terrapod.UpdateWorkspaceRequest{
+			AgentPoolID: poolID,
+		}); err != nil {
+			out.Unresolved = append(out.Unresolved, ref)
+			continue
+		}
+		out.Assignments++
+	}
+	return out
+}
+
+// planPoolAssignments counts how many of a pool's member workspaces map
+// to migrated workspaces and collects the source refs that don't (used
+// in dry-run and to seed the outcome). Mirrors planVarsetAssignments.
+func (w *Writer) planPoolAssignments(ap *ir.AgentPool) (assigned int, unresolved []string) {
+	for _, ref := range ap.WorkspaceRefs {
+		if ws := w.state.WorkspaceBySourceID(ref); ws != nil {
+			assigned++
+		} else {
+			unresolved = append(unresolved, ref)
+		}
+	}
+	return assigned, unresolved
+}
+
+func (w *Writer) recordAgentPool(ap *ir.AgentPool, state, terrapodID, errMsg string) {
+	if rec := w.state.AgentPoolBySourceID(ap.SourceID); rec != nil {
+		rec.State = state
+		rec.Error = errMsg
+		if terrapodID != "" {
+			rec.TerrapodID = terrapodID
+			rec.CreatedByMigration = true
+		}
+		return
+	}
+	rec := framework.AgentPoolRecord{
+		SourceID: ap.SourceID,
+		Name:     ap.Name,
+		State:    state,
+		Error:    errMsg,
+	}
+	if terrapodID != "" {
+		rec.TerrapodID = terrapodID
+		rec.CreatedByMigration = true
+	}
+	w.state.AgentPools = append(w.state.AgentPools, rec)
+}
+
 func (w *Writer) recordConnection(c *ir.VCSConnection, state, errMsg string) {
 	if rec := findConnectionRecord(w.state, c.SourceID); rec != nil {
 		rec.State = state
@@ -1246,6 +1384,11 @@ func collectErrors(r *Report) []string {
 	for _, nc := range r.Notifications {
 		if nc.State == "errored" && nc.Detail != "" {
 			errs = append(errs, fmt.Sprintf("notification %q on %q: %s", nc.Name, nc.WorkspaceName, nc.Detail))
+		}
+	}
+	for _, ap := range r.AgentPools {
+		if ap.State == "errored" && ap.Error != "" {
+			errs = append(errs, fmt.Sprintf("agent-pool %q: %s", ap.Name, ap.Error))
 		}
 	}
 	return errs

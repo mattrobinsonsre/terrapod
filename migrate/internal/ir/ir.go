@@ -64,6 +64,13 @@ type Plan struct {
 	// migrated destination workspace.
 	Notifications []NotificationConfiguration `json:"notifications,omitempty"`
 
+	// AgentPools are named groups of runner listeners. Created after
+	// workspaces so their workspace assignments resolve to Terrapod IDs;
+	// each pool re-points its migrated member workspaces at the new pool.
+	// Join tokens are never portable — every migrated pool needs a fresh
+	// token + redeployed listeners, reported for operator follow-up.
+	AgentPools []AgentPool `json:"agent_pools,omitempty"`
+
 	// Skipped collects items the source decided not to migrate, with a
 	// per-item reason. Surfaced in the dry-run report and the handover
 	// document; never written to Terrapod.
@@ -161,6 +168,21 @@ type NotificationConfiguration struct {
 	EmailAddresses  []string `json:"email_addresses,omitempty"`
 	NeedsToken      bool     `json:"needs_token,omitempty"`
 	WorkspaceName   string   `json:"workspace_name,omitempty"`
+}
+
+// AgentPool is the migrated form of a TFE agent pool — a named group of
+// runner listeners. WorkspaceRefs are the SOURCE workspace IDs assigned
+// to the pool (execution-mode=agent); the writer maps each to the
+// migrated Terrapod workspace and re-points it at the new pool. Refs
+// outside the migration scope are reported for manual follow-up.
+//
+// Only the pool's identity migrates — TFE agent tokens are write-only
+// and never returned, so no token is created. Every migrated pool needs
+// a fresh join token and redeployed listeners, which the report flags.
+type AgentPool struct {
+	SourceID      string   `json:"source_id"`
+	Name          string   `json:"name"`
+	WorkspaceRefs []string `json:"workspace_refs,omitempty"`
 }
 
 // VCSConnection is a Terrapod-side VCS connection (one per source
