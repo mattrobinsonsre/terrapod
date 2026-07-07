@@ -520,6 +520,60 @@ func TestWriter_Apply_AgentPool_CreatesAndRepointsWorkspaces(t *testing.T) {
 	}
 }
 
+func TestWriter_VariableSet_NonGlobal_Resume_ReassignsIdempotently(t *testing.T) {
+	// A non-global varset with a workspace assignment: on resume, the
+	// varset is reused and its workspace assignment is re-applied. The
+	// assign endpoint is idempotent (204 on already-assigned), so resume
+	// re-assigns cleanly with no error — this exercises the real re-assign
+	// path (the global-only resume test can't, since global skips assignment).
+	fs, c := newFakeServer(t)
+	state := &framework.State{}
+	w := New(c, state, "")
+
+	plan := ir.Plan{
+		Source:     "tfe",
+		Workspaces: []ir.Workspace{{SourceID: "ws-src-1", Name: "app"}},
+		VariableSets: []ir.VariableSet{
+			{SourceID: "vs-src-1", Name: "app-vars", WorkspaceRefs: []string{"ws-src-1"},
+				Variables: []ir.Variable{{Key: "region", Value: "eu-west-1", Category: "terraform"}}},
+		},
+	}
+
+	report1, err := w.Run(t.Context(), plan, Options{})
+	if err != nil {
+		t.Fatalf("first Run: %v", err)
+	}
+	if len(report1.Errors) != 0 {
+		t.Fatalf("first run errors: %+v", report1.Errors)
+	}
+	if report1.VariableSets[0].State != "created" || report1.VariableSets[0].Assignments != 1 {
+		t.Fatalf("first run varset outcome: %+v", report1.VariableSets[0])
+	}
+	if fs.varsetAssignments != 1 {
+		t.Errorf("expected 1 assignment POST on first run, got %d", fs.varsetAssignments)
+	}
+
+	// Resume: varset reused (not re-created), assignment re-applied via the
+	// idempotent 204 path — no error, count still 1.
+	fs.varsetsCreated = 0
+	report2, err := w.Run(t.Context(), plan, Options{})
+	if err != nil {
+		t.Fatalf("second Run: %v", err)
+	}
+	if len(report2.Errors) != 0 {
+		t.Fatalf("resume run errors: %+v", report2.Errors)
+	}
+	if fs.varsetsCreated != 0 {
+		t.Errorf("varset re-created on resume: %d", fs.varsetsCreated)
+	}
+	if report2.VariableSets[0].State != "reused" {
+		t.Errorf("expected reused, got %+v", report2.VariableSets[0])
+	}
+	if report2.VariableSets[0].Assignments != 1 {
+		t.Errorf("resume should re-assign idempotently (1), got %d", report2.VariableSets[0].Assignments)
+	}
+}
+
 func TestWriter_Apply_GPGKey_CreatesAndIsIdempotent(t *testing.T) {
 	fs, c := newFakeServer(t)
 	state := &framework.State{}

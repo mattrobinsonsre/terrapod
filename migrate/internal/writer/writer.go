@@ -926,12 +926,10 @@ func (w *Writer) applyVarsetContents(ctx context.Context, varsetID string, vs *i
 			out.Unresolved = append(out.Unresolved, ref)
 			continue
 		}
+		// The assign endpoint is idempotent (204 on already-assigned,
+		// never 409), so a resume re-assign just succeeds — no special
+		// conflict handling needed.
 		if err := w.client.AssignWorkspaceToVarset(ctx, varsetID, rec.TerrapodID); err != nil {
-			var conflict *terrapod.ConflictError
-			if errors.As(err, &conflict) {
-				out.Assignments++ // already assigned by a prior run
-				continue
-			}
 			out.Unresolved = append(out.Unresolved, ref)
 			continue
 		}
@@ -1000,7 +998,10 @@ func (w *Writer) planVarsetAssignments(vs *ir.VariableSet) (int, []string) {
 	var resolved int
 	var unresolved []string
 	for _, ref := range vs.WorkspaceRefs {
-		if w.state.WorkspaceBySourceID(ref) != nil {
+		// A workspace that errored during apply has a state record but was
+		// not successfully created — don't count it as a would-be
+		// assignment; report it as unresolved instead (optimistic-count fix).
+		if ws := w.state.WorkspaceBySourceID(ref); ws != nil && ws.State != "errored" {
 			resolved++
 		} else {
 			unresolved = append(unresolved, ref)
@@ -1285,7 +1286,9 @@ func (w *Writer) applyAgentPool(ctx context.Context, ap *ir.AgentPool, opts Opti
 // in dry-run and to seed the outcome). Mirrors planVarsetAssignments.
 func (w *Writer) planPoolAssignments(ap *ir.AgentPool) (assigned int, unresolved []string) {
 	for _, ref := range ap.WorkspaceRefs {
-		if ws := w.state.WorkspaceBySourceID(ref); ws != nil {
+		// Skip workspaces that errored during apply — a record exists but
+		// the workspace wasn't successfully created (optimistic-count fix).
+		if ws := w.state.WorkspaceBySourceID(ref); ws != nil && ws.State != "errored" {
 			assigned++
 		} else {
 			unresolved = append(unresolved, ref)

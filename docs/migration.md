@@ -94,8 +94,11 @@ is advisory by policy; the registry artefacts below are limited by the
   tree. **Dry-run by default**; pass `--write` to touch disk. No VCS
   interaction — you commit and push after.
 - `terrapod-migrate verify` — confirm each migrated workspace still matches
-  what the migration recorded: it's present, the variable count is intact,
-  and the state serial/lineage is unchanged. Exits non-zero on any mismatch.
+  what the migration recorded (present, variable count intact, state
+  serial/lineage unchanged), and existence-check the other migration-created
+  resources (variable sets, run triggers, notifications, agent pools, GPG
+  keys) — a resource deleted post-migration is flagged. Exits non-zero on any
+  mismatch.
 - `terrapod-migrate rollback` — reverse a migration by deleting the
   workspaces it created. **Dry-run by default**; pass `--apply` to delete.
   Safe by construction (see [Reversibility](#reversibility-dry-run--rollback)).
