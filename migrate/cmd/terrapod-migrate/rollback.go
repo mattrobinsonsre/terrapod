@@ -106,17 +106,30 @@ func rollbackCmd(args []string) int {
 
 // RollbackReport is the structured result of a rollback run.
 type RollbackReport struct {
-	DryRun            bool                 `json:"dry_run"`
-	Target            string               `json:"target"`
-	RunTriggers       []RollbackRunTrigger `json:"run_triggers,omitempty"`
-	VariableSets      []RollbackVarset     `json:"variable_sets,omitempty"`
-	Workspaces        []RollbackWorkspace  `json:"workspaces"`
-	ConnectionsLeft   []string             `json:"connections_left_in_place,omitempty"`
-	DeletedCount      int                  `json:"deleted_count"`
-	VarsetDeleted     int                  `json:"varset_deleted_count"`
-	RunTriggerDeleted int                  `json:"run_trigger_deleted_count"`
-	SkippedCount      int                  `json:"skipped_count"`
-	Errors            []string             `json:"errors,omitempty"`
+	DryRun              bool                   `json:"dry_run"`
+	Target              string                 `json:"target"`
+	Notifications       []RollbackNotification `json:"notifications,omitempty"`
+	RunTriggers         []RollbackRunTrigger   `json:"run_triggers,omitempty"`
+	VariableSets        []RollbackVarset       `json:"variable_sets,omitempty"`
+	Workspaces          []RollbackWorkspace    `json:"workspaces"`
+	ConnectionsLeft     []string               `json:"connections_left_in_place,omitempty"`
+	DeletedCount        int                    `json:"deleted_count"`
+	VarsetDeleted       int                    `json:"varset_deleted_count"`
+	RunTriggerDeleted   int                    `json:"run_trigger_deleted_count"`
+	NotificationDeleted int                    `json:"notification_deleted_count"`
+	SkippedCount        int                    `json:"skipped_count"`
+	Errors              []string               `json:"errors,omitempty"`
+}
+
+// RollbackNotification is the per-notification-config rollback outcome.
+// Action is one of: "would_delete" (dry-run), "deleted", "already_gone",
+// "errored".
+type RollbackNotification struct {
+	Workspace  string `json:"workspace"` // destination workspace ref
+	Name       string `json:"name"`
+	TerrapodID string `json:"terrapod_id,omitempty"`
+	Action     string `json:"action"`
+	Detail     string `json:"detail,omitempty"`
 }
 
 // RollbackVarset is the per-variable-set rollback outcome. Action is one
@@ -157,7 +170,51 @@ func runRollback(ctx context.Context, c *terrapod.Client, state *framework.State
 		report.ConnectionsLeft = append(report.ConnectionsLeft, state.VCSConnections[i].Name)
 	}
 
-	// Run triggers first — the reverse of the create order (workspaces →
+	// Notifications first — they were created last (workspaces → varsets
+	// → run triggers → notifications), so rollback deletes them in the
+	// reverse order. Pure per-workspace config with no state serial, so
+	// no advanced-state guard; the provenance gate is the whole safety
+	// boundary. Delete is 404-tolerant.
+	for _, rec := range state.NotificationRollbackTargets() {
+		nt := RollbackNotification{
+			Workspace:  rec.WorkspaceRef,
+			Name:       rec.Name,
+			TerrapodID: rec.TerrapodID,
+		}
+		if !apply {
+			nt.Action = "would_delete"
+			report.Notifications = append(report.Notifications, nt)
+			report.NotificationDeleted++
+			continue
+		}
+		if err := c.DeleteNotificationConfiguration(ctx, rec.TerrapodID); err != nil {
+			var nf *terrapod.NotFoundError
+			if errors.As(err, &nf) {
+				nt.Action = "already_gone"
+				rec.State = "rolled_back"
+				rec.TerrapodID = ""
+				report.Notifications = append(report.Notifications, nt)
+				report.NotificationDeleted++
+				_ = state.Save(statePath, Version)
+				continue
+			}
+			nt.Action = "errored"
+			nt.Detail = err.Error()
+			report.Notifications = append(report.Notifications, nt)
+			report.Errors = append(report.Errors, fmt.Sprintf("notification %q on %s: delete failed: %v", nt.Name, nt.Workspace, err))
+			continue
+		}
+		nt.Action = "deleted"
+		rec.State = "rolled_back"
+		rec.TerrapodID = ""
+		report.Notifications = append(report.Notifications, nt)
+		report.NotificationDeleted++
+		if err := state.Save(statePath, Version); err != nil {
+			report.Errors = append(report.Errors, fmt.Sprintf("notification %q on %s deleted but state save failed: %v", nt.Name, nt.Workspace, err))
+		}
+	}
+
+	// Run triggers next — the reverse of the create order (workspaces →
 	// varsets → run triggers). Like varsets they're pure config with no
 	// state serial, so no advanced-state guard; the provenance gate is
 	// the whole safety boundary. Delete is 404-tolerant.
@@ -340,11 +397,28 @@ func printRollbackSummary(r *RollbackReport, dryRun bool) {
 			fmt.Printf("  run triggers deleted: %d\n", r.RunTriggerDeleted)
 		}
 	}
+	if r.NotificationDeleted > 0 {
+		if dryRun {
+			fmt.Printf("  would delete:  %d notification config(s)\n", r.NotificationDeleted)
+		} else {
+			fmt.Printf("  notification configs deleted: %d\n", r.NotificationDeleted)
+		}
+	}
 	if len(r.ConnectionsLeft) > 0 {
 		fmt.Printf("  vcs connections left in place (operator-owned): %d\n", len(r.ConnectionsLeft))
 	}
 	if len(r.Errors) > 0 {
 		fmt.Printf("  errors:        %d\n", len(r.Errors))
+	}
+	for _, n := range r.Notifications {
+		fmt.Printf("    [%-16s] notification %s / %s", n.Action, n.Workspace, n.Name)
+		if n.TerrapodID != "" {
+			fmt.Printf(" (%s)", n.TerrapodID)
+		}
+		fmt.Println()
+		if n.Detail != "" {
+			fmt.Printf("        - %s\n", n.Detail)
+		}
 	}
 	for _, t := range r.RunTriggers {
 		fmt.Printf("    [%-16s] run-trigger %s", t.Action, t.Pair)

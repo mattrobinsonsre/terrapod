@@ -19,14 +19,17 @@ import (
 // how many times it was hit so tests can assert on the API call
 // pattern (e.g. "no workspace POST in dry-run mode").
 type fakeTerrapodServer struct {
-	t                  *testing.T
-	connectionsCreated int
-	workspacesCreated  int
-	variablesCreated   int
-	varsetsCreated     int
-	varsetVarsCreated  int
-	varsetAssignments  int
-	runTriggersCreated int
+	t                   *testing.T
+	connectionsCreated  int
+	workspacesCreated   int
+	variablesCreated    int
+	varsetsCreated      int
+	varsetVarsCreated   int
+	varsetAssignments   int
+	runTriggersCreated  int
+	notificationCreated int
+	// lastNotificationBody records the most recent notification-create body
+	lastNotificationBody []byte
 	// lastWorkspaceBody records the most recent workspace-create body
 	// so tests can verify field round-tripping.
 	lastWorkspaceBody []byte
@@ -69,6 +72,11 @@ func newFakeServer(t *testing.T) (*fakeTerrapodServer, *terrapod.Client) {
 			fs.runTriggersCreated++
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"rt-fixt","type":"run-triggers","attributes":{"workspace-id":"ws-fixt","sourceable-id":"ws-fixt"}}}`))
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/notification-configurations"):
+			fs.notificationCreated++
+			fs.lastNotificationBody = body
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"data":{"id":"nc-fixt","type":"notification-configurations","attributes":{"name":"nm","destination-type":"generic","enabled":true}}}`))
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/workspaces"):
 			fs.workspacesCreated++
 			fs.lastWorkspaceBody = body
@@ -360,6 +368,77 @@ func TestWriter_Apply_RunTrigger_CreatesInScope_SkipsOutOfScope(t *testing.T) {
 	}
 	if report2.RunTriggers[0].State != "reused" {
 		t.Errorf("expected reused, got: %+v", report2.RunTriggers[0])
+	}
+}
+
+func TestWriter_Apply_Notification_CreatesInScope_SkipsOutOfScope(t *testing.T) {
+	fs, c := newFakeServer(t)
+	state := &framework.State{}
+	w := New(c, state, "")
+
+	plan := ir.Plan{
+		Source: "tfe",
+		Workspaces: []ir.Workspace{
+			{SourceID: "ws-dst", Name: "app"},
+		},
+		Notifications: []ir.NotificationConfiguration{
+			// Destination migrated → created.
+			{WorkspaceRef: "ws-dst", Name: "slack-alerts", DestinationType: "generic", URL: "https://hooks.example/x", Enabled: true, Triggers: []string{"run:errored"}, NeedsToken: true, WorkspaceName: "app"},
+			// Destination outside the migration scope → skipped.
+			{WorkspaceRef: "ws-external", Name: "orphan", DestinationType: "slack", URL: "https://hooks.example/y", WorkspaceName: "external"},
+		},
+	}
+
+	report, err := w.Run(t.Context(), plan, Options{})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(report.Errors) != 0 {
+		t.Fatalf("expected no errors, got: %+v", report.Errors)
+	}
+	if fs.notificationCreated != 1 {
+		t.Errorf("expected 1 notification POST, got %d", fs.notificationCreated)
+	}
+	if len(report.Notifications) != 2 {
+		t.Fatalf("expected 2 notification outcomes, got %d", len(report.Notifications))
+	}
+	if report.Notifications[0].State != "created" || report.Notifications[0].TerrapodID != "nc-fixt" {
+		t.Errorf("in-scope notification: %+v", report.Notifications[0])
+	}
+	if !report.Notifications[0].NeedsToken {
+		t.Errorf("expected NeedsToken flagged on generic webhook: %+v", report.Notifications[0])
+	}
+	if report.Notifications[1].State != "skipped" {
+		t.Errorf("out-of-scope notification should be skipped: %+v", report.Notifications[1])
+	}
+	// The create body must NOT carry a non-empty token (source never
+	// returns it, so we migrate the config with an empty token).
+	var env struct {
+		Data struct {
+			Attributes map[string]any `json:"attributes"`
+		} `json:"data"`
+	}
+	_ = json.Unmarshal(fs.lastNotificationBody, &env)
+	if tok, ok := env.Data.Attributes["token"].(string); ok && tok != "" {
+		t.Errorf("notification create body leaked a token: %q", tok)
+	}
+	// State records the created config with the provenance gate set.
+	rec := state.NotificationByWorkspaceAndName("ws-dst", "slack-alerts")
+	if rec == nil || rec.TerrapodID != "nc-fixt" || !rec.CreatedByMigration {
+		t.Errorf("notification state record: %+v", rec)
+	}
+
+	// Idempotent: a second run reuses (no new POST).
+	fs.notificationCreated = 0
+	report2, err := w.Run(t.Context(), plan, Options{})
+	if err != nil {
+		t.Fatalf("second Run: %v", err)
+	}
+	if fs.notificationCreated != 0 {
+		t.Errorf("notification re-created on resume: %d", fs.notificationCreated)
+	}
+	if report2.Notifications[0].State != "reused" {
+		t.Errorf("expected reused, got: %+v", report2.Notifications[0])
 	}
 }
 

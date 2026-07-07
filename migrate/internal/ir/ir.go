@@ -59,6 +59,11 @@ type Plan struct {
 	// when BOTH endpoints were migrated.
 	RunTriggers []RunTrigger `json:"run_triggers,omitempty"`
 
+	// Notifications are per-workspace notification configurations
+	// (generic webhook / Slack / email). Created after workspaces on the
+	// migrated destination workspace.
+	Notifications []NotificationConfiguration `json:"notifications,omitempty"`
+
 	// Skipped collects items the source decided not to migrate, with a
 	// per-item reason. Surfaced in the dry-run report and the handover
 	// document; never written to Terrapod.
@@ -137,6 +142,25 @@ type RunTrigger struct {
 	DestinationWorkspaceRef string `json:"destination_workspace_ref"`
 	SourceName              string `json:"source_name,omitempty"`
 	DestinationName         string `json:"destination_name,omitempty"`
+}
+
+// NotificationConfiguration is the migrated form of a TFE workspace
+// notification configuration. WorkspaceRef is the destination workspace's
+// source ID (resolved to a Terrapod workspace id by the writer). Triggers
+// are already mapped to Terrapod's trigger vocabulary by the source. The
+// HMAC token is write-only at the source (never returned) — for generic
+// webhooks that need one, NeedsToken flags it so the operator re-enters
+// it post-migration; the config is created with an empty token.
+type NotificationConfiguration struct {
+	WorkspaceRef    string   `json:"workspace_ref"`
+	Name            string   `json:"name"`
+	DestinationType string   `json:"destination_type"` // "generic" | "slack" | "email"
+	URL             string   `json:"url,omitempty"`
+	Enabled         bool     `json:"enabled,omitempty"`
+	Triggers        []string `json:"triggers,omitempty"`
+	EmailAddresses  []string `json:"email_addresses,omitempty"`
+	NeedsToken      bool     `json:"needs_token,omitempty"`
+	WorkspaceName   string   `json:"workspace_name,omitempty"`
 }
 
 // VCSConnection is a Terrapod-side VCS connection (one per source

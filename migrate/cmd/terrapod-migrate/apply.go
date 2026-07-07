@@ -367,6 +367,12 @@ func loadTFEPlan(ctx context.Context, address, token, org string) (ir.Plan, writ
 		return ir.Plan{}, nil, err
 	}
 
+	notifications, ntSkipped, err := c.Notifications(ctx, workspaces)
+	if err != nil {
+		return ir.Plan{}, nil, err
+	}
+	skipped = append(skipped, ntSkipped...)
+
 	plan := ir.Plan{
 		Source: "tfe",
 		SourceMetadata: map[string]string{
@@ -378,6 +384,7 @@ func loadTFEPlan(ctx context.Context, address, token, org string) (ir.Plan, writ
 		Workspaces:     workspaces,
 		VariableSets:   varsets,
 		RunTriggers:    runTriggers,
+		Notifications:  notifications,
 		Skipped:        skipped,
 	}
 	return plan, c.StateReader(), nil
@@ -400,6 +407,7 @@ func printReportSummary(r *writer.Report, dryRun bool) {
 	fmt.Printf("  workspaces:    %d\n", len(r.Workspaces))
 	fmt.Printf("  variable sets: %d\n", len(r.VariableSets))
 	fmt.Printf("  run triggers:  %d\n", len(r.RunTriggers))
+	fmt.Printf("  notifications: %d\n", len(r.Notifications))
 	fmt.Printf("  skipped:       %d\n", len(r.Skipped))
 	if len(r.Errors) > 0 {
 		fmt.Printf("  errors:        %d\n", len(r.Errors))
@@ -474,6 +482,42 @@ func printReportSummary(r *writer.Report, dryRun bool) {
 		fmt.Println("    One or both endpoints were outside the migration scope. Recreate")
 		fmt.Println("    these source → destination triggers in Terrapod once both workspaces exist.")
 		for _, s := range skippedTriggers {
+			fmt.Printf("    - %s\n", s)
+		}
+	}
+
+	// Generic-webhook notification configs migrate with an empty HMAC
+	// token (the source never returns it). The operator must re-enter
+	// the token before the receiver will accept signed deliveries.
+	var needsToken []string
+	for _, nc := range r.Notifications {
+		if nc.NeedsToken && nc.State != "skipped" {
+			needsToken = append(needsToken, fmt.Sprintf("%s / %s", nc.WorkspaceName, nc.Name))
+		}
+	}
+	if len(needsToken) > 0 {
+		fmt.Printf("\n  notification tokens needing operator action (%d):\n", len(needsToken))
+		fmt.Println("    These generic-webhook configs were created with an empty HMAC token")
+		fmt.Println("    (the source never returns it). Re-enter each token in Terrapod if the")
+		fmt.Println("    receiver verifies signatures.")
+		for _, n := range needsToken {
+			fmt.Printf("    - %s\n", n)
+		}
+	}
+
+	// Notification configs whose destination workspace wasn't migrated
+	// can't be attached automatically.
+	var skippedNotifications []string
+	for _, nc := range r.Notifications {
+		if nc.State == "skipped" {
+			skippedNotifications = append(skippedNotifications, fmt.Sprintf("%s / %s", nc.WorkspaceName, nc.Name))
+		}
+	}
+	if len(skippedNotifications) > 0 {
+		fmt.Printf("\n  notifications needing operator action (%d):\n", len(skippedNotifications))
+		fmt.Println("    The destination workspace was outside the migration scope. Recreate")
+		fmt.Println("    these configs in Terrapod once the workspace exists.")
+		for _, s := range skippedNotifications {
 			fmt.Printf("    - %s\n", s)
 		}
 	}

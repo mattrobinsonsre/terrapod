@@ -17,11 +17,12 @@ import (
 // DELETE workspace (records the id). currentSerial maps a terrapod id
 // to the serial the destination currently reports; absent → 404.
 type rollbackFakeServer struct {
-	mu                 sync.Mutex
-	currentSerial      map[string]int64
-	deleted            []string
-	deletedVarsets     []string
-	deletedRunTriggers []string
+	mu                   sync.Mutex
+	currentSerial        map[string]int64
+	deleted              []string
+	deletedVarsets       []string
+	deletedRunTriggers   []string
+	deletedNotifications []string
 }
 
 func newRollbackServer(t *testing.T, currentSerial map[string]int64) (*rollbackFakeServer, *terrapod.Client) {
@@ -59,6 +60,12 @@ func newRollbackServer(t *testing.T, currentSerial map[string]int64) (*rollbackF
 			id := strings.TrimPrefix(r.URL.Path, "/api/terrapod/v1/run-triggers/")
 			fs.mu.Lock()
 			fs.deletedRunTriggers = append(fs.deletedRunTriggers, id)
+			fs.mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/api/terrapod/v1/notification-configurations/"):
+			id := strings.TrimPrefix(r.URL.Path, "/api/terrapod/v1/notification-configurations/")
+			fs.mu.Lock()
+			fs.deletedNotifications = append(fs.deletedNotifications, id)
 			fs.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
 		default:
@@ -128,6 +135,36 @@ func TestRollback_Apply_DeletesMigrationCreatedRunTriggers_SkipsReused(t *testin
 	report2 := runRollback(t.Context(), c, state, "", true, false)
 	if len(fs.deletedRunTriggers) != 0 || report2.RunTriggerDeleted != 0 {
 		t.Fatalf("second rollback not idempotent: %v", fs.deletedRunTriggers)
+	}
+}
+
+func TestRollback_Apply_DeletesMigrationCreatedNotifications_SkipsReused(t *testing.T) {
+	fs, c := newRollbackServer(t, map[string]int64{})
+	state := &framework.State{
+		Notifications: []framework.NotificationRecord{
+			{WorkspaceRef: "ws-a", Name: "slack-alerts", TerrapodID: "nc-a", State: "created", CreatedByMigration: true},
+			// A reused/pre-existing config (no id, not created by us) — never deleted.
+			{WorkspaceRef: "ws-a", Name: "orphan", State: "reused", CreatedByMigration: false},
+		},
+	}
+	report := runRollback(t.Context(), c, state, "", true /*apply*/, false)
+	if len(fs.deletedNotifications) != 1 || fs.deletedNotifications[0] != "nc-a" {
+		t.Fatalf("expected only nc-a deleted, got %v", fs.deletedNotifications)
+	}
+	if report.NotificationDeleted != 1 {
+		t.Fatalf("NotificationDeleted=%d", report.NotificationDeleted)
+	}
+	if state.Notifications[0].State != "rolled_back" || state.Notifications[0].TerrapodID != "" {
+		t.Fatalf("record not marked rolled_back: %+v", state.Notifications[0])
+	}
+	if state.Notifications[1].State != "reused" {
+		t.Fatalf("reused config was modified: %+v", state.Notifications[1])
+	}
+	// Idempotent re-run.
+	fs.deletedNotifications = nil
+	report2 := runRollback(t.Context(), c, state, "", true, false)
+	if len(fs.deletedNotifications) != 0 || report2.NotificationDeleted != 0 {
+		t.Fatalf("second rollback not idempotent: %v", fs.deletedNotifications)
 	}
 }
 

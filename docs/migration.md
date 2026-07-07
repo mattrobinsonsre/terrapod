@@ -46,6 +46,7 @@ didn't.
 | **State** | The current state version per workspace, with **serial + lineage preserved**, guarded against lineage mismatch and destination-serial-ahead (see [Reversibility](#reversibility-dry-run--rollback)). For **non-VCS** workspaces, the latest uploaded **configuration-version tarball** is migrated too (without it the workspace has no code to run on first plan). |
 | **Variable sets** | Name, description, global/priority flags, their variables (sensitive values → empty + `sensitive=true` for re-entry, same as workspace variables), and workspace assignments — resolved to the migrated workspaces (created **after** workspaces so the assignment IDs are known). Assignments to workspaces outside the migration scope, and TFE project/stack scoping (no Terrapod equivalent), are reported for manual follow-up. |
 | **Run triggers** | Cross-workspace dependencies (a source workspace's apply queues a run on the destination). Created after workspaces so both endpoints resolve to Terrapod IDs; a trigger is created only when **both** endpoints were migrated — one whose source or destination is outside the migration scope is reported for manual follow-up. |
+| **Notification configurations** | Per-workspace generic-webhook / Slack / email configs, with their triggers mapped to Terrapod's vocabulary (`assessment:drifted` → `run:drift_detected`; TFE-only triggers such as `assessment:failed`, `workspace:*`, `change_request:*` are dropped + reported). Created on the migrated destination workspace. **Generic-webhook HMAC tokens are write-only at the source and are never returned**, so those configs migrate with an **empty token** and are reported for re-entry. `microsoft-teams` (no Terrapod equivalent) and TFE user-reference recipients (not raw addresses) are reported for manual follow-up. |
 
 ### Read, reported, and left for you (a checklist, not yet auto-created)
 
@@ -57,7 +58,6 @@ later increments.
 
 | Not-yet-created | How to complete it |
 |---|---|
-| **Notification configurations** | Reported per workspace (webhook / Slack / email). Recreate with `terrapod_notification_configuration`. |
 | **Agent pools** | Reported by name + workspace assignments. Tokens are never portable — create the pool and regenerate a join token. |
 | **Private registry** (modules, module versions, providers, GPG keys) | Reported for awareness. Republish with [`terrapod-publish`](registry-publishing.md), or point Terrapod's registry at the module's VCS tag stream. |
 | **RBAC roles** | The tool generates a **suggested** role mapping from the source's teams/permissions into the handover doc. RBAC is the highest-blast-radius decision in a migration, so it is advisory only — you review, edit, and apply it via `terrapod_role` + `terrapod_role_assignment`. Nothing is applied automatically. |
@@ -175,9 +175,10 @@ terrapod-migrate verify --target https://terrapod.example.com --token "$TERRAPOD
 
 **3. Roll back if it goes sideways.** `rollback` reads the state file and
 deletes the workspaces the migration created (cascading their variables
-and state) **plus the variable sets and run triggers it created** — run
-triggers first, then variable sets, then workspaces (the reverse of the
-create order). It is built to never destroy anything it shouldn't:
+and state) **plus the notification configs, run triggers, and variable
+sets it created** — notifications first, then run triggers, then variable
+sets, then workspaces (the reverse of the create order). It is built to
+never destroy anything it shouldn't:
 
 ```bash
 terrapod-migrate rollback --target https://terrapod.example.com --token "$TERRAPOD_TOKEN"           # dry-run: lists what would be deleted

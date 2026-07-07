@@ -117,14 +117,18 @@ type State struct {
 	// trigger id (needed for rollback).
 	RunTriggers []RunTriggerRecord `json:"run_triggers,omitempty"`
 
+	// Notifications is the per-workspace notification-config mapping,
+	// keyed by (workspace ref, name); TerrapodID is the created config id
+	// (needed for rollback).
+	Notifications []NotificationRecord `json:"notifications,omitempty"`
+
 	// SkippedItems records what didn't migrate, in the order the
 	// source emitted them. Surfaced in reports.
 	SkippedItems []SkippedRecord `json:"skipped_items,omitempty"`
 
-	// Subsequent increments add per-resource mappings for notifications,
-	// agent pools, registry modules, registry providers. Each gets a
-	// Record type to keep the State struct narrow rather than embedding
-	// raw IR.
+	// Subsequent increments add per-resource mappings for agent pools,
+	// registry modules, registry providers. Each gets a Record type to
+	// keep the State struct narrow rather than embedding raw IR.
 }
 
 // WorkspaceRecord is what we remember about each migrated workspace.
@@ -204,6 +208,18 @@ type RunTriggerRecord struct {
 	State                   string `json:"state"` // "created" | "reused" | "skipped" | "errored" | "rolled_back"
 	Error                   string `json:"error,omitempty"`
 	CreatedByMigration      bool   `json:"created_by_migration,omitempty"`
+}
+
+// NotificationRecord is the (workspace ref, name) → TerrapodID mapping
+// for a migrated notification configuration. TerrapodID is the created
+// config id used for rollback; CreatedByMigration gates rollback.
+type NotificationRecord struct {
+	WorkspaceRef       string `json:"workspace_ref"`
+	Name               string `json:"name"`
+	TerrapodID         string `json:"terrapod_id,omitempty"`
+	State              string `json:"state"` // "created" | "reused" | "skipped" | "errored" | "rolled_back"
+	Error              string `json:"error,omitempty"`
+	CreatedByMigration bool   `json:"created_by_migration,omitempty"`
 }
 
 // SkippedRecord — operator-visible record of what we declined to
@@ -392,6 +408,34 @@ func (s *State) RunTriggerRollbackTargets() []*RunTriggerRecord {
 	var out []*RunTriggerRecord
 	for i := range s.RunTriggers {
 		r := &s.RunTriggers[i]
+		if r.CreatedByMigration && r.TerrapodID != "" && r.State != "rolled_back" {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// NotificationByWorkspaceAndName returns the recorded notification config
+// for a (workspace ref, name) pair, or nil. Used by `apply` for idempotent
+// resume — a config a prior run already created is not re-created.
+func (s *State) NotificationByWorkspaceAndName(wsRef, name string) *NotificationRecord {
+	for i := range s.Notifications {
+		if s.Notifications[i].WorkspaceRef == wsRef && s.Notifications[i].Name == name {
+			return &s.Notifications[i]
+		}
+	}
+	return nil
+}
+
+// NotificationRollbackTargets returns the notification-config records
+// `rollback` may delete: those THIS migration created (CreatedByMigration)
+// that still carry a TerrapodID and haven't been rolled back. Notification
+// configs are pure config with no state serial — the provenance gate is
+// the whole safety boundary.
+func (s *State) NotificationRollbackTargets() []*NotificationRecord {
+	var out []*NotificationRecord
+	for i := range s.Notifications {
+		r := &s.Notifications[i]
 		if r.CreatedByMigration && r.TerrapodID != "" && r.State != "rolled_back" {
 			out = append(out, r)
 		}

@@ -12,9 +12,11 @@
 //     values are NEVER read from the source in this mode.
 //
 //   - Apply — actually writes. Order is dependency-first: VCS
-//     connections → workspaces → variables. After each write the state
-//     file is saved so a crash mid-migration is resumable from the
-//     same state file.
+//     connections → workspaces (+ their variables + state) → variable
+//     sets → run triggers → notification configurations. The last three
+//     come after workspaces so their references resolve to the Terrapod
+//     IDs the workspace loop recorded. After each write the state file is
+//     saved so a crash mid-migration is resumable from the same state file.
 package writer
 
 import (
@@ -83,16 +85,17 @@ type Options struct {
 // stays self-contained (no live SDK references) so callers can
 // serialise it to disk for the handover document.
 type Report struct {
-	DryRun       bool                `json:"dry_run"`
-	StartedAt    time.Time           `json:"started_at"`
-	FinishedAt   time.Time           `json:"finished_at"`
-	Source       string              `json:"source"`
-	Connections  []ConnectionOutcome `json:"connections,omitempty"`
-	Workspaces   []WorkspaceOutcome  `json:"workspaces,omitempty"`
-	VariableSets []VarsetOutcome     `json:"variable_sets,omitempty"`
-	RunTriggers  []RunTriggerOutcome `json:"run_triggers,omitempty"`
-	Skipped      []ir.SkippedItem    `json:"skipped,omitempty"`
-	Errors       []string            `json:"errors,omitempty"`
+	DryRun        bool                  `json:"dry_run"`
+	StartedAt     time.Time             `json:"started_at"`
+	FinishedAt    time.Time             `json:"finished_at"`
+	Source        string                `json:"source"`
+	Connections   []ConnectionOutcome   `json:"connections,omitempty"`
+	Workspaces    []WorkspaceOutcome    `json:"workspaces,omitempty"`
+	VariableSets  []VarsetOutcome       `json:"variable_sets,omitempty"`
+	RunTriggers   []RunTriggerOutcome   `json:"run_triggers,omitempty"`
+	Notifications []NotificationOutcome `json:"notifications,omitempty"`
+	Skipped       []ir.SkippedItem      `json:"skipped,omitempty"`
+	Errors        []string              `json:"errors,omitempty"`
 }
 
 // ConnectionOutcome is the per-VCS-connection result. State is
@@ -163,6 +166,20 @@ type RunTriggerOutcome struct {
 	State           string `json:"state"`
 	TerrapodID      string `json:"terrapod_id,omitempty"`
 	Detail          string `json:"detail,omitempty"`
+}
+
+// NotificationOutcome is the per-notification-config result. State:
+// "planned" | "created" | "reused" | "skipped" | "errored". "skipped"
+// means the destination workspace wasn't migrated (out of scope);
+// Detail explains. NeedsToken flags a generic webhook whose HMAC token
+// the operator must re-enter (the source never returns it).
+type NotificationOutcome struct {
+	WorkspaceName string `json:"workspace_name"`
+	Name          string `json:"name"`
+	State         string `json:"state"`
+	TerrapodID    string `json:"terrapod_id,omitempty"`
+	NeedsToken    bool   `json:"needs_token,omitempty"`
+	Detail        string `json:"detail,omitempty"`
 }
 
 // Writer is the entry point. Construct one per migration run and call
@@ -275,6 +292,17 @@ func (w *Writer) Run(ctx context.Context, plan ir.Plan, opts Options) (*Report, 
 		report.RunTriggers = append(report.RunTriggers, outcome)
 		if err := w.saveState(); err != nil {
 			return report, fmt.Errorf("save state after run trigger %s→%s: %w", rt.SourceName, rt.DestinationName, err)
+		}
+	}
+
+	// Notifications last too: the destination workspace must be a
+	// migrated workspace for the config to attach.
+	for i := range plan.Notifications {
+		nc := &plan.Notifications[i]
+		outcome := w.applyNotification(ctx, nc, opts)
+		report.Notifications = append(report.Notifications, outcome)
+		if err := w.saveState(); err != nil {
+			return report, fmt.Errorf("save state after notification %q on %s: %w", nc.Name, nc.WorkspaceName, err)
 		}
 	}
 
@@ -1029,6 +1057,102 @@ func (w *Writer) recordRunTrigger(rt *ir.RunTrigger, state, terrapodID, errMsg s
 	w.state.RunTriggers = append(w.state.RunTriggers, rec)
 }
 
+// applyNotification creates a per-workspace notification configuration on
+// the migrated destination workspace. Idempotent (reuses a prior record),
+// 409-tolerant (a same-named config already present is treated as reused),
+// and skips cleanly when the destination workspace is outside the
+// migration scope. Generic-webhook HMAC tokens are never available from
+// the source, so those configs are created with an empty token and the
+// operator is told to re-enter it (NeedsToken → the report flags it).
+func (w *Writer) applyNotification(ctx context.Context, nc *ir.NotificationConfiguration, opts Options) NotificationOutcome {
+	out := NotificationOutcome{
+		WorkspaceName: nc.WorkspaceName,
+		Name:          nc.Name,
+		State:         "planned",
+		NeedsToken:    nc.NeedsToken,
+	}
+
+	if prior := w.state.NotificationByWorkspaceAndName(nc.WorkspaceRef, nc.Name); prior != nil && prior.TerrapodID != "" {
+		out.State = "reused"
+		out.TerrapodID = prior.TerrapodID
+		return out
+	}
+
+	// The destination workspace must be a migrated workspace. In dry-run
+	// presence is enough; in apply we also need its Terrapod ID.
+	dst := w.state.WorkspaceBySourceID(nc.WorkspaceRef)
+	inScope := dst != nil
+	if !opts.DryRun {
+		inScope = inScope && dst.TerrapodID != ""
+	}
+	if !inScope {
+		out.State = "skipped"
+		out.Detail = "destination workspace is outside the migration scope; create this notification configuration by hand once the workspace exists on Terrapod"
+		w.recordNotification(nc, "skipped", "", "")
+		return out
+	}
+
+	if opts.DryRun {
+		w.recordNotification(nc, "planned", "", "")
+		return out
+	}
+
+	created, err := w.client.CreateNotificationConfiguration(ctx, dst.TerrapodID, terrapod.CreateNotificationConfigurationRequest{
+		Name:            nc.Name,
+		DestinationType: nc.DestinationType,
+		URL:             nc.URL,
+		Enabled:         nc.Enabled,
+		Triggers:        nc.Triggers,
+		EmailAddresses:  nc.EmailAddresses,
+		// Token intentionally empty: the source never returns it. For
+		// generic webhooks NeedsToken flags operator re-entry.
+	})
+	if err != nil {
+		// 409 → a same-named config already exists on the workspace
+		// (a prior run, or a pre-existing identical config). Treat as
+		// reused. We don't learn its id, so it won't be a rollback
+		// target — rollback only deletes configs it can positively
+		// identify as its own.
+		var conflict *terrapod.ConflictError
+		if errors.As(err, &conflict) {
+			out.State = "reused"
+			w.recordNotification(nc, "reused", "", "")
+			return out
+		}
+		out.State = "errored"
+		out.Detail = err.Error()
+		w.recordNotification(nc, "errored", "", err.Error())
+		return out
+	}
+	out.State = "created"
+	out.TerrapodID = created.ID
+	w.recordNotification(nc, "created", created.ID, "")
+	return out
+}
+
+func (w *Writer) recordNotification(nc *ir.NotificationConfiguration, state, terrapodID, errMsg string) {
+	if rec := w.state.NotificationByWorkspaceAndName(nc.WorkspaceRef, nc.Name); rec != nil {
+		rec.State = state
+		rec.Error = errMsg
+		if terrapodID != "" {
+			rec.TerrapodID = terrapodID
+			rec.CreatedByMigration = true
+		}
+		return
+	}
+	rec := framework.NotificationRecord{
+		WorkspaceRef: nc.WorkspaceRef,
+		Name:         nc.Name,
+		State:        state,
+		Error:        errMsg,
+	}
+	if terrapodID != "" {
+		rec.TerrapodID = terrapodID
+		rec.CreatedByMigration = true
+	}
+	w.state.Notifications = append(w.state.Notifications, rec)
+}
+
 func (w *Writer) recordConnection(c *ir.VCSConnection, state, errMsg string) {
 	if rec := findConnectionRecord(w.state, c.SourceID); rec != nil {
 		rec.State = state
@@ -1117,6 +1241,11 @@ func collectErrors(r *Report) []string {
 	for _, rt := range r.RunTriggers {
 		if rt.State == "errored" && rt.Detail != "" {
 			errs = append(errs, fmt.Sprintf("run-trigger %s→%s: %s", rt.SourceName, rt.DestinationName, rt.Detail))
+		}
+	}
+	for _, nc := range r.Notifications {
+		if nc.State == "errored" && nc.Detail != "" {
+			errs = append(errs, fmt.Sprintf("notification %q on %q: %s", nc.Name, nc.WorkspaceName, nc.Detail))
 		}
 	}
 	return errs

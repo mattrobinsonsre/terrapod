@@ -56,11 +56,11 @@ Two categories are marked throughout:
 ## Migration
 
 - **`terrapod-migrate` auto-creates a core subset** *(partly not yet)*. The tool
-  imports VCS connections, workspaces, workspace variables, and state today.
-  Variable sets, run triggers, notifications, agent pools, and the private
-  registry are **read and reported** (surfaced as a checklist in the handover
-  doc) but not yet auto-created — you recreate them by hand, typically via the
-  Terraform provider. Extending this is tracked in
+  imports VCS connections, workspaces, workspace variables, state, variable
+  sets, run triggers, and notification configurations today. Agent pools and the
+  private registry are **read and reported** (surfaced as a checklist in the
+  handover doc) but not yet auto-created — you recreate them by hand, typically
+  via the Terraform provider. Extending this is tracked in
   [#709](https://github.com/mattrobinsonsre/terrapod/issues/709). RBAC is
   intentionally *suggested, never auto-applied*. See
   [Migration](migration.md#what-actually-transfers-today).
