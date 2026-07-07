@@ -29,7 +29,7 @@ go-terrapod targets the full Terrapod API surface — both the TFE-V2-compatible
 
 ### Version contract
 
-go-terrapod pins to a specific Terrapod API version at build time via the `SDKVersion` constant. Consuming tools call `Client.VersionCheck` at startup to fail-fast on a mismatch. The migration tool requires this match by default and exposes `--allow-api-version-mismatch` for advanced operators. Releases of Terrapod, go-terrapod, the provider, and the migration tool all happen at the same tag — they ship together.
+go-terrapod pins to a specific Terrapod API version at build time via the `SDKVersion` constant and exposes `Client.VersionCheck` so a consumer can fail-fast on a version mismatch. Releases of Terrapod, go-terrapod, the provider, and the migration tool all happen at the same tag — they ship together, so keeping the CLIs and the server on matching versions avoids schema drift.
 
 ---
 

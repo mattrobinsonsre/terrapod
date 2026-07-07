@@ -65,7 +65,7 @@ Build/lint/test all run in Docker via `make` (`make test`, `make lint`, `make de
 - [AI Plan Summary](docs/ai-plan-summary.md): LLM change summary + risk + failure analysis, provider-agnostic via LiteLLM (Bedrock/OpenAI/Anthropic/Gemini/vLLM).
 - [Audit Logging](docs/audit-logging.md), [Monitoring](docs/monitoring.md), [Artifact Retention](docs/artifact-retention.md): immutable event log, Prometheus metrics + shipped Grafana dashboard + alert rules with per-alert runbooks, automated cleanup.
 - [Terragrunt](docs/terragrunt.md): per-workspace Terragrunt support for agent-mode and CLI-driven runs.
-- [Migration](docs/migration.md): move TFE/HCP and Atlantis platforms onto Terrapod with `terrapod-migrate`.
+- [Migration](docs/migration.md): move a TFE/HCP Terraform or Atlantis platform onto Terrapod with the `terrapod-migrate` CLI (six subcommands: `apply`/`rewrite`/`verify`/`rollback`/`status`/`cutover`). **Dry-run-first + reversible** (provenance-gated `rollback`). Auto-creates the core — VCS connections, workspaces, workspace variables, state (serial+lineage preserved; config-version tarball for non-VCS). Variable sets, run triggers, notifications, agent pools, and the private registry are **read + reported as a checklist**, not yet auto-created ([#709](https://github.com/mattrobinsonsre/terrapod/issues/709)); RBAC is *suggested, never auto-applied*.
 
 ## Enabling features (operator quick-reference)
 
@@ -103,6 +103,7 @@ How each capability is turned on. **Platform-level** features are Helm values un
 - [docs/deployment-network-isolation.md](docs/deployment-network-isolation.md) and [docs/deployment-webhook-ingress.md](docs/deployment-webhook-ingress.md): split-ingress topologies.
 - [docs/deployment-proxy.md](docs/deployment-proxy.md): forward proxy (`proxy.*`) + custom outbound CA trust (`caBundle.*`) across all components incl. runner Jobs; for no-direct-egress / TLS-intercepting networks.
 - [docs/security-hardening.md](docs/security-hardening.md), [docs/production-checklist.md](docs/production-checklist.md), [docs/disaster-recovery.md](docs/disaster-recovery.md): go-live and break-glass.
+- [docs/known-limitations.md](docs/known-limitations.md): what Terrapod does **not** (yet) do — K8s-only deployment, single-org by design, no teams/projects, `local`/`agent` execution only, GitHub/GitLab VCS only, migration checklist gaps, OPA-only policy — each marked *by design* vs *not yet*.
 - [docs/runbooks.md](docs/runbooks.md): operator runbooks for high-blast-radius surfaces.
 - [docs/local-development.md](docs/local-development.md): run from source with Tilt (contributors).
 

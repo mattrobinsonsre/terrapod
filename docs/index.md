@@ -112,6 +112,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | Guide | Description |
 |---|---|
 | [Getting Started](getting-started.md) | Deploy the Helm chart on Kubernetes (or k3s), first workspace, first plan/apply |
+| [Migration](migration.md) | Move a TFE / HCP Terraform or Atlantis platform onto Terrapod with `terrapod-migrate` — dry-run-first, reversible, with an explicit "what transfers vs. what's a checklist" breakdown |
 | [Local Development](local-development.md) | Run Terrapod from source with Tilt (contributors only) |
 | [Architecture](architecture.md) | System components, storage, runners, auth flows |
 | [Authentication](authentication.md) | Local auth, OIDC, SAML, terraform login, API tokens, scoped service tokens (bound/detached) + offboarding idle guard |
@@ -144,6 +145,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Optional split webhook ingress](deployment-webhook-ingress.md) | Optional second Ingress for the public-must-reach surface (VCS webhooks, run-task callbacks) |
 | [Forward proxy & custom CA trust](deployment-proxy.md) | Route all outbound HTTP(S) through a corporate proxy and trust a private/MITM CA, across every component including runner Jobs |
 | [Security Hardening](security-hardening.md) | TLS, secrets management, network policies, rate limiting |
+| [Known Limitations](known-limitations.md) | What Terrapod does not (yet) do — deployment, scope, and feature constraints, stated plainly |
 | [Production Checklist](production-checklist.md) | Step-by-step checklist for go-live readiness |
 | [Disaster Recovery](disaster-recovery.md) | Break-glass state recovery, shipped DB backup CronJob + restore-verification DR drill, per-backend object-storage protection |
 | [API Reference](api-reference.md) | All API endpoints with examples |
