@@ -10,6 +10,7 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
+import { WorkspaceStatusBadges } from '@/components/workspace-status-badges'
 import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
@@ -367,15 +368,6 @@ function WorkspacesPageInner() {
       else setSuggestOpen(false)
     }
     else if (e.key === 'Escape') { e.preventDefault(); setSuggestOpen(false) }
-  }
-
-  const badgeColors: Record<string, string> = {
-    amber: 'bg-amber-900/50 text-amber-300',
-    red: 'bg-red-900/50 text-red-300',
-    blue: 'bg-blue-900/50 text-blue-300',
-    green: 'bg-green-900/50 text-green-300',
-    slate: 'bg-slate-700/50 text-slate-400',
-    gray: 'text-slate-500',
   }
 
   const { sortedItems: sortedWorkspaces, sortState, toggleSort } = useSortable<Workspace, WsSortKey>(
@@ -1071,6 +1063,22 @@ function WorkspacesPageInner() {
                             })}
                           </div>
                         )}
+                        {/*
+                          Mobile-only status (#719). Below `lg` the STATUS
+                          column is hidden, so surface the same badges here
+                          where the row is name-only — a phone must never lose
+                          the running/errored/applied signal. Hidden at `lg`+
+                          where the dedicated STATUS column takes over, so
+                          desktop is pixel-identical.
+                        */}
+                        <div className="lg:hidden" data-testid="ws-row-status-mobile">
+                          <WorkspaceStatusBadges
+                            workspaceId={ws.id}
+                            def={def}
+                            runId={runId}
+                            lifecycleState={ws.attributes['lifecycle-state']}
+                          />
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
@@ -1087,32 +1095,12 @@ function WorkspacesPageInner() {
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {!def ? (
-                          <span className="text-xs text-slate-500">&mdash;</span>
-                        ) : runId ? (
-                          <Link
-                            href={`/workspaces/${ws.id}/runs/${runId}`}
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap hover:opacity-80 transition-opacity ${badgeColors[def.color]}`}
-                          >
-                            {def.label}
-                          </Link>
-                        ) : (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${badgeColors[def.color]}`}>
-                            {def.label}
-                          </span>
-                        )}
-                        {ws.attributes['lifecycle-state'] === 'pending_deletion' && (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${badgeColors.amber}`}>
-                            Pending deletion
-                          </span>
-                        )}
-                        {ws.attributes['lifecycle-state'] === 'archived' && (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${badgeColors.slate}`}>
-                            Archived
-                          </span>
-                        )}
-                      </div>
+                      <WorkspaceStatusBadges
+                        workspaceId={ws.id}
+                        def={def}
+                        runId={runId}
+                        lifecycleState={ws.attributes['lifecycle-state']}
+                      />
                     </td>
                     <td className="px-4 py-3 hidden xl:table-cell">
                       <span className="text-xs text-slate-500">

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { getStoredToken, createWorkspace, uniqueName } from '../helpers/api';
 
 /**
  * Responsive / mobile harness (#719).
@@ -59,6 +60,29 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(menu.getByText('Account', { exact: true })).toBeVisible();
     await expect(menu.getByRole('link', { name: 'Modules' })).toBeVisible();
     // Opening the sheet must not introduce horizontal overflow.
+    await expectNoHorizontalPageScroll(page);
+  });
+
+  test('workspace list surfaces status in-row at phone width', async ({ page }) => {
+    // Below `lg` the STATUS table column is hidden, so the row must carry an
+    // inline status indicator — otherwise a phone loses the running/errored/
+    // applied signal entirely (regression the mobile status line fixes, #719).
+    const token = getStoredToken();
+    const name = uniqueName('resp-status');
+    await createWorkspace(token, name);
+
+    // The client-side filter reads the `q` query param — narrow to our row.
+    await page.goto(`/workspaces?q=${encodeURIComponent(name)}`);
+    const row = page.getByRole('row').filter({ hasText: name });
+    await expect(row).toBeVisible();
+
+    // The inline mobile status indicator is present (a fresh workspace shows
+    // "—", a run-bearing one shows its coloured pill — either way, not hidden).
+    await expect(row.getByTestId('ws-row-status-mobile')).toBeVisible();
+
+    // The dedicated desktop STATUS column header stays hidden at this width.
+    await expect(page.getByRole('columnheader', { name: 'Status' })).toBeHidden();
+
     await expectNoHorizontalPageScroll(page);
   });
 });
