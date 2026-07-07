@@ -63,6 +63,14 @@ sleep 4
 auth=(-H "Authorization: Bearer ${TOKEN}")
 jsonapi=(-H "Content-Type: application/vnd.api+json")
 
+# ── 3b. Assert the bootstrap seeded the sample workspace (#707) ───────────────
+# The eval profile seeds a sample workspace + a completed plan-only run so the
+# first screen after `make eval` is populated. Confirm it actually landed.
+log "Checking the seeded sample workspace is present…"
+curl -fsS "${API}/api/v2/organizations/default/workspaces" "${auth[@]}" \
+  | python3 -c "import sys,json;names=[w['attributes']['name'] for w in json.load(sys.stdin)['data']];sys.exit(0 if 'example-vpc' in names else 1)" \
+  || die "seeded sample workspace 'example-vpc' not found"
+
 # ── 4. Create an agent-mode workspace bound to the eval-pool ──────────────────
 WSNAME="eval-smoke-$$"
 log "Creating agent workspace ${WSNAME}…"

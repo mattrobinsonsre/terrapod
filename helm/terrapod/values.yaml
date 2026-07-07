@@ -1338,6 +1338,10 @@ migrations:
 #   passwordKey: password
 #   poolName: ""       # Optional: auto-create an agent pool with this name
 #   poolToken: ""      # Optional: auto-create a join token for the pool
+#   sampleWorkspace: false      # Eval only: seed a sample workspace + a completed
+#                               # plan-only run so the UI is populated on first login.
+#                               # Do NOT enable in production (it inserts demo data).
+#   sampleWorkspaceName: ""     # Optional name for the seeded workspace (default "example-vpc")
 #   hook: ""           # Helm hook phase (default "post-install"). Set to
 #                      # "pre-install,pre-upgrade" with hookWeight "-3" to create
 #                      # the admin/pool BEFORE the listener rolls out — required if

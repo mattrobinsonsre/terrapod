@@ -10,6 +10,11 @@ Reads configuration from environment variables:
   DATABASE_URL                       - PostgreSQL connection URL (from Helm)
   TERRAPOD_BOOTSTRAP_POOL_NAME      - Agent pool name (optional; creates pool + join token)
   TERRAPOD_BOOTSTRAP_POOL_TOKEN     - Raw join token value (optional; generated if pool name set)
+  TERRAPOD_BOOTSTRAP_SAMPLE_WORKSPACE      - If set (truthy), seed a sample workspace + a
+                                             completed plan-only run so an evaluation instance
+                                             shows a populated UI on first login. Intended for the
+                                             eval profile only — NOT for production.
+  TERRAPOD_BOOTSTRAP_SAMPLE_WORKSPACE_NAME - Sample workspace name (optional; default "example-vpc")
 """
 
 import asyncio
@@ -23,7 +28,16 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from terrapod.auth.passwords import hash_password
-from terrapod.db.models import AgentPool, AgentPoolToken, PlatformRoleAssignment, User
+from terrapod.db.models import (
+    AgentPool,
+    AgentPoolToken,
+    ConfigurationVersion,
+    PlatformRoleAssignment,
+    Run,
+    User,
+    Workspace,
+    now_utc,
+)
 
 # Use stdlib logging — structlog isn't configured yet during bootstrap
 logger = logging.getLogger("terrapod.bootstrap")
@@ -113,6 +127,10 @@ async def bootstrap() -> None:
             if pool_name:
                 await _bootstrap_pool(session, pool_name)
 
+            # ── Sample workspace + run (optional; eval profile only) ─
+            if os.environ.get("TERRAPOD_BOOTSTRAP_SAMPLE_WORKSPACE", "").strip():
+                await _bootstrap_sample_workspace(session, pool_name, admin_email)
+
     await engine.dispose()
     logger.info("Bootstrap complete")
 
@@ -160,6 +178,77 @@ async def _bootstrap_pool(session: AsyncSession, pool_name: str) -> None:
             print("IMPORTANT: Save this token now. It will not be shown again.")  # noqa: T201
         else:
             logger.info("Join token created from TERRAPOD_BOOTSTRAP_POOL_TOKEN")
+
+
+async def _bootstrap_sample_workspace(
+    session: AsyncSession, pool_name: str, owner_email: str
+) -> None:
+    """Seed a sample workspace with one completed plan-only run.
+
+    So an evaluation instance shows a populated, real-looking UI on first
+    login instead of an empty workspace list. Idempotent: skips if the sample
+    workspace already exists. The run is a terminal plan-only run seeded
+    directly as DB rows — no runner execution and no state is involved, so it
+    is safe on a stack with no real configuration.
+    """
+    sample_name = (
+        os.environ.get("TERRAPOD_BOOTSTRAP_SAMPLE_WORKSPACE_NAME", "").strip() or "example-vpc"
+    )
+
+    result = await session.execute(select(Workspace).where(Workspace.name == sample_name))
+    if result.scalar_one_or_none():
+        logger.info("Sample workspace '%s' already exists, skipping seed", sample_name)
+        return
+
+    # Attach to the bootstrapped pool if one was created (agent execution mode).
+    pool_id = None
+    if pool_name:
+        pool_result = await session.execute(select(AgentPool).where(AgentPool.name == pool_name))
+        pool = pool_result.scalar_one_or_none()
+        if pool:
+            pool_id = pool.id
+
+    workspace = Workspace(
+        name=sample_name,
+        execution_mode="agent",
+        execution_backend="tofu",
+        terraform_version="1.12",
+        agent_pool_id=pool_id,
+        owner_email=owner_email,
+        labels={"env": "demo", "team": "platform"},
+    )
+    session.add(workspace)
+    await session.flush()
+
+    cv = ConfigurationVersion(
+        workspace_id=workspace.id,
+        source="tfe-api",
+        status="uploaded",
+        auto_queue_runs=False,
+    )
+    session.add(cv)
+    await session.flush()
+
+    now = now_utc()
+    run = Run(
+        workspace_id=workspace.id,
+        configuration_version_id=cv.id,
+        status="planned",
+        plan_only=True,
+        source="tfe-api",
+        created_by=owner_email,
+        message="Example plan — welcome to Terrapod",
+        execution_backend="tofu",
+        terraform_version="1.12",
+        has_changes=True,
+        resource_additions=3,
+        resource_changes=1,
+        resource_destructions=0,
+        plan_started_at=now,
+        plan_finished_at=now,
+    )
+    session.add(run)
+    logger.info("Seeded sample workspace '%s' with one completed plan-only run", sample_name)
 
 
 if __name__ == "__main__":

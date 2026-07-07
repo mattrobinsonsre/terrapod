@@ -94,3 +94,7 @@ bootstrap:
   adminPassword: terrapod
   poolName: eval-pool
   poolToken: "eval-join-token-not-for-real-use"
+  # Seed a sample workspace + a completed plan-only run so the very first
+  # screen after `make eval` shows a populated, real-looking UI instead of an
+  # empty workspace list. Eval-only demo data — never enabled in production.
+  sampleWorkspace: true

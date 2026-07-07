@@ -278,6 +278,8 @@
         "passwordKey": { "type": "string" },
         "poolName": { "type": "string" },
         "poolToken": { "type": "string" },
+        "sampleWorkspace": { "type": "boolean" },
+        "sampleWorkspaceName": { "type": "string" },
         "hook": { "type": "string" },
         "hookWeight": { "type": "string" }
       }

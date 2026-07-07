@@ -93,6 +93,14 @@ spec:
             - name: TERRAPOD_BOOTSTRAP_POOL_TOKEN
               value: {{ .Values.bootstrap.poolToken | quote }}
             {{- end }}
+            {{- if .Values.bootstrap.sampleWorkspace }}
+            - name: TERRAPOD_BOOTSTRAP_SAMPLE_WORKSPACE
+              value: "true"
+            {{- if .Values.bootstrap.sampleWorkspaceName }}
+            - name: TERRAPOD_BOOTSTRAP_SAMPLE_WORKSPACE_NAME
+              value: {{ .Values.bootstrap.sampleWorkspaceName | quote }}
+            {{- end }}
+            {{- end }}
             {{- if $dbIam }}
             - name: TP_DB_AUTH_MODE
               value: {{ $dbAuthMode | quote }}
