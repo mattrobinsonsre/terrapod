@@ -141,5 +141,14 @@ export default defineConfig({
       testMatch: 'slack.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
+    {
+      // The mobile / responsive guard (#719): runs the responsive suite at a
+      // phone viewport (Pixel 7, ~412px). The existing Desktop Chrome projects
+      // are the desktop guard — together they enforce "one DRY UI, adapted by
+      // width, desktop never sacrificed". Grows as #719 stages land.
+      name: 'responsive',
+      testMatch: 'responsive.spec.ts',
+      use: { ...devices['Pixel 7'], storageState: ADMIN_AUTH },
+    },
   ],
 });
