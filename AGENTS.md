@@ -194,7 +194,9 @@ Routing rules of thumb:
 - A **new frontend page / RBAC gate / user-facing flow** → an E2E spec. For
   RBAC, include a **negative-path** spec with a non-admin session asserting the
   action is blocked. `tsc` + ESLint are necessary but **not** sufficient — the
-  page must actually render in the E2E stack.
+  page must actually render in the E2E stack. It must **also** carry a
+  responsive guard (see *Responsive / mobile-first UI* below) — a page that
+  only works on desktop is an incomplete change, not a done one.
 - A **new hard invariant** ("X must never happen") → a source-introspection
   test that reads the implementation and asserts the absence of the forbidden
   pattern, so the invariant fails CI loudly if a future change violates it.
@@ -206,6 +208,41 @@ not deterministic): every test creates its own uniquely-named resources and
 tears them down; never assert global counts or absolute list positions; never
 depend on another spec having run; no fixed `setTimeout` waits — use
 Playwright's auto-waiting.
+
+## Responsive / mobile-first UI (hard requirement)
+
+Mobile is a **first-class target**, not an afterthought — a UI change that is
+not mobile-friendly is **not done** and must not merge. The full brief and the
+staged plan live in issue **#719**; the rules a contributor must follow:
+
+- **One DRY, viewport-driven implementation.** No forked `Mobile*`/`Desktop*`
+  component trees, and **never** branch on the user agent
+  (`navigator.userAgent`, device-detect libraries, server-side "is this a
+  phone"). Adapt on **actual available width**: CSS first — Tailwind
+  responsive utilities (`sm:`/`md:`/`lg:`) and CSS container queries
+  (`@container`); reach for JS (`useMediaQuery`/`useIsMobile` in
+  `web/src/lib/use-media-query.ts`) only where *behaviour* must branch (e.g.
+  bottom-sheet vs inline panel), keyed to the same breakpoints, SSR-safe.
+- **Desktop is never sacrificed.** Every change is breakpoint-scoped; at
+  desktop widths the result is pixel-identical to before. A desktop window
+  narrowed to phone width adapting is *expected*, not a regression.
+- **Touch model** (touch is not a small mouse): no hover-only affordances (no
+  hover-reveal actions, no info that only appears in a `:hover` tooltip); no
+  reliance on double-tap or right-click; **no inner scrollbars nested inside a
+  scrolling page** (the page is the scroll container on mobile); tap targets
+  ≥44px; inputs ≥16px (no iOS zoom-on-focus); **no horizontal *page* scroll**
+  at any width; **URL is the source of truth for tab/view state** (it must
+  survive reload / back / deep-link — no `useState`-only tabs). Prefer
+  drill-down to a route over cramming panels into one dense page.
+- **Enforcement (this is what blocks non-mobile-friendly changes):** the
+  `responsive` Playwright project runs the suite at a **phone viewport**
+  (`e2e/tests/responsive.spec.ts`) and is the **mobile guard**; the existing
+  Desktop Chrome projects are the **desktop guard**. Both run in CI. A new
+  frontend page or major component **must add a responsive assertion** to the
+  mobile suite (at minimum `expectNoHorizontalPageScroll`, plus the
+  touch-model checks relevant to it) **in the same PR** as its desktop spec,
+  and **must not** break the mobile guard. Breaking the mobile guard fails CI
+  — that is the gate.
 
 ## Conventions
 
