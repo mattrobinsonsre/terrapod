@@ -42,7 +42,7 @@ Treatment legend:
 | `/admin/users`, `/admin/roles`, `/admin/variable-sets`, `/admin/policy-sets`, `/admin/provider-templates`, `/admin/execution-hooks`, `/admin/catalog`, `/admin/agent-pools`, `/admin/binary-cache`, `/admin/bulk-update` | 1–2 unwrapped tables | card the list where cheap, else **scroll** fallback | 4 |
 | `/admin/audit-log` | table already wrapped | verify | 4 |
 | `/catalog/[id]` | 1 table + 1 inner-scroll, 6 tooltips | card + drop-inner + tooltip→tap | 4 |
-| `/labels` | 2 unwrapped tables | card | 4 |
+| `/labels` | 2 unwrapped tables | **deprecated** — dropped from nav + banner; no mobile work | — |
 | `/settings/tokens` | table wrapped | verify | 4 |
 | `/settings/sessions` | 1 unwrapped table | card | 4 |
 | `/registry/providers/[name]` | 1 unwrapped table | card/scroll | 4 |

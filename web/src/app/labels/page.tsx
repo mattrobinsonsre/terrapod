@@ -367,6 +367,29 @@ export default function LabelsPage() {
           title="Labels"
           description="Browse labels in use across workspaces, agent pools, registry modules, and registry providers. Read-only — labels are edited on each entity's own page."
         />
+        {/* Deprecated surface — removed from the primary nav; reachable by
+            direct link only, pending removal in a future release. */}
+        <div
+          role="status"
+          className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+        >
+          <span className="font-semibold">Deprecated &amp; unsupported.</span>{' '}
+          The Labels browser is no longer in the main navigation and will be
+          removed in a future release. Filter by label from the{' '}
+          <Link href="/workspaces" className="underline hover:text-amber-100">
+            Workspaces
+          </Link>{' '}
+          page instead. If you rely on this page, please{' '}
+          <a
+            href="https://github.com/mattrobinsonsre/terrapod/issues/new"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-amber-100"
+          >
+            open an issue
+          </a>
+          .
+        </div>
         <Suspense fallback={<LoadingSpinner />}>
           <LabelsBrowserInner />
         </Suspense>

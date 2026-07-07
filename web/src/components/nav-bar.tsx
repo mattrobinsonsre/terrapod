@@ -22,7 +22,6 @@ import {
   LogOut,
   Menu,
   X,
-  Tags,
   Compass,
   Wrench,
   ScrollText,
@@ -316,7 +315,6 @@ export default function NavBar() {
               <NavDropdown label="Registry" icon={Library} items={REGISTRY_ITEMS} active={registryActive} />
               <NavLink href="/catalog" icon={LayoutGrid} label="Catalog" />
               <NavLink href="/admin/agent-pools" icon={Server} label="Agent Pools" />
-              <NavLink href="/labels" icon={Tags} label="Labels" />
             </div>
             {adminOrAudit && (
               <NavDropdown label="Admin" icon={Cog} items={adminMenuItems} active={adminActive} align="end" />
@@ -376,7 +374,6 @@ export default function NavBar() {
                 item={{ href: '/admin/agent-pools', label: 'Agent Pools', icon: Server }}
                 onClick={closeMenu}
               />
-              <MobileLink item={{ href: '/labels', label: 'Labels', icon: Tags }} onClick={closeMenu} />
 
               <MobileSection label="Registry" />
               {REGISTRY_ITEMS.map((it) => (
