@@ -356,6 +356,12 @@ func loadTFEPlan(ctx context.Context, address, token, org string) (ir.Plan, writ
 	}
 	skipped = append(skipped, varSkipped...)
 
+	varsets, vsSkipped, err := c.VariableSets(ctx)
+	if err != nil {
+		return ir.Plan{}, nil, err
+	}
+	skipped = append(skipped, vsSkipped...)
+
 	plan := ir.Plan{
 		Source: "tfe",
 		SourceMetadata: map[string]string{
@@ -365,6 +371,7 @@ func loadTFEPlan(ctx context.Context, address, token, org string) (ir.Plan, writ
 		},
 		VCSConnections: conns,
 		Workspaces:     workspaces,
+		VariableSets:   varsets,
 		Skipped:        skipped,
 	}
 	return plan, c.StateReader(), nil
@@ -385,6 +392,7 @@ func printReportSummary(r *writer.Report, dryRun bool) {
 	}
 	fmt.Printf("  connections:   %d\n", len(r.Connections))
 	fmt.Printf("  workspaces:    %d\n", len(r.Workspaces))
+	fmt.Printf("  variable sets: %d\n", len(r.VariableSets))
 	fmt.Printf("  skipped:       %d\n", len(r.Skipped))
 	if len(r.Errors) > 0 {
 		fmt.Printf("  errors:        %d\n", len(r.Errors))
@@ -412,12 +420,36 @@ func printReportSummary(r *writer.Report, dryRun bool) {
 			}
 		}
 	}
+	for _, vs := range r.VariableSets {
+		for _, v := range vs.VarOutcomes {
+			if v.State == "needs_value" {
+				needsValue = append(needsValue, fmt.Sprintf("varset %s / %s", vs.Name, v.Key))
+			}
+		}
+	}
 	if len(needsValue) > 0 {
 		fmt.Printf("\n  sensitive variables needing operator action (%d):\n", len(needsValue))
 		fmt.Println("    These were created as empty rows with sensitive=true. Open each")
-		fmt.Println("    workspace in Terrapod and fill in the value before the next plan.")
+		fmt.Println("    workspace/variable set in Terrapod and fill in the value before the next plan.")
 		for _, n := range needsValue {
 			fmt.Printf("    - %s\n", n)
+		}
+	}
+
+	// Variable-set assignments that couldn't be resolved (the referenced
+	// workspace wasn't in the migration scope) need a manual assignment.
+	var unresolved []string
+	for _, vs := range r.VariableSets {
+		for _, ref := range vs.Unresolved {
+			unresolved = append(unresolved, fmt.Sprintf("varset %s → source workspace %s", vs.Name, ref))
+		}
+	}
+	if len(unresolved) > 0 {
+		fmt.Printf("\n  variable-set assignments needing operator action (%d):\n", len(unresolved))
+		fmt.Println("    These sets reference workspaces outside the migration scope. Assign")
+		fmt.Println("    them to the intended workspaces in Terrapod by hand.")
+		for _, u := range unresolved {
+			fmt.Printf("    - %s\n", u)
 		}
 	}
 }

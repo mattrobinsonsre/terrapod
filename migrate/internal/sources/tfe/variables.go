@@ -106,9 +106,9 @@ func (c *Client) readWorkspaceVariables(ctx context.Context, workspaceID, worksp
 	}
 
 	var (
-		out          []ir.Variable
-		dynSkipped   []ir.SkippedItem
-		sensSkipped  []ir.SkippedItem
+		out         []ir.Variable
+		dynSkipped  []ir.SkippedItem
+		sensSkipped []ir.SkippedItem
 	)
 	for _, v := range allVars {
 		if v.Category == tfe.CategoryEnv && isDynamicCredsKey(v.Key) {
@@ -186,16 +186,19 @@ func ir2skippedSensitive(workspaceName, key string, tier TokenTier) ir.SkippedIt
 	}
 }
 
-// VariableSetsReport pulls every variable set in the org plus its
-// workspace assignments and emits SkippedItems for any unsupported
-// scoping (project-scoped sets when the org has projects). The
-// migration tool can't create varsets on Terrapod yet — that's a
-// later increment (writer + Terrapod varset endpoints). For now we
-// record what exists so the report covers it.
+// VariableSets pulls every variable set in the org (with its variables
+// and workspace assignments) and translates them to ir.VariableSet for
+// the writer to create on Terrapod. Sensitive variable values and
+// Dynamic-Credentials env vars are handled exactly as for workspace
+// variables: sensitive values are never read (empty value + a
+// SkippedItem telling the operator to re-enter), and TFC_* dynamic-creds
+// keys are stripped (Terrapod uses runner-pool workload identity).
 //
-// Returns the raw list so a future increment can wire varset → IR
-// translation without re-reading the API.
-func (c *Client) VariableSetsReport(ctx context.Context) ([]*tfe.VariableSet, []ir.SkippedItem, error) {
+// Project- and Stack-scoped assignments have no Terrapod equivalent
+// (single-org, no projects): the varset itself and its direct workspace
+// assignments migrate, but the project/stack scoping is surfaced as a
+// SkippedItem so the operator re-assigns by hand.
+func (c *Client) VariableSets(ctx context.Context) ([]ir.VariableSet, []ir.SkippedItem, error) {
 	var all []*tfe.VariableSet
 	page := 1
 	for {
@@ -214,23 +217,88 @@ func (c *Client) VariableSetsReport(ctx context.Context) ([]*tfe.VariableSet, []
 		page++
 	}
 
-	// First-cut: report every varset as a skipped-item so the operator
-	// is aware. Later increment translates varsets to Terrapod IR. The
-	// Terrapod writer needs Terrapod-side varset CRUD endpoints wired,
-	// which is its own piece of work in the writer increment.
-	var skipped []ir.SkippedItem
+	var (
+		sets    []ir.VariableSet
+		skipped []ir.SkippedItem
+	)
 	for _, vs := range all {
-		desc := fmt.Sprintf("varset %q with %d workspace(s)", vs.Name, len(vs.Workspaces))
-		if vs.Global {
-			desc = fmt.Sprintf("global varset %q applying to every workspace", vs.Name)
+		set, sk := varsetToIR(vs, c.TokenTier)
+		sets = append(sets, set)
+		skipped = append(skipped, sk...)
+	}
+	return sets, skipped, nil
+}
+
+// varsetToIR translates one go-tfe VariableSet (with its Variables and
+// Workspaces relationships populated) into an ir.VariableSet plus any
+// SkippedItems. Pure — no API calls — so it's directly unit-testable.
+func varsetToIR(vs *tfe.VariableSet, tier TokenTier) (ir.VariableSet, []ir.SkippedItem) {
+	set := ir.VariableSet{
+		SourceID:    vs.ID,
+		Name:        vs.Name,
+		Description: vs.Description,
+		Global:      vs.Global,
+		Priority:    vs.Priority,
+	}
+	var skipped []ir.SkippedItem
+
+	for _, v := range vs.Variables {
+		if v == nil {
+			continue
 		}
+		if v.Category == tfe.CategoryEnv && isDynamicCredsKey(v.Key) {
+			skipped = append(skipped, ir.SkippedItem{
+				Kind: "tfe-dynamic-credentials",
+				Name: fmt.Sprintf("varset %s: %s", vs.Name, v.Key),
+				Reason: "TFE Dynamic Credentials env var; Terrapod uses Kubernetes Workload Identity " +
+					"via runner-pool ServiceAccount annotations instead (see docs/runners.md). Stripped " +
+					"from the migrated variable set.",
+			})
+			continue
+		}
+		set.Variables = append(set.Variables, ir.Variable{
+			Key:         v.Key,
+			Value:       v.Value, // empty when sensitive
+			Category:    categoryString(v.Category),
+			HCL:         v.HCL,
+			Sensitive:   v.Sensitive,
+			Description: v.Description,
+		})
+		if v.Sensitive {
+			skipped = append(skipped, ir2skippedSensitiveVarset(vs.Name, v.Key, tier))
+		}
+	}
+
+	// Direct workspace assignments carry over as source-ID refs the
+	// writer resolves to Terrapod workspace IDs after the workspace
+	// loop. Global sets carry none (they apply to everything).
+	if !vs.Global {
+		for _, ws := range vs.Workspaces {
+			if ws != nil && ws.ID != "" {
+				set.WorkspaceRefs = append(set.WorkspaceRefs, ws.ID)
+			}
+		}
+	}
+
+	// Project / Stack scoping has no single-org Terrapod equivalent.
+	if len(vs.Projects) > 0 || len(vs.Stacks) > 0 {
 		skipped = append(skipped, ir.SkippedItem{
-			Kind:   "tfe-variable-set",
-			Name:   desc,
-			Reason: "Variable sets are migrated separately (later increment). Recorded here for completeness.",
+			Kind:   "tfe-variable-set-project-scope",
+			Name:   fmt.Sprintf("varset %s", vs.Name),
+			Reason: "Assigned to TFE project(s)/stack(s), which Terrapod (single-org, no projects) has no equivalent for. The variable set and its direct workspace assignments migrate; re-assign the project/stack-scoped workspaces by hand.",
 		})
 	}
-	return all, skipped, nil
+
+	return set, skipped
+}
+
+// ir2skippedSensitiveVarset is the varset analogue of
+// ir2skippedSensitive — same wording, varset context.
+func ir2skippedSensitiveVarset(varsetName, key string, tier TokenTier) ir.SkippedItem {
+	s := ir2skippedSensitive(varsetName, key, tier)
+	s.Kind = "tfe-sensitive-varset-variable"
+	s.Name = fmt.Sprintf("varset %s: %s", varsetName, key)
+	return s
 }
 
 // StripTFCPrefixedVariables is a public helper exposing the

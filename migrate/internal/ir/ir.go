@@ -47,16 +47,21 @@ type Plan struct {
 	// that reference them. The writer resolves the dependency.
 	VCSConnections []VCSConnection `json:"vcs_connections,omitempty"`
 
+	// VariableSets are org-scoped variable collections applied to many
+	// workspaces. Created by the writer AFTER workspaces, so their
+	// per-workspace assignments can resolve source workspace IDs to the
+	// Terrapod IDs the workspace loop recorded.
+	VariableSets []VariableSet `json:"variable_sets,omitempty"`
+
 	// Skipped collects items the source decided not to migrate, with a
 	// per-item reason. Surfaced in the dry-run report and the handover
 	// document; never written to Terrapod.
 	Skipped []SkippedItem `json:"skipped,omitempty"`
 
-	// Subsequent increments add: VariableSets, RunTriggers,
-	// Notifications, AgentPools, RegistryModules, RegistryProviders,
-	// GPGKeys, RoleProposals, Cutover (lock-source + handover) etc.
-	// Keeping the Plan struct narrow on first cut so we don't fix shape
-	// before the sources can speak.
+	// Subsequent increments add: RunTriggers, Notifications, AgentPools,
+	// RegistryModules, RegistryProviders, GPGKeys, RoleProposals. Keeping
+	// the Plan struct narrow so we don't fix shape before the sources can
+	// speak.
 }
 
 // Workspace is the migrated form of a TFE workspace or an Atlantis
@@ -65,10 +70,10 @@ type Plan struct {
 type Workspace struct {
 	SourceID         string            `json:"source_id"`
 	Name             string            `json:"name"`
-	ExecutionMode    string            `json:"execution_mode,omitempty"`     // "local" | "agent"
-	TerraformVersion string            `json:"terraform_version,omitempty"`  // "1.12", "1.12.3", etc — Terrapod accepts partials
-	WorkingDirectory string            `json:"working_directory,omitempty"`  // relative path within the repo
-	Labels           map[string]string `json:"labels,omitempty"`             // TFE tags translate here: "k:v" → {k: "v"}, "k" → {k: ""}
+	ExecutionMode    string            `json:"execution_mode,omitempty"`    // "local" | "agent"
+	TerraformVersion string            `json:"terraform_version,omitempty"` // "1.12", "1.12.3", etc — Terrapod accepts partials
+	WorkingDirectory string            `json:"working_directory,omitempty"` // relative path within the repo
+	Labels           map[string]string `json:"labels,omitempty"`            // TFE tags translate here: "k:v" → {k: "v"}, "k" → {k: ""}
 	AutoApply        bool              `json:"auto_apply,omitempty"`
 	OwnerEmail       string            `json:"owner_email,omitempty"`        // set on creation; defaults to migrating user
 	VCSConnectionRef string            `json:"vcs_connection_ref,omitempty"` // references VCSConnection.SourceID
@@ -89,10 +94,30 @@ type Workspace struct {
 type Variable struct {
 	Key         string `json:"key"`
 	Value       string `json:"value,omitempty"`
-	Category    string `json:"category"`           // "terraform" | "env"
-	HCL         bool   `json:"hcl,omitempty"`      // only meaningful for category=terraform
+	Category    string `json:"category"`      // "terraform" | "env"
+	HCL         bool   `json:"hcl,omitempty"` // only meaningful for category=terraform
 	Sensitive   bool   `json:"sensitive,omitempty"`
 	Description string `json:"description,omitempty"`
+}
+
+// VariableSet is the migrated form of a TFE variable set — an
+// org-scoped collection of variables applied to many workspaces.
+// Variables reuse the Variable shape (sensitive values are read at
+// apply time, never serialised, same as workspace variables).
+type VariableSet struct {
+	SourceID    string `json:"source_id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	// Global sets apply to every workspace and carry no explicit
+	// WorkspaceRefs. Priority sets override workspace-local variables.
+	Global    bool       `json:"global,omitempty"`
+	Priority  bool       `json:"priority,omitempty"`
+	Variables []Variable `json:"variables,omitempty"`
+	// WorkspaceRefs are the SOURCE workspace IDs this set is assigned to
+	// (empty when Global). The writer maps each to the Terrapod
+	// workspace ID recorded during the workspace loop; refs outside the
+	// migration scope are reported as an unresolved assignment.
+	WorkspaceRefs []string `json:"workspace_refs,omitempty"`
 }
 
 // VCSConnection is a Terrapod-side VCS connection (one per source

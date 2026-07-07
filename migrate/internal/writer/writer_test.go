@@ -23,9 +23,14 @@ type fakeTerrapodServer struct {
 	connectionsCreated int
 	workspacesCreated  int
 	variablesCreated   int
+	varsetsCreated     int
+	varsetVarsCreated  int
+	varsetAssignments  int
 	// lastWorkspaceBody records the most recent workspace-create body
 	// so tests can verify field round-tripping.
 	lastWorkspaceBody []byte
+	// lastVarsetBody records the most recent varset-create body.
+	lastVarsetBody []byte
 }
 
 func newFakeServer(t *testing.T) (*fakeTerrapodServer, *terrapod.Client) {
@@ -43,6 +48,22 @@ func newFakeServer(t *testing.T) (*fakeTerrapodServer, *terrapod.Client) {
 			fs.connectionsCreated++
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"vcs-fixt","type":"vcs-connections","attributes":{"name":"github","provider":"github","has-token":true}}}`))
+		// Varset routes must be matched BEFORE the generic "/workspaces"
+		// and "/vars" suffix cases: the varset→workspace assignment ends
+		// in "/relationships/workspaces" and the varset variable POST
+		// ends in "/relationships/vars".
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/varsets"):
+			fs.varsetsCreated++
+			fs.lastVarsetBody = body
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"data":{"id":"varset-fixt","type":"varsets","attributes":{"name":"nm","global":false,"priority":false}}}`))
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/relationships/vars"):
+			fs.varsetVarsCreated++
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"data":{"id":"vsv-fixt","type":"vars","attributes":{"key":"k","value":"v","category":"terraform"}}}`))
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/relationships/workspaces"):
+			fs.varsetAssignments++
+			w.WriteHeader(http.StatusNoContent)
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/workspaces"):
 			fs.workspacesCreated++
 			fs.lastWorkspaceBody = body
@@ -151,6 +172,131 @@ func TestWriter_Apply_CreatesEverything(t *testing.T) {
 		// TerrapodID is recorded as the Workspace's ID — verify it propagated.
 		// (The fake server returns "ws-fixt" for every workspace POST.)
 		t.Errorf("workspace state record: %+v", state.WorkspaceBySourceID("ws-src-1"))
+	}
+}
+
+func TestWriter_Apply_CreatesVariableSet(t *testing.T) {
+	fs, c := newFakeServer(t)
+	state := &framework.State{}
+	w := New(c, state, "")
+
+	plan := ir.Plan{
+		Source: "tfe",
+		Workspaces: []ir.Workspace{
+			{SourceID: "ws-src-1", Name: "app"},
+		},
+		VariableSets: []ir.VariableSet{
+			{
+				SourceID: "vs-src-1",
+				Name:     "global-tags",
+				Variables: []ir.Variable{
+					{Key: "environment", Value: "prod", Category: "terraform"},
+					{Key: "api_key", Sensitive: true, Category: "env"},
+				},
+				WorkspaceRefs: []string{"ws-src-1"},
+			},
+		},
+	}
+
+	report, err := w.Run(t.Context(), plan, Options{})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(report.Errors) != 0 {
+		t.Fatalf("expected no errors, got: %+v", report.Errors)
+	}
+	if fs.varsetsCreated != 1 || fs.varsetVarsCreated != 2 || fs.varsetAssignments != 1 {
+		t.Errorf("varset API calls: sets=%d vars=%d assigns=%d", fs.varsetsCreated, fs.varsetVarsCreated, fs.varsetAssignments)
+	}
+	if len(report.VariableSets) != 1 {
+		t.Fatalf("expected 1 varset outcome, got %d", len(report.VariableSets))
+	}
+	vo := report.VariableSets[0]
+	if vo.State != "created" || vo.TerrapodID != "varset-fixt" {
+		t.Errorf("varset outcome: %+v", vo)
+	}
+	if vo.Assignments != 1 || len(vo.Unresolved) != 0 {
+		t.Errorf("assignments=%d unresolved=%v", vo.Assignments, vo.Unresolved)
+	}
+	// The sensitive var must be created as needs_value (empty), never
+	// with a read-back value.
+	var needsValue int
+	for _, v := range vo.VarOutcomes {
+		if v.State == "needs_value" {
+			needsValue++
+		}
+	}
+	if needsValue != 1 {
+		t.Errorf("expected 1 needs_value var outcome, got %d (%+v)", needsValue, vo.VarOutcomes)
+	}
+	// State-file mapping + provenance gate recorded.
+	rec := state.VarsetBySourceID("vs-src-1")
+	if rec == nil || rec.TerrapodID != "varset-fixt" || !rec.CreatedByMigration {
+		t.Errorf("varset state record: %+v", rec)
+	}
+}
+
+func TestWriter_VariableSet_Idempotent_Resume(t *testing.T) {
+	fs, c := newFakeServer(t)
+	state := &framework.State{}
+	w := New(c, state, "")
+
+	plan := ir.Plan{
+		Source:     "tfe",
+		Workspaces: []ir.Workspace{{SourceID: "ws-src-1", Name: "app"}},
+		VariableSets: []ir.VariableSet{
+			{SourceID: "vs-src-1", Name: "global-tags", Global: true,
+				Variables: []ir.Variable{{Key: "environment", Value: "prod", Category: "terraform"}}},
+		},
+	}
+
+	if _, err := w.Run(t.Context(), plan, Options{}); err != nil {
+		t.Fatalf("first Run: %v", err)
+	}
+	// Second run against the same state must NOT re-create the varset —
+	// the recorded TerrapodID makes it a reuse.
+	report, err := w.Run(t.Context(), plan, Options{})
+	if err != nil {
+		t.Fatalf("second Run: %v", err)
+	}
+	if fs.varsetsCreated != 1 {
+		t.Errorf("varset re-created on resume: varsetsCreated=%d (want 1)", fs.varsetsCreated)
+	}
+	if len(report.VariableSets) != 1 || report.VariableSets[0].State != "reused" {
+		t.Errorf("expected reused varset outcome, got: %+v", report.VariableSets)
+	}
+}
+
+func TestWriter_DryRun_VariableSet_NoAPICalls(t *testing.T) {
+	fs, c := newFakeServer(t)
+	state := &framework.State{}
+	w := New(c, state, "")
+
+	plan := ir.Plan{
+		Source:     "tfe",
+		Workspaces: []ir.Workspace{{SourceID: "ws-src-1", Name: "app"}},
+		VariableSets: []ir.VariableSet{
+			{SourceID: "vs-src-1", Name: "global-tags",
+				Variables:     []ir.Variable{{Key: "environment", Value: "prod", Category: "terraform"}},
+				WorkspaceRefs: []string{"ws-src-1"}},
+		},
+	}
+
+	report, err := w.Run(t.Context(), plan, Options{DryRun: true})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if fs.varsetsCreated != 0 || fs.varsetVarsCreated != 0 || fs.varsetAssignments != 0 {
+		t.Errorf("dry-run touched varset API: sets=%d vars=%d assigns=%d",
+			fs.varsetsCreated, fs.varsetVarsCreated, fs.varsetAssignments)
+	}
+	if len(report.VariableSets) != 1 || report.VariableSets[0].State != "planned" {
+		t.Errorf("varset outcome: %+v", report.VariableSets)
+	}
+	// The workspace ref resolves to a planned workspace, so the dry-run
+	// reports one planned assignment (not unresolved).
+	if report.VariableSets[0].Assignments != 1 {
+		t.Errorf("planned assignments = %d (want 1)", report.VariableSets[0].Assignments)
 	}
 }
 

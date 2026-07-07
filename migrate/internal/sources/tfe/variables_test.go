@@ -182,6 +182,88 @@ func TestAttachVariables_SensitiveVarReportsWorkerTier(t *testing.T) {
 	}
 }
 
+func TestVarsetToIR_Translation(t *testing.T) {
+	vs := &tfe.VariableSet{
+		ID:          "varset-1",
+		Name:        "global-tags",
+		Description: "shared",
+		Global:      false,
+		Priority:    true,
+		Variables: []*tfe.VariableSetVariable{
+			{Key: "environment", Value: "prod", Category: tfe.CategoryTerraform},
+			{Key: "api_key", Value: "", Category: tfe.CategoryEnv, Sensitive: true},
+			// Dynamic-credentials env var → stripped + reported.
+			{Key: "TFC_AWS_PROVIDER_AUTH", Value: "true", Category: tfe.CategoryEnv},
+		},
+		Workspaces: []*tfe.Workspace{{ID: "ws-a"}, {ID: "ws-b"}},
+	}
+
+	set, skipped := varsetToIR(vs, TokenTierOwner)
+
+	if set.SourceID != "varset-1" || set.Name != "global-tags" || !set.Priority || set.Global {
+		t.Errorf("varset meta: %+v", set)
+	}
+	// Dynamic-creds var stripped → 2 remaining.
+	if len(set.Variables) != 2 {
+		t.Fatalf("expected 2 vars (dynamic-creds stripped), got %d: %+v", len(set.Variables), set.Variables)
+	}
+	var sawSensitive bool
+	for _, v := range set.Variables {
+		if v.Key == "api_key" {
+			sawSensitive = true
+			if v.Value != "" || !v.Sensitive {
+				t.Errorf("sensitive var should be empty + sensitive: %+v", v)
+			}
+		}
+	}
+	if !sawSensitive {
+		t.Error("api_key not translated")
+	}
+	if len(set.WorkspaceRefs) != 2 || set.WorkspaceRefs[0] != "ws-a" {
+		t.Errorf("workspace refs: %+v", set.WorkspaceRefs)
+	}
+	var dyn, sens int
+	for _, s := range skipped {
+		switch s.Kind {
+		case "tfe-dynamic-credentials":
+			dyn++
+		case "tfe-sensitive-varset-variable":
+			sens++
+		}
+	}
+	if dyn != 1 || sens != 1 {
+		t.Errorf("skipped kinds: dyn=%d sens=%d (%+v)", dyn, sens, skipped)
+	}
+}
+
+func TestVarsetToIR_GlobalHasNoWorkspaceRefs(t *testing.T) {
+	vs := &tfe.VariableSet{
+		ID: "vs-g", Name: "global", Global: true,
+		Workspaces: []*tfe.Workspace{{ID: "ws-a"}},
+	}
+	set, _ := varsetToIR(vs, TokenTierOwner)
+	if len(set.WorkspaceRefs) != 0 {
+		t.Errorf("global varset should carry no workspace refs, got %+v", set.WorkspaceRefs)
+	}
+}
+
+func TestVarsetToIR_ProjectScopeReported(t *testing.T) {
+	vs := &tfe.VariableSet{
+		ID: "vs-p", Name: "proj",
+		Projects: []*tfe.Project{{ID: "prj-1"}},
+	}
+	_, skipped := varsetToIR(vs, TokenTierOwner)
+	var found bool
+	for _, s := range skipped {
+		if s.Kind == "tfe-variable-set-project-scope" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("project-scoped varset should emit a skipped item: %+v", skipped)
+	}
+}
+
 func TestIsDynamicCredsKey(t *testing.T) {
 	cases := []struct {
 		key  string

@@ -83,14 +83,15 @@ type Options struct {
 // stays self-contained (no live SDK references) so callers can
 // serialise it to disk for the handover document.
 type Report struct {
-	DryRun      bool                `json:"dry_run"`
-	StartedAt   time.Time           `json:"started_at"`
-	FinishedAt  time.Time           `json:"finished_at"`
-	Source      string              `json:"source"`
-	Connections []ConnectionOutcome `json:"connections,omitempty"`
-	Workspaces  []WorkspaceOutcome  `json:"workspaces,omitempty"`
-	Skipped     []ir.SkippedItem    `json:"skipped,omitempty"`
-	Errors      []string            `json:"errors,omitempty"`
+	DryRun       bool                `json:"dry_run"`
+	StartedAt    time.Time           `json:"started_at"`
+	FinishedAt   time.Time           `json:"finished_at"`
+	Source       string              `json:"source"`
+	Connections  []ConnectionOutcome `json:"connections,omitempty"`
+	Workspaces   []WorkspaceOutcome  `json:"workspaces,omitempty"`
+	VariableSets []VarsetOutcome     `json:"variable_sets,omitempty"`
+	Skipped      []ir.SkippedItem    `json:"skipped,omitempty"`
+	Errors       []string            `json:"errors,omitempty"`
 }
 
 // ConnectionOutcome is the per-VCS-connection result. State is
@@ -134,6 +135,22 @@ type VarOutcome struct {
 	Key   string `json:"key"`
 	State string `json:"state"`
 	Error string `json:"error,omitempty"`
+}
+
+// VarsetOutcome is the per-variable-set result. VarOutcomes records each
+// variable; Assignments is how many workspace assignments landed (source
+// refs resolved to migrated Terrapod workspaces); Unresolved lists source
+// workspace refs outside the migration scope (assign by hand).
+type VarsetOutcome struct {
+	SourceID    string       `json:"source_id"`
+	Name        string       `json:"name"`
+	State       string       `json:"state"` // "planned" | "created" | "reused" | "errored"
+	TerrapodID  string       `json:"terrapod_id,omitempty"`
+	Global      bool         `json:"global,omitempty"`
+	Error       string       `json:"error,omitempty"`
+	VarOutcomes []VarOutcome `json:"var_outcomes,omitempty"`
+	Assignments int          `json:"assignments,omitempty"`
+	Unresolved  []string     `json:"unresolved_workspace_refs,omitempty"`
 }
 
 // Writer is the entry point. Construct one per migration run and call
@@ -223,6 +240,18 @@ func (w *Writer) Run(ctx context.Context, plan ir.Plan, opts Options) (*Report, 
 		report.Workspaces = append(report.Workspaces, outcome)
 		if err := w.saveState(); err != nil {
 			return report, fmt.Errorf("save state after workspace %q: %w", ws.SourceID, err)
+		}
+	}
+
+	// Variable sets AFTER workspaces: their per-workspace assignments
+	// resolve source workspace IDs to the Terrapod IDs the workspace
+	// loop just recorded in the state file.
+	for i := range plan.VariableSets {
+		vs := &plan.VariableSets[i]
+		outcome := w.applyVariableSet(ctx, vs, opts)
+		report.VariableSets = append(report.VariableSets, outcome)
+		if err := w.saveState(); err != nil {
+			return report, fmt.Errorf("save state after variable set %q: %w", vs.SourceID, err)
 		}
 	}
 
@@ -707,6 +736,190 @@ func (w *Writer) reconcileVariable(ctx context.Context, workspaceID string, req 
 
 // ── State plumbing ───────────────────────────────────────────────────
 
+// ── Variable set handling ─────────────────────────────────────────────
+
+// applyVariableSet creates a variable set on Terrapod, adds its
+// variables, and assigns it to the migrated workspaces it referenced.
+// Runs after the workspace loop so WorkspaceRefs (source IDs) resolve to
+// the Terrapod workspace IDs recorded during that loop. Idempotent: a
+// prior run's varset (recorded with a TerrapodID) is reused, not
+// re-created.
+func (w *Writer) applyVariableSet(ctx context.Context, vs *ir.VariableSet, opts Options) VarsetOutcome {
+	out := VarsetOutcome{SourceID: vs.SourceID, Name: vs.Name, State: "planned", Global: vs.Global}
+
+	if prior := w.state.VarsetBySourceID(vs.SourceID); prior != nil && prior.TerrapodID != "" {
+		out.State = "reused"
+		out.TerrapodID = prior.TerrapodID
+		if !opts.DryRun {
+			w.applyVarsetContents(ctx, prior.TerrapodID, vs, &out, opts)
+		}
+		return out
+	}
+
+	if opts.DryRun {
+		// Don't recurse into variables (would invoke the sensitive-value
+		// callback) — just plan them, mirroring the workspace path.
+		for _, v := range vs.Variables {
+			out.VarOutcomes = append(out.VarOutcomes, VarOutcome{Key: v.Key, State: "planned"})
+		}
+		out.Assignments, out.Unresolved = w.planVarsetAssignments(vs)
+		w.recordVarset(vs, "planned", "", 0)
+		return out
+	}
+
+	created, err := w.client.CreateVariableSet(ctx, terrapod.CreateVariableSetRequest{
+		Name:        vs.Name,
+		Description: vs.Description,
+		Global:      vs.Global,
+		Priority:    vs.Priority,
+	})
+	if err != nil {
+		var conflict *terrapod.ConflictError
+		if errors.As(err, &conflict) {
+			out.State = "errored"
+			out.Error = fmt.Sprintf("Terrapod variable set named %q already exists; resolve the collision (rename or delete the existing set) then re-run apply", vs.Name)
+			w.recordVarset(vs, "errored", out.Error, 0)
+			return out
+		}
+		out.State = "errored"
+		out.Error = err.Error()
+		w.recordVarset(vs, "errored", out.Error, 0)
+		return out
+	}
+
+	out.State = "created"
+	out.TerrapodID = created.ID
+	w.recordVarset(vs, "created", "", len(vs.Variables))
+	if rec := w.state.VarsetBySourceID(vs.SourceID); rec != nil {
+		rec.TerrapodID = created.ID
+		// Provenance gate for a future rollback: WE created this set.
+		rec.CreatedByMigration = true
+	}
+	w.applyVarsetContents(ctx, created.ID, vs, &out, opts)
+	return out
+}
+
+// applyVarsetContents adds the variables and workspace assignments to an
+// existing (just-created or reused) varset.
+func (w *Writer) applyVarsetContents(ctx context.Context, varsetID string, vs *ir.VariableSet, out *VarsetOutcome, opts Options) {
+	for i := range vs.Variables {
+		v := &vs.Variables[i]
+		out.VarOutcomes = append(out.VarOutcomes, w.applyVarsetVariable(ctx, varsetID, vs.SourceID, v, opts))
+	}
+
+	// Global sets apply to everything and take no explicit assignment.
+	if vs.Global {
+		return
+	}
+	for _, ref := range vs.WorkspaceRefs {
+		rec := w.state.WorkspaceBySourceID(ref)
+		if rec == nil || rec.TerrapodID == "" {
+			// The referenced workspace wasn't migrated (out of scope, or
+			// it errored). Surface it so the operator assigns by hand.
+			out.Unresolved = append(out.Unresolved, ref)
+			continue
+		}
+		if err := w.client.AssignWorkspaceToVarset(ctx, varsetID, rec.TerrapodID); err != nil {
+			var conflict *terrapod.ConflictError
+			if errors.As(err, &conflict) {
+				out.Assignments++ // already assigned by a prior run
+				continue
+			}
+			out.Unresolved = append(out.Unresolved, ref)
+			continue
+		}
+		out.Assignments++
+	}
+	if rec := w.state.VarsetBySourceID(vs.SourceID); rec != nil {
+		rec.AssignedWorkspaces = out.Assignments
+	}
+}
+
+// applyVarsetVariable adds one variable to a varset. Mirrors
+// applyVariable's sensitive-value handling: sensitive values are never
+// read from the source — the variable is created with an empty value +
+// sensitive=true for the operator to fill in post-cutover.
+func (w *Writer) applyVarsetVariable(ctx context.Context, varsetID, varsetSourceID string, v *ir.Variable, opts Options) VarOutcome {
+	out := VarOutcome{Key: v.Key, State: "created"}
+
+	value := v.Value
+	if v.Sensitive {
+		value = ""
+		out.State = "needs_value"
+		if opts.SensitiveValueForVariable != nil {
+			if s, err := opts.SensitiveValueForVariable(varsetSourceID, v.Key); err == nil {
+				value = s
+				out.State = "created"
+			}
+		}
+	}
+
+	_, err := w.client.CreateVarsetVariable(ctx, varsetID, terrapod.CreateVarsetVariableRequest{
+		Key:         v.Key,
+		Value:       value,
+		Category:    v.Category,
+		HCL:         v.HCL,
+		Sensitive:   v.Sensitive,
+		Description: v.Description,
+	})
+	if err != nil {
+		// 409 → a prior run already added this key. Leave sensitive
+		// values alone (operator may have hand-entered them); treat
+		// non-sensitive as reconciled (present, value not re-pushed in
+		// this slice).
+		var conflict *terrapod.ConflictError
+		if errors.As(err, &conflict) {
+			if v.Sensitive {
+				out.State = "needs_value"
+				return out
+			}
+			out.State = "reconciled"
+			return out
+		}
+		out.State = "errored"
+		out.Error = err.Error()
+		return out
+	}
+	return out
+}
+
+// planVarsetAssignments reports, for a dry-run, how many of a varset's
+// workspace refs resolve to a recorded (planned or created) workspace
+// and which don't. Global sets return (0, nil).
+func (w *Writer) planVarsetAssignments(vs *ir.VariableSet) (int, []string) {
+	if vs.Global {
+		return 0, nil
+	}
+	var resolved int
+	var unresolved []string
+	for _, ref := range vs.WorkspaceRefs {
+		if w.state.WorkspaceBySourceID(ref) != nil {
+			resolved++
+		} else {
+			unresolved = append(unresolved, ref)
+		}
+	}
+	return resolved, unresolved
+}
+
+func (w *Writer) recordVarset(vs *ir.VariableSet, state, errMsg string, varCount int) {
+	if rec := w.state.VarsetBySourceID(vs.SourceID); rec != nil {
+		rec.State = state
+		rec.Error = errMsg
+		if varCount > 0 {
+			rec.ExpectedVarCount = varCount
+		}
+		return
+	}
+	w.state.VariableSets = append(w.state.VariableSets, framework.VariableSetRecord{
+		SourceID:         vs.SourceID,
+		Name:             vs.Name,
+		State:            state,
+		Error:            errMsg,
+		ExpectedVarCount: varCount,
+	})
+}
+
 func (w *Writer) recordConnection(c *ir.VCSConnection, state, errMsg string) {
 	if rec := findConnectionRecord(w.state, c.SourceID); rec != nil {
 		rec.State = state
@@ -780,6 +993,16 @@ func collectErrors(r *Report) []string {
 		}
 		if ws.StateOutcome != nil && ws.StateOutcome.Error != "" {
 			errs = append(errs, fmt.Sprintf("workspace %q state: %s", ws.Name, ws.StateOutcome.Error))
+		}
+	}
+	for _, vs := range r.VariableSets {
+		if vs.Error != "" {
+			errs = append(errs, fmt.Sprintf("variable-set %q: %s", vs.Name, vs.Error))
+		}
+		for _, v := range vs.VarOutcomes {
+			if v.Error != "" {
+				errs = append(errs, fmt.Sprintf("variable-set %q variable %q: %s", vs.Name, v.Key, v.Error))
+			}
 		}
 	}
 	return errs

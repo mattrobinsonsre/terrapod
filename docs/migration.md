@@ -44,6 +44,7 @@ didn't.
 | **Workspaces** | Name, execution mode, terraform/tofu version, working directory, auto-apply, owner, VCS repo + branch link. TFE **tags → Terrapod labels** (`"k:v"` → `{k: "v"}`, bare `"k"` → `{k: ""}`). |
 | **Workspace variables** | Terraform + env, sensitive flag, HCL flag, description. Sensitive values are read from the source **at apply time** and never written into the state file or dry-run report. |
 | **State** | The current state version per workspace, with **serial + lineage preserved**, guarded against lineage mismatch and destination-serial-ahead (see [Reversibility](#reversibility-dry-run--rollback)). For **non-VCS** workspaces, the latest uploaded **configuration-version tarball** is migrated too (without it the workspace has no code to run on first plan). |
+| **Variable sets** | Name, description, global/priority flags, their variables (sensitive values → empty + `sensitive=true` for re-entry, same as workspace variables), and workspace assignments — resolved to the migrated workspaces (created **after** workspaces so the assignment IDs are known). Assignments to workspaces outside the migration scope, and TFE project/stack scoping (no Terrapod equivalent), are reported for manual follow-up. |
 
 ### Read, reported, and left for you (a checklist, not yet auto-created)
 
@@ -55,7 +56,6 @@ later increments.
 
 | Not-yet-created | How to complete it |
 |---|---|
-| **Variable sets** | Reported per varset (name + workspace count). Recreate as Terrapod variable sets and assign to workspaces. |
 | **Run triggers** | Reported per source→destination pair. Recreate with `terrapod_run_trigger`. |
 | **Notification configurations** | Reported per workspace (webhook / Slack / email). Recreate with `terrapod_notification_configuration`. |
 | **Agent pools** | Reported by name + workspace assignments. Tokens are never portable — create the pool and regenerate a join token. |
