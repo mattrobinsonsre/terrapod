@@ -85,4 +85,19 @@ test.describe('Responsive harness (phone viewport)', () => {
 
     await expectNoHorizontalPageScroll(page);
   });
+
+  test('workspace list trims secondary chrome at phone width', async ({ page }) => {
+    // On a phone we drop the explanatory subtitle and the Total/Locked
+    // stat cards (secondary), but KEEP Health Issues (the primary signal
+    // that something needs attention) — #719.
+    await page.goto('/workspaces');
+    await expect(page.getByRole('heading', { name: 'Workspaces', level: 1 })).toBeVisible();
+
+    await expect(page.getByText('Manage Terraform workspaces, state, and runs')).toBeHidden();
+    await expect(page.getByText('Total', { exact: true })).toBeHidden();
+    await expect(page.getByText('Locked', { exact: true })).toBeHidden();
+    await expect(page.getByText('Health Issues', { exact: true })).toBeVisible();
+
+    await expectNoHorizontalPageScroll(page);
+  });
 });

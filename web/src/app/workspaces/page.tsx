@@ -704,9 +704,13 @@ function WorkspacesPageInner() {
           const withConditions = workspaces.filter(ws => (ws.attributes['health-conditions'] || []).length > 0).length
           const locked = workspaces.filter(ws => ws.attributes.locked).length
           const healthFilterActive = hasStatusTerm(parsedFilter, HEALTH_ISSUE_STATUS)
+          // On mobile only Health Issues matters — Total and Locked are
+          // secondary counts we can live without on a small screen (#719), so
+          // they're hidden below `sm` and the grid collapses to a single
+          // full-width Health Issues card. Desktop keeps all three.
           return (
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              <div className="hidden sm:block bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
                 <p className="text-xs text-slate-500 uppercase tracking-wider">Total</p>
                 <p className="text-2xl font-semibold text-slate-100 mt-1">{total}</p>
               </div>
@@ -738,7 +742,7 @@ function WorkspacesPageInner() {
                   <p className="text-2xl font-semibold mt-1 text-slate-100">{withConditions}</p>
                 </div>
               )}
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
+              <div className="hidden sm:block bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
                 <p className="text-xs text-slate-500 uppercase tracking-wider">Locked</p>
                 <p className={`text-2xl font-semibold mt-1 ${locked > 0 ? 'text-amber-400' : 'text-slate-100'}`}>{locked}</p>
               </div>

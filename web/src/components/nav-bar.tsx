@@ -364,17 +364,24 @@ export default function NavBar() {
           </div>
           {menuOpen && (
             <div id="mobile-nav-menu" className="md:hidden flex flex-col gap-0.5 pb-4">
+              {/*
+                Primary destinations first, flat and un-headed (they are the
+                default group). Registry is a delimited section BELOW them —
+                otherwise Catalog/Agent Pools/Labels read as if they belong to
+                the Registry section header.
+              */}
               <MobileLink item={{ href: '/workspaces', label: 'Workspaces', icon: Layers }} onClick={closeMenu} />
-              <MobileSection label="Registry" />
-              {REGISTRY_ITEMS.map((it) => (
-                <MobileLink key={it.href} item={it} onClick={closeMenu} />
-              ))}
               <MobileLink item={{ href: '/catalog', label: 'Catalog', icon: LayoutGrid }} onClick={closeMenu} />
               <MobileLink
                 item={{ href: '/admin/agent-pools', label: 'Agent Pools', icon: Server }}
                 onClick={closeMenu}
               />
               <MobileLink item={{ href: '/labels', label: 'Labels', icon: Tags }} onClick={closeMenu} />
+
+              <MobileSection label="Registry" />
+              {REGISTRY_ITEMS.map((it) => (
+                <MobileLink key={it.href} item={it} onClick={closeMenu} />
+              ))}
 
               {adminOrAudit && (
                 <>

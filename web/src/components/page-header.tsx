@@ -9,8 +9,11 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
     <div className="flex items-start justify-between gap-4 mb-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-100">{title}</h1>
+        {/* The explanatory subtitle is desktop-only — on a phone the title
+            alone is enough and the vertical space is better spent on content
+            (#719). Restored at `sm`+ so desktop is unchanged. */}
         {description && (
-          <p className="text-slate-400 mt-1">{description}</p>
+          <p className="text-slate-400 mt-1 hidden sm:block">{description}</p>
         )}
       </div>
       {actions && <div className="flex-shrink-0">{actions}</div>}
