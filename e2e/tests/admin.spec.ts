@@ -5,9 +5,14 @@ test.describe('Admin access control', () => {
     await adminPage.goto('/workspaces');
     await expect(adminPage.locator('h1:has-text("Workspaces")')).toBeVisible();
 
-    // Admin-only links should be visible
-    await expect(adminPage.locator('nav >> text=Roles')).toBeVisible();
-    await expect(adminPage.locator('nav >> text=Users')).toBeVisible();
+    // Admin destinations now live behind the Admin▾ dropdown (#719 IA):
+    // the trigger is visible, and opening it reveals the admin items.
+    await expect(adminPage.getByRole('button', { name: 'Admin', exact: true })).toBeVisible();
+    await adminPage.getByRole('button', { name: 'Admin', exact: true }).click();
+    await expect(adminPage.getByRole('menuitem', { name: 'Roles' })).toBeVisible();
+    await expect(adminPage.getByRole('menuitem', { name: 'Users' })).toBeVisible();
+    await adminPage.keyboard.press('Escape');
+    // Agent Pools stays top-level (visible to all users).
     await expect(adminPage.locator('nav >> text=Agent Pools')).toBeVisible();
   });
 
@@ -15,9 +20,8 @@ test.describe('Admin access control', () => {
     await userPage.goto('/workspaces');
     await expect(userPage.locator('h1:has-text("Workspaces")')).toBeVisible();
 
-    // Admin-only links should not be visible
-    await expect(userPage.locator('nav >> text=Roles')).not.toBeVisible();
-    await expect(userPage.locator('nav >> text=Users')).not.toBeVisible();
+    // A non-admin/non-audit user gets no Admin▾ menu at all.
+    await expect(userPage.getByRole('button', { name: 'Admin', exact: true })).not.toBeVisible();
     // Agent Pools is visible to all users (RBAC-filtered server-side)
     await expect(userPage.locator('nav >> text=Agent Pools')).toBeVisible();
   });

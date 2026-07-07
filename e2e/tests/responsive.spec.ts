@@ -38,19 +38,27 @@ test.describe('Responsive harness (phone viewport)', () => {
     expect(vp!.width, 'responsive project runs below the md breakpoint').toBeLessThan(768);
   });
 
-  test('nav adapts to mobile: hamburger shown, desktop bar hidden', async ({ page }) => {
+  test('nav adapts to mobile: hamburger shown, grouped sheet', async ({ page }) => {
     await page.goto('/workspaces');
+    await expectNoHorizontalPageScroll(page);
 
     // The mobile branch of the nav renders a hamburger toggle; the desktop
     // link row is hidden below md. Proves the single nav component adapts
-    // by width (the foundation the Stage 1 nav restructure builds on).
+    // by width — no forked mobile build (#719).
     const hamburger = page.getByRole('button', { name: /open menu/i });
     await expect(hamburger).toBeVisible();
 
-    // Opening it reveals the nav destinations (currently the full list;
-    // Stage 1 groups these).
+    // Opening it reveals the grouped sheet: primary links plus labelled
+    // sections (Registry / Account, + Admin for admins). Stage 1 groups the
+    // destinations rather than dumping ~22 flat items.
     await hamburger.click();
-    await expect(page.locator('#mobile-nav-menu')).toBeVisible();
-    await expect(page.locator('#mobile-nav-menu >> text=Workspaces').first()).toBeVisible();
+    const menu = page.locator('#mobile-nav-menu');
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('link', { name: 'Workspaces' })).toBeVisible();
+    await expect(menu.getByText('Registry', { exact: true })).toBeVisible();
+    await expect(menu.getByText('Account', { exact: true })).toBeVisible();
+    await expect(menu.getByRole('link', { name: 'Modules' })).toBeVisible();
+    // Opening the sheet must not introduce horizontal overflow.
+    await expectNoHorizontalPageScroll(page);
   });
 });
