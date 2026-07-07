@@ -39,7 +39,10 @@ Try Terrapod end-to-end on your laptop in one command. It spins up a throwaway
 [kind](https://kind.sigs.k8s.io/) or [k3d](https://k3d.io/) cluster and installs
 a complete, self-contained stack — in-cluster PostgreSQL + Redis, filesystem
 storage, a local admin login — with **no cloud account and no external
-dependencies**.
+dependencies**. It even seeds a sample workspace + a completed plan, so you land
+on a populated UI, not an empty list:
+
+![Terrapod eval walkthrough — login, sample workspace, and a completed plan](docs/images/eval-demo.gif)
 
 ```sh
 make eval          # create a local cluster + install Terrapod, then port-forward
