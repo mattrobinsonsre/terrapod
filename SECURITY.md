@@ -60,6 +60,35 @@ If you are unable to use GitHub's reporting, email the maintainer directly.
 - Static analysis via Semgrep with OWASP Top 10 and custom project rules.
 - Dynamic application security testing via Nuclei with custom templates.
 
+### Release Artifact Provenance
+
+Every release is cryptographically verifiable. Each container image and the
+Helm chart are **keyless-signed with [cosign](https://github.com/sigstore/cosign)**
+(via GitHub OIDC — no long-lived signing key), and each image carries an
+**SBOM (SPDX)** attestation and a **SLSA build-provenance** attestation,
+discoverable as OCI referrers on the image digest. SBOMs and a checksums file
+are also attached to every GitHub Release.
+
+Verify before deploying:
+
+```zsh
+# Image (or chart) signature — identity pinned to the release workflow's OIDC:
+cosign verify ghcr.io/mattrobinsonsre/terrapod-api:vX.Y.Z \
+  --certificate-identity-regexp '^https://github.com/mattrobinsonsre/terrapod/\.github/workflows/ci\.yml@refs/tags/v.*$' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+# SBOM + build provenance:
+gh attestation verify oci://ghcr.io/mattrobinsonsre/terrapod-api:vX.Y.Z --repo mattrobinsonsre/terrapod
+```
+
+Full verification details, the complete artifact list, and admission-time
+enforcement patterns (e.g. Kyverno) are in
+[Supply-chain Verification](docs/supply-chain-verification.md#verifying-terrapods-own-release-artifacts).
+That guide also covers the *other* direction — how Terrapod verifies the
+upstream terraform/tofu binaries and provider archives it caches against the
+publisher's GPG-signed `SHA256SUMS`, with the runner re-verifying the
+executable before it runs.
+
 ## Security Testing
 
 Terrapod includes a three-layer security testing framework:

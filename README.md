@@ -11,6 +11,17 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
 ![Workspaces](docs/images/workspaces.png)
 
+## Is Terrapod for you?
+
+Terrapod earns its keep when the network, the credentials boundary, or the migration is the hard part. You're likely a fit if:
+
+- **You run Terraform/OpenTofu across networks a SaaS can't reach into** — isolated VPCs, other regions, on-prem, or behind egress-only firewalls. Terrapod's control plane **never needs a route into an execution cluster**: runners dial *out* and create Jobs locally, so a cluster only ever makes outbound connections. VCS is polled outbound too, and cached providers/binaries can be served with no upstream internet.
+- **State and cloud credentials must not leave your boundary** — Terrapod is self-hosted end to end. One Helm release owns the API, state, registry, and caches; nothing is handed to an external control plane.
+- **You're leaving Terraform Enterprise / HCP Terraform** (cost, licensing, or the Replicated end-of-life) and want an open, self-hosted landing spot — often paired with a move to OpenTofu. The [`terrapod-migrate`](docs/migration.md) CLI imports workspaces, variables, VCS wiring, and state with a dry-run-first, reversible flow.
+- **You're a Kubernetes-native platform team** — Terrapod deploys only on Kubernetes, via Helm, and runs as just another workload in your stack.
+
+If none of these describe you — a single team, a freely-reachable network, happy on a hosted service — a managed platform may be less to operate. Terrapod is built for the harder-network, own-your-boundary case.
+
 ## Why Terrapod
 
 Beyond broad TFE compatibility, Terrapod is built with three deliberate design foci:
@@ -22,6 +33,8 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 ---
 
 > **Drop-in replacement for HCP Terraform.** Point your existing `cloud` blocks, `go-tfe` clients, and CI/CD pipelines at Terrapod — zero code changes required.
+
+> **Migrating from Terraform Enterprise / HCP Terraform / Atlantis.** The [`terrapod-migrate`](docs/migration.md) CLI imports workspaces, variables, VCS connections, and state with a **dry-run-first, fully reversible** flow — preview everything, apply, verify parity, and roll back cleanly if needed.
 
 > **AI-augmented plans.** Every plan can carry an LLM-generated change description, risk assessment, and (on failure) suggested fixes — provider-agnostic via [LiteLLM](https://github.com/BerriAI/litellm). Wire AWS Bedrock (Claude, Nova, gpt-oss) with native IAM auth, or point at OpenAI, Anthropic, Gemini, Azure OpenAI, or any OpenAI-compatible endpoint. See [docs/ai-plan-summary.md](docs/ai-plan-summary.md).
 
@@ -212,6 +225,22 @@ Defaults give you filesystem storage on a PVC, local password auth, the migratio
 
 Object storage options: S3, Azure Blob, GCS, or the default PVC-backed filesystem.
 
+### Verify what you're deploying (optional)
+
+Every released image and the Helm chart are keyless-signed with [cosign](https://github.com/sigstore/cosign) and carry SBOM (SPDX) + SLSA build-provenance attestations. To verify an image's signature and provenance before you deploy:
+
+```zsh
+# Signature (keyless — identity pinned to the release workflow's GitHub OIDC):
+cosign verify ghcr.io/mattrobinsonsre/terrapod-api:vX.Y.Z \
+  --certificate-identity-regexp '^https://github.com/mattrobinsonsre/terrapod/\.github/workflows/ci\.yml@refs/tags/v.*$' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+# SBOM + build provenance (discoverable as OCI referrers on the same digest):
+gh attestation verify oci://ghcr.io/mattrobinsonsre/terrapod-api:vX.Y.Z --repo mattrobinsonsre/terrapod
+```
+
+Full details and admission-time enforcement patterns: [Supply-chain Verification](docs/supply-chain-verification.md#verifying-terrapods-own-release-artifacts).
+
 ### Create Your First Workspace
 
 ```zsh
@@ -278,6 +307,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 |---|---|
 | [Architecture](docs/architecture.md) | System components, BFF pattern, storage, runners, auth flows |
 | [Getting Started](docs/getting-started.md) | Deploy the Helm chart on Kubernetes (or k3s), first workspace, first plan/apply |
+| [Migration](docs/migration.md) | Move a TFE / HCP Terraform or Atlantis platform onto Terrapod with `terrapod-migrate` — dry-run-first, reversible, what transfers vs. what's left as a checklist |
 | [Local Development](docs/local-development.md) | Run Terrapod from source with Tilt (contributors only) |
 | [Authentication](docs/authentication.md) | Local auth, OIDC, SAML, terraform login, API tokens |
 | [RBAC](docs/rbac.md) | Permission model, label-based access control, custom roles |
@@ -307,6 +337,8 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Optional Webhook Ingress](docs/deployment-webhook-ingress.md) | Split public webhook ingress so the management plane can stay private |
 | [Forward Proxy & Custom CA](docs/deployment-proxy.md) | Route all outbound HTTP(S) through a corporate proxy and trust a private/MITM CA, across every component including runner Jobs |
 | [Security Hardening](docs/security-hardening.md) | Pod hardening defaults, secrets, network posture |
+| [Supply-chain Verification](docs/supply-chain-verification.md) | Verify Terrapod's own signed images + SBOM/SLSA attestations, and how cached binaries/providers are verified against publisher signatures |
+| [Known Limitations](docs/known-limitations.md) | What Terrapod does not (yet) do — deployment, scope, and feature constraints, stated plainly |
 | [Production Checklist](docs/production-checklist.md) | Pre-go-live checklist for a production deployment |
 | [Disaster Recovery](docs/disaster-recovery.md) | Break-glass state recovery, shipped DB backup CronJob + restore-verification DR drill, per-backend object-storage protection |
 | [Encryption at Rest](docs/encryption-at-rest.md) | Optional off-by-default app-layer (BYOK) envelope encryption of DB secrets **and state files** — for no-/niche-CSP, bare-metal, or air-gapped deployments (static / Vault Transit / AWS KMS) |
