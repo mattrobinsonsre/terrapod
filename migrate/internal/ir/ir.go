@@ -71,6 +71,13 @@ type Plan struct {
 	// token + redeployed listeners, reported for operator follow-up.
 	AgentPools []AgentPool `json:"agent_pools,omitempty"`
 
+	// GPGKeys are private-registry provider signing PUBLIC keys. Only the
+	// public key is portable (it's not secret); the private key never
+	// leaves the operator, so provider *versions* still re-publish via
+	// terrapod-publish — but registering the public key up front means the
+	// operator doesn't have to re-import it by hand.
+	GPGKeys []GPGKey `json:"gpg_keys,omitempty"`
+
 	// Skipped collects items the source decided not to migrate, with a
 	// per-item reason. Surfaced in the dry-run report and the handover
 	// document; never written to Terrapod.
@@ -183,6 +190,16 @@ type AgentPool struct {
 	SourceID      string   `json:"source_id"`
 	Name          string   `json:"name"`
 	WorkspaceRefs []string `json:"workspace_refs,omitempty"`
+}
+
+// GPGKey is a private-registry provider signing public key. SourceID is
+// the upstream key's ID (for idempotent resume); ASCIIArmor is the
+// armored PUBLIC key (safe to carry — it is not secret). KeyID is the
+// PGP key id, carried for readable reports.
+type GPGKey struct {
+	SourceID   string `json:"source_id"`
+	ASCIIArmor string `json:"ascii_armor"`
+	KeyID      string `json:"key_id,omitempty"`
 }
 
 // VCSConnection is a Terrapod-side VCS connection (one per source

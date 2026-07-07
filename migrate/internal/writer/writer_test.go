@@ -30,6 +30,7 @@ type fakeTerrapodServer struct {
 	notificationCreated int
 	agentPoolsCreated   int
 	workspacePatches    int
+	gpgKeysCreated      int
 	// lastNotificationBody records the most recent notification-create body
 	lastNotificationBody []byte
 	// lastWorkspaceBody records the most recent workspace-create body
@@ -83,6 +84,10 @@ func newFakeServer(t *testing.T) (*fakeTerrapodServer, *terrapod.Client) {
 			fs.agentPoolsCreated++
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"data":{"id":"ap-fixt","type":"agent-pools","attributes":{"name":"nm"}}}`))
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/gpg-keys"):
+			fs.gpgKeysCreated++
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"data":{"id":"gpg-fixt","type":"gpg-keys","attributes":{"key-id":"ABC123"}}}`))
 		case r.Method == http.MethodPatch && strings.Contains(r.URL.Path, "/api/v2/workspaces/"):
 			fs.workspacePatches++
 			w.WriteHeader(http.StatusOK)
@@ -512,6 +517,55 @@ func TestWriter_Apply_AgentPool_CreatesAndRepointsWorkspaces(t *testing.T) {
 	}
 	if report2.AgentPools[0].State != "reused" {
 		t.Errorf("expected reused, got: %+v", report2.AgentPools[0])
+	}
+}
+
+func TestWriter_Apply_GPGKey_CreatesAndIsIdempotent(t *testing.T) {
+	fs, c := newFakeServer(t)
+	state := &framework.State{}
+	w := New(c, state, "")
+
+	plan := ir.Plan{
+		Source: "tfe",
+		GPGKeys: []ir.GPGKey{
+			{SourceID: "gk-1", KeyID: "ABC123", ASCIIArmor: "-----BEGIN PGP PUBLIC KEY BLOCK-----\n...\n-----END PGP PUBLIC KEY BLOCK-----"},
+		},
+	}
+
+	report, err := w.Run(t.Context(), plan, Options{})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if len(report.Errors) != 0 {
+		t.Fatalf("expected no errors, got: %+v", report.Errors)
+	}
+	if fs.gpgKeysCreated != 1 {
+		t.Errorf("expected 1 gpg-key POST, got %d", fs.gpgKeysCreated)
+	}
+	if len(report.GPGKeys) != 1 {
+		t.Fatalf("expected 1 gpg-key outcome, got %d", len(report.GPGKeys))
+	}
+	gk := report.GPGKeys[0]
+	if gk.State != "created" || gk.TerrapodID != "gpg-fixt" {
+		t.Errorf("gpg-key outcome: %+v", gk)
+	}
+	// State records the created key with the provenance gate set.
+	rec := state.GPGKeyBySourceID("gk-1")
+	if rec == nil || rec.TerrapodID != "gpg-fixt" || !rec.CreatedByMigration {
+		t.Errorf("gpg-key state record: %+v", rec)
+	}
+
+	// Idempotent: a second run reuses (no new POST).
+	fs.gpgKeysCreated = 0
+	report2, err := w.Run(t.Context(), plan, Options{})
+	if err != nil {
+		t.Fatalf("second Run: %v", err)
+	}
+	if fs.gpgKeysCreated != 0 {
+		t.Errorf("gpg-key re-created on resume: %d", fs.gpgKeysCreated)
+	}
+	if report2.GPGKeys[0].State != "reused" {
+		t.Errorf("expected reused, got: %+v", report2.GPGKeys[0])
 	}
 }
 

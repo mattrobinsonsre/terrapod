@@ -13,11 +13,12 @@
 //
 //   - Apply — actually writes. Order is dependency-first: VCS
 //     connections → workspaces (+ their variables + state) → variable
-//     sets → run triggers → notification configurations → agent pools.
-//     Everything after workspaces comes later so its references resolve to
-//     the Terrapod IDs the workspace loop recorded (agent pools also
-//     re-point their member workspaces). After each write the state file is
-//     saved so a crash mid-migration is resumable from the same state file.
+//     sets → run triggers → notification configurations → agent pools →
+//     gpg keys. Everything after workspaces comes later so its references
+//     resolve to the Terrapod IDs the workspace loop recorded (agent pools
+//     also re-point their member workspaces; gpg keys are independent).
+//     After each write the state file is saved so a crash mid-migration is
+//     resumable from the same state file.
 package writer
 
 import (
@@ -96,6 +97,7 @@ type Report struct {
 	RunTriggers   []RunTriggerOutcome   `json:"run_triggers,omitempty"`
 	Notifications []NotificationOutcome `json:"notifications,omitempty"`
 	AgentPools    []AgentPoolOutcome    `json:"agent_pools,omitempty"`
+	GPGKeys       []GPGKeyOutcome       `json:"gpg_keys,omitempty"`
 	Skipped       []ir.SkippedItem      `json:"skipped,omitempty"`
 	Errors        []string              `json:"errors,omitempty"`
 }
@@ -198,6 +200,18 @@ type AgentPoolOutcome struct {
 	Error       string   `json:"error,omitempty"`
 	Assignments int      `json:"assignments,omitempty"`
 	Unresolved  []string `json:"unresolved_workspace_refs,omitempty"`
+}
+
+// GPGKeyOutcome is the per-GPG-key result. State: "planned" | "created"
+// | "reused" | "errored". Only the public key migrates; provider
+// versions still re-publish via terrapod-publish (which owns the
+// signature).
+type GPGKeyOutcome struct {
+	SourceID   string `json:"source_id"`
+	KeyID      string `json:"key_id,omitempty"`
+	State      string `json:"state"`
+	TerrapodID string `json:"terrapod_id,omitempty"`
+	Error      string `json:"error,omitempty"`
 }
 
 // Writer is the entry point. Construct one per migration run and call
@@ -333,6 +347,18 @@ func (w *Writer) Run(ctx context.Context, plan ir.Plan, opts Options) (*Report, 
 		report.AgentPools = append(report.AgentPools, outcome)
 		if err := w.saveState(); err != nil {
 			return report, fmt.Errorf("save state after agent pool %q: %w", ap.Name, err)
+		}
+	}
+
+	// GPG keys are independent of workspaces (provider signing public
+	// keys), so order doesn't matter for correctness — created last,
+	// rolled back first, to keep the reverse-order invariant uniform.
+	for i := range plan.GPGKeys {
+		gk := &plan.GPGKeys[i]
+		outcome := w.applyGPGKey(ctx, gk, opts)
+		report.GPGKeys = append(report.GPGKeys, outcome)
+		if err := w.saveState(); err != nil {
+			return report, fmt.Errorf("save state after gpg key %q: %w", gk.KeyID, err)
 		}
 	}
 
@@ -1291,6 +1317,73 @@ func (w *Writer) recordAgentPool(ap *ir.AgentPool, state, terrapodID, errMsg str
 	w.state.AgentPools = append(w.state.AgentPools, rec)
 }
 
+// applyGPGKey registers a provider signing PUBLIC key on Terrapod.
+// Idempotent (reuses a prior record), 409-tolerant (a key already
+// registered is treated as reused). Only the public key migrates — the
+// private key never leaves the operator, so provider versions still
+// re-publish via terrapod-publish.
+func (w *Writer) applyGPGKey(ctx context.Context, gk *ir.GPGKey, opts Options) GPGKeyOutcome {
+	out := GPGKeyOutcome{SourceID: gk.SourceID, KeyID: gk.KeyID, State: "planned"}
+
+	if prior := w.state.GPGKeyBySourceID(gk.SourceID); prior != nil && prior.TerrapodID != "" {
+		out.State = "reused"
+		out.TerrapodID = prior.TerrapodID
+		return out
+	}
+
+	if opts.DryRun {
+		w.recordGPGKey(gk, "planned", "", "")
+		return out
+	}
+
+	created, err := w.client.CreateGPGKey(ctx, terrapod.CreateGPGKeyRequest{
+		ASCIIArmor: gk.ASCIIArmor,
+	})
+	if err != nil {
+		// 409 → the key is already registered (a prior run, or the
+		// operator imported it). Treat as reused. We don't learn its id,
+		// so it won't be a rollback target — rollback only deletes keys
+		// it can positively identify as its own.
+		var conflict *terrapod.ConflictError
+		if errors.As(err, &conflict) {
+			out.State = "reused"
+			w.recordGPGKey(gk, "reused", "", "")
+			return out
+		}
+		out.State = "errored"
+		out.Error = err.Error()
+		w.recordGPGKey(gk, "errored", "", err.Error())
+		return out
+	}
+	out.State = "created"
+	out.TerrapodID = created.ID
+	w.recordGPGKey(gk, "created", created.ID, "")
+	return out
+}
+
+func (w *Writer) recordGPGKey(gk *ir.GPGKey, state, terrapodID, errMsg string) {
+	if rec := w.state.GPGKeyBySourceID(gk.SourceID); rec != nil {
+		rec.State = state
+		rec.Error = errMsg
+		if terrapodID != "" {
+			rec.TerrapodID = terrapodID
+			rec.CreatedByMigration = true
+		}
+		return
+	}
+	rec := framework.GPGKeyRecord{
+		SourceID: gk.SourceID,
+		KeyID:    gk.KeyID,
+		State:    state,
+		Error:    errMsg,
+	}
+	if terrapodID != "" {
+		rec.TerrapodID = terrapodID
+		rec.CreatedByMigration = true
+	}
+	w.state.GPGKeys = append(w.state.GPGKeys, rec)
+}
+
 func (w *Writer) recordConnection(c *ir.VCSConnection, state, errMsg string) {
 	if rec := findConnectionRecord(w.state, c.SourceID); rec != nil {
 		rec.State = state
@@ -1389,6 +1482,11 @@ func collectErrors(r *Report) []string {
 	for _, ap := range r.AgentPools {
 		if ap.State == "errored" && ap.Error != "" {
 			errs = append(errs, fmt.Sprintf("agent-pool %q: %s", ap.Name, ap.Error))
+		}
+	}
+	for _, gk := range r.GPGKeys {
+		if gk.State == "errored" && gk.Error != "" {
+			errs = append(errs, fmt.Sprintf("gpg-key %q: %s", gk.KeyID, gk.Error))
 		}
 	}
 	return errs

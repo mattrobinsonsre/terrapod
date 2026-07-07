@@ -378,6 +378,11 @@ func loadTFEPlan(ctx context.Context, address, token, org string) (ir.Plan, writ
 		return ir.Plan{}, nil, err
 	}
 
+	gpgKeys, err := c.GPGKeys(ctx)
+	if err != nil {
+		return ir.Plan{}, nil, err
+	}
+
 	plan := ir.Plan{
 		Source: "tfe",
 		SourceMetadata: map[string]string{
@@ -391,6 +396,7 @@ func loadTFEPlan(ctx context.Context, address, token, org string) (ir.Plan, writ
 		RunTriggers:    runTriggers,
 		Notifications:  notifications,
 		AgentPools:     agentPools,
+		GPGKeys:        gpgKeys,
 		Skipped:        skipped,
 	}
 	return plan, c.StateReader(), nil
@@ -415,6 +421,7 @@ func printReportSummary(r *writer.Report, dryRun bool) {
 	fmt.Printf("  run triggers:  %d\n", len(r.RunTriggers))
 	fmt.Printf("  notifications: %d\n", len(r.Notifications))
 	fmt.Printf("  agent pools:   %d\n", len(r.AgentPools))
+	fmt.Printf("  gpg keys:      %d\n", len(r.GPGKeys))
 	fmt.Printf("  skipped:       %d\n", len(r.Skipped))
 	if len(r.Errors) > 0 {
 		fmt.Printf("  errors:        %d\n", len(r.Errors))

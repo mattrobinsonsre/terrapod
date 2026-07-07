@@ -108,6 +108,7 @@ func rollbackCmd(args []string) int {
 type RollbackReport struct {
 	DryRun              bool                   `json:"dry_run"`
 	Target              string                 `json:"target"`
+	GPGKeys             []RollbackGPGKey       `json:"gpg_keys,omitempty"`
 	AgentPools          []RollbackAgentPool    `json:"agent_pools,omitempty"`
 	Notifications       []RollbackNotification `json:"notifications,omitempty"`
 	RunTriggers         []RollbackRunTrigger   `json:"run_triggers,omitempty"`
@@ -119,8 +120,18 @@ type RollbackReport struct {
 	RunTriggerDeleted   int                    `json:"run_trigger_deleted_count"`
 	NotificationDeleted int                    `json:"notification_deleted_count"`
 	AgentPoolDeleted    int                    `json:"agent_pool_deleted_count"`
+	GPGKeyDeleted       int                    `json:"gpg_key_deleted_count"`
 	SkippedCount        int                    `json:"skipped_count"`
 	Errors              []string               `json:"errors,omitempty"`
+}
+
+// RollbackGPGKey is the per-GPG-key rollback outcome. Action is one of:
+// "would_delete" (dry-run), "deleted", "already_gone", "errored".
+type RollbackGPGKey struct {
+	KeyID      string `json:"key_id"`
+	TerrapodID string `json:"terrapod_id,omitempty"`
+	Action     string `json:"action"`
+	Detail     string `json:"detail,omitempty"`
 }
 
 // RollbackAgentPool is the per-agent-pool rollback outcome. Action is
@@ -183,9 +194,48 @@ func runRollback(ctx context.Context, c *terrapod.Client, state *framework.State
 		report.ConnectionsLeft = append(report.ConnectionsLeft, state.VCSConnections[i].Name)
 	}
 
-	// Agent pools first — they were created last (workspaces → varsets →
-	// run triggers → notifications → agent pools), so rollback deletes
-	// them at the front of the reverse order. Deleting a pool SET-NULLs
+	// GPG keys first — provider signing PUBLIC keys, created last and
+	// independent of everything else, so they lead the reverse order.
+	// Pure config with no dependents; the provenance gate is the whole
+	// safety boundary. Delete is 404-tolerant.
+	for _, rec := range state.GPGKeyRollbackTargets() {
+		gk := RollbackGPGKey{KeyID: rec.KeyID, TerrapodID: rec.TerrapodID}
+		if !apply {
+			gk.Action = "would_delete"
+			report.GPGKeys = append(report.GPGKeys, gk)
+			report.GPGKeyDeleted++
+			continue
+		}
+		if err := c.DeleteGPGKey(ctx, rec.TerrapodID); err != nil {
+			var nf *terrapod.NotFoundError
+			if errors.As(err, &nf) {
+				gk.Action = "already_gone"
+				rec.State = "rolled_back"
+				rec.TerrapodID = ""
+				report.GPGKeys = append(report.GPGKeys, gk)
+				report.GPGKeyDeleted++
+				_ = state.Save(statePath, Version)
+				continue
+			}
+			gk.Action = "errored"
+			gk.Detail = err.Error()
+			report.GPGKeys = append(report.GPGKeys, gk)
+			report.Errors = append(report.Errors, fmt.Sprintf("gpg-key %q: delete failed: %v", gk.KeyID, err))
+			continue
+		}
+		gk.Action = "deleted"
+		rec.State = "rolled_back"
+		rec.TerrapodID = ""
+		report.GPGKeys = append(report.GPGKeys, gk)
+		report.GPGKeyDeleted++
+		if err := state.Save(statePath, Version); err != nil {
+			report.Errors = append(report.Errors, fmt.Sprintf("gpg-key %q deleted but state save failed: %v", gk.KeyID, err))
+		}
+	}
+
+	// Agent pools next — they were created after notifications (workspaces
+	// → varsets → run triggers → notifications → agent pools → gpg keys),
+	// so rollback deletes them after gpg keys. Deleting a pool SET-NULLs
 	// any workspace still pointing at it (FK ondelete=SET NULL), so there
 	// is no ordering hazard with the workspace deletes that follow. The
 	// provenance gate is the whole safety boundary. Delete is 404-tolerant.
@@ -464,11 +514,28 @@ func printRollbackSummary(r *RollbackReport, dryRun bool) {
 			fmt.Printf("  agent pools deleted: %d\n", r.AgentPoolDeleted)
 		}
 	}
+	if r.GPGKeyDeleted > 0 {
+		if dryRun {
+			fmt.Printf("  would delete:  %d gpg key(s)\n", r.GPGKeyDeleted)
+		} else {
+			fmt.Printf("  gpg keys deleted: %d\n", r.GPGKeyDeleted)
+		}
+	}
 	if len(r.ConnectionsLeft) > 0 {
 		fmt.Printf("  vcs connections left in place (operator-owned): %d\n", len(r.ConnectionsLeft))
 	}
 	if len(r.Errors) > 0 {
 		fmt.Printf("  errors:        %d\n", len(r.Errors))
+	}
+	for _, g := range r.GPGKeys {
+		fmt.Printf("    [%-16s] gpg-key %s", g.Action, g.KeyID)
+		if g.TerrapodID != "" {
+			fmt.Printf(" (%s)", g.TerrapodID)
+		}
+		fmt.Println()
+		if g.Detail != "" {
+			fmt.Printf("        - %s\n", g.Detail)
+		}
 	}
 	for _, a := range r.AgentPools {
 		fmt.Printf("    [%-16s] agent-pool %s", a.Action, a.Name)

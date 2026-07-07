@@ -126,13 +126,13 @@ type State struct {
 	// is the created pool id (needed for rollback).
 	AgentPools []AgentPoolRecord `json:"agent_pools,omitempty"`
 
+	// GPGKeys is the provider-signing public-key mapping, keyed by source
+	// key ID; TerrapodID is the created key id (needed for rollback).
+	GPGKeys []GPGKeyRecord `json:"gpg_keys,omitempty"`
+
 	// SkippedItems records what didn't migrate, in the order the
 	// source emitted them. Surfaced in reports.
 	SkippedItems []SkippedRecord `json:"skipped_items,omitempty"`
-
-	// Subsequent increments add per-resource mappings for registry
-	// modules, registry providers. Each gets a Record type to keep the
-	// State struct narrow rather than embedding raw IR.
 }
 
 // WorkspaceRecord is what we remember about each migrated workspace.
@@ -232,6 +232,18 @@ type NotificationRecord struct {
 type AgentPoolRecord struct {
 	SourceID           string `json:"source_id"`
 	Name               string `json:"name"`
+	TerrapodID         string `json:"terrapod_id,omitempty"`
+	State              string `json:"state"` // "planned" | "created" | "reused" | "errored" | "rolled_back"
+	Error              string `json:"error,omitempty"`
+	CreatedByMigration bool   `json:"created_by_migration,omitempty"`
+}
+
+// GPGKeyRecord is the source-key-ID → TerrapodID mapping for a migrated
+// provider signing public key. TerrapodID is the created key id used for
+// rollback; CreatedByMigration gates rollback.
+type GPGKeyRecord struct {
+	SourceID           string `json:"source_id"`
+	KeyID              string `json:"key_id,omitempty"`
 	TerrapodID         string `json:"terrapod_id,omitempty"`
 	State              string `json:"state"` // "planned" | "created" | "reused" | "errored" | "rolled_back"
 	Error              string `json:"error,omitempty"`
@@ -480,6 +492,34 @@ func (s *State) AgentPoolRollbackTargets() []*AgentPoolRecord {
 	var out []*AgentPoolRecord
 	for i := range s.AgentPools {
 		r := &s.AgentPools[i]
+		if r.CreatedByMigration && r.TerrapodID != "" && r.State != "rolled_back" {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// GPGKeyBySourceID returns the recorded GPG key for a source key ID, or
+// nil. Used by `apply` for idempotent resume — a key a prior run already
+// created is not re-created.
+func (s *State) GPGKeyBySourceID(sourceID string) *GPGKeyRecord {
+	for i := range s.GPGKeys {
+		if s.GPGKeys[i].SourceID == sourceID {
+			return &s.GPGKeys[i]
+		}
+	}
+	return nil
+}
+
+// GPGKeyRollbackTargets returns the GPG-key records `rollback` may
+// delete: those THIS migration created (CreatedByMigration) that still
+// carry a TerrapodID and haven't been rolled back. Public keys are pure
+// config with no dependents; the provenance gate is the whole safety
+// boundary.
+func (s *State) GPGKeyRollbackTargets() []*GPGKeyRecord {
+	var out []*GPGKeyRecord
+	for i := range s.GPGKeys {
+		r := &s.GPGKeys[i]
 		if r.CreatedByMigration && r.TerrapodID != "" && r.State != "rolled_back" {
 			out = append(out, r)
 		}

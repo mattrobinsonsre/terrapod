@@ -24,6 +24,7 @@ type rollbackFakeServer struct {
 	deletedRunTriggers   []string
 	deletedNotifications []string
 	deletedAgentPools    []string
+	deletedGPGKeys       []string
 }
 
 func newRollbackServer(t *testing.T, currentSerial map[string]int64) (*rollbackFakeServer, *terrapod.Client) {
@@ -73,6 +74,12 @@ func newRollbackServer(t *testing.T, currentSerial map[string]int64) (*rollbackF
 			id := strings.TrimPrefix(r.URL.Path, "/api/terrapod/v1/agent-pools/")
 			fs.mu.Lock()
 			fs.deletedAgentPools = append(fs.deletedAgentPools, id)
+			fs.mu.Unlock()
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/api/terrapod/v1/gpg-keys/"):
+			id := strings.TrimPrefix(r.URL.Path, "/api/terrapod/v1/gpg-keys/")
+			fs.mu.Lock()
+			fs.deletedGPGKeys = append(fs.deletedGPGKeys, id)
 			fs.mu.Unlock()
 			w.WriteHeader(http.StatusNoContent)
 		default:
@@ -202,6 +209,36 @@ func TestRollback_Apply_DeletesMigrationCreatedAgentPools_SkipsReused(t *testing
 	report2 := runRollback(t.Context(), c, state, "", true, false)
 	if len(fs.deletedAgentPools) != 0 || report2.AgentPoolDeleted != 0 {
 		t.Fatalf("second rollback not idempotent: %v", fs.deletedAgentPools)
+	}
+}
+
+func TestRollback_Apply_DeletesMigrationCreatedGPGKeys_SkipsReused(t *testing.T) {
+	fs, c := newRollbackServer(t, map[string]int64{})
+	state := &framework.State{
+		GPGKeys: []framework.GPGKeyRecord{
+			{SourceID: "gk-1", KeyID: "ABC123", TerrapodID: "gpg-a", State: "created", CreatedByMigration: true},
+			// A reused/pre-existing key (no id, not created by us) — never deleted.
+			{SourceID: "gk-2", KeyID: "DEF456", State: "reused", CreatedByMigration: false},
+		},
+	}
+	report := runRollback(t.Context(), c, state, "", true /*apply*/, false)
+	if len(fs.deletedGPGKeys) != 1 || fs.deletedGPGKeys[0] != "gpg-a" {
+		t.Fatalf("expected only gpg-a deleted, got %v", fs.deletedGPGKeys)
+	}
+	if report.GPGKeyDeleted != 1 {
+		t.Fatalf("GPGKeyDeleted=%d", report.GPGKeyDeleted)
+	}
+	if state.GPGKeys[0].State != "rolled_back" || state.GPGKeys[0].TerrapodID != "" {
+		t.Fatalf("record not marked rolled_back: %+v", state.GPGKeys[0])
+	}
+	if state.GPGKeys[1].State != "reused" {
+		t.Fatalf("reused key was modified: %+v", state.GPGKeys[1])
+	}
+	// Idempotent re-run.
+	fs.deletedGPGKeys = nil
+	report2 := runRollback(t.Context(), c, state, "", true, false)
+	if len(fs.deletedGPGKeys) != 0 || report2.GPGKeyDeleted != 0 {
+		t.Fatalf("second rollback not idempotent: %v", fs.deletedGPGKeys)
 	}
 }
 

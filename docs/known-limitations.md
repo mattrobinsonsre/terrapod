@@ -55,16 +55,20 @@ Two categories are marked throughout:
 
 ## Migration
 
-- **`terrapod-migrate` auto-creates a core subset** *(partly not yet)*. The tool
-  imports VCS connections, workspaces, workspace variables, state, variable
-  sets, run triggers, notification configurations, and agent pools today (agent
-  pools migrate the pool identity + re-point member workspaces; tokens are never
-  portable, so each pool is reported as needing a fresh join token + redeployed
-  listeners). The private registry is **read and reported** (surfaced as a
-  checklist in the handover doc) but not yet auto-created — you recreate it by
-  hand, typically via the Terraform provider. Extending this is tracked in
-  [#709](https://github.com/mattrobinsonsre/terrapod/issues/709). RBAC is
-  intentionally *suggested, never auto-applied*. See
+- **`terrapod-migrate` auto-creates a core subset** *(partly by design)*. The
+  tool imports VCS connections, workspaces, workspace variables, state, variable
+  sets, run triggers, notification configurations, agent pools, and registry GPG
+  signing public keys today (agent pools migrate the pool identity + re-point
+  member workspaces; tokens are never portable, so each pool is reported as
+  needing a fresh join token + redeployed listeners). Registry **module and
+  provider versions** are **read and reported**, not auto-created — this is a
+  limit of the source API and the signing model, not missing work: the source
+  API doesn't return published module tarballs (re-publish, or point Terrapod at
+  the module's VCS tag stream), and a provider version's detached signature
+  needs the operator's **private** signing key to re-create (re-publish with
+  `terrapod-publish`; the public key is migrated for you). RBAC is intentionally
+  *suggested, never auto-applied*. Extending coverage is tracked in
+  [#709](https://github.com/mattrobinsonsre/terrapod/issues/709). See
   [Migration](migration.md#what-actually-transfers-today).
 
 ## Terragrunt

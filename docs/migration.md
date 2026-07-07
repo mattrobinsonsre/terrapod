@@ -48,18 +48,21 @@ didn't.
 | **Run triggers** | Cross-workspace dependencies (a source workspace's apply queues a run on the destination). Created after workspaces so both endpoints resolve to Terrapod IDs; a trigger is created only when **both** endpoints were migrated — one whose source or destination is outside the migration scope is reported for manual follow-up. |
 | **Notification configurations** | Per-workspace generic-webhook / Slack / email configs, with their triggers mapped to Terrapod's vocabulary (`assessment:drifted` → `run:drift_detected`; TFE-only triggers such as `assessment:failed`, `workspace:*`, `change_request:*` are dropped + reported). Created on the migrated destination workspace. **Generic-webhook HMAC tokens are write-only at the source and are never returned**, so those configs migrate with an **empty token** and are reported for re-entry. `microsoft-teams` (no Terrapod equivalent) and TFE user-reference recipients (not raw addresses) are reported for manual follow-up. |
 | **Agent pools** | The pool's identity (name) is created, and every migrated member workspace is re-pointed at the new pool. Members outside the migration scope are reported. **Agent tokens are never portable** — TFE agent tokens are write-only and never returned — so no token is created: every migrated pool is reported as needing a **fresh join token + redeployed listeners** before agent runs work. |
+| **GPG signing keys** | Private-registry provider signing **public** keys are registered on Terrapod up front (the public key is not secret). The private key never leaves the operator, so provider *versions* still re-publish via `terrapod-publish` — but the key is already in place, so you don't re-import it by hand. |
 
 ### Read, reported, and left for you (a checklist, not yet auto-created)
 
 The source plugin discovers these and lists them in the skipped-items
 report + handover document with operator-readable guidance, but the tool
-does **not** create them on Terrapod yet — you complete them by hand
-(typically via `terraform-provider-terrapod`). They are on the roadmap as
-later increments.
+does **not** create them on Terrapod — you complete them by hand
+(typically via `terraform-provider-terrapod` or `terrapod-publish`). RBAC
+is advisory by policy; the registry artefacts below are limited by the
+**source API and the signing model**, not by missing work.
 
-| Not-yet-created | How to complete it |
+| Left for you | Why, and how to complete it |
 |---|---|
-| **Private registry** (modules, module versions, providers, GPG keys) | Reported for awareness. Republish with [`terrapod-publish`](registry-publishing.md), or point Terrapod's registry at the module's VCS tag stream. |
+| **Registry module versions** | The source API doesn't hand back a published module version's **tarball** (module versions are ingested from the module's VCS tag; the git tag is the source of truth). Re-publish with [`terrapod-publish`](registry-publishing.md), or point Terrapod's registry at the module's VCS tag stream and let it re-ingest. The signing **public** key is migrated for you (above). |
+| **Registry provider versions** | A provider version's trust anchor is a **detached GPG signature over the SHA256SUMS**, which requires the **private** signing key — that never leaves the operator, so the migrator can't re-sign. Re-publish with [`terrapod-publish`](registry-publishing.md) using your signing key (the matching public key is already registered). |
 | **RBAC roles** | The tool generates a **suggested** role mapping from the source's teams/permissions into the handover doc. RBAC is the highest-blast-radius decision in a migration, so it is advisory only — you review, edit, and apply it via `terrapod_role` + `terrapod_role_assignment`. Nothing is applied automatically. |
 
 ### Not migrated by design (and why)
