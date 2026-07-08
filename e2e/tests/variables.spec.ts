@@ -38,8 +38,9 @@ test.describe('Variables', () => {
     // Submit (the submit button also says "Add Variable")
     await page.click('form button:has-text("Add Variable")');
 
-    // Variable should appear in the table
-    await expect(page.locator('text=test-value')).toBeVisible({ timeout: 10_000 });
+    // Variable should appear in the table. Scope to the <tr> — the value also
+    // renders in the (hidden) mobile card, so a bare text= match is ambiguous.
+    await expect(page.locator('tr:has-text("test-value")')).toBeVisible({ timeout: 10_000 });
   });
 
   test('create sensitive variable shows masked value', async ({ page }) => {
@@ -99,9 +100,9 @@ test.describe('Variables', () => {
     const row = page.locator(`tr:has-text("${varKey}")`);
     await expect(row).toBeVisible({ timeout: 10_000 });
 
-    // Delete it — two-click inline confirm (Delete → Confirm)
+    // Delete it — a native confirm() now guards the delete (#719); accept it.
+    page.once('dialog', (d) => d.accept());
     await row.locator('button:has-text("Delete")').click();
-    await row.locator('button:has-text("Confirm")').click();
 
     // Should be gone
     await expect(row).not.toBeVisible({ timeout: 10_000 });

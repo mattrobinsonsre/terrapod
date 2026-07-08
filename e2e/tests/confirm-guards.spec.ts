@@ -39,11 +39,13 @@ test.describe('confirm() guards — precise pointer', () => {
     page.off('dialog', spy);
 
     // Tier 1 — delete MUST prompt a confirm() even on a precise pointer.
-    const dialogP = page.waitForEvent('dialog');
+    // Register the handler BEFORE the click: window.confirm() is synchronous and
+    // blocks the click handler, so it must be accepted as it opens (waitForEvent
+    // + click deadlocks).
+    let deleteMsg = '';
+    page.once('dialog', async (d) => { deleteMsg = d.message(); await d.accept(); });
     await page.getByRole('button', { name: 'Delete' }).click();
-    const dialog = await dialogP;
-    expect(dialog.message()).toContain('Delete run task');
-    await dialog.accept();
+    await expect.poll(() => deleteMsg, { timeout: 5_000 }).toContain('Delete run task');
     await expect(page.getByText(rtName)).toBeHidden({ timeout: 10_000 });
   });
 });

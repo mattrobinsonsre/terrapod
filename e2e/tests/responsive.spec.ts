@@ -178,10 +178,11 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page.locator('#ws-tab-select')).toBeVisible();
     // The desktop table's Serial column header is hidden below md...
     await expect(page.getByRole('columnheader', { name: 'Serial' })).toBeHidden();
-    // ...and the state version renders as a card with its serial and a
-    // Download button (the card's action, not a tiny text link).
-    await expect(page.getByText('#1', { exact: true })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole('button', { name: 'Download' }).first()).toBeVisible();
+    // ...and the state version renders as a card with its serial and a Download
+    // button. `#1` + Download also exist in the hidden desktop table, so filter
+    // to the visible (mobile-card) copy.
+    await expect(page.getByText('#1', { exact: true }).filter({ visible: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: 'Download' }).filter({ visible: true })).toBeVisible();
 
     await expectNoHorizontalPageScroll(page);
   });
@@ -202,9 +203,10 @@ test.describe('Responsive harness (phone viewport)', () => {
     // The desktop table's column header is hidden at phone width...
     await expect(page.getByRole('columnheader', { name: 'Source' })).toBeHidden();
     // ...and the config version renders as a card exposing its full id + the
-    // Compare checkbox that the clipped table hid.
-    await expect(page.getByText(/^cv-/).first()).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole('checkbox', { name: /Select cv-.* for compare/ }).first()).toBeVisible();
+    // Compare checkbox. Both also exist in the hidden desktop table, so filter
+    // to the visible (mobile-card) copy.
+    await expect(page.getByText(/^cv-/).filter({ visible: true }).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('checkbox', { name: /Select cv-.* for compare/ }).filter({ visible: true }).first()).toBeVisible();
 
     await expectNoHorizontalPageScroll(page);
   });
@@ -222,20 +224,22 @@ test.describe('Responsive harness (phone viewport)', () => {
     await page.goto(`/workspaces/${wsId}?tab=run-tasks`);
     await expect(page.getByText(rtName)).toBeVisible({ timeout: 15_000 });
 
+    // Handlers registered BEFORE the click: window.confirm() is synchronous and
+    // blocks the click handler, so the dialog must be handled as it opens
+    // (waitForEvent + click deadlocks).
+
     // Tier 2 — the Disable toggle DOES prompt on touch; dismiss keeps it enabled.
-    const toggleDialogP = page.waitForEvent('dialog');
+    let toggleMsg = '';
+    page.once('dialog', async (d) => { toggleMsg = d.message(); await d.dismiss(); });
     await page.getByRole('button', { name: 'Disable' }).click();
-    const toggleDialog = await toggleDialogP;
-    expect(toggleDialog.message()).toContain('Disable this run task');
-    await toggleDialog.dismiss();
+    await expect.poll(() => toggleMsg, { timeout: 5_000 }).toContain('Disable this run task');
     await expect(page.getByText('Enabled', { exact: true })).toBeVisible();
 
     // Tier 1 — delete prompts on touch too; dismiss keeps the row.
-    const deleteDialogP = page.waitForEvent('dialog');
+    let deleteMsg = '';
+    page.once('dialog', async (d) => { deleteMsg = d.message(); await d.dismiss(); });
     await page.getByRole('button', { name: 'Delete' }).click();
-    const deleteDialog = await deleteDialogP;
-    expect(deleteDialog.message()).toContain('Delete run task');
-    await deleteDialog.dismiss();
+    await expect.poll(() => deleteMsg, { timeout: 5_000 }).toContain('Delete run task');
     await expect(page.getByText(rtName)).toBeVisible();
   });
 });
