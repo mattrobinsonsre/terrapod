@@ -3005,86 +3005,72 @@ function WorkspaceDetailContent() {
                   the link (big touch target); Status stays prominent (never
                   hidden — the primary signal), destroy/plan-only keep their
                   coloured pills, and the rest reflow as label/value rows. */}
-              <ul className="md:hidden space-y-2">
+              <MobileCardList>
                 {sortedRuns.map((run) => {
                   const shortId = run.id.replace(/^run-/, '').split('-').pop()
                   return (
-                    <li key={run.id}>
-                      <Link
-                        href={`/workspaces/${workspaceId}/runs/${run.id}`}
-                        className="block rounded-lg border border-slate-700/50 bg-slate-800/50 p-3 active:bg-slate-700/30"
-                      >
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <span className="text-sm font-mono text-brand-400">{shortId}</span>
-                          {run.attributes.actions?.['is-confirmable'] ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">
-                              needs confirm
+                    <MobileCard
+                      key={run.id}
+                      href={`/workspaces/${workspaceId}/runs/${run.id}`}
+                      title={<span className="text-sm font-mono text-brand-400">{shortId}</span>}
+                      badge={
+                        run.attributes.actions?.['is-confirmable'] ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">
+                            needs confirm
+                          </span>
+                        ) : (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(run.attributes.status)}`}>
+                            {run.attributes.status}
+                          </span>
+                        )
+                      }
+                      fields={[
+                        {
+                          label: 'Type',
+                          value: run.attributes['is-destroy'] ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-300">
+                              destroy
+                            </span>
+                          ) : run.attributes['plan-only'] ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-900/50 text-cyan-300">
+                              plan only
                             </span>
                           ) : (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(run.attributes.status)}`}>
-                              {run.attributes.status}
-                            </span>
-                          )}
-                        </div>
-                        <dl className="space-y-1 text-xs">
-                          <div className="flex items-baseline justify-between gap-3">
-                            <dt className="text-slate-500">Type</dt>
-                            <dd>
-                              {run.attributes['is-destroy'] ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-300">
-                                  destroy
-                                </span>
-                              ) : run.attributes['plan-only'] ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-900/50 text-cyan-300">
-                                  plan only
-                                </span>
-                              ) : (
-                                <span className="text-slate-400">plan + apply</span>
-                              )}
-                            </dd>
-                          </div>
-                          {run.attributes['plan-summary'] && (
-                            <div className="flex items-baseline justify-between gap-3">
-                              <dt className="text-slate-500">Changes</dt>
-                              <dd>
-                                <PlanSummaryBadges summary={run.attributes['plan-summary']} size="sm" />
-                              </dd>
-                            </div>
-                          )}
-                          <div className="flex items-baseline justify-between gap-3">
-                            <dt className="text-slate-500">Source</dt>
-                            <dd className="text-slate-300">
-                              {run.attributes.source === 'module-test' ? (
-                                <span className="text-purple-400">module test</span>
-                              ) : run.attributes.source === 'module-publish' ? (
-                                <span className="text-purple-400">module publish</span>
-                              ) : (
-                                run.attributes.source
-                              )}
-                            </dd>
-                          </div>
-                          {run.attributes['created-by'] && (
-                            <div className="flex items-baseline justify-between gap-3">
-                              <dt className="shrink-0 text-slate-500">Triggered by</dt>
-                              <dd className="min-w-0 break-words text-right text-slate-300">
-                                {run.attributes['created-by']}
-                              </dd>
-                            </div>
-                          )}
-                          {run.attributes['created-at'] && (
-                            <div className="flex items-baseline justify-between gap-3">
-                              <dt className="text-slate-500">Created</dt>
-                              <dd className="text-right text-slate-400">
-                                {new Date(run.attributes['created-at']).toLocaleString()}
-                              </dd>
-                            </div>
-                          )}
-                        </dl>
-                      </Link>
-                    </li>
+                            <span className="text-slate-400">plan + apply</span>
+                          ),
+                        },
+                        ...(run.attributes['plan-summary']
+                          ? [{
+                              label: 'Changes',
+                              value: <PlanSummaryBadges summary={run.attributes['plan-summary']} size="sm" />,
+                            }]
+                          : []),
+                        {
+                          label: 'Source',
+                          value:
+                            run.attributes.source === 'module-test' ? (
+                              <span className="text-purple-400">module test</span>
+                            ) : run.attributes.source === 'module-publish' ? (
+                              <span className="text-purple-400">module publish</span>
+                            ) : (
+                              run.attributes.source
+                            ),
+                        },
+                        ...(run.attributes['created-by']
+                          ? [{ label: 'Triggered by', value: run.attributes['created-by'] }]
+                          : []),
+                        ...(run.attributes['created-at']
+                          ? [{
+                              label: 'Created',
+                              value: new Date(run.attributes['created-at']).toLocaleString(),
+                              valueClassName: 'text-slate-400',
+                            }]
+                          : []),
+                      ]}
+                    />
                   )
                 })}
-              </ul>
+              </MobileCardList>
               </>
             )}
           </div>
