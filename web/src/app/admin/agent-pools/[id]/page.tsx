@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/empty-state'
 import { ConnectionStatus } from '@/components/connection-status'
 import { LabelsEditor } from '@/components/labels-editor'
 import { getAuthState } from '@/lib/auth'
+import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch } from '@/lib/api'
 import { usePoolEvents } from '@/lib/use-pool-events'
 import { usePollingInterval } from '@/lib/use-polling-interval'
@@ -85,6 +86,7 @@ export default function AgentPoolDetailPage() {
   const router = useRouter()
   const params = useParams()
   const poolId = params.id as string
+  const { confirmDelete } = useConfirm()
 
   const [pool, setPool] = useState<Pool | null>(null)
   const [loading, setLoading] = useState(true)
@@ -269,6 +271,7 @@ export default function AgentPoolDetailPage() {
   }
 
   async function handleRevokeToken(tokenId: string) {
+    if (!confirmDelete('Revoke this join token? Listeners using it can no longer join, and this cannot be undone.')) return
     setError('')
     setSuccess('')
     try {
@@ -282,6 +285,7 @@ export default function AgentPoolDetailPage() {
   }
 
   async function handleDeleteListener(listenerId: string) {
+    if (!confirmDelete('Delete this listener? It will re-register on its next heartbeat if the pod is still running.')) return
     setError('')
     setSuccess('')
     try {
@@ -379,11 +383,11 @@ export default function AgentPoolDetailPage() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-slate-300">Pool Settings</h3>
                 {isPoolAdmin && (!editing ? (
-                  <button onClick={startEditing} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
+                  <button onClick={startEditing} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Edit</button>
                 ) : (
                   <div className="flex gap-2">
-                    <button onClick={() => setEditing(false)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
-                    <button onClick={handleSave} disabled={saving} className="text-xs text-brand-400 hover:text-brand-300">
+                    <button onClick={() => setEditing(false)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Cancel</button>
+                    <button onClick={handleSave} disabled={saving} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-50">
                       {saving ? 'Saving...' : 'Save'}
                     </button>
                   </div>
@@ -522,7 +526,7 @@ export default function AgentPoolDetailPage() {
             ) : tokens.length === 0 ? (
               <EmptyState message="No tokens for this pool." />
             ) : (
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
@@ -554,7 +558,7 @@ export default function AgentPoolDetailPage() {
                         <td className="px-4 py-3 text-xs text-slate-400 hidden lg:table-cell">{tok.attributes['created-by']}</td>
                         <td className="px-4 py-3 text-right">
                           {!tok.attributes.revoked && (
-                            <button onClick={() => handleRevokeToken(tok.id)} className="text-xs text-red-400 hover:text-red-300">Revoke</button>
+                            <button onClick={() => handleRevokeToken(tok.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">Revoke</button>
                           )}
                         </td>
                       </tr>
@@ -574,7 +578,7 @@ export default function AgentPoolDetailPage() {
             ) : listeners.length === 0 ? (
               <EmptyState message="No listeners registered for this pool." />
             ) : (
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
@@ -609,7 +613,7 @@ export default function AgentPoolDetailPage() {
                           {formatDate(l.attributes['certificate-expires-at'])}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <button onClick={() => handleDeleteListener(l.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
+                          <button onClick={() => handleDeleteListener(l.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">Delete</button>
                         </td>
                       </tr>
                     ))}

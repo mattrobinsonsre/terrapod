@@ -212,11 +212,11 @@ export default function ProviderDetailPage() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-medium text-slate-300">Metadata</h3>
               {!editingMeta ? (
-                provPerms['can-update'] && <button onClick={startEditingMeta} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
+                provPerms['can-update'] && <button onClick={startEditingMeta} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Edit</button>
               ) : (
                 <div className="flex gap-2">
-                  <button onClick={() => { setEditingMeta(false); setLockoutWarning('') }} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
-                  <button onClick={() => handleSaveMeta()} disabled={savingMeta} className="text-xs text-brand-400 hover:text-brand-300">{savingMeta ? 'Saving...' : 'Save'}</button>
+                  <button onClick={() => { setEditingMeta(false); setLockoutWarning('') }} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Cancel</button>
+                  <button onClick={() => handleSaveMeta()} disabled={savingMeta} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white">{savingMeta ? 'Saving...' : 'Save'}</button>
                 </div>
               )}
             </div>
@@ -293,7 +293,7 @@ export default function ProviderDetailPage() {
                       {provPerms['can-destroy'] && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setDeleteTarget({ type: 'version', version: v.attributes.version }) }}
-                          className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                          className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
                         >
                           Delete
                         </button>
@@ -316,12 +316,12 @@ export default function ProviderDetailPage() {
                             <tr key={`${p.os}-${p.arch}`} className="border-t border-slate-700/20">
                               <td className="py-1.5 text-slate-300">{p.os}</td>
                               <td className="py-1.5 text-slate-300">{p.arch}</td>
-                              <td className="py-1.5 text-slate-400 font-mono text-xs">{p.filename}</td>
+                              <td className="py-1.5 text-slate-400 font-mono text-xs break-all">{p.filename}</td>
                               {provPerms['can-destroy'] && (
                                 <td className="py-1.5 text-right">
                                   <button
                                     onClick={() => setDeleteTarget({ type: 'platform', version: v.attributes.version, os: p.os, arch: p.arch })}
-                                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                                    className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
                                   >
                                     Delete
                                   </button>

@@ -171,7 +171,7 @@ export default function AgentPoolsPage() {
         ) : pools.length === 0 ? (
           <EmptyState message="No agent pools configured." />
         ) : (
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
@@ -193,6 +193,17 @@ export default function AgentPoolsPage() {
                         </Link>
                         {pool.attributes['is-default'] && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand-900/50 text-brand-300">default</span>
+                        )}
+                        {/* Below md the STATUS column is hidden, so reflow the health dot inline —
+                            otherwise a phone loses the healthy/degraded signal entirely (#719). */}
+                        {pool.attributes.status && (
+                          <span
+                            className="md:hidden inline-flex items-center gap-1"
+                            data-testid="pool-row-status-mobile"
+                            title={pool.attributes.status}
+                          >
+                            <span className={`w-2 h-2 rounded-full ${statusDotClass(pool.attributes.status)}`} />
+                          </span>
                         )}
                       </div>
                     </td>

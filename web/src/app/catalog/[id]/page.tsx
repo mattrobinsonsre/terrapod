@@ -603,7 +603,7 @@ export default function CatalogItemPage() {
           {instances.length === 0 ? (
             <EmptyState message="No instances provisioned from this item yet." />
           ) : (
-            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+            <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-700/50">
@@ -630,11 +630,11 @@ export default function CatalogItemPage() {
                           {poolName || inst.attributes['agent-pool-id'] || '—'}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-3">
-                            <button onClick={() => startReconfigure(inst)} className="text-xs text-brand-400 hover:text-brand-300">Reconfigure</button>
-                            <button onClick={() => { setDestroyInstance(inst); setDestroyError(''); setDestroyAutoApply(false) }} className="text-xs text-red-400 hover:text-red-300">Destroy</button>
+                          <div className="flex justify-end gap-2">
+                            <button onClick={() => startReconfigure(inst)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Reconfigure</button>
+                            <button onClick={() => { setDestroyInstance(inst); setDestroyError(''); setDestroyAutoApply(false) }} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">Destroy</button>
                             {canOrphan && (
-                              <button onClick={() => { setOrphanInstance(inst); setOrphanError(''); setOrphanConfirm('') }} className="text-xs text-slate-500 hover:text-slate-300" title="Delete the catalog record without destroying its infrastructure (discouraged)">Orphan…</button>
+                              <button onClick={() => { setOrphanInstance(inst); setOrphanError(''); setOrphanConfirm('') }} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-400" title="Delete the catalog record without destroying its infrastructure (discouraged)">Orphan…</button>
                             )}
                           </div>
                         </td>

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { getStoredToken, createWorkspace, createUser, seedRun, seedStateVersion, seedRunTask, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedRunTask, uniqueName } from '../helpers/api';
 
 /**
  * Responsive / mobile harness (#719).
@@ -243,6 +243,29 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect.poll(() => toggleMsg, { timeout: 5_000 }).toMatch(/Deactivate|Activate/);
   });
 
+  test('agent pools list + detail fit a phone viewport', async ({ page }) => {
+    // Agent Pools is a top-level admin surface (#719). The list hides the
+    // STATUS column below md, so the pool's health dot must reflow inline into
+    // the row; the detail page (settings + tokens + listeners tables) must not
+    // introduce horizontal page scroll.
+    const token = getStoredToken();
+    const poolName = uniqueName('resp-pool');
+    const poolId = await createAgentPool(token, poolName);
+
+    await page.goto('/admin/agent-pools');
+    const row = page.getByRole('row').filter({ hasText: poolName });
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    // The dedicated desktop STATUS column header stays hidden at phone width.
+    await expect(page.getByRole('columnheader', { name: 'Status' })).toBeHidden();
+    await expectNoHorizontalPageScroll(page);
+
+    await page.goto(`/admin/agent-pools/${poolId}`);
+    await expect(
+      page.getByRole('heading', { name: new RegExp(poolName), level: 1 }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expectNoHorizontalPageScroll(page);
+  });
+
   test('touch: both a reversible toggle and an irreversible delete prompt confirm()', async ({ page }) => {
     // #719 two-tier confirm policy, coarse-pointer half. On touch EVERY mutation
     // prompts: tier-2 (toggle) — which on a precise pointer would NOT — and
@@ -273,5 +296,26 @@ test.describe('Responsive harness (phone viewport)', () => {
     await page.getByRole('button', { name: 'Delete' }).click();
     await expect.poll(() => deleteMsg, { timeout: 5_000 }).toContain('Delete run task');
     await expect(page.getByText(rtName)).toBeVisible();
+  });
+
+  test('catalog browse page renders without horizontal scroll at phone width', async ({ page }) => {
+    // The catalog browse page is a responsive card grid (or an empty state);
+    // either way it must not scroll horizontally on a phone.
+    await page.goto('/catalog');
+    await expect(page.getByRole('heading', { name: 'Service Catalog' })).toBeVisible({ timeout: 15_000 });
+    await expectNoHorizontalPageScroll(page);
+  });
+
+  test('registry module list renders as a card grid at phone width', async ({ page }) => {
+    // The registry list pages are responsive card grids (grid-cols-1 at phone),
+    // so a seeded module shows as a full-width card with no horizontal scroll.
+    const token = getStoredToken();
+    const modName = uniqueName('respmod').replace(/[^a-z0-9]/gi, '');
+    await createRegistryModule(token, modName, 'aws');
+
+    await page.goto('/registry/modules');
+    await expect(page.getByText(modName).first()).toBeVisible({ timeout: 15_000 });
+
+    await expectNoHorizontalPageScroll(page);
   });
 });
