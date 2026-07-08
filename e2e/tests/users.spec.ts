@@ -68,9 +68,9 @@ test.describe('User Management', () => {
     const row = page.locator(`tr:has-text("${email}")`);
     await expect(row).toBeVisible({ timeout: 10_000 });
 
-    // Click Delete button in the row, then Confirm
+    // Delete → native confirm() dialog (#719 two-tier policy)
+    page.once("dialog", (d) => d.accept());
     await row.locator('button:has-text("Delete")').click();
-    await row.locator('button:has-text("Confirm")').click();
 
     // User should be gone
     await expect(row).not.toBeVisible({ timeout: 10_000 });

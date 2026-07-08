@@ -27,7 +27,7 @@ test.describe('Variable Sets', () => {
     // Variable set should appear in the table with Global badge
     const row = page.locator(`tr:has-text("${name}")`);
     await expect(row).toBeVisible({ timeout: 10_000 });
-    await expect(row.locator('text=Global')).toBeVisible();
+    await expect(row.locator('text=Global').filter({ visible: true })).toBeVisible();
   });
 
   test('navigate to detail page shows tabs', async ({ page }) => {

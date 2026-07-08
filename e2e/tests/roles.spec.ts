@@ -116,8 +116,8 @@ test.describe('Roles & Assignments', () => {
     await expect(card.getByText('run:apply', { exact: true })).toHaveCount(0);
 
     // Teardown: delete the role (other specs in this file self-teardown).
+    page.once("dialog", (d) => d.accept());
     await card.locator('button:has-text("Delete")').click();
-    await card.locator('button:has-text("Confirm")').click();
     await expect(page.locator(`h3:has-text("${roleName}")`)).not.toBeVisible({ timeout: 10_000 });
   });
 
@@ -137,10 +137,9 @@ test.describe('Roles & Assignments', () => {
 
     // Find the role card (a rounded-lg div containing the h3 with the role name)
     const card = page.locator('div.rounded-lg').filter({ has: page.locator(`h3:has-text("${roleName}")`) });
-    await card.locator('button:has-text("Delete")').click();
+    page.once("dialog", (d) => d.accept());
 
-    // Click Confirm (replaces Delete inline)
-    await card.locator('button:has-text("Confirm")').click();
+    await card.locator('button:has-text("Delete")').click();
 
     // Role should be gone
     await expect(page.locator(`h3:has-text("${roleName}")`)).not.toBeVisible({ timeout: 10_000 });
