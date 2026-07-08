@@ -109,6 +109,21 @@ async def get_session(token: str) -> Session | None:
     return Session(token=token, **parsed)
 
 
+async def get_session_ttl(token: str) -> int | None:
+    """Return the session's true remaining TTL in seconds, WITHOUT sliding it.
+
+    Reads the Redis key TTL directly so a caller (the web session-expiry
+    banner, #726) can reconcile against the server's real remaining lifetime
+    rather than a stale client-cached timestamp. Returns None when the key is
+    gone (`-2`) or has no expiry (`-1`); a non-negative int otherwise. This is
+    a pure read — it must never call refresh_session, or polling it would keep
+    the session alive forever and the warning could never fire.
+    """
+    redis = get_redis_client()
+    ttl = await redis.ttl(SESSION_PREFIX + token)
+    return ttl if ttl is not None and ttl >= 0 else None
+
+
 # Minimum interval between session TTL refreshes (seconds).
 SESSION_REFRESH_INTERVAL = 300  # 5 minutes
 

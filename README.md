@@ -17,7 +17,7 @@ Terrapod earns its keep when the network, the credentials boundary, or the migra
 
 - **You run Terraform/OpenTofu across networks a SaaS can't reach into** — isolated VPCs, other regions, on-prem, or behind egress-only firewalls. Terrapod's control plane **never needs a route into an execution cluster**: runners dial *out* and create Jobs locally, so a cluster only ever makes outbound connections. VCS is polled outbound too, and cached providers/binaries can be served with no upstream internet.
 - **State and cloud credentials must not leave your boundary** — Terrapod is self-hosted end to end. One Helm release owns the API, state, registry, and caches; nothing is handed to an external control plane.
-- **You're leaving Terraform Enterprise / HCP Terraform** (cost, licensing, or the Replicated end-of-life) and want an open, self-hosted landing spot — often paired with a move to OpenTofu. The [`terrapod-migrate`](docs/migration.md) CLI imports workspaces, variables, VCS wiring, and state with a dry-run-first, reversible flow.
+- **You're leaving Terraform Enterprise / HCP Terraform** (cost, licensing, or the Replicated end-of-life) and want an open, self-hosted landing spot — often paired with a move to OpenTofu. The [`terrapod-migrate`](docs/migration.md) CLI imports workspaces, variables, variable sets, VCS wiring, state, run triggers, notifications, agent pools, and registry signing keys with a dry-run-first, reversible flow.
 - **You're a Kubernetes-native platform team** — Terrapod deploys only on Kubernetes, via Helm, and runs as just another workload in your stack.
 
 If none of these describe you — a single team, a freely-reachable network, happy on a hosted service — a managed platform may be less to operate. Terrapod is built for the harder-network, own-your-boundary case.
@@ -34,7 +34,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 
 > **Drop-in replacement for HCP Terraform.** Point your existing `cloud` blocks, `go-tfe` clients, and CI/CD pipelines at Terrapod — zero code changes required.
 
-> **Migrating from Terraform Enterprise / HCP Terraform / Atlantis.** The [`terrapod-migrate`](docs/migration.md) CLI imports workspaces, variables, VCS connections, and state with a **dry-run-first, fully reversible** flow — preview everything, apply, verify parity, and roll back cleanly if needed.
+> **Migrating from Terraform Enterprise / HCP Terraform / Atlantis.** The [`terrapod-migrate`](docs/migration.md) CLI imports workspaces, variables, variable sets, VCS connections, state, run triggers, notifications, agent pools, and registry signing keys with a **dry-run-first, fully reversible** flow — preview everything, apply, verify parity, and roll back cleanly if needed.
 
 > **AI-augmented plans.** Every plan can carry an LLM-generated change description, risk assessment, and (on failure) suggested fixes — provider-agnostic via [LiteLLM](https://github.com/BerriAI/litellm). Wire AWS Bedrock (Claude, Nova, gpt-oss) with native IAM auth, or point at OpenAI, Anthropic, Gemini, Azure OpenAI, or any OpenAI-compatible endpoint. See [docs/ai-plan-summary.md](docs/ai-plan-summary.md).
 
@@ -208,7 +208,7 @@ Terrapod runs **only on Kubernetes** (the runner uses the Jobs API). Deploy it o
 
 - A Kubernetes cluster (1.27+). No cluster? `curl -sfL https://get.k3s.io | sh -` gives you one on a single VM, with an ingress controller (Traefik) and storage included.
 - Helm 3.x
-- **External** PostgreSQL 14+ and Redis 7+ (the chart does not bundle them) — a managed service or run them on the cluster/VM.
+- **External** PostgreSQL 14+ and Redis 7+ (the chart does not bundle a production-grade datastore; it can deploy in-cluster Postgres/Redis via `postgresql.deploy`/`redis.deploy` for eval/dev only) — use a managed service or run them on the cluster/VM.
 
 ### Deploy
 
@@ -372,7 +372,7 @@ All builds, tests, and linting run in Docker -- no local Python or Node.js insta
 make dev          # Start local dev environment (Tilt)
 make dev-down     # Stop local dev environment
 make test         # Run pytest in Docker (with LocalStack for S3)
-make lint         # Run ruff + mypy in Docker
+make lint         # Run ruff (check + format) in Docker
 make images       # Build production Docker images
 ```
 
@@ -403,7 +403,7 @@ make pentest          # All three layers
 | Layer | Tool | What it covers |
 |-------|------|----------------|
 | SAST | [Semgrep](https://semgrep.dev/) | OWASP Top 10, secrets detection, project-specific rules (naive datetimes, raw background tasks) |
-| Container scanning | [Trivy](https://trivy.dev/) | HIGH/CRITICAL CVEs in `terrapod-api` and `terrapod-web` images |
+| Container scanning | [Trivy](https://trivy.dev/) | HIGH/CRITICAL CVEs in the `terrapod-api`, `terrapod-web`, and `terrapod-runner` images |
 | DAST | [Nuclei](https://nuclei.projectdiscovery.io/) | Auth bypass, header injection, CORS validation, state endpoint security, HTTP method restriction |
 
 Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for the full security policy.
