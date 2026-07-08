@@ -15,7 +15,7 @@ import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
 import { useIsMobile } from '@/lib/use-media-query'
-import { ChevronsUp, ArrowDownToLine, RefreshCw } from 'lucide-react'
+import { ChevronsUp, ArrowDownToLine, RefreshCw, Download } from 'lucide-react'
 
 interface RunActions {
   'is-confirmable': boolean
@@ -440,19 +440,20 @@ function LogPanel({
               {copied ? 'Copied!' : 'Copy'}
             </button>
           )}
+          {/* One download button — the current Color/Plain mode decides what
+              it saves: colored (ANSI codes preserved) in Color mode, stripped
+              plain text in Plain mode. */}
           <button
-            onClick={() => downloadFile(cleanLog!, `${shortId}-${phase}.log`)}
-            className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
-            title="Download with ANSI color codes"
+            onClick={() =>
+              colorMode
+                ? downloadFile(cleanLog ?? '', `${shortId}-${phase}.log`)
+                : downloadFile(plainContent, `${shortId}-${phase}-plain.log`)
+            }
+            className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
+            title={colorMode ? 'Download log (with ANSI colour codes)' : 'Download log (plain text)'}
           >
-            Download colored
-          </button>
-          <button
-            onClick={() => downloadFile(plainContent, `${shortId}-${phase}-plain.log`)}
-            className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
-            title="Download plain text (no color codes)"
-          >
-            Download plain
+            <Download className="w-3 h-3" />
+            Download
           </button>
         </div>
       </div>
@@ -873,12 +874,25 @@ function RunDetailPageInner() {
   // ── Tabs (#721) — AI + OPA appear only when the run has them; Apply only
   // for plan+apply runs. `view` clamps to Overview if the active tab isn't
   // available (e.g. a deep link to ?view=ai on a run with no AI summary).
-  const tabs: [RunView, string][] = [
+  // Labels shorten below `md` so all six tabs need less horizontal scroll on a
+  // phone ("Plan"/"Apply" vs "Plan Log"/"Apply Log"); desktop keeps the full
+  // words. The " Log" suffix is CSS-hidden on mobile — one DRY label.
+  const planLabel = (
+    <>
+      Plan<span className="hidden md:inline"> Log</span>
+    </>
+  )
+  const applyLabel = (
+    <>
+      Apply<span className="hidden md:inline"> Log</span>
+    </>
+  )
+  const tabs: [RunView, React.ReactNode][] = [
     ['overview', 'Overview'],
-    ...((aiInfo?.present ? [['ai', 'AI']] : []) as [RunView, string][]),
-    ...((policyInfo?.present ? [['opa', 'OPA']] : []) as [RunView, string][]),
-    ['plan', 'Plan Log'],
-    ...((attrs['plan-only'] ? [] : [['apply', 'Apply Log']]) as [RunView, string][]),
+    ...((aiInfo?.present ? [['ai', 'AI']] : []) as [RunView, React.ReactNode][]),
+    ...((policyInfo?.present ? [['opa', 'OPA']] : []) as [RunView, React.ReactNode][]),
+    ['plan', planLabel],
+    ...((attrs['plan-only'] ? [] : [['apply', applyLabel]]) as [RunView, React.ReactNode][]),
     ['details', 'Details'],
   ]
   const availableViews = new Set(tabs.map((t) => t[0]))
@@ -1051,9 +1065,11 @@ function RunDetailPageInner() {
 
         {/* View tabs (#721) — Overview summarises the run; AI and OPA appear
             only when the run has them; each log gets its own full-height tab;
-            Details holds metadata / timeline / resource usage / run options. */}
-        <div className="border-b border-slate-700/50 mb-6 overflow-x-auto">
-          <div className="flex gap-1 -mb-px">
+            Details holds metadata / timeline / resource usage / run options.
+            Six tabs don't fit a phone, so the strip scrolls horizontally with a
+            right-edge fade cueing there's more (mobile only — desktop fits). */}
+        <div className="relative border-b border-slate-700/50 mb-6">
+          <div className="flex gap-1 -mb-px overflow-x-auto">
             {tabs.map(([v, label]) => (
               <button
                 key={v}
@@ -1069,6 +1085,9 @@ function RunDetailPageInner() {
               </button>
             ))}
           </div>
+          {/* Scroll cue: a right-edge fade on phones where the strip overflows;
+              hidden from `md` up where all tabs fit. Non-interactive. */}
+          <div className="md:hidden pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-slate-950 to-transparent" />
         </div>
 
         {view === 'overview' && (
