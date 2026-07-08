@@ -45,6 +45,7 @@ from terrapod.auth.pkce import s256_challenge
 from terrapod.auth.sessions import (
     create_session,
     get_session,
+    get_session_ttl,
     list_all_sessions,
     list_user_sessions,
     revoke_all_user_sessions,
@@ -102,6 +103,22 @@ class SessionInfo(BaseModel):
     last_active_at: str
     token_hint: str
     is_current: bool = False
+
+
+class SessionStatus(BaseModel):
+    """Live status of the caller's web session (#726).
+
+    The web session-expiry banner polls this to reconcile against the
+    server's TRUE remaining TTL rather than a stale client-cached expiry —
+    SSE-driven views slide the server session without emitting the
+    ``X-Session-Expires`` header, so the client clock drifts. ``ttl_seconds``
+    is the authoritative remaining lifetime read straight off Redis (no
+    slide); a 401 from this endpoint is the authoritative "session is gone"
+    signal that should trigger a re-login.
+    """
+
+    authenticated: bool
+    ttl_seconds: int
 
 
 # --- Endpoints ---
@@ -581,6 +598,26 @@ async def exchange_token(
 
 
 # --- Session management endpoints ---
+
+
+@router.get("/session", response_model=SessionStatus)
+async def session_status_endpoint(request: Request) -> SessionStatus:
+    """Return the caller's live session TTL for the expiry banner (#726).
+
+    Reads the true Redis TTL WITHOUT sliding the session, so the web client
+    can reconcile a stale local expiry against the server's real remaining
+    lifetime. A 401 (raised by ``_require_session``) means the session is
+    genuinely gone — that is the authoritative re-login signal, not a local
+    countdown. On the (shouldn't-happen) edge of a live session with no TTL,
+    fall back to the full configured lifetime rather than 0 so a transient
+    read never triggers a spurious logout; a genuinely-expired session
+    surfaces as the 401 above.
+    """
+    session = await _require_session(request)
+    ttl = await get_session_ttl(session.token)
+    if ttl is None:
+        ttl = settings.auth.session_ttl_hours * 3600
+    return SessionStatus(authenticated=True, ttl_seconds=ttl)
 
 
 @router.get("/sessions", response_model=list[SessionInfo])
