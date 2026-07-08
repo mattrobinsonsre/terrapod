@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { getStoredToken, createWorkspace, seedRun, seedStateVersion, seedRunTask, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, seedRun, seedStateVersion, seedRunTask, createRegistryModule, uniqueName } from '../helpers/api';
 
 /**
  * Responsive / mobile harness (#719).
@@ -241,5 +241,18 @@ test.describe('Responsive harness (phone viewport)', () => {
     await page.getByRole('button', { name: 'Delete' }).click();
     await expect.poll(() => deleteMsg, { timeout: 5_000 }).toContain('Delete run task');
     await expect(page.getByText(rtName)).toBeVisible();
+  });
+
+  test('registry module list renders as a card grid at phone width', async ({ page }) => {
+    // The registry list pages are responsive card grids (grid-cols-1 at phone),
+    // so a seeded module shows as a full-width card with no horizontal scroll.
+    const token = getStoredToken();
+    const modName = uniqueName('respmod').replace(/[^a-z0-9]/gi, '');
+    await createRegistryModule(token, modName, 'aws');
+
+    await page.goto('/registry/modules');
+    await expect(page.getByText(modName).first()).toBeVisible({ timeout: 15_000 });
+
+    await expectNoHorizontalPageScroll(page);
   });
 });
