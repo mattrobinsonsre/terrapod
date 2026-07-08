@@ -587,14 +587,14 @@ function RunDetailPageInner() {
   // onto the matching tab, so old links from the runs list and the
   // confirm-redirect keep working.
   const viewParam = searchParams.get('view')
-  const initialView: RunView =
-    viewParam === 'plan' || viewParam === 'apply' || viewParam === 'overview'
-      ? viewParam
-      : viewParam === 'logs' || tabParam === 'plan'
-        ? 'plan'
-        : tabParam === 'apply'
-          ? 'apply'
-          : 'overview'
+  const KNOWN_VIEWS: RunView[] = ['overview', 'ai', 'opa', 'plan', 'apply', 'details']
+  const initialView: RunView = KNOWN_VIEWS.includes(viewParam as RunView)
+    ? (viewParam as RunView)
+    : viewParam === 'logs' || tabParam === 'plan'
+      ? 'plan'
+      : tabParam === 'apply'
+        ? 'apply'
+        : 'overview'
   const [activeView, setActiveView] = useState<RunView>(initialView)
 
   const switchView = useCallback((view: RunView) => {
