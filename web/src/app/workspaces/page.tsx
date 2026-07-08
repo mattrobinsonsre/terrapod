@@ -1044,7 +1044,7 @@ function WorkspacesPageInner() {
                       <div className="flex flex-col gap-1.5">
                         <Link
                           href={`/workspaces/${ws.id}`}
-                          className="text-sm font-medium text-brand-400 hover:text-brand-300"
+                          className="text-sm font-medium text-brand-400 hover:text-brand-300 break-all"
                         >
                           {ws.attributes.name}
                         </Link>

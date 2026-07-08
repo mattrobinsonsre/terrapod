@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { forwardRef, useEffect, useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
@@ -183,8 +183,19 @@ function NavDropdown({
   )
 }
 
-/** A single link row inside a desktop dropdown. */
-function MenuLink({ item }: { item: NavItem }) {
+/**
+ * A single link row inside a desktop dropdown. Rendered as the `asChild`
+ * target of `DropdownMenu.Item`, so it MUST forward the ref and spread the
+ * props Radix's Slot injects (`role="menuitem"`, `tabindex`, the highlight /
+ * keyboard handlers, `data-*`). Dropping them — as an earlier version did by
+ * accepting only `{item}` — left the anchor with no `menuitem` role, breaking
+ * keyboard navigation and making the items invisible to assistive tech and to
+ * `getByRole('menuitem')`. `forwardRef` + `{...rest}` restores the contract.
+ */
+const MenuLink = forwardRef<
+  HTMLAnchorElement,
+  { item: NavItem } & React.AnchorHTMLAttributes<HTMLAnchorElement>
+>(function MenuLink({ item, className, ...rest }, ref) {
   const pathname = usePathname()
   const Icon = item.icon
   const cls =
@@ -192,10 +203,12 @@ function MenuLink({ item }: { item: NavItem }) {
   if (item.external) {
     return (
       <a
+        ref={ref}
         href={item.href}
         target="_blank"
         rel="noopener noreferrer"
-        className={`${cls} text-slate-300 hover:bg-slate-700 hover:text-slate-100`}
+        className={`${cls} text-slate-300 hover:bg-slate-700 hover:text-slate-100${className ? ' ' + className : ''}`}
+        {...rest}
       >
         <Icon size={16} />
         {item.label}
@@ -205,14 +218,16 @@ function MenuLink({ item }: { item: NavItem }) {
   const active = isPathActive(pathname, item.href)
   return (
     <Link
+      ref={ref}
       href={item.href}
-      className={`${cls} ${active ? 'text-brand-400' : 'text-slate-300 hover:bg-slate-700 hover:text-slate-100'}`}
+      className={`${cls} ${active ? 'text-brand-400' : 'text-slate-300 hover:bg-slate-700 hover:text-slate-100'}${className ? ' ' + className : ''}`}
+      {...rest}
     >
       <Icon size={16} />
       {item.label}
     </Link>
   )
-}
+})
 
 /** A section header in the mobile sheet. */
 function MobileSection({ label }: { label: string }) {
