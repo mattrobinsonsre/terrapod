@@ -242,4 +242,12 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect.poll(() => deleteMsg, { timeout: 5_000 }).toContain('Delete run task');
     await expect(page.getByText(rtName)).toBeVisible();
   });
+
+  test('catalog browse page renders without horizontal scroll at phone width', async ({ page }) => {
+    // The catalog browse page is a responsive card grid (or an empty state);
+    // either way it must not scroll horizontally on a phone.
+    await page.goto('/catalog');
+    await expect(page.getByRole('heading', { name: 'Service Catalog' })).toBeVisible({ timeout: 15_000 });
+    await expectNoHorizontalPageScroll(page);
+  });
 });
