@@ -215,6 +215,19 @@ Mobile is a **first-class target**, not an afterthought — a UI change that is
 not mobile-friendly is **not done** and must not merge. The full brief and the
 staged plan live in issue **#719**; the rules a contributor must follow:
 
+- **Two axes — width drives *layout*, pointer drives *touch-friendliness*.**
+  These are independent signals; never infer one from the other (a wide
+  tablet/foldable is touch; a narrow desktop window is not). **Viewport width**
+  governs layout density — cards↔table, tab-bar↔`<select>` picker, hidden
+  columns — and is expressed in **CSS** (`sm:`/`md:`/`lg:`, `@container`), or in
+  JS via `useIsMobile()` only where *layout behaviour* must branch.
+  **Pointer type** governs touch-friendliness — destructive-action `confirm()`
+  guards, avoiding nested scroll traps, tap-target sizing — via the `touch:` /
+  `fine:` CSS custom variants (in `globals.css`) or `useIsTouch()`
+  (`= matchMedia('(pointer: coarse)')`, reflecting the *primary* pointer, in
+  `web/src/lib/use-media-query.ts`). So the same page can be a roomy
+  desktop-width layout **and** touch-safe at once. Still **never** branch on the
+  user agent for either axis.
 - **One DRY, viewport-driven implementation.** No forked `Mobile*`/`Desktop*`
   component trees, and **never** branch on the user agent
   (`navigator.userAgent`, device-detect libraries, server-side "is this a
