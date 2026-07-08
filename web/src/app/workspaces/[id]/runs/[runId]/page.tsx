@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Convert from 'ansi-to-html'
@@ -15,7 +15,7 @@ import { ResourceUsage } from '@/components/resource-usage'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
-import { ChevronsDown, ChevronsUp, ArrowDownToLine, RefreshCw } from 'lucide-react'
+import { ChevronsUp, ArrowDownToLine, RefreshCw } from 'lucide-react'
 
 interface RunActions {
   'is-confirmable': boolean
@@ -109,6 +109,20 @@ function downloadFile(content: string, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+/**
+ * Log viewer (#722). The log is rendered inline with **no inner scrollbar** —
+ * the page itself is the scroll container, so the newest streaming lines can
+ * never be trapped inside an off-screen fixed-height box (the old
+ * `max-h-[600px] overflow-y-auto` bug: on a tall viewport the tail lived
+ * inside a small pane below the fold, and the pane growing from "no output"
+ * reflowed the page and shifted the window). Instead:
+ *  - the `<pre>` grows with the content and wraps long lines (no horizontal
+ *    scroll either — mobile-friendly);
+ *  - "follow" pins the **window** to the tail. We scroll in `useLayoutEffect`
+ *    (before paint) so an append/resize never shows a visible jump;
+ *  - at-bottom is measured against the **window**, so scrolling up to read
+ *    disengages follow and a floating "Jump to latest" affordance snaps back.
+ */
 function LogPanel({
   log,
   precomputedHtml,
@@ -129,9 +143,11 @@ function LogPanel({
   onRefresh?: () => void
 }) {
   const [colorMode, setColorMode] = useState(true)
-  const [following, setFollowing] = useState(true)
+  // Follow the tail by default while streaming; a static (finished) log opens
+  // at the top so the operator reads from the start.
+  const [following, setFollowing] = useState(isStreaming)
+  const [atBottom, setAtBottom] = useState(true)
   const [copied, setCopied] = useState(false)
-  const preRef = useRef<HTMLPreElement>(null)
 
   const cleanLog = useMemo(() => (log ? stripStxEtx(log) : null), [log])
 
@@ -147,42 +163,50 @@ function LogPanel({
     return stripAnsi(cleanLog)
   }, [cleanLog])
 
-  // Auto-scroll to bottom when following and content changes
+  const isWindowAtBottom = useCallback(() => {
+    const doc = document.documentElement
+    return window.innerHeight + window.scrollY >= doc.scrollHeight - 80
+  }, [])
+
+  const scrollWindowToBottom = useCallback((smooth = false) => {
+    window.scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior: smooth ? 'smooth' : 'auto',
+    })
+  }, [])
+
+  // Pin the window to the tail when following and the content changes. Runs in
+  // useLayoutEffect (synchronously before the browser paints) so a fresh chunk
+  // or the panel's own resize never flashes an intermediate scroll position.
+  useLayoutEffect(() => {
+    if (following) scrollWindowToBottom(false)
+  }, [log, colorMode, following, scrollWindowToBottom])
+
+  // Track the window's position so scrolling up to read disengages follow and
+  // scrolling back to the bottom re-engages it.
   useEffect(() => {
-    if (following && preRef.current) {
-      preRef.current.scrollTop = preRef.current.scrollHeight
+    const onScroll = () => {
+      const bottom = isWindowAtBottom()
+      setAtBottom(bottom)
+      setFollowing(bottom)
     }
-  }, [log, following])
-
-  const handleScroll = useCallback(() => {
-    const el = preRef.current
-    if (!el) return
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
-    setFollowing(atBottom)
-  }, [])
-
-  const scrollToTop = useCallback(() => {
-    preRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [])
-
-  const scrollToEnd = useCallback(() => {
-    if (preRef.current) {
-      preRef.current.scrollTo({ top: preRef.current.scrollHeight, behavior: 'smooth' })
-    }
-  }, [])
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [isWindowAtBottom])
 
   if (loading) {
     return (
-      <div className="bg-slate-900 rounded-lg border border-slate-700/50 overflow-hidden">
-        <div className="p-6"><LoadingSpinner /></div>
+      <div className="bg-slate-900 rounded-lg border border-slate-700/50 p-6">
+        <LoadingSpinner />
       </div>
     )
   }
 
   if (!log) {
     return (
-      <div className="bg-slate-900 rounded-lg border border-slate-700/50 overflow-hidden">
-        <div className="p-6 text-sm text-slate-500">{emptyMessage}</div>
+      <div className="bg-slate-900 rounded-lg border border-slate-700/50 p-6 text-sm text-slate-500">
+        {emptyMessage}
       </div>
     )
   }
@@ -191,7 +215,7 @@ function LogPanel({
 
   return (
     <div className="bg-slate-900 rounded-lg border border-slate-700/50 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-700/50 bg-slate-800/50">
+      <div className="flex items-center justify-between gap-2 flex-wrap px-4 py-2 border-b border-slate-700/50 bg-slate-800/50">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setColorMode(true)}
@@ -213,6 +237,12 @@ function LogPanel({
           >
             Plain
           </button>
+          {isStreaming && (
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-slate-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              live
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {onRefresh && (
@@ -225,41 +255,6 @@ function LogPanel({
               Refresh
             </button>
           )}
-          {isStreaming && (
-            <button
-              onClick={() => {
-                setFollowing(f => !f)
-                if (!following && preRef.current) {
-                  preRef.current.scrollTop = preRef.current.scrollHeight
-                }
-              }}
-              className={`px-2.5 py-1 text-xs rounded font-medium transition-colors inline-flex items-center gap-1 ${
-                following
-                  ? 'bg-brand-600 text-white'
-                  : 'bg-slate-700 text-slate-400 hover:text-slate-200'
-              }`}
-              title={following ? 'Following output — click to stop' : 'Click to follow output'}
-            >
-              <ArrowDownToLine className="w-3 h-3" />
-              Follow
-            </button>
-          )}
-          <button
-            onClick={scrollToEnd}
-            className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
-            title="Jump to end"
-          >
-            <ChevronsDown className="w-3 h-3" />
-            End
-          </button>
-          <button
-            onClick={scrollToTop}
-            className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
-            title="Jump to top"
-          >
-            <ChevronsUp className="w-3 h-3" />
-            Top
-          </button>
           {plainContent && (
             <button
               onClick={() => {
@@ -292,20 +287,55 @@ function LogPanel({
 
       {colorMode ? (
         <pre
-          ref={preRef}
-          onScroll={handleScroll}
-          className="p-4 text-sm text-slate-300 font-mono overflow-x-auto whitespace-pre-wrap max-h-[600px] overflow-y-auto"
+          data-testid={`log-pre-${phase}`}
+          className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words"
           dangerouslySetInnerHTML={{ __html: htmlContent }}
         />
       ) : (
         <pre
-          ref={preRef}
-          onScroll={handleScroll}
-          className="p-4 text-sm text-slate-300 font-mono overflow-x-auto whitespace-pre-wrap max-h-[600px] overflow-y-auto"
+          data-testid={`log-pre-${phase}`}
+          className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words"
         >
           {plainContent}
         </pre>
       )}
+
+      {/* Floating tail controls — fixed to the viewport so they're always
+          reachable no matter how far the page has scrolled. "Jump to latest"
+          appears whenever the window isn't already at the tail; it re-engages
+          follow. "Top" is always offered for a long finished log. */}
+      <div className="fixed bottom-6 right-6 z-20 flex flex-col items-end gap-2">
+        {!atBottom && (
+          <button
+            onClick={() => {
+              setFollowing(true)
+              scrollWindowToBottom(true)
+            }}
+            className="px-3 py-2 rounded-full text-xs font-medium shadow-lg bg-brand-600 hover:bg-brand-500 text-white transition-colors inline-flex items-center gap-1.5"
+            title="Jump to the newest output and follow it"
+          >
+            <ArrowDownToLine className="w-3.5 h-3.5" />
+            {isStreaming ? 'Jump to latest' : 'Jump to end'}
+          </button>
+        )}
+        {atBottom && isStreaming && (
+          <span
+            className="px-3 py-2 rounded-full text-xs font-medium shadow-lg bg-slate-800/90 text-slate-300 border border-slate-700 inline-flex items-center gap-1.5"
+            title="Following live output"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            Following
+          </span>
+        )}
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="px-3 py-2 rounded-full text-xs font-medium shadow-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors inline-flex items-center gap-1.5"
+          title="Jump to top"
+        >
+          <ChevronsUp className="w-3.5 h-3.5" />
+          Top
+        </button>
+      </div>
     </div>
   )
 }
@@ -358,6 +388,28 @@ function RunDetailPageInner() {
   const [activeSection, setActiveSection] = useState<'plan' | 'apply'>(
     tabParam === 'apply' ? 'apply' : 'plan'
   )
+
+  // Top-level view (#721): the run page is split into three focused,
+  // URL-driven views instead of one long scroll. Deep-link preservation — a
+  // legacy `?tab=plan|apply` link with no explicit `?view` lands on Logs (that
+  // is where the plan/apply tabs used to live), so old links from the runs
+  // list and the confirm-redirect keep working.
+  const viewParam = searchParams.get('view')
+  const [activeView, setActiveView] = useState<'overview' | 'logs' | 'details'>(
+    viewParam === 'logs' || viewParam === 'details'
+      ? viewParam
+      : tabParam
+        ? 'logs'
+        : 'overview'
+  )
+
+  const switchView = useCallback((view: 'overview' | 'logs' | 'details') => {
+    setActiveView(view)
+    const url = new URL(window.location.href)
+    url.searchParams.set('view', view)
+    window.history.replaceState({}, '', url.toString())
+    window.scrollTo({ top: 0 })
+  }, [])
 
   const switchSection = useCallback((section: 'plan' | 'apply') => {
     setActiveSection(section)
@@ -422,6 +474,24 @@ function RunDetailPageInner() {
       loadApplyLog(true).finally(() => setApplyLogLoading(false))
     }
   }, [run?.id, run?.attributes.status])
+
+  // Poll the streaming phase's log on a short interval (#722). SSE
+  // `log_updated` events are the primary trigger, but they can be missed
+  // (dropped connection, coalesced bursts) and only fire when the server
+  // relays new bytes; a lightweight incremental poll guarantees the client
+  // catches up even if an event is lost. The fetch is offset-based and
+  // fetch-locked, so a poll with nothing new is a cheap empty read. It only
+  // runs while the relevant phase is actively streaming.
+  useEffect(() => {
+    const status = run?.attributes.status
+    if (status !== 'planning' && status !== 'applying') return
+    const handle = window.setInterval(() => {
+      if (status === 'planning') loadPlanLog()
+      else if (status === 'applying') loadApplyLog()
+    }, 2500)
+    return () => window.clearInterval(handle)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadPlanLog/loadApplyLog are stable function declarations
+  }, [run?.attributes.status])
 
   async function fetchLogUrl(phase: 'plan' | 'apply'): Promise<string | null> {
     const urlRef = phase === 'plan' ? planLogUrl : applyLogUrl
@@ -537,9 +607,10 @@ function RunDetailPageInner() {
           return
         }
       }
-      // Confirm = applies — jump straight to the apply tab so the user sees
-      // the apply log streaming instead of the plan log they were just on.
+      // Confirm = applies — jump straight to the Logs view's apply tab so the
+      // user watches the apply log stream instead of staying on the overview.
       if (action === 'confirm') {
+        switchView('logs')
         switchSection('apply')
       }
       await loadRun()
@@ -613,6 +684,33 @@ function RunDetailPageInner() {
 
         {error && <ErrorBanner message={error} />}
 
+        {/* View tabs (#721) — the run detail is split into three focused,
+            URL-driven views instead of one long scroll. Overview is the
+            decision surface (status, change summary, policy, actions, AI);
+            Logs is the full-height streaming surface; Details holds the
+            metadata / timeline / resource usage. Same components adapt to a
+            drill-down on narrow viewports in the mobile pass. */}
+        <div className="border-b border-slate-700/50 mb-6">
+          <div className="flex gap-1 -mb-px">
+            {(['overview', 'logs', 'details'] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => switchView(v)}
+                aria-current={activeView === v ? 'page' : undefined}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
+                  activeView === v
+                    ? 'border-brand-500 text-brand-400'
+                    : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {activeView === 'overview' && (
+        <>
         {/* Destroy run warning */}
         {attrs['is-destroy'] && (
           <div className="mb-6 p-4 bg-red-900/20 rounded-lg border border-red-800/50">
@@ -661,21 +759,9 @@ function RunDetailPageInner() {
           </div>
         )}
 
-        {/* Resource usage panel (#430) — peak memory/CPU alongside the
-            workspace's requested/limit, plus an OOM tag when the
-            listener observed an OOMKilled / exit-137 termination. The
-            ResourceUsage component returns null when no peak data is
-            present (pre-#430 runs), so this block is safe to render
-            unconditionally for new runs. */}
-        <div className="mb-6">
-          <ResourceUsage
-            resourceMemory={attrs['resource-memory']}
-            peakMemoryBytes={attrs['peak-memory-bytes']}
-            runnerExitStatus={attrs['runner-exit-status']}
-          />
-        </div>
-
-        {/* OPA policy evaluations (#343) */}
+        {/* OPA policy evaluations (#343) — kept on Overview: a mandatory
+            policy failure blocks apply and carries the admin override action,
+            so it belongs with the decision controls. */}
         <PolicyPanel runId={runId} runStatus={attrs.status} onChanged={loadRun} />
 
         {/* No-changes notice — explains why Confirm & Apply isn't shown.
@@ -750,6 +836,22 @@ function RunDetailPageInner() {
         {/* AI plan summary / failure analysis (#401) — renders nothing
             when the feature is off or no row exists for this plan. */}
         <PlanAiSummary runId={runId.replace(/^run-/, '')} refreshKey={aiSummaryRefresh} />
+        </>
+        )}
+
+        {activeView === 'details' && (
+        <>
+        {/* Resource usage panel (#430) — peak memory/CPU alongside the
+            workspace's requested/limit, plus an OOM tag when the listener
+            observed an OOMKilled / exit-137 termination. Returns null when no
+            peak data is present (pre-#430 runs). */}
+        <div className="mb-6">
+          <ResourceUsage
+            resourceMemory={attrs['resource-memory']}
+            peakMemoryBytes={attrs['peak-memory-bytes']}
+            runnerExitStatus={attrs['runner-exit-status']}
+          />
+        </div>
 
         {/* Run metadata */}
         <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6 mb-6">
@@ -871,8 +973,12 @@ function RunDetailPageInner() {
               ))}
           </div>
         </div>
+        </>
+        )}
 
-        {/* Log tabs */}
+        {activeView === 'logs' && (
+        <>
+        {/* Plan / Apply sub-tabs */}
         <div className="border-b border-slate-700/50 mb-4">
           <div className="flex gap-1 -mb-px">
             <button
@@ -926,6 +1032,8 @@ function RunDetailPageInner() {
             isStreaming={attrs.status === 'applying'}
             onRefresh={() => loadApplyLog(true)}
           />
+        )}
+        </>
         )}
       </main>
     </>
