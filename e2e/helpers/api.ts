@@ -355,6 +355,54 @@ export async function seedRun(
   return (await runRes.json()).data.id as string;
 }
 
+/** Seed a workspace Terraform variable. Returns the variable id. */
+export async function seedVariable(
+  token: string,
+  workspaceId: string,
+  key: string,
+  value = 'seed-value',
+): Promise<string> {
+  const res = await fetch(`${API_URL}/api/v2/workspaces/${workspaceId}/vars`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/vnd.api+json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      data: {
+        type: 'vars',
+        attributes: { key, value, category: 'terraform', sensitive: false, hcl: false },
+      },
+    }),
+  });
+  if (!res.ok) throw new Error(`Create variable failed: ${res.status} ${await res.text()}`);
+  return (await res.json()).data.id as string;
+}
+
+/** Seed a workspace run task (enabled). Returns the run-task id. */
+export async function seedRunTask(
+  token: string,
+  workspaceId: string,
+  name: string,
+  url = 'https://run-tasks.example.com/validate',
+): Promise<string> {
+  const res = await fetch(`${API_URL}/api/terrapod/v1/workspaces/${workspaceId}/run-tasks`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/vnd.api+json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      data: {
+        type: 'run-tasks',
+        attributes: { name, url, stage: 'post_plan', 'enforcement-level': 'mandatory', enabled: true },
+      },
+    }),
+  });
+  if (!res.ok) throw new Error(`Create run task failed: ${res.status} ${await res.text()}`);
+  return (await res.json()).data.id as string;
+}
+
 /**
  * Seed a state-version record on a workspace (the record alone is enough to
  * render the State tab; content upload is not needed for a UI-render test).

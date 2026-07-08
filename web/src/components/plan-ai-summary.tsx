@@ -21,6 +21,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Sparkles, AlertTriangle, Info, ShieldAlert, ShieldX, RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
+import { useIsTouch } from '@/lib/use-media-query'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { PlanSummaryChat } from '@/components/plan-summary-chat'
 
@@ -73,6 +74,7 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
   const [transportError, setTransportError] = useState<string | null>(null)
   const [regenerating, setRegenerating] = useState(false)
   const [regenerateError, setRegenerateError] = useState<string | null>(null)
+  const isTouch = useIsTouch()
 
   const load = useCallback(async () => {
     try {
@@ -102,9 +104,10 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
   }, [load, refreshKey])
 
   const regenerate = useCallback(async () => {
-    // Skip confirmation modal: errored/skipped clicks are clearly an
-    // operator asking for a retry; ready→regen is also unambiguous —
-    // they're saying "this one wasn't good enough".
+    // On a precise pointer a regenerate click is unambiguous ("this one wasn't
+    // good enough"); on touch it re-runs the model on a mis-tap, so guard it
+    // (#719 tier-2 mutation → touch-only confirm).
+    if (isTouch && !window.confirm('Regenerate the AI analysis? This runs the model again.')) return
     setRegenerating(true)
     setRegenerateError(null)
     try {
@@ -136,7 +139,7 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
     } finally {
       setRegenerating(false)
     }
-  }, [runId])
+  }, [runId, isTouch])
 
   // When the feature is globally disabled (no row will ever appear) we
   // render nothing — operators on a non-AI deployment don't see this

@@ -100,6 +100,13 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
     },
     {
+      // The precise-pointer half of the #719 confirm() guards (Desktop Chrome →
+      // fine pointer). The coarse-pointer half is in the 'responsive' project.
+      name: 'confirm-guards',
+      testMatch: 'confirm-guards.spec.ts',
+      use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },
+    },
+    {
       name: 'ai-summary',
       testMatch: 'ai-summary.spec.ts',
       use: { ...devices['Desktop Chrome'], storageState: ADMIN_AUTH },

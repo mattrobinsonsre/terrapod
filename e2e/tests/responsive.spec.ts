@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { getStoredToken, createWorkspace, seedRun, seedStateVersion, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, seedRun, seedStateVersion, seedRunTask, uniqueName } from '../helpers/api';
 
 /**
  * Responsive / mobile harness (#719).
@@ -207,5 +207,35 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page.getByRole('checkbox', { name: /Select cv-.* for compare/ }).first()).toBeVisible();
 
     await expectNoHorizontalPageScroll(page);
+  });
+
+  test('touch: both a reversible toggle and an irreversible delete prompt confirm()', async ({ page }) => {
+    // #719 two-tier confirm policy, coarse-pointer half. On touch EVERY mutation
+    // prompts: tier-2 (toggle) — which on a precise pointer would NOT — and
+    // tier-1 (delete). This Pixel project is the only proof of the touch path,
+    // since the maintainer doesn't test on a real device.
+    const token = getStoredToken();
+    const wsId = await createWorkspace(token, uniqueName('confirm-touch'));
+    const rtName = uniqueName('rt');
+    await seedRunTask(token, wsId, rtName);
+
+    await page.goto(`/workspaces/${wsId}?tab=run-tasks`);
+    await expect(page.getByText(rtName)).toBeVisible({ timeout: 15_000 });
+
+    // Tier 2 — the Disable toggle DOES prompt on touch; dismiss keeps it enabled.
+    const toggleDialogP = page.waitForEvent('dialog');
+    await page.getByRole('button', { name: 'Disable' }).click();
+    const toggleDialog = await toggleDialogP;
+    expect(toggleDialog.message()).toContain('Disable this run task');
+    await toggleDialog.dismiss();
+    await expect(page.getByText('Enabled', { exact: true })).toBeVisible();
+
+    // Tier 1 — delete prompts on touch too; dismiss keeps the row.
+    const deleteDialogP = page.waitForEvent('dialog');
+    await page.getByRole('button', { name: 'Delete' }).click();
+    const deleteDialog = await deleteDialogP;
+    expect(deleteDialog.message()).toContain('Delete run task');
+    await deleteDialog.dismiss();
+    await expect(page.getByText(rtName)).toBeVisible();
   });
 });

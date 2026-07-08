@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
-import Link from 'next/link'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
@@ -305,6 +304,12 @@ function WorkspaceDetailContent() {
 
   const isTouch = useIsTouch()
 
+  // #719 two-tier confirm policy (see AGENTS.md → Responsive → Touch model):
+  // an irreversible delete/remove prompts in BOTH modes; any other single-tap
+  // mutation prompts on touch only (a mis-tap is easy on a phone).
+  const confirmDelete = (msg: string) => window.confirm(msg)
+  const confirmTouchMutation = (msg: string) => !isTouch || window.confirm(msg)
+
   // Runs
   const [runs, setRuns] = useState<RunItem[]>([])
   const [runsLoading, setRunsLoading] = useState(false)
@@ -418,7 +423,6 @@ function WorkspaceDetailContent() {
   const [notifEmails, setNotifEmails] = useState('')
   const [notifTriggers, setNotifTriggers] = useState<Set<string>>(new Set())
   const [addingNotif, setAddingNotif] = useState(false)
-  const [deleteNotifId, setDeleteNotifId] = useState<string | null>(null)
   const [verifyingId, setVerifyingId] = useState<string | null>(null)
   const [expandedNotifId, setExpandedNotifId] = useState<string | null>(null)
 
@@ -432,8 +436,6 @@ function WorkspaceDetailContent() {
   const [rtEnforcement, setRtEnforcement] = useState<string>('mandatory')
   const [rtHmacKey, setRtHmacKey] = useState('')
   const [addingRunTask, setAddingRunTask] = useState(false)
-  const [deleteRtId, setDeleteRtId] = useState<string | null>(null)
-  const [deleteVarId, setDeleteVarId] = useState<string | null>(null)
 
   // Sorting for runs tab
   type RunSortKey = 'id' | 'status' | 'type' | 'source' | 'created-by' | 'created-at'
@@ -785,6 +787,8 @@ function WorkspaceDetailContent() {
   }
 
   async function revokeRemoteStateConsumer(edgeId: string) {
+    // Irreversible: the consumer loses access to this workspace's state.
+    if (!confirmDelete('Remove this remote state sharing? The consumer will lose access to this state.')) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/remote-state-consumers/${edgeId}`, { method: 'DELETE' })
       if (!res.ok) {
@@ -858,6 +862,8 @@ function WorkspaceDetailContent() {
   }
 
   async function removeRunTrigger(triggerId: string) {
+    // Irreversible: removes the cross-workspace trigger edge.
+    if (!confirmDelete('Remove this run trigger?')) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/run-triggers/${triggerId}`, { method: 'DELETE' })
       if (!res.ok) {
@@ -922,6 +928,7 @@ function WorkspaceDetailContent() {
   }
 
   async function handleToggleRunTask(rt: RunTaskItem) {
+    if (!confirmTouchMutation(rt.attributes.enabled ? 'Disable this run task?' : 'Enable this run task?')) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/run-tasks/${rt.id}`, {
         method: 'PATCH',
@@ -936,10 +943,11 @@ function WorkspaceDetailContent() {
   }
 
   async function handleDeleteRunTask(rtId: string) {
+    // Irreversible delete → confirm in both modes.
+    if (!confirmDelete(`Delete run task "${runTasks.find(r => r.id === rtId)?.attributes.name ?? ''}"?`)) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/run-tasks/${rtId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete')
-      setDeleteRtId(null)
       await loadRunTasks()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete run task')
@@ -1065,6 +1073,7 @@ function WorkspaceDetailContent() {
   async function handleLockToggle() {
     if (!workspace) return
     const action = workspace.attributes.locked ? 'unlock' : 'lock'
+    if (!confirmTouchMutation(action === 'unlock' ? 'Unlock this workspace?' : 'Lock this workspace?')) return
     try {
       // lock/unlock are TFE V2 CLI-contract endpoints — only at /api/v2/.
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/actions/${action}`, {
@@ -1303,10 +1312,11 @@ function WorkspaceDetailContent() {
   }
 
   async function handleDeleteVariable(varId: string) {
+    // Irreversible delete → confirm in both modes.
+    if (!confirmDelete(`Delete variable "${variables.find(v => v.id === varId)?.attributes.key ?? ''}"?`)) return
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/vars/${varId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete variable')
-      setDeleteVarId(null)
       await loadVariables()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete variable')
@@ -1499,6 +1509,7 @@ function WorkspaceDetailContent() {
   }
 
   async function handleToggleNotif(nc: NotificationConfig) {
+    if (!confirmTouchMutation(nc.attributes.enabled ? 'Disable this notification?' : 'Enable this notification?')) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/notification-configurations/${nc.id}`, {
         method: 'PATCH',
@@ -1513,10 +1524,11 @@ function WorkspaceDetailContent() {
   }
 
   async function handleDeleteNotif(ncId: string) {
+    // Irreversible delete → confirm in both modes.
+    if (!confirmDelete(`Delete notification "${notifications.find(n => n.id === ncId)?.attributes.name ?? ''}"?`)) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/notification-configurations/${ncId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete')
-      setDeleteNotifId(null)
       await loadNotifications()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete notification')
@@ -2652,14 +2664,7 @@ function WorkspaceDetailContent() {
                             <td className="px-4 py-3 text-right">
                               <div className="flex justify-end gap-2">
                                 <button onClick={() => startEditingVar(v)} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
-                                {deleteVarId === v.id ? (
-                                  <>
-                                    <button onClick={() => setDeleteVarId(null)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
-                                    <button onClick={() => handleDeleteVariable(v.id)} className="text-xs text-red-400 hover:text-red-300">Confirm</button>
-                                  </>
-                                ) : (
-                                  <button onClick={() => setDeleteVarId(v.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
-                                )}
+                                <button onClick={() => handleDeleteVariable(v.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
                               </div>
                             </td>
                           )}
@@ -2735,12 +2740,8 @@ function WorkspaceDetailContent() {
                         {perms['can-update-variable'] && (
                           <div className="flex gap-2">
                             <button onClick={() => startEditingVar(v)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Edit</button>
-                            {/* Native confirm on delete — a destructive tap on a
-                                phone deserves a guard. */}
                             <button
-                              onClick={() => {
-                                if (window.confirm(`Delete variable "${v.attributes.key}"?`)) handleDeleteVariable(v.id)
-                              }}
+                              onClick={() => handleDeleteVariable(v.id)}
                               className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"
                             >
                               Delete
@@ -3690,14 +3691,7 @@ function WorkspaceDetailContent() {
                             </button>
                           )}
                           {perms['can-update'] && (
-                            deleteNotifId === nc.id ? (
-                              <>
-                                <button onClick={() => setDeleteNotifId(null)} className="text-xs text-slate-400 hover:text-slate-200 px-1">Cancel</button>
-                                <button onClick={() => handleDeleteNotif(nc.id)} className="text-xs text-red-400 hover:text-red-300 px-1">Confirm</button>
-                              </>
-                            ) : (
-                              <button onClick={() => setDeleteNotifId(nc.id)} className="text-xs text-red-400 hover:text-red-300 px-1">Delete</button>
-                            )
+                            <button onClick={() => handleDeleteNotif(nc.id)} className="text-xs text-red-400 hover:text-red-300 px-1">Delete</button>
                           )}
                         </div>
                       </div>
@@ -3823,28 +3817,12 @@ function WorkspaceDetailContent() {
                           <button onClick={() => handleToggleRunTask(rt)} className="text-xs text-brand-400 hover:text-brand-300 rounded-lg bg-slate-700 px-3 py-1.5 sm:rounded-none sm:bg-transparent sm:px-1 sm:py-0">
                             {a.enabled ? 'Disable' : 'Enable'}
                           </button>
-                          {deleteRtId === rt.id ? (
-                            <>
-                              <button onClick={() => setDeleteRtId(null)} className="text-xs text-slate-400 hover:text-slate-200 rounded-lg bg-slate-700 px-3 py-1.5 sm:rounded-none sm:bg-transparent sm:px-1 sm:py-0">Cancel</button>
-                              <button onClick={() => handleDeleteRunTask(rt.id)} className="text-xs text-red-400 hover:text-red-300 rounded-lg bg-red-900/40 px-3 py-1.5 sm:rounded-none sm:bg-transparent sm:px-1 sm:py-0">Confirm</button>
-                            </>
-                          ) : (
-                            // Touch: a native confirm() (the inline two-step
-                            // swap is fiddly on a phone); desktop keeps the
-                            // inline Cancel/Confirm.
-                            <button
-                              onClick={() => {
-                                if (isTouch) {
-                                  if (window.confirm(`Delete run task "${a.name}"?`)) handleDeleteRunTask(rt.id)
-                                } else {
-                                  setDeleteRtId(rt.id)
-                                }
-                              }}
-                              className="text-xs text-red-400 hover:text-red-300 rounded-lg bg-red-900/40 px-3 py-1.5 sm:rounded-none sm:bg-transparent sm:px-1 sm:py-0"
-                            >
-                              Delete
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleDeleteRunTask(rt.id)}
+                            className="text-xs text-red-400 hover:text-red-300 rounded-lg bg-red-900/40 px-3 py-1.5 sm:rounded-none sm:bg-transparent sm:px-1 sm:py-0"
+                          >
+                            Delete
+                          </button>
                         </div>
                       )}
                     </div>

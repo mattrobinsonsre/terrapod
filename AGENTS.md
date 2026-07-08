@@ -247,6 +247,19 @@ staged plan live in issue **#719**; the rules a contributor must follow:
   at any width; **URL is the source of truth for tab/view state** (it must
   survive reload / back / deep-link — no `useState`-only tabs). Prefer
   drill-down to a route over cramming panels into one dense page.
+- **Confirmation guards on mutating actions (hard).** Two tiers, and they are
+  not the same: **(1) an irreversible destructive action — a delete or remove
+  with no undo (delete variable / notification / run task, remove run trigger /
+  remote-state consumer, delete state version, delete workspace) — MUST prompt a
+  `confirm()` in BOTH modes** (touch *and* precise pointer). Losing data on a
+  single stray click is a desktop hazard too, not just a touch one. **(2) Any
+  other single-tap mutation that is reversible or lower-stakes (enable/disable
+  toggles, lock/unlock, queue a destroy run, …) MUST prompt a `confirm()` on
+  touch** (via `useIsTouch()`), where a mis-tap is easy; on a precise pointer it
+  may proceed without one. Do NOT rely on a bespoke inline two-step
+  (Delete→Confirm swap) as the guard — use the native `confirm()` so the tiers
+  stay uniform. Form *submits* after deliberate data entry (create/edit save)
+  are not "single-tap mutations" and don't need a guard.
 - **Enforcement (this is what blocks non-mobile-friendly changes):** the
   `responsive` Playwright project runs the suite at a **phone viewport**
   (`e2e/tests/responsive.spec.ts`) and is the **mobile guard**; the existing
