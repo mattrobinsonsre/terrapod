@@ -139,4 +139,24 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page).toHaveURL(/[?&]view=plan/);
     await expectNoHorizontalPageScroll(page);
   });
+
+  test('workspace runs list becomes tappable cards at phone width', async ({ page }) => {
+    // The 7-column runs table is unreadable on a phone, so below md it renders
+    // as stacked cards driven by the same data (#719 Stage 2). The desktop
+    // table header is hidden; the seeded run shows as a card that is itself a
+    // link to the run (one big tap target).
+    const token = getStoredToken();
+    const wsName = uniqueName('resp-runs');
+    const wsId = await createWorkspace(token, wsName);
+    await seedRun(token, wsId);
+
+    await page.goto(`/workspaces/${wsId}?tab=runs`);
+
+    // The desktop table's column header is hidden at phone width...
+    await expect(page.getByRole('columnheader', { name: 'Run ID' })).toBeHidden();
+    // ...and the run renders as a card linking to the run detail page.
+    await expect(page.locator('a[href*="/runs/run-"]').first()).toBeVisible({ timeout: 15_000 });
+
+    await expectNoHorizontalPageScroll(page);
+  });
 });
