@@ -26,7 +26,7 @@ interface ResourceUsageProps {
 
 // Parse a K8s memory quantity string to bytes. Supports Ei/Pi/Ti/Gi/Mi/Ki
 // (binary) and E/P/T/G/M/K (decimal). Returns NaN on parse failure.
-function parseMemoryToBytes(s: string): number {
+export function parseMemoryToBytes(s: string): number {
   const m = /^([0-9]+(?:\.[0-9]+)?)([EPTGMK]i?)?$/.exec(s.trim())
   if (!m) return NaN
   const n = parseFloat(m[1])
@@ -50,7 +50,7 @@ function parseMemoryToBytes(s: string): number {
 }
 
 // Render a byte count using the smallest binary unit that gives a value ≥ 1.
-function humanBytes(n: number): string {
+export function humanBytes(n: number): string {
   if (!Number.isFinite(n)) return '?'
   for (const [unit, scale] of [
     ['Gi', 1 << 30],
