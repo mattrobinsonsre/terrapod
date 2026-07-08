@@ -3793,10 +3793,14 @@ function WorkspaceDetailContent() {
                 {runTasks.map((rt) => {
                   const a = rt.attributes
                   return (
-                    <div key={rt.id} className="bg-slate-800/50 rounded-lg border border-slate-700/50 px-4 py-3 flex items-center gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-slate-200 truncate">{a.name}</span>
+                    <div key={rt.id} className="bg-slate-800/50 rounded-lg border border-slate-700/50 px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <div className="min-w-0 sm:flex-1">
+                        {/* Below sm the name takes its own line (w-full) so the
+                            badges wrap beneath it instead of squeezing it to an
+                            ellipsis; sm+ they share one line and the name
+                            truncates as before. */}
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <span className="w-full sm:w-auto text-sm font-medium text-slate-200 break-words sm:truncate">{a.name}</span>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${stageBadge(a.stage)}`}>
                             {a.stage.replace('_', ' ')}
                           </span>
@@ -3809,20 +3813,37 @@ function WorkspaceDetailContent() {
                             {a.enabled ? 'Enabled' : 'Disabled'}
                           </span>
                         </div>
-                        <div className="text-xs text-slate-500 truncate">{a.url}</div>
+                        <div className="text-xs text-slate-500 break-all sm:truncate">{a.url}</div>
                       </div>
                       {perms['can-update'] && (
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button onClick={() => handleToggleRunTask(rt)} className="text-xs text-brand-400 hover:text-brand-300 px-1">
+                        // Tap-friendly buttons below sm (px-3 py-1.5 pill); sm+
+                        // revert to the compact inline text links (desktop
+                        // unchanged).
+                        <div className="flex items-center gap-2 sm:gap-1.5 sm:shrink-0">
+                          <button onClick={() => handleToggleRunTask(rt)} className="text-xs text-brand-400 hover:text-brand-300 rounded-lg bg-slate-700 px-3 py-1.5 sm:rounded-none sm:bg-transparent sm:px-1 sm:py-0">
                             {a.enabled ? 'Disable' : 'Enable'}
                           </button>
                           {deleteRtId === rt.id ? (
                             <>
-                              <button onClick={() => setDeleteRtId(null)} className="text-xs text-slate-400 hover:text-slate-200 px-1">Cancel</button>
-                              <button onClick={() => handleDeleteRunTask(rt.id)} className="text-xs text-red-400 hover:text-red-300 px-1">Confirm</button>
+                              <button onClick={() => setDeleteRtId(null)} className="text-xs text-slate-400 hover:text-slate-200 rounded-lg bg-slate-700 px-3 py-1.5 sm:rounded-none sm:bg-transparent sm:px-1 sm:py-0">Cancel</button>
+                              <button onClick={() => handleDeleteRunTask(rt.id)} className="text-xs text-red-400 hover:text-red-300 rounded-lg bg-red-900/40 px-3 py-1.5 sm:rounded-none sm:bg-transparent sm:px-1 sm:py-0">Confirm</button>
                             </>
                           ) : (
-                            <button onClick={() => setDeleteRtId(rt.id)} className="text-xs text-red-400 hover:text-red-300 px-1">Delete</button>
+                            // Touch: a native confirm() (the inline two-step
+                            // swap is fiddly on a phone); desktop keeps the
+                            // inline Cancel/Confirm.
+                            <button
+                              onClick={() => {
+                                if (isTouch) {
+                                  if (window.confirm(`Delete run task "${a.name}"?`)) handleDeleteRunTask(rt.id)
+                                } else {
+                                  setDeleteRtId(rt.id)
+                                }
+                              }}
+                              className="text-xs text-red-400 hover:text-red-300 rounded-lg bg-red-900/40 px-3 py-1.5 sm:rounded-none sm:bg-transparent sm:px-1 sm:py-0"
+                            >
+                              Delete
+                            </button>
                           )}
                         </div>
                       )}
