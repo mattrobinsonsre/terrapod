@@ -356,6 +356,42 @@ export async function seedRun(
 }
 
 /**
+ * Seed a state-version record on a workspace (the record alone is enough to
+ * render the State tab; content upload is not needed for a UI-render test).
+ * Returns the state-version id.
+ */
+export async function seedStateVersion(
+  token: string,
+  workspaceId: string,
+  serial = 1,
+): Promise<string> {
+  const res = await fetch(
+    `${API_URL}/api/v2/workspaces/${workspaceId}/state-versions`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/vnd.api+json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        data: {
+          type: 'state-versions',
+          attributes: {
+            serial,
+            md5: 'd41d8cd98f00b204e9800998ecf8427e',
+            lineage: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+          },
+        },
+      }),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Create state version failed: ${res.status} ${await res.text()}`);
+  }
+  return (await res.json()).data.id as string;
+}
+
+/**
  * Wait for the stack to be healthy by polling the API ping endpoint.
  */
 export async function waitForStack(timeoutMs = 120_000): Promise<void> {

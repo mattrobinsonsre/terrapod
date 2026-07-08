@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { getStoredToken, createWorkspace, seedRun, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, seedRun, seedStateVersion, uniqueName } from '../helpers/api';
 
 /**
  * Responsive / mobile harness (#719).
@@ -159,6 +159,29 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page.getByRole('columnheader', { name: 'Run ID' })).toBeHidden();
     // ...and the run renders as a card linking to the run detail page.
     await expect(page.locator('a[href*="/runs/run-"]').first()).toBeVisible({ timeout: 15_000 });
+
+    await expectNoHorizontalPageScroll(page);
+  });
+
+  test('workspace state list becomes cards at phone width', async ({ page }) => {
+    // The state-version table hid Created-by / Run / Size / Created behind
+    // sm/md/lg breakpoints, leaving a phone with only the serial. Below md it
+    // renders as cards driven by the same data (#719), so nothing is dropped.
+    const token = getStoredToken();
+    const wsName = uniqueName('resp-state');
+    const wsId = await createWorkspace(token, wsName);
+    await seedStateVersion(token, wsId, 1);
+
+    await page.goto(`/workspaces/${wsId}?tab=state`);
+
+    // The 9-tab strip is the native <select> picker at phone width.
+    await expect(page.locator('#ws-tab-select')).toBeVisible();
+    // The desktop table's Serial column header is hidden below md...
+    await expect(page.getByRole('columnheader', { name: 'Serial' })).toBeHidden();
+    // ...and the state version renders as a card with its serial and a
+    // Download button (the card's action, not a tiny text link).
+    await expect(page.getByText('#1', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: 'Download' }).first()).toBeVisible();
 
     await expectNoHorizontalPageScroll(page);
   });
