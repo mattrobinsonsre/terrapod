@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { getStoredToken, createWorkspace, createAgentPool, seedRun, seedStateVersion, seedRunTask, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedRunTask, uniqueName } from '../helpers/api';
 
 /**
  * Responsive / mobile harness (#719).
@@ -264,5 +264,26 @@ test.describe('Responsive harness (phone viewport)', () => {
     await page.getByRole('button', { name: 'Delete' }).click();
     await expect.poll(() => deleteMsg, { timeout: 5_000 }).toContain('Delete run task');
     await expect(page.getByText(rtName)).toBeVisible();
+  });
+
+  test('catalog browse page renders without horizontal scroll at phone width', async ({ page }) => {
+    // The catalog browse page is a responsive card grid (or an empty state);
+    // either way it must not scroll horizontally on a phone.
+    await page.goto('/catalog');
+    await expect(page.getByRole('heading', { name: 'Service Catalog' })).toBeVisible({ timeout: 15_000 });
+    await expectNoHorizontalPageScroll(page);
+  });
+
+  test('registry module list renders as a card grid at phone width', async ({ page }) => {
+    // The registry list pages are responsive card grids (grid-cols-1 at phone),
+    // so a seeded module shows as a full-width card with no horizontal scroll.
+    const token = getStoredToken();
+    const modName = uniqueName('respmod').replace(/[^a-z0-9]/gi, '');
+    await createRegistryModule(token, modName, 'aws');
+
+    await page.goto('/registry/modules');
+    await expect(page.getByText(modName).first()).toBeVisible({ timeout: 15_000 });
+
+    await expectNoHorizontalPageScroll(page);
   });
 });

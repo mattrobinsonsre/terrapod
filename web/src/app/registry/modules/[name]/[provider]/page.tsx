@@ -11,6 +11,7 @@ import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { getAuthState, isAdmin } from '@/lib/auth'
+import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch } from '@/lib/api'
 import { LabelsEditor } from '@/components/labels-editor'
 import { usePollingInterval } from '@/lib/use-polling-interval'
@@ -143,6 +144,7 @@ async function buildTarGz(files: File[]): Promise<Uint8Array> {
 }
 
 export default function ModuleDetailPage() {
+  const { confirmDelete } = useConfirm()
   const router = useRouter()
   const params = useParams<{ name: string; provider: string }>()
   const { name, provider } = params
@@ -316,6 +318,7 @@ export default function ModuleDetailPage() {
   }
 
   async function handleUnlinkWorkspace(linkId: string) {
+    if (!confirmDelete('Unlink this workspace from the module? Impact analysis will no longer run for it.')) return
     setError('')
     try {
       const res = await apiFetch(
@@ -728,7 +731,7 @@ export default function ModuleDetailPage() {
                   </div>
                   <button
                     onClick={() => setShowLinkPicker(!showLinkPicker)}
-                    className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1"
+                    className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 flex items-center gap-1"
                   >
                     <Plus size={12} />
                     Link Workspace
@@ -764,7 +767,7 @@ export default function ModuleDetailPage() {
                         </a>
                         <button
                           onClick={() => handleUnlinkWorkspace(link.id)}
-                          className="text-slate-500 hover:text-red-400 transition-colors"
+                          className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-slate-700/50 transition-colors"
                           title="Unlink workspace"
                         >
                           <Trash2 size={14} />
@@ -781,11 +784,11 @@ export default function ModuleDetailPage() {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium text-slate-300">Metadata</h3>
                 {!editingMeta ? (
-                  modPerms['can-update'] && <button onClick={startEditingMeta} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
+                  modPerms['can-update'] && <button onClick={startEditingMeta} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Edit</button>
                 ) : (
                   <div className="flex gap-2">
-                    <button onClick={() => { setEditingMeta(false); setLockoutWarning('') }} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
-                    <button onClick={() => handleSaveMeta()} disabled={savingMeta} className="text-xs text-brand-400 hover:text-brand-300">{savingMeta ? 'Saving...' : 'Save'}</button>
+                    <button onClick={() => { setEditingMeta(false); setLockoutWarning('') }} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Cancel</button>
+                    <button onClick={() => handleSaveMeta()} disabled={savingMeta} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white">{savingMeta ? 'Saving...' : 'Save'}</button>
                   </div>
                 )}
               </div>
@@ -1027,7 +1030,7 @@ export default function ModuleDetailPage() {
                               <td className="px-4 py-3 text-right">
                                 <button
                                   onClick={() => setDeleteTarget(v.version)}
-                                  className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                                  className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
                                 >
                                   Delete
                                 </button>
