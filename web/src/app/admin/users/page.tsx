@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { useSortable } from '@/lib/use-sortable'
 import { getAuthState, isAdmin } from '@/lib/auth'
+import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch } from '@/lib/api'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
@@ -243,6 +244,7 @@ function PasswordResetForm({
 
 export default function UsersPage() {
   const router = useRouter()
+  const { confirmDelete, confirmTouchMutation } = useConfirm()
   const [users, setUsers] = useState<UserRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -262,7 +264,6 @@ export default function UsersPage() {
   const [resettingPassword, setResettingPassword] = useState(false)
 
   // Delete
-  const [deleteEmail, setDeleteEmail] = useState<string | null>(null)
 
   type SortKey = 'email' | 'displayName' | 'active' | 'lastLogin' | 'created'
   const accessor = useCallback((item: UserRecord, key: SortKey) => {
@@ -361,6 +362,7 @@ export default function UsersPage() {
   }
 
   async function handleToggleActive(email: string, currentlyActive: boolean) {
+    if (!confirmTouchMutation(`${currentlyActive ? 'Deactivate' : 'Activate'} user "${email}"?`)) return
     setError('')
     setSuccess('')
     try {
@@ -406,12 +408,12 @@ export default function UsersPage() {
   }
 
   async function handleDelete(email: string) {
+    if (!confirmDelete(`Delete user "${email}"? This cannot be undone.`)) return
     setError('')
     setSuccess('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/users/${encodeURIComponent(email)}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete user')
-      setDeleteEmail(null)
       if (resetEmail === email) setResetEmail(null)
       if (editingEmail === email) setEditingEmail(null)
       setSuccess(`User "${email}" deleted`)
@@ -457,7 +459,7 @@ export default function UsersPage() {
         ) : users.length === 0 ? (
           <EmptyState message="No users found." />
         ) : (
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
@@ -486,10 +488,10 @@ export default function UsersPage() {
                               onChange={(e) => setEditDisplayName(e.target.value)}
                               className="px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 w-40"
                             />
-                            <button onClick={handleSaveEdit} disabled={savingEdit} className="text-xs text-brand-400 hover:text-brand-300">
+                            <button onClick={handleSaveEdit} disabled={savingEdit} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-50">
                               {savingEdit ? 'Saving...' : 'Save'}
                             </button>
-                            <button onClick={() => setEditingEmail(null)} className="text-xs text-slate-400 hover:text-slate-200">
+                            <button onClick={() => setEditingEmail(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">
                               Cancel
                             </button>
                           </div>
@@ -518,23 +520,16 @@ export default function UsersPage() {
                       <td className="px-4 py-3 text-right">
                         <div className="flex gap-2 justify-end">
                           {!isEditing && (
-                            <button onClick={() => startEdit(u)} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
+                            <button onClick={() => startEdit(u)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Edit</button>
                           )}
                           {!isResetting ? (
-                            <button onClick={() => { setResetEmail(a.email); setEditingEmail(null) }} className="text-xs text-yellow-400 hover:text-yellow-300">
+                            <button onClick={() => { setResetEmail(a.email); setEditingEmail(null) }} className="px-2.5 py-1 rounded-md text-xs font-medium bg-yellow-900/40 hover:bg-yellow-900/60 text-yellow-300 transition-colors">
                               {a['has-password'] ? 'Reset PW' : 'Set PW'}
                             </button>
                           ) : (
-                            <button onClick={() => setResetEmail(null)} className="text-xs text-slate-400 hover:text-slate-200">Cancel PW</button>
+                            <button onClick={() => setResetEmail(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Cancel PW</button>
                           )}
-                          {deleteEmail === a.email ? (
-                            <>
-                              <button onClick={() => setDeleteEmail(null)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
-                              <button onClick={() => handleDelete(a.email)} className="text-xs text-red-400 hover:text-red-300">Confirm</button>
-                            </>
-                          ) : (
-                            <button onClick={() => setDeleteEmail(a.email)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
-                          )}
+                          <button onClick={() => handleDelete(a.email)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">Delete</button>
                         </div>
                       </td>
                     </tr>

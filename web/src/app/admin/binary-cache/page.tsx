@@ -11,6 +11,7 @@ import { SortableHeader } from '@/components/sortable-header'
 import { useSortable } from '@/lib/use-sortable'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 import { getAuthState, isAdmin } from '@/lib/auth'
+import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch } from '@/lib/api'
 
 interface CachedBinary {
@@ -42,6 +43,7 @@ interface CachedProvider {
 
 export default function CachePage() {
   const router = useRouter()
+  const { confirmDelete, confirmTouchMutation } = useConfirm()
   const [entries, setEntries] = useState<CachedBinary[]>([])
   const [providerEntries, setProviderEntries] = useState<CachedProvider[]>([])
   const [loading, setLoading] = useState(true)
@@ -129,6 +131,7 @@ export default function CachePage() {
   }
 
   async function handleBulkWarm() {
+    if (!confirmTouchMutation('Warm the selected cache entries now?')) return
     setError('')
     setSuccess('')
     setWarmResults(null)
@@ -184,6 +187,7 @@ export default function CachePage() {
   }
 
   async function handlePurge(tool: string, version: string) {
+    if (!confirmDelete(`Purge ${tool} ${version} from the cache? It will be re-fetched from upstream on the next request.`)) return
     setError('')
     setSuccess('')
     try {
@@ -200,6 +204,7 @@ export default function CachePage() {
   }
 
   async function handleProviderPurge(hostname: string, namespace: string, type: string, version: string) {
+    if (!confirmDelete(`Purge ${namespace}/${type} ${version} from the provider cache? It will be re-fetched from upstream on the next request.`)) return
     setError('')
     setSuccess('')
     try {
@@ -248,6 +253,7 @@ export default function CachePage() {
   }
 
   async function handleBatchPurgeBinaries() {
+    if (!confirmDelete('Purge all selected binary cache entries? They will be re-fetched from upstream on the next request.')) return
     setPurging(true)
     setError('')
     setSuccess('')
@@ -278,6 +284,7 @@ export default function CachePage() {
   }
 
   async function handleBatchPurgeProviders() {
+    if (!confirmDelete('Purge all selected provider cache entries? They will be re-fetched from upstream on the next request.')) return
     setPurging(true)
     setError('')
     setSuccess('')
@@ -424,7 +431,7 @@ export default function CachePage() {
             {entries.length === 0 ? (
               <EmptyState message="No cached CLI binaries yet." />
             ) : (
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden mb-8">
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto mb-8">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-700/50">
@@ -455,7 +462,7 @@ export default function CachePage() {
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => handlePurge(entry.attributes.tool, entry.attributes.version)}
-                            className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                            className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
                           >
                             Purge
                           </button>
@@ -483,7 +490,7 @@ export default function CachePage() {
             {providerEntries.length === 0 ? (
               <EmptyState message="No cached provider binaries yet." />
             ) : (
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-700/50">
@@ -523,7 +530,7 @@ export default function CachePage() {
                               entry.attributes['provider-type'],
                               entry.attributes.version,
                             )}
-                            className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                            className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
                           >
                             Purge
                           </button>

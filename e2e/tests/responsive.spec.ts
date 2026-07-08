@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { getStoredToken, createWorkspace, seedRun, seedStateVersion, seedRunTask, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, createUser, seedRun, seedStateVersion, seedRunTask, uniqueName } from '../helpers/api';
 
 /**
  * Responsive / mobile harness (#719).
@@ -209,6 +209,38 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page.getByRole('checkbox', { name: /Select cv-.* for compare/ }).filter({ visible: true }).first()).toBeVisible();
 
     await expectNoHorizontalPageScroll(page);
+  });
+
+  test('admin users page fits a phone + delete/toggle are two-tier confirm buttons', async ({ page }) => {
+    // Representative deep-admin surface (#719): the users table hides secondary
+    // columns below breakpoints but keeps the Active/Inactive status in-row; the
+    // row actions are real buttons; delete confirms in BOTH modes and the
+    // activate/deactivate toggle confirms on touch (this Pixel project).
+    const token = getStoredToken();
+    const email = `${uniqueName('resp-user')}@example.com`;
+    await createUser(token, email, 'Sup3rSecret!pw', 'Resp User');
+
+    await page.goto('/admin/users');
+    const row = page.getByRole('row').filter({ hasText: email });
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    // Status stays visible at phone width (not hidden behind a breakpoint).
+    await expect(row.getByRole('button', { name: /Active|Inactive/ })).toBeVisible();
+    // Row actions are real buttons (Delete present as a button, not bare text).
+    await expect(row.getByRole('button', { name: 'Delete' })).toBeVisible();
+    await expectNoHorizontalPageScroll(page);
+
+    // Tier-1 delete prompts on touch (and would on desktop too); dismiss keeps the row.
+    let deleteMsg = '';
+    page.once('dialog', async (d) => { deleteMsg = d.message(); await d.dismiss(); });
+    await row.getByRole('button', { name: 'Delete' }).click();
+    await expect.poll(() => deleteMsg, { timeout: 5_000 }).toContain('Delete user');
+    await expect(row).toBeVisible();
+
+    // Tier-2 activate/deactivate toggle prompts on touch; dismiss keeps state.
+    let toggleMsg = '';
+    page.once('dialog', async (d) => { toggleMsg = d.message(); await d.dismiss(); });
+    await row.getByRole('button', { name: /Active|Inactive/ }).click();
+    await expect.poll(() => toggleMsg, { timeout: 5_000 }).toMatch(/Deactivate|Activate/);
   });
 
   test('touch: both a reversible toggle and an irreversible delete prompt confirm()', async ({ page }) => {

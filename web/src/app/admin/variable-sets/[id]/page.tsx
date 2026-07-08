@@ -10,6 +10,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
 import { getAuthState, isAdmin } from '@/lib/auth'
+import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch } from '@/lib/api'
 import { usePollingInterval } from '@/lib/use-polling-interval'
 
@@ -53,6 +54,7 @@ export default function VariableSetDetailPage() {
   const router = useRouter()
   const params = useParams()
   const varsetId = params.id as string
+  const { confirmDelete } = useConfirm()
 
   const [varset, setVarset] = useState<Varset | null>(null)
   const [loading, setLoading] = useState(true)
@@ -299,6 +301,7 @@ export default function VariableSetDetailPage() {
   }
 
   async function handleDeleteVariable(varId: string) {
+    if (!confirmDelete('Delete this variable? This cannot be undone.')) return
     setError('')
     try {
       const res = await apiFetch(`/api/v2/varsets/${varsetId}/relationships/vars/${varId}`, { method: 'DELETE' })
@@ -339,6 +342,7 @@ export default function VariableSetDetailPage() {
   }
 
   async function handleRemoveWorkspace(wsId: string) {
+    if (!confirmDelete('Remove this workspace from the variable set? Its variables will no longer apply to that workspace.')) return
     setError('')
     try {
       const res = await apiFetch(`/api/v2/varsets/${varsetId}/relationships/workspaces`, {
@@ -412,11 +416,11 @@ export default function VariableSetDetailPage() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-slate-300">Settings</h3>
                 {!editing ? (
-                  <button onClick={startEditing} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
+                  <button onClick={startEditing} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Edit</button>
                 ) : (
                   <div className="flex gap-2">
-                    <button onClick={() => setEditing(false)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
-                    <button onClick={handleSave} disabled={saving} className="text-xs text-brand-400 hover:text-brand-300">
+                    <button onClick={() => setEditing(false)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Cancel</button>
+                    <button onClick={handleSave} disabled={saving} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-50">
                       {saving ? 'Saving...' : 'Save'}
                     </button>
                   </div>
@@ -551,7 +555,7 @@ export default function VariableSetDetailPage() {
             ) : variables.length === 0 ? (
               <EmptyState message="No variables in this set." />
             ) : (
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
@@ -597,8 +601,8 @@ export default function VariableSetDetailPage() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex justify-end gap-2">
-                              <button onClick={() => setEditingVarId(null)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
-                              <button onClick={handleSaveVar} disabled={savingVar} className="text-xs text-brand-400 hover:text-brand-300">
+                              <button onClick={() => setEditingVarId(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Cancel</button>
+                              <button onClick={handleSaveVar} disabled={savingVar} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-50">
                                 {savingVar ? 'Saving...' : 'Save'}
                               </button>
                             </div>
@@ -619,8 +623,8 @@ export default function VariableSetDetailPage() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex justify-end gap-2">
-                              <button onClick={() => startEditingVar(v)} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
-                              <button onClick={() => handleDeleteVariable(v.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
+                              <button onClick={() => startEditingVar(v)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Edit</button>
+                              <button onClick={() => handleDeleteVariable(v.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">Delete</button>
                             </div>
                           </td>
                         </tr>
@@ -679,7 +683,7 @@ export default function VariableSetDetailPage() {
             ) : workspaces.length === 0 && !varset.attributes.global ? (
               <EmptyState message="No workspaces assigned to this variable set." />
             ) : workspaces.length > 0 ? (
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
@@ -696,7 +700,7 @@ export default function VariableSetDetailPage() {
                           </Link>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <button onClick={() => handleRemoveWorkspace(ws.id)} className="text-xs text-red-400 hover:text-red-300">Remove</button>
+                          <button onClick={() => handleRemoveWorkspace(ws.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">Remove</button>
                         </td>
                       </tr>
                     ))}

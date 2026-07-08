@@ -246,7 +246,7 @@ export default function BulkUpdatePage() {
         <h3 className="text-sm font-semibold text-slate-200 mb-2">
           {title} ({entries.length})
         </h3>
-        <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+        <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-700/50 text-left text-xs text-slate-400 uppercase">
@@ -409,7 +409,7 @@ export default function BulkUpdatePage() {
             {searchResult.workspaces.length === 0 ? (
               <EmptyState message="No workspaces matched this filter." />
             ) : (
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-700/50 text-left text-xs text-slate-400 uppercase">

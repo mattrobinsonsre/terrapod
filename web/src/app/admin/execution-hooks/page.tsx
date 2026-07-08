@@ -193,7 +193,7 @@ export default function ExecutionHooksPage() {
         ) : hooks.length === 0 ? (
           <EmptyState message="No execution hooks configured." />
         ) : (
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
@@ -215,6 +215,11 @@ export default function ExecutionHooksPage() {
                       </Link>
                       {h.attributes.description && (
                         <div className="text-xs text-slate-500 mt-0.5">{h.attributes.description}</div>
+                      )}
+                      {/* Below md the ENABLED column is hidden — reflow a Disabled badge inline
+                          so a phone doesn't miss a silently-disabled hook (#719). */}
+                      {!h.attributes.enabled && (
+                        <span className="md:hidden mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-400">Disabled</span>
                       )}
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">

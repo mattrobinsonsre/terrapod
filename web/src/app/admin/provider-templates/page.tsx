@@ -9,6 +9,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { LabelsEditor } from '@/components/labels-editor'
 import { getAuthState, isAdmin } from '@/lib/auth'
+import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch } from '@/lib/api'
 
 interface ProviderTemplate {
@@ -33,6 +34,7 @@ const EMPTY_FORM = {
 
 export default function ProviderTemplatesPage() {
   const router = useRouter()
+  const { confirmDelete } = useConfirm()
   const [templates, setTemplates] = useState<ProviderTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -44,7 +46,6 @@ export default function ProviderTemplatesPage() {
   const [f, setF] = useState({ ...EMPTY_FORM })
   const [saving, setSaving] = useState(false)
 
-  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
@@ -145,6 +146,7 @@ export default function ProviderTemplatesPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!confirmDelete('Delete this provider template? Catalog items referencing it will fail to provision. This cannot be undone.')) return
     setError(''); setSuccess('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/provider-templates/${id}`, { method: 'DELETE' })
@@ -153,11 +155,9 @@ export default function ProviderTemplatesPage() {
         throw new Error(data.detail || 'Cannot delete: this template is referenced by a catalog item.')
       }
       if (!res.ok) throw new Error('Failed to delete provider template')
-      setDeleteId(null)
       setSuccess('Provider template deleted')
       await loadTemplates()
     } catch (err) {
-      setDeleteId(null)
       setError(err instanceof Error ? err.message : 'Failed to delete provider template')
     }
   }
@@ -243,7 +243,7 @@ export default function ProviderTemplatesPage() {
             ) : templates.length === 0 ? (
               <EmptyState message="No provider templates yet." />
             ) : (
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
@@ -266,17 +266,10 @@ export default function ProviderTemplatesPage() {
                           {(t.attributes.parameters || []).length}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {deleteId === t.id ? (
-                            <div className="flex justify-end gap-2">
-                              <button onClick={() => setDeleteId(null)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
-                              <button onClick={() => handleDelete(t.id)} className="text-xs text-red-400 hover:text-red-300">Confirm</button>
-                            </div>
-                          ) : (
-                            <div className="flex justify-end gap-3">
-                              <button onClick={() => startEdit(t)} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
-                              <button onClick={() => setDeleteId(t.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
-                            </div>
-                          )}
+                          <div className="flex justify-end gap-2">
+                            <button onClick={() => startEdit(t)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Edit</button>
+                            <button onClick={() => handleDelete(t.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">Delete</button>
+                          </div>
                         </td>
                       </tr>
                     ))}

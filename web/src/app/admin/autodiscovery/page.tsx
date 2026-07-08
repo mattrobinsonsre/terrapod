@@ -768,6 +768,7 @@ export default function AutodiscoveryPage() {
         {sortedItems.length === 0 ? (
           <EmptyState message="No autodiscovery rules yet. Create one to start auto-provisioning workspaces from PRs in your monorepo." />
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-slate-400 border-b border-slate-800">
               <tr>
@@ -800,30 +801,33 @@ export default function AutodiscoveryPage() {
                       : ''}
                   </td>
                   <td className="py-3 text-right">
-                    <button
-                      onClick={() => openPreview(r.id, r.attributes.name)}
-                      className="text-brand-400 hover:text-brand-300 text-xs px-2 py-1"
-                      title="Walk the repo and preview which workspaces this rule would create"
-                    >
-                      Preview
-                    </button>
-                    <button
-                      onClick={() => openEditForm(r)}
-                      className="text-slate-400 hover:text-slate-200 text-xs px-2 py-1"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => setDeleteId(r.id)}
-                      className="text-red-400 hover:text-red-300 text-xs px-2 py-1"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => openPreview(r.id, r.attributes.name)}
+                        className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-brand-300 transition-colors"
+                        title="Walk the repo and preview which workspaces this rule would create"
+                      >
+                        Preview
+                      </button>
+                      <button
+                        onClick={() => openEditForm(r)}
+                        className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => setDeleteId(r.id)}
+                        className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
 
         {deleteId && (

@@ -171,7 +171,7 @@ export default function VariableSetsPage() {
         ) : varsets.length === 0 ? (
           <EmptyState message="No variable sets configured." />
         ) : (
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
@@ -187,10 +187,20 @@ export default function VariableSetsPage() {
                   <tr key={vs.id} className="hover:bg-slate-700/20 transition-colors cursor-pointer"
                     onClick={() => router.push(`/admin/variable-sets/${vs.id}`)}>
                     <td className="px-4 py-3">
-                      <Link href={`/admin/variable-sets/${vs.id}`} className="text-sm font-medium text-brand-400 hover:text-brand-300"
-                        onClick={(e) => e.stopPropagation()}>
-                        {vs.attributes.name}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link href={`/admin/variable-sets/${vs.id}`} className="text-sm font-medium text-brand-400 hover:text-brand-300"
+                          onClick={(e) => e.stopPropagation()}>
+                          {vs.attributes.name}
+                        </Link>
+                        {/* Below md the SCOPE column is hidden — reflow the Global/Priority badges
+                            inline so a phone still sees a varset's reach/precedence (#719). */}
+                        {vs.attributes.global && (
+                          <span className="md:hidden inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-900/50 text-blue-300">Global</span>
+                        )}
+                        {vs.attributes.priority && (
+                          <span className="md:hidden inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">Priority</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-400 hidden sm:table-cell">
                       {vs.attributes.description || '-'}

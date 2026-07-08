@@ -9,6 +9,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { getAuthState, isAdmin } from '@/lib/auth'
+import { useConfirm } from '@/lib/use-confirm'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
 import { usePollingInterval } from '@/lib/use-polling-interval'
@@ -33,6 +34,7 @@ type VCSSortKey = 'name' | 'provider' | 'server-url' | 'status' | 'created'
 
 export default function VCSConnectionsPage() {
   const router = useRouter()
+  const { confirmDelete } = useConfirm()
   const [connections, setConnections] = useState<VCSConnection[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -57,7 +59,6 @@ export default function VCSConnectionsPage() {
   const [editId, setEditId] = useState<string | null>(null)
 
   // Delete confirmation
-  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   function resetForm() {
     setName(''); setServerUrl(''); setAppId(''); setInstallationId('')
@@ -166,12 +167,12 @@ export default function VCSConnectionsPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!confirmDelete('Delete this VCS connection? Workspaces using it will lose VCS integration. This cannot be undone.')) return
     setError('')
     setSuccess('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/vcs-connections/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete connection')
-      setDeleteId(null)
       setSuccess('VCS connection deleted')
       await loadConnections()
     } catch (err) {
@@ -330,7 +331,7 @@ export default function VCSConnectionsPage() {
         ) : connections.length === 0 ? (
           <EmptyState message="No VCS connections configured." />
         ) : (
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
@@ -345,7 +346,16 @@ export default function VCSConnectionsPage() {
               <tbody className="divide-y divide-slate-700/30">
                 {sortedItems.map((conn) => (
                   <tr key={conn.id} className="hover:bg-slate-700/20 transition-colors">
-                    <td className="px-4 py-3 text-sm text-slate-200">{conn.attributes.name}</td>
+                    <td className="px-4 py-3 text-sm text-slate-200">
+                      <div className="flex items-center gap-2">
+                        <span>{conn.attributes.name}</span>
+                        {/* Below md the STATUS column is hidden — reflow the status pill inline so a
+                            phone doesn't lose the connection health signal (#719). */}
+                        <span className={`md:hidden inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(conn.attributes.status)}`}>
+                          {conn.attributes.status}
+                        </span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${providerBadge(conn.attributes.provider)}`}>
                         {conn.attributes.provider}
@@ -363,17 +373,10 @@ export default function VCSConnectionsPage() {
                       {conn.attributes['created-at'] ? new Date(conn.attributes['created-at']).toLocaleDateString() : ''}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {deleteId === conn.id ? (
-                        <div className="flex justify-end gap-2">
-                          <button onClick={() => setDeleteId(null)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
-                          <button onClick={() => handleDelete(conn.id)} className="text-xs text-red-400 hover:text-red-300">Confirm</button>
-                        </div>
-                      ) : (
-                        <div className="flex justify-end gap-3">
-                          <button onClick={() => startEdit(conn)} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
-                          <button onClick={() => setDeleteId(conn.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
-                        </div>
-                      )}
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => startEdit(conn)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors">Edit</button>
+                        <button onClick={() => handleDelete(conn.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors">Delete</button>
+                      </div>
                     </td>
                   </tr>
                 ))}

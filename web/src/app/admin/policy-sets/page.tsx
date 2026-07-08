@@ -246,7 +246,7 @@ export default function PolicySetsPage() {
         ) : sets.length === 0 ? (
           <EmptyState message="No policy sets configured." />
         ) : (
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
@@ -269,6 +269,13 @@ export default function PolicySetsPage() {
                       {!ps.attributes.enabled && (
                         <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-400">Disabled</span>
                       )}
+                      {/* Below md the ENFORCEMENT column is hidden — reflow it inline so a phone
+                          still sees whether a policy blocks applies or only advises (#719). */}
+                      <span className={`md:hidden ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        ps.attributes['enforcement-level'] === 'mandatory' ? 'bg-red-900/50 text-red-300' : 'bg-amber-900/50 text-amber-300'
+                      }`}>
+                        {ps.attributes['enforcement-level'] === 'mandatory' ? 'Mandatory' : 'Advisory'}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-400 hidden sm:table-cell">
                       {ps.attributes.description || '-'}
