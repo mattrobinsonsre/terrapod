@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { getStoredToken, createWorkspace, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, seedRun, uniqueName } from '../helpers/api';
 
 /**
  * Responsive / mobile harness (#719).
@@ -109,6 +109,34 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page.getByText('Locked', { exact: true })).toBeHidden();
     await expect(page.getByText('Health', { exact: true })).toBeVisible();
 
+    await expectNoHorizontalPageScroll(page);
+  });
+
+  test('run detail page: native view picker drives navigation at phone width', async ({ page }) => {
+    // The run-detail page is the hard mobile surface (#721/#722): the view
+    // tabs collapse to a native <select> (no horizontal-scroll strip), the URL
+    // stays the source of truth for the active view, and there is no horizontal
+    // page scroll. Seed a run — the E2E stack has no runner so it sits `queued`,
+    // which renders the whole page without needing real execution.
+    const token = getStoredToken();
+    const wsName = uniqueName('resp-run');
+    const wsId = await createWorkspace(token, wsName);
+    const runId = await seedRun(token, wsId);
+
+    await page.goto(`/workspaces/${wsId}/runs/${runId}?view=overview`);
+    await expect(
+      page.getByRole('heading', { name: new RegExp(wsName), level: 1 }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // Below md the tabs are a native <select>, not a scrolling tab strip.
+    const picker = page.locator('#run-view-select');
+    await expect(picker).toBeVisible();
+    await expectNoHorizontalPageScroll(page);
+
+    // The picker is the source of truth for the active view — selecting an
+    // option updates the URL (survives reload / back / deep-link).
+    await picker.selectOption('plan');
+    await expect(page).toHaveURL(/[?&]view=plan/);
     await expectNoHorizontalPageScroll(page);
   });
 });

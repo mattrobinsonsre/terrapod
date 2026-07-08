@@ -285,6 +285,77 @@ export async function createRegistryModule(
 }
 
 /**
+ * Seed a run so the run-detail page can be exercised in E2E.
+ *
+ * The E2E stack has no runner/listener, so a seeded run simply sits in
+ * `queued` — which is exactly what we want: the run-detail page renders in
+ * full (status, tabs/picker, action row) without needing real execution. The
+ * config-version tarball is never extracted here, so an arbitrary placeholder
+ * blob is enough to satisfy the upload + let a run be created against it.
+ *
+ * Flow: create CV → PUT placeholder bytes (no auth, per the upload contract)
+ * → POST /runs referencing the workspace's now-uploaded CV. Returns the
+ * `run-<uuid>` id.
+ */
+export async function seedRun(
+  token: string,
+  workspaceId: string,
+  planOnly = true,
+): Promise<string> {
+  const cvRes = await fetch(
+    `${API_URL}/api/v2/workspaces/${workspaceId}/configuration-versions`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/vnd.api+json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        data: {
+          type: 'configuration-versions',
+          attributes: { 'auto-queue-runs': true },
+        },
+      }),
+    },
+  );
+  if (!cvRes.ok) {
+    throw new Error(`Create config version failed: ${cvRes.status} ${await cvRes.text()}`);
+  }
+  const cvId = (await cvRes.json()).data.id as string;
+
+  // No Authorization header — the upload endpoint is unauthenticated (the CV
+  // UUID is the capability token), matching go-tfe's presigned-style upload.
+  const upRes = await fetch(
+    `${API_URL}/api/v2/configuration-versions/${cvId}/upload`,
+    { method: 'PUT', body: 'terrapod-e2e-config-placeholder' },
+  );
+  if (!upRes.ok) {
+    throw new Error(`Config version upload failed: ${upRes.status}`);
+  }
+
+  const runRes = await fetch(`${API_URL}/api/v2/runs`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/vnd.api+json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      data: {
+        type: 'runs',
+        attributes: { 'plan-only': planOnly },
+        relationships: {
+          workspace: { data: { type: 'workspaces', id: workspaceId } },
+        },
+      },
+    }),
+  });
+  if (!runRes.ok) {
+    throw new Error(`Create run failed: ${runRes.status} ${await runRes.text()}`);
+  }
+  return (await runRes.json()).data.id as string;
+}
+
+/**
  * Wait for the stack to be healthy by polling the API ping endpoint.
  */
 export async function waitForStack(timeoutMs = 120_000): Promise<void> {
