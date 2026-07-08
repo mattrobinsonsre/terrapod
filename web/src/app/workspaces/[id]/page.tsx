@@ -2561,7 +2561,11 @@ function WorkspaceDetailContent() {
             ) : variables.length === 0 ? (
               <EmptyState message="No variables configured for this workspace." />
             ) : (
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+              <>
+              {/* Desktop (md+): the variables table. Below md it's replaced by
+                  the stacked cards (a phone can't show the table + inline edit
+                  legibly). #719 Stage 2. */}
+              <div className="hidden md:block bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
@@ -2648,6 +2652,90 @@ function WorkspaceDetailContent() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Mobile (< md): variables as stacked cards — same data + inline
+                  edit / delete states as the table. Value is masked when
+                  sensitive; the category pill is kept; actions are proper
+                  buttons (not tiny text). */}
+              <ul className="md:hidden space-y-2">
+                {sortedVars.map((v) => (
+                  <li key={v.id} className="rounded-lg border border-slate-700/50 bg-slate-800/50 p-3">
+                    {editingVarId === v.id ? (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={editVarKey}
+                          onChange={(e) => setEditVarKey(e.target.value)}
+                          placeholder="Key"
+                          className="w-full px-2 py-1.5 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
+                        <SensitiveValueInput
+                          value={editVarValue}
+                          onChange={setEditVarValue}
+                          sensitive={editVarSensitive}
+                          placeholder={editVarSensitive ? 'Enter new value' : ''}
+                          rows={2}
+                          className="w-full px-2 py-1.5 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500 resize-y"
+                        />
+                        <div className="flex flex-wrap items-center gap-3">
+                          <select
+                            value={editVarCategory}
+                            onChange={(e) => setEditVarCategory(e.target.value)}
+                            className="px-2 py-1 text-xs border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                          >
+                            <option value="terraform">terraform</option>
+                            <option value="env">env</option>
+                          </select>
+                          <label className="flex items-center gap-1 cursor-pointer">
+                            <input type="checkbox" checked={editVarSensitive} onChange={(e) => setEditVarSensitive(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600" />
+                            <span className="text-xs text-slate-400">Sensitive</span>
+                          </label>
+                          <label className="flex items-center gap-1 cursor-pointer">
+                            <input type="checkbox" checked={editVarHcl} onChange={(e) => setEditVarHcl(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600" />
+                            <span className="text-xs text-slate-400">HCL</span>
+                          </label>
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <button onClick={() => setEditingVarId(null)} className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Cancel</button>
+                          <button onClick={handleSaveVar} disabled={savingVar} className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white">
+                            {savingVar ? 'Saving…' : 'Save'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                          <span className="text-sm font-mono font-medium text-slate-200 break-all">{v.attributes.key}</span>
+                          <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            v.attributes.category === 'terraform' ? 'bg-purple-900/50 text-purple-300' : 'bg-cyan-900/50 text-cyan-300'
+                          }`}>
+                            {v.attributes.category}
+                          </span>
+                        </div>
+                        <div className="mb-2 text-sm text-slate-400 font-mono break-all">
+                          {v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">empty</span>)}
+                        </div>
+                        {perms['can-update-variable'] && (
+                          <div className="flex gap-2">
+                            <button onClick={() => startEditingVar(v)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Edit</button>
+                            {/* Native confirm on delete — a destructive tap on a
+                                phone deserves a guard. */}
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Delete variable "${v.attributes.key}"?`)) handleDeleteVariable(v.id)
+                              }}
+                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              </>
             )}
           </div>
         )}
