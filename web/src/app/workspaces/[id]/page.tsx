@@ -3357,67 +3357,128 @@ function WorkspaceDetailContent() {
             ) : cvs.length === 0 ? (
               <EmptyState message="No configuration versions yet. They appear here as soon as a `terraform plan` uploads or a VCS push triggers a run." />
             ) : (
-              <div className="overflow-hidden rounded-xl border border-slate-800">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-900/50 text-slate-400">
-                    <tr>
-                      <th className="w-8 px-2 py-3" aria-hidden />
-                      <th className="px-4 py-3 text-left font-medium">ID</th>
-                      <th className="px-4 py-3 text-left font-medium">Source</th>
-                      <th className="px-4 py-3 text-left font-medium">Status</th>
-                      <th className="px-4 py-3 text-left font-medium">Created</th>
-                      <th className="px-4 py-3 text-right font-medium">Download</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {cvs.map(cv => {
-                      const isCurrent = cv.id === cvCurrentId
-                      const isSelected = cvSelected.has(cv.id)
-                      const canDownload = cv.attributes.status === 'uploaded'
-                      return (
-                        <tr key={cv.id} className={isSelected ? 'bg-blue-900/20' : 'hover:bg-slate-900/30 transition-colors'}>
-                          <td className="px-2 py-3 align-middle">
-                            <input
-                              type="checkbox"
-                              aria-label={`Select ${cv.id} for compare`}
-                              checked={isSelected}
-                              onChange={() => toggleCvSelected(cv.id)}
-                              className="h-4 w-4"
-                              disabled={!canDownload}
-                            />
-                          </td>
-                          <td className="px-4 py-3 font-mono text-xs">
-                            <span className="text-slate-200">{cv.id}</span>
-                            {isCurrent && (
-                              <span className="ml-2 inline-flex items-center rounded bg-green-900/40 px-1.5 py-0.5 text-xs font-medium text-green-300">
-                                current
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-slate-300">{cv.attributes.source}</td>
-                          <td className="px-4 py-3 text-slate-400">{cv.attributes.status}</td>
-                          <td className="px-4 py-3 text-slate-400">
-                            {new Date(cv.attributes['created-at']).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {canDownload ? (
+              <>
+                {/* Desktop (md+): the table with per-row compare checkboxes. */}
+                <div className="hidden md:block overflow-hidden rounded-xl border border-slate-800">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-900/50 text-slate-400">
+                      <tr>
+                        <th className="w-8 px-2 py-3" aria-hidden />
+                        <th className="px-4 py-3 text-left font-medium">ID</th>
+                        <th className="px-4 py-3 text-left font-medium">Source</th>
+                        <th className="px-4 py-3 text-left font-medium">Status</th>
+                        <th className="px-4 py-3 text-left font-medium">Created</th>
+                        <th className="px-4 py-3 text-right font-medium">Download</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {cvs.map(cv => {
+                        const isCurrent = cv.id === cvCurrentId
+                        const isSelected = cvSelected.has(cv.id)
+                        const canDownload = cv.attributes.status === 'uploaded'
+                        return (
+                          <tr key={cv.id} className={isSelected ? 'bg-blue-900/20' : 'hover:bg-slate-900/30 transition-colors'}>
+                            <td className="px-2 py-3 align-middle">
+                              <input
+                                type="checkbox"
+                                aria-label={`Select ${cv.id} for compare`}
+                                checked={isSelected}
+                                onChange={() => toggleCvSelected(cv.id)}
+                                className="h-4 w-4"
+                                disabled={!canDownload}
+                              />
+                            </td>
+                            <td className="px-4 py-3 font-mono text-xs">
+                              <span className="text-slate-200">{cv.id}</span>
+                              {isCurrent && (
+                                <span className="ml-2 inline-flex items-center rounded bg-green-900/40 px-1.5 py-0.5 text-xs font-medium text-green-300">
+                                  current
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-slate-300">{cv.attributes.source}</td>
+                            <td className="px-4 py-3 text-slate-400">{cv.attributes.status}</td>
+                            <td className="px-4 py-3 text-slate-400">
+                              {new Date(cv.attributes['created-at']).toLocaleString()}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {canDownload ? (
+                                <button
+                                  type="button"
+                                  onClick={() => downloadCv(cv.id)}
+                                  className="text-blue-400 hover:text-blue-300 text-sm font-medium"
+                                >
+                                  Download
+                                </button>
+                              ) : (
+                                <span className="text-slate-600 text-sm">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile (< md): cards — the 6-column table is 529px wide and was
+                    clipped by its overflow-hidden wrapper on a phone, hiding
+                    Created + Download entirely. Cards keep every field plus the
+                    compare checkbox and Download as tap targets. */}
+                <MobileCardList>
+                  {cvs.map(cv => {
+                    const isCurrent = cv.id === cvCurrentId
+                    const isSelected = cvSelected.has(cv.id)
+                    const canDownload = cv.attributes.status === 'uploaded'
+                    return (
+                      <MobileCard
+                        key={cv.id}
+                        title={<span className="min-w-0 text-xs font-mono text-slate-200 break-all">{cv.id}</span>}
+                        badge={
+                          isCurrent && (
+                            <span className="shrink-0 inline-flex items-center rounded bg-green-900/40 px-1.5 py-0.5 text-xs font-medium text-green-300">
+                              current
+                            </span>
+                          )
+                        }
+                        fields={[
+                          { label: 'Source', value: cv.attributes.source },
+                          { label: 'Status', value: cv.attributes.status, valueClassName: 'text-slate-400' },
+                          {
+                            label: 'Created',
+                            value: new Date(cv.attributes['created-at']).toLocaleString(),
+                            valueClassName: 'text-slate-400',
+                          },
+                        ]}
+                        actions={
+                          <>
+                            <label className={`flex items-center gap-1.5 text-xs ${canDownload ? 'text-slate-400' : 'text-slate-600'}`}>
+                              <input
+                                type="checkbox"
+                                aria-label={`Select ${cv.id} for compare`}
+                                checked={isSelected}
+                                onChange={() => toggleCvSelected(cv.id)}
+                                className="h-4 w-4"
+                                disabled={!canDownload}
+                              />
+                              Compare
+                            </label>
+                            {canDownload && (
                               <button
                                 type="button"
                                 onClick={() => downloadCv(cv.id)}
-                                className="text-blue-400 hover:text-blue-300 text-sm font-medium"
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200"
                               >
                                 Download
                               </button>
-                            ) : (
-                              <span className="text-slate-600 text-sm">—</span>
                             )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          </>
+                        }
+                      />
+                    )
+                  })}
+                </MobileCardList>
+              </>
             )}
 
             {cvDiffError && (

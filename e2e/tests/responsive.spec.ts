@@ -185,4 +185,27 @@ test.describe('Responsive harness (phone viewport)', () => {
 
     await expectNoHorizontalPageScroll(page);
   });
+
+  test('workspace configurations list becomes cards at phone width', async ({ page }) => {
+    // The 6-column configuration-versions table is 529px wide and was clipped
+    // by its overflow-hidden wrapper on a phone (Created + Download vanished).
+    // Below md it renders as cards driven by the same data (#719). Seeding a run
+    // uploads a configuration version.
+    const token = getStoredToken();
+    const wsName = uniqueName('resp-cfg');
+    const wsId = await createWorkspace(token, wsName);
+    await seedRun(token, wsId);
+
+    await page.goto(`/workspaces/${wsId}?tab=configurations`);
+
+    await expect(page.locator('#ws-tab-select')).toBeVisible();
+    // The desktop table's column header is hidden at phone width...
+    await expect(page.getByRole('columnheader', { name: 'Source' })).toBeHidden();
+    // ...and the config version renders as a card exposing its full id + the
+    // Compare checkbox that the clipped table hid.
+    await expect(page.getByText(/^cv-/).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('checkbox', { name: /Select cv-.* for compare/ }).first()).toBeVisible();
+
+    await expectNoHorizontalPageScroll(page);
+  });
 });
