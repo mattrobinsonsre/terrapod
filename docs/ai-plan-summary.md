@@ -46,7 +46,7 @@ For a run that errored during EITHER plan or apply (`errored`):
   targeted re-apply (`-target=...`).
 
 Both kinds are persisted in the `plan_summaries` table, returned by
-`GET /api/v2/plans/{plan-id}/summary`, and announced over the
+`GET /api/terrapod/v1/runs/{run_id}/plan-summary`, and announced over the
 per-workspace SSE channel as a `plan_summary_ready` event so the UI
 re-fetches without polling.
 

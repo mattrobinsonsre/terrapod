@@ -791,7 +791,7 @@ The endpoint is mounted at `/api/v2/` because `go-tfe` and Terraform's `cloud` b
 ### Plan Summary
 
 ```
-GET /api/v2/plans/{plan_id}/summary
+GET /api/terrapod/v1/runs/{run_id}/plan-summary
 ```
 
 Returns the AI-generated plan summary (or failure analysis on errored plans) when the optional `ai_summary` feature is enabled and a summary has been produced for the run. See [docs/ai-plan-summary.md](ai-plan-summary.md) for the operator-side setup.
