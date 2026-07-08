@@ -155,7 +155,9 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-brand-400" aria-hidden="true" />
           <h3 className="text-sm font-medium text-slate-300">{heading}</h3>
-          <span className="text-xs text-slate-500">AI generated</span>
+          {/* Dropped on a phone — the ✨ sparkle already signals "AI", and the
+              header row is too tight there to carry the extra words. */}
+          <span className="text-xs text-slate-500 hidden md:inline">AI generated</span>
         </div>
         <div className="flex items-center gap-3">
           {attrs && attrs.status === 'ready' && attrs['risk-level'] && (
@@ -171,9 +173,11 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
               disabled={regenerating}
               className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed px-2 py-1 rounded border border-slate-700/50 hover:border-slate-600"
               title="Re-run the AI summary against the same plan inputs"
+              aria-label="Regenerate AI summary"
             >
               <RefreshCw className={`w-3 h-3 ${regenerating ? 'animate-spin' : ''}`} />
-              {regenerating ? 'Queueing…' : 'Regenerate'}
+              {/* Icon-only on a phone (the row is tight); label returns at md+. */}
+              <span className="hidden md:inline">{regenerating ? 'Queueing…' : 'Regenerate'}</span>
             </button>
           )}
         </div>
@@ -211,12 +215,11 @@ export function PlanAiSummary({ runId, refreshKey = 0 }: Props) {
 
       {attrs?.status === 'ready' && (
         <>
-          {/* Same xs / slate-400 baseline as risk_factor.detail so the two
-              sections read as one coherent voice. Description gets a touch
-              more vertical breathing room between paragraphs since it's
-              usually multi-paragraph; everything else (inline code, lists,
-              links) shares typography with the risk-factor detail. */}
-          <div className="text-xs text-slate-400 leading-relaxed">
+          {/* The analysis prose is the primary content of this tab, so it
+              reads a notch larger (sm) than the secondary risk-factor detail
+              (xs) — legibility beats strict typographic uniformity here,
+              especially on a phone. Inline code / lists / links inherit. */}
+          <div className="text-sm text-slate-300 leading-relaxed">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={SUMMARY_MARKDOWN_COMPONENTS}

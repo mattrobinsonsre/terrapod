@@ -214,7 +214,7 @@ export function PlanSummaryChat({ runId, refreshKey }: Props) {
             disabled={sending}
             rows={2}
             placeholder="Ask a follow-up question about this plan… (⌘/Ctrl + Enter to send)"
-            className="flex-1 text-xs bg-slate-900/60 border border-slate-700 focus:border-brand-500 focus:outline-none rounded p-2 text-slate-200 placeholder-slate-500 resize-y min-h-[3rem] max-h-40"
+            className="flex-1 text-sm bg-slate-900/60 border border-slate-700 focus:border-brand-500 focus:outline-none rounded p-2 text-slate-200 placeholder-slate-500 resize-y min-h-[3rem] max-h-40"
           />
           <button
             type="button"
@@ -252,7 +252,7 @@ function ChatRow({ msg }: { msg: ChatMessage }) {
             {msg.attributes['error-message']}
           </div>
         ) : (
-          <div className="text-xs text-slate-300 leading-relaxed">
+          <div className="text-sm text-slate-300 leading-relaxed">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {msg.attributes.content}
             </ReactMarkdown>

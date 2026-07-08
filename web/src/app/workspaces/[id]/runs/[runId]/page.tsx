@@ -15,7 +15,7 @@ import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
 import { useIsMobile } from '@/lib/use-media-query'
-import { ChevronsUp, ArrowDownToLine, RefreshCw, Download } from 'lucide-react'
+import { ArrowDownToLine, RefreshCw, Download, Copy, Check, Palette } from 'lucide-react'
 
 interface RunActions {
   'is-confirmable': boolean
@@ -302,7 +302,6 @@ function LogPanel({
   // Follow the tail by default while streaming; a static (finished) log opens
   // at the top so the operator reads from the start.
   const [following, setFollowing] = useState(isStreaming)
-  const [atBottom, setAtBottom] = useState(true)
   const [copied, setCopied] = useState(false)
   const preRef = useRef<HTMLPreElement>(null)
 
@@ -339,11 +338,6 @@ function LogPanel({
     [isMobile],
   )
 
-  const scrollToTop = useCallback(() => {
-    if (isMobile) window.scrollTo({ top: 0, behavior: 'smooth' })
-    else preRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [isMobile])
-
   // Pin the active scroller to the tail when following and the content changes.
   // Runs in useLayoutEffect (synchronously before paint) so a fresh chunk or
   // the panel's own resize never flashes an intermediate scroll position.
@@ -356,9 +350,7 @@ function LogPanel({
   // (mobile) or the inner pane (desktop).
   useEffect(() => {
     const onScroll = () => {
-      const bottom = isAtBottom()
-      setAtBottom(bottom)
-      setFollowing(bottom)
+      setFollowing(isAtBottom())
     }
     const el = isMobile ? window : preRef.current
     if (!el) return
@@ -389,72 +381,109 @@ function LogPanel({
     <div className="bg-slate-900 rounded-lg border border-slate-700/50 overflow-hidden">
       <div className="flex items-center justify-between gap-2 flex-wrap px-4 py-2 border-b border-slate-700/50 bg-slate-800/50">
         <div className="flex items-center gap-2">
+          {/* Single Color toggle (checkbox-style): on = ANSI colours, off =
+              plain text. Consolidated from the old two-button Color/Plain pair
+              to free a slot on a phone-width toolbar row. */}
           <button
-            onClick={() => setColorMode(true)}
-            className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
+            onClick={() => setColorMode((c) => !c)}
+            aria-pressed={colorMode}
+            className={`px-2 py-1 text-xs rounded font-medium transition-colors inline-flex items-center gap-1 ${
               colorMode
                 ? 'bg-brand-600 text-white'
                 : 'bg-slate-700 text-slate-400 hover:text-slate-200'
             }`}
+            title={colorMode ? 'Showing ANSI colours — click for plain text' : 'Showing plain text — click for colours'}
           >
-            Color
+            <Palette className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Color</span>
           </button>
-          <button
-            onClick={() => setColorMode(false)}
-            className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
-              !colorMode
-                ? 'bg-brand-600 text-white'
-                : 'bg-slate-700 text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Plain
-          </button>
-          {isStreaming && (
-            <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-slate-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              live
-            </span>
-          )}
         </div>
+        {/* Two groups: utility icons (refresh/copy/download — icon-only on a
+            phone) and, separated by a divider, the scroll-nav controls
+            (Follow/End). End keeps its text label at every width — an unlabelled
+            down-arrow reads as a second Download next to the real one. */}
         <div className="flex items-center gap-2">
-          {onRefresh && (
+          <div className="flex items-center gap-1.5">
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                className="px-2 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
+                title="Refresh log"
+                aria-label="Refresh log"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+            )}
+            {plainContent && (
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(plainContent)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2000)
+                }}
+                className="px-2 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
+                title="Copy plain text to clipboard"
+                aria-label="Copy log to clipboard"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">{copied ? 'Copied!' : 'Copy'}</span>
+              </button>
+            )}
+            {/* One download button — the current Color/Plain mode decides what
+                it saves: colored (ANSI codes preserved) in Color mode, stripped
+                plain text in Plain mode. */}
             <button
-              onClick={onRefresh}
-              className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
-              title="Refresh log"
+              onClick={() =>
+                colorMode
+                  ? downloadFile(cleanLog ?? '', `${shortId}-${phase}.log`)
+                  : downloadFile(plainContent, `${shortId}-${phase}-plain.log`)
+              }
+              className="px-2 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
+              title={colorMode ? 'Download log (with ANSI colour codes)' : 'Download log (plain text)'}
+              aria-label="Download log"
             >
-              <RefreshCw className="w-3 h-3" />
-              Refresh
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Download</span>
             </button>
-          )}
-          {plainContent && (
+          </div>
+          {/* Scroll-nav group, divider-separated from the utilities. Both keep
+              their text label at all widths so they never read as another icon. */}
+          <div className="flex items-center gap-1.5 border-l border-slate-700/60 pl-2">
+            {/* Follow appears only while the log is streaming: a persistent
+                auto-tail toggle. Green when engaged; the scroll listener also
+                flips it as the operator scrolls up/down. */}
+            {isStreaming && (
+              <button
+                onClick={() => {
+                  const next = !following
+                  setFollowing(next)
+                  if (next) scrollToBottom(true)
+                }}
+                aria-pressed={following}
+                className={`px-2 py-1 text-xs rounded font-medium transition-colors inline-flex items-center gap-1 ${
+                  following
+                    ? 'bg-green-600/20 text-green-300'
+                    : 'bg-slate-700 text-slate-400 hover:text-slate-200'
+                }`}
+                title={following ? 'Following the live tail — click to stop' : 'Follow the live tail'}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full bg-green-400 ${following ? 'animate-pulse' : ''}`} />
+                Follow
+              </button>
+            )}
+            {/* "End" jumps to the tail (one-shot). Distinct from Follow: End is a
+                single scroll-to-bottom, always available; Follow is the streaming
+                auto-tail mode. Phones have a built-in scroll-to-top, so no Top. */}
             <button
-              onClick={() => {
-                navigator.clipboard.writeText(plainContent)
-                setCopied(true)
-                setTimeout(() => setCopied(false), 2000)
-              }}
-              className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
-              title="Copy plain text to clipboard"
+              onClick={() => scrollToBottom(true)}
+              className="px-2 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
+              title="Jump to the end of the log"
             >
-              {copied ? 'Copied!' : 'Copy'}
+              <ArrowDownToLine className="w-3.5 h-3.5" />
+              End
             </button>
-          )}
-          {/* One download button — the current Color/Plain mode decides what
-              it saves: colored (ANSI codes preserved) in Color mode, stripped
-              plain text in Plain mode. */}
-          <button
-            onClick={() =>
-              colorMode
-                ? downloadFile(cleanLog ?? '', `${shortId}-${phase}.log`)
-                : downloadFile(plainContent, `${shortId}-${phase}-plain.log`)
-            }
-            className="px-2.5 py-1 text-xs rounded font-medium bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
-            title={colorMode ? 'Download log (with ANSI colour codes)' : 'Download log (plain text)'}
-          >
-            <Download className="w-3 h-3" />
-            Download
-          </button>
+          </div>
         </div>
       </div>
 
@@ -481,42 +510,6 @@ function LogPanel({
         </pre>
       )}
 
-      {/* Floating tail controls — fixed to the viewport so they're always
-          reachable. They act on the active scroller (the inner pane on desktop,
-          the window on mobile). "Jump to latest" appears when not at the tail
-          and re-engages follow; "Top" is always offered for a long log. */}
-      <div className="fixed bottom-6 right-6 z-20 flex flex-col items-end gap-2">
-        {!atBottom && (
-          <button
-            onClick={() => {
-              setFollowing(true)
-              scrollToBottom(true)
-            }}
-            className="px-3 py-2 rounded-full text-xs font-medium shadow-lg bg-brand-600 hover:bg-brand-500 text-white transition-colors inline-flex items-center gap-1.5"
-            title="Jump to the newest output and follow it"
-          >
-            <ArrowDownToLine className="w-3.5 h-3.5" />
-            {isStreaming ? 'Jump to latest' : 'Jump to end'}
-          </button>
-        )}
-        {atBottom && isStreaming && (
-          <span
-            className="px-3 py-2 rounded-full text-xs font-medium shadow-lg bg-slate-800/90 text-slate-300 border border-slate-700 inline-flex items-center gap-1.5"
-            title="Following live output"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            Following
-          </span>
-        )}
-        <button
-          onClick={scrollToTop}
-          className="px-3 py-2 rounded-full text-xs font-medium shadow-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors inline-flex items-center gap-1.5"
-          title="Jump to top"
-        >
-          <ChevronsUp className="w-3.5 h-3.5" />
-          Top
-        </button>
-      </div>
     </div>
   )
 }
@@ -538,6 +531,7 @@ function RunDetailPageInner() {
   const workspaceId = params.id as string
   const runId = params.runId as string
 
+  const isMobile = useIsMobile()
   const [run, setRun] = useState<Run | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -847,6 +841,24 @@ function RunDetailPageInner() {
     }
   }
 
+  // Mobile is a fat-finger danger zone — a stray tap on Apply/Discard/Cancel/
+  // Retry mutates infra or state. On a phone, gate every state-changing action
+  // behind the browser-native confirm() (accessible, familiar, and reusable for
+  // any future mobile action); on desktop (larger targets, precise pointer)
+  // execute immediately, unchanged.
+  function requestAction(action: 'confirm' | 'discard' | 'cancel' | 'retry') {
+    if (isMobile) {
+      const prompts: Record<string, string> = {
+        confirm: 'Apply this run? This applies the plan and changes infrastructure.',
+        discard: 'Discard this plan?',
+        cancel: 'Cancel this run?',
+        retry: 'Retry this run?',
+      }
+      if (!window.confirm(prompts[action])) return
+    }
+    handleAction(action)
+  }
+
   function statusColor(status: string): string {
     switch (status) {
       case 'applied': return 'bg-green-900/50 text-green-300'
@@ -887,13 +899,15 @@ function RunDetailPageInner() {
       Apply<span className="hidden md:inline"> Log</span>
     </>
   )
-  const tabs: [RunView, React.ReactNode][] = [
-    ['overview', 'Overview'],
-    ...((aiInfo?.present ? [['ai', 'AI']] : []) as [RunView, React.ReactNode][]),
-    ...((policyInfo?.present ? [['opa', 'OPA']] : []) as [RunView, React.ReactNode][]),
-    ['plan', planLabel],
-    ...((attrs['plan-only'] ? [] : [['apply', applyLabel]]) as [RunView, React.ReactNode][]),
-    ['details', 'Details'],
+  // Each tab carries a rich label (for the desktop bar) AND a plain-text label
+  // (for the mobile <select>, whose <option>s can't hold JSX).
+  const tabs: [RunView, React.ReactNode, string][] = [
+    ['overview', 'Overview', 'Overview'],
+    ...((aiInfo?.present ? [['ai', 'AI', 'AI analysis']] : []) as [RunView, React.ReactNode, string][]),
+    ...((policyInfo?.present ? [['opa', 'OPA', 'OPA policies']] : []) as [RunView, React.ReactNode, string][]),
+    ['plan', planLabel, 'Plan log'],
+    ...((attrs['plan-only'] ? [] : [['apply', applyLabel, 'Apply log']]) as [RunView, React.ReactNode, string][]),
+    ['details', 'Details', 'Details'],
   ]
   const availableViews = new Set(tabs.map((t) => t[0]))
   const view: RunView = availableViews.has(activeView) ? activeView : 'overview'
@@ -980,6 +994,92 @@ function RunDetailPageInner() {
     return { value: '—', tone: 'neutral' }
   })()
 
+  const hasActions =
+    actions['is-confirmable'] ||
+    actions['is-discardable'] ||
+    actions['is-cancelable'] ||
+    actions['is-retryable']
+
+  // Status pills — reused in the desktop header (top-right) and, on mobile, in
+  // the combined status+actions row below the title (one row, not two).
+  const statusBadges = (
+    <>
+      {attrs['is-destroy'] && (
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-900/50 text-red-300">
+          destroy
+        </span>
+      )}
+      {attrs['plan-only'] && !attrs['is-destroy'] && (
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-cyan-900/50 text-cyan-300">
+          plan only
+        </span>
+      )}
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusColor(attrs.status)}`}>
+        {attrs.status}
+      </span>
+    </>
+  )
+
+  // Primary run actions — shared between the desktop bar and the mobile row.
+  // Labels go terse below `md` (Apply / Retry / Cancel) and full at `md+`
+  // (Confirm & Apply / Retry Run / Cancel Run). `requestAction` inserts the
+  // mobile confirm step; desktop runs immediately.
+  const actionButtons = (
+    <>
+      {actions['is-retryable'] && (
+        <button
+          onClick={() => requestAction('retry')}
+          disabled={!!actionLoading}
+          className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
+        >
+          {actionLoading === 'retry' ? 'Retrying…' : (
+            <>
+              <span className="md:hidden">Retry</span>
+              <span className="hidden md:inline">Retry Run</span>
+            </>
+          )}
+        </button>
+      )}
+      {actions['is-confirmable'] && (
+        <button
+          onClick={() => requestAction('confirm')}
+          disabled={!!actionLoading}
+          className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-500 disabled:bg-green-800 disabled:text-green-400 text-white transition-colors"
+        >
+          {actionLoading === 'confirm' ? 'Confirming…' : (
+            <>
+              <span className="md:hidden">Apply</span>
+              <span className="hidden md:inline">Confirm &amp; Apply</span>
+            </>
+          )}
+        </button>
+      )}
+      {actions['is-discardable'] && (
+        <button
+          onClick={() => requestAction('discard')}
+          disabled={!!actionLoading}
+          className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-slate-600 hover:bg-slate-500 disabled:bg-slate-700 disabled:text-slate-400 text-white transition-colors"
+        >
+          {actionLoading === 'discard' ? 'Discarding…' : 'Discard'}
+        </button>
+      )}
+      {actions['is-cancelable'] && (
+        <button
+          onClick={() => requestAction('cancel')}
+          disabled={!!actionLoading}
+          className="px-3 md:px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 disabled:bg-red-800 disabled:text-red-400 text-white transition-colors"
+        >
+          {actionLoading === 'cancel' ? 'Canceling…' : (
+            <>
+              <span className="md:hidden">Cancel</span>
+              <span className="hidden md:inline">Cancel Run</span>
+            </>
+          )}
+        </button>
+      )}
+    </>
+  )
+
   return (
     <>
       <NavBar />
@@ -1000,19 +1100,10 @@ function RunDetailPageInner() {
           actions={
             <div className="flex items-center gap-2">
               <ConnectionStatus connected={sseConnected} />
-              {attrs['is-destroy'] && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-900/50 text-red-300">
-                  destroy
-                </span>
-              )}
-              {attrs['plan-only'] && !attrs['is-destroy'] && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-cyan-900/50 text-cyan-300">
-                  plan only
-                </span>
-              )}
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusColor(attrs.status)}`}>
-                {attrs.status}
-              </span>
+              {/* Desktop keeps the status pills top-right beside the title. On
+                  mobile they move down to share one row with the action buttons
+                  (see below), so they're hidden here below `md`. */}
+              <div className="hidden md:flex items-center gap-2">{statusBadges}</div>
             </div>
           }
         />
@@ -1021,46 +1112,21 @@ function RunDetailPageInner() {
 
         {/* Primary run actions live OUTSIDE the tab structure (#721) so they
             stay reachable from any tab — confirm an apply while watching the
-            plan log, cancel from Details, retry from anywhere. */}
-        {(actions['is-confirmable'] || actions['is-discardable'] || actions['is-cancelable'] || actions['is-retryable']) && (
-          <div className="flex flex-wrap gap-3 mb-6">
-            {actions['is-retryable'] && (
-              <button
-                onClick={() => handleAction('retry')}
-                disabled={!!actionLoading}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
-              >
-                {actionLoading === 'retry' ? 'Retrying...' : 'Retry Run'}
-              </button>
-            )}
-            {actions['is-confirmable'] && (
-              <button
-                onClick={() => handleAction('confirm')}
-                disabled={!!actionLoading}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-500 disabled:bg-green-800 disabled:text-green-400 text-white transition-colors"
-              >
-                {actionLoading === 'confirm' ? 'Confirming...' : 'Confirm & Apply'}
-              </button>
-            )}
-            {actions['is-discardable'] && (
-              <button
-                onClick={() => handleAction('discard')}
-                disabled={!!actionLoading}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-slate-600 hover:bg-slate-500 disabled:bg-slate-700 disabled:text-slate-400 text-white transition-colors"
-              >
-                {actionLoading === 'discard' ? 'Discarding...' : 'Discard'}
-              </button>
-            )}
-            {actions['is-cancelable'] && (
-              <button
-                onClick={() => handleAction('cancel')}
-                disabled={!!actionLoading}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 disabled:bg-red-800 disabled:text-red-400 text-white transition-colors"
-              >
-                {actionLoading === 'cancel' ? 'Canceling...' : 'Cancel Run'}
-              </button>
-            )}
-          </div>
+            plan log, cancel from Details, retry from anywhere.
+
+            Mobile (`< md`): the status pills + action buttons share ONE row
+            below the title (the header pills are desktop-only). A tapped
+            state-changing action is gated behind a native confirm() (see
+            requestAction). This row always renders on mobile so the status pill
+            has a home even when there are no actions. */}
+        <div className="md:hidden flex flex-wrap items-center gap-x-4 gap-y-2 mb-6">
+          <div className="flex items-center gap-2">{statusBadges}</div>
+          <div className="flex flex-wrap items-center gap-2">{actionButtons}</div>
+        </div>
+        {/* Desktop (`md+`): buttons only (pills are in the header), single
+            click — unchanged. */}
+        {hasActions && (
+          <div className="hidden md:flex flex-wrap gap-3 mb-6">{actionButtons}</div>
         )}
 
         {/* View tabs (#721) — Overview summarises the run; AI and OPA appear
@@ -1068,8 +1134,30 @@ function RunDetailPageInner() {
             Details holds metadata / timeline / resource usage / run options.
             Six tabs don't fit a phone, so the strip scrolls horizontally with a
             right-edge fade cueing there's more (mobile only — desktop fits). */}
-        <div className="relative border-b border-slate-700/50 mb-6">
-          <div className="flex gap-1 -mb-px overflow-x-auto">
+        {/* Mobile (`< md`): a native <select> view picker — one tap, native
+            picker, no awful horizontal-scroll strip. Desktop (`md+`): the tab
+            bar (all tabs fit, so no scroll/fade needed). One `tabs` source, two
+            viewport-driven presentations; the URL stays the source of truth via
+            switchView either way. */}
+        <div className="mb-6 md:hidden">
+          <label htmlFor="run-view-select" className="sr-only">
+            Run section
+          </label>
+          <select
+            id="run-view-select"
+            value={view}
+            onChange={(e) => switchView(e.target.value as RunView)}
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm font-medium text-slate-100 focus:border-brand-500 focus:outline-none"
+          >
+            {tabs.map(([v, , text]) => (
+              <option key={v} value={v}>
+                {text}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="hidden border-b border-slate-700/50 mb-6 md:block">
+          <div className="flex gap-1 -mb-px">
             {tabs.map(([v, label]) => (
               <button
                 key={v}
@@ -1085,9 +1173,6 @@ function RunDetailPageInner() {
               </button>
             ))}
           </div>
-          {/* Scroll cue: a right-edge fade on phones where the strip overflows;
-              hidden from `md` up where all tabs fit. Non-interactive. */}
-          <div className="md:hidden pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-slate-950 to-transparent" />
         </div>
 
         {view === 'overview' && (
