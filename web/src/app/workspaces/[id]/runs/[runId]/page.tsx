@@ -14,7 +14,7 @@ import { ResourceUsage, parseMemoryToBytes, humanBytes } from '@/components/reso
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
-import { useIsMobile } from '@/lib/use-media-query'
+import { useIsTouch } from '@/lib/use-media-query'
 import { ArrowDownToLine, RefreshCw, Download, Copy, Check, Palette } from 'lucide-react'
 
 interface RunActions {
@@ -296,8 +296,11 @@ function LogPanel({
   // normal inner-scroll pane (the familiar CI-log behaviour — it scrolls
   // independently of the page); on a phone a nested scroll region is a touch
   // trap, so the pane just expands and the *page* is the scroll container.
-  // Same component, the scroll target branches on width.
-  const isMobile = useIsMobile()
+  // Same component; the scroll target branches on POINTER, not width — a nested
+  // scroll region is a touch trap regardless of how wide the screen is, so a
+  // touch tablet/foldable page-scrolls too, while a mouse (any width) keeps the
+  // inner pane. Mirrors the CSS `fine:` overflow on the <pre> below.
+  const isTouch = useIsTouch()
   const [colorMode, setColorMode] = useState(true)
   // Follow the tail by default while streaming; a static (finished) log opens
   // at the top so the operator reads from the start.
@@ -320,22 +323,22 @@ function LogPanel({
   }, [cleanLog])
 
   const isAtBottom = useCallback(() => {
-    if (isMobile) {
+    if (isTouch) {
       const doc = document.documentElement
       return window.innerHeight + window.scrollY >= doc.scrollHeight - 80
     }
     const el = preRef.current
     if (!el) return true
     return el.scrollHeight - el.scrollTop - el.clientHeight < 60
-  }, [isMobile])
+  }, [isTouch])
 
   const scrollToBottom = useCallback(
     (smooth = false) => {
       const opts: ScrollToOptions = { behavior: smooth ? 'smooth' : 'auto' }
-      if (isMobile) window.scrollTo({ top: document.documentElement.scrollHeight, ...opts })
+      if (isTouch) window.scrollTo({ top: document.documentElement.scrollHeight, ...opts })
       else preRef.current?.scrollTo({ top: preRef.current.scrollHeight, ...opts })
     },
-    [isMobile],
+    [isTouch],
   )
 
   // Pin the active scroller to the tail when following and the content changes.
@@ -347,17 +350,17 @@ function LogPanel({
 
   // Track the scroller's position so scrolling up to read disengages follow and
   // scrolling back to the bottom re-engages it. The listener is on the window
-  // (mobile) or the inner pane (desktop).
+  // (touch — the page scrolls) or the inner pane (mouse).
   useEffect(() => {
     const onScroll = () => {
       setFollowing(isAtBottom())
     }
-    const el = isMobile ? window : preRef.current
+    const el = isTouch ? window : preRef.current
     if (!el) return
     el.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
     return () => el.removeEventListener('scroll', onScroll)
-  }, [isMobile, isAtBottom])
+  }, [isTouch, isAtBottom])
 
   if (loading) {
     return (
@@ -487,24 +490,25 @@ function LogPanel({
         </div>
       </div>
 
-      {/* On desktop (`md:`) the pane is a bounded inner-scroll region — it
-          scrolls independently of the page, the familiar CI-log behaviour.
-          Below `md` it has no max-height and no inner overflow, so it expands
-          and the page scrolls (no nested-scroll touch trap). The `md` boundary
-          matches `useIsMobile` (768px), so the CSS scroller and the JS scroll
-          logic agree. */}
+      {/* With a precise pointer (`fine:`) the pane is a bounded inner-scroll
+          region — it scrolls independently of the page, the familiar CI-log
+          behaviour. On a touch device it has no max-height and no inner
+          overflow, so it expands and the *page* scrolls (no nested-scroll touch
+          trap) — regardless of width, so a wide touch tablet is safe too. The
+          `fine:` CSS variant matches `useIsTouch()`, so the CSS scroller and
+          the JS tail-follow logic agree. */}
       {colorMode ? (
         <pre
           ref={preRef}
           data-testid={`log-pre-${phase}`}
-          className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words md:max-h-[70vh] md:overflow-y-auto"
+          className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[70vh] fine:overflow-y-auto"
           dangerouslySetInnerHTML={{ __html: htmlContent }}
         />
       ) : (
         <pre
           ref={preRef}
           data-testid={`log-pre-${phase}`}
-          className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words md:max-h-[70vh] md:overflow-y-auto"
+          className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words fine:max-h-[70vh] fine:overflow-y-auto"
         >
           {plainContent}
         </pre>
@@ -531,7 +535,7 @@ function RunDetailPageInner() {
   const workspaceId = params.id as string
   const runId = params.runId as string
 
-  const isMobile = useIsMobile()
+  const isTouch = useIsTouch()
   const [run, setRun] = useState<Run | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -841,13 +845,13 @@ function RunDetailPageInner() {
     }
   }
 
-  // Mobile is a fat-finger danger zone — a stray tap on Apply/Discard/Cancel/
-  // Retry mutates infra or state. On a phone, gate every state-changing action
-  // behind the browser-native confirm() (accessible, familiar, and reusable for
-  // any future mobile action); on desktop (larger targets, precise pointer)
-  // execute immediately, unchanged.
+  // Touch is a fat-finger danger zone — a stray tap on Apply/Discard/Cancel/
+  // Retry mutates infra or state. On a touch device (phone, tablet, foldable —
+  // any width) gate every state-changing action behind the browser-native
+  // confirm(); with a precise pointer (mouse/trackpad) execute immediately.
+  // Keyed on pointer, not width, so a wide touch tablet is still guarded.
   function requestAction(action: 'confirm' | 'discard' | 'cancel' | 'retry') {
-    if (isMobile) {
+    if (isTouch) {
       const prompts: Record<string, string> = {
         confirm: 'Apply this run? This applies the plan and changes infrastructure.',
         discard: 'Discard this plan?',

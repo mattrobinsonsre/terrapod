@@ -48,7 +48,30 @@ export const BREAKPOINTS = {
  * True when the viewport is narrower than the `md` breakpoint (the phone /
  * small-tablet range). Keyed to the same 768px boundary as Tailwind's `md:`
  * and the nav's mobile switch, so CSS and JS agree.
+ *
+ * Use this for **layout density** decisions only (though CSS `md:` handles
+ * almost all of those). For **touch-friendliness** — destructive-action
+ * confirms, avoiding nested scroll traps — use `useIsTouch()` instead: width
+ * does NOT imply touch (a wide tablet/foldable is touch; a narrow desktop
+ * window is not).
  */
 export function useIsMobile(): boolean {
   return useMediaQuery(`(max-width: ${BREAKPOINTS.md - 0.02}px)`)
+}
+
+/**
+ * True when the **primary pointing device is coarse** — i.e. the person is
+ * most likely interacting by touch (finger / stylus), as opposed to a precise
+ * mouse / trackpad. This is the correct signal for touch-friendliness (guard
+ * destructive taps with `confirm()`, avoid nested scroll traps), independent
+ * of viewport width — so a tablet or unfolded foldable at desktop width still
+ * gets the touch-safe behaviour while keeping the roomy desktop layout.
+ *
+ * Reflects the *primary* pointer (`(pointer: coarse)`), so a laptop with a
+ * trackpad + touchscreen reads as precise and isn't nagged. Mirrors the CSS
+ * `touch:` custom variant in globals.css. (Switch to `(any-pointer: coarse)`
+ * if any touch-capable input should trigger the touch treatment.)
+ */
+export function useIsTouch(): boolean {
+  return useMediaQuery('(pointer: coarse)')
 }

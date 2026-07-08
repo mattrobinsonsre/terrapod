@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Interaction-media variants (#719). Touch-friendliness is keyed on the
+   pointer, NOT viewport width: `touch:` = the primary pointer is coarse (finger
+   / stylus), `fine:` = a precise pointer (mouse / trackpad). Layout density
+   stays on width (sm:/md:/lg:); these govern interaction (scroll traps, tap
+   targets, hover-only affordances) so tablets & foldables stay touch-safe. */
+@custom-variant touch (@media (pointer: coarse));
+@custom-variant fine (@media (pointer: fine));
+
 @theme {
   --color-brand-50: #f5f3ff;
   --color-brand-100: #ede9fe;
