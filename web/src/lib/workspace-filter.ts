@@ -63,6 +63,13 @@ export interface StatusTerm {
  *  `matchWorkspace` against the `health-conditions` array. */
 export const HEALTH_ISSUE_STATUS = 'unhealthy'
 
+/** The `status:` value matching manually-locked workspaces. Like
+ *  `unhealthy`, it isn't a resolved-run status — it's matched specially in
+ *  `matchWorkspace` against the workspace's `locked` attribute, and rides the
+ *  `status` facet so no new reserved label key is introduced. Drives the
+ *  clickable "Locked" stat chip. */
+export const LOCKED_STATUS = 'locked'
+
 export type FilterTerm = NameTerm | LabelTerm | StatusTerm
 
 export interface ParsedFilter {
@@ -154,6 +161,8 @@ export interface MatchableWorkspace {
     // Server-computed health conditions (see `_compute_health_conditions`).
     // Only consulted by the `status:unhealthy` aggregate term; safe to omit.
     'health-conditions'?: unknown[] | null
+    // Manual state lock. Only consulted by the `status:locked` term.
+    locked?: boolean | null
   }
 }
 
@@ -180,6 +189,10 @@ export function matchWorkspace(
         // resolved status (which can mask underlying conditions, e.g.
         // needs-confirm over state_diverged).
         if ((ws.attributes['health-conditions'] || []).length === 0) return false
+      } else if (term.value === LOCKED_STATUS) {
+        // Manual state lock — matched on the workspace attribute, not the
+        // resolved run status (a locked workspace still has a run status).
+        if (!ws.attributes.locked) return false
       } else if (resolvedStatus !== term.value) {
         return false
       }

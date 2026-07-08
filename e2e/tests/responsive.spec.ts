@@ -50,16 +50,26 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(hamburger).toBeVisible();
 
     // Opening it reveals the grouped sheet: primary links plus labelled
-    // sections (Registry / Account, + Admin for admins). Stage 1 groups the
-    // destinations rather than dumping ~22 flat items.
+    // sections (Registry / Help, + Admin for admins). Account is NOT here — it
+    // has its own trigger + drawer.
     await hamburger.click();
     const menu = page.locator('#mobile-nav-menu');
     await expect(menu).toBeVisible();
     await expect(menu.getByRole('link', { name: 'Workspaces' })).toBeVisible();
     await expect(menu.getByText('Registry', { exact: true })).toBeVisible();
-    await expect(menu.getByText('Account', { exact: true })).toBeVisible();
+    await expect(menu.getByText('Help', { exact: true })).toBeVisible();
     await expect(menu.getByRole('link', { name: 'Modules' })).toBeVisible();
+    await expect(menu.getByText('Account', { exact: true })).toHaveCount(0);
     // Opening the sheet must not introduce horizontal overflow.
+    await expectNoHorizontalPageScroll(page);
+
+    // Account has its own trigger + drawer (personal/session items + log out).
+    await menu.getByRole('button', { name: /close menu/i }).click();
+    await page.getByRole('button', { name: 'Open account menu' }).click();
+    const account = page.locator('#mobile-account-menu');
+    await expect(account).toBeVisible();
+    await expect(account.getByRole('link', { name: 'API Tokens' })).toBeVisible();
+    await expect(account.getByRole('button', { name: 'Log out' })).toBeVisible();
     await expectNoHorizontalPageScroll(page);
   });
 
@@ -94,9 +104,10 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page.getByRole('heading', { name: 'Workspaces', level: 1 })).toBeVisible();
 
     await expect(page.getByText('Manage Terraform workspaces, state, and runs')).toBeHidden();
+    // Compact stat chips: Total/Locked are desktop-only; Health always shows.
     await expect(page.getByText('Total', { exact: true })).toBeHidden();
     await expect(page.getByText('Locked', { exact: true })).toBeHidden();
-    await expect(page.getByText('Health Issues', { exact: true })).toBeVisible();
+    await expect(page.getByText('Health', { exact: true })).toBeVisible();
 
     await expectNoHorizontalPageScroll(page);
   });

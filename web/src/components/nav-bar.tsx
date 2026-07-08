@@ -83,11 +83,16 @@ const ADMIN_ITEMS: NavItem[] = [
 
 const AUDIT_ITEM: NavItem = { href: '/admin/audit-log', label: 'Audit Log', icon: FileText }
 
-// Account / reference destinations (behind Account▾ on desktop). Logout is
+// Personal / session destinations (behind the Account menu). Logout is
 // rendered separately (it is an action, not a link).
 const ACCOUNT_ITEMS: NavItem[] = [
   { href: '/settings/tokens', label: 'API Tokens', icon: Key },
   { href: '/settings/sessions', label: 'Sessions', icon: Activity },
+]
+
+// Help / reference destinations — NOT account items. Grouped separately so
+// the Account menu stays personal (tokens, sessions, log out).
+const HELP_ITEMS: NavItem[] = [
   { href: '/api-docs', label: 'API Reference', icon: Code },
   {
     href: 'https://github.com/mattrobinsonsre/terrapod/blob/main/docs/index.md',
@@ -253,6 +258,46 @@ function MobileLink({ item, onClick }: { item: NavItem; onClick: () => void }) {
   )
 }
 
+/**
+ * A full-screen mobile drawer: its own top bar (title + close) plus an
+ * internally-scrolling body. Being `fixed inset-0` it's self-contained and
+ * always aligned regardless of the sticky nav / expiry banners above it;
+ * `overscroll-contain` + the body-scroll lock stop scrolling from chaining to
+ * the page behind it.
+ */
+function MobileDrawer({
+  id,
+  title,
+  onClose,
+  children,
+}: {
+  id: string
+  title: string
+  onClose: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div
+      id={id}
+      className="md:hidden fixed top-0 left-0 right-0 h-dvh z-40 bg-slate-900 flex flex-col"
+    >
+      <div className="flex items-center justify-between h-14 px-4 border-b border-slate-800 flex-shrink-0">
+        <span className="font-bold text-lg text-slate-100">{title}</span>
+        <button
+          onClick={onClose}
+          aria-label="Close menu"
+          className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+        >
+          <X size={22} />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4 pt-2 pb-8 flex flex-col gap-0.5">
+        {children}
+      </div>
+    </div>
+  )
+}
+
 export default function NavBar() {
   const router = useRouter()
   const noopSubscribe = () => () => {}
@@ -265,6 +310,7 @@ export default function NavBar() {
   )
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const [version, setVersion] = useState('')
 
   useEffect(() => {
@@ -274,17 +320,33 @@ export default function NavBar() {
       .catch(() => {})
   }, [])
 
-  // Close the mobile sheet on route change (tapping a link navigates).
+  // Close both mobile drawers on route change (tapping a link navigates).
   useEffect(() => {
     setMenuOpen(false)
+    setAccountOpen(false)
   }, [pathname])
+
+  // A mobile drawer is a full-screen, internally-scrolling overlay; lock the
+  // body while one is open so scrolling the drawer doesn't chain to the page
+  // behind it. Restored on close/unmount.
+  useEffect(() => {
+    if (!menuOpen && !accountOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [menuOpen, accountOpen])
 
   const handleLogout = () => {
     clearAuth()
     router.push('/login')
   }
 
-  const closeMenu = () => setMenuOpen(false)
+  const closeDrawers = () => {
+    setMenuOpen(false)
+    setAccountOpen(false)
+  }
 
   // Admin menu contents: full admin list for admins; audit-only users see
   // just the Audit Log entry. Audit Log is appended for anyone admin-or-audit.
@@ -292,8 +354,8 @@ export default function NavBar() {
 
   const registryActive = REGISTRY_ITEMS.some((i) => isPathActive(pathname, i.href))
   const adminActive = adminMenuItems.some((i) => isPathActive(pathname, i.href))
-  const accountActive =
-    ACCOUNT_ITEMS.some((i) => !i.external && isPathActive(pathname, i.href))
+  const helpActive = HELP_ITEMS.some((i) => !i.external && isPathActive(pathname, i.href))
+  const accountActive = ACCOUNT_ITEMS.some((i) => !i.external && isPathActive(pathname, i.href))
 
   const accountLabel = email || 'Account'
 
@@ -319,6 +381,7 @@ export default function NavBar() {
             {adminOrAudit && (
               <NavDropdown label="Admin" icon={Cog} items={adminMenuItems} active={adminActive} align="end" />
             )}
+            <NavDropdown label="Help" icon={BookOpen} items={HELP_ITEMS} active={helpActive} align="end" />
             <NavDropdown
               label={accountLabel}
               icon={User}
@@ -343,55 +406,80 @@ export default function NavBar() {
             />
           </div>
 
-          {/* Mobile nav */}
+          {/* Mobile top bar — logo + Account trigger + hamburger */}
           <div className="md:hidden flex items-center justify-between h-14">
             <Link href="/" className="flex items-center gap-2">
               <img src="/logo.svg" alt="Terrapod" className="w-7 h-7" />
               <span className="font-bold text-lg text-slate-100">Terrapod</span>
               {version && <span className="text-xs text-slate-500 font-normal">{version}</span>}
             </Link>
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-              aria-expanded={menuOpen}
-              aria-controls="mobile-nav-menu"
-              className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-            >
-              {menuOpen ? <X size={22} /> : <Menu size={22} />}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  setAccountOpen(true)
+                  setMenuOpen(false)
+                }}
+                aria-label="Open account menu"
+                aria-expanded={accountOpen}
+                aria-controls="mobile-account-menu"
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+              >
+                <User size={22} />
+              </button>
+              <button
+                onClick={() => {
+                  setMenuOpen(true)
+                  setAccountOpen(false)
+                }}
+                aria-label="Open menu"
+                aria-expanded={menuOpen}
+                aria-controls="mobile-nav-menu"
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+              >
+                <Menu size={22} />
+              </button>
+            </div>
           </div>
+
+          {/* Mobile main drawer — primary destinations, then Registry / Admin /
+              Help sections. Account is deliberately NOT here — it has its own
+              trigger + drawer. */}
           {menuOpen && (
-            <div id="mobile-nav-menu" className="md:hidden flex flex-col gap-0.5 pb-4">
-              {/*
-                Primary destinations first, flat and un-headed (they are the
-                default group). Registry is a delimited section BELOW them —
-                otherwise Catalog/Agent Pools/Labels read as if they belong to
-                the Registry section header.
-              */}
-              <MobileLink item={{ href: '/workspaces', label: 'Workspaces', icon: Layers }} onClick={closeMenu} />
-              <MobileLink item={{ href: '/catalog', label: 'Catalog', icon: LayoutGrid }} onClick={closeMenu} />
+            <MobileDrawer id="mobile-nav-menu" title="Menu" onClose={closeDrawers}>
+              <MobileLink item={{ href: '/workspaces', label: 'Workspaces', icon: Layers }} onClick={closeDrawers} />
+              <MobileLink item={{ href: '/catalog', label: 'Catalog', icon: LayoutGrid }} onClick={closeDrawers} />
               <MobileLink
                 item={{ href: '/admin/agent-pools', label: 'Agent Pools', icon: Server }}
-                onClick={closeMenu}
+                onClick={closeDrawers}
               />
 
               <MobileSection label="Registry" />
               {REGISTRY_ITEMS.map((it) => (
-                <MobileLink key={it.href} item={it} onClick={closeMenu} />
+                <MobileLink key={it.href} item={it} onClick={closeDrawers} />
               ))}
 
               {adminOrAudit && (
                 <>
                   <MobileSection label="Admin" />
                   {adminMenuItems.map((it) => (
-                    <MobileLink key={it.href} item={it} onClick={closeMenu} />
+                    <MobileLink key={it.href} item={it} onClick={closeDrawers} />
                   ))}
                 </>
               )}
 
-              <MobileSection label="Account" />
+              <MobileSection label="Help" />
+              {HELP_ITEMS.map((it) => (
+                <MobileLink key={it.href} item={it} onClick={closeDrawers} />
+              ))}
+            </MobileDrawer>
+          )}
+
+          {/* Mobile account drawer — personal / session, opened by the User icon */}
+          {accountOpen && (
+            <MobileDrawer id="mobile-account-menu" title="Account" onClose={closeDrawers}>
+              {email && <div className="px-3 pb-2 text-sm text-slate-400 truncate">{email}</div>}
               {ACCOUNT_ITEMS.map((it) => (
-                <MobileLink key={it.href} item={it} onClick={closeMenu} />
+                <MobileLink key={it.href} item={it} onClick={closeDrawers} />
               ))}
               <button
                 onClick={handleLogout}
@@ -400,7 +488,7 @@ export default function NavBar() {
                 <LogOut size={18} />
                 Log out
               </button>
-            </div>
+            </MobileDrawer>
           )}
         </div>
       </nav>

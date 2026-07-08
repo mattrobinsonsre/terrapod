@@ -11,6 +11,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { WorkspaceStatusBadges } from '@/components/workspace-status-badges'
+import { StatChip } from '@/components/stat-chip'
 import { getAuthState } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
@@ -19,6 +20,7 @@ import {
   hasLabelTerm,
   hasStatusTerm,
   HEALTH_ISSUE_STATUS,
+  LOCKED_STATUS,
   matchWorkspace,
   parseFilterQuery,
   removeTerm,
@@ -241,6 +243,20 @@ function WorkspacesPageInner() {
     }
     return counts
   }, [workspaces])
+
+  // "Health issues" is ONE control rendered two ways (#719): the desktop
+  // stat-grid card and the compact chip on the mobile filter row. Compute the
+  // count + toggle once so both forms stay in sync.
+  const withConditions = useMemo(
+    () => workspaces.filter(ws => (ws.attributes['health-conditions'] || []).length > 0).length,
+    [workspaces],
+  )
+  const healthFilterActive = hasStatusTerm(parsedFilter, HEALTH_ISSUE_STATUS)
+  const toggleHealth = () =>
+    setFilterInput(serializeFilter(toggleStatusTerm(parsedFilter, HEALTH_ISSUE_STATUS)))
+  const lockedFilterActive = hasStatusTerm(parsedFilter, LOCKED_STATUS)
+  const toggleLocked = () =>
+    setFilterInput(serializeFilter(toggleStatusTerm(parsedFilter, LOCKED_STATUS)))
 
   // Distinct labels across the unfiltered list: key → sorted unique values
   // with workspace counts. Drives the two-level "+ Label" picker. Computed
@@ -701,67 +717,55 @@ function WorkspacesPageInner() {
 
         {!loading && workspaces.length > 0 && (() => {
           const total = workspaces.length
-          const withConditions = workspaces.filter(ws => (ws.attributes['health-conditions'] || []).length > 0).length
           const locked = workspaces.filter(ws => ws.attributes.locked).length
-          const healthFilterActive = hasStatusTerm(parsedFilter, HEALTH_ISSUE_STATUS)
-          // On mobile only Health Issues matters — Total and Locked are
-          // secondary counts we can live without on a small screen (#719), so
-          // they're hidden below `sm` and the grid collapses to a single
-          // full-width Health Issues card. Desktop keeps all three.
-          return (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-              <div className="hidden sm:block bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Total</p>
-                <p className="text-2xl font-semibold text-slate-100 mt-1">{total}</p>
-              </div>
-              {/* Clicking a non-zero Health Issues count toggles the
-                  `status:unhealthy` filter so the operator can jump straight to
-                  the affected workspaces (and click again to clear). When the
-                  count is zero there's nothing to filter to, so it stays a
-                  plain card. */}
-              {withConditions > 0 ? (
-                <button
-                  type="button"
-                  aria-pressed={healthFilterActive}
-                  aria-label={healthFilterActive ? 'Clear health issues filter' : 'Filter to workspaces with health issues'}
-                  title={healthFilterActive ? 'Clear health issues filter' : 'Filter to workspaces with health issues'}
-                  onClick={() => setFilterInput(serializeFilter(toggleStatusTerm(parsedFilter, HEALTH_ISSUE_STATUS)))}
-                  className={
-                    'text-left rounded-lg border p-4 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 ' +
-                    (healthFilterActive
-                      ? 'bg-red-500/10 border-red-500/50'
-                      : 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-700/40 hover:border-slate-600')
-                  }
-                >
-                  <p className="text-xs text-slate-500 uppercase tracking-wider">Health Issues</p>
-                  <p className="text-2xl font-semibold mt-1 text-red-400">{withConditions}</p>
-                </button>
-              ) : (
-                <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
-                  <p className="text-xs text-slate-500 uppercase tracking-wider">Health Issues</p>
-                  <p className="text-2xl font-semibold mt-1 text-slate-100">{withConditions}</p>
-                </div>
-              )}
-              <div className="hidden sm:block bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Locked</p>
-                <p className={`text-2xl font-semibold mt-1 ${locked > 0 ? 'text-amber-400' : 'text-slate-100'}`}>{locked}</p>
-              </div>
-            </div>
-          )
-        })()}
-
-        {!loading && workspaces.length > 0 && (() => {
-          // The aggregate `unhealthy` term is driven by the Health Issues card
-          // + its filter chip, not the Status dropdown, so it doesn't count
-          // toward the dropdown's active badge (which would otherwise show a
-          // count with no matching checked row inside).
+          // `unhealthy` is driven by the Health chip, not the Status dropdown,
+          // so it doesn't count toward the dropdown's active badge (which would
+          // otherwise show a count with no matching checked row inside).
           const activeStatusCount = parsedFilter.terms.filter(
-            t => t.kind === 'status' && t.value !== HEALTH_ISSUE_STATUS,
+            t => t.kind === 'status' && t.value !== HEALTH_ISSUE_STATUS && t.value !== LOCKED_STATUS,
           ).length
+          const healthLabel = healthFilterActive
+            ? 'Clear health issues filter'
+            : 'Filter to workspaces with health issues'
           return (
             <div className="mb-4">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1" ref={suggestWrapRef}>
+              {/* Compact toolbar (#719): stat chips + Status/Label share one
+                  row; the filter input drops to its own row (basis-full) via
+                  flex `order`. Total/Locked are desktop-only secondary counts;
+                  Health is always shown (primary signal) and toggles the
+                  `status:unhealthy` filter. No big stat cards on any viewport. */}
+              <div className="flex flex-wrap items-center gap-2">
+                <StatChip
+                  label="Total"
+                  value={total}
+                  onClick={parsedFilter.terms.length > 0 ? () => setFilterInput('') : undefined}
+                  ariaLabel="Clear all filters"
+                  className="order-1 max-sm:hidden"
+                />
+                <StatChip
+                  label="Health"
+                  value={withConditions}
+                  valueClassName={withConditions > 0 ? 'text-red-400' : 'text-slate-300'}
+                  onClick={withConditions > 0 ? toggleHealth : undefined}
+                  active={healthFilterActive}
+                  ariaLabel={healthLabel}
+                  className="order-2"
+                />
+                <StatChip
+                  label="Locked"
+                  value={locked}
+                  valueClassName={locked > 0 ? 'text-amber-400' : undefined}
+                  onClick={locked > 0 ? toggleLocked : undefined}
+                  active={lockedFilterActive}
+                  activeClassName="bg-amber-500/10 border-amber-500/50"
+                  ariaLabel={lockedFilterActive ? 'Clear locked filter' : 'Filter to locked workspaces'}
+                  className="order-3 max-sm:hidden"
+                />
+                <div className="order-4 flex-1 min-w-0" />
+                {/* Input + Clear share their own full-width row (order-7),
+                    Clear pinned to the right of the input — desktop and mobile. */}
+                <div className="order-7 basis-full flex items-center gap-2">
+                  <div className="relative flex-1 min-w-0" ref={suggestWrapRef}>
                   <input
                     type="text"
                     value={filterInput}
@@ -814,11 +818,21 @@ function WorkspacesPageInner() {
                       ))}
                     </div>
                   )}
+                  </div>
+                  {parsedFilter.terms.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterInput('')}
+                      className="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 transition-colors whitespace-nowrap flex-shrink-0"
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
                 {/* Status dropdown — single entry point for all status presets.
                     Picks any combination via toggle; the existing chips below
                     show what's active and let the user remove individually. */}
-                <div className="relative" ref={statusMenuRef}>
+                <div className="relative order-5" ref={statusMenuRef}>
                   <button
                     type="button"
                     aria-haspopup="menu"
@@ -879,7 +893,7 @@ function WorkspacesPageInner() {
                     key/value pairs. First level lists distinct label keys
                     in the visible workspaces; clicking a key drills into a
                     second menu of distinct values for that key. */}
-                <div className="relative" ref={labelMenuRef}>
+                <div className="relative order-6" ref={labelMenuRef}>
                   {(() => {
                     const activeLabelCount = parsedFilter.terms.filter(t => t.kind === 'label' && t.value !== null).length
                     return (
@@ -968,15 +982,6 @@ function WorkspacesPageInner() {
                     )
                   })()}
                 </div>
-                {parsedFilter.terms.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setFilterInput('')}
-                    className="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 transition-colors"
-                  >
-                    Clear
-                  </button>
-                )}
               </div>
               {parsedFilter.terms.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
