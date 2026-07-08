@@ -9,6 +9,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { SortableHeader } from '@/components/sortable-header'
 import { useSortable } from '@/lib/use-sortable'
+import { useConfirm } from '@/lib/use-confirm'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { usePollingInterval } from '@/lib/use-polling-interval'
@@ -208,6 +209,7 @@ interface Identity {
 type Tab = 'roles' | 'assignments'
 
 export default function RolesPage() {
+  const { confirmDelete } = useConfirm()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<Tab>('roles')
 
@@ -254,7 +256,6 @@ export default function RolesPage() {
   const [editRoleCapsCustom, setEditRoleCapsCustom] = useState(false)
 
   // Delete role
-  const [deleteRoleName, setDeleteRoleName] = useState<string | null>(null)
 
   // Display: which role rows have their capability list expanded
   const [expandedCaps, setExpandedCaps] = useState<Set<string>>(new Set())
@@ -535,12 +536,12 @@ export default function RolesPage() {
   }
 
   async function handleDeleteRole(name: string) {
+    if (!confirmDelete(`Delete role "${name}"? Any assignments referencing it are affected.`)) return
     setError('')
     setSuccess('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/roles/${name}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete role')
-      setDeleteRoleName(null)
       setSuccess(`Role "${name}" deleted`)
       await loadRoles()
     } catch (err) {
@@ -585,6 +586,7 @@ export default function RolesPage() {
   }
 
   async function handleDeleteAssignment(provider: string, email: string, roleName: string) {
+    if (!confirmDelete(`Remove role "${roleName}" from ${email}?`)) return
     setError('')
     setSuccess('')
     try {
@@ -776,8 +778,8 @@ export default function RolesPage() {
                           <div className="flex items-center justify-between">
                             <h3 className="text-sm font-medium text-slate-200">{role.name}</h3>
                             <div className="flex gap-2">
-                              <button onClick={() => setEditingRole(null)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
-                              <button onClick={handleSaveRole} disabled={savingRole} className="text-xs text-brand-400 hover:text-brand-300">
+                              <button onClick={() => setEditingRole(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Cancel</button>
+                              <button onClick={handleSaveRole} disabled={savingRole} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white">
                                 {savingRole ? 'Saving...' : 'Save'}
                               </button>
                             </div>
@@ -924,15 +926,8 @@ export default function RolesPage() {
                           </div>
                           {!a['built-in'] && (
                             <div className="flex gap-2 flex-shrink-0">
-                              <button onClick={() => startEditRole(role)} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
-                              {deleteRoleName === role.name ? (
-                                <>
-                                  <button onClick={() => setDeleteRoleName(null)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
-                                  <button onClick={() => handleDeleteRole(role.name)} className="text-xs text-red-400 hover:text-red-300">Confirm</button>
-                                </>
-                              ) : (
-                                <button onClick={() => setDeleteRoleName(role.name)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
-                              )}
+                              <button onClick={() => startEditRole(role)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Edit</button>
+                              <button onClick={() => handleDeleteRole(role.name)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">Delete</button>
                             </div>
                           )}
                         </div>
@@ -1036,7 +1031,7 @@ export default function RolesPage() {
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => handleDeleteAssignment(a.attributes['provider-name'], a.attributes.email, a.attributes['role-name'])}
-                            className="text-xs text-red-400 hover:text-red-300"
+                            className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"
                           >
                             Remove
                           </button>
