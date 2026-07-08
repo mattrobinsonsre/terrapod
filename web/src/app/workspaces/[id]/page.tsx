@@ -15,6 +15,7 @@ import { HealthConditions } from '@/components/health-conditions'
 import { PlanSummaryBadges } from '@/components/plan-summary-badges'
 import { WorkspacePicker } from '@/components/workspace-picker'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
+import { MobileCardList, MobileCard } from '@/components/mobile-card-list'
 import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
@@ -591,6 +592,21 @@ function WorkspaceDetailContent() {
       setError(err instanceof Error ? err.message : 'Failed to load state versions')
     } finally {
       setStateLoading(false)
+    }
+  }
+
+  async function downloadStateVersion(sv: StateVersionItem) {
+    try {
+      const resp = await apiFetch(`/api/v2/state-versions/${sv.id}/download`)
+      const blob = await resp.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `state-${sv.attributes.serial}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('Failed to download state file')
     }
   }
 
@@ -3174,68 +3190,139 @@ function WorkspaceDetailContent() {
             ) : stateVersions.length === 0 ? (
               <EmptyState message="No state versions yet for this workspace." />
             ) : (
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-700/50">
-                      <SortableHeader label="Serial" sortKey="serial" sortState={stateSortState} onSort={toggleStateSort} />
-                      <SortableHeader label="Created By" sortKey="created-by" sortState={stateSortState} onSort={toggleStateSort} className="hidden sm:table-cell" />
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Run</th>
-                      <SortableHeader label="Size" sortKey="size" sortState={stateSortState} onSort={toggleStateSort} className="hidden md:table-cell" />
-                      <SortableHeader label="Created" sortKey="created-at" sortState={stateSortState} onSort={toggleStateSort} className="hidden lg:table-cell" />
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-700/30">
-                    {sortedState.map((sv) => {
-                      const maxSerial = Math.max(...stateVersions.map(s => s.attributes.serial))
-                      const isLatest = sv.attributes.serial === maxSerial
-                      const runData = sv.relationships?.run?.data
-                      return (
-                        <tr key={sv.id} className="hover:bg-slate-700/20 transition-colors">
-                          <td className="px-4 py-3 text-sm text-slate-200 font-mono">#{sv.attributes.serial}</td>
-                          <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
-                            {sv.attributes['created-by'] || <span className="text-slate-500">runner</span>}
-                          </td>
-                          <td className="px-4 py-3 text-xs hidden sm:table-cell">
-                            {runData ? (
+              <>
+                {/* Desktop (md+): the sortable table, unchanged columns. Actions
+                    are proper buttons (Download/Rollback/Delete), not tiny text. */}
+                <div className="hidden md:block bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-slate-700/50">
+                        <SortableHeader label="Serial" sortKey="serial" sortState={stateSortState} onSort={toggleStateSort} />
+                        <SortableHeader label="Created By" sortKey="created-by" sortState={stateSortState} onSort={toggleStateSort} />
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Run</th>
+                        <SortableHeader label="Size" sortKey="size" sortState={stateSortState} onSort={toggleStateSort} />
+                        <SortableHeader label="Created" sortKey="created-at" sortState={stateSortState} onSort={toggleStateSort} className="hidden lg:table-cell" />
+                        <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-700/30">
+                      {sortedState.map((sv) => {
+                        const maxSerial = Math.max(...stateVersions.map(s => s.attributes.serial))
+                        const isLatest = sv.attributes.serial === maxSerial
+                        const runData = sv.relationships?.run?.data
+                        return (
+                          <tr key={sv.id} className="hover:bg-slate-700/20 transition-colors">
+                            <td className="px-4 py-3 text-sm text-slate-200 font-mono">#{sv.attributes.serial}</td>
+                            <td className="px-4 py-3 text-xs text-slate-400">
+                              {sv.attributes['created-by'] || <span className="text-slate-500">runner</span>}
+                            </td>
+                            <td className="px-4 py-3 text-xs">
+                              {runData ? (
+                                <a href={`/workspaces/${workspaceId}/runs/${runData.id}`} className="text-brand-400 hover:text-brand-300">
+                                  {runData.id.replace('run-', '').slice(0, 8)}
+                                </a>
+                              ) : (
+                                <span className="text-slate-500">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-400">
+                              {sv.attributes.size > 0 ? `${(sv.attributes.size / 1024).toFixed(1)} KB` : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-500 hidden lg:table-cell">
+                              {sv.attributes['created-at'] ? new Date(sv.attributes['created-at']).toLocaleString() : ''}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => downloadStateVersion(sv)}
+                                  className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200"
+                                >
+                                  Download
+                                </button>
+                                {!isLatest && perms['can-create-state-versions'] && (
+                                  <button
+                                    onClick={() => setConfirmStateAction({ action: 'rollback', sv })}
+                                    className="px-2.5 py-1 rounded-md text-xs font-medium bg-amber-900/40 hover:bg-amber-900/60 text-amber-300"
+                                  >
+                                    Rollback
+                                  </button>
+                                )}
+                                {!isLatest && perms['can-update'] && (
+                                  <button
+                                    onClick={() => setConfirmStateAction({ action: 'delete', sv })}
+                                    className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile (< md): state versions as cards so nothing is dropped —
+                    the table hid Created-by / Run / Size / Created behind
+                    sm/md/lg breakpoints, leaving phones with only the serial. */}
+                <MobileCardList>
+                  {sortedState.map((sv) => {
+                    const maxSerial = Math.max(...stateVersions.map(s => s.attributes.serial))
+                    const isLatest = sv.attributes.serial === maxSerial
+                    const runData = sv.relationships?.run?.data
+                    return (
+                      <MobileCard
+                        key={sv.id}
+                        title={<span className="text-sm font-mono text-slate-200">#{sv.attributes.serial}</span>}
+                        badge={
+                          isLatest && (
+                            <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/40 text-green-300">
+                              latest
+                            </span>
+                          )
+                        }
+                        fields={[
+                          {
+                            label: 'Created by',
+                            value: sv.attributes['created-by'] || 'runner',
+                            valueClassName: sv.attributes['created-by'] ? 'text-slate-300' : 'text-slate-500',
+                          },
+                          {
+                            label: 'Run',
+                            value: runData ? (
                               <a href={`/workspaces/${workspaceId}/runs/${runData.id}`} className="text-brand-400 hover:text-brand-300">
                                 {runData.id.replace('run-', '').slice(0, 8)}
                               </a>
                             ) : (
-                              <span className="text-slate-500">-</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">
-                            {sv.attributes.size > 0 ? `${(sv.attributes.size / 1024).toFixed(1)} KB` : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate-500 hidden lg:table-cell">
-                            {sv.attributes['created-at'] ? new Date(sv.attributes['created-at']).toLocaleString() : ''}
-                          </td>
-                          <td className="px-4 py-3 text-right space-x-2">
+                              '—'
+                            ),
+                            valueClassName: 'text-slate-400',
+                          },
+                          {
+                            label: 'Size',
+                            value: sv.attributes.size > 0 ? `${(sv.attributes.size / 1024).toFixed(1)} KB` : '—',
+                            valueClassName: 'text-slate-400',
+                          },
+                          {
+                            label: 'Created',
+                            value: sv.attributes['created-at'] ? new Date(sv.attributes['created-at']).toLocaleString() : '—',
+                            valueClassName: 'text-slate-500',
+                          },
+                        ]}
+                        actions={
+                          <>
                             <button
-                              onClick={async () => {
-                                try {
-                                  const resp = await apiFetch(`/api/v2/state-versions/${sv.id}/download`)
-                                  const blob = await resp.blob()
-                                  const url = URL.createObjectURL(blob)
-                                  const a = document.createElement('a')
-                                  a.href = url
-                                  a.download = `state-${sv.attributes.serial}.json`
-                                  a.click()
-                                  URL.revokeObjectURL(url)
-                                } catch {
-                                  alert('Failed to download state file')
-                                }
-                              }}
-                              className="text-xs text-brand-400 hover:text-brand-300"
+                              onClick={() => downloadStateVersion(sv)}
+                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200"
                             >
                               Download
                             </button>
                             {!isLatest && perms['can-create-state-versions'] && (
                               <button
                                 onClick={() => setConfirmStateAction({ action: 'rollback', sv })}
-                                className="text-xs text-amber-400 hover:text-amber-300"
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-900/40 hover:bg-amber-900/60 text-amber-300"
                               >
                                 Rollback
                               </button>
@@ -3243,18 +3330,18 @@ function WorkspaceDetailContent() {
                             {!isLatest && perms['can-update'] && (
                               <button
                                 onClick={() => setConfirmStateAction({ action: 'delete', sv })}
-                                className="text-xs text-red-400 hover:text-red-300"
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"
                               >
                                 Delete
                               </button>
                             )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          </>
+                        }
+                      />
+                    )
+                  })}
+                </MobileCardList>
+              </>
             )}
           </div>
         )}
