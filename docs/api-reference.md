@@ -791,7 +791,7 @@ The endpoint is mounted at `/api/v2/` because `go-tfe` and Terraform's `cloud` b
 ### Plan Summary
 
 ```
-GET /api/v2/plans/{plan_id}/summary
+GET /api/terrapod/v1/runs/{run_id}/plan-summary
 ```
 
 Returns the AI-generated plan summary (or failure analysis on errored plans) when the optional `ai_summary` feature is enabled and a summary has been produced for the run. See [docs/ai-plan-summary.md](ai-plan-summary.md) for the operator-side setup.
@@ -2564,6 +2564,21 @@ POST /api/terrapod/v1/auth/callback
 ```
 GET /api/terrapod/v1/auth/sessions
 ```
+
+### Session Status
+
+```
+GET /api/terrapod/v1/auth/session
+```
+
+Returns the caller's live web-session status for the expiry-warning banner
+(#726): `{ "authenticated": true, "ttl_seconds": <int> }`. `ttl_seconds` is the
+session's true remaining lifetime read straight from Redis **without sliding
+it**, so the web client reconciles against the server's real TTL instead of a
+stale client-cached timestamp — SSE-driven views slide the server session
+without emitting the `X-Session-Expires` header, which used to make the banner
+warn falsely. A `401` is the authoritative "session is gone → re-authenticate"
+signal (session auth only; API-token callers get `401` here).
 
 ### Logout
 
