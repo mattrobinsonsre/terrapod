@@ -1740,7 +1740,7 @@ function WorkspaceDetailContent() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-slate-300">Settings</h3>
                 {!editing ? (
-                  perms['can-update'] && <button onClick={startEditing} className="text-xs text-brand-400 hover:text-brand-300">
+                  perms['can-update'] && <button onClick={startEditing} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">
                     Edit
                   </button>
                 ) : (
@@ -2640,8 +2640,8 @@ function WorkspaceDetailContent() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex justify-end gap-2">
-                              <button onClick={() => setEditingVarId(null)} className="text-xs text-slate-400 hover:text-slate-200">Cancel</button>
-                              <button onClick={handleSaveVar} disabled={savingVar} className="text-xs text-brand-400 hover:text-brand-300">
+                              <button onClick={() => setEditingVarId(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Cancel</button>
+                              <button onClick={handleSaveVar} disabled={savingVar} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white">
                                 {savingVar ? 'Saving...' : 'Save'}
                               </button>
                             </div>
@@ -2663,8 +2663,8 @@ function WorkspaceDetailContent() {
                           {perms['can-update-variable'] && (
                             <td className="px-4 py-3 text-right">
                               <div className="flex justify-end gap-2">
-                                <button onClick={() => startEditingVar(v)} className="text-xs text-brand-400 hover:text-brand-300">Edit</button>
-                                <button onClick={() => handleDeleteVariable(v.id)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
+                                <button onClick={() => startEditingVar(v)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Edit</button>
+                                <button onClick={() => handleDeleteVariable(v.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">Delete</button>
                               </div>
                             </td>
                           )}
@@ -3648,8 +3648,8 @@ function WorkspaceDetailContent() {
 
                   return (
                     <div key={nc.id} className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
-                      <div className="px-4 py-3 flex items-center gap-3">
-                        <div className="flex-1 min-w-0">
+                      <div className="px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <div className="min-w-0 sm:flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-sm font-medium text-slate-200 truncate">{a.name}</span>
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${destTypeBadge(a['destination-type'])}`}>
@@ -3667,7 +3667,7 @@ function WorkspaceDetailContent() {
                             ))}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                           {lastResponse && (
                             <span className={`text-xs ${lastResponse.success ? 'text-green-400' : 'text-red-400'}`}>
                               {lastResponse.success ? 'OK' : `Err ${lastResponse.status}`}
@@ -3675,23 +3675,23 @@ function WorkspaceDetailContent() {
                           )}
                           {perms['can-update'] && (
                             <>
-                              <button onClick={() => handleToggleNotif(nc)} className="text-xs text-brand-400 hover:text-brand-300 px-1">
+                              <button onClick={() => handleToggleNotif(nc)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">
                                 {a.enabled ? 'Disable' : 'Enable'}
                               </button>
                               <button onClick={() => handleVerifyNotif(nc.id)} disabled={verifyingId === nc.id}
-                                className="text-xs text-brand-400 hover:text-brand-300 px-1">
+                                className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-50">
                                 {verifyingId === nc.id ? 'Sending...' : 'Verify'}
                               </button>
                             </>
                           )}
                           {responses.length > 0 && (
                             <button onClick={() => setExpandedNotifId(isExpanded ? null : nc.id)}
-                              className="text-xs text-slate-400 hover:text-slate-200 px-1">
+                              className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-300">
                               {isExpanded ? 'Hide' : 'History'}
                             </button>
                           )}
                           {perms['can-update'] && (
-                            <button onClick={() => handleDeleteNotif(nc.id)} className="text-xs text-red-400 hover:text-red-300 px-1">Delete</button>
+                            <button onClick={() => handleDeleteNotif(nc.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">Delete</button>
                           )}
                         </div>
                       </div>
@@ -3810,16 +3810,13 @@ function WorkspaceDetailContent() {
                         <div className="text-xs text-slate-500 break-all sm:truncate">{a.url}</div>
                       </div>
                       {perms['can-update'] && (
-                        // Tap-friendly buttons below sm (px-3 py-1.5 pill); sm+
-                        // revert to the compact inline text links (desktop
-                        // unchanged).
-                        <div className="flex items-center gap-2 sm:gap-1.5 sm:shrink-0">
-                          <button onClick={() => handleToggleRunTask(rt)} className="text-xs text-brand-400 hover:text-brand-300 rounded-lg bg-slate-700 px-3 py-1.5 sm:rounded-none sm:bg-transparent sm:px-1 sm:py-0">
+                        <div className="flex items-center gap-2 sm:shrink-0">
+                          <button onClick={() => handleToggleRunTask(rt)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">
                             {a.enabled ? 'Disable' : 'Enable'}
                           </button>
                           <button
                             onClick={() => handleDeleteRunTask(rt.id)}
-                            className="text-xs text-red-400 hover:text-red-300 rounded-lg bg-red-900/40 px-3 py-1.5 sm:rounded-none sm:bg-transparent sm:px-1 sm:py-0"
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"
                           >
                             Delete
                           </button>

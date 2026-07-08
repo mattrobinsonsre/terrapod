@@ -260,6 +260,17 @@ staged plan live in issue **#719**; the rules a contributor must follow:
   (Delete→Confirm swap) as the guard — use the native `confirm()` so the tiers
   stay uniform. Form *submits* after deliberate data entry (create/edit save)
   are not "single-tap mutations" and don't need a guard.
+- **Actions are real buttons, not clickable text (hard).** Any control that
+  performs an action — a row action (Edit / Delete / Enable-Disable / Verify /
+  Download / Rollback / Remove), a form Save/Cancel, a toggle — MUST render as a
+  proper button with a background, padding, and rounded corners (e.g.
+  `px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600`;
+  destructive variants use `bg-red-900/40 … text-red-300`), giving it a real
+  tap target (~44px). Do NOT ship "little clickable chunks of text" — a bare
+  coloured-text `<button>` (e.g. `text-xs text-brand-400` with no background) —
+  as an action affordance: it reads as a link, is a poor tap target on touch,
+  and is easy to miss on desktop. Genuine *navigation* (to another
+  page/resource) may still be a text link; *actions* are buttons.
 - **Enforcement (this is what blocks non-mobile-friendly changes):** the
   `responsive` Playwright project runs the suite at a **phone viewport**
   (`e2e/tests/responsive.spec.ts`) and is the **mobile guard**; the existing
