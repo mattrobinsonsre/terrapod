@@ -14,6 +14,7 @@ import { ResourceUsage, parseMemoryToBytes, humanBytes } from '@/components/reso
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
+import { useIsMobile } from '@/lib/use-media-query'
 import { ChevronsUp, ArrowDownToLine, RefreshCw } from 'lucide-react'
 
 interface RunActions {
@@ -291,12 +292,19 @@ function LogPanel({
   isStreaming: boolean
   onRefresh?: () => void
 }) {
+  // Scroll model is viewport-driven (#722, #719): on desktop the log is a
+  // normal inner-scroll pane (the familiar CI-log behaviour — it scrolls
+  // independently of the page); on a phone a nested scroll region is a touch
+  // trap, so the pane just expands and the *page* is the scroll container.
+  // Same component, the scroll target branches on width.
+  const isMobile = useIsMobile()
   const [colorMode, setColorMode] = useState(true)
   // Follow the tail by default while streaming; a static (finished) log opens
   // at the top so the operator reads from the start.
   const [following, setFollowing] = useState(isStreaming)
   const [atBottom, setAtBottom] = useState(true)
   const [copied, setCopied] = useState(false)
+  const preRef = useRef<HTMLPreElement>(null)
 
   const cleanLog = useMemo(() => (log ? stripStxEtx(log) : null), [log])
 
@@ -312,37 +320,52 @@ function LogPanel({
     return stripAnsi(cleanLog)
   }, [cleanLog])
 
-  const isWindowAtBottom = useCallback(() => {
-    const doc = document.documentElement
-    return window.innerHeight + window.scrollY >= doc.scrollHeight - 80
-  }, [])
+  const isAtBottom = useCallback(() => {
+    if (isMobile) {
+      const doc = document.documentElement
+      return window.innerHeight + window.scrollY >= doc.scrollHeight - 80
+    }
+    const el = preRef.current
+    if (!el) return true
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 60
+  }, [isMobile])
 
-  const scrollWindowToBottom = useCallback((smooth = false) => {
-    window.scrollTo({
-      top: document.documentElement.scrollHeight,
-      behavior: smooth ? 'smooth' : 'auto',
-    })
-  }, [])
+  const scrollToBottom = useCallback(
+    (smooth = false) => {
+      const opts: ScrollToOptions = { behavior: smooth ? 'smooth' : 'auto' }
+      if (isMobile) window.scrollTo({ top: document.documentElement.scrollHeight, ...opts })
+      else preRef.current?.scrollTo({ top: preRef.current.scrollHeight, ...opts })
+    },
+    [isMobile],
+  )
 
-  // Pin the window to the tail when following and the content changes. Runs in
-  // useLayoutEffect (synchronously before the browser paints) so a fresh chunk
-  // or the panel's own resize never flashes an intermediate scroll position.
+  const scrollToTop = useCallback(() => {
+    if (isMobile) window.scrollTo({ top: 0, behavior: 'smooth' })
+    else preRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [isMobile])
+
+  // Pin the active scroller to the tail when following and the content changes.
+  // Runs in useLayoutEffect (synchronously before paint) so a fresh chunk or
+  // the panel's own resize never flashes an intermediate scroll position.
   useLayoutEffect(() => {
-    if (following) scrollWindowToBottom(false)
-  }, [log, colorMode, following, scrollWindowToBottom])
+    if (following) scrollToBottom(false)
+  }, [log, colorMode, following, scrollToBottom])
 
-  // Track the window's position so scrolling up to read disengages follow and
-  // scrolling back to the bottom re-engages it.
+  // Track the scroller's position so scrolling up to read disengages follow and
+  // scrolling back to the bottom re-engages it. The listener is on the window
+  // (mobile) or the inner pane (desktop).
   useEffect(() => {
     const onScroll = () => {
-      const bottom = isWindowAtBottom()
+      const bottom = isAtBottom()
       setAtBottom(bottom)
       setFollowing(bottom)
     }
-    window.addEventListener('scroll', onScroll, { passive: true })
+    const el = isMobile ? window : preRef.current
+    if (!el) return
+    el.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [isWindowAtBottom])
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [isMobile, isAtBottom])
 
   if (loading) {
     return (
@@ -434,31 +457,39 @@ function LogPanel({
         </div>
       </div>
 
+      {/* On desktop (`md:`) the pane is a bounded inner-scroll region — it
+          scrolls independently of the page, the familiar CI-log behaviour.
+          Below `md` it has no max-height and no inner overflow, so it expands
+          and the page scrolls (no nested-scroll touch trap). The `md` boundary
+          matches `useIsMobile` (768px), so the CSS scroller and the JS scroll
+          logic agree. */}
       {colorMode ? (
         <pre
+          ref={preRef}
           data-testid={`log-pre-${phase}`}
-          className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words"
+          className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words md:max-h-[70vh] md:overflow-y-auto"
           dangerouslySetInnerHTML={{ __html: htmlContent }}
         />
       ) : (
         <pre
+          ref={preRef}
           data-testid={`log-pre-${phase}`}
-          className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words"
+          className="p-4 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words md:max-h-[70vh] md:overflow-y-auto"
         >
           {plainContent}
         </pre>
       )}
 
       {/* Floating tail controls — fixed to the viewport so they're always
-          reachable no matter how far the page has scrolled. "Jump to latest"
-          appears whenever the window isn't already at the tail; it re-engages
-          follow. "Top" is always offered for a long finished log. */}
+          reachable. They act on the active scroller (the inner pane on desktop,
+          the window on mobile). "Jump to latest" appears when not at the tail
+          and re-engages follow; "Top" is always offered for a long log. */}
       <div className="fixed bottom-6 right-6 z-20 flex flex-col items-end gap-2">
         {!atBottom && (
           <button
             onClick={() => {
               setFollowing(true)
-              scrollWindowToBottom(true)
+              scrollToBottom(true)
             }}
             className="px-3 py-2 rounded-full text-xs font-medium shadow-lg bg-brand-600 hover:bg-brand-500 text-white transition-colors inline-flex items-center gap-1.5"
             title="Jump to the newest output and follow it"
@@ -477,7 +508,7 @@ function LogPanel({
           </span>
         )}
         <button
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          onClick={scrollToTop}
           className="px-3 py-2 rounded-full text-xs font-medium shadow-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors inline-flex items-center gap-1.5"
           title="Jump to top"
         >
