@@ -15,6 +15,7 @@ import { HealthConditions } from '@/components/health-conditions'
 import { PlanSummaryBadges } from '@/components/plan-summary-badges'
 import { WorkspacePicker } from '@/components/workspace-picker'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
+import { useIsMobile } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
@@ -300,6 +301,8 @@ function WorkspaceDetailContent() {
   const [varSensitive, setVarSensitive] = useState(false)
   const [varHcl, setVarHcl] = useState(false)
   const [addingVar, setAddingVar] = useState(false)
+
+  const isMobile = useIsMobile()
 
   // Runs
   const [runs, setRuns] = useState<RunItem[]>([])
@@ -1295,6 +1298,15 @@ function WorkspaceDetailContent() {
   }
 
   async function handleQueuePlan() {
+    // Mobile fat-finger guard — queuing a run is a state change (and on a
+    // non-VCS agent workspace a `plan + apply` run can change infrastructure),
+    // so a stray tap on a phone gets a native confirm. Desktop is unchanged.
+    if (isMobile) {
+      const msg = planOnly
+        ? 'Queue a speculative plan for this workspace?'
+        : 'Queue a plan + apply run? This can change infrastructure.'
+      if (!window.confirm(msg)) return
+    }
     setQueueingPlan(true)
     setError('')
     try {
