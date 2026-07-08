@@ -58,6 +58,76 @@ class TestTerraformServiceDiscovery:
         assert data["tfe.v2.2"] == "/api/v2/"
 
 
+class TestSessionStatus:
+    """#726: GET /auth/session returns the true remaining TTL for the banner."""
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.auth.get_session_ttl", new_callable=AsyncMock)
+    @patch("terrapod.api.routers.auth.get_session", new_callable=AsyncMock)
+    async def test_returns_ttl_for_valid_session(
+        self, mock_get_session, mock_get_ttl, mock_init_db, mock_init_redis, mock_init_storage
+    ):
+        from terrapod.auth.sessions import Session
+
+        mock_get_session.return_value = Session(
+            token="sess-tok",
+            email="u@example.com",
+            display_name="U",
+            roles=["everyone"],
+            provider_name="local",
+            created_at="2026-01-01T00:00:00+00:00",
+            expires_at="2026-01-01T12:00:00+00:00",
+            last_active_at="2026-01-01T00:00:00+00:00",
+        )
+        mock_get_ttl.return_value = 41234
+
+        app = create_app()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            res = await client.get(
+                "/api/terrapod/v1/auth/session",
+                headers={"Authorization": "Bearer sess-tok"},
+            )
+
+        assert res.status_code == 200
+        body = res.json()
+        assert body["authenticated"] is True
+        assert body["ttl_seconds"] == 41234
+        # The endpoint must not slide — it reads the TTL, nothing else.
+        mock_get_ttl.assert_awaited_once_with("sess-tok")
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.auth.get_session", new_callable=AsyncMock)
+    async def test_no_session_is_401(
+        self, mock_get_session, mock_init_db, mock_init_redis, mock_init_storage
+    ):
+        # A gone/invalid session → 401. This is the authoritative "log back in"
+        # signal the banner acts on (never a stale local countdown).
+        mock_get_session.return_value = None
+
+        app = create_app()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            res = await client.get(
+                "/api/terrapod/v1/auth/session",
+                headers={"Authorization": "Bearer gone"},
+            )
+
+        assert res.status_code == 401
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    async def test_missing_bearer_is_401(self, mock_init_db, mock_init_redis, mock_init_storage):
+        app = create_app()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            res = await client.get("/api/terrapod/v1/auth/session")
+
+        assert res.status_code == 401
+
+
 class TestOAuthAuthorize:
     @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
     @patch("terrapod.api.app.init_redis")

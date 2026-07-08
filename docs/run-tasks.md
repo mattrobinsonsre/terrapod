@@ -277,10 +277,15 @@ def handle_task():
     access_token = payload["access_token"]
     run_id = payload["run_id"]
 
-    # 2. Fetch plan JSON from Terrapod
+    # 2. Resolve the plan id from the run, then fetch the structured plan JSON.
+    #    The plan-JSON endpoint 302-redirects to a presigned URL (httpx follows it).
+    auth = {"Authorization": f"Bearer {TERRAPOD_TOKEN}"}
+    run = httpx.get(f"https://terrapod.local/api/terrapod/v1/runs/{run_id}", headers=auth).json()
+    plan_id = run["data"]["relationships"]["plans"]["data"][0]["id"]
     plan_resp = httpx.get(
-        f"https://terrapod.local/api/terrapod/v1/runs/{run_id}/plan/json-output",
-        headers={"Authorization": f"Bearer {TERRAPOD_TOKEN}"},
+        f"https://terrapod.local/api/v2/plans/{plan_id}/json-output",
+        headers=auth,
+        follow_redirects=True,
     )
     plan_json = plan_resp.json()
 
