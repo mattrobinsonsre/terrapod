@@ -320,8 +320,13 @@ export default function NavBar() {
       .catch(() => {})
   }, [])
 
-  // Close both mobile drawers on route change (tapping a link navigates).
+  // Close both mobile drawers whenever the route changes. Link taps already
+  // close via onClick, but this also covers navigations that don't originate
+  // from a drawer link (browser back/forward, programmatic pushes) so a
+  // full-screen drawer can never survive a page change. No cascading render:
+  // React bails out of the update when the value is already `false`.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate route-sync close; see comment above
     setMenuOpen(false)
     setAccountOpen(false)
   }, [pathname])
