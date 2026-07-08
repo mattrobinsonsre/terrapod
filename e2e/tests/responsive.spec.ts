@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { getStoredToken, createWorkspace, seedRun, seedStateVersion, seedRunTask, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, createAgentPool, seedRun, seedStateVersion, seedRunTask, uniqueName } from '../helpers/api';
 
 /**
  * Responsive / mobile harness (#719).
@@ -208,6 +208,29 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page.getByText(/^cv-/).filter({ visible: true }).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('checkbox', { name: /Select cv-.* for compare/ }).filter({ visible: true }).first()).toBeVisible();
 
+    await expectNoHorizontalPageScroll(page);
+  });
+
+  test('agent pools list + detail fit a phone viewport', async ({ page }) => {
+    // Agent Pools is a top-level admin surface (#719). The list hides the
+    // STATUS column below md, so the pool's health dot must reflow inline into
+    // the row; the detail page (settings + tokens + listeners tables) must not
+    // introduce horizontal page scroll.
+    const token = getStoredToken();
+    const poolName = uniqueName('resp-pool');
+    const poolId = await createAgentPool(token, poolName);
+
+    await page.goto('/admin/agent-pools');
+    const row = page.getByRole('row').filter({ hasText: poolName });
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    // The dedicated desktop STATUS column header stays hidden at phone width.
+    await expect(page.getByRole('columnheader', { name: 'Status' })).toBeHidden();
+    await expectNoHorizontalPageScroll(page);
+
+    await page.goto(`/admin/agent-pools/${poolId}`);
+    await expect(
+      page.getByRole('heading', { name: new RegExp(poolName), level: 1 }),
+    ).toBeVisible({ timeout: 15_000 });
     await expectNoHorizontalPageScroll(page);
   });
 

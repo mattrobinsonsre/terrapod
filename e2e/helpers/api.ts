@@ -285,6 +285,31 @@ export async function createRegistryModule(
 }
 
 /**
+ * Create an agent pool via the management API. Returns the bare pool UUID.
+ */
+export async function createAgentPool(
+  token: string,
+  name: string,
+): Promise<string> {
+  const res = await fetch(`${API_URL}/api/terrapod/v1/agent-pools`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/vnd.api+json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      data: { type: 'agent-pools', attributes: { name } },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Create agent pool failed: ${res.status} ${body}`);
+  }
+  const data = await res.json();
+  return data.data.id as string;
+}
+
+/**
  * Seed a run so the run-detail page can be exercised in E2E.
  *
  * The E2E stack has no runner/listener, so a seeded run simply sits in
