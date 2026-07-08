@@ -56,8 +56,10 @@ test.describe('Authentication', () => {
       timeout: 15_000,
     });
 
-    // Click the logout button in the nav bar
-    await page.click('button:has-text("Logout")');
+    // Log out now lives inside the Account menu (whose desktop trigger is
+    // labelled with the signed-in user's email) — #719 grouped-nav IA.
+    await page.getByRole('button', { name: ADMIN_EMAIL }).click();
+    await page.getByRole('menuitem', { name: 'Log out' }).click();
 
     // Should redirect to /login
     await page.waitForURL('**/login', { timeout: 10_000 });

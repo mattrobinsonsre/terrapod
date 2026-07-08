@@ -5,8 +5,10 @@ test.describe('User Management', () => {
     await page.goto('/admin/users');
     await expect(page.locator('h1:has-text("Users")')).toBeVisible();
 
-    // Bootstrap admin should be in the table
-    await expect(page.locator('text=admin@terrapod.local')).toBeVisible();
+    // Bootstrap admin should be in the table. Scope to the table: the email
+    // also appears as the Account-menu trigger label in the nav (#719 IA), so
+    // an unscoped text lookup is now ambiguous (strict-mode violation).
+    await expect(page.locator('table').getByText('admin@terrapod.local')).toBeVisible();
   });
 
   test('create new user appears in table', async ({ page }) => {

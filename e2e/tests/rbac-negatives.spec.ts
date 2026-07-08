@@ -57,9 +57,12 @@ test.describe('RBAC — audit user is read-only', () => {
 
   test('audit can reach the audit log but not the admin management links', async ({ page }) => {
     await page.goto('/workspaces');
-    // Audit-or-admin gate → the audit log link IS visible to an audit user.
+    // Audit-or-admin gate → an audit user sees the Admin▾ menu, and opening it
+    // reveals the Audit Log link (its only entry for a non-admin) — #719 IA.
+    await page.getByRole('button', { name: 'Admin', exact: true }).click();
     await expect(page.locator('a[href="/admin/audit-log"]')).toBeVisible();
-    // …but the admin-only management links are not.
+    // …but the admin-only management links are not — they are gated on `admin`
+    // and never render for the audit role even with the menu open.
     for (const href of ADMIN_LINKS) {
       await expect(page.locator(`a[href="${href}"]`)).toHaveCount(0);
     }
