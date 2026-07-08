@@ -12,6 +12,7 @@ from terrapod.auth.sessions import (
     _should_refresh_session,
     create_session,
     get_session,
+    get_session_ttl,
     revoke_session,
 )
 
@@ -121,6 +122,43 @@ class TestGetSession:
 
         session = await get_session("nonexistent-token")
         assert session is None
+
+
+class TestGetSessionTTL:
+    """#726: the banner reconciles against the server's TRUE remaining TTL."""
+
+    @patch("terrapod.auth.sessions.get_redis_client")
+    async def test_returns_positive_ttl_without_sliding(self, mock_get_redis):
+        redis = AsyncMock()
+        mock_get_redis.return_value = redis
+        redis.ttl.return_value = 41234
+
+        ttl = await get_session_ttl("test-token")
+
+        assert ttl == 41234
+        # It is a pure read of the key TTL — must never touch expiry (no
+        # set/expire/pipeline), or polling it would keep the session alive.
+        redis.ttl.assert_awaited_once_with(SESSION_PREFIX + "test-token")
+        redis.set.assert_not_called()
+        redis.expire.assert_not_called()
+
+    @patch("terrapod.auth.sessions.get_redis_client")
+    async def test_missing_key_returns_none(self, mock_get_redis):
+        # redis TTL returns -2 when the key does not exist.
+        redis = AsyncMock()
+        mock_get_redis.return_value = redis
+        redis.ttl.return_value = -2
+
+        assert await get_session_ttl("gone") is None
+
+    @patch("terrapod.auth.sessions.get_redis_client")
+    async def test_no_expiry_returns_none(self, mock_get_redis):
+        # redis TTL returns -1 when the key exists but has no expiry set.
+        redis = AsyncMock()
+        mock_get_redis.return_value = redis
+        redis.ttl.return_value = -1
+
+        assert await get_session_ttl("no-ttl") is None
 
 
 class TestRevokeSession:

@@ -57,9 +57,9 @@ type Workspace struct {
 	// PlanExpirySeconds is the per-workspace plan-expiry TTL (#646); nil =
 	// disabled (the default). An apply-capable plan older than this is
 	// auto-discarded and must be re-planned.
-	PlanExpirySeconds             *int64   `json:"plan-expiry-seconds,omitempty"`
-	DriftStatus                   string   `json:"drift-status,omitempty"`
-	DriftLastCheckedAt            string   `json:"drift-last-checked-at,omitempty"`
+	PlanExpirySeconds  *int64 `json:"plan-expiry-seconds,omitempty"`
+	DriftStatus        string `json:"drift-status,omitempty"`
+	DriftLastCheckedAt string `json:"drift-last-checked-at,omitempty"`
 	// DriftLatestRunID is the ID (prefixed `run-…`) of the drift run that
 	// produced the current DriftStatus, or "" when drift has never run or
 	// was just cleared by a successful apply. Lets consumers link the
@@ -582,6 +582,7 @@ func workspaceFromResource(res *Resource) *Workspace {
 		VCSConnectionName:     GetStringAttr(res, "vcs-connection-name"),
 		AISummaryMode:         GetStringAttr(res, "ai-summary-mode"),
 		AISummaryContext:      GetStringAttr(res, "ai-summary-context"),
+		SlackChannel:          GetStringAttr(res, "slack-channel"),
 		CreatedAt:             GetStringAttr(res, "created-at"),
 		UpdatedAt:             GetStringAttr(res, "updated-at"),
 	}

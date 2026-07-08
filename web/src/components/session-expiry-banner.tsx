@@ -1,25 +1,48 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { clearAuth, getExpiresAt, loginRedirectUrl } from '@/lib/auth'
+import { getAuthState, getExpiresAt, updateExpiresAt } from '@/lib/auth'
+import { apiFetch } from '@/lib/api'
 
 const WARNING_THRESHOLD_MS = 5 * 60 * 1000 // 5 minutes
-const CHECK_INTERVAL_MS = 30_000 // 30 seconds
+const TICK_MS = 30_000 // re-render the countdown every 30s
+const POLL_MS = 60_000 // reconcile against the server every 60s
 
+/**
+ * Session-expiry warning banner (#726).
+ *
+ * The warning must reflect the SERVER's true remaining session TTL, not a
+ * stale client-cached expiry. SSE-driven views slide the server session
+ * (each `authenticate_request`) without emitting the `X-Session-Expires`
+ * header, so the local `expiresAt` in localStorage drifts stale and the old
+ * banner warned (and redirected) falsely — a reload always cleared it, and
+ * the user never actually had to log back in.
+ *
+ * Fix: poll a lightweight, non-sliding status endpoint and reconcile the
+ * local expiry from the server's real `ttl_seconds` (applied to the client's
+ * own clock, so absolute clock skew can't matter). Logout is now
+ * server-authoritative: `apiFetch` clears auth + redirects on a genuine 401
+ * from the poll. The local countdown only DISPLAYS the warning — it never
+ * triggers a redirect on its own.
+ */
 export function SessionExpiryBanner() {
   const [showWarning, setShowWarning] = useState(false)
   const [remaining, setRemaining] = useState('')
 
   useEffect(() => {
-    const check = () => {
-      const exp = getExpiresAt()
-      if (!exp) return
+    let cancelled = false
 
+    // Render the amber warning from the (reconciled) local expiry. Never
+    // redirects — the server poll owns logout.
+    const render = () => {
+      if (cancelled) return
+      const exp = getExpiresAt()
+      if (!exp) {
+        setShowWarning(false)
+        return
+      }
       const ms = exp.getTime() - Date.now()
-      if (ms <= 0) {
-        clearAuth()
-        window.location.href = loginRedirectUrl()
-      } else if (ms < WARNING_THRESHOLD_MS) {
+      if (ms > 0 && ms < WARNING_THRESHOLD_MS) {
         const mins = Math.ceil(ms / 60_000)
         setShowWarning(true)
         setRemaining(`${mins} minute${mins !== 1 ? 's' : ''}`)
@@ -28,9 +51,42 @@ export function SessionExpiryBanner() {
       }
     }
 
-    check()
-    const id = setInterval(check, CHECK_INTERVAL_MS)
-    return () => clearInterval(id)
+    // Reconcile the local expiry against the server's true remaining TTL.
+    // apiFetch handles a genuine 401 (clear auth + redirect) — the only path
+    // that logs the user out — and re-syncs on success. A transient network
+    // blip is swallowed; the next poll re-syncs, so we never log out on a blip.
+    const reconcile = async () => {
+      if (cancelled || !getAuthState()) return
+      try {
+        const res = await apiFetch('/api/terrapod/v1/auth/session')
+        if (cancelled || !res.ok) return
+        const data = await res.json().catch(() => null)
+        if (data && typeof data.ttl_seconds === 'number') {
+          updateExpiresAt(new Date(Date.now() + data.ttl_seconds * 1000).toISOString())
+        }
+      } catch {
+        // transient — leave the local expiry as-is; the next poll re-syncs
+      }
+      render()
+    }
+
+    render()
+    reconcile()
+    const tick = setInterval(render, TICK_MS)
+    const poll = setInterval(reconcile, POLL_MS)
+    // Re-sync promptly when the user returns to a backgrounded tab — a hidden
+    // tab's timers are throttled, so its local expiry may be well out of date.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') reconcile()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      cancelled = true
+      clearInterval(tick)
+      clearInterval(poll)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
   if (!showWarning) return null

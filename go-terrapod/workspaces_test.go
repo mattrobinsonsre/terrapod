@@ -389,7 +389,8 @@ func TestWorkspaceFromResource_ContractParity(t *testing.T) {
 	    "vcs-last-error": "github app token expired",
 	    "vcs-last-error-at": "2026-06-10T11:45:00Z",
 	    "agent-pool-name": "dev-pool-1",
-	    "vcs-connection-name": "example-github"
+	    "vcs-connection-name": "example-github",
+	    "slack-channel": "C0XXXXXXXXX"
 	  }
 	}}`
 	ws, err := parseWorkspace([]byte(body))
@@ -414,6 +415,12 @@ func TestWorkspaceFromResource_ContractParity(t *testing.T) {
 	}
 	if ws.AgentPoolName != "dev-pool-1" || ws.VCSConnectionName != "example-github" {
 		t.Errorf("derived names: pool=%q conn=%q", ws.AgentPoolName, ws.VCSConnectionName)
+	}
+	// slack-channel (#556) must decode — the resource reads ws.SlackChannel
+	// into state, so dropping it here made every apply that sets
+	// slack_channel fail with "inconsistent result after apply" (#732).
+	if ws.SlackChannel != "C0XXXXXXXXX" {
+		t.Errorf("SlackChannel = %q, want C0XXXXXXXXX", ws.SlackChannel)
 	}
 }
 

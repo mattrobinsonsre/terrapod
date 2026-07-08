@@ -42,7 +42,7 @@ If you are unable to use GitHub's reporting, email the maintainer directly.
 - **API tokens**: Long-lived tokens for CLI and automation are SHA-256 hashed
   at rest. Only the raw token value is returned once at creation time.
   Configurable max TTL via `auth.api_token_max_ttl_hours`.
-- **Label-based RBAC**: Hierarchical workspace permissions (read/plan/write/admin)
+- **Label-based RBAC**: Hierarchical workspace permissions (read/plan/write/admin); the presets expand to fine-grained `resource:verb` capabilities for precise scoping (#585)
   with label-based access control. No teams — labels replace teams entirely.
 - **MFA delegated to IdP**: Terrapod never implements MFA directly. Your
   identity provider (Auth0, Okta, Azure AD) handles MFA enforcement.
