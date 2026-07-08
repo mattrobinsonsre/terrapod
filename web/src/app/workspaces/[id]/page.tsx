@@ -1664,8 +1664,28 @@ function WorkspaceDetailContent() {
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="border-b border-slate-700/50 mb-6">
+        {/* Tabs. Nine sections overflow a phone-width strip, so below md they
+            collapse to a native <select> picker (same pattern as the run page);
+            the tab bar returns at md+. One source (`tabs`), two viewport-driven
+            presentations; the URL (?tab=) stays the source of truth either way. */}
+        <div className="mb-6 md:hidden">
+          <label htmlFor="ws-tab-select" className="sr-only">
+            Workspace section
+          </label>
+          <select
+            id="ws-tab-select"
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value as Tab)}
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm font-medium text-slate-100 focus:border-brand-500 focus:outline-none"
+          >
+            {tabs.map((tab) => (
+              <option key={tab.key} value={tab.key}>
+                {tab.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="hidden border-b border-slate-700/50 mb-6 md:block">
           <div className="flex gap-1 -mb-px">
             {tabs.map((tab) => (
               <button

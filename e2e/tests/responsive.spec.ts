@@ -152,6 +152,9 @@ test.describe('Responsive harness (phone viewport)', () => {
 
     await page.goto(`/workspaces/${wsId}?tab=runs`);
 
+    // The 9-tab strip collapses to a native <select> section picker at phone
+    // width (the tab bar overflows a phone), driven by the same ?tab= URL.
+    await expect(page.locator('#ws-tab-select')).toBeVisible();
     // The desktop table's column header is hidden at phone width...
     await expect(page.getByRole('columnheader', { name: 'Run ID' })).toBeHidden();
     // ...and the run renders as a card linking to the run detail page.
