@@ -97,9 +97,34 @@ async def create_task_stage(
     with individual TaskStageResults, and enqueues webhook triggers for each.
 
     Returns None if no applicable run tasks exist (caller should proceed).
+
+    **Idempotent per (run, stage).** A run has exactly one stage per boundary
+    (one ``post_plan``, one ``pre_apply``, …). The gate caller
+    (``run_service.complete_plan``) is re-driven on every reconciler tick while
+    the run sits in ``planning``, so a non-idempotent create would spawn a fresh
+    stage — with a fresh, still-``running`` webhook — on every tick, and the
+    gate would never resolve to ``passed``. That wedges the run in ``planning``
+    forever, accumulating one dead stage per tick (observed live: an advisory
+    ``post_plan`` task pointed at an unreachable URL produced dozens of
+    duplicate stages and a run that never reached ``planned``). If a stage
+    already exists for this run+boundary, return it so the caller re-resolves
+    the SAME stage each tick.
     """
     if stage_name not in VALID_STAGES:
         raise ValueError(f"Invalid stage: {stage_name}")
+
+    # Idempotency: reuse an existing stage for this run+boundary if present.
+    # Order by creation so re-entry deterministically returns the canonical
+    # (first-created) stage rather than an arbitrary row.
+    existing = await db.execute(
+        select(TaskStage)
+        .where(TaskStage.run_id == run_id, TaskStage.stage == stage_name)
+        .order_by(TaskStage.created_at.asc())
+        .limit(1)
+    )
+    prior = existing.scalars().first()
+    if prior is not None:
+        return prior
 
     # Find applicable run tasks
     result = await db.execute(
@@ -123,9 +148,8 @@ async def create_task_stage(
     db.add(ts)
     await db.flush()
 
-    # Create results and enqueue webhook calls
-    from terrapod.services.scheduler import enqueue_trigger
-
+    # Create results (webhook delivery is enqueued AFTER commit — see below).
+    result_ids: list[uuid.UUID] = []
     for task in tasks:
         tsr = TaskStageResult(
             task_stage_id=ts.id,
@@ -138,13 +162,29 @@ async def create_task_stage(
         # Generate callback token
         tsr.callback_token = generate_callback_token(tsr.id)
         await db.flush()
+        result_ids.append(tsr.id)
 
-        # Enqueue webhook delivery
+    ts_id = ts.id
+
+    # Commit the stage + result rows BEFORE enqueuing the delivery triggers
+    # (#739). The `run_task_call` consumer runs in a *separate* DB session
+    # (and possibly on another replica) and looks the TaskStageResult up by
+    # id. If we enqueue while the rows are only flushed-not-committed — the
+    # caller (`run_service.complete_plan`) commits much later, up the stack —
+    # the consumer races ahead, reads "task stage result not found", and
+    # silently drops the webhook. The result then sits at `pending` forever,
+    # the stage never resolves, and the run wedges in `planning`. Committing
+    # here makes the rows visible before any trigger can fire.
+    await db.commit()
+
+    from terrapod.services.scheduler import enqueue_trigger
+
+    for tsr_id in result_ids:
         try:
             await enqueue_trigger(
                 "run_task_call",
-                {"task_stage_result_id": str(tsr.id)},
-                dedup_key=f"run_task:{tsr.id}",
+                {"task_stage_result_id": str(tsr_id)},
+                dedup_key=f"run_task:{tsr_id}",
                 dedup_ttl=300,
             )
         except Exception as e:
@@ -152,13 +192,15 @@ async def create_task_stage(
 
     logger.info(
         "Task stage created",
-        task_stage_id=str(ts.id),
+        task_stage_id=str(ts_id),
         run_id=str(run_id),
         stage=stage_name,
         task_count=len(tasks),
     )
 
-    return ts
+    # `commit()` expired the instance; return a live one for the caller
+    # (complete_plan immediately reads ts.id / resolves the stage).
+    return await db.get(TaskStage, ts_id)
 
 
 async def get_task_stage(db: AsyncSession, ts_id: uuid.UUID) -> TaskStage | None:
