@@ -74,4 +74,4 @@ first plan/apply (substitute `terrapod.local` for the hostname).
   resources; use `tilt trigger` to force a rebuild.
 
 For the architecture and conventions behind the stack, see
-[Architecture](architecture.md) and the repository `CLAUDE.md`.
+[Architecture](architecture.md) and the repository `AGENTS.md`.

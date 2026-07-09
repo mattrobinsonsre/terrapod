@@ -27,7 +27,7 @@ For this to succeed on agent-mode runs, the **producer workspace** (`shared-netw
 
 ## Authorizing a consumer
 
-Authorization always lives with the producer (the state owner). Three equivalent ways to set it:
+Authorization always lives with the producer (the state owner). Two equivalent ways to set it:
 
 **1. Terrapod provider — standalone resource (cross-config / cross-team).** Suitable when producer and consumer workspaces live in different Terraform configurations or are managed by different teams:
 
@@ -52,8 +52,6 @@ curl -X POST \
 
 List, replace, and revoke endpoints are documented in [the API reference](api-reference.md#cross-workspace-remote-state-consumers).
 
-**3. Bulk-update or autodiscovery rule templates.** For fleets (e.g. a monorepo where many workspaces consume a `shared-network` workspace), set the consumer list via the [bulk-update endpoint](api-reference.md) or an [autodiscovery rule template](autodiscovery.md) so newly-discovered workspaces auto-consume the shared producer.
-
 ## Authorization model
 
 | Principal | Reading another workspace's state via the v2 state endpoints |
@@ -61,7 +59,7 @@ List, replace, and revoke endpoints are documented in [the API reference](api-re
 | **User / API token** (CLI, UI, automation) | Existing label-RBAC: requires `plan` on the producer. Unchanged. |
 | **Runner token** (agent-mode run reading via `terraform_remote_state`) | Allowed iff the consumer workspace (the run's own workspace) appears in the producer's allowlist, **or** the consumer workspace *is* the producer (self-reads are harmless — the runner already owns its own state via the run-artifact path). |
 
-Granting / revoking always requires **admin/write on the producer** — by either the provider, the API, or the bulk-update endpoint. There is no way for a consumer to self-grant.
+Granting / revoking always requires **admin/write on the producer** — by either the provider or the API. There is no way for a consumer to self-grant.
 
 ### Security note: state holds secrets
 

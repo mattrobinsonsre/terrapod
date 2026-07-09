@@ -50,7 +50,7 @@ api:
         labels: {}         # extra labels for ServiceMonitor selection
 ```
 
-The listener Deployment has a separate PodMonitor (`podmonitor-listener.yaml`), also gated by `metrics.enabled`.
+The listener Deployment has a separate PodMonitor (`podmonitor-listener.yaml`), gated by `metrics.enabled`, `metrics.podMonitor.enabled`, and `listener.enabled` (all three must be true).
 
 | Component | Port | Path | ServiceMonitor |
 |---|---|---|---|

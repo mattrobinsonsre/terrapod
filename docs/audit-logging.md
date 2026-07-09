@@ -11,6 +11,7 @@ Terrapod maintains an immutable audit log of all API requests for compliance and
 All API requests are logged except:
 
 - `/health*` and `/ready*` (health checks and readiness probes)
+- `/metrics` (Prometheus metrics endpoint)
 - `/api/docs`, `/api/redoc`, `/api/openapi.json` (OpenAPI documentation)
 
 Each audit entry captures:
@@ -90,10 +91,6 @@ page[size]=50" \
         "timestamp": "2026-03-05T14:32:10Z",
         "actor-email": "admin@example.com",
         "actor-ip": "203.0.113.42",
-        "actor-type": "terrapod_user",
-        "actor-login": "",
-        "actor-id": "",
-        "origin": "api",
         "action": "POST",
         "resource-type": "workspaces",
         "resource-id": "ws-abc123",

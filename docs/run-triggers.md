@@ -116,11 +116,13 @@ Triggers fire when a run transitions to `applied` status and is not plan-only. T
 
 1. Run in source workspace reaches `applied` state
 2. `fire_run_triggers()` queries all `RunTrigger` rows where this workspace is the source
-3. For each trigger, a new `Run` is created in the destination workspace with:
+3. For each trigger, a new `Run` is created in the destination workspace against its latest successfully-uploaded configuration version, with:
     - Message: `"Triggered by successful apply in workspace '{source_name}'"`
     - `auto_apply` from the destination workspace's setting
     - `plan_only=false` (full plan + apply)
 4. Each triggered run is immediately queued for execution
+
+If a destination workspace has never had a configuration version uploaded, its trigger is skipped with a warning — there is no code for the runner to plan against.
 
 Triggers do **not** fire for:
 

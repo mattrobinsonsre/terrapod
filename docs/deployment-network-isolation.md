@@ -1,6 +1,6 @@
 # Split-networking deployments
 
-> Part of Terrapod's **restricted-network & multi-cluster execution** design focus — see [Why Terrapod](../README.md#why-terrapod). Related: the [ARC execution model](architecture.md#runner-architecture-arc-pattern), the [webhook split](deployment-webhook-ingress.md), and [forward-proxy support](deployment-proxy.md).
+> Part of Terrapod's **restricted-network & multi-cluster execution** design focus — see [Why Terrapod](../README.md#is-terrapod-for-you). Related: the [ARC execution model](architecture.md#runner-architecture-arc-pattern), the [webhook split](deployment-webhook-ingress.md), and [forward-proxy support](deployment-proxy.md).
 
 By default, every Terrapod consumer — a human's browser, the `terraform` CLI cloud block, listener pods in remote clusters, runner Jobs uploading state — reaches the API through a single `Ingress`. That works fine when the management plane is freely reachable from every network the consumers live in.
 
@@ -55,14 +55,14 @@ The chart validates each block:
 
 ## Listener `apiUrl` + `publicApiUrl` — the runner-side asymmetry
 
-The listener Deployment carries two URL env vars:
+The listener reads two URLs from its runner ConfigMap (`runners.yaml` — non-sensitive config, not Deployment env):
 
-| Env var | Helm value | Meaning |
+| Helm value | `runners.yaml` key | Meaning |
 |---|---|---|
-| `TERRAPOD_API_URL` | `listener.apiUrl` | The URL the listener (and the runners it spawns) **actually calls**. In a split-networking deployment, this is the `internalIngress` hostname. |
-| `TERRAPOD_PUBLIC_API_URL` | `listener.publicApiUrl` (default: `api.config.external_url`, or empty if both are unset) | The **public/canonical** hostname users see in their browsers, in the CLI cloud block, and in `source = "..."` registry URLs in user `.tf` code. Empty means "no redirect needed" — the listener still works, runner Jobs just don't get a `host{}` block. |
+| `listener.apiUrl` | `server_url` | The URL the listener (and the runners it spawns) **actually calls**. In a split-networking deployment, this is the `internalIngress` hostname. |
+| `listener.publicApiUrl` (default: `api.config.external_url`, or empty if both are unset) | `public_api_url` | The **public/canonical** hostname users see in their browsers, in the CLI cloud block, and in `source = "..."` registry URLs in user `.tf` code. Empty means "no redirect needed" — the listener still works, runner Jobs just don't get a `host{}` block. |
 
-When the two values differ, the listener forwards `TP_PUBLIC_API_URL` to each runner Job pod's env. The runner entrypoint detects the mismatch and appends a terraform CLI `host{}` block to `TF_CLI_CONFIG_FILE`:
+When the two values differ, the listener sets `TP_PUBLIC_API_URL` in each runner Job pod's env (alongside `TP_API_URL`). The runner entrypoint detects the mismatch and appends a terraform CLI `host{}` block to `TF_CLI_CONFIG_FILE`:
 
 ```hcl
 credentials "terrapod.example.com" {
@@ -71,7 +71,7 @@ credentials "terrapod.example.com" {
 host "terrapod.example.com" {
   services = {
     "modules.v1"   = "https://terrapod-internal.example.com/api/v2/registry/modules/"
-    "providers.v1" = "https://terrapod-internal.example.com/v1/providers/"
+    "providers.v1" = "https://terrapod-internal.example.com/api/v2/registry/providers/"
   }
 }
 ```
@@ -174,9 +174,9 @@ After enabling `internalIngress`:
 2. **TLS cert issued**: if using cert-manager, `kubectl get certificate -n terrapod terrapod-internal-tls` shows `Ready=True` within ~30 s of the Ingress being created.
 3. **DNS record published**: if using external-dns, the configured private zone should have an A/AAAA record matching `internalIngress.hostname`.
 4. **Reachable from agent clusters**: `kubectl run -n default --rm -it --restart=Never --image=curlimages/curl debug -- curl -sS https://terrapod-internal.example.com/.well-known/terraform.json` from an agent cluster should return the service-discovery JSON document. This endpoint is unauthenticated and goes through the BFF the same way listener and runner traffic does, so a 200 here proves both the Ingress routing and BFF→API proxy work.
-5. **Listener pods using the internal URL**: `kubectl get deploy -n terrapod -l app.kubernetes.io/component=listener -o jsonpath='{.items[0].spec.template.spec.containers[0].env[?(@.name=="TERRAPOD_API_URL")].value}'` matches the internal hostname.
+5. **Listener using the internal URL**: `kubectl get configmap -n terrapod <release>-runner-config -o jsonpath='{.data.runners\.yaml}' | grep server_url` shows the internal hostname (the listener reads `server_url` from `runners.yaml`, not a Deployment env var).
 6. **Runner Job spec carries `TP_PUBLIC_API_URL`**: trigger a plan, then `kubectl get job -n terrapod-runners <job> -o yaml | grep TP_PUBLIC_API_URL` should show the canonical URL.
-7. **Runner `terraform.rc` includes the host block**: `kubectl logs -n terrapod-runners <pod> | grep "Configured host{} redirect"` confirms the entrypoint wrote it.
+7. **Runner `terraform.rc` includes the host block**: `kubectl exec -n terrapod-runners <pod> -- cat /tmp/terraform.rc | grep -A1 'host "'` shows the `host{}` redirect the entrypoint wrote.
 
 ## What this is not
 

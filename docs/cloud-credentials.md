@@ -597,7 +597,7 @@ Setup:
 
 1. **Enable IAM authentication** on the Cloud SQL instance (`cloudsql.iam_authentication = on`) and add the API's GCP service account as an [IAM database user](https://cloud.google.com/sql/docs/postgres/add-manage-iam-users) — the DB user is the SA email **without** the `.gserviceaccount.com` suffix.
 2. **Grant the SA** the role `roles/cloudsql.instanceUser` (the `cloudsql.instances.login` permission) plus `roles/cloudsql.client`.
-3. **Bind the API's K8s ServiceAccount to that GCP SA via Workload Identity Federation** (the same WIF binding used for GCS — see [GCP](#gcp-workload-identity-federation)).
+3. **Bind the API's K8s ServiceAccount to that GCP SA via Workload Identity Federation** (the same WIF binding used for GCS — see [GCP](#gcp-workload-identity-federation-setup)).
 4. **Configure the mode** (the DB host is the instance's private IP or a Cloud SQL Auth Proxy sidecar; the user is the truncated SA email, no password):
    ```yaml
    api:
@@ -620,7 +620,7 @@ Setup:
 
 1. **Enable Microsoft Entra authentication** on the Flexible Server and set an Entra admin.
 2. **Create a PostgreSQL role for the API's managed identity** — as the Entra admin, run `SELECT * FROM pgaadauth_create_principal('terrapod-api', false, false);` — the DB user is the managed identity's name.
-3. **Bind the API's K8s ServiceAccount to the user-assigned managed identity via Azure Workload Identity** (the same binding used for Blob storage — see [Azure](#azure-workload-identity)); the pod needs the `azure.workload.identity/use: "true"` label.
+3. **Bind the API's K8s ServiceAccount to the user-assigned managed identity via Azure Workload Identity** (the same binding used for Blob storage — see [Azure](#azure-workload-identity-setup)); the pod needs the `azure.workload.identity/use: "true"` label.
 4. **Configure the mode** (the user is the managed identity's name; the token is the password):
    ```yaml
    api:

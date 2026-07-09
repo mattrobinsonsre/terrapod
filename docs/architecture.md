@@ -248,7 +248,7 @@ Terrapod's execution layer follows the Actions Runner Controller (ARC) pattern: 
    f. Uploads plan log + plan file via artifact endpoints (PUT)
    g. Reports has_changes to API (plan phase only)
         |
-9. Run reconciler (10s periodic task) drives state transitions:
+9. Run reconciler (2s periodic task) drives state transitions:
    a. Publishes "check_job_status" event via SSE → listener queries K8s
    b. Listener POSTs Job status to Redis
    c. Reconciler reads status from Redis → transitions run state
@@ -556,7 +556,7 @@ Currently registered periodic tasks:
 | `registry_vcs_poll` | 60s (configurable) | `registry_vcs_poller.poll_cycle` | Poll VCS for new module version tags |
 | `audit_retention` | 86400s (daily) | `audit_service.purge_old_entries` | Purge audit log entries older than retention period |
 | `drift_check` | 300s (configurable) | `drift_detection_service.drift_check_cycle` | Check workspaces for infrastructure drift |
-| `run_reconciler` | 10s | `run_reconciler.reconcile_runs` | Drive run state transitions based on Job outcomes |
+| `run_reconciler` | 2s | `run_reconciler.reconcile_runs` | Drive run state transitions based on Job outcomes |
 | `module_impact_poll` | 60s (configurable) | `module_impact_service.module_impact_poll_cycle` | Poll module PRs and create speculative runs on linked workspaces |
 
 ### Triggered Tasks
@@ -617,7 +617,7 @@ Any non-terminal state -----> canceled (user action)
 **Key behaviors:**
 - `auto_apply=true`: planned transitions automatically to confirmed, then applying
 - `auto_apply=false`: planned waits for user confirmation
-- Workspace is locked during an active run and unlocked on terminal state
+- The `workspace.locked` flag is the CLI/manual state lock only (set by the `cloud`/`remote` backend's state lock and the UI padlock) — runs do **not** auto-set it. Per-workspace run serialization is enforced in the dispatcher instead: only one apply-capable run executes per workspace at a time; a manually locked workspace blocks apply-capable runs (plan-only/speculative runs are exempt)
 - Queue dispatch uses `SELECT ... FOR UPDATE SKIP LOCKED` (PostgreSQL job queue pattern)
 - Plan-only (speculative) runs skip the apply phase entirely
 - **Run options** — runs can carry optional CLI flags: `-target` (resource targeting), `-replace` (force resource replacement), `-refresh-only`, `-refresh=false`, `-allow-empty-apply`. These are stored on the run, passed through the listener to the runner Job as env vars (`TP_TARGET_ADDRS`, `TP_REPLACE_ADDRS`, `TP_REFRESH_ONLY`, `TP_REFRESH`, `TP_ALLOW_EMPTY_APPLY`), and applied as CLI arguments by the entrypoint

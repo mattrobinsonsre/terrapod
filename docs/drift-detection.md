@@ -64,7 +64,7 @@ Drift detection is **automatically enabled** when a workspace is created with a 
 Enable via the API:
 
 ```bash
-curl -X PATCH https://terrapod.local/api/v2/organizations/default/workspaces/ws-abc123 \
+curl -X PATCH https://terrapod.local/api/v2/workspaces/ws-abc123 \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -135,7 +135,7 @@ The drift checker skips a workspace if any of the following are true:
 
 - **Not yet due** — elapsed time since last check is less than the configured interval
 - **Workspace locked** — a user has an active lock
-- **Active runs** — the workspace has runs in non-terminal states (pending, queued, planning, planned, confirmed, applying)
+- **Runner busy** — the workspace has a run actively executing terraform (`planning` or `applying`). Runs awaiting operator action (`planned`, `confirmed`) do **not** block a drift check — a plan-only drift run on its own configuration version doesn't conflict with them
 - **No state** — the workspace has zero state versions (nothing to drift against)
 - **VCS error** — (VCS-connected workspaces) the connection is inactive, repo URL is unparseable, or archive download fails
 

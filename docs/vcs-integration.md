@@ -186,7 +186,7 @@ curl -X POST https://terrapod.example.com/api/terrapod/v1/vcs-connections \
         "name": "my-github",
         "provider": "github",
         "github-app-id": 12345,
-        "github-installation-id": 112887490,
+        "github-installation-id": 67890,
         "github-account-login": "my-org",
         "github-account-type": "Organization",
         "private-key": "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
@@ -610,7 +610,7 @@ has its own secret, that connection's webhooks are validated against it; when
 it doesn't, validation falls back to the global secret — so existing
 single-secret deployments are unaffected.
 
-> GitLab webhook support is not yet implemented. GitLab connections use polling only.
+> GitLab webhooks are supported too — see [Configure a GitLab webhook for instant triggers](#step-3-optional-configure-a-gitlab-webhook-for-instant-triggers) above. GitLab connections also work on polling alone if you don't configure a webhook.
 
 ---
 

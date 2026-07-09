@@ -826,8 +826,8 @@ The `/.well-known/terraform.json` endpoint includes paths for both module and pr
 
 ```json
 {
-  "modules.v1": "/api/terrapod/v1/registry/modules/",
-  "providers.v1": "/api/terrapod/v1/registry/providers/"
+  "modules.v1": "/api/v2/registry/modules/",
+  "providers.v1": "/api/v2/registry/providers/"
 }
 ```
 

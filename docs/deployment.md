@@ -144,11 +144,13 @@ listener:
   replicas: 1
   name: "production-listener"
   existingSecret: terrapod-listener-credentials  # K8s Secret with join_token key
-  # Each listener pod persists its certificate to a per-pod K8s Secret
-  # (`tplnr-<name>-identity`), so a restart re-uses the existing identity
-  # rather than re-joining the pool. Certificates auto-renew at 50% of
-  # validity. Multiple replicas form an active-active HA pool — any
-  # listener can answer Job-status queries for runs launched by any other.
+  # All pods of this listener Deployment share one identity/name and
+  # coordinate via a single K8s Secret (`<release>-listener-credentials`)
+  # in the release namespace, where the X.509 cert is stored and rotated
+  # (auto-renewed at 50% of validity plus a per-pod splay). A restart
+  # re-uses the stored cert rather than re-joining the pool. Multiple
+  # replicas form an active-active HA pool — any listener can answer
+  # Job-status queries for runs launched by any other.
 
 ingress:
   enabled: true
@@ -157,9 +159,6 @@ ingress:
   tls: true
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
-
-runners:
-  default: standard
 
 postgresql:
   url: ""  # Injected via secret
@@ -199,10 +198,10 @@ The chart ships with a `values.schema.json` that validates all values at `helm i
 | `api.replicas` | `1` | Number of API server replicas |
 | `api.image.repository` | `ghcr.io/mattrobinsonsre/terrapod-api` | API Docker image |
 | `api.image.tag` | `""` (appVersion) | Image tag |
-| `api.resources.requests.cpu` | `250m` | CPU request |
-| `api.resources.requests.memory` | `512Mi` | Memory request |
+| `api.resources.requests.cpu` | `500m` | CPU request |
+| `api.resources.requests.memory` | `2Gi` | Memory request |
 | `api.resources.limits.cpu` | `1` | CPU limit |
-| `api.resources.limits.memory` | `1Gi` | Memory limit |
+| `api.resources.limits.memory` | `2Gi` | Memory limit |
 | `api.autoscaling.enabled` | `false` | Enable HPA (requires cloud storage backend) |
 | `api.autoscaling.minReplicas` | `2` | HPA minimum replicas |
 | `api.autoscaling.maxReplicas` | `10` | HPA maximum replicas |

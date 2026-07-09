@@ -436,7 +436,7 @@ The lockout check only fires for users whose access comes from label-based role 
   "errors": [{
     "status": "409",
     "title": "Label change would reduce your access",
-    "detail": "This label change would reduce your access from write to read on this workspace. Re-submit with \"force\": true to confirm."
+    "detail": "This label change would remove capabilities you currently hold on this workspace (run:apply, var:write). Re-submit with \"force\": true to confirm."
   }]
 }
 ```

@@ -150,7 +150,7 @@ the set name is retained for display).
 ## Operational notes
 
 - The `opa` binary is **bundled in both the runner and the API images**
-  at a pinned version (currently OPA 1.16.2). The runner is where
+  at a pinned version (currently OPA 1.18.0). The runner is where
   evaluation actually happens — it has the plan JSON locally and scales
   out with K8s. The API keeps OPA only for `opa check` (write-time Rego
   validation, so broken syntax is rejected at policy save time rather

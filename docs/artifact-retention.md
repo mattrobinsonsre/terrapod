@@ -6,12 +6,12 @@ Terrapod stores versioned state files, run logs, plan outputs, configuration tar
 
 ## Overview
 
-When enabled, a daily background task (via the distributed scheduler) iterates six artifact categories and deletes entries that exceed their configured retention threshold. Each category runs independently -- a failure in one does not block the others.
+When enabled, a daily background task (via the distributed scheduler) iterates several artifact categories and deletes entries that exceed their configured retention threshold. Each category runs independently -- a failure in one does not block the others.
 
 | Category | Retention Key | Default | What Gets Deleted |
 |---|---|---|---|
 | **State versions** | `state_versions_keep` | 20 per workspace | Excess state versions beyond the keep count (oldest first) |
-| **Run artifacts** | `run_artifacts_retention_days` | 90 days | Plan output, plan logs, apply logs, and plan-artifacts tarballs for terminal runs |
+| **Run artifacts** | `run_artifacts_retention_days` | 90 days | Plan output, plan JSON output, plan logs, and apply logs for terminal runs |
 | **Config versions (age)** | `config_versions_retention_days` | 90 days | Uploaded configuration tarballs no longer referenced by active runs, older than the threshold |
 | **Config versions (count)** | `config_versions_keep` | 50 per workspace | Excess CVs beyond the keep count (oldest first); CVs referenced by an active run are always preserved |
 | **Provider cache** | `provider_cache_retention_days` | 30 days | Cached upstream provider binaries not accessed within the retention window |
@@ -67,7 +67,7 @@ The retention system enforces several invariants to prevent data loss:
 ### Run Artifacts
 
 - **Only terminal runs are eligible.** Runs in `applied`, `errored`, `discarded`, or `canceled` state have their artifacts cleaned up. Runs still in progress (`pending`, `queued`, `planning`, `planned`, `confirmed`, `applying`) are never touched.
-- Artifacts deleted: plan output file, plan-phase log, apply-phase log.
+- Artifacts deleted: plan output file, plan JSON output, plan-phase log, apply-phase log.
 
 ### Config Versions
 
@@ -94,7 +94,7 @@ All storage deletions are wrapped in try/except blocks. If an individual object 
 Both the provider cache and binary cache track when each entry was last accessed via a `last_accessed_at` column. This timestamp is updated every time a cache hit occurs:
 
 - **Binary cache**: When a runner downloads a cached terraform/tofu binary, the `last_accessed_at` on the `CachedBinary` record is touched.
-- **Provider cache**: When the `{version}.json` endpoint serves cached platform info (tier 1 lookup), `last_accessed_at` is touched on each `CachedProviderPackage` record. Similarly, when a single platform is served via the download proxy, the timestamp is updated.
+- **Provider cache**: When the `{version}.json` endpoint serves cached platform info (tier 1 lookup), `last_accessed_at` is touched on each `CachedProviderPackage` record.
 
 The retention cleanup compares `last_accessed_at` against the configured retention days -- not `cached_at`. This means:
 
@@ -115,7 +115,7 @@ Three Prometheus metrics track retention activity:
 | `terrapod_retention_errors_total` | Counter | category | Per-item deletion errors |
 | `terrapod_retention_duration_seconds` | Histogram | -- | Wall-clock duration of the full cleanup cycle |
 
-Categories: `state_versions`, `run_artifacts`, `config_versions`, `config_versions_count`, `provider_cache`, `binary_cache`, `module_overrides`.
+Categories: `state_versions`, `run_artifacts`, `config_versions`, `config_versions_count`, `provider_cache`, `binary_cache`, `module_overrides`, `vcs_archives`.
 
 ### Recommended Alert
 

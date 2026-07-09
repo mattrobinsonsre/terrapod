@@ -139,8 +139,8 @@ Returns service discovery document for `terraform login` and registry protocol.
     "token": "/oauth/token",
     "ports": [10000, 10010]
   },
-  "modules.v1": "/api/terrapod/v1/registry/modules/",
-  "providers.v1": "/api/terrapod/v1/registry/providers/"
+  "modules.v1": "/api/v2/registry/modules/",
+  "providers.v1": "/api/v2/registry/providers/"
 }
 ```
 
@@ -158,7 +158,7 @@ API version handshake. Returns TFE-compatible version headers.
 ```
 TFP-API-Version: 2.6
 TFP-AppName: Terrapod
-X-TFE-Version: v0.1.0
+X-TFE-Version: v202301-1
 ```
 
 ---
@@ -1800,7 +1800,7 @@ POST /api/terrapod/v1/vcs-connections
       "name": "my-github",
       "provider": "github",
       "github-app-id": 12345,
-      "github-installation-id": 112887490,
+      "github-installation-id": 67890,
       "github-account-login": "my-org",
       "github-account-type": "Organization",
       "private-key": "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----",

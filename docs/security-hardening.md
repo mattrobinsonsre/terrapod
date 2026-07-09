@@ -56,7 +56,7 @@ api:
 
 ### API Token Lifetime
 
-Reduce the maximum API token lifetime. The default is 168 hours (7 days). For stricter environments:
+Reduce the maximum API token lifetime. The default is 8760 hours (1 year); `0` means no limit. For stricter environments:
 
 ```yaml
 api:

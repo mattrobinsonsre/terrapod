@@ -158,8 +158,8 @@ Service-discovered via `providers.v1` URL.
 
 | Method | Path |
 |---|---|
-| GET | `/api/v2/registry/providers/{namespace}/{type}/versions` |
-| GET | `/api/v2/registry/providers/{namespace}/{type}/{version}/download/{os}/{arch}` |
+| GET | `/api/v2/registry/providers/{namespace}/{name}/versions` |
+| GET | `/api/v2/registry/providers/{namespace}/{name}/{version}/download/{os}/{arch}` |
 
 The platform-download endpoint returns JSON with `download_url`, `shasums_url`, and `shasums_signature_url` — the CLI then follows those URLs (which may be absolute, presigned, or server-relative).
 

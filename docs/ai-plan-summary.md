@@ -1,6 +1,6 @@
 # AI Plan Summary
 
-> Part of Terrapod's **AI-augmented review layer** design focus — see [Why Terrapod](../README.md#why-terrapod). Disabled by default; opt in per the configuration below.
+> Part of Terrapod's **AI-augmented review layer** design focus — see [Why Terrapod](../README.md#is-terrapod-for-you). Disabled by default; opt in per the configuration below.
 
 Terrapod can attach an AI-generated change summary and risk assessment
 to every plan, and an AI-generated failure analysis to every plan that
@@ -62,7 +62,7 @@ api:
       # Bedrock requires the inference-profile ID (not the bare
       # foundation-model ID) for on-demand invocation of newer models.
       model: bedrock/us.anthropic.claude-opus-4-8
-      max_output_tokens: 1024
+      max_output_tokens: 16384
       daily_token_budget: 1000000   # cap output tokens per UTC day
       auth:
         aws_region: us-east-1
@@ -198,9 +198,8 @@ Each workspace has two opt-in fields:
   causes a global outage") or domain knowledge.
 
 Set both via the workspace settings UI, the API (`PATCH
-/api/v2/workspaces/{id}`), the `terrapod_workspace` Terraform resource
-attributes (`ai_summary_mode` and `ai_summary_context`), or the bulk
-update endpoint.
+/api/v2/workspaces/{id}`), or the `terrapod_workspace` Terraform resource
+attributes (`ai_summary_mode` and `ai_summary_context`).
 
 ## Prompt customisation
 

@@ -10,7 +10,7 @@ Two endpoints have to accept connections from the public internet:
 
 | Endpoint | Caller | Auth on the request |
 |---|---|---|
-| `POST /api/terrapod/v1/vcs-events/github` (and future `/gitlab`) | github.com / gitlab.com webhook delivery | HMAC-SHA256 with the connection's `webhook_secret` |
+| `POST /api/terrapod/v1/vcs-events/github` and `.../gitlab` | github.com / gitlab.com webhook delivery | GitHub: HMAC-SHA256 with the connection's `webhook_secret`. GitLab: verbatim `X-Gitlab-Token` compared timing-safe |
 | `PATCH /api/terrapod/v1/task-stage-results/{id}/callback` | external run-task services (policy engines, scanners) | Short-lived HMAC-derived `access_token` bound to the specific result ID |
 
 Everything else stays on the management ingress:
@@ -122,4 +122,4 @@ That's the default. All traffic, including webhooks, goes through `ingress`. If 
 - `helm/terrapod/values.yaml` — full `webhookIngress:` block schema.
 - `services/terrapod/api/routers/vcs_events.py` — GitHub webhook receiver (HMAC validated).
 - `services/terrapod/api/routers/run_tasks.py` — run-task callback receiver (token validated).
-- `services/terrapod/services/run_task_dispatcher.py:120` — the server-side site that hands out the callback URL using `public_webhook_url`.
+- `services/terrapod/services/run_task_dispatcher.py` — the server-side site that hands out the callback URL using `public_webhook_url` (see the base-URL priority chain and `callback_url` construction).

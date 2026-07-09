@@ -1039,7 +1039,7 @@ The catalog provisions **and** destroys real infrastructure on behalf of self-se
 
 **Symptom**: someone used the discouraged **Orphan** escape hatch (`DELETE /catalog-instances/{id}?orphan=true`, or the admin-only UI action) — the catalog record is gone but the cloud resources are still running, now unmanaged.
 
-1. **Confirm via audit.** The orphan is audit-logged (`Catalog instance orphaned: workspace deleted, infrastructure abandoned`, with workspace name + actor) and captured by the audit middleware (`/api/terrapod/v1/audit?action=DELETE`).
+1. **Confirm via audit.** The orphan is audit-logged (`Catalog instance orphaned: workspace deleted, infrastructure abandoned`, with workspace name + actor) and captured by the audit middleware (`/api/terrapod/v1/admin/audit-log?filter[action]=DELETE`).
 2. **Reclaim the infra.** There is no Terrapod state for it anymore — adopt it back under IaC: re-provision the same catalog item (or a plain workspace) and `terraform import` the live resources, or tear it down directly in the cloud console. Prefer `destroy` over `orphan` next time so this doesn't recur.
 
 ### Stuck provision (run never progresses)

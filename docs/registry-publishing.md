@@ -113,8 +113,8 @@ Module, declaratively:
 
 ```hcl
 resource "terrapod_registry_module" "vpc" {
-  name     = "vpc"
-  provider = "aws"
+  name          = "vpc"
+  provider_name = "aws"
 }
 ```
 
@@ -146,7 +146,8 @@ slot. See [Registry RBAC](registry.md#rbac).
 way to get one is `terraform login terrapod.example.internal`, which
 stores the token in `~/.terraform.d/credentials.tfrc.json` — the CLI
 reads it from there automatically. For CI, create a long-lived token
-(`settings → tokens` in the UI, or `POST /api/terrapod/v1/account/tokens`)
+(`settings → tokens` in the UI, or
+`POST /api/terrapod/v1/users/{user_id}/authentication-tokens`)
 and pass it via `$TERRAPOD_TOKEN`. See [Auth resolution](#auth-resolution).
 
 ---

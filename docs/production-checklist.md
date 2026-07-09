@@ -10,7 +10,7 @@ A step-by-step checklist for preparing a Terrapod instance for production use. E
 
 - [ ] **PostgreSQL is externally managed** -- RDS, Cloud SQL, Azure Database, or equivalent with automated backups and point-in-time recovery (PITR). Do not run PostgreSQL inside the Kubernetes cluster for production workloads. See [Deployment: Database](deployment.md#database).
 - [ ] **Redis is externally managed** -- ElastiCache, MemoryDB, Azure Cache, or equivalent. Redis holds ephemeral data (sessions, scheduler state, listener heartbeats) so durability is not required, but availability is. See [Deployment: Redis](deployment.md#redis).
-- [ ] **Object storage is configured** -- S3, Azure Blob, or GCS with encryption at rest enabled. Filesystem storage (PVC) is acceptable for single-replica deployments but does not support multi-replica or cross-AZ redundancy. See [Deployment: Storage Backends](deployment.md#storage-backends).
+- [ ] **Object storage is configured** -- S3, Azure Blob, or GCS with encryption at rest enabled. Filesystem storage (PVC) is acceptable for single-replica deployments but does not support multi-replica or cross-AZ redundancy. See [Deployment: Storage Backends](deployment.md#storage-backend-setup).
 - [ ] **API pod ephemeral storage is provisioned** -- `api.ephemeralStorage.enabled: true` (default) gives each api pod replica its own PVC for streaming VCS tarballs. The configured `storageClass` MUST have `Delete` reclaim policy, otherwise PVs accumulate as orphans on every pod restart. See [Deployment: VCS archive streaming and ephemeral storage](deployment.md#vcs-archive-streaming-and-ephemeral-storage-required-for-monorepo-workspaces).
   - **AWS EKS**: use `xfs` or `gp3` (NOT `xfs-retain` / `gp3-retain`).
   - **k3s (single-node)**: built-in `local-path` works out of the box.
@@ -49,7 +49,7 @@ A step-by-step checklist for preparing a Terrapod instance for production use. E
 ## Backups & Recovery
 
 - [ ] **Database backups are automated** -- Managed databases (RDS, Cloud SQL) provide automated daily backups with PITR. Verify backup retention meets your compliance requirements. See [Security Hardening: Backup Strategy](security-hardening.md#backup-strategy).
-- [ ] **Object storage versioning is enabled** -- S3 versioning, Azure Blob soft delete, or GCS versioning protects against accidental state file deletion. See [Security Hardening: Object Storage](security-hardening.md#object-storage-security).
+- [ ] **Object storage versioning is enabled** -- S3 versioning, Azure Blob soft delete, or GCS versioning protects against accidental state file deletion. See [Security Hardening: Object Storage](security-hardening.md#object-storage).
 - [ ] **Break-glass recovery procedure is tested** -- Follow the [Disaster Recovery](disaster-recovery.md) guide in a non-production environment to verify you can recover Terraform state directly from object storage if Terrapod is unavailable.
 - [ ] **Kubernetes Secrets are backed up** -- OIDC client secrets, bootstrap credentials, and listener join tokens stored in K8s Secrets are not recoverable from the database. Back them up or ensure they can be regenerated from your secrets manager.
 
@@ -64,7 +64,7 @@ A step-by-step checklist for preparing a Terrapod instance for production use. E
   - Scheduler stalls (`run_reconciler` not executing in 5 minutes)
   - Storage errors (any in 5 minutes)
   - Database/Redis connection errors
-  - See [Monitoring: Recommended Alerts](monitoring.md#recommended-alerts)
+  - See [Monitoring: Alerting](monitoring.md#alerting-shipped-prometheusrule)
 - [ ] **Structured logging is collected** -- Terrapod emits JSON-formatted logs to stdout. Configure your log aggregator (Loki, CloudWatch, Datadog) to ingest from all pods in the Terrapod namespace.
 - [ ] **Health checks are verified** -- `GET /ready` returns 200 when database, Redis, and storage are all reachable. Configure your load balancer or ingress to use this endpoint.
 
@@ -73,7 +73,7 @@ A step-by-step checklist for preparing a Terrapod instance for production use. E
 ## Scaling & Availability
 
 - [ ] **API runs at least 2 replicas** -- PodDisruptionBudget (`maxUnavailable: 1`) is enabled by default. A single replica means downtime during rolling updates.
-- [ ] **HPA is configured for the API** -- Recommended: min 2, max 10 replicas targeting 70% CPU. See [Deployment: Scaling](deployment.md#scaling).
+- [ ] **HPA is configured for the API** -- Recommended: min 2, max 10 replicas targeting 70% CPU. See [Deployment: Scaling](deployment.md#scaling-considerations).
 - [ ] **Database connection pool is sized correctly** -- Total max connections = `(pool_size + max_overflow) x replicas`. Verify this does not exceed the database's `max_connections`. See [Deployment: Connection Pooling](deployment.md#connection-pool-tuning).
 - [ ] **Pod anti-affinity spreads replicas across nodes** -- Prevent all API replicas from landing on the same node. The Helm chart supports `affinity` configuration for API, web, and listener Deployments.
 
@@ -93,7 +93,7 @@ A step-by-step checklist for preparing a Terrapod instance for production use. E
 
 - [ ] **Audit log retention is set** -- Default: 90 days. Set `audit.retention_days` to meet your compliance requirements (SOC2/ISO27001 typically require 365 days). See [Audit Logging](audit-logging.md).
 - [ ] **Audit log is queryable** -- Verify the `/admin/audit-log` page shows recent API activity and that filters work correctly.
-- [ ] **State-diverged workspaces are monitored** -- A workspace flagged as `state_diverged` means a runner applied changes but failed to upload the resulting state. This requires immediate operator intervention. Monitor via the health dashboard or the `terrapod_runs_terminal_total{terminal_state="errored"}` metric.
+- [ ] **State-diverged workspaces are monitored** -- A workspace flagged as `state_diverged` means a runner applied changes but failed to upload the resulting state. This requires immediate operator intervention. Monitor via the health dashboard or the `terrapod_runs_terminal_total{status="errored"}` metric.
 
 ---
 

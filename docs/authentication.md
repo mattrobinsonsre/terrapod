@@ -429,8 +429,17 @@ The token comes back with `"bound-to": null` and the pinned roles as its absolut
 
 ### Listing Tokens
 
+List your own tokens:
+
 ```zsh
-curl https://terrapod.example.com/api/terrapod/v1/authentication-tokens \
+curl https://terrapod.example.com/api/terrapod/v1/users/{user_id}/authentication-tokens \
+  -H "Authorization: Bearer $TERRAPOD_TOKEN"
+```
+
+Admins can list all tokens across users (optionally filtered by `?kind=`):
+
+```zsh
+curl https://terrapod.example.com/api/terrapod/v1/admin/authentication-tokens \
   -H "Authorization: Bearer $TERRAPOD_TOKEN"
 ```
 
