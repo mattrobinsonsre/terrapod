@@ -253,3 +253,13 @@ class TestCountActiveRunnerJobs:
 
         mock_batch.return_value.list_namespaced_job.side_effect = ApiException(status=500)
         assert await count_active_runner_jobs() == 0
+
+    @patch("terrapod.runner.job_manager._get_batch_api")
+    @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
+    async def test_uninitialised_client_fails_open_to_zero(self, _ns, mock_batch):
+        # A not-yet-initialised K8s client (e.g. init_k8s never ran) must fail
+        # open too — the client acquisition is inside the guarded block.
+        from terrapod.runner.job_manager import count_active_runner_jobs
+
+        mock_batch.side_effect = RuntimeError("k8s config not loaded")
+        assert await count_active_runner_jobs() == 0

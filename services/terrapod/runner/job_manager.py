@@ -313,9 +313,10 @@ async def count_active_runner_jobs(namespace: str = "") -> int:
     if not namespace:
         namespace = _default_namespace()
 
-    batch_api = _get_batch_api()
-
     try:
+        # Inside the try so a not-yet-initialised client also fails open —
+        # the whole helper is best-effort (see docstring), not just the list.
+        batch_api = _get_batch_api()
         loop = asyncio.get_event_loop()
         jobs = await loop.run_in_executor(
             _executor,
