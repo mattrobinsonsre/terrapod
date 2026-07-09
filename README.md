@@ -3,17 +3,44 @@
 [![CI](https://github.com/mattrobinsonsre/terrapod/actions/workflows/ci.yml/badge.svg)](https://github.com/mattrobinsonsre/terrapod/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
-**Open-source platform replacement for Terraform Enterprise.**
+**A free, open-source, self-hosted platform replacement for Terraform Enterprise / HCP Terraform.**
 
-Terrapod provides the collaboration, governance (label-based RBAC **and OPA/Rego policy-as-code** — the open-source equivalent of TFE's Sentinel), state management, and UI layer that wraps around `terraform` or `tofu` as pluggable execution backends. It targets API compatibility with the [HCP Terraform / TFE V2 API](https://developer.hashicorp.com/terraform/enterprise/api-docs) so that existing tooling -- the `terraform` CLI with `cloud` block, the [`go-tfe`](https://pkg.go.dev/github.com/hashicorp/go-tfe) client, CI/CD integrations -- can point at a Terrapod instance with minimal reconfiguration.
+Get the collaboration, governance, state, registry, and UI layer of a commercial Terraform platform — self-hosted on your own Kubernetes, with no per-resource licensing and nothing proprietary in the stack. Terrapod gives you label-based RBAC and OPA/Rego policy-as-code (the open-source equivalent of TFE's Sentinel), versioned remote state, a private module + provider registry, and a modern web UI — all wrapped around `terraform` or `tofu`. It targets compatibility with the [TFE V2 API](https://developer.hashicorp.com/terraform/enterprise/api-docs), so existing `cloud` blocks, [`go-tfe`](https://pkg.go.dev/github.com/hashicorp/go-tfe) clients, and CI/CD point at a Terrapod instance with minimal reconfiguration — usually zero code changes. It's **GPLv3**, and self-hosted internal use triggers no source-disclosure obligation (GPLv3 is not AGPL).
 
 Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
-![Workspaces](docs/images/workspaces.png)
+![Terrapod run detail — plan output with an AI change summary, per-policy OPA pass/fail, and resource-change cards](docs/images/run-detail.png)
+*A single run: plan output, an AI-generated change summary and risk assessment, per-policy OPA results, and resource-change cards.*
+
+**Which path are you on?** — [Evaluate](#quick-evaluation) (`make eval`, one command) · [Deploy](#quick-start) (Helm on your cluster) · [Migrate](docs/migration.md) (off TFE / HCP / Atlantis, reversible) · [Contribute](CONTRIBUTING.md)
+
+---
+
+## Coming from Terraform Enterprise / HCP Terraform?
+
+Terrapod targets API compatibility with the surface the `terraform`/`tofu` CLI and `go-tfe` consume, so most tooling points at it unchanged. Where the *models* differ (structural facts, not a feature-by-feature scorecard):
+
+| | HCP Terraform / TFE | Terrapod |
+|---|---|---|
+| Hosting | Vendor SaaS, or a self-managed distribution | Self-hosted on your own Kubernetes |
+| Licensing & cost | Proprietary (BUSL), priced by managed resources | Free and open source (GPLv3) |
+| Where state + secrets live | On the vendor / self-managed control plane | Never leave your boundary (your Postgres + object store) |
+| Cloud credentials | Vendor-stored or dynamic | K8s workload identity (IRSA / WIF / Azure WI) — nothing long-lived |
+| Policy engine | Sentinel (proprietary) | OPA / Rego (open) — advisory or mandatory |
+| Restricted-network / air-gap execution | SaaS-dependent by default | First-class — outbound-only runners, polling VCS, pull-through mirror + sealed cache-only mode |
+| Private registry · RBAC · SSO · Audit | Yes | Yes — self-hosted equivalents (label RBAC; OIDC/SAML; immutable audit) |
+| Multi-organization | Yes | Single org by design ([run an instance per tenant](docs/architecture.md#why-a-single-organization)) |
+| CLI / `go-tfe` API | TFE V2 | TFE V2-compatible |
+
+*Model-level comparison — it deliberately avoids version-specific pricing and fast-moving feature claims; confirm current HCP terms with HashiCorp.*
+
+> **Ready to move?** [`terrapod-migrate`](docs/migration.md) does it dry-run-first and fully reversible — preview every workspace, variable, variable set, VCS connection, state file (serial + lineage preserved), run trigger, notification, agent pool, and registry signing key it will create, apply, verify parity, then roll back cleanly if needed. Registry module/provider *versions* are reported for re-publish rather than auto-created (a source-API + signing-key limitation, [documented plainly](docs/migration.md#what-actually-transfers-today)).
+
+---
 
 ## Is Terrapod for you?
 
-If you want an open, self-hosted alternative to Terraform Enterprise / HCP Terraform, yes. Terrapod is the **full** platform layer, not a thin slice of it — point your existing `cloud` blocks, `go-tfe` clients, and CI/CD at it and it just works.
+If you want an open, self-hosted alternative to Terraform Enterprise / HCP Terraform, yes. Terrapod is the **full** platform layer, not a thin slice of it — point your existing `cloud` blocks, `go-tfe` clients, and CI/CD at it and it just works, with zero code changes.
 
 Everything you'd expect from the platform tier is here and first-class:
 
@@ -22,7 +49,7 @@ Everything you'd expect from the platform tier is here and first-class:
 - Label-based RBAC and OPA/Rego policy-as-code (the open-source equivalent of Sentinel) — advisory or mandatory.
 - API compatibility with the TFE V2 surface the `terraform`/`tofu` CLI and `go-tfe` speak, so most tooling points at it unchanged.
 
-And a few **standout, first-class features** you may really like:
+And a few standout, first-class features you may really like:
 
 - **Runs anywhere your network is awkward.** Runners dial *out* and create Kubernetes Jobs locally, so the control plane never needs inbound reach into an execution cluster — isolated VPCs, other regions, on-prem, or behind egress-only firewalls. VCS is polled outbound, and a pull-through provider mirror + binary cache (with an air-gap sealed mode) lets runs resolve providers and binaries with no upstream internet.
 - **Zero static cloud credentials.** Runs and the platform reach cloud APIs through Kubernetes workload identity (AWS IRSA, GCP WIF, Azure WI) — nothing long-lived to store, leak, or rotate.
@@ -31,37 +58,31 @@ And a few **standout, first-class features** you may really like:
 
 The one hard requirement is Kubernetes, and that's a low bar: Terrapod is a single Helm release, a one-node [k3s](https://k3s.io/) VM is plenty to start, and `make eval` spins up a throwaway [k3d](https://k3d.io/)/kind cluster in one command.
 
-## Why Terrapod
-
-Beyond broad TFE compatibility, Terrapod is built with three deliberate design foci:
-
-- **Restricted-network & multi-cluster execution.** Runner listeners connect *outbound* over SSE and create Kubernetes Jobs locally, so the API never needs inbound reach into the clusters where runs happen — they can sit in isolated VPCs, other regions, or behind firewalls. VCS is polling-first (webhooks optional), and a pull-through provider mirror + CLI binary cache — with an air-gap **sealed mode** — let runners resolve providers and binaries with no upstream internet for cached platforms. See [docs/deployment-network-isolation.md](docs/deployment-network-isolation.md) and the [ARC execution model](docs/architecture.md#runner-architecture-arc-pattern).
-- **An AI-augmented review layer.** Every plan can carry an LLM-generated change summary and risk assessment, with failure analysis on errored plans and a chat to interrogate a run — provider-agnostic via LiteLLM, and **disabled by default** for AI-averse deployments. See [docs/ai-plan-summary.md](docs/ai-plan-summary.md).
-- **A low contribution barrier.** The platform core is **Python** (FastAPI + async SQLAlchemy), so the surface most changes touch is approachable; the consumer ecosystem (Go SDK, Terraform provider, migration/publish CLIs) is **Go**. AI-assisted contributions are welcome — point your assistant at [`llms.txt`](llms.txt) and [AGENTS.md](AGENTS.md), then see [CONTRIBUTING.md](CONTRIBUTING.md).
+Three deliberate design foci set Terrapod apart, each with a doc to go deeper: **restricted-network & multi-cluster execution** (outbound-only runners + polling VCS + a self-contained provider mirror/binary cache with a sealed air-gap mode — see [network isolation](docs/deployment-network-isolation.md) and the [ARC execution model](docs/architecture.md#runner-architecture-arc-pattern)); an **AI-augmented review layer** (provider-agnostic via [LiteLLM](https://github.com/BerriAI/litellm), off by default — see [AI plan summary](docs/ai-plan-summary.md)); and a **low contribution barrier** (a Python platform core, AI-assisted contributions welcome — see [`llms.txt`](llms.txt) and [AGENTS.md](AGENTS.md)).
 
 ---
 
-> **Drop-in replacement for HCP Terraform.** Point your existing `cloud` blocks, `go-tfe` clients, and CI/CD pipelines at Terrapod — zero code changes required.
+## Enterprise-ready
 
-> **Migrating from Terraform Enterprise / HCP Terraform / Atlantis.** The [`terrapod-migrate`](docs/migration.md) CLI imports workspaces, variables, variable sets, VCS connections, state, run triggers, notifications, agent pools, and registry signing keys with a **dry-run-first, fully reversible** flow — preview everything, apply, verify parity, and roll back cleanly if needed.
+Built to run in production, not just to demo — the de-risking signals in one place:
 
-> **AI-augmented plans.** Every plan can carry an LLM-generated change description, risk assessment, and (on failure) suggested fixes — provider-agnostic via [LiteLLM](https://github.com/BerriAI/litellm). Wire AWS Bedrock (Claude, Nova, gpt-oss) with native IAM auth, or point at OpenAI, Anthropic, Gemini, Azure OpenAI, or any OpenAI-compatible endpoint. See [docs/ai-plan-summary.md](docs/ai-plan-summary.md).
-
-> **Policy-as-code with OPA.** Block applies on policy violations using [Open Policy Agent](https://www.openpolicyagent.org/) and the Rego language — the open-source equivalent of TFE's proprietary Sentinel. Policy sets are scoped to workspaces with the same label-based model as roles, evaluated on the runner against the plan JSON, and gated as `advisory` (warn) or `mandatory` (block). See [docs/policies.md](docs/policies.md).
-
-> **Zero static cloud credentials, end to end.** Both the runs and the platform reach cloud APIs through Kubernetes workload identity — AWS IRSA, GCP Workload Identity Federation, Azure Workload Identity — so there are no long-lived access keys to store, leak, or rotate. Credentials are short-lived, auto-rotated, and auditable. See [docs/cloud-credentials.md](docs/cloud-credentials.md).
-
-> **Contributions welcome — including AI-assisted ones.** The platform core is **Python** (FastAPI + async SQLAlchemy), which keeps the contribution barrier low; the consumer ecosystem (Go SDK, Terraform provider, migration/publish CLIs) is **Go**. Pairing with an AI coding assistant? Point it at [`llms.txt`](llms.txt) (a machine-friendly map of the repo, docs, and how to enable each feature) and [AGENTS.md](AGENTS.md) (architecture, contracts, conventions, and the hard invariants). Then read [CONTRIBUTING.md](CONTRIBUTING.md) and [open an issue](https://github.com/mattrobinsonsre/terrapod/issues) to get started.
+- **High availability, no leader election** — run the API and listeners multi-replica behind a load balancer; all background work coordinates through Redis, so any replica can do any job and nothing is a single point of failure. PodDisruptionBudgets are on by default. See [Architecture → distributed scheduler](docs/architecture.md#distributed-task-scheduler).
+- **Enterprise identity & access** — SSO via OIDC and SAML (Auth0, Okta, Azure AD, …), plus `terraform login` (OAuth2 + PKCE) and long-lived API tokens for automation; granular label-based RBAC with `resource:verb` capabilities. See [Authentication](docs/authentication.md) · [RBAC](docs/rbac.md).
+- **Immutable audit** — a tamper-evident, retention-configurable audit log of every API action. See [Audit logging](docs/audit-logging.md).
+- **Hardened by default** — every pod runs non-root, read-only root filesystem, all capabilities dropped, and a seccomp profile. See [Security hardening](docs/security-hardening.md) · [Production checklist](docs/production-checklist.md).
+- **Verifiable supply chain** — every release image and the Helm chart is keyless-signed with cosign and carries SBOM (SPDX) + SLSA build-provenance; verify with `cosign verify` / `gh attestation verify` before you deploy. See [Supply-chain verification](docs/supply-chain-verification.md).
+- **Backup & disaster recovery** — an optional shipped `pg_dump` backup CronJob, a restore-verification DR drill (a real green check, not a doc), and documented break-glass state recovery straight from object storage. See [Disaster recovery](docs/disaster-recovery.md).
+- **Reversible upgrades & migration** — every schema migration ships a real `upgrade()`/`downgrade()` and the chart is the single upgrade unit, so version bumps are auditable and reversible; migrating *in* off TFE / HCP / Atlantis is dry-run-first and roll-back-able. See [Deployment](docs/deployment.md) · [Migration](docs/migration.md).
 
 ---
 
-## ⚡ Quick Evaluation
+## Quick Evaluation
 
 Try Terrapod end-to-end on your laptop in one command. It spins up a throwaway
 [kind](https://kind.sigs.k8s.io/) or [k3d](https://k3d.io/) cluster and installs
 a complete, self-contained stack — in-cluster PostgreSQL + Redis, filesystem
-storage, a local admin login — with **no cloud account and no external
-dependencies**. It even seeds a sample workspace + a completed plan, so you land
+storage, a local admin login — with no cloud account and no external
+dependencies. It even seeds a sample workspace + a completed plan, so you land
 on a populated UI, not an empty list:
 
 ![Terrapod eval walkthrough — login, sample workspace, and a completed plan](docs/images/eval-demo.gif)
@@ -83,66 +104,80 @@ quickstart pulls released images, so the only wait is the image download.
 
 ---
 
-## Key Features
+## Features
 
-| Feature | Status | Description |
-|---|---|---|
-| Workspaces | Implemented | Isolate state, variables, and runs per workspace |
-| Remote State Management | Implemented | Versioned state storage with locking, rollback, encryption at rest via CSP services |
-| Agent Execution | Implemented | Plan/apply runs on the server via K8s Job-based runner infrastructure |
-| VCS Integration | Implemented | GitHub (App) and GitLab (access token); inbound webhooks supported (GitHub HMAC + GitLab token) for instant triggers, with outbound polling as the resilient default so webhooks are optional, never required |
-| Variables & Secrets | Implemented | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets |
-| RBAC | Implemented | Label-based roles with granular capabilities (`resource:verb`, e.g. `run:plan` without `run:apply`); permission levels (read/plan/write/admin) remain as authoring shorthand |
-| Private Module Registry | Implemented | Publish, version, and share modules internally |
-| Private Provider Registry | Implemented | Publish, version, and share providers with GPG signing and network mirror caching |
-| Binary Caching | Implemented | Pull-through cache for terraform/tofu/terragrunt CLI binaries |
-| Cache Pre-population | Implemented | Seed the binary + provider caches ahead of time via a bulk-warm admin endpoint + UI panel (for restricted-network / fast-first-run deployments) |
-| Sealed (cache-only) Mode | Implemented | Air-gap switch (`registry.cache_only`) guaranteeing no upstream fetch — cache-backed version resolution, actionable cache-miss errors, retention skips the caches |
-| Supply-chain Verification | Implemented | Cached binaries + provider archives verified against the publisher's GPG-signed SHA256SUMS (pinned keys); the runner re-verifies the executable before running it |
-| Signed Releases (cosign) | Implemented | Every release image + the Helm chart is keyless-signed with cosign, with per-image SBOM (SPDX) + SLSA build-provenance attestations — verifiable with `cosign verify` / `gh attestation verify`. See [docs/supply-chain-verification.md](docs/supply-chain-verification.md#verifying-terrapods-own-release-artifacts) |
-| **Terragrunt** | **Implemented** | **Per-workspace Terragrunt support for agent-mode runs — a `terragrunt_enabled` flag + pinned version, pull-through binary cache for the terragrunt CLI, and transparent local-backend reconciliation so Terrapod still owns state. CLI-driven runs work with zero extra config. See [docs/terragrunt.md](docs/terragrunt.md).** |
-| Agent Pools | Implemented | Named groups of runner listeners; join token → certificate exchange for auth |
-| CLI-Driven Runs | Implemented | `terraform plan` / `apply` via cloud backend (both `terraform` and `tofu` verified) |
-| TFE V2 API | Implemented | JSON:API surface compatible with `go-tfe` / `terraform login` |
-| Audit Logging | Implemented | Immutable event log with configurable retention |
-| SSO (OIDC / SAML) | Implemented | Pluggable identity providers (Auth0, Okta, Azure AD, etc.) |
-| Drift Detection | Implemented | Scheduled plan-only runs to detect out-of-band changes |
-| Run Triggers | Implemented | Cross-workspace dependency chains — source apply triggers downstream runs |
-| Stale-plan Guards | Implemented | Auto-discard a plan that no longer reflects reality: state-version drift (always on) + optional per-workspace time-based plan expiry |
-| **AI Plan Summary** | **Implemented** | **LLM-generated change summary + risk assessment on every plan; failure analysis on errored plans. Provider-agnostic via LiteLLM — AWS Bedrock (Claude, Nova, gpt-oss…), OpenAI, Anthropic direct, Google Gemini, Azure OpenAI, vLLM. IAM-native auth for Bedrock (IRSA + optional cross-account `sts:AssumeRole`).** |
-| **Policy-as-Code (OPA)** | **Implemented** | **Rego-based policy enforcement on plan output — the open-source equivalent of Sentinel. Advisory or mandatory sets, label-scoped to workspaces, evaluated on the runner against plan JSON, with admin-override on mandatory blocks. Author Rego, attach to workspaces by label, see pass/fail per policy on every run.** |
-| Notifications | Implemented | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
-| Interactive Slack app | Implemented | Outbound Socket Mode app: `/terrapod` account linking (explicit browser confirm step) + opt-in per-workspace run notifications with RBAC-checked Approve/Discard buttons, threaded plan/AI/result. Enable with `api.config.slack.enabled`; opt a workspace in via its `slack_channel`. Multiple deployments can share one Slack workspace via per-deployment `slack.command` + `slack.label`. See [Slack integration](docs/slack-integration.md) |
-| Run Tasks | Implemented | Pre/post-plan webhook hooks for external validation |
-| Execution Hooks | Implemented | Admin-managed custom shell steps run in the runner Job at pre_init/pre_plan/post_plan/pre_apply/post_apply, associated with workspaces (Helm kill-switch `runners.hooksEnabled`) |
-| Workspace Health | Implemented | Per-workspace health conditions, VCS polling status, drift detection indicators |
-| Workspace Autodiscovery | Implemented | Atlantis-style monorepo autodiscovery — pattern-matched rules auto-create workspaces on PRs to new directories |
-| Cloud Credentials | Implemented | Dynamic provider credentials via K8s workload identity (AWS IRSA, GCP WIF, Azure WI) |
+Everything below is implemented and shipped today.
 
-### Screenshots
+### Core platform
+
+| Feature | Description |
+|---|---|
+| Workspaces | Isolate state, variables, and runs per workspace |
+| Remote state | Versioned state with locking and rollback; encrypted at rest by your object store, with optional app-layer BYOK envelope encryption |
+| CLI-driven runs | `terraform` / `tofu` plan / apply via the `cloud` backend (both verified) |
+| Agent execution | Server-side plan / apply on ephemeral K8s Jobs (ARC pattern) |
+| Agent pools | Named runner-listener groups; join-token → certificate exchange for auth |
+| TFE V2 API | JSON:API surface compatible with `go-tfe` / `terraform login` |
+| Run triggers | Cross-workspace dependency chains — a source apply triggers downstream runs |
+| Stale-plan guards | Auto-discard a plan that no longer reflects reality: state-version drift (always on) + optional per-workspace time-based plan expiry |
+
+### Governance & security
+
+| Feature | Description |
+|---|---|
+| Label-based RBAC | Roles with granular `resource:verb` capabilities (e.g. `run:plan` without `run:apply`); read/plan/write/admin levels remain as authoring shorthand |
+| Policy-as-code (OPA) | Rego enforcement on plan JSON — the open-source equivalent of Sentinel. Advisory or mandatory sets, label-scoped to workspaces, evaluated on the runner, with admin override |
+| SSO (OIDC / SAML) | Pluggable identity providers (Auth0, Okta, Azure AD, any standards-compliant IdP) |
+| Audit logging | Immutable event log with configurable retention |
+| Cloud credentials | Zero static keys — dynamic credentials via K8s workload identity (AWS IRSA, GCP WIF, Azure WI); passwordless DB and Redis IAM auth |
+| Supply-chain verification | Cached binaries + provider archives verified against the publisher's GPG-signed SHA256SUMS (pinned keys); the runner re-verifies the executable before running it |
+| Signed releases | Every release image + the Helm chart is keyless-signed with cosign, with per-image SBOM (SPDX) + SLSA build-provenance attestations — verifiable with `cosign verify` / `gh attestation verify` |
 
 <details>
-<summary>Workspace overview with VCS integration, drift detection, and labels</summary>
+<summary><strong>Registry &amp; caching · Integrations &amp; operations · AI</strong> (click to expand)</summary>
 
-![Workspace Overview](docs/images/workspace-overview.png)
+### Registry & caching
+
+| Feature | Description |
+|---|---|
+| Private module registry | Publish, version, and share modules internally |
+| Private provider registry | Publish, version, and share providers with GPG signing and network-mirror caching |
+| Binary caching | Pull-through cache for the terraform / tofu / terragrunt CLI binaries |
+| Cache pre-population | Bulk-warm the binary + provider caches ahead of time via an admin endpoint + UI panel (for restricted-network / fast-first-run deployments) |
+| Sealed (cache-only) mode | Air-gap switch (`registry.cache_only`) guaranteeing no upstream fetch — cache-backed version resolution, actionable cache-miss errors, retention skips the caches |
+
+### Integrations & operations
+
+| Feature | Description |
+|---|---|
+| VCS integration | GitHub App + GitLab token; inbound webhooks supported (GitHub HMAC + GitLab token) for instant triggers, with outbound polling as the resilient default — so webhooks are optional, never required |
+| Workspace autodiscovery | Atlantis-style monorepo autodiscovery — pattern-matched rules auto-create workspaces on PRs to new directories |
+| Terragrunt | Per-workspace Terragrunt for agent-mode runs (a flag + pinned version, pull-through binary cache, local-backend reconciliation so Terrapod still owns state); CLI-driven runs need no extra config |
+| Variables & secrets | Per-workspace env and Terraform variables; sensitive values protected by database encryption-at-rest; variable sets |
+| Drift detection | Scheduled plan-only runs to detect out-of-band changes, with a per-workspace ignore allowlist |
+| Notifications | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
+| Interactive Slack app | Outbound Socket Mode app — `/terrapod` account linking + opt-in per-workspace run notifications with RBAC-checked Approve/Discard buttons; multiple deployments can share one Slack workspace |
+| Run tasks | Pre/post-plan webhook hooks for external validation |
+| Execution hooks | Admin-managed custom shell steps run in the runner Job at pre_init / pre_plan / post_plan / pre_apply / post_apply, associated with workspaces |
+| Service catalog | No-code self-service provisioning over the module registry |
+| Workspace health | Per-workspace health conditions, VCS polling status, drift detection indicators |
+
+### AI (optional, off by default)
+
+| Feature | Description |
+|---|---|
+| AI plan review | LLM change summary + risk assessment on every plan, failure analysis on errored plans, and a chat to interrogate a run — provider-agnostic via LiteLLM (AWS Bedrock, OpenAI, Anthropic, Gemini, Azure OpenAI, vLLM). IAM-native auth for Bedrock (IRSA + optional cross-account `sts:AssumeRole`) |
+
 </details>
 
-<details>
-<summary>Run detail with plan output and VCS metadata</summary>
-
-![Run Detail](docs/images/run-detail.png)
-</details>
+### More screenshots
 
 <details>
-<summary>Variables with sensitive masking and HCL support</summary>
+<summary>Workspace overview, variables, and agent pools</summary>
 
-![Variables](docs/images/workspace-variables.png)
-</details>
-
-<details>
-<summary>Agent pools with listener health monitoring</summary>
-
-![Agent Pools](docs/images/admin-agent-pools.png)
+![Workspace overview with VCS integration, drift detection, and labels](docs/images/workspace-overview.png)
+![Variables with sensitive masking and HCL support](docs/images/workspace-variables.png)
+![Agent pools with listener health monitoring](docs/images/admin-agent-pools.png)
 </details>
 
 ---
@@ -199,14 +234,14 @@ quickstart pulls released images, so the only wait is the image download.
 
 ### Design Principles
 
-- **API-first** -- every UI action is backed by a public API endpoint
-- **BFF pattern** -- Next.js frontend is the single ingress entry point; browser never talks to the API directly
-- **Responsive, mobile-first web UI** -- the whole UI adapts from desktop tables to touch-friendly card layouts on phones; one DRY viewport-driven implementation, no separate mobile app
-- **Kubernetes-native** -- deployed exclusively via Helm chart; runner Jobs are ephemeral K8s Jobs
-- **ARC-pattern execution** -- listener creates Jobs on demand (like GitHub Actions Runner Controller)
-- **OpenTofu-first** -- [OpenTofu](https://opentofu.org/) is the recommended execution backend; `terraform` is also supported
-- **Single organization** -- one org per instance (the literal name `default`); a deliberate fit for self-hosted, aligned with HashiCorp's own current guidance to consolidate onto a single org. Need separate tenants? Run an instance per tenant. See [Why a single organization](docs/architecture.md#why-a-single-organization)
-- **Native object storage** -- speaks each cloud provider's native SDK (S3, Azure Blob, GCS) with filesystem fallback for dev
+- **API-first** — every UI action is backed by a public API endpoint
+- **BFF pattern** — the Next.js frontend is the single ingress entry point; the browser never talks to the API directly
+- **Responsive, mobile-first web UI** — the whole UI adapts from desktop tables to touch-friendly card layouts on phones; one DRY viewport-driven implementation, no separate mobile app
+- **Kubernetes-native** — deployed exclusively via the Helm chart; runner Jobs are ephemeral K8s Jobs
+- **ARC-pattern execution** — the listener creates Jobs on demand (like GitHub Actions Runner Controller)
+- **OpenTofu-first** — [OpenTofu](https://opentofu.org/) is the recommended execution backend; `terraform` is also supported
+- **Single organization** — one org per instance (the literal name `default`), a deliberate self-hosted fit. Need separate tenants? Run an instance per tenant. See [Why a single organization](docs/architecture.md#why-a-single-organization)
+- **Native object storage** — speaks each cloud provider's native SDK (S3, Azure Blob, GCS) with filesystem fallback for dev
 
 ---
 
@@ -304,11 +339,11 @@ For the full walkthrough (k3s bootstrap, DNS/ingress, agent mode, variables, reg
 
 Terrapod supports multiple authentication methods:
 
-- **Local passwords** -- PBKDF2-SHA256 hashed, with zxcvbn strength validation
-- **OIDC** -- Auth0, Okta, Azure AD, and any standards-compliant provider via authlib
-- **SAML** -- Azure AD SAML and other SAML 2.0 providers via python3-saml
-- **terraform login** -- OAuth2 Authorization Code with PKCE for CLI authentication
-- **API tokens** -- long-lived tokens for automation, SHA-256 hashed at rest
+- **Local passwords** — PBKDF2-SHA256 hashed, with zxcvbn strength validation
+- **OIDC** — Auth0, Okta, Azure AD, and any standards-compliant provider via authlib
+- **SAML** — Azure AD SAML and other SAML 2.0 providers via python3-saml
+- **terraform login** — OAuth2 Authorization Code with PKCE for CLI authentication
+- **API tokens** — long-lived tokens for automation, SHA-256 hashed at rest
 
 See [docs/authentication.md](docs/authentication.md) for setup guides.
 
@@ -339,6 +374,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Remote State](docs/remote-state.md) | State versioning, locking, rollback, the `cloud` backend |
 | [AI Plan Summary](docs/ai-plan-summary.md) | LLM plan summaries, risk assessment, failure analysis, chat |
 | [Notifications](docs/notifications.md) | Webhook, Slack, and email alerts on run events |
+| [Slack Integration](docs/slack-integration.md) | Interactive Socket Mode app — account linking, approvals, run notifications |
 | [Run Tasks](docs/run-tasks.md) | Pre/post-plan webhook hooks for external validation |
 | [Execution Hooks](docs/execution-hooks.md) | Custom shell steps run in the runner Job at pre_init/pre_plan/post_plan/pre_apply/post_apply, associated with workspaces |
 | [Audit Logging](docs/audit-logging.md) | Immutable event log, query API, retention |
@@ -354,7 +390,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Known Limitations](docs/known-limitations.md) | What Terrapod does not (yet) do — deployment, scope, and feature constraints, stated plainly |
 | [Production Checklist](docs/production-checklist.md) | Pre-go-live checklist for a production deployment |
 | [Disaster Recovery](docs/disaster-recovery.md) | Break-glass state recovery, shipped DB backup CronJob + restore-verification DR drill, per-backend object-storage protection |
-| [Encryption at Rest](docs/encryption-at-rest.md) | Optional off-by-default app-layer (BYOK) envelope encryption of DB secrets **and state files** — for no-/niche-CSP, bare-metal, or air-gapped deployments (static / Vault Transit / AWS KMS) |
+| [Encryption at Rest](docs/encryption-at-rest.md) | Optional off-by-default app-layer (BYOK) envelope encryption of DB secrets and state files — for no-/niche-CSP, bare-metal, or air-gapped deployments (static / Vault Transit / AWS KMS) |
 
 ---
 
@@ -376,7 +412,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 
 ## Development
 
-All builds, tests, and linting run in Docker -- no local Python or Node.js install needed.
+All builds, tests, and linting run in Docker — no local Python or Node.js install needed.
 
 ```zsh
 make dev          # Start local dev environment (Tilt)
@@ -388,12 +424,12 @@ make images       # Build production Docker images
 
 ### Conventions
 
-- **Issue-first**: every change beyond a trivial tweak starts with a GitHub issue; the PR references it (`closes #N`)
-- **Commits**: conventional commits (`feat:`, `fix:`, `docs:`, `chore:`)
-- **Branches**: feature branches off `main`; never push directly to `main`
-- **API contract**: JSON:API spec; compatibility tested against `go-tfe` client
-- **Migrations**: Alembic with async SQLAlchemy
-- **Local dev**: Tilt with live_update for Python and Node.js hot reload
+- **Issue-first** — every change beyond a trivial tweak starts with a GitHub issue; the PR references it (`closes #N`)
+- **Commits** — conventional commits (`feat:`, `fix:`, `docs:`, `chore:`)
+- **Branches** — feature branches off `main`; never push directly to `main`
+- **API contract** — JSON:API spec; compatibility tested against the `go-tfe` client
+- **Migrations** — Alembic with async SQLAlchemy
+- **Local dev** — Tilt with live_update for Python and Node.js hot reload
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow and [AGENTS.md](AGENTS.md) for the architecture, contracts, and conventions (point your AI assistant at it).
 
@@ -411,7 +447,7 @@ make pentest          # All three layers
 ```
 
 | Layer | Tool | What it covers |
-|-------|------|----------------|
+|---|---|---|
 | SAST | [Semgrep](https://semgrep.dev/) | OWASP Top 10, secrets detection, project-specific rules (naive datetimes, raw background tasks) |
 | Container scanning | [Trivy](https://trivy.dev/) | HIGH/CRITICAL CVEs in the `terrapod-api`, `terrapod-web`, and `terrapod-runner` images |
 | DAST | [Nuclei](https://nuclei.projectdiscovery.io/) | Auth bypass, header injection, CORS validation, state endpoint security, HTTP method restriction |
@@ -424,8 +460,8 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 
 | Project | What it does | Position relative to Terrapod |
 |---|---|---|
-| [Terrakube](https://terrakube.io/) | Open-source TFC/TFE replacement | **Closest peer** -- comparable full-platform scope (see below) |
-| [OpenTofu](https://opentofu.org/) | Open-source Terraform fork (CLI) | CLI only -- no collaboration platform; Terrapod runs it as an engine |
+| [Terrakube](https://terrakube.io/) | Open-source TFC/TFE replacement | Closest peer — comparable full-platform scope (see below) |
+| [OpenTofu](https://opentofu.org/) | Open-source Terraform fork (CLI) | CLI only — no collaboration platform; Terrapod runs it as an engine |
 | [Atlantis](https://www.runatlantis.io/) | PR-based plan/apply automation | No UI, no state management, no registry, no RBAC |
 | [Digger](https://digger.dev/) | CI-native Terraform orchestration | Runs inside CI; no standalone platform |
 | [Terrateam](https://terrateam.io/) | GitHub-integrated TF automation | GitHub-coupled; limited community edition |
@@ -433,7 +469,7 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 
 ### Terrakube
 
-[Terrakube](https://terrakube.io/) is the closest open-source alternative and the project most worth comparing against. It is **also** a full self-hosted Terraform Cloud / Enterprise replacement: it implements the same `cloud {}` / `backend "remote"` TFE V2 API that Terrapod targets, and ships organizations, a private module + provider registry with GPG-signed provider publishing, granular RBAC, VCS integration (GitHub/GitLab/Bitbucket/Azure DevOps), dynamic provider credentials (AWS/GCP/Azure workload identity), OPA policy checks, and ephemeral Kubernetes-Job executors. It is Apache-2.0, built on Java/Spring Boot + Angular, with an established community and a frequent release cadence. **If you are choosing a Terraform platform today, evaluate Terrakube alongside Terrapod** -- on the core surface the two are at rough parity, and Terrakube is the more mature project.
+[Terrakube](https://terrakube.io/) is the closest open-source alternative and the project most worth comparing against. It is **also** a full self-hosted Terraform Cloud / Enterprise replacement: it implements the same `cloud {}` / `backend "remote"` TFE V2 API that Terrapod targets, and ships organizations, a private module + provider registry with GPG-signed provider publishing, granular RBAC, VCS integration (GitHub/GitLab/Bitbucket/Azure DevOps), dynamic provider credentials (AWS/GCP/Azure workload identity), OPA policy checks, and ephemeral Kubernetes-Job executors. It is Apache-2.0, built on Java/Spring Boot + Angular, with an established community and a frequent release cadence. **If you are choosing a Terraform platform today, evaluate Terrakube alongside Terrapod** — on the core surface the two are at rough parity, and Terrakube is the more mature project.
 
 **Where Terrakube differs from Terrapod:**
 
@@ -441,28 +477,28 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 
 **Where Terrakube is more mature:**
 
-- **Maturity**: longer track record, larger community, more permissive (Apache-2.0) license. Terrapod is newer and backed by a small core team.
+- **Maturity** — longer track record, larger community, more permissive (Apache-2.0) license. Terrapod is newer and backed by a small core team.
 
-**Where Terrapod is genuinely differentiated** (verified against Terrakube's current docs). The first three share one theme -- Terrapod is built for restricted-network, multi-cluster, low-upstream-dependency topologies:
+**Where Terrapod is genuinely differentiated.** The first three share one theme — Terrapod is built for restricted-network, multi-cluster, low-upstream-dependency topologies:
 
-- **Firewall-friendly cross-cluster execution.** Terrapod runners connect *outbound* to the control plane over SSE and create Jobs locally; the API holds no inbound reach and no Kubernetes access into the execution cluster. Terrakube's API connects *into* the executor (it must be exposed via ingress, with Redis reachable), so isolated / NAT'd / outbound-only execution clusters aren't supported the same way.
-- **Polling-first VCS** -- Terrapod supports inbound webhooks (GitHub and GitLab) but does not require them: it also polls VCS over outbound HTTPS, so the integration works behind firewalls/NATs with no inbound delivery. Terrakube uses webhook delivery. Different fits for inbound-restricted networks.
-- **Pull-through provider mirror + terraform/tofu binary cache** -- runners have zero direct upstream dependency; Terrakube ships a local plugin cache.
-- **Monorepo autodiscovery** -- Atlantis-style auto-creation of workspaces from glob-matched directories on PRs (Terrakube has directory filtering, but not auto-creation).
-- **Run tasks** -- pre/post-plan external webhook validation hooks (not present in Terrakube).
-- **In-platform AI** -- plan summaries, failure analysis, and chat (Terrakube integrates AI via an external MCP server).
-- **Native Terragrunt** -- a per-workspace flag wraps agent-mode runs in `terragrunt` (pull-through binary cache, local-backend reconciliation) while Terrapod keeps owning state and the run lifecycle; CLI-driven runs need no config. Something TFE/HCP Terraform never did. See [docs/terragrunt.md](docs/terragrunt.md).
-- Additionally: first-class OPA **policy sets** with mandatory/advisory enforcement, native multi-channel **notifications** (Slack/email/webhook), and cross-workspace **run triggers**.
+- **Firewall-friendly cross-cluster execution** — Terrapod runners connect *outbound* to the control plane over SSE and create Jobs locally, so the API holds no inbound reach and no Kubernetes access into the execution cluster. This suits isolated / NAT'd / outbound-only execution clusters. Per Terrakube's documented model, its API reaches into the executor (so the executor is exposed to the control plane) — a different network topology, better fit for different constraints.
+- **Polling-first VCS** — Terrapod supports inbound webhooks (GitHub and GitLab) but does not require them: it also polls VCS over outbound HTTPS, so the integration works behind firewalls/NATs with no inbound delivery. Terrakube uses webhook delivery. Different fits for inbound-restricted networks.
+- **Pull-through provider mirror + terraform/tofu binary cache** — runners have zero direct upstream dependency; Terrakube ships a local plugin cache.
+- **Monorepo autodiscovery** — Atlantis-style auto-creation of workspaces from glob-matched directories on PRs (Terrakube has directory filtering, but not auto-creation).
+- **Run tasks** — pre/post-plan external webhook validation hooks (not present in Terrakube).
+- **In-platform AI** — plan summaries, failure analysis, and chat (Terrakube integrates AI via an external MCP server).
+- **Native Terragrunt** — a per-workspace flag wraps agent-mode runs in `terragrunt` (pull-through binary cache, local-backend reconciliation) while Terrapod keeps owning state and the run lifecycle; CLI-driven runs need no config. See [docs/terragrunt.md](docs/terragrunt.md).
+- Additionally — first-class OPA **policy sets** with mandatory/advisory enforcement, native multi-channel **notifications** (Slack/email/webhook), and cross-workspace **run triggers**.
 
-Net: Terrapod is not a "better general TFE replacement" -- Terrakube is the more mature project and offers multi-org tenancy for those who want it (Terrapod is deliberately single-org, in line with [HashiCorp's current direction](https://developer.hashicorp.com/validated-patterns/terraform/migrate-terraform-orgs-projects)). Terrapod's defensible niche is **restricted-network, multi-cluster execution** (outbound-only runners, polling VCS, self-contained caching) with an AI-assisted review layer. Pick on that basis.
+Net: Terrapod is not a "better general TFE replacement" — Terrakube is the more mature project and offers multi-org tenancy for those who want it (Terrapod is deliberately single-org, in line with [HashiCorp's current direction](https://developer.hashicorp.com/validated-patterns/terraform/migrate-terraform-orgs-projects)). Terrapod's defensible niche is **restricted-network, multi-cluster execution** (outbound-only runners, polling VCS, self-contained caching) with an AI-assisted review layer. Pick on that basis.
 
-Licensing: Terrapod is **GPLv3** (strong copyleft); Terrakube is **Apache-2.0** (permissive) -- relevant if you intend to redistribute a modified platform.
+Licensing: Terrapod is **GPLv3** (strong copyleft); Terrakube is **Apache-2.0** (permissive) — relevant if you intend to redistribute a modified platform.
 
 ---
 
 ## License
 
-[GPLv3](LICENSE) -- strong copyleft ensures Terrapod and all derivative works remain open source.
+[GPLv3](LICENSE) — strong copyleft keeps Terrapod and all derivative works open source. For most operators this is a non-issue: **running Terrapod internally, self-hosted, imposes no obligation to disclose your own code or configuration** — GPLv3's copyleft attaches to *distributing a modified Terrapod*, and GPLv3 is not AGPL (there is no network-use trigger).
 
 ---
 
