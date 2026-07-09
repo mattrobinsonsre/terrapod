@@ -148,9 +148,8 @@ async def create_task_stage(
     db.add(ts)
     await db.flush()
 
-    # Create results and enqueue webhook calls
-    from terrapod.services.scheduler import enqueue_trigger
-
+    # Create results (webhook delivery is enqueued AFTER commit — see below).
+    result_ids: list[uuid.UUID] = []
     for task in tasks:
         tsr = TaskStageResult(
             task_stage_id=ts.id,
@@ -163,13 +162,29 @@ async def create_task_stage(
         # Generate callback token
         tsr.callback_token = generate_callback_token(tsr.id)
         await db.flush()
+        result_ids.append(tsr.id)
 
-        # Enqueue webhook delivery
+    ts_id = ts.id
+
+    # Commit the stage + result rows BEFORE enqueuing the delivery triggers
+    # (#739). The `run_task_call` consumer runs in a *separate* DB session
+    # (and possibly on another replica) and looks the TaskStageResult up by
+    # id. If we enqueue while the rows are only flushed-not-committed — the
+    # caller (`run_service.complete_plan`) commits much later, up the stack —
+    # the consumer races ahead, reads "task stage result not found", and
+    # silently drops the webhook. The result then sits at `pending` forever,
+    # the stage never resolves, and the run wedges in `planning`. Committing
+    # here makes the rows visible before any trigger can fire.
+    await db.commit()
+
+    from terrapod.services.scheduler import enqueue_trigger
+
+    for tsr_id in result_ids:
         try:
             await enqueue_trigger(
                 "run_task_call",
-                {"task_stage_result_id": str(tsr.id)},
-                dedup_key=f"run_task:{tsr.id}",
+                {"task_stage_result_id": str(tsr_id)},
+                dedup_key=f"run_task:{tsr_id}",
                 dedup_ttl=300,
             )
         except Exception as e:
@@ -177,13 +192,15 @@ async def create_task_stage(
 
     logger.info(
         "Task stage created",
-        task_stage_id=str(ts.id),
+        task_stage_id=str(ts_id),
         run_id=str(run_id),
         stage=stage_name,
         task_count=len(tasks),
     )
 
-    return ts
+    # `commit()` expired the instance; return a live one for the caller
+    # (complete_plan immediately reads ts.id / resolves the stage).
+    return await db.get(TaskStage, ts_id)
 
 
 async def get_task_stage(db: AsyncSession, ts_id: uuid.UUID) -> TaskStage | None:

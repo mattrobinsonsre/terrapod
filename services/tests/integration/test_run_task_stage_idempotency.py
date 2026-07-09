@@ -18,7 +18,7 @@ import uuid
 import pytest
 from sqlalchemy import func, select
 
-from terrapod.db.models import TaskStage
+from terrapod.db.models import TaskStage, TaskStageResult
 from terrapod.db.session import get_db_session
 from terrapod.services import run_task_service
 from tests.integration.conftest import AUTH, admin_user, set_auth
@@ -151,3 +151,46 @@ class TestTaskStageIdempotency:
                 db, _rid(run_id), _wid(ws_id), "post_plan"
             )
             assert ts is None
+
+    async def test_delivery_trigger_enqueued_after_result_committed(self, app, client):
+        """The result row must be committed and visible to the (separate-session)
+        delivery consumer *before* its trigger is enqueued (#739).
+
+        Enqueuing while the row is only flushed-not-committed races the
+        consumer, which then reads "task stage result not found" and silently
+        drops the webhook — wedging the run in `planning`. We assert the fix by
+        patching the enqueue and, from a *fresh* session, confirming the
+        TaskStageResult is already visible at enqueue time.
+        """
+        import terrapod.services.scheduler as scheduler_mod
+
+        set_auth(app, admin_user())
+        ws_id = await _create_workspace(client, f"ts-commit-{uuid.uuid4().hex[:8]}")
+        await _create_post_plan_task(client, ws_id, "opa-cost-check")
+        run_id = await _create_run(client, ws_id)
+
+        visibility: list[bool] = []
+        orig = scheduler_mod.enqueue_trigger
+
+        async def _spy_enqueue(trigger_type, payload, **kwargs):
+            # A brand-new session — sees only committed data.
+            async with get_db_session() as fresh:
+                tsr_uuid = uuid.UUID(payload["task_stage_result_id"])
+                row = await fresh.get(TaskStageResult, tsr_uuid)
+                visibility.append(row is not None)
+            # Don't actually enqueue (no consumer running in this test).
+
+        scheduler_mod.enqueue_trigger = _spy_enqueue
+        try:
+            async with get_db_session() as db:
+                ts = await run_task_service.create_task_stage(
+                    db, _rid(run_id), _wid(ws_id), "post_plan"
+                )
+                assert ts is not None
+        finally:
+            scheduler_mod.enqueue_trigger = orig
+
+        assert visibility, "expected at least one delivery trigger to be enqueued"
+        assert all(visibility), (
+            "result row must be committed/visible before its trigger is enqueued"
+        )
