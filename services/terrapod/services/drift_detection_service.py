@@ -150,15 +150,20 @@ async def _apply_drift_ignore_rules(run: Run, rules: list[str]) -> str:
         )
         return "drifted"
 
-    if not still_drifted and suppressed:
-        # Surface what we silenced so operators can audit the rule set
-        # against the run it just classified.
-        logger.info(
-            "drift_ignore: all changes suppressed by rules",
-            run_id=str(run.id),
-            suppressed=suppressed,
-            rules=rules,
-        )
+    if not still_drifted:
+        # No un-ignored drift remains → clean. This is keyed off
+        # `still_drifted` alone, NOT off `suppressed` being non-empty: a plan
+        # whose only drift was irrelevant refresh noise (filtered out by the
+        # classifier) leaves both False and empty, and must resolve to
+        # no_drift rather than falling through to the conservative default
+        # (#753 — the bug that pinned workspaces `drifted` despite the rule).
+        if suppressed:
+            logger.info(
+                "drift_ignore: all drift suppressed by rules",
+                run_id=str(run.id),
+                suppressed=suppressed,
+                rules=rules,
+            )
         return "no_drift"
     if suppressed:
         logger.info(

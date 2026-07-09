@@ -37,22 +37,32 @@ Examples::
 Match semantics
 ===============
 
-For each `resource_change` in the plan JSON:
+Two sources are evaluated: `resource_changes` (actionable planned
+actions) and `resource_drift` (out-of-band changes detected during
+refresh). For a drift-detection run the drift usually lives in
+`resource_drift` — computed/read-only attribute drift (e.g. an EKS
+`platform_version` AWS bumps out-of-band) plans no action, so
+`resource_changes` are all `no-op`.
+
+For each entry:
 
 1. Compute the set of attribute paths whose value differs between
    `before` and `after` (recursive walk; lists indexed by `[i]`,
    dicts joined by `.`).
-2. Build a candidate string for each diff path as
-   ``<address>.<path>``. The address alone (no `.path` suffix) is
-   also a candidate for the "whole resource" rule shape.
-3. If every diff path matches at least one rule, drop the
-   resource_change. Otherwise the resource is still considered
-   drifted.
-4. Resources whose `change.actions` is `["no-op"]` or `["read"]` are
+2. For `resource_drift` only, keep just the paths OpenTofu deems
+   **relevant** (`relevant_attributes`) — the rest is refresh noise
+   OpenTofu itself hides from the plan (computed timestamps,
+   server-managed metadata) and must never flag drift or need a rule.
+3. Build a candidate string for each diff path as ``<address>.<path>``.
+   The address alone (no `.path` suffix) is a candidate for the "whole
+   resource" rule shape.
+4. If every counted diff path matches at least one rule, drop the
+   entry. Otherwise the resource is still considered drifted.
+5. Entries whose `change.actions` is `["no-op"]` or `["read"]` are
    never considered drift to begin with.
 
-If every resource_change is dropped → drift was fully ignored;
-caller sets `drift_status=no_drift`. Otherwise → `drifted`.
+If every counted entry is dropped → drift was fully ignored; caller
+sets `drift_status=no_drift`. Otherwise → `drifted`.
 
 The classifier is deliberately stateless and pure: caller is
 responsible for fetching the plan JSON (typically via the
@@ -278,6 +288,100 @@ def _path_is_ignored(
     return False, None
 
 
+def _strip_indices(addr: str) -> str:
+    """Drop numeric `[N]` indices so a `module.eks[0]...` drift address
+    matches the un-indexed form OpenTofu uses in `relevant_attributes`."""
+    return _NUMERIC_INDEX_RE.sub("", addr)
+
+
+def _path_segments(path: str) -> list[str]:
+    """Split a diff path (`metadata[0].resource_version`) into normalised
+    segments (`["metadata", "resource_version"]`) — dotted keys split, numeric
+    block indices dropped (they carry no meaning for relevance matching)."""
+    segs: list[str] = []
+    for part in path.split("."):
+        part = _NUMERIC_INDEX_RE.sub("", part)
+        if part:
+            segs.append(part)
+    return segs
+
+
+def _relevant_attribute_index(plan_json: dict[str, Any]) -> dict[str, list[list[str]]]:
+    """Index OpenTofu's `relevant_attributes` by (index-stripped) resource
+    address → list of attribute segment-lists.
+
+    `relevant_attributes` is OpenTofu's own record of which attributes are
+    referenced by the configuration (outputs, other resources). It is exactly
+    what OpenTofu uses to decide which out-of-band drift to *surface* in the
+    plan versus hide as irrelevant refresh noise (computed timestamps,
+    server-managed metadata, …). We reuse it as the relevance signal (#753)."""
+    index: dict[str, list[list[str]]] = {}
+    for ra in plan_json.get("relevant_attributes") or []:
+        res = ra.get("resource")
+        attr = ra.get("attribute")
+        if not res or not attr:
+            continue
+        index.setdefault(_strip_indices(str(res)), []).append([str(x) for x in attr])
+    return index
+
+
+def _drift_path_is_relevant(address: str, path: str, relevant: dict[str, list[list[str]]]) -> bool:
+    """True if a drifted attribute is one OpenTofu deems relevant.
+
+    A drift path counts if it shares a common prefix with any relevant
+    attribute of the same resource (bidirectional: the drift is at, above, or
+    below a referenced attribute). Non-relevant drift — the refresh noise
+    OpenTofu hides from the plan — is excluded before rule-matching, so it
+    never flags drift and never needs an ignore rule (#753)."""
+    rel_attrs = relevant.get(_strip_indices(address))
+    if not rel_attrs:
+        return False
+    segs = _path_segments(path)
+    if not segs:
+        return False
+    for rel_segs in rel_attrs:
+        n = min(len(rel_segs), len(segs))
+        if n and rel_segs[:n] == segs[:n]:
+            return True
+    return False
+
+
+def _evaluate_entry(
+    address: str,
+    diff_paths: list[str],
+    is_whole: bool,
+    compiled: list[tuple[str, re.Pattern[str]]],
+    suppressed: list[dict[str, Any]],
+) -> bool:
+    """Match one resource's diff against the rules. Appends to `suppressed`
+    when fully ignored; returns True if the resource still counts as drift."""
+    if is_whole:
+        ignored, matching_rule = _path_is_ignored(address, "", True, compiled)
+        if ignored:
+            suppressed.append({"address": address, "paths": [], "rule": matching_rule})
+            return False
+        return True
+
+    unsuppressed: list[str] = []
+    matched_paths: list[str] = []
+    matched_rule_for_resource: str | None = None
+    for p in diff_paths:
+        ignored, matching_rule = _path_is_ignored(address, p, False, compiled)
+        if ignored:
+            matched_paths.append(p)
+            if matched_rule_for_resource is None:
+                matched_rule_for_resource = matching_rule
+        else:
+            unsuppressed.append(p)
+
+    if not unsuppressed:
+        suppressed.append(
+            {"address": address, "paths": matched_paths, "rule": matched_rule_for_resource}
+        )
+        return False
+    return True
+
+
 def classify_drift(
     plan_json: dict[str, Any],
     rules: Iterable[str],
@@ -292,72 +396,73 @@ def classify_drift(
 
     Returns:
         `(still_drifted, suppressed_changes)` where:
-          * `still_drifted` is True if at least one resource_change
-            has a diff that no rule matches.
+          * `still_drifted` is True if at least one change/drift has a
+            diff that no rule matches.
           * `suppressed_changes` is a list of `{address, paths, rule}`
             dicts describing what got silenced. Useful for surfacing
             "ignored by policy" sections in the UI and for runbook
             tracing.
 
-    A workspace with no rules → returns the original drift decision
-    unchanged (`still_drifted=True` if any resource_change had a real
-    action). Callers should typically short-circuit on empty rules
-    before invoking this function; it's safe but wasteful.
+    Two sources of change are evaluated (#753):
+
+      * `resource_changes` — actionable planned actions. Every diff path
+        must be ignored for the resource to be suppressed.
+      * `resource_drift` — out-of-band changes OpenTofu detected during
+        refresh. For a drift-detection run this is where the drift lives
+        (its `resource_changes` are typically all `no-op`, since computed/
+        read-only attribute drift plans no action). Only drift on attributes
+        OpenTofu deems **relevant** (`relevant_attributes`) is considered —
+        the rest is refresh noise OpenTofu hides from the plan (computed
+        timestamps, server-managed metadata) and must never flag drift or
+        require an ignore rule.
+
+    A workspace with no rules → `still_drifted=True` if any counted change/
+    drift exists. Callers may short-circuit on empty rules; it's safe but
+    wasteful.
     """
     rule_list = list(rules)
     compiled = _compile_rules(rule_list) if rule_list else []
 
     resource_changes = plan_json.get("resource_changes") or []
-    if not resource_changes:
+    resource_drift = plan_json.get("resource_drift") or []
+    if not resource_changes and not resource_drift:
         return False, []
 
+    relevant = _relevant_attribute_index(plan_json)
     suppressed: list[dict[str, Any]] = []
     still_drifted = False
-    matched_paths: list[str] = []  # accumulate per resource
 
+    # Actionable planned changes: every diff path counts (OpenTofu would
+    # apply them, so they are real regardless of relevance).
     for rc in resource_changes:
         address = rc.get("address") or ""
         if not address:
             continue
         diff_paths, is_whole = _resource_change_diff_paths(rc)
-
         if not diff_paths and not is_whole:
-            # Action exists but resolves to nothing changing (e.g. a
-            # `no-op` slipped through, or before==after under
-            # update). Not drift.
+            # Resolves to nothing changing (no-op / before==after). Not drift.
             continue
+        if _evaluate_entry(address, diff_paths, is_whole, compiled, suppressed):
+            still_drifted = True
 
+    # Out-of-band drift: keep only the attributes OpenTofu deems relevant;
+    # the rest is refresh noise it hides from the plan.
+    for rd in resource_drift:
+        address = rd.get("address") or ""
+        if not address:
+            continue
+        diff_paths, is_whole = _resource_change_diff_paths(rd)
         if is_whole:
-            ignored, matching_rule = _path_is_ignored(address, "", True, compiled)
-            if ignored:
-                suppressed.append({"address": address, "paths": [], "rule": matching_rule})
-            else:
+            # A whole-resource drift (created/deleted outside) is always
+            # material — never noise-filtered.
+            if _evaluate_entry(address, [], True, compiled, suppressed):
                 still_drifted = True
             continue
-
-        # Per-attribute: every diff path must be ignored for the whole
-        # resource to be suppressed.
-        unsuppressed: list[str] = []
-        matched_paths = []
-        matched_rule_for_resource: str | None = None
-        for p in diff_paths:
-            ignored, matching_rule = _path_is_ignored(address, p, False, compiled)
-            if ignored:
-                matched_paths.append(p)
-                if matched_rule_for_resource is None:
-                    matched_rule_for_resource = matching_rule
-            else:
-                unsuppressed.append(p)
-
-        if not unsuppressed:
-            suppressed.append(
-                {
-                    "address": address,
-                    "paths": matched_paths,
-                    "rule": matched_rule_for_resource,
-                }
-            )
-        else:
+        rel_paths = [p for p in diff_paths if _drift_path_is_relevant(address, p, relevant)]
+        if not rel_paths:
+            # Only irrelevant refresh noise drifted → not drift.
+            continue
+        if _evaluate_entry(address, rel_paths, False, compiled, suppressed):
             still_drifted = True
 
     return still_drifted, suppressed

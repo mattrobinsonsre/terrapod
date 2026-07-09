@@ -349,3 +349,123 @@ class TestDiffPathWalking:
         )
         still_drifted, _ = classify_drift(plan, ["aws_iam_role.foo.statements[*]"])
         assert still_drifted is False
+
+
+def _drift_plan(drift, relevant, changes=None):
+    """Build a drift-detection plan: out-of-band drift in `resource_drift`,
+    `resource_changes` all no-op (the real shape — computed-attr drift plans
+    no action), and OpenTofu's `relevant_attributes` list.
+
+    `drift`: list of (address, before, after).
+    `relevant`: list of (resource_addr, [attr_segments]).
+    """
+    return {
+        "resource_changes": changes
+        or [
+            {
+                "address": "aws_ssm_parameter.noop",
+                "change": {"actions": ["no-op"], "before": {"v": 1}, "after": {"v": 1}},
+            }
+        ],
+        "resource_drift": [
+            {
+                "address": addr,
+                "change": {"actions": ["update"], "before": before, "after": after},
+            }
+            for (addr, before, after) in drift
+        ],
+        "relevant_attributes": [{"resource": res, "attribute": attr} for (res, attr) in relevant],
+    }
+
+
+# The live core-* shape (#753): AWS bumps EKS platform_version out-of-band;
+# it drifts in resource_drift (relevant, feeds an output), alongside pure
+# refresh noise OpenTofu hides — an RDS latest_restorable_time timestamp and a
+# k8s secret metadata.resource_version — neither of which is relevant.
+def _core_shape():
+    return _drift_plan(
+        drift=[
+            (
+                "module.eks[0].aws_eks_cluster.this",
+                {"platform_version": "eks.14"},
+                {"platform_version": "eks.15"},
+            ),
+            (
+                "module.spiredb[0].aws_db_instance.this[0]",
+                {"latest_restorable_time": "2026-06-16T11:31:10Z"},
+                {"latest_restorable_time": "2026-07-09T12:03:17Z"},
+            ),
+            (
+                "module.eks[0].kubernetes_secret_v1.vault_sa",
+                {"metadata": [{"resource_version": "111"}]},
+                {"metadata": [{"resource_version": "222"}]},
+            ),
+        ],
+        relevant=[("module.eks.aws_eks_cluster.this", ["platform_version"])],
+    )
+
+
+class TestResourceDriftRelevance:
+    """#753 — drift-detection drift lives in `resource_drift`, filtered to the
+    attributes OpenTofu deems relevant. Rules match real drift; refresh noise
+    OpenTofu hides never flags drift or needs a rule."""
+
+    def test_rule_matching_relevant_drift_clears(self):
+        # The user's real case: rule on the drifted, relevant attribute.
+        sd, sup = classify_drift(
+            _core_shape(), ["module.eks*.aws_eks_cluster.this.platform_version"]
+        )
+        assert sd is False
+        assert len(sup) == 1 and sup[0]["address"] == "module.eks[0].aws_eks_cluster.this"
+        assert sup[0]["paths"] == ["platform_version"]
+
+    def test_no_rules_leaves_relevant_drift_flagged(self):
+        sd, _ = classify_drift(_core_shape(), [])
+        assert sd is True  # platform_version is real, unmatched drift
+
+    def test_unrelated_rule_leaves_relevant_drift_flagged(self):
+        sd, _ = classify_drift(_core_shape(), ["aws_something.else.tags.Name"])
+        assert sd is True
+
+    def test_irrelevant_noise_never_flags_drift(self):
+        # A plan whose ONLY drift is on non-relevant attributes (timestamp,
+        # server-managed metadata) — no rules at all — must be no-drift.
+        plan = _drift_plan(
+            drift=[
+                (
+                    "module.spiredb[0].aws_db_instance.this[0]",
+                    {"latest_restorable_time": "a"},
+                    {"latest_restorable_time": "b"},
+                ),
+                (
+                    "module.eks[0].kubernetes_secret_v1.vault_sa",
+                    {"metadata": [{"resource_version": "1"}]},
+                    {"metadata": [{"resource_version": "2"}]},
+                ),
+            ],
+            relevant=[("module.eks.aws_eks_cluster.this", ["platform_version"])],
+        )
+        sd, sup = classify_drift(plan, [])
+        assert sd is False
+        assert sup == []
+
+    def test_actionable_resource_change_still_counts_regardless_of_relevance(self):
+        # A real planned change (not drift) is always material.
+        plan = _drift_plan(
+            drift=[],
+            relevant=[],
+            changes=[
+                {
+                    "address": "aws_instance.web",
+                    "change": {
+                        "actions": ["update"],
+                        "before": {"instance_type": "t3.small"},
+                        "after": {"instance_type": "t3.large"},
+                    },
+                }
+            ],
+        )
+        sd, _ = classify_drift(plan, [])
+        assert sd is True
+        sd2, sup2 = classify_drift(plan, ["aws_instance.web.instance_type"])
+        assert sd2 is False and sup2
