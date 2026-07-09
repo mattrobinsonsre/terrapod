@@ -114,12 +114,15 @@ async def create_task_stage(
         raise ValueError(f"Invalid stage: {stage_name}")
 
     # Idempotency: reuse an existing stage for this run+boundary if present.
-    # Order by creation so re-entry deterministically returns the canonical
-    # (first-created) stage rather than an arbitrary row.
+    # Order by creation (with the id as a stable tiebreak, since created_at
+    # can collide within a tick) so re-entry deterministically returns the
+    # canonical first-created stage rather than an arbitrary row. NOTE: this
+    # is a read-then-insert with no DB-level uniqueness — a concurrent
+    # cross-replica insert can still duplicate; #742 adds the constraint.
     existing = await db.execute(
         select(TaskStage)
         .where(TaskStage.run_id == run_id, TaskStage.stage == stage_name)
-        .order_by(TaskStage.created_at.asc())
+        .order_by(TaskStage.created_at.asc(), TaskStage.id.asc())
         .limit(1)
     )
     prior = existing.scalars().first()
@@ -198,8 +201,10 @@ async def create_task_stage(
         task_count=len(tasks),
     )
 
-    # `commit()` expired the instance; return a live one for the caller
-    # (complete_plan immediately reads ts.id / resolves the stage).
+    # Return the committed stage. (Sessions use expire_on_commit=False, so the
+    # instance is still live after the commit above — this get() just resolves
+    # it from the identity map for the caller, which immediately reads ts.id /
+    # resolves the stage in complete_plan.)
     return await db.get(TaskStage, ts_id)
 
 

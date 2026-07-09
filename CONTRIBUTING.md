@@ -69,6 +69,13 @@ Two contracts are worth internalising before you start (both detailed in
   services-api / integration / e2e). A change that alters a user-visible
   surface or a behaviour the system depends on (state machine, locking, SSE,
   RBAC) ships its end-to-end coverage in the same PR.
+- **Responsive / mobile-first UI (hard requirement)** — the web UI is
+  mobile-first; a frontend change that isn't touch-friendly is not done. Adapt
+  on viewport width (CSS/Tailwind responsive utilities, container queries),
+  never sniff the user agent, and never fork mobile/desktop component trees.
+  Desktop is never sacrificed. A new page/component adds a phone-viewport E2E
+  assertion (the `responsive` Playwright project) in the same PR. Full brief:
+  [AGENTS.md → Responsive / mobile-first UI](AGENTS.md).
 
 ## Verify before you push
 

@@ -192,6 +192,7 @@ quickstart pulls released images, so the only wait is the image download.
 
 - **API-first** -- every UI action is backed by a public API endpoint
 - **BFF pattern** -- Next.js frontend is the single ingress entry point; browser never talks to the API directly
+- **Responsive, mobile-first web UI** -- the whole UI adapts from desktop tables to touch-friendly card layouts on phones; one DRY viewport-driven implementation, no separate mobile app
 - **Kubernetes-native** -- deployed exclusively via Helm chart; runner Jobs are ephemeral K8s Jobs
 - **ARC-pattern execution** -- listener creates Jobs on demand (like GitHub Actions Runner Controller)
 - **OpenTofu-first** -- [OpenTofu](https://opentofu.org/) is the recommended execution backend; `terraform` is also supported
@@ -356,7 +357,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | Database | PostgreSQL |
 | Cache / Sessions | Redis |
 | Object storage | AWS S3, Azure Blob, GCS, or filesystem (native SDKs) |
-| Frontend | Next.js 16 / React 19 / TypeScript / Tailwind CSS / Radix UI |
+| Frontend | Next.js 16 / React 19 / TypeScript / Tailwind CSS / Radix UI (responsive, mobile-first) |
 | Runner listener | Python (same codebase as API) |
 | Auth | authlib (OIDC), python3-saml (SAML) |
 | Deployment | Helm chart on Kubernetes |

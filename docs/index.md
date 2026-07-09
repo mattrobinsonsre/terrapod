@@ -100,6 +100,7 @@ Browser / CLI  ──▶  Ingress  ──▶  Next.js (BFF)  ──▶  FastAPI 
 
 - **API-first** -- every UI action is backed by a public API endpoint
 - **BFF pattern** -- Next.js is the single ingress entry point; browser never talks to the API directly
+- **Responsive, mobile-first web UI** -- every surface adapts from desktop tables to touch-friendly card layouts on phones (one viewport-driven implementation, no separate mobile app)
 - **Kubernetes-native** -- deployed exclusively via Helm chart
 - **ARC-pattern execution** -- listener receives events via SSE, creates ephemeral K8s Jobs; API reconciler owns all run state
 
