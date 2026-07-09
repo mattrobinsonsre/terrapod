@@ -287,6 +287,59 @@ async def get_job_status(job_name: str, namespace: str = "") -> str | None:
         raise
 
 
+async def count_active_runner_jobs(namespace: str = "") -> int:
+    """Count runner Jobs currently occupying capacity in the namespace — i.e.
+    non-terminal Jobs with at least one active (Pending or Running) pod (#749).
+
+    The listener admits runs up to `max_concurrent`, but its in-process
+    `_active_launches` counter only tracks launch *operations* (the brief
+    create window), not Jobs that are actually running. On a fixed-size
+    cluster that let the listener over-admit: it would keep claiming runs and
+    spawning Jobs that then sit Pending, unschedulable. Counting real Jobs
+    from K8s — the authoritative source — keeps the listener stateless and
+    makes admission reflect actual occupancy.
+
+    Selects by the runner component label (`app.kubernetes.io/component=runner`)
+    that every runner Job carries, scoped to `namespace`. Terminal Jobs
+    (succeeded/failed) are excluded — they no longer occupy a slot. A Job that
+    exists but has no active pod yet is covered by `_active_launches` on the
+    listener, so it is not double-counted here.
+
+    Best-effort: on any K8s API error returns 0 (fail-open). A transient list
+    error must not wedge the whole pool, and #748 is the backstop — if
+    fail-open lets a Job launch that can't be placed, the scheduler declares it
+    unschedulable and the reconciler fails it fast with a clear reason.
+    """
+    if not namespace:
+        namespace = _default_namespace()
+
+    batch_api = _get_batch_api()
+
+    try:
+        loop = asyncio.get_event_loop()
+        jobs = await loop.run_in_executor(
+            _executor,
+            lambda: batch_api.list_namespaced_job(
+                namespace=namespace,
+                label_selector="app.kubernetes.io/component=runner",
+            ),
+        )
+        batch_api.api_client.last_response = None
+
+        count = 0
+        for job in jobs.items:
+            st = job.status
+            if not st:
+                continue
+            if (st.succeeded and st.succeeded > 0) or (st.failed and st.failed > 0):
+                continue  # terminal — no longer occupies a slot
+            if st.active and st.active > 0:
+                count += 1
+        return count
+    except Exception:
+        return 0
+
+
 async def get_pod_terminated_info(
     job_name: str, namespace: str = ""
 ) -> dict[str, int | str] | None:

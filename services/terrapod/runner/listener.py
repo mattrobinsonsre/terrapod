@@ -71,6 +71,10 @@ class RunnerListener:
         self._identity_ready = False
         self._last_heartbeat_at: float | None = None
         self._active_launches = 0  # count of concurrent launch operations
+        # Real running-Job count from K8s, refreshed each heartbeat (#749).
+        # `_active_launches` only covers the create window; this is the honest
+        # occupancy operators see in the pool/listener status and metrics.
+        self._active_runs_observed = 0
 
         # Track background tasks to prevent GC accumulation (Finding 1: memory leak)
         self._background_tasks: set[asyncio.Task] = set()
@@ -329,7 +333,7 @@ class RunnerListener:
         """Generate Prometheus metrics for the listener."""
         from prometheus_client import generate_latest
 
-        self._metric_active_runs.set(self._active_launches)
+        self._metric_active_runs.set(self._active_runs_observed)
         self._metric_identity_ready.set(1 if self._identity_ready else 0)
 
         if self._last_heartbeat_at is not None:
@@ -371,6 +375,16 @@ class RunnerListener:
         name — but is not guaranteed by every CRI, so non-Helm operators
         running this listener should set POD_NAME explicitly.
         """
+        # Report the real running-Job count from K8s, not the launch counter,
+        # so the pool/listener status operators see reflects actual occupancy
+        # (#749). Best-effort — a K8s blip returns 0 and the value self-heals
+        # on the next heartbeat.
+        from terrapod.runner.job_manager import count_active_runner_jobs
+
+        self._active_runs_observed = await count_active_runner_jobs(
+            self.runner_config.runner_namespace
+        )
+
         await arequest_with_retry(
             self._http_client,
             "POST",
@@ -378,7 +392,7 @@ class RunnerListener:
             idempotent=True,  # idempotent presence upsert — safe to retry on timeout/5xx
             json={
                 "capacity": self._max_concurrent,
-                "active_runs": self._active_launches,
+                "active_runs": self._active_runs_observed,
                 "pod_name": os.environ.get("POD_NAME") or os.environ.get("HOSTNAME") or "",
             },
             headers=self._auth_headers(),
@@ -582,7 +596,27 @@ class RunnerListener:
 
     async def _handle_run_available(self) -> None:
         """Claim a run, launch a Job, report back — done."""
+        # Fast local guard — never exceed max_concurrent from launch ops alone.
         if self._active_launches >= self._max_concurrent:
+            return
+
+        # Capacity-aware admission (#749): `_active_launches` only tracks the
+        # brief create window, not Jobs already running. On a fixed-size
+        # cluster that let the listener over-admit and pile up Pending,
+        # unschedulable Jobs. Gate on the real running-Job count from K8s
+        # (authoritative — keeps the listener stateless) plus in-flight
+        # launches. Best-effort: a K8s blip returns 0, and #748 (unschedulable
+        # detection) is the backstop that fails an unplaceable Job fast.
+        from terrapod.runner.job_manager import count_active_runner_jobs
+
+        active_jobs = await count_active_runner_jobs(self.runner_config.runner_namespace)
+        if self._active_launches + active_jobs >= self._max_concurrent:
+            logger.debug(
+                "At capacity — deferring run claim",
+                active_jobs=active_jobs,
+                active_launches=self._active_launches,
+                max_concurrent=self._max_concurrent,
+            )
             return
 
         response = await arequest_with_retry(

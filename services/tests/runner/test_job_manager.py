@@ -202,3 +202,54 @@ class TestUnschedulableDetection:
 
         assert await get_job_status("tprun-x-plan") == "succeeded"
         mock_core.return_value.list_namespaced_pod.assert_not_called()
+
+
+class TestCountActiveRunnerJobs:
+    """#749 — the listener admits runs on real running-Job occupancy, not the
+    near-instant launch counter. count_active_runner_jobs counts non-terminal
+    Jobs with an active pod; terminal Jobs don't occupy a slot; K8s errors
+    fail open (return 0, #748 is the backstop)."""
+
+    @patch("terrapod.runner.job_manager._get_batch_api")
+    @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
+    async def test_counts_only_active_non_terminal(self, _ns, mock_batch):
+        from terrapod.runner.job_manager import count_active_runner_jobs
+
+        mock_batch.return_value.list_namespaced_job.return_value = SimpleNamespace(
+            items=[
+                _job(active=1),  # running/pending — counts
+                _job(active=1),  # counts
+                _job(succeeded=1, active=0),  # terminal — excluded
+                _job(failed=1),  # terminal — excluded
+                _job(active=None),  # created, no pod yet — not counted here
+            ]
+        )
+        assert await count_active_runner_jobs() == 2
+
+    @patch("terrapod.runner.job_manager._get_batch_api")
+    @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
+    async def test_selects_by_runner_component_label_in_namespace(self, _ns, mock_batch):
+        from terrapod.runner.job_manager import count_active_runner_jobs
+
+        mock_batch.return_value.list_namespaced_job.return_value = SimpleNamespace(items=[])
+        await count_active_runner_jobs("runners-ns")
+        mock_batch.return_value.list_namespaced_job.assert_called_once_with(
+            namespace="runners-ns",
+            label_selector="app.kubernetes.io/component=runner",
+        )
+
+    @patch("terrapod.runner.job_manager._get_batch_api")
+    @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
+    async def test_empty_is_zero(self, _ns, mock_batch):
+        from terrapod.runner.job_manager import count_active_runner_jobs
+
+        mock_batch.return_value.list_namespaced_job.return_value = SimpleNamespace(items=[])
+        assert await count_active_runner_jobs() == 0
+
+    @patch("terrapod.runner.job_manager._get_batch_api")
+    @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
+    async def test_k8s_error_fails_open_to_zero(self, _ns, mock_batch):
+        from terrapod.runner.job_manager import count_active_runner_jobs
+
+        mock_batch.return_value.list_namespaced_job.side_effect = ApiException(status=500)
+        assert await count_active_runner_jobs() == 0
