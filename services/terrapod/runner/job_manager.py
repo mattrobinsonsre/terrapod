@@ -177,6 +177,44 @@ async def _check_pod_stuck(job_name: str, namespace: str) -> str | None:
     return None
 
 
+async def _pod_unschedulable(job_name: str, namespace: str) -> bool:
+    """True if the Job's pod is Pending and the scheduler has declared it
+    Unschedulable — insufficient cluster resources, or an unsatisfiable
+    nodeSelector / affinity / taint (#748).
+
+    A Pending pod counts toward `job.status.active`, so without this check the
+    run looks "running" and only fails at the 1h stale timeout. We key off the
+    scheduler's own `PodScheduled=False, reason=Unschedulable` condition (not a
+    bare Pending) so a pod that's merely mid-scheduling is not misflagged.
+    """
+    core_api = _get_core_api()
+    try:
+        loop = asyncio.get_event_loop()
+        pods = await loop.run_in_executor(
+            _executor,
+            lambda: core_api.list_namespaced_pod(
+                namespace=namespace,
+                label_selector=f"job-name={job_name}",
+            ),
+        )
+        core_api.api_client.last_response = None
+
+        for pod in pods.items:
+            if not pod.status or pod.status.phase != "Pending":
+                continue
+            for cond in pod.status.conditions or []:
+                if (
+                    cond.type == "PodScheduled"
+                    and cond.status == "False"
+                    and cond.reason == "Unschedulable"
+                ):
+                    return True
+    except Exception:
+        return False
+
+    return False
+
+
 async def delete_job(
     job_name: str,
     namespace: str = "",
@@ -236,9 +274,13 @@ async def get_job_status(job_name: str, namespace: str = "") -> str | None:
             return "succeeded"
         if job.status.failed and job.status.failed > 0:
             return "failed"
-        if job.status.active and job.status.active > 0:
-            return "running"
-        return "running"  # Job exists but no status yet
+        # Not terminal. A Pending pod the scheduler cannot place still counts
+        # toward `job.status.active`, so it otherwise looks "running" and the
+        # run hangs until the stale timeout. Surface it explicitly so the
+        # reconciler can fail fast with a clear reason (#748).
+        if await _pod_unschedulable(job_name, namespace):
+            return "unschedulable"
+        return "running"  # active, or Job exists but no pod status yet
     except ApiException as e:
         if e.status == 404:
             return None

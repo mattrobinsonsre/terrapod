@@ -137,3 +137,68 @@ class TestDefaultNamespace:
         fake_cfg = SimpleNamespace(runner_namespace="cfg-runner-ns")
         with patch("terrapod.config.load_runner_config", return_value=fake_cfg):
             assert job_manager._default_namespace() == "cfg-runner-ns"
+
+
+def _pod(phase, sched_status="True", reason=None):
+    cond = SimpleNamespace(type="PodScheduled", status=sched_status, reason=reason)
+    return SimpleNamespace(status=SimpleNamespace(phase=phase, conditions=[cond]))
+
+
+def _job(succeeded=None, failed=None, active=None):
+    return SimpleNamespace(
+        status=SimpleNamespace(succeeded=succeeded, failed=failed, active=active)
+    )
+
+
+class TestUnschedulableDetection:
+    """#748 — a Pending pod the scheduler can't place counts as job.active, so
+    get_job_status must surface it as `unschedulable` (not `running`) so the
+    reconciler can fail fast with a clear reason."""
+
+    @patch("terrapod.runner.job_manager._get_core_api")
+    @patch("terrapod.runner.job_manager._get_batch_api")
+    @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
+    async def test_pending_unschedulable_reports_unschedulable(self, _ns, mock_batch, mock_core):
+        from terrapod.runner.job_manager import get_job_status
+
+        mock_batch.return_value.read_namespaced_job.return_value = _job(active=1)
+        mock_core.return_value.list_namespaced_pod.return_value = SimpleNamespace(
+            items=[_pod("Pending", sched_status="False", reason="Unschedulable")]
+        )
+        assert await get_job_status("tprun-x-plan") == "unschedulable"
+
+    @patch("terrapod.runner.job_manager._get_core_api")
+    @patch("terrapod.runner.job_manager._get_batch_api")
+    @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
+    async def test_pending_but_still_scheduling_is_running(self, _ns, mock_batch, mock_core):
+        # PodScheduled=False without reason=Unschedulable means "mid-scheduling",
+        # not "can't be placed" — must NOT be flagged.
+        mock_batch.return_value.read_namespaced_job.return_value = _job(active=1)
+        mock_core.return_value.list_namespaced_pod.return_value = SimpleNamespace(
+            items=[_pod("Pending", sched_status="False", reason=None)]
+        )
+        from terrapod.runner.job_manager import get_job_status
+
+        assert await get_job_status("tprun-x-plan") == "running"
+
+    @patch("terrapod.runner.job_manager._get_core_api")
+    @patch("terrapod.runner.job_manager._get_batch_api")
+    @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
+    async def test_running_pod_is_running(self, _ns, mock_batch, mock_core):
+        mock_batch.return_value.read_namespaced_job.return_value = _job(active=1)
+        mock_core.return_value.list_namespaced_pod.return_value = SimpleNamespace(
+            items=[_pod("Running")]
+        )
+        from terrapod.runner.job_manager import get_job_status
+
+        assert await get_job_status("tprun-x-plan") == "running"
+
+    @patch("terrapod.runner.job_manager._get_core_api")
+    @patch("terrapod.runner.job_manager._get_batch_api")
+    @patch("terrapod.runner.job_manager._default_namespace", return_value="terrapod")
+    async def test_succeeded_short_circuits_before_pod_check(self, _ns, mock_batch, mock_core):
+        mock_batch.return_value.read_namespaced_job.return_value = _job(succeeded=1)
+        from terrapod.runner.job_manager import get_job_status
+
+        assert await get_job_status("tprun-x-plan") == "succeeded"
+        mock_core.return_value.list_namespaced_pod.assert_not_called()

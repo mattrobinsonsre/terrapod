@@ -162,6 +162,15 @@ async def _reconcile_one(db: AsyncSession, run: Run) -> None:
     if status == "running":
         return  # Still running, no-op
 
+    if status == "unschedulable":
+        # The Job's pod can't be scheduled (insufficient cluster resources, or
+        # an unsatisfiable nodeSelector/affinity/taint). Give a short grace in
+        # case the scheduler catches up — a node is added, another Job frees
+        # capacity — then fail fast with a clear reason, instead of hanging to
+        # the 1h stale timeout and reporting a vague "stale" (#748).
+        await _check_unschedulable(db, run)
+        return
+
     # `canceling` resolution is keyed on the Job-completion signal AND
     # whether a state-version was uploaded by this run; both branches
     # of the normal-path handlers (succeeded → applied, failed →
@@ -264,6 +273,40 @@ async def _handle_failed(db: AsyncSession, run: Run, error_message: str) -> None
         ws.lock_id = None
 
     logger.info("Run errored", run_id=str(run.id), reason=error_message)
+
+
+async def _check_unschedulable(db: AsyncSession, run: Run) -> None:
+    """Fail a run whose pod has been Unschedulable past the launch grace, with
+    an explicit "insufficient cluster resources" reason (#748).
+
+    Uses `launch_timeout_seconds` (default 5 min) as the grace — long enough to
+    ride out a transient scheduling gap (cluster-autoscaler adding a node, a
+    peer Job finishing), short enough that an operator on a fixed-resource
+    cluster gets a fast, actionable signal rather than a 1h "stale" hang.
+    """
+    phase_start = run.plan_started_at if run.status == "planning" else run.apply_started_at
+    if phase_start is None:
+        return
+
+    cfg = load_runner_config()
+    if datetime.now(UTC) - phase_start <= timedelta(seconds=cfg.launch_timeout_seconds):
+        return  # within grace — the scheduler may still place the pod
+
+    msg = (
+        f"Runner pod could not be scheduled for >{cfg.launch_timeout_seconds}s — "
+        f"insufficient cluster resources, or an unsatisfiable nodeSelector / "
+        f"affinity / taint. The workspace requests {run.resource_cpu} CPU / "
+        f"{run.resource_memory} memory (limits are 2× the request); no node had "
+        f"room. Reduce the request, free capacity, or add a node."
+    )
+    await _handle_failed(db, run, msg)
+    logger.warning(
+        "Run errored: pod unschedulable past grace",
+        run_id=str(run.id),
+        status=run.status,
+        resource_cpu=run.resource_cpu,
+        resource_memory=run.resource_memory,
+    )
 
 
 async def _check_stale(db: AsyncSession, run: Run) -> None:

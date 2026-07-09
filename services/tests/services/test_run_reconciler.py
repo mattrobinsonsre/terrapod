@@ -9,6 +9,7 @@ import pytest
 from terrapod.services.run_reconciler import (
     DEFAULT_STALE_TIMEOUT_SECONDS,
     _check_stale,
+    _check_unschedulable,
     _handle_failed,
     _handle_succeeded,
     _reconcile_one,
@@ -744,3 +745,68 @@ class TestReconcileOneWithoutJobName:
         mock_publish.assert_not_called()
         mock_status.assert_not_called()
         mock_check_stale.assert_called_once()
+
+
+# ── unschedulable handling (#748) ─────────────────────────────────────
+
+
+class TestUnschedulable:
+    @patch("terrapod.services.run_reconciler._check_unschedulable", new_callable=AsyncMock)
+    @patch("terrapod.redis.client.get_job_status_from_redis", new_callable=AsyncMock)
+    @patch("terrapod.redis.client.publish_listener_event", new_callable=AsyncMock)
+    async def test_reconcile_routes_unschedulable_to_grace_check(
+        self, mock_publish, mock_get_status, mock_unsched
+    ):
+        db = AsyncMock()
+        run = _mock_run()
+        mock_get_status.return_value = "unschedulable"
+
+        await _reconcile_one(db, run)
+
+        mock_unsched.assert_called_once_with(db, run)
+
+    @patch("terrapod.services.run_reconciler.load_runner_config")
+    @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
+    async def test_unschedulable_past_grace_errors_with_clear_reason(
+        self, mock_handle, mock_config
+    ):
+        mock_config.return_value = MagicMock(launch_timeout_seconds=300)
+        db = AsyncMock()
+        run = _mock_run(
+            status="planning",
+            plan_started_at=datetime.now(UTC) - timedelta(minutes=10),
+        )
+        run.resource_cpu = "1"
+        run.resource_memory = "2Gi"
+
+        await _check_unschedulable(db, run)
+
+        mock_handle.assert_called_once()
+        msg = mock_handle.call_args.args[2]
+        assert "could not be scheduled" in msg
+        assert "2Gi" in msg  # names the actionable resource request
+
+    @patch("terrapod.services.run_reconciler.load_runner_config")
+    @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
+    async def test_unschedulable_within_grace_is_noop(self, mock_handle, mock_config):
+        mock_config.return_value = MagicMock(launch_timeout_seconds=300)
+        db = AsyncMock()
+        run = _mock_run(
+            status="planning",
+            plan_started_at=datetime.now(UTC) - timedelta(seconds=30),
+        )
+
+        await _check_unschedulable(db, run)
+
+        mock_handle.assert_not_called()  # scheduler may still place it
+
+    @patch("terrapod.services.run_reconciler.load_runner_config")
+    @patch("terrapod.services.run_reconciler._handle_failed", new_callable=AsyncMock)
+    async def test_unschedulable_no_phase_start_skips(self, mock_handle, mock_config):
+        mock_config.return_value = MagicMock(launch_timeout_seconds=300)
+        db = AsyncMock()
+        run = _mock_run(status="planning", plan_started_at=None)
+
+        await _check_unschedulable(db, run)
+
+        mock_handle.assert_not_called()
