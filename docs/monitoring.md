@@ -196,6 +196,7 @@ These metrics are emitted by the **API server**, since it receives all heartbeat
 |---|---|---|---|
 | `terrapod_listener_heartbeats_total` | Counter | pool_id | Heartbeats received from listeners |
 | `terrapod_listener_joins_total` | Counter | pool_name | Listener join events |
+| `terrapod_pool_queued_runs` | Gauge | pool_id | Runs waiting for a listener slot per pool (backlog depth). Refreshed each reconciler cycle (~10s); reads 0 for an idle pool. A sustained non-zero value means the pool needs more listener capacity |
 
 ### Listeners (Self-Reported)
 

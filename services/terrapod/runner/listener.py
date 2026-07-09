@@ -595,51 +595,63 @@ class RunnerListener:
     # ── Event Handlers ───────────────────────────────────────────────
 
     async def _handle_run_available(self) -> None:
-        """Claim a run, launch a Job, report back — done."""
-        # Fast local guard — never exceed max_concurrent from launch ops alone.
-        if self._active_launches >= self._max_concurrent:
-            return
+        """Claim and launch queued runs up to capacity, then stop.
 
-        # Capacity-aware admission (#749): `_active_launches` only tracks the
-        # brief create window, not Jobs already running. On a fixed-size
-        # cluster that let the listener over-admit and pile up Pending,
-        # unschedulable Jobs. Gate on the real running-Job count from K8s
-        # (authoritative — keeps the listener stateless) plus in-flight
-        # launches. Best-effort: a K8s blip returns 0, and #748 (unschedulable
-        # detection) is the backstop that fails an unplaceable Job fast.
+        Keeps claiming until the pool has no more queued runs (204) or the
+        listener is at capacity, so a backlog drains as fast as slots free
+        (#750) instead of one run per 30s poll — the API nudges the pool with a
+        fresh `run_available` on every terminal transition, and this loop
+        drains everything that fits in one pass. Each iteration re-checks real
+        capacity (#749), so a single event never over-admits onto a fixed
+        cluster.
+        """
         from terrapod.runner.job_manager import count_active_runner_jobs
 
-        active_jobs = await count_active_runner_jobs(self.runner_config.runner_namespace)
-        if self._active_launches + active_jobs >= self._max_concurrent:
-            logger.debug(
-                "At capacity — deferring run claim",
-                active_jobs=active_jobs,
-                active_launches=self._active_launches,
-                max_concurrent=self._max_concurrent,
+        launched = 0
+        while True:
+            # Fast local guard — never exceed max_concurrent from launch ops
+            # alone (also bounds this loop even if K8s counting fails open).
+            if self._active_launches >= self._max_concurrent:
+                return
+
+            # Capacity-aware admission (#749): gate on the real running-Job
+            # count from K8s (authoritative — keeps the listener stateless) plus
+            # in-flight launches plus Jobs already launched *this* pass. The K8s
+            # count lags a just-created Job (its pod isn't active yet), so
+            # `launched` prevents a single drain pass from over-admitting.
+            active_jobs = await count_active_runner_jobs(self.runner_config.runner_namespace)
+            if self._active_launches + active_jobs + launched >= self._max_concurrent:
+                if launched == 0:
+                    logger.debug(
+                        "At capacity — deferring run claim",
+                        active_jobs=active_jobs,
+                        active_launches=self._active_launches,
+                        max_concurrent=self._max_concurrent,
+                    )
+                return
+
+            response = await arequest_with_retry(
+                self._http_client,
+                "GET",
+                f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}/runs/next",
+                headers=self._auth_headers(),
             )
-            return
 
-        response = await arequest_with_retry(
-            self._http_client,
-            "GET",
-            f"/api/terrapod/v1/listeners/listener-{self.identity.listener_id}/runs/next",
-            headers=self._auth_headers(),
-        )
+            if response.status_code == 204:
+                return  # No more queued runs for this pool
+            response.raise_for_status()
 
-        if response.status_code == 204:
-            return  # No runs available (another listener claimed it)
-        response.raise_for_status()
+            data = response.json()["data"]
+            run_id = data["id"].removeprefix("run-")
+            attrs = data.get("attributes", {})
 
-        data = response.json()["data"]
-        run_id = data["id"].removeprefix("run-")
-        attrs = data.get("attributes", {})
-
-        # Launch the Job in the background (fire-and-forget)
-        self._active_launches += 1
-        try:
-            await self._launch_run(run_id, attrs)
-        finally:
-            self._active_launches -= 1
+            # Launch the Job in the background (fire-and-forget)
+            self._active_launches += 1
+            try:
+                await self._launch_run(run_id, attrs)
+            finally:
+                self._active_launches -= 1
+            launched += 1
 
     async def _launch_run(self, run_id: str, attrs: dict) -> None:
         """Build and launch a K8s Job for a claimed run, then report back.

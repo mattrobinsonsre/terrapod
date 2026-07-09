@@ -107,3 +107,72 @@ async def test_launch_counter_alone_at_cap_skips_k8s_call():
             await listener._handle_run_available()
     assert calls["next"] == 0
     mock_count.assert_not_called()
+
+
+def _run_claim(n: int) -> httpx.Response:
+    return httpx.Response(
+        200,
+        json={
+            "data": {
+                "id": f"run-{n:08d}-0000-0000-0000-000000000000",
+                "attributes": {"phase": "plan"},
+            }
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_drains_backlog_in_one_pass_up_to_capacity():
+    """A backlog drains in a single _handle_run_available pass, bounded by
+    max_concurrent — even if the queue never empties (#750/#749). The
+    `launched`-this-pass counter is what stops it (K8s count lags the just-
+    created Jobs)."""
+    launches = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/runs/next"):
+            launches["n"] += 1
+            return _run_claim(launches["n"])  # queue never empties
+        return httpx.Response(200, json={"ok": True})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(base_url="http://test", transport=transport) as client:
+        listener = _make_listener(client)
+        listener._max_concurrent = 3
+        listener._active_launches = 0
+        listener._launch_run = AsyncMock()
+        with patch(
+            "terrapod.runner.job_manager.count_active_runner_jobs",
+            AsyncMock(return_value=0),
+        ):
+            await listener._handle_run_available()
+
+    assert listener._launch_run.await_count == 3  # capped at max_concurrent
+
+
+@pytest.mark.asyncio
+async def test_drain_stops_on_empty_queue_before_capacity():
+    """The loop stops as soon as the pool returns 204, even below capacity."""
+    responses = [_run_claim(1), _run_claim(2), httpx.Response(204)]
+    idx = {"i": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/runs/next"):
+            r = responses[idx["i"]]
+            idx["i"] += 1
+            return r
+        return httpx.Response(200, json={"ok": True})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(base_url="http://test", transport=transport) as client:
+        listener = _make_listener(client)
+        listener._max_concurrent = 5
+        listener._active_launches = 0
+        listener._launch_run = AsyncMock()
+        with patch(
+            "terrapod.runner.job_manager.count_active_runner_jobs",
+            AsyncMock(return_value=0),
+        ):
+            await listener._handle_run_available()
+
+    assert listener._launch_run.await_count == 2  # drained the 2 queued, then 204

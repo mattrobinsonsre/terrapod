@@ -13,6 +13,7 @@ from terrapod.services.run_reconciler import (
     _handle_failed,
     _handle_succeeded,
     _reconcile_one,
+    _refresh_pool_queue_depth,
 )
 
 
@@ -810,3 +811,48 @@ class TestUnschedulable:
         await _check_unschedulable(db, run)
 
         mock_handle.assert_not_called()
+
+
+class TestPoolQueueDepth:
+    """#750 — per-pool queued-runs gauge refreshed each reconciler cycle."""
+
+    async def test_sets_gauge_per_pool_with_explicit_zero(self):
+        from terrapod.api.metrics import POOL_QUEUED_RUNS
+
+        p1 = uuid.uuid4()  # 3 queued
+        p2 = uuid.uuid4()  # idle → explicit 0, not absent
+
+        counts_result = MagicMock()
+        counts_result.all.return_value = [(p1, 3)]
+        pools_result = MagicMock()
+        pools_result.all.return_value = [(p1,), (p2,)]
+
+        db = AsyncMock()
+        db.execute.side_effect = [counts_result, pools_result]
+
+        await _refresh_pool_queue_depth(db)
+
+        assert POOL_QUEUED_RUNS.labels(pool_id=str(p1))._value.get() == 3
+        assert POOL_QUEUED_RUNS.labels(pool_id=str(p2))._value.get() == 0
+
+    async def test_queued_on_deleted_pool_still_surfaced(self):
+        from terrapod.api.metrics import POOL_QUEUED_RUNS
+
+        p3 = uuid.uuid4()  # has queued runs but the pool row is gone
+        counts_result = MagicMock()
+        counts_result.all.return_value = [(p3, 2)]
+        pools_result = MagicMock()
+        pools_result.all.return_value = []
+
+        db = AsyncMock()
+        db.execute.side_effect = [counts_result, pools_result]
+
+        await _refresh_pool_queue_depth(db)
+
+        assert POOL_QUEUED_RUNS.labels(pool_id=str(p3))._value.get() == 2
+
+    async def test_db_error_fails_open(self):
+        db = AsyncMock()
+        db.execute.side_effect = RuntimeError("db down")
+        # Must not raise into the reconcile cycle.
+        await _refresh_pool_queue_depth(db)

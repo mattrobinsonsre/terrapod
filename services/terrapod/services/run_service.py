@@ -704,6 +704,14 @@ async def transition_run(
     # Notify listeners when a run becomes claimable
     if target_status in ("queued", "confirmed") and run.pool_id:
         await _publish_run_available(run)
+    # A freed slot: when a run reaches a terminal state it releases the runner
+    # capacity it held, so nudge its pool to re-drive any backlog immediately
+    # rather than waiting for the listener's ~30s poll fallback (#750). The
+    # listener drains everything that now fits in one pass; a spurious nudge on
+    # an idle pool just yields a 204, so this is safe to fire unconditionally on
+    # terminal transitions.
+    elif target_status in TERMINAL_STATES and run.pool_id:
+        await _publish_run_available(run)
 
     # Auto-discard superseded runs. When a full run becomes claimable
     # (`queued`), discard older un-applied full runs on the same workspace

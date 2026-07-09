@@ -129,7 +129,8 @@ class TestHandleRunAvailable:
         mock_client.get.assert_called_once()
 
     async def test_claims_and_launches_run(self, fresh_shutdown_event):
-        """Successful claim triggers _launch_run."""
+        """Successful claim triggers _launch_run, then the drain loop stops on
+        the next 204 (no more queued runs)."""
         listener = _make_listener(fresh_shutdown_event)
 
         run_data = {
@@ -138,19 +139,27 @@ class TestHandleRunAvailable:
                 "attributes": {"phase": "plan"},
             }
         }
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = run_data
-        mock_response.raise_for_status = MagicMock()
+        claimed = MagicMock()
+        claimed.status_code = 200
+        claimed.json.return_value = run_data
+        claimed.raise_for_status = MagicMock()
+        empty = MagicMock()
+        empty.status_code = 204
 
         mock_client = AsyncMock()
-        mock_client.get.return_value = mock_response
+        # One run, then the queue is empty — the loop drains and stops (#750).
+        mock_client.get.side_effect = [claimed, empty]
         listener._http_client = mock_client
 
         listener._launch_run = AsyncMock()
-        await listener._handle_run_available()
+        with patch(
+            "terrapod.runner.job_manager.count_active_runner_jobs",
+            AsyncMock(return_value=0),
+        ):
+            await listener._handle_run_available()
 
         listener._launch_run.assert_called_once()
+        assert mock_client.get.call_count == 2  # claim, then 204
         assert listener._active_launches == 0  # Decremented after launch
 
 

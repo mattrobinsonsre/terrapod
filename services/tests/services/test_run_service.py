@@ -354,6 +354,36 @@ class TestTransitionRun:
         assert run.apply_finished_at is not None
 
 
+class TestTerminalTransitionNudge:
+    """#750 — a run reaching a terminal state frees runner capacity, so its
+    pool is nudged with a fresh run_available to re-drive any backlog."""
+
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    async def test_terminal_transition_nudges_pool(self, mock_pub):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="planning")
+        run.pool_id = uuid.uuid4()
+        await transition_run(db, run, "errored")
+        mock_pub.assert_awaited_once_with(run)
+
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    async def test_terminal_transition_without_pool_does_not_nudge(self, mock_pub):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="planning")
+        run.pool_id = None
+        await transition_run(db, run, "errored")
+        mock_pub.assert_not_awaited()
+
+    @patch("terrapod.services.run_service._publish_run_available", new_callable=AsyncMock)
+    async def test_non_terminal_transition_does_not_nudge(self, mock_pub):
+        db = AsyncMock(spec=AsyncSession)
+        run = _mock_run(status="queued")
+        run.pool_id = uuid.uuid4()
+        # queued → planning is neither claimable (queued/confirmed) nor terminal
+        await transition_run(db, run, "planning")
+        mock_pub.assert_not_awaited()
+
+
 # ── create_run ─────────────────────────────────────────────────────────
 
 

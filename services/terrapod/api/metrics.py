@@ -10,7 +10,13 @@ instrumentation points (1-2 lines each).
 import time
 
 from fastapi import Request, Response
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+)
 
 # ---------------------------------------------------------------------------
 # HTTP request metrics
@@ -250,6 +256,18 @@ LISTENER_PRELAUNCH_TIMEOUTS = Counter(
         "manage to PATCH the failure (its cert was rejected, or it crashed). "
         "Backstop signal for silent listener failures."
     ),
+)
+
+POOL_QUEUED_RUNS = Gauge(
+    "terrapod_pool_queued_runs",
+    (
+        "Runs currently in `queued` state per agent pool — the backlog waiting "
+        "for a listener slot. Refreshed each reconciler cycle (~10s) with a "
+        "single grouped COUNT. An operator watches this to see 'N runs waiting "
+        "on pool X' and decide whether the pool needs more listener capacity "
+        "(#750)."
+    ),
+    ["pool_id"],
 )
 
 

@@ -14,7 +14,7 @@ Registered as a periodic task (2s interval) in app.py.
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from terrapod.config import load_runner_config
@@ -67,6 +67,38 @@ async def _persist_live_log_if_missing(run: Run, phase: str) -> None:
         logger.warning("Failed to persist live log", run_id=run_id, error=str(e))
 
 
+async def _refresh_pool_queue_depth(db: AsyncSession) -> None:
+    """Publish the per-pool `queued` backlog as a Prometheus gauge (#750).
+
+    One grouped COUNT per reconciler cycle (~10s). Every existing pool is given
+    an explicit value (0 when idle) so the series is stable — a pool that drains
+    to empty reads as 0, not absent. Queued runs on a since-deleted pool are
+    still surfaced (they are a real backlog). Best-effort: never raises into the
+    reconcile cycle.
+    """
+    from terrapod.api.metrics import POOL_QUEUED_RUNS
+    from terrapod.db.models import AgentPool
+
+    try:
+        counts_result = await db.execute(
+            select(Run.pool_id, func.count())
+            .where(Run.status == "queued", Run.pool_id.isnot(None))
+            .group_by(Run.pool_id)
+        )
+        counts = {row[0]: row[1] for row in counts_result.all()}
+
+        pool_ids_result = await db.execute(select(AgentPool.id))
+        pool_ids = {row[0] for row in pool_ids_result.all()}
+
+        # Clear + re-set so pools that drained to 0 (or were deleted) don't keep
+        # a stale non-zero value from a prior cycle.
+        POOL_QUEUED_RUNS.clear()
+        for pid in pool_ids | set(counts):
+            POOL_QUEUED_RUNS.labels(pool_id=str(pid)).set(counts.get(pid, 0))
+    except Exception as e:
+        logger.debug("Failed to refresh pool queue-depth gauge", error=str(e))
+
+
 async def reconcile_runs() -> None:
     """Drive run state transitions based on Job outcomes.
 
@@ -81,6 +113,11 @@ async def reconcile_runs() -> None:
        this cohort so failures surface in minutes, not hours.
     """
     async with get_db_session() as db:
+        # Refresh the per-pool queued-backlog gauge first — queued runs exist
+        # independently of in-flight ones, so this must run before the early
+        # return below (#750).
+        await _refresh_pool_queue_depth(db)
+
         # `canceling` joins planning/applying here: it's the intermediate
         # state entered when a user cancels an in-flight apply. The
         # reconciler waits for the listener's Job-status report (the
