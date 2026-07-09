@@ -17,6 +17,7 @@ import uuid
 
 import pytest
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 from terrapod.db.models import TaskStage, TaskStageResult
 from terrapod.db.session import get_db_session
@@ -194,3 +195,67 @@ class TestTaskStageIdempotency:
         assert all(visibility), (
             "result row must be committed/visible before its trigger is enqueued"
         )
+
+    async def test_db_rejects_duplicate_run_stage(self, app, client):
+        """The UniqueConstraint(run_id, stage) rejects a second stage for the
+        same run+boundary at the DB level (#742)."""
+        set_auth(app, admin_user())
+        ws_id = await _create_workspace(client, f"ts-uq-{uuid.uuid4().hex[:8]}")
+        run_id = await _create_run(client, ws_id)
+        rid = _rid(run_id)
+
+        async with get_db_session() as db:
+            db.add(TaskStage(run_id=rid, stage="post_plan", status="running"))
+            await db.flush()
+            db.add(TaskStage(run_id=rid, stage="post_plan", status="running"))
+            with pytest.raises(IntegrityError):
+                await db.flush()
+            # The failed flush poisons the transaction; reset it so the
+            # session's context-manager exit doesn't raise PendingRollbackError.
+            await db.rollback()
+
+    async def test_concurrent_insert_race_returns_winner(self, app, client, monkeypatch):
+        """When a concurrent cross-replica insert wins the (run, stage) race, the
+        loser's insert hits the unique constraint; create_task_stage rolls back
+        and returns the winning stage rather than raising or duplicating (#742).
+
+        Simulated by making the idempotency lookup miss the already-committed
+        winner on the first call (a stale read), forcing the insert path.
+        """
+        set_auth(app, admin_user())
+        ws_id = await _create_workspace(client, f"ts-race-{uuid.uuid4().hex[:8]}")
+        await _create_post_plan_task(client, ws_id, "opa-cost-check")
+        run_id = await _create_run(client, ws_id)
+        rid, wid = _rid(run_id), _wid(ws_id)
+
+        # The "winner": a stage already committed for (run, post_plan).
+        async with get_db_session() as db:
+            winner = TaskStage(run_id=rid, stage="post_plan", status="running")
+            db.add(winner)
+            await db.commit()
+            winner_id = winner.id
+
+        real_existing = run_task_service._existing_stage
+        calls = {"n": 0}
+
+        async def _stale_then_real(db, run_id_, stage_name):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return None  # stale read: miss the winner, proceed to insert
+            return await real_existing(db, run_id_, stage_name)
+
+        monkeypatch.setattr(run_task_service, "_existing_stage", _stale_then_real)
+
+        async with get_db_session() as db:
+            got = await run_task_service.create_task_stage(db, rid, wid, "post_plan")
+            assert got is not None
+            assert got.id == winner_id, "must return the winner, not a new stage"
+
+        # The loser's insert was rolled back — exactly one stage exists.
+        async with get_db_session() as db:
+            count = await db.scalar(
+                select(func.count())
+                .select_from(TaskStage)
+                .where(TaskStage.run_id == rid, TaskStage.stage == "post_plan")
+            )
+            assert count == 1

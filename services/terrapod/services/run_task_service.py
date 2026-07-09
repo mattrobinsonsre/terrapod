@@ -12,6 +12,7 @@ import time
 import uuid
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -85,6 +86,17 @@ def verify_callback_token(token: str) -> uuid.UUID | None:
     return result_id
 
 
+async def _existing_stage(db: AsyncSession, run_id: uuid.UUID, stage_name: str) -> TaskStage | None:
+    """Return the canonical (first-created) stage for a run+boundary, if any."""
+    res = await db.execute(
+        select(TaskStage)
+        .where(TaskStage.run_id == run_id, TaskStage.stage == stage_name)
+        .order_by(TaskStage.created_at.asc(), TaskStage.id.asc())
+        .limit(1)
+    )
+    return res.scalars().first()
+
+
 async def create_task_stage(
     db: AsyncSession,
     run_id: uuid.UUID,
@@ -116,16 +128,10 @@ async def create_task_stage(
     # Idempotency: reuse an existing stage for this run+boundary if present.
     # Order by creation (with the id as a stable tiebreak, since created_at
     # can collide within a tick) so re-entry deterministically returns the
-    # canonical first-created stage rather than an arbitrary row. NOTE: this
-    # is a read-then-insert with no DB-level uniqueness — a concurrent
-    # cross-replica insert can still duplicate; #742 adds the constraint.
-    existing = await db.execute(
-        select(TaskStage)
-        .where(TaskStage.run_id == run_id, TaskStage.stage == stage_name)
-        .order_by(TaskStage.created_at.asc(), TaskStage.id.asc())
-        .limit(1)
-    )
-    prior = existing.scalars().first()
+    # canonical first-created stage. This read-then-insert is backed by a
+    # UniqueConstraint(run_id, stage) (#742), so a concurrent cross-replica
+    # insert that slips past this check is caught below via IntegrityError.
+    prior = await _existing_stage(db, run_id, stage_name)
     if prior is not None:
         return prior
 
@@ -142,43 +148,55 @@ async def create_task_stage(
     if not tasks:
         return None
 
-    # Create task stage
-    ts = TaskStage(
-        run_id=run_id,
-        stage=stage_name,
-        status="running",
-    )
-    db.add(ts)
-    await db.flush()
-
-    # Create results (webhook delivery is enqueued AFTER commit — see below).
-    result_ids: list[uuid.UUID] = []
-    for task in tasks:
-        tsr = TaskStageResult(
-            task_stage_id=ts.id,
-            run_task_id=task.id,
-            status="pending",
+    # Create task stage + its results, then commit. The UniqueConstraint on
+    # (run_id, stage) makes this race-safe: if a concurrent tick on another
+    # replica committed the same stage between our existence check above and
+    # this commit, the commit raises IntegrityError — we roll back and return
+    # the winner (it enqueued its own delivery triggers, so we don't re-enqueue).
+    try:
+        ts = TaskStage(
+            run_id=run_id,
+            stage=stage_name,
+            status="running",
         )
-        db.add(tsr)
+        db.add(ts)
         await db.flush()
 
-        # Generate callback token
-        tsr.callback_token = generate_callback_token(tsr.id)
-        await db.flush()
-        result_ids.append(tsr.id)
+        # Create results (webhook delivery is enqueued AFTER commit — see below).
+        result_ids: list[uuid.UUID] = []
+        for task in tasks:
+            tsr = TaskStageResult(
+                task_stage_id=ts.id,
+                run_task_id=task.id,
+                status="pending",
+            )
+            db.add(tsr)
+            await db.flush()
 
-    ts_id = ts.id
+            # Generate callback token
+            tsr.callback_token = generate_callback_token(tsr.id)
+            await db.flush()
+            result_ids.append(tsr.id)
 
-    # Commit the stage + result rows BEFORE enqueuing the delivery triggers
-    # (#739). The `run_task_call` consumer runs in a *separate* DB session
-    # (and possibly on another replica) and looks the TaskStageResult up by
-    # id. If we enqueue while the rows are only flushed-not-committed — the
-    # caller (`run_service.complete_plan`) commits much later, up the stack —
-    # the consumer races ahead, reads "task stage result not found", and
-    # silently drops the webhook. The result then sits at `pending` forever,
-    # the stage never resolves, and the run wedges in `planning`. Committing
-    # here makes the rows visible before any trigger can fire.
-    await db.commit()
+        ts_id = ts.id
+
+        # Commit the stage + result rows BEFORE enqueuing the delivery triggers
+        # (#739). The `run_task_call` consumer runs in a *separate* DB session
+        # (and possibly on another replica) and looks the TaskStageResult up by
+        # id. If we enqueue while the rows are only flushed-not-committed — the
+        # caller (`run_service.complete_plan`) commits much later, up the stack —
+        # the consumer races ahead, reads "task stage result not found", and
+        # silently drops the webhook. The result then sits at `pending` forever,
+        # the stage never resolves, and the run wedges in `planning`. Committing
+        # here makes the rows visible before any trigger can fire.
+        await db.commit()
+    except IntegrityError:
+        # A concurrent creator won the (run_id, stage) race. Return their stage.
+        await db.rollback()
+        winner = await _existing_stage(db, run_id, stage_name)
+        if winner is not None:
+            return winner
+        raise
 
     from terrapod.services.scheduler import enqueue_trigger
 

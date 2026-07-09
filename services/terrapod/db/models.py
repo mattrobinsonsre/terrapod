@@ -1879,7 +1879,14 @@ class TaskStage(Base):
         back_populates="task_stage", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (Index("ix_task_stages_run_id", "run_id"),)
+    # A run has exactly one stage per boundary (one post_plan, one pre_apply, …).
+    # Enforced at the DB level so a concurrent cross-replica insert can't create a
+    # duplicate (the read-then-insert idempotency in run_task_service is racy on
+    # its own) (#742).
+    __table_args__ = (
+        Index("ix_task_stages_run_id", "run_id"),
+        UniqueConstraint("run_id", "stage", name="uq_task_stages_run_stage"),
+    )
 
 
 class TaskStageResult(Base):
