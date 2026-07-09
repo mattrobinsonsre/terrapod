@@ -280,8 +280,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- include "terrapod.podAntiAffinity" (dict "enabled" .Values.api.podAntiAffinity.enabled "affinity" .Values.api.affinity "labels" (include "terrapod.api.selectorLabels" .)) }}
-      {{- if .Values.api.priorityClassName }}
-      priorityClassName: {{ .Values.api.priorityClassName | quote }}
+      {{- $pc := include "terrapod.controlPlanePriorityClassName" (dict "explicit" .Values.api.priorityClassName "root" .) }}
+      {{- if $pc }}
+      priorityClassName: {{ $pc | quote }}
       {{- end }}
       {{- with .Values.api.topologySpreadConstraints }}
       topologySpreadConstraints:

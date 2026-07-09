@@ -71,9 +71,14 @@ api:
     annotations: {}
 
   resources:
-    # Request/limit ratios deliberately tight: CPU ≤ 2× request,
-    # memory = request (Guaranteed QoS). Wide bands cause noisy-neighbour
-    # evictions on memory and unpredictable throttling on CPU.
+    # Request/limit ratios deliberately tight: CPU ≤ 2× request, memory
+    # request == limit. This is **Burstable** QoS, not Guaranteed — Guaranteed
+    # requires requests == limits for BOTH cpu and memory, and the CPU request
+    # (500m) is intentionally below the limit (1) so the API can burst on spiky
+    # request load. Memory is pinned (request == limit) so it never bursts into
+    # noisy-neighbour OOM territory. Wide bands cause noisy-neighbour evictions
+    # on memory and unpredictable throttling on CPU. (To make the API Guaranteed
+    # instead, raise the CPU request to match the limit.)
     #
     # Memory raised from 1Gi after the parallel VCS poller (v0.17.2,
     # PR #233) started holding up to 10 concurrent per-workspace archive
@@ -1415,6 +1420,34 @@ storage:
 # Requires a CNI plugin that supports NetworkPolicy (Calico, Cilium, etc.).
 networkPolicies:
   enabled: false
+
+# ── Priority Classes ─────────────────────────────────────────────────────────
+# Optional control-plane priority protection. OFF by default — enabling creates
+# CLUSTER-SCOPED PriorityClass objects (they affect scheduling globally), so we
+# don't inject them silently. Recommended for FIXED-SIZE node pools where
+# node-pressure eviction would otherwise reap the control plane: PDBs do NOT
+# help there — the kubelet ignores PodDisruptionBudgets when evicting for node
+# pressure, and only pod priority decides who gets reaped first.
+#
+# When create=true the chart renders a higher-priority class for the control
+# plane (api, listener, web) and (optionally) a lower one for runner Jobs, and
+# defaults each component's priorityClassName to it — unless that component's
+# own api/listener/web.priorityClassName (or runners.priorityClassName) is set,
+# which always wins. Values stay well below the reserved system classes
+# (system-cluster-critical = 2000000000).
+priorityClasses:
+  create: false
+  # Higher-priority class for the control plane (api, listener, web).
+  controlPlane:
+    name: terrapod-control-plane
+    value: 1000000
+  # Lower-priority class for runner Jobs — so runners are evicted before the
+  # control plane under node pressure. Set enabled=false to skip it (runner
+  # Jobs then fall back to the cluster's global-default priority).
+  runner:
+    enabled: true
+    name: terrapod-runner
+    value: 100000
 
 # ── Namespace ───────────────────────────────────────────────────────────────
 # Optionally create the namespace with Pod Security Standards labels.

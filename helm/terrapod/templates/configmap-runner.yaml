@@ -69,8 +69,9 @@ data:
     pod_annotations:
       {{- toYaml . | nindent 6 }}
     {{- end }}
-    {{- if .Values.runners.priorityClassName }}
-    priority_class_name: {{ .Values.runners.priorityClassName | quote }}
+    {{- $rpc := include "terrapod.runnerPriorityClassName" . }}
+    {{- if $rpc }}
+    priority_class_name: {{ $rpc | quote }}
     {{- end }}
     {{- with .Values.runners.topologySpreadConstraints }}
     topology_spread_constraints:

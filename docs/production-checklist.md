@@ -76,6 +76,7 @@ A step-by-step checklist for preparing a Terrapod instance for production use. E
 - [ ] **HPA is configured for the API** -- Recommended: min 2, max 10 replicas targeting 70% CPU. See [Deployment: Scaling](deployment.md#scaling-considerations).
 - [ ] **Database connection pool is sized correctly** -- Total max connections = `(pool_size + max_overflow) x replicas`. Verify this does not exceed the database's `max_connections`. See [Deployment: Connection Pooling](deployment.md#connection-pool-tuning).
 - [ ] **Pod anti-affinity spreads replicas across nodes** -- Prevent all API replicas from landing on the same node. The Helm chart supports `affinity` configuration for API, web, and listener Deployments.
+- [ ] **Control-plane PriorityClasses are enabled on fixed-size node pools** -- Set `priorityClasses.create=true` to create a higher-priority class for the control plane (api/listener/web) and a lower one for runner Jobs, so under node pressure the kubelet reaps runners before the control plane. This is **off by default** (it creates cluster-scoped objects). PodDisruptionBudgets do **not** protect against node-pressure eviction -- only pod priority does. Strongly recommended when Terrapod runs on a fixed node pool it shares with runner Jobs. See [Deployment](deployment.md).
 
 ---
 

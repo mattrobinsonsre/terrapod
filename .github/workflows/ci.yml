@@ -658,6 +658,29 @@ jobs:
               --set redis.url=redis://redis:6379)
           echo "$stock" | grep -A1 "encryption:" | grep -q "enabled: true" && { echo "FAIL: encryption enabled by default"; exit 1; }
           echo "encryption-at-rest config + secret wiring OK and off by default (#553)"
+      - name: Control-plane PriorityClasses render and are off by default (#751)
+        run: |
+          out=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            template terrapod helm/terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379 \
+              --set priorityClasses.create=true)
+          echo "$out" | grep -q "kind: PriorityClass" || { echo "FAIL: PriorityClass not rendered when create=true"; exit 1; }
+          echo "$out" | grep -q "name: terrapod-control-plane" || { echo "FAIL: control-plane PriorityClass missing"; exit 1; }
+          echo "$out" | grep -q "name: terrapod-runner" || { echo "FAIL: runner PriorityClass missing"; exit 1; }
+          # api/listener/web default their priorityClassName to the control-plane class.
+          n=$(echo "$out" | grep -c 'priorityClassName: "terrapod-control-plane"')
+          [ "$n" -eq 3 ] || { echo "FAIL: expected 3 control-plane priorityClassName (got $n)"; exit 1; }
+          # runner config carries the runner class (config-channel contract).
+          echo "$out" | grep -q 'priority_class_name: "terrapod-runner"' || { echo "FAIL: runner priority_class_name not rendered"; exit 1; }
+          # Off by default — no PriorityClass object, no priorityClassName default.
+          stock=$(docker run --rm -v "$PWD:/chart" -w /chart alpine/helm:3.17.2 \
+            template terrapod helm/terrapod \
+              --set postgresql.url=postgresql+asyncpg://t:t@db:5432/terrapod \
+              --set redis.url=redis://redis:6379)
+          echo "$stock" | grep -q "kind: PriorityClass" && { echo "FAIL: PriorityClass rendered by default (should be opt-in)"; exit 1; }
+          echo "$stock" | grep -q "priorityClassName:" && { echo "FAIL: priorityClassName set by default"; exit 1; }
+          echo "control-plane PriorityClasses render OK and are off by default (#751)"
 
   # ── Config-channel contract (#617) ────────────────────
   # Renders the chart (every values profile) and parses the rendered ConfigMaps

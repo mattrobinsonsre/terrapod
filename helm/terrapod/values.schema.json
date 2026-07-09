@@ -415,6 +415,31 @@
       }
     },
 
+    "priorityClasses": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "create": { "type": "boolean" },
+        "controlPlane": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string" },
+            "value": { "type": "integer", "minimum": 0, "maximum": 1000000000 }
+          }
+        },
+        "runner": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "name": { "type": "string" },
+            "value": { "type": "integer", "minimum": 0, "maximum": 1000000000 }
+          }
+        }
+      }
+    },
+
     "namespace": {
       "type": "object",
       "additionalProperties": false,

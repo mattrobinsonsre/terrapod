@@ -534,3 +534,32 @@ roots. Same mount as the Node helper; named distinctly so the intent is clear.
   value: /etc/terrapod-ca-src/{{ include "terrapod.caBundle.key" . }}
 {{- end }}
 {{- end -}}
+
+{{/*
+Resolved priorityClassName for a control-plane component (api/listener/web,
+#751). The component's own explicit value always wins; otherwise, when
+priorityClasses.create is true, fall back to the created control-plane class.
+Empty string (falsy) when neither applies. Call with:
+  (dict "explicit" .Values.api.priorityClassName "root" .)
+*/}}
+{{- define "terrapod.controlPlanePriorityClassName" -}}
+{{- if .explicit -}}
+{{- .explicit -}}
+{{- else if .root.Values.priorityClasses.create -}}
+{{- .root.Values.priorityClasses.controlPlane.name -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Resolved priority_class_name for runner Jobs (#751). runners.priorityClassName
+wins; otherwise, when priorityClasses.create AND the runner class is enabled,
+fall back to the created runner class. Empty (falsy) when neither applies.
+Call with the root context (.).
+*/}}
+{{- define "terrapod.runnerPriorityClassName" -}}
+{{- if .Values.runners.priorityClassName -}}
+{{- .Values.runners.priorityClassName -}}
+{{- else if and .Values.priorityClasses.create .Values.priorityClasses.runner.enabled -}}
+{{- .Values.priorityClasses.runner.name -}}
+{{- end -}}
+{{- end -}}

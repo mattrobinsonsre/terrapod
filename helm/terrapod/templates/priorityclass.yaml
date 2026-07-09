@@ -1,0 +1,30 @@
+{{- /*
+Optional control-plane priority protection (#751). Cluster-scoped, so OFF by
+default — only rendered when priorityClasses.create is true. Values stay well
+below the reserved system classes (system-cluster-critical = 2000000000). The
+Deployments/runner config default their priorityClassName to these names when
+create is true and the component's own priorityClassName is unset.
+*/ -}}
+{{- if .Values.priorityClasses.create }}
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ .Values.priorityClasses.controlPlane.name }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+value: {{ .Values.priorityClasses.controlPlane.value | int }}
+globalDefault: false
+description: "Terrapod control plane (API, listener, web) — protected from node-pressure eviction ahead of runner Jobs and lower-priority workloads."
+{{- if .Values.priorityClasses.runner.enabled }}
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ .Values.priorityClasses.runner.name }}
+  labels:
+    {{- include "terrapod.labels" . | nindent 4 }}
+value: {{ .Values.priorityClasses.runner.value | int }}
+globalDefault: false
+description: "Terrapod runner Jobs — lower priority than the control plane, so runners are reaped first under node pressure."
+{{- end }}
+{{- end }}
