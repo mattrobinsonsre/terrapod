@@ -425,6 +425,7 @@ Enable encryption on your managed database and object storage services. For file
 | `listener.image.repository` | `ghcr.io/mattrobinsonsre/terrapod-listener` | Listener Docker image |
 | `listener.image.tag` | `""` (appVersion) | Image tag |
 | `listener.replicas` | `1` | Number of listener replicas |
+| `listener.maxConcurrent` | `3` | Max runner Jobs a single listener pod runs concurrently. Admission is gated on the **real** running-Job count, so the listener never exceeds this even under a burst. The primary knob for [sizing a fixed-resource cluster](#sizing-runner-concurrency-on-a-fixed-resource-cluster). |
 | `listener.name` | `"listener"` | Listener name (registered in the pool) |
 | `listener.joinToken` | `""` | Raw join token (use `existingSecret` for production) |
 | `listener.existingSecret` | `""` | K8s Secret containing the join token |
@@ -470,6 +471,68 @@ listener:
 | `runners.serviceAccount.name` | `""` | SA name (cloud identity) |
 | `runners.serviceAccount.annotations` | `{}` | SA annotations (for IRSA, GCP WIF, Azure WI) |
 | `runners.hooksEnabled` | `true` | Master kill-switch: when false, execution hooks are never delivered to runner Jobs |
+
+### Sizing runner concurrency on a fixed-resource cluster
+
+On an autoscaling node pool the scheduler simply adds nodes when runner Jobs
+don't fit. On a **fixed-size** pool (a single k3s VM, a capped node group, a
+`ResourceQuota`-bound namespace) there is nothing to scale onto, so you must
+size concurrency to the capacity you have — otherwise runner Jobs sit
+**Pending / unschedulable** and never start.
+
+**How the multiplier works.** Each listener pod runs up to `listener.maxConcurrent`
+runner Jobs at once (default **3**). Each Job requests its workspace's
+`resource_cpu` / `resource_memory` (default **1 CPU / 2Gi** *requests*; limits are
+computed as **2×** the requests). The Kubernetes scheduler fits pods by their
+**requests**, so the worst-case simultaneous runner demand a single listener can
+place is:
+
+```
+listener.maxConcurrent × max(per-workspace resource_cpu / resource_memory requests)
+```
+
+With multiple listener replicas, multiply again by `listener.replicas`.
+
+**The inequality to keep true** (per node, using requests):
+
+```
+Σ(runner requests) + api + web + listener + (embedded Postgres/Redis if used) ≤ node allocatable
+```
+
+**Worked example.** A single 8-CPU / 16Gi node, one listener replica,
+`maxConcurrent: 3`, default workspace resources (1 CPU / 2Gi requests):
+
+- Runners: `3 × (1 CPU / 2Gi)` = **3 CPU / 6Gi** of requests.
+- Control plane (defaults): api `500m / 2Gi` + web + listener `100m / 256Mi` ≈ **~1 CPU / ~2.5Gi**.
+- Headroom for the kubelet + system pods: leave ~1 CPU / ~1Gi.
+
+That fits comfortably in 8 CPU / 16Gi. Bump `maxConcurrent` to 6 and the runner
+requests alone become **6 CPU / 12Gi** — now a fourth concurrent run, or one
+larger workspace, tips past allocatable and the extra Job goes **Pending**.
+
+**Failure mode (distinct from OOMKilled).** Over-committing *requests* means a
+Job can't be *scheduled* — it stays Pending with a `PodScheduled=False,
+reason=Unschedulable` condition. This is different from
+[OOMKilled](runners.md#memory-pressure--oom-visibility-430), which happens at
+*runtime* when a running Job exceeds its memory *limit*. Terrapod surfaces the
+unschedulable case explicitly: the reconciler fails the run after
+`runners.launchTimeoutSeconds` with a message naming the requested CPU/memory
+and the likely cause (insufficient capacity or an unsatisfiable
+nodeSelector/affinity/taint). Watch the per-pool backlog with the
+[`terrapod_pool_queued_runs`](monitoring.md) gauge — a sustained non-zero value
+on a fixed pool means demand exceeds `maxConcurrent`.
+
+**What to do on a fixed pool:** lower `listener.maxConcurrent`, lower the
+per-workspace `resource_cpu` / `resource_memory`, or add node capacity.
+
+**Safety cap (strongly recommended).** Put a **ResourceQuota** on the runner
+namespace (`listener.runnerNamespace`) so runaway concurrency can never
+over-subscribe the node, plus a **LimitRange** to default/limit per-Job
+requests. The quota is the hard backstop; `maxConcurrent` is the soft one. On a
+shared fixed pool, also enable the control-plane PriorityClasses
+(`priorityClasses.create=true`, see the
+[production checklist](production-checklist.md)) so that if the node *does* come
+under pressure, the kubelet reaps runner Jobs before the API/web/listener.
 
 ### Ingress
 

@@ -167,6 +167,12 @@ All runner Jobs inherit the following settings from `runners.*` in Helm values:
 
 Each workspace has `resource_cpu` and `resource_memory` settings (default: 1 CPU / 2Gi memory) that control the resource **requests** for its runner Jobs. Limits are computed as 2x the requests automatically. These are set via the workspace API or UI.
 
+### Concurrency (`listener.maxConcurrent`)
+
+Each listener pod runs at most `listener.maxConcurrent` runner Jobs at once (default **3**, set in Helm values). Admission is gated on the **real** running-Job count queried from Kubernetes — not an in-memory launch counter — so the listener never exceeds the cap even during a burst, and it drains a backlog as fast as slots free (rather than one run per poll). Watch the per-pool backlog with the [`terrapod_pool_queued_runs`](monitoring.md) gauge.
+
+`maxConcurrent` is the primary knob for **sizing a fixed-resource cluster**: on an autoscaling pool the scheduler just adds nodes, but on a fixed pool `maxConcurrent × per-workspace requests` must fit within node allocatable or the extra runner Jobs sit **Pending / unschedulable** (a schedule-time failure, distinct from the runtime OOMKilled case below). The reconciler fails an unplaceable run after `runners.launchTimeoutSeconds` with a message naming the requested CPU/memory. See [Deployment → Sizing runner concurrency on a fixed-resource cluster](deployment.md#sizing-runner-concurrency-on-a-fixed-resource-cluster) for the formula, a worked example, and the recommended ResourceQuota backstop.
+
 ### Memory Pressure & OOM Visibility (#430)
 
 Terraform/OpenTofu provider plugins can consume substantial memory — particularly the AWS provider when refreshing thousands of resources, or any provider that pulls a large module tarball into memory. If a runner Job hits its memory limit (`2 × resource_memory`), Kubernetes OOM-kills the container. Without explicit surfacing, the symptom is just a "Job failed" with no signal that memory was the cause — leaving an operator to guess + incrementally bump the limit. Terrapod surfaces it explicitly.

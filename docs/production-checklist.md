@@ -85,6 +85,7 @@ A step-by-step checklist for preparing a Terrapod instance for production use. E
 - [ ] **Agent pool is created** -- At least one agent pool exists for scheduling runs. See [Architecture: Agent Pools](architecture.md).
 - [ ] **Listener is deployed and connected** -- The listener registers via join token, maintains heartbeat, and appears as "online" in the admin UI.
 - [ ] **Runner resource limits are appropriate** -- Default: 1 CPU / 2Gi memory (requests), 2 CPU / 4Gi (limits). Adjust per-workspace via `resource_cpu` and `resource_memory` for workspaces managing large state files. See [Deployment: Runner Jobs](deployment.md#runner-jobs).
+- [ ] **Runner concurrency fits the cluster** -- `listener.maxConcurrent` (default 3) × per-workspace requests must fit node allocatable on a **fixed-size** pool, or extra runner Jobs sit Pending/unschedulable. Size it, and cap it with a `ResourceQuota` on the runner namespace. See [Deployment: Sizing runner concurrency on a fixed-resource cluster](deployment.md#sizing-runner-concurrency-on-a-fixed-resource-cluster).
 - [ ] **Cloud workload identity is configured** (if applicable) -- AWS IRSA, GCP WIF, or Azure WI annotations on the runner ServiceAccount. See [Cloud Credentials](cloud-credentials.md).
 - [ ] **Graceful termination period is sufficient** -- Default 120 seconds. Increase for workspaces with large provider downloads or slow applies. See [Deployment: Graceful Termination](deployment.md#runner-jobs).
 
