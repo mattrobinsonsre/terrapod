@@ -63,8 +63,8 @@ class TestBuildGraph:
         assert sub["module"] == "module.net"
         assert sub["type"] == "aws_subnet"
         assert sub["provider"] == "aws"
-        # root module label
-        assert nodes["aws_vpc.main"]["module"] == "(root)"
+        # root module is "" (impact-graph convention; the UI renders "(root)")
+        assert nodes["aws_vpc.main"]["module"] == ""
 
         # one depends-on edge (deduped across the two subnet instances)
         assert g["edges"] == [

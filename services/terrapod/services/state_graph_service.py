@@ -122,7 +122,10 @@ def build_graph_from_state(state: dict) -> dict:
                     "name": addr,
                     "type": rtype,
                     "mode": mode,
-                    "module": module or "(root)",
+                    # "" for root-module resources (matches the impact graph's
+                    # convention so the shared renderer's module-cluster force
+                    # skips the root module rather than boxing it).
+                    "module": module,
                     "provider": _provider_short(res.get("provider") or ""),
                     "indeg": 0,
                 }

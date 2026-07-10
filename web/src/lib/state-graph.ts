@@ -55,14 +55,14 @@ export function groupAxes(nodes: StateNode[]): { value: string; label: string }[
     { value: 'module', label: 'Module' },
     { value: 'provider', label: 'Provider' },
     { value: 'mode', label: 'Managed / data' },
-    { value: 'none', label: 'Nothing (single colour)' },
+    { value: 'none', label: 'Nothing (single color)' },
   ]
 }
 
 export function categoryOf(n: StateNode, groupBy: string): string {
   if (groupBy === 'none') return 'resource'
   if (groupBy === 'type') return n.type
-  if (groupBy === 'module') return n.module
+  if (groupBy === 'module') return n.module || '(root)'
   if (groupBy === 'provider') return n.provider || '(none)'
   if (groupBy === 'mode') return n.mode
   return 'resource'

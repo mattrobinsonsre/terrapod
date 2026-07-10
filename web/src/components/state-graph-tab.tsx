@@ -12,13 +12,7 @@ import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
 import { apiFetch } from '@/lib/api'
 import { useIsMobile } from '@/lib/use-media-query'
-import {
-  groupAxes,
-  categoryOf,
-  PALETTE,
-  type StateGraphData,
-  type StateNode,
-} from '@/lib/state-graph'
+import { groupAxes, type StateGraphData } from '@/lib/state-graph'
 
 const StateGraph3D = dynamic(
   () => import('@/components/state-graph-3d').then((m) => m.StateGraph3D),
@@ -47,7 +41,6 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [version, setVersion] = useState<string>('') // '' = current
   const [groupBy, setGroupBy] = useState('type')
-  const [selected, setSelected] = useState<StateNode | null>(null)
   const isMobile = useIsMobile()
   const [viewOverride, setViewOverride] = useState<View | null>(null)
   // Phones default to the table (WebGL is heavy + the graph is desktop-oriented);
@@ -73,11 +66,6 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
   }, [workspaceId, version])
 
   const axes = useMemo(() => (graph ? groupAxes(graph.nodes) : []), [graph])
-  const categories = useMemo(() => {
-    if (!graph) return []
-    return [...new Set(graph.nodes.map((n) => categoryOf(n, groupBy)))].sort()
-  }, [graph, groupBy])
-  const colorFor = (c: string) => PALETTE[categories.indexOf(c) % PALETTE.length]
 
   const sortedNodes = useMemo(
     () => (graph ? [...graph.nodes].sort((a, b) => b.indeg - a.indeg || a.id.localeCompare(b.id)) : []),
@@ -99,10 +87,7 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
           State version{' '}
           <select
             value={version}
-            onChange={(e) => {
-              setSelected(null)
-              setVersion(e.target.value)
-            }}
+            onChange={(e) => setVersion(e.target.value)}
             className="ml-1 text-sm bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-100"
           >
             {versions.map((v) => (
@@ -114,7 +99,7 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
           </select>
         </label>
         <label className="text-xs text-slate-400">
-          Group by{' '}
+          Color by{' '}
           <select
             value={groupBy}
             onChange={(e) => setGroupBy(e.target.value)}
@@ -143,42 +128,12 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
         </p>
       )}
 
-      {/* legend — shared by both views */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-4 text-[11px] text-slate-300">
-        {categories.slice(0, 20).map((c) => (
-          <span key={c} className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ background: colorFor(c) }} />
-            {c}
-          </span>
-        ))}
-        <span className="flex items-center gap-1.5 text-slate-400">
-          <span className="w-2.5 h-2.5 rounded-sm border border-slate-500" />
-          data source
-        </span>
-      </div>
-
       {view === 'graph' ? (
-        <div className="relative w-full h-[70vh] min-h-[420px] rounded-xl overflow-hidden border border-slate-800 bg-[#0a0e17]">
-          <StateGraph3D
-            graph={graph}
-            groupBy={groupBy}
-            selectedId={selected?.id ?? null}
-            onSelect={setSelected}
-          />
-          {selected && (
-            <div className="absolute z-10 bottom-3 left-3 max-w-[min(360px,80vw)] rounded-xl border border-slate-700/40 bg-slate-900/85 backdrop-blur px-4 py-3">
-              <div className="font-mono text-xs text-slate-100 break-all">{selected.name}</div>
-              <div className="text-[11px] text-slate-400 mt-1">
-                {selected.mode === 'data' ? 'data source' : 'managed'}
-                {selected.provider ? ` · ${selected.provider}` : ''} · {selected.module}
-              </div>
-              <div className="text-lg font-bold mt-1.5">
-                {selected.indeg}{' '}
-                <span className="text-xs font-medium text-slate-400">resources depend on this</span>
-              </div>
-            </div>
-          )}
-        </div>
+        <StateGraph3D
+          graph={graph}
+          groupBy={groupBy}
+          subtitle={`${graph.meta.state_version ? `v${graph.meta.state_version.serial}${graph.meta.state_version.is_current ? ' (current)' : ''} · ` : ''}${graph.meta.counts.resources} resources`}
+        />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-800">
           <table className="w-full text-sm">
@@ -199,7 +154,7 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
                   </th>
                   <td className="px-3 py-2 text-slate-300">{n.type}</td>
                   <td className="px-3 py-2 text-slate-400">{n.mode}</td>
-                  <td className="px-3 py-2 text-slate-400 text-xs">{n.module}</td>
+                  <td className="px-3 py-2 text-slate-400 text-xs">{n.module || '(root)'}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-slate-300">{n.indeg}</td>
                 </tr>
               ))}
