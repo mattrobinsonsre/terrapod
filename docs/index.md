@@ -2,7 +2,7 @@
 
 **Open-source platform replacement for Terraform Enterprise.**
 
-Terrapod provides the collaboration, governance, state management, and UI layer that wraps around `terraform` or `tofu` as pluggable execution backends. It targets API compatibility with the [HCP Terraform / TFE V2 API](https://developer.hashicorp.com/terraform/enterprise/api-docs) so that existing tooling -- the `terraform` CLI with `cloud` block, the [`go-tfe`](https://pkg.go.dev/github.com/hashicorp/go-tfe) client, CI/CD integrations -- can point at a Terrapod instance with minimal reconfiguration.
+Terrapod provides the collaboration, governance, state management, and UI layer that wraps around `terraform` or `tofu` as pluggable execution backends. It is compatible with the `terraform`/`tofu` **`cloud` backend**: it implements the subset of the [HCP Terraform / TFE V2 API](https://developer.hashicorp.com/terraform/enterprise/api-docs) those CLIs consume (over the [`go-tfe`](https://pkg.go.dev/github.com/hashicorp/go-tfe) protocol) as a stable contract at `/api/v2/`, so existing `cloud` blocks and CI/CD point at a Terrapod instance with minimal reconfiguration. Everything else -- workspace/registry/RBAC management, agent pools, and the rest -- is Terrapod's own API at `/api/terrapod/v1/`; Terrapod does not reimplement the full TFE V2 API, and is not a general drop-in for `go-tfe`-based automation or the `hashicorp/tfe` provider.
 
 Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
@@ -52,6 +52,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Workspace Autodiscovery** | Atlantis-style monorepo autodiscovery with rule templating; safe-by-default rename/delete/orphan lifecycle (opt-in destroy) |
 | **Bulk Workspace Operations** | Server-side workspace search + all-or-nothing bulk settings update (dry-run by default; never triggers runs) |
 | **Cross-Workspace Remote State** | `terraform_remote_state` composition with a producer-controlled consumer allowlist (secure by default; secret-bearing state stays with its owner) |
+| **Migrate in (TFE / HCP / Atlantis)** | [`terrapod-migrate`](migration.md) — a dry-run-first, reversible CLI that moves an existing Terraform Enterprise / HCP Terraform / Atlantis platform onto Terrapod: previews, creates the core (VCS connections, workspaces, variables, variable sets, state with serial + lineage preserved, run triggers, notifications, agent pools, registry signing keys), verifies parity, and rolls back cleanly. Registry versions are reported for re-publish; RBAC is suggested, never auto-applied |
 
 ---
 
