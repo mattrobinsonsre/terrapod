@@ -130,6 +130,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Remote State](remote-state.md) | Cross-workspace `terraform_remote_state` composition with producer-controlled allowlist |
 | [AI Plan Summary](ai-plan-summary.md) | LLM-generated change summary + risk assessment on every plan; failure analysis on errored plans. Bedrock, OpenAI, Anthropic, Gemini, vLLM — any provider via LiteLLM |
 | [Impact Graph](impact-graph.md) | Interactive dependency + blast-radius view of a plan on the run page, clustered by module; click a resource to light up its transitive downstream impact |
+| [Estate Topology](estate-topology.md) | Whole-estate dependency + module-impact graph — workspaces + modules wired by run-triggers, remote-state, and module links; group by any label / pool / name prefix; RBAC-filtered; accessible table fallback |
 | [Notifications](notifications.md) | Webhook, Slack, and email alerts on run events |
 | [Run Tasks](run-tasks.md) | Pre/post-plan webhook hooks for external validation |
 | [Execution Hooks](execution-hooks.md) | Custom shell steps in the runner Job at five lifecycle points |

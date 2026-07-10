@@ -802,6 +802,20 @@ Deriving the graph on the server (rather than shipping the raw, possibly multi-M
 
 **Required permission:** `read` on the workspace. Returns **404** when the run produced no JSON plan output.
 
+### Estate Graph
+
+```
+GET /api/terrapod/v1/estate-graph
+```
+
+Returns the **whole-estate topology graph** behind the [Estate topology](estate-topology.md) page: every workspace the caller can read (nodes of kind `workspace`, carrying their raw `labels`, `pool`, and in-degree) plus the registry `module` nodes they use, wired by three edge kinds — `remote-state` (consumer → producer), `run-trigger` (source → destination), and `uses-module` (module → workspace).
+
+The result is **RBAC-filtered**: only workspaces the caller can read appear, and an edge or module is included only when it touches a visible workspace — so the estate view never discloses a workspace (or a dependency on one) the caller couldn't otherwise see. The response is deliberately **label-agnostic** (each workspace ships its raw labels); the grouping axis is chosen client-side, because the platform enforces no labelling convention.
+
+**Response:** `{"data": {"type": "estate-graphs", "attributes": {"nodes": [...], "edges": [...], "meta": {"counts": {"workspaces": N, "modules": N, "edges": N}}}}}`
+
+**Required permission:** any authenticated user (content is filtered by per-workspace read access).
+
 ### Plan Summary
 
 ```
