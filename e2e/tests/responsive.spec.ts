@@ -319,20 +319,22 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
-  test('impact graph view fits the phone viewport (#761)', async ({ page }) => {
-    // The Impact graph is a new major component (#761); per #719 it must carry a
-    // mobile guard. The E2E stack has no runner, so a seeded run has no plan JSON
-    // — deep-linking ?view=impact mounts the component (its overlay panels are
-    // capped to the viewport), which 404s and shows the "not available" banner.
-    // We assert the mountable surface fits without horizontal page scroll.
+  test('impact graph is gated in the mobile view picker (#761)', async ({ page }) => {
+    // The Impact graph (#761) lives on the run-detail page; per #719 the gating
+    // must hold on mobile too. The E2E stack has no runner, so a seeded run has no
+    // plan JSON output — the WebGL graph is unreachable (verified on the live Tilt
+    // stack; its overlay panels are viewport-capped). Here we guard the mobile
+    // surface: the run page fits the phone viewport and the native view picker
+    // offers NO Impact option without plan JSON output.
     const token = getStoredToken();
-    const wsId = await createWorkspace(token, uniqueName('e2e-impact-mob'));
+    const wsName = uniqueName('e2e-impact-mob');
+    const wsId = await createWorkspace(token, wsName);
     const runId = await seedRun(token, wsId, true);
 
-    await page.goto(`/workspaces/${wsId}/runs/${runId}?view=impact`);
-    await expect(page.getByText(/Impact graph is not available/i)).toBeVisible({
-      timeout: 15_000,
-    });
+    await page.goto(`/workspaces/${wsId}/runs/${runId}?view=overview`);
+    const picker = page.locator('#run-view-select');
+    await expect(picker).toBeVisible({ timeout: 15_000 });
+    await expect(picker.locator('option[value="impact"]')).toHaveCount(0);
     await expectNoHorizontalPageScroll(page);
   });
 });
