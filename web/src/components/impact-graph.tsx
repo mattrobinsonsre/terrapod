@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import ForceGraph3D from 'react-force-graph-3d'
 import SpriteText from 'three-spritetext'
+import * as THREE from 'three'
 import { apiFetch } from '@/lib/api'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
@@ -18,10 +19,14 @@ interface GNode {
   provider: string
   action: Action
   key: string | null
-  // react-force-graph mutates x/y/z onto nodes after layout
+  module: string
+  // react-force-graph mutates x/y/z (+ velocities) onto nodes after layout
   x?: number
   y?: number
   z?: number
+  vx?: number
+  vy?: number
+  vz?: number
 }
 // After the force sim resolves, link endpoints are node objects; before, ids.
 interface GLink {
@@ -49,7 +54,8 @@ interface Vec3 {
 interface FgMethods {
   zoomToFit: (ms?: number, px?: number) => void
   cameraPosition: (pos?: Vec3, lookAt?: Vec3, ms?: number) => Vec3
-  d3Force: (name: string) => D3Force | undefined
+  d3Force: (name: string, force?: unknown) => D3Force | undefined
+  scene: () => THREE.Scene
 }
 type FgProps = {
   ref?: React.Ref<FgMethods>
@@ -89,13 +95,11 @@ const LABEL: Record<Action, string> = {
 const DIM_NODE = 'rgba(130,144,166,.55)'
 const ACT_ORDER: Record<Action, number> = { replace: 0, delete: 1, create: 2, update: 3, noop: 4 }
 
-function shortLabel(n: GNode): string {
-  // Short type word + resource name + for_each/count key, e.g.
-  // terraform_data.cdn[0] → "data.cdn[0]", tls_cert.svc["api"] → "cert.svc[api]".
-  // (Using the key alone drops the meaningful name for count-indexed resources.)
-  const t = n.type.split('_').slice(-1)[0] || n.type
-  const idx = n.key != null ? `[${n.key}]` : ''
-  return `${t}.${n.name}${idx}`
+function localAddr(id: string): string {
+  // The resource's full local address with the module path stripped —
+  // `module.vpc.aws_subnet.this[0]` → `aws_subnet.this[0]`. Module membership
+  // is conveyed by the cluster box + its label, so it's redundant on the node.
+  return id.replace(/^(module\.[^.]+\.)+/, '')
 }
 function endId(x: string | GNode): string {
   return typeof x === 'string' ? x : x.id
@@ -110,6 +114,7 @@ export function ImpactGraph({ runId }: { runId: string }) {
 
   const fgRef = useRef<FgMethods | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const clusterObjs = useRef<THREE.Object3D[]>([])
   const [size, setSize] = useState({ w: 800, h: 560 })
 
   useEffect(() => {
@@ -175,21 +180,28 @@ export function ImpactGraph({ runId }: { runId: string }) {
     setSel(null)
     setRadius(new Set())
   }
-  // Frame the whole graph, but never closer than a comfortable minimum —
-  // zoomToFit alone fills the viewport, which over-zooms tiny plans.
+  // Frame the whole graph from its own centroid — pull the camera back to a
+  // distance proportional to the node cloud's bounding-sphere radius, along the
+  // current view direction. Anchoring to the origin (as zoomToFit-plus-clamp
+  // did) over-zooms whenever the layout centroid drifts away from (0,0,0).
   function frame() {
     const fg = fgRef.current
-    if (!fg) return
-    fg.zoomToFit(400, 60)
-    window.setTimeout(() => {
-      const p = fg.cameraPosition()
-      const d = Math.hypot(p.x, p.y, p.z) || 1
-      const MIN = 180
-      if (d < MIN) {
-        const k = MIN / d
-        fg.cameraPosition({ x: p.x * k, y: p.y * k, z: p.z * k }, { x: 0, y: 0, z: 0 }, 300)
+    if (!fg || !graph) return
+    const box = new THREE.Box3()
+    for (const n of graph.nodes) {
+      if (n.x != null && n.y != null && n.z != null) {
+        box.expandByPoint(new THREE.Vector3(n.x, n.y, n.z))
       }
-    }, 450)
+    }
+    if (box.isEmpty()) return
+    const c = box.getCenter(new THREE.Vector3())
+    const radius = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 1)
+    const dist = Math.max(radius * 2.6, 220)
+    const cur = fg.cameraPosition()
+    const dir = new THREE.Vector3(cur.x - c.x, cur.y - c.y, cur.z - c.z)
+    if (dir.length() < 1) dir.set(0, 0, 1)
+    dir.normalize().multiplyScalar(dist)
+    fg.cameraPosition({ x: c.x + dir.x, y: c.y + dir.y, z: c.z + dir.z }, c, 400)
   }
   function resetView() {
     frame()
@@ -197,11 +209,84 @@ export function ImpactGraph({ runId }: { runId: string }) {
     if (ca) select(ca.id)
   }
 
+  // Draw a translucent wireframe box + label around each module's node cluster,
+  // so large multi-module plans read as grouped regions. Rebuilt every settle
+  // (node positions have moved); root-module resources (module === '') get no box.
+  function drawClusters() {
+    const fg = fgRef.current
+    if (!fg || !graph) return
+    const scene = fg.scene()
+    for (const o of clusterObjs.current) scene.remove(o)
+    clusterObjs.current = []
+
+    const byModule = new Map<string, GNode[]>()
+    for (const n of graph.nodes) {
+      if (!n.module || n.x == null) continue
+      ;(byModule.get(n.module) ?? byModule.set(n.module, []).get(n.module)!).push(n)
+    }
+    for (const [mod, ns] of byModule) {
+      if (ns.length < 2) continue
+      const box = new THREE.Box3()
+      for (const n of ns) box.expandByPoint(new THREE.Vector3(n.x!, n.y!, n.z!))
+      box.expandByScalar(9)
+      const helper = new THREE.Box3Helper(box, new THREE.Color('#64748b'))
+      const hm = helper.material as THREE.Material
+      hm.transparent = true
+      hm.opacity = 0.35
+      hm.depthWrite = false
+      scene.add(helper)
+      clusterObjs.current.push(helper)
+
+      const label = new SpriteText(`module.${mod}`)
+      label.color = '#94a3b8'
+      label.textHeight = 4
+      label.backgroundColor = 'rgba(10,14,23,.7)'
+      label.padding = 2
+      const lm = label as unknown as {
+        material: { depthTest: boolean; depthWrite: boolean }
+        position: { set: (x: number, y: number, z: number) => void }
+      }
+      lm.material.depthTest = false
+      lm.material.depthWrite = false
+      const c = box.getCenter(new THREE.Vector3())
+      label.position.set(c.x, box.max.y + 6, c.z)
+      scene.add(label)
+      clusterObjs.current.push(label)
+    }
+  }
+
   useEffect(() => {
     const fg = fgRef.current
     if (!fg || !graph) return
     fg.d3Force('charge')?.strength?.(-140)?.distanceMax?.(220)
     fg.d3Force('link')?.distance?.(26)
+
+    // Custom force: pull same-module nodes toward their module's centroid so
+    // modules settle into visually distinct clusters. Reads x/vx only (no octree
+    // dependency), so it's compatible with the bundled sim's force contract.
+    const nodes = graph.nodes
+    const cluster = (alpha: number) => {
+      const cx: Record<string, number> = {}
+      const cy: Record<string, number> = {}
+      const cz: Record<string, number> = {}
+      const cn: Record<string, number> = {}
+      for (const n of nodes) {
+        if (!n.module || n.x == null) continue
+        cx[n.module] = (cx[n.module] || 0) + n.x
+        cy[n.module] = (cy[n.module] || 0) + (n.y || 0)
+        cz[n.module] = (cz[n.module] || 0) + (n.z || 0)
+        cn[n.module] = (cn[n.module] || 0) + 1
+      }
+      const k = 0.14 * alpha
+      for (const n of nodes) {
+        if (!n.module || n.x == null || cn[n.module] < 2) continue
+        n.vx = (n.vx || 0) + (cx[n.module] / cn[n.module] - n.x) * k
+        n.vy = (n.vy || 0) + (cy[n.module] / cn[n.module] - (n.y || 0)) * k
+        n.vz = (n.vz || 0) + (cz[n.module] / cn[n.module] - (n.z || 0)) * k
+      }
+    }
+    ;(cluster as unknown as { initialize: (n: GNode[]) => void }).initialize = () => {}
+    fg.d3Force('cluster', cluster)
   }, [graph])
 
   if (error) return <ErrorBanner message={error} />
@@ -301,7 +386,10 @@ export function ImpactGraph({ runId }: { runId: string }) {
           backgroundColor="#0a0e17"
           graphData={data}
           cooldownTicks={160}
-          onEngineStop={frame}
+          onEngineStop={() => {
+            frame()
+            drawClusters()
+          }}
           nodeVal={(n) => (n.action === 'noop' ? 1.4 : 3)}
           nodeColor={(n) => {
             if (!sel) return COLOR[n.action]
@@ -311,7 +399,7 @@ export function ImpactGraph({ runId }: { runId: string }) {
           }}
           nodeThreeObjectExtend
           nodeThreeObject={(n) => {
-            const s = new SpriteText(shortLabel(n))
+            const s = new SpriteText(localAddr(n.id))
             s.color = !sel
               ? n.action === 'noop'
                 ? '#64748b'
