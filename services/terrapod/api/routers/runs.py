@@ -154,6 +154,9 @@ def _run_json(
                 "allow-empty-apply": run.allow_empty_apply,
                 "is-drift-detection": run.is_drift_detection,
                 "has-changes": run.has_changes,
+                # Whether a structured JSON plan exists — gates the Impact
+                # graph tab in the UI (#761).
+                "has-json-output": bool(run.has_json_output),
                 "plan-summary": _plan_summary_attr(run),
                 "workspace-name": workspace_name,
                 "workspace-has-vcs": workspace_has_vcs,

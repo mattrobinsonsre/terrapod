@@ -51,7 +51,7 @@ interface RunAttrs {
   'vcs-branch': string | null
   'vcs-pull-request-number': number | null
   'has-changes': boolean
-  'json-output'?: string
+  'has-json-output'?: boolean
   'plan-summary': {
     add: number
     change: number
@@ -917,7 +917,7 @@ function RunDetailPageInner() {
     ['overview', 'Overview', 'Overview'],
     ...((aiInfo?.present ? [['ai', 'AI', 'AI analysis']] : []) as [RunView, React.ReactNode, string][]),
     ...((policyInfo?.present ? [['opa', 'OPA', 'OPA policies']] : []) as [RunView, React.ReactNode, string][]),
-    ...((attrs['json-output']
+    ...((attrs['has-json-output']
       ? [['impact', 'Impact', 'Impact graph']]
       : []) as [RunView, React.ReactNode, string][]),
     ['plan', planLabel, 'Plan log'],
