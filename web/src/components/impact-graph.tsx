@@ -90,8 +90,12 @@ const DIM_NODE = 'rgba(130,144,166,.55)'
 const ACT_ORDER: Record<Action, number> = { replace: 0, delete: 1, create: 2, update: 3, noop: 4 }
 
 function shortLabel(n: GNode): string {
-  const t = n.type.split('_').slice(-2).join('_')
-  return n.key ? `${t}·${n.key}` : `${t}·${n.name}`
+  // Short type word + resource name + for_each/count key, e.g.
+  // terraform_data.cdn[0] → "data.cdn[0]", tls_cert.svc["api"] → "cert.svc[api]".
+  // (Using the key alone drops the meaningful name for count-indexed resources.)
+  const t = n.type.split('_').slice(-1)[0] || n.type
+  const idx = n.key != null ? `[${n.key}]` : ''
+  return `${t}.${n.name}${idx}`
 }
 function endId(x: string | GNode): string {
   return typeof x === 'string' ? x : x.id
