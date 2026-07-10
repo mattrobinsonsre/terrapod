@@ -1,11 +1,11 @@
 # Terrapod
 
 [![CI](https://github.com/mattrobinsonsre/terrapod/actions/workflows/ci.yml/badge.svg)](https://github.com/mattrobinsonsre/terrapod/actions/workflows/ci.yml)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](LICENSE)
 
 **A free, open-source, self-hosted platform replacement for Terraform Enterprise / HCP Terraform.**
 
-Get the collaboration, governance, state, registry, and UI layer of a commercial Terraform platform — self-hosted on your own Kubernetes, with no per-resource licensing and nothing proprietary in the stack. Terrapod gives you label-based RBAC and OPA/Rego policy-as-code (the open-source equivalent of TFE's Sentinel), versioned remote state, a private module + provider registry, and a modern web UI — all wrapped around `terraform` or `tofu`. It targets compatibility with the [TFE V2 API](https://developer.hashicorp.com/terraform/enterprise/api-docs), so existing `cloud` blocks, [`go-tfe`](https://pkg.go.dev/github.com/hashicorp/go-tfe) clients, and CI/CD point at a Terrapod instance with minimal reconfiguration — usually zero code changes. It's **GPLv3**, and self-hosted internal use triggers no source-disclosure obligation (GPLv3 is not AGPL).
+Get the collaboration, governance, state, registry, and UI layer of a commercial Terraform platform — self-hosted on your own Kubernetes, with no per-resource licensing and nothing proprietary in the stack. Terrapod gives you label-based RBAC and OPA/Rego policy-as-code (the open-source equivalent of TFE's Sentinel), versioned remote state, a private module + provider registry, and a modern web UI — all wrapped around `terraform` or `tofu`. It targets compatibility with the [TFE V2 API](https://developer.hashicorp.com/terraform/enterprise/api-docs), so existing `cloud` blocks, [`go-tfe`](https://pkg.go.dev/github.com/hashicorp/go-tfe) clients, and CI/CD point at a Terrapod instance with minimal reconfiguration — usually zero code changes. It's **MPL-2.0** (the same license as OpenTofu and the historical Terraform codebase), and self-hosted internal use triggers no source-disclosure obligation.
 
 Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
@@ -23,7 +23,7 @@ Terrapod targets API compatibility with the surface the `terraform`/`tofu` CLI a
 | | HCP Terraform / TFE | Terrapod |
 |---|---|---|
 | Hosting | Vendor SaaS, or a self-managed distribution | Self-hosted on your own Kubernetes |
-| Licensing & cost | Proprietary (BUSL), priced by managed resources | Free and open source (GPLv3) |
+| Licensing & cost | Proprietary (BUSL), priced by managed resources | Free and open source (MPL-2.0) |
 | Where state + secrets live | On the vendor / self-managed control plane | Never leave your boundary (your Postgres + object store) |
 | Cloud credentials | Vendor-stored or dynamic | K8s workload identity (IRSA / WIF / Azure WI) — nothing long-lived |
 | Policy engine | Sentinel (proprietary) | OPA / Rego (open) — advisory or mandatory |
@@ -497,13 +497,13 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 
 Net: Terrapod is not a "better general TFE replacement" — Terrakube is the more mature project and offers multi-org tenancy for those who want it (Terrapod is deliberately single-org, in line with [HashiCorp's current direction](https://developer.hashicorp.com/validated-patterns/terraform/migrate-terraform-orgs-projects)). Terrapod's defensible niche is **restricted-network, multi-cluster execution** (outbound-only runners, polling VCS, self-contained caching) with an AI-assisted review layer. Pick on that basis.
 
-Licensing: Terrapod is **GPLv3** (strong copyleft); Terrakube is **Apache-2.0** (permissive) — relevant if you intend to redistribute a modified platform.
+Licensing: Terrapod is **MPL-2.0** (file-level copyleft, the same license as OpenTofu and the historical Terraform codebase); Terrakube is **Apache-2.0** (permissive) — relevant if you intend to redistribute a modified platform.
 
 ---
 
 ## License
 
-[GPLv3](LICENSE) — strong copyleft keeps Terrapod and all derivative works open source. For most operators this is a non-issue: **running Terrapod internally, self-hosted, imposes no obligation to disclose your own code or configuration** — GPLv3's copyleft attaches to *distributing a modified Terrapod*, and GPLv3 is not AGPL (there is no network-use trigger).
+[MPL-2.0](LICENSE) — file-level copyleft keeps Terrapod's own source open while staying friendly to enterprise adoption (the same license as OpenTofu and the historical Terraform codebase). For most operators this is a non-issue: **running Terrapod internally, self-hosted, imposes no obligation to disclose your own code or configuration** — MPL-2.0's copyleft is file-level (it attaches to modifications of Terrapod's *own* files you distribute), and there is no network-use trigger.
 
 ---
 
