@@ -133,9 +133,6 @@ function WorkspaceGroupRows({
             {!isCollapsed && group.workspaces.map(item => {
               const ws = item.workspace as Workspace
               const { def, runId } = resolveStatus(ws)
-              const dir = ws.attributes['working-directory'] || ''
-              const lastSegment = dir ? dir.split('/').pop() || dir : ''
-              const displayName = lastSegment || item.name
               return (
                 <tr key={item.id} className="hover:bg-slate-700/20 transition-colors border-t border-slate-700/30">
                   <td className="px-4 py-3">
@@ -144,7 +141,7 @@ function WorkspaceGroupRows({
                         href={`/workspaces/${item.id}`}
                         className="text-sm font-medium text-brand-400 hover:text-brand-300"
                       >
-                        {displayName}
+                        {item.name}
                       </Link>
                       {ws.attributes.labels && Object.keys(ws.attributes.labels).length > 0 && (
                         <div className="flex flex-wrap gap-1">
@@ -253,7 +250,7 @@ function WorkspacesPageInner() {
     if (typeof window !== 'undefined') {
       return parseGroupParam(localStorage.getItem('terrapod:workspace-group'))
     }
-    return 'none'
+    return 'flat'
   })
 
   const setGroupMode = useCallback((mode: GroupMode) => {
@@ -1268,13 +1265,13 @@ function WorkspacesPageInner() {
                     onClick={() => setGroupMenuOpen(o => !o)}
                     className={
                       'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ' +
-                      (groupMode !== 'none'
+                      (groupMode !== 'flat'
                         ? 'bg-slate-700/60 text-slate-100 border-slate-600'
                         : 'bg-slate-800/50 text-slate-300 border-slate-700/50 hover:bg-slate-700/60')
                     }
                   >
                     <span>Group</span>
-                    {groupMode !== 'none' && (
+                    {groupMode !== 'flat' && (
                       <span className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
                         1
                       </span>
@@ -1288,20 +1285,29 @@ function WorkspacesPageInner() {
                       <button
                         type="button"
                         role="menuitemradio"
-                        aria-checked={groupMode === 'none'}
-                        onClick={() => { setGroupMode('none'); setGroupMenuOpen(false) }}
-                        className={'w-full flex items-center px-3 py-1.5 text-sm transition-colors ' + (groupMode === 'none' ? 'text-brand-400 bg-slate-700/30' : 'text-slate-300 hover:bg-slate-700/40')}
+                        aria-checked={groupMode === 'flat'}
+                        onClick={() => { setGroupMode('flat'); setGroupMenuOpen(false) }}
+                        className={'w-full flex items-center px-3 py-1.5 text-sm transition-colors ' + (groupMode === 'flat' ? 'text-brand-400 bg-slate-700/30' : 'text-slate-300 hover:bg-slate-700/40')}
                       >
-                        None (flat list)
+                        Flat
                       </button>
                       <button
                         type="button"
                         role="menuitemradio"
-                        aria-checked={groupMode === 'path'}
-                        onClick={() => { setGroupMode('path'); setGroupMenuOpen(false) }}
-                        className={'w-full flex items-center px-3 py-1.5 text-sm transition-colors ' + (groupMode === 'path' ? 'text-brand-400 bg-slate-700/30' : 'text-slate-300 hover:bg-slate-700/40')}
+                        aria-checked={groupMode === 'repo'}
+                        onClick={() => { setGroupMode('repo'); setGroupMenuOpen(false) }}
+                        className={'w-full flex items-center px-3 py-1.5 text-sm transition-colors ' + (groupMode === 'repo' ? 'text-brand-400 bg-slate-700/30' : 'text-slate-300 hover:bg-slate-700/40')}
                       >
-                        Path
+                        Repository
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={groupMode === 'repo-path'}
+                        onClick={() => { setGroupMode('repo-path'); setGroupMenuOpen(false) }}
+                        className={'w-full flex items-center px-3 py-1.5 text-sm transition-colors ' + (groupMode === 'repo-path' ? 'text-brand-400 bg-slate-700/30' : 'text-slate-300 hover:bg-slate-700/40')}
+                      >
+                        Repository + Path
                       </button>
                     </div>
                   )}
@@ -1346,7 +1352,7 @@ function WorkspacesPageInner() {
           <EmptyState message={t('empty.none')} />
         ) : filteredWorkspaces.length === 0 ? (
           <EmptyState message="No workspaces match this filter." />
-        ) : groupMode !== 'none' && workspaceTree.length > 0 ? (
+        ) : groupMode !== 'flat' && workspaceTree.length > 0 ? (
           <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-hidden">
             <div className="flex items-center justify-end px-4 py-2 border-b border-slate-700/50">
               <button

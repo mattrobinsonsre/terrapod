@@ -33,6 +33,42 @@ export function buildWorkspaceTree<T extends { id: string; attributes: { name: s
   return buildRepoPathTree(workspaces)
 }
 
+function buildRepoTree<T extends { id: string; attributes: { name: string; 'working-directory'?: string; 'vcs-repo-url'?: string } }>(
+  workspaces: T[],
+): WorkspaceGroup[] {
+  const vcsWorkspaces = workspaces.filter(ws => ws.attributes['vcs-repo-url'])
+  const localWorkspaces = workspaces.filter(ws => !ws.attributes['vcs-repo-url'])
+
+  const result: WorkspaceGroup[] = []
+
+  const byRepo = new Map<string, T[]>()
+  for (const ws of vcsWorkspaces) {
+    const repo = repoBasename(ws.attributes['vcs-repo-url']!)
+    if (!byRepo.has(repo)) byRepo.set(repo, [])
+    byRepo.get(repo)!.push(ws)
+  }
+
+  for (const [repo, repoWs] of Array.from(byRepo.entries()).sort(([a], [b]) => a.localeCompare(b))) {
+    const repoGroup: WorkspaceGroup = { key: repo, label: repo, workspaces: [], children: [] }
+    for (const ws of repoWs) {
+      repoGroup.workspaces.push({ id: ws.id, name: ws.attributes.name, workspace: ws })
+    }
+    repoGroup.workspaces.sort((a, b) => a.name.localeCompare(b.name))
+    result.push(repoGroup)
+  }
+
+  if (localWorkspaces.length > 0) {
+    const localGroup: WorkspaceGroup = { key: '__local__', label: 'Local', workspaces: [], children: [] }
+    for (const ws of localWorkspaces) {
+      localGroup.workspaces.push({ id: ws.id, name: ws.attributes.name, workspace: ws })
+    }
+    localGroup.workspaces.sort((a, b) => a.name.localeCompare(b.name))
+    result.push(localGroup)
+  }
+
+  return result
+}
+
 function repoBasename(url: string): string {
   if (!url) return ''
   const cleaned = url.replace(/\.git$/, '')
@@ -40,7 +76,7 @@ function repoBasename(url: string): string {
   return lastSep >= 0 ? cleaned.slice(lastSep + 1) : cleaned
 }
 
-function buildPathTree<T extends { id: string; attributes: { name: string; 'working-directory'?: string; 'vcs-repo-url'?: string } }>(
+function buildRepoPathTree<T extends { id: string; attributes: { name: string; 'working-directory'?: string; 'vcs-repo-url'?: string } }>(
   workspaces: T[],
 ): WorkspaceGroup[] {
   const vcsWorkspaces = workspaces.filter(ws => ws.attributes['vcs-repo-url'])
