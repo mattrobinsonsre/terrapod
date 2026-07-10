@@ -52,6 +52,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Workspace Autodiscovery** | Atlantis-style monorepo autodiscovery with rule templating; safe-by-default rename/delete/orphan lifecycle (opt-in destroy) |
 | **Bulk Workspace Operations** | Server-side workspace search + all-or-nothing bulk settings update (dry-run by default; never triggers runs) |
 | **Cross-Workspace Remote State** | `terraform_remote_state` composition with a producer-controlled consumer allowlist (secure by default; secret-bearing state stays with its owner) |
+| **Migrate in (TFE / HCP / Atlantis)** | [`terrapod-migrate`](migration.md) — a dry-run-first, reversible CLI that moves an existing Terraform Enterprise / HCP Terraform / Atlantis platform onto Terrapod: previews, creates the core (VCS connections, workspaces, variables, variable sets, state with serial + lineage preserved, run triggers, notifications, agent pools, registry signing keys), verifies parity, and rolls back cleanly. Registry versions are reported for re-publish; RBAC is suggested, never auto-applied |
 
 ---
 

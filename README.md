@@ -165,6 +165,12 @@ Everything below is implemented and shipped today.
 | State resource graph | Per-workspace resource dependency graph from Terraform state — resources wired by `depends-on`; current state version by default with an older-version picker; group by type / module / provider / mode; accessible table fallback |
 | Workspace health | Per-workspace health conditions, VCS polling status, drift detection indicators |
 
+### Migration & onboarding
+
+| Feature | Description |
+|---|---|
+| Migrate in from TFE / HCP / Atlantis | [`terrapod-migrate`](docs/migration.md) — a dry-run-first, reversible CLI that moves an existing Terraform Enterprise / HCP Terraform / Atlantis platform onto Terrapod: previews, then creates VCS connections, workspaces, variables, variable sets, state (serial + lineage preserved), run triggers, notifications, agent pools, and registry signing keys; verifies parity and rolls back cleanly. Registry module/provider *versions* are reported for re-publish (a source-API + signing-key limit), and RBAC is suggested, never auto-applied |
+
 ### AI (optional, off by default)
 
 | Feature | Description |
