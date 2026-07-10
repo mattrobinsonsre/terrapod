@@ -46,7 +46,8 @@ test.describe('Workspaces', () => {
     await expect(page.getByRole('button', { name: 'Overview' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Variables' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Runs' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'State' })).toBeVisible();
+    // `exact` so 'State' doesn't also match the 'State Graph' tab (#765).
+    await expect(page.getByRole('button', { name: 'State', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Notifications' })).toBeVisible();
   });
 
