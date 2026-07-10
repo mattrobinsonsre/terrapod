@@ -12,10 +12,14 @@ It is the **same interactive graph as the plan/impact graph** ([impact-graph.md]
 
 ## What it shows
 
-- **Nodes** — every resource in the state, one per resource address (a resource
-  with `count`/`for_each` collapses to a single node). Node size reflects
-  in-degree: the more resources depend on a node, the bigger it is, so
-  foundational resources (a VPC, a shared security group) stand out.
+- **Nodes** — every resource in the state, one node per resource *block*. Node
+  size reflects in-degree: the more resources depend on a node, the bigger it is,
+  so foundational resources (a VPC, a shared security group) stand out.
+- **Count / for_each "nucleus"** — a resource with `count`/`for_each` is one node
+  drawn as a **clump of small spheres, one pearl per instance** (the label shows
+  the exact count, e.g. `aws_subnet.this ×8`), so a resource with many instances
+  reads as a big cluster at a glance instead of a single sphere. (Modules are
+  *not* collapsed — three modules from a `for_each` stay three boxes.)
 - **Module clustering** — resources are grouped spatially by their module and
   drawn inside a translucent `module.<name>` box; root-module resources float
   free. So a multi-module state reads as distinct regions at a glance.

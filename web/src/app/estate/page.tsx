@@ -27,6 +27,20 @@ const EstateGraph3D = dynamic(
   { ssr: false, loading: () => <LoadingSpinner /> },
 )
 
+// Module-level (stable identity). Defining this INSIDE the page component makes
+// it a new component type on every render, which unmounts + REMOUNTS the whole
+// subtree — including the WebGL <EstateGraph3D> — on every state change. That
+// remount is what reset the graph to its default view whenever you selected a
+// node (#770).
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <NavBar />
+      <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto">{children}</main>
+    </>
+  )
+}
+
 export default function EstatePage() {
   const [graph, setGraph] = useState<EstateGraphData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -74,13 +88,6 @@ export default function EstatePage() {
     }
     return m
   }, [graph])
-
-  const Shell = ({ children }: { children: React.ReactNode }) => (
-    <>
-      <NavBar />
-      <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-7xl mx-auto">{children}</main>
-    </>
-  )
 
   if (error) return <Shell><ErrorBanner message={error} /></Shell>
   if (!graph) return <Shell><LoadingSpinner /></Shell>

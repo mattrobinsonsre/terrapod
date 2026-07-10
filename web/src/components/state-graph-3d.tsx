@@ -55,6 +55,10 @@ export function StateGraph3D({
         </>
       }
       colorOf={colorOf}
+      // A count/for_each resource becomes a nucleus of `instances` pearls. State
+      // has no per-instance action to encode, so every pearl takes the node's
+      // own (pivot) colour — a uniform clump that still reads as "N of these".
+      nucleonColorsOf={(n) => Array(Math.max(1, n.instances ?? 1)).fill(colorOf(n))}
       nodeSize={(n) => 2.5 + Math.min(n.indeg, 10) * 0.35}
       sortNodes={(a, b) => b.indeg - a.indeg || a.id.localeCompare(b.id)}
       renderDetail={(n, downstream) => (

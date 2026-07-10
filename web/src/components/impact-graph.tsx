@@ -16,8 +16,8 @@ interface GNode extends RGNode {
   type: string
   name: string
   provider: string
-  action: Action
-  key: string | null
+  action: Action // most-severe action across instances → node-level colour
+  instance_actions: Action[] // per-instance action → one nucleus pearl each
 }
 interface Graph {
   nodes: GNode[]
@@ -91,6 +91,10 @@ export function ImpactGraph({ runId }: { runId: string }) {
         </>
       }
       colorOf={(n) => COLOR[n.action]}
+      // A count/for_each resource becomes a nucleus: one pearl per instance,
+      // each coloured by its OWN planned action (a single count can be
+      // [0] destroy / [1] create / [2] update all at once).
+      nucleonColorsOf={(n) => n.instance_actions.map((a) => COLOR[a])}
       nodeSize={(n) => (n.action === 'noop' ? 1.4 : 3)}
       sortNodes={(a, b) => ACT_ORDER[a.action] - ACT_ORDER[b.action] || a.id.localeCompare(b.id)}
       renderDetail={(n, downstream) => (

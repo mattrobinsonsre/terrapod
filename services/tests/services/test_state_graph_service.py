@@ -63,6 +63,9 @@ class TestBuildGraph:
         assert sub["module"] == "module.net"
         assert sub["type"] == "aws_subnet"
         assert sub["provider"] == "aws"
+        # count/for_each instance count → drawn as a nucleus of N pearls (#770)
+        assert sub["instances"] == 2
+        assert nodes["aws_vpc.main"]["instances"] == 1
         # root module is "" (impact-graph convention; the UI renders "(root)")
         assert nodes["aws_vpc.main"]["module"] == ""
 

@@ -11,6 +11,7 @@ export type StateNode = {
   mode: string // 'managed' | 'data'
   module: string
   provider: string
+  instances: number // count/for_each instance count → drawn as a nucleus (#770)
   indeg: number
   // react-force-graph mutates positions/velocities onto nodes after layout
   x?: number

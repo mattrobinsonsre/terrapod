@@ -107,9 +107,15 @@ def build_graph_from_state(state: dict) -> dict:
         if not rtype or not name:
             continue
         addr = _resource_address(module, mode, rtype, name)
+        # instances count drives the nucleus (a count/for_each resource is ONE
+        # node drawn as a clump of `instances` pearls). A resource with no
+        # instances (count = 0) is still a single node.
+        n_instances = len(res.get("instances") or [])
         if addr in node_ids:
             # Same address seen twice (shouldn't happen in valid state) — merge.
-            pass
+            by_id_local = next((nd for nd in nodes if nd["id"] == addr), None)
+            if by_id_local is not None:
+                by_id_local["instances"] = by_id_local.get("instances", 1) + n_instances
         elif len(node_ids) >= MAX_NODES:
             truncated = True
             continue
@@ -127,6 +133,7 @@ def build_graph_from_state(state: dict) -> dict:
                     # skips the root module rather than boxing it).
                     "module": module,
                     "provider": _provider_short(res.get("provider") or ""),
+                    "instances": max(n_instances, 1),
                     "indeg": 0,
                 }
             )

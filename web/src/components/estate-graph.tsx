@@ -28,9 +28,23 @@ interface D3Force {
   distance?: (n: number) => D3Force
   distanceMax?: (n: number) => D3Force
 }
+interface Vec3 {
+  x: number
+  y: number
+  z: number
+}
 interface FgMethods {
   zoomToFit: (ms?: number, px?: number) => void
+  cameraPosition: (pos?: Vec3, lookAt?: Vec3, ms?: number) => Vec3
   d3Force: (name: string, force?: unknown) => D3Force | undefined
+  controls: () =>
+    | {
+        noRoll?: boolean
+        staticMoving?: boolean
+        target?: { set: (x: number, y: number, z: number) => void }
+        update?: () => void
+      }
+    | undefined
 }
 type FgProps = {
   ref?: React.Ref<FgMethods>
@@ -38,6 +52,7 @@ type FgProps = {
   height?: number
   backgroundColor?: string
   graphData: { nodes: EstateNode[]; links: EstateEdge[] }
+  showNavInfo?: boolean
   cooldownTicks?: number
   onEngineStop?: () => void
   nodeThreeObject?: (n: EstateNode) => object
@@ -63,6 +78,9 @@ export function EstateGraph3D({
 }) {
   const fgRef = useRef<FgMethods | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  // Once the user takes camera control (click-to-orbit, drag, zoom), stop
+  // auto-framing so a re-settle doesn't snap the view back.
+  const userMoved = useRef(false)
   const [size, setSize] = useState({ w: 800, h: 600 })
 
   const data = useMemo(
@@ -89,11 +107,26 @@ export function EstateGraph3D({
 
   useEffect(() => {
     if (!wrapRef.current) return
+    userMoved.current = false // a freshly-loaded graph auto-frames again
     const el = wrapRef.current
     const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }))
     ro.observe(el)
     setSize({ w: el.clientWidth, h: el.clientHeight })
-    return () => ro.disconnect()
+    // CAPTURE phase: react-force-graph's controls call stopPropagation on the
+    // canvas's pointerdown, so a bubble-phase listener never fires. Capture fires
+    // on the way DOWN (ancestor before target), guaranteeing userMoved is set
+    // BEFORE the click reheats the sim → the ensuing onEngineStop won't re-frame
+    // (the "click resets to default view" bug). Same for wheel-zoom.
+    const onDown = () => {
+      userMoved.current = true
+    }
+    el.addEventListener('pointerdown', onDown, { capture: true })
+    el.addEventListener('wheel', onDown, { capture: true, passive: true })
+    return () => {
+      ro.disconnect()
+      el.removeEventListener('pointerdown', onDown, { capture: true } as EventListenerOptions)
+      el.removeEventListener('wheel', onDown, { capture: true } as EventListenerOptions)
+    }
   }, [graph])
 
   const near = selectedId ? adj[selectedId] : null
@@ -134,13 +167,42 @@ export function EstateGraph3D({
     return grp
   }
 
+  // Frame with cameraPosition (NOT zoomToFit): the click-to-orbit recenter also
+  // uses cameraPosition, and react-force-graph keeps separate internal camera
+  // state for zoomToFit vs cameraPosition — mixing them makes the recenter fall
+  // back to the default view instead of centring on the clicked node. Keep the
+  // whole camera on one API. (Same framing the shared resource graph uses.)
   function frame() {
-    fgRef.current?.zoomToFit(600, 90)
+    const fg = fgRef.current
+    if (!fg) return
+    const box = new THREE.Box3()
+    for (const n of graph.nodes as EstateNode[]) {
+      if (n.x != null && n.y != null && n.z != null) {
+        box.expandByPoint(new THREE.Vector3(n.x, n.y, n.z))
+      }
+    }
+    if (box.isEmpty()) return
+    const c = box.getCenter(new THREE.Vector3())
+    const r = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 1)
+    const dist = Math.max(r * 1.9, 150)
+    const cur = fg.cameraPosition()
+    const dir = new THREE.Vector3(cur.x - c.x, cur.y - c.y, cur.z - c.z)
+    if (dir.length() < 1) dir.set(0, 0, 1)
+    dir.normalize().multiplyScalar(dist)
+    fg.cameraPosition({ x: c.x + dir.x, y: c.y + dir.y, z: c.z + dir.z }, c, 400)
   }
 
   useEffect(() => {
     const fg = fgRef.current
     if (!fg) return
+    // Tame the default TrackballControls into an orbit-like feel (upright, no
+    // inertial drift), keeping node-drag; clicking a node swings the pivot onto
+    // it (onNodeClick) so dragging the background orbits it.
+    const controls = fg.controls?.()
+    if (controls) {
+      controls.noRoll = true
+      controls.staticMoving = true
+    }
     fg.d3Force('charge')?.strength?.(-130)?.distanceMax?.(220)
     fg.d3Force('link')?.distance?.(52)
     const nodes = graph.nodes
@@ -170,16 +232,39 @@ export function EstateGraph3D({
         height={size.h}
         backgroundColor="#0a0e17"
         graphData={data}
+        showNavInfo={false}
         cooldownTicks={180}
-        onEngineStop={frame}
+        onEngineStop={() => {
+          if (!userMoved.current) frame() // don't stomp a camera the user moved
+        }}
         nodeThreeObject={nodeObj}
-        onNodeClick={(n) => onSelect(n.id === selectedId ? null : n)}
+        onNodeClick={(n) => {
+          onSelect(n.id === selectedId ? null : n)
+          // Make the clicked node the rotation pivot by setting the controls
+          // TARGET directly. NOT cameraPosition(): react-force-graph's
+          // cameraPosition() getter returns its own cached position which does
+          // NOT track TrackballControls rotation, so passing it back snaps the
+          // camera to the last API-set (default) view — the "click resets to
+          // default" bug. Setting controls.target re-aims onto the node without
+          // touching the camera position, so a subsequent background-drag orbits
+          // it. A click ≠ a drag, so node drag still works.
+          userMoved.current = true
+          const controls = fgRef.current?.controls?.()
+          if (controls?.target && n.x != null && n.y != null && n.z != null) {
+            controls.target.set(n.x, n.y, n.z)
+            controls.update?.()
+          }
+        }}
         linkColor={(l) => (linkLit(l) ? EDGE[l.kind] || '#94a3b8' : 'rgba(120,130,150,.1)')}
         linkWidth={(l) => (l.kind === 'uses-module' ? 0.5 : 1.2)}
         linkDirectionalArrowLength={3.2}
         linkDirectionalArrowRelPos={1}
         linkDirectionalArrowColor={(l) => EDGE[l.kind] || '#94a3b8'}
       />
+      <div className="absolute bottom-1.5 inset-x-0 text-center text-[10px] text-slate-500 pointer-events-none select-none">
+        Drag to rotate · scroll to zoom · right-drag to pan ·{' '}
+        <span className="text-slate-400">click a node to orbit around it</span>
+      </div>
     </div>
   )
 }

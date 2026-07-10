@@ -22,14 +22,15 @@ type StateGraph struct {
 
 // StateNode is a single resource in the state.
 type StateNode struct {
-	ID       string `json:"id"`       // resource address, e.g. "module.net.aws_subnet.a"
-	Kind     string `json:"kind"`     // always "resource"
-	Name     string `json:"name"`     // the resource address (label)
-	Type     string `json:"type"`     // e.g. "aws_subnet"
-	Mode     string `json:"mode"`     // "managed" | "data"
-	Module   string `json:"module"`   // "(root)" or "module.<name>..."
-	Provider string `json:"provider"` // short provider name, e.g. "aws"
-	InDeg    int    `json:"indeg"`    // how many resources depend on this one
+	ID        string `json:"id"`        // resource address, e.g. "module.net.aws_subnet.a"
+	Kind      string `json:"kind"`      // always "resource"
+	Name      string `json:"name"`      // the resource address (label)
+	Type      string `json:"type"`      // e.g. "aws_subnet"
+	Mode      string `json:"mode"`      // "managed" | "data"
+	Module    string `json:"module"`    // "(root)" or "module.<name>..."
+	Provider  string `json:"provider"`  // short provider name, e.g. "aws"
+	Instances int    `json:"instances"` // count/for_each instance count (drawn as a nucleus)
+	InDeg     int    `json:"indeg"`     // how many resources depend on this one
 }
 
 // StateEdge is a directed dependency (source depends on target).

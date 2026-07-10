@@ -28,6 +28,7 @@ import * as THREE from 'three'
 export interface RGNode {
   id: string
   module: string // '' for root-module resources
+  instances?: number // count/for_each instance count → drawn as a "nucleus" (#770)
   // react-force-graph mutates x/y/z (+ velocities) onto nodes after layout
   x?: number
   y?: number
@@ -57,6 +58,14 @@ interface FgMethods {
   cameraPosition: (pos?: Vec3, lookAt?: Vec3, ms?: number) => Vec3
   d3Force: (name: string, force?: unknown) => D3Force | undefined
   scene: () => THREE.Scene
+  controls: () =>
+    | {
+        noRoll?: boolean
+        staticMoving?: boolean
+        target?: { set: (x: number, y: number, z: number) => void }
+        update?: () => void
+      }
+    | undefined
 }
 type FgProps<T extends RGNode> = {
   ref?: React.Ref<FgMethods>
@@ -64,6 +73,7 @@ type FgProps<T extends RGNode> = {
   height?: number
   backgroundColor?: string
   graphData: { nodes: T[]; links: RGLink<T>[] }
+  controlType?: 'trackball' | 'orbit' | 'fly'
   cooldownTicks?: number
   onEngineStop?: () => void
   nodeVal?: (n: T) => number
@@ -76,6 +86,7 @@ type FgProps<T extends RGNode> = {
   linkDirectionalArrowLength?: number
   linkDirectionalArrowRelPos?: number
   linkDirectionalArrowColor?: (l: RGLink<T>) => string
+  showNavInfo?: boolean
 }
 const FG3D = ForceGraph3D as unknown as <T extends RGNode>(props: FgProps<T>) => ReactElement
 
@@ -89,6 +100,124 @@ export function localAddr(id: string): string {
 }
 function endId<T extends RGNode>(x: string | T): string {
   return typeof x === 'string' ? x : x.id
+}
+
+// A count/for_each resource is drawn as a "nucleus" — a clump of small spheres,
+// one pearl per instance (#770). NO cap on the instance count: every instance is
+// packed into a ball, but we only instantiate meshes for the outer ~2 pearl
+// layers and skip any pearl buried deeper than that — a buried pearl is fully
+// occluded, so drawing it is wasted. Mesh count then scales with the clump's
+// *surface* (~N^2/3), not its volume, so a count=500 resource stays cheap while
+// still reading as a big ball. Positions use a deterministic sunflower/fibonacci
+// ball packing (no Math.random) so the clump is stable across renders.
+const NUCLEUS_LAYERS = 2 // draw the outer N pearl-layers; cull anything deeper
+// Direction for pearl `i`, INDEPENDENT of its radius. The radius uses the
+// cbrt(i/n) ordering (so the ball fills at uniform density); if the direction
+// also keyed off `i` monotonically the fill would spiral north-pole-inner →
+// south-pole-outer and leave the outer shell's top empty (a hole at the pole).
+// The R2 low-discrepancy sequence (plastic-number constants) scrambles i into a
+// well-spread (latitude, longitude), so every radius band — including the outer
+// surviving shell — covers the whole sphere with no gap.
+const R2_A1 = 0.7548776662466927 // 1/plastic
+const R2_A2 = 0.5698402909980532 // 1/plastic²
+function ballDir(i: number): [number, number, number] {
+  const z = 1 - 2 * (((i + 0.5) * R2_A1) % 1) // equal-area latitude in (-1,1)
+  const theta = 2 * Math.PI * (((i + 0.5) * R2_A2) % 1)
+  const rho = Math.sqrt(Math.max(0, 1 - z * z))
+  return [rho * Math.cos(theta), z, rho * Math.sin(theta)]
+}
+// Clump radius for a nucleus of `n` pearls of radius `rp`. The 0.95 factor packs
+// the ball a touch tighter than kissing so surface pearls OVERLAP into a solid
+// skin (no gaps between them); grows as cbrt(n) so density stays uniform as the
+// ball fills. Shared by the builder and the label offset.
+function nucleusRadius(n: number, rp: number): number {
+  return rp * 0.95 * Math.cbrt(Math.max(1, n))
+}
+// How many of the `m` *visible* surface pearls each distinct colour gets. When
+// nothing is culled (m ≥ n) every instance keeps its own colour. When the
+// interior is culled, proportional colouring would make a minority action (a
+// handful of destroys among hundreds of creates) ~1% of the surface — easily
+// lost or occluded, which is exactly wrong for a blast-radius view where a
+// destroy must jump out. So every present colour gets a VISIBILITY FLOOR (a
+// small fraction of the surface, enough that several pearls face the camera from
+// any angle); the majority absorbs the difference. Returns [{color, count}],
+// counts summing to m. The exact instance count still rides on the node label
+// and the legend — the nucleus conveys "which actions, roughly how mixed", not a
+// faithful ratio.
+function apportionColors(colors: string[], m: number): Array<{ color: string; count: number }> {
+  const order: string[] = []
+  const count = new Map<string, number>()
+  for (const c of colors) {
+    if (!count.has(c)) order.push(c)
+    count.set(c, (count.get(c) ?? 0) + 1)
+  }
+  const n = colors.length
+  if (m >= n) return order.map((c) => ({ color: c, count: count.get(c) as number }))
+  const visFloor = Math.max(1, Math.ceil(m * 0.02)) // ≥2% of the surface per present action
+  const alloc = order.map((c) => Math.max(visFloor, Math.floor(((count.get(c) as number) / n) * m)))
+  let used = alloc.reduce((a, b) => a + b, 0)
+  // Reconcile to exactly m by adjusting the current largest bucket (the majority
+  // action), so the floored minorities keep their guaranteed presence.
+  while (used > m) {
+    let mi = 0
+    for (let i = 1; i < alloc.length; i++) if (alloc[i] > alloc[mi]) mi = i
+    if (alloc[mi] <= 1) break
+    alloc[mi]--
+    used--
+  }
+  while (used < m) {
+    let mi = 0
+    for (let i = 1; i < order.length; i++)
+      if ((count.get(order[i]) as number) > (count.get(order[mi]) as number)) mi = i
+    alloc[mi]++
+    used++
+  }
+  return order.map((c, i) => ({ color: c, count: alloc[i] }))
+}
+function buildNucleus(colors: string[], baseSize: number): THREE.Group {
+  const g = new THREE.Group()
+  const n = colors.length
+  const rp = Math.max(1.5, baseSize * 0.55) // pearl radius
+  const rBall = nucleusRadius(n, rp)
+  const cull = rBall - NUCLEUS_LAYERS * (2 * rp) // keep pearls within 2 diameters of the surface
+  const geo = new THREE.SphereGeometry(rp, 10, 10)
+  // Equal-volume shells: radius grows as cbrt(index/n), so the ball fills at
+  // uniform density. Keep only the outer layers (occlusion cull). Sort the kept
+  // pearls OUTERMOST-FIRST: only the outer ~1 layer is actually visible, so
+  // colours must be assigned outer-first or a minority action lands on the
+  // occluded inner edge of the shell and reads as absent (the "no red at all"
+  // bug). Colour ≠ radius: index order here is discarded, only the sort matters.
+  const drawn: number[] = []
+  for (let i = 0; i < n; i++) {
+    if (rBall * Math.cbrt((i + 0.5) / n) >= cull) drawn.push(i)
+  }
+  drawn.sort((a, b) => b - a) // larger index → larger radius → outermost first
+  const m = drawn.length || 1
+
+  // Build the surface-colour list: each colour's allocation placed at evenly
+  // spaced slots (minorities first so they get clean spacing), so no colour
+  // clumps and every action is spread around the visible surface — some pearls
+  // of each always face the camera. slot 0 is the outermost pearl.
+  const alloc = apportionColors(colors, m)
+  const surface: string[] = new Array(m)
+  for (const { color, count } of [...alloc].sort((x, y) => x.count - y.count)) {
+    for (let j = 0; j < count; j++) {
+      let pos = Math.round((j * m) / count) % m
+      let guard = 0
+      while (surface[pos] !== undefined && guard++ < m) pos = (pos + 1) % m
+      surface[pos] = color
+    }
+  }
+  const fallback = alloc[0]?.color ?? '#475569'
+
+  drawn.forEach((i, k) => {
+    const rad = rBall * Math.cbrt((i + 0.5) / n)
+    const [dx, dy, dz] = ballDir(i)
+    const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: surface[k] ?? fallback }))
+    mesh.position.set(dx * rad, dy * rad, dz * rad)
+    g.add(mesh)
+  })
+  return g
 }
 
 function ToolBtn({ onClick, active, children }: { onClick: () => void; active?: boolean; children: ReactNode }) {
@@ -115,6 +244,7 @@ export function ResourceGraph3D<T extends RGNode>({
   hint,
   colorOf,
   nodeSize,
+  nucleonColorsOf,
   sortNodes,
   renderDetail,
 }: {
@@ -126,6 +256,10 @@ export function ResourceGraph3D<T extends RGNode>({
   hint: ReactNode
   colorOf: (n: T) => string
   nodeSize: (n: T) => number
+  // For a count/for_each resource (instances > 1): the per-pearl colours of its
+  // nucleus. State passes the node colour × N (uniform); the impact graph passes
+  // one colour per instance action. Omit / return ≤1 colour → a single sphere.
+  nucleonColorsOf?: (n: T) => string[]
   sortNodes?: (a: T, b: T) => number
   // The consumer's selection-detail block: gets the node + its transitive
   // downstream (blast-radius) size.
@@ -144,6 +278,12 @@ export function ResourceGraph3D<T extends RGNode>({
   const fgRef = useRef<FgMethods | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const clusterObjs = useRef<THREE.Object3D[]>([])
+  // Once the user has moved the camera (clicked a resource to orbit it, dragged,
+  // zoomed…), the auto-framing on engine-settle must STOP — otherwise the next
+  // time the layout re-settles it yanks the camera back to the graph centroid,
+  // undoing the user's framing (the "click → centres → jumps back" bug). Reset
+  // when a new graph loads or on explicit Reset view.
+  const userMoved = useRef(false)
   const [size, setSize] = useState({ w: 800, h: 560 })
 
   useEffect(() => {
@@ -152,7 +292,18 @@ export function ResourceGraph3D<T extends RGNode>({
     const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }))
     ro.observe(el)
     setSize({ w: el.clientWidth, h: el.clientHeight })
-    return () => ro.disconnect()
+    // Any drag/zoom on the canvas also counts as taking camera control, so a
+    // later re-settle won't re-frame over it (Reset view re-enables auto-frame).
+    const onDown = () => {
+      userMoved.current = true
+    }
+    el.addEventListener('pointerdown', onDown)
+    el.addEventListener('wheel', onDown, { passive: true })
+    return () => {
+      ro.disconnect()
+      el.removeEventListener('pointerdown', onDown)
+      el.removeEventListener('wheel', onDown)
+    }
   }, [nodes])
 
   // reverse adjacency: dependents[X] = nodes that depend on X.
@@ -167,6 +318,11 @@ export function ResourceGraph3D<T extends RGNode>({
     const sorted = [...nodes].sort(sortNodes ?? ((a, b) => a.id.localeCompare(b.id)))
     return { data: { nodes, links: edges.map((e) => ({ ...e })) }, dependents, byId, sorted }
   }, [nodes, edges, sortNodes])
+
+  // A freshly-loaded graph should auto-frame again (until the user moves it).
+  useEffect(() => {
+    userMoved.current = false
+  }, [data])
 
   function blastFrom(id: string): Set<string> {
     const seen = new Set<string>()
@@ -214,6 +370,7 @@ export function ResourceGraph3D<T extends RGNode>({
     fg.cameraPosition({ x: c.x + dir.x, y: c.y + dir.y, z: c.z + dir.z }, c, 400)
   }
   function resetView() {
+    userMoved.current = false // re-enable auto-framing (incl. on the next re-settle)
     frame()
     clear()
   }
@@ -266,6 +423,17 @@ export function ResourceGraph3D<T extends RGNode>({
   useEffect(() => {
     const fg = fgRef.current
     if (!fg) return
+    // Keep the default TrackballControls (node-drag needs them — OrbitControls
+    // crashes on drag-end in 3d-force-graph), but tame them into an orbit-like
+    // feel: noRoll keeps the scene upright (no tumbling), staticMoving drops the
+    // inertial drift so rotation stops when you do. Rotation orbits the controls'
+    // target, and clicking a resource swings that target onto it (onNodeClick),
+    // so you get controlled "rotate around the selected resource" AND node drag.
+    const controls = fg.controls?.()
+    if (controls) {
+      controls.noRoll = true
+      controls.staticMoving = true
+    }
     fg.d3Force('charge')?.strength?.(-140)?.distanceMax?.(220)
     fg.d3Force('link')?.distance?.(26)
 
@@ -294,12 +462,39 @@ export function ResourceGraph3D<T extends RGNode>({
     }
     ;(cluster as unknown as { initialize: () => void }).initialize = () => {}
     fg.d3Force('cluster', cluster)
+
+    // Centering gravity: pull every node toward the origin, proportional to its
+    // distance. Without it a node (or whole component) with no links — a
+    // disconnected resource, or a count/for_each block nothing depends on — is
+    // pushed out by charge repulsion to the charge's distanceMax and never comes
+    // back, leaving a huge empty gap and wrecking the auto-framing. This bounds
+    // the layout so unlinked pieces settle near the rest instead of drifting off.
+    // Weaker than the module-cluster pull (0.14) so distinct modules still spread.
+    const gravity = (alpha: number) => {
+      const k = 0.045 * alpha
+      for (const n of nodes) {
+        if (n.x == null) continue
+        n.vx = (n.vx || 0) - n.x * k
+        n.vy = (n.vy || 0) - (n.y || 0) * k
+        n.vz = (n.vz || 0) - (n.z || 0) * k
+      }
+    }
+    ;(gravity as unknown as { initialize: () => void }).initialize = () => {}
+    fg.d3Force('gravity', gravity)
   }, [nodes])
 
   const linkHi = (l: RGLink<T>): boolean => {
     const s = endId(l.source)
     const t = endId(l.target)
     return (radius.has(s) || s === sel) && (radius.has(t) || t === sel)
+  }
+
+  // The per-pearl colours for a node's nucleus, or [] when it's an ordinary
+  // single-instance node (draw the default sphere instead of a clump).
+  const nucleons = (n: T): string[] => {
+    if ((n.instances ?? 1) <= 1) return []
+    const cols = nucleonColorsOf?.(n) ?? []
+    return cols.length > 1 ? cols : []
   }
 
   return (
@@ -387,12 +582,15 @@ export function ResourceGraph3D<T extends RGNode>({
           height={size.h}
           backgroundColor="#0a0e17"
           graphData={data}
+          showNavInfo={false}
           cooldownTicks={160}
           onEngineStop={() => {
-            frame()
+            // Only auto-frame while the user hasn't taken camera control — a
+            // re-settle must not stomp their framing.
+            if (!userMoved.current) frame()
             drawClusters()
           }}
-          nodeVal={(n) => nodeSize(n)}
+          nodeVal={(n) => (nucleons(n).length > 1 ? 0.2 : nodeSize(n))}
           nodeColor={(n) => {
             if (!sel) return colorOf(n)
             if (n.id === sel) return '#ffffff'
@@ -400,9 +598,19 @@ export function ResourceGraph3D<T extends RGNode>({
           }}
           nodeThreeObjectExtend
           nodeThreeObject={(n) => {
-            // `nodeThreeObjectExtend` keeps the default sphere; we only add the
-            // module-stripped label sprite above it.
-            const label = new SpriteText(localAddr(n.id))
+            const cols = nucleons(n)
+            const isNucleus = cols.length > 1
+            // A count/for_each resource is a "nucleus" clump; the default sphere
+            // is shrunk to nothing (nodeVal above) and replaced by the pearls.
+            // Otherwise `nodeThreeObjectExtend` keeps the default sphere and we
+            // only add the module-stripped label sprite above it.
+            const group = new THREE.Group()
+            let yOffset = 6
+            if (isNucleus) {
+              group.add(buildNucleus(cols, nodeSize(n)))
+              yOffset = Math.max(8, nucleusRadius(cols.length, Math.max(1.5, nodeSize(n) * 0.55)) + 3)
+            }
+            const label = new SpriteText(isNucleus ? `${localAddr(n.id)} ×${cols.length}` : localAddr(n.id))
             label.color = !sel ? '#e2e8f0' : n.id === sel ? '#fff' : radius.has(n.id) ? '#e2e8f0' : 'rgba(160,174,192,.7)'
             label.textHeight = 2.6
             label.backgroundColor = 'rgba(10,14,23,.66)'
@@ -412,16 +620,39 @@ export function ResourceGraph3D<T extends RGNode>({
               position: { set: (x: number, y: number, z: number) => void }
             }
             obj.material.depthTest = false
-            obj.position.set(0, 6, 0)
-            return label
+            obj.position.set(0, yOffset, 0)
+            group.add(label)
+            return group
           }}
-          onNodeClick={(n) => select(n.id)}
+          onNodeClick={(n) => {
+            select(n.id)
+            // Make the clicked resource the rotation pivot by setting the
+            // controls TARGET directly (camera stays put) so dragging the
+            // background orbits THIS node. NOT cameraPosition(): its getter
+            // returns a cached position that doesn't track TrackballControls
+            // rotation, so feeding it back snaps the camera to the default view.
+            // A click ≠ a drag, so grabbing a node to reposition it still works.
+            userMoved.current = true // stop auto-frame from stomping this
+            const controls = fgRef.current?.controls?.()
+            if (controls?.target && n.x != null && n.y != null && n.z != null) {
+              controls.target.set(n.x, n.y, n.z)
+              controls.update?.()
+            }
+          }}
           linkColor={(l) => (!sel ? 'rgba(148,163,184,.45)' : linkHi(l) ? 'rgba(226,232,240,.95)' : 'rgba(130,144,166,.4)')}
           linkWidth={(l) => (!sel ? 0.8 : linkHi(l) ? 1.8 : 0.4)}
           linkDirectionalArrowLength={3.2}
           linkDirectionalArrowRelPos={1}
           linkDirectionalArrowColor={(l) => (!sel ? 'rgba(148,163,184,.6)' : linkHi(l) ? 'rgba(226,232,240,.95)' : 'rgba(130,144,166,.4)')}
         />
+      </div>
+
+      {/* Our own nav hint (the built-in one is disabled): the click-a-resource-
+          to-orbit-around-it behaviour is non-obvious, so it has to be spelled
+          out here. */}
+      <div className="absolute bottom-1.5 inset-x-0 text-center text-[10px] text-slate-500 pointer-events-none select-none">
+        Drag to rotate · scroll to zoom · right-drag to pan ·{' '}
+        <span className="text-slate-400">click a resource to orbit around it</span>
       </div>
     </div>
   )

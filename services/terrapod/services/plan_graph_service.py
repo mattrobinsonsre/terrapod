@@ -45,18 +45,17 @@ _ACTION = {
     ("create", "delete"): "replace",
 }
 
+# Node-level colour when a block's instances have mixed actions: the most
+# severe wins (a block with any replace reads as replace, etc.). The nucleus
+# still shows every instance's true action per-pearl.
+_SEVERITY = {"replace": 0, "delete": 1, "create": 2, "update": 3, "noop": 4}
+
 _INDEX_RE = re.compile(r"\[[^\]]*\]$")
-_KEY_RE = re.compile(r'\["?([^"\]]+)"?\]$')
 
 
 def _block_of(addr: str) -> str:
     # strip a trailing for_each/count index: foo.bar["api"] -> foo.bar
     return _INDEX_RE.sub("", addr)
-
-
-def _key_of(addr: str) -> str | None:
-    m = _KEY_RE.search(addr)
-    return m.group(1) if m else None
 
 
 def _module_of(addr: str) -> str:
@@ -202,26 +201,42 @@ def derive_graph(plan_bytes: bytes) -> dict:
     plan = json.loads(plan_bytes)
     rcs = plan.get("resource_changes") or []
 
+    # ONE node per resource BLOCK (a count/for_each resource collapses to a
+    # single node, drawn as a "nucleus" of per-instance pearls — #770). Each
+    # node carries `instances` and the per-instance `instance_actions` so the
+    # renderer can colour each pearl by its own planned action (a single count
+    # can be [0] noop / [1] create / [2] destroy). The node-level `action` is the
+    # most-severe action, used for the collapsed dot / legend swatch.
     nodes: list[dict] = []
-    by_block: dict[str, list[dict]] = {}
+    node_by_block: dict[str, dict] = {}
     for rc in rcs:
         addr = rc.get("address")
         if not addr:
             continue
-        actions = tuple(rc.get("change", {}).get("actions", []))
-        node = {
-            "id": addr,
-            "type": rc.get("type", ""),
-            "name": rc.get("name", ""),
-            "provider": (rc.get("provider_name", "") or "").split("/")[-1],
-            "action": _ACTION.get(actions, "update"),
-            "key": _key_of(addr),
-            "module": _module_of(addr),
-        }
-        nodes.append(node)
-        by_block.setdefault(_block_of(addr), []).append(node)
+        block = _block_of(addr)
+        action = _ACTION.get(tuple(rc.get("change", {}).get("actions", [])), "update")
+        node = node_by_block.get(block)
+        if node is None:
+            node = {
+                "id": block,
+                "type": rc.get("type", ""),
+                "name": rc.get("name", ""),
+                "provider": (rc.get("provider_name", "") or "").split("/")[-1],
+                "module": _module_of(block),
+                "instance_actions": [],
+            }
+            node_by_block[block] = node
+            nodes.append(node)
+        node["instance_actions"].append(action)
+
+    for node in nodes:
+        acts = node["instance_actions"]
+        node["instances"] = len(acts)
+        # most-severe action drives the node-level colour (replace>delete>create>update>noop)
+        node["action"] = min(acts, key=lambda a: _SEVERITY.get(a, 9)) if acts else "noop"
 
     resource_types = {n["type"] for n in nodes}
+    node_ids = {n["id"] for n in nodes}
 
     # Block-level reference map from the configuration, walked across the whole
     # module tree (root + every module_call) with cross-module var/output binding.
@@ -247,24 +262,24 @@ def derive_graph(plan_bytes: bytes) -> dict:
             targets.discard(src_block)
             block_refs[src_block] = block_refs.get(src_block, set()) | targets
 
-    # Expand to instance-level edges (source depends-on target).
+    # Block-level edges (source block depends-on target block). Nodes are now
+    # per-block, so no instance expansion is needed.
     edges: list[dict] = []
     seen: set[tuple[str, str]] = set()
     for src_block, targets in block_refs.items():
-        for s in by_block.get(src_block, []):
-            for tb in targets:
-                cands = by_block.get(tb, [])
-                same_key = [t for t in cands if s["key"] and t["key"] == s["key"]]
-                for t in same_key or cands:
-                    e = (s["id"], t["id"])
-                    if e not in seen and s["id"] != t["id"]:
-                        seen.add(e)
-                        edges.append({"source": s["id"], "target": t["id"]})
+        if src_block not in node_ids:
+            continue
+        for tb in targets:
+            if tb in node_ids and tb != src_block and (src_block, tb) not in seen:
+                seen.add((src_block, tb))
+                edges.append({"source": src_block, "target": tb})
 
-    counts = {
-        a: sum(1 for n in nodes if n["action"] == a)
-        for a in ("create", "update", "replace", "delete", "noop")
-    }
+    # Legend counts stay per-INSTANCE (the plan really does create/destroy N
+    # things) even though nodes are per-block.
+    counts = dict.fromkeys(("create", "update", "replace", "delete", "noop"), 0)
+    for node in nodes:
+        for a in node["instance_actions"]:
+            counts[a] = counts.get(a, 0) + 1
     return {
         "nodes": nodes,
         "edges": edges,

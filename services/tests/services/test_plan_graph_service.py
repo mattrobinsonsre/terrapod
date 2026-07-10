@@ -63,7 +63,10 @@ _PLAN = {
 class TestDeriveGraph:
     def test_actions_and_counts(self):
         g = plan_graph_service.derive_graph(json.dumps(_PLAN).encode())
-        assert len(g["nodes"]) == 4
+        # ONE node per resource BLOCK (#770): the two for_each cert instances
+        # collapse to a single `tls_cert.svc` node drawn as a nucleus.
+        assert len(g["nodes"]) == 3
+        # legend counts stay PER-INSTANCE (the plan really creates/destroys N).
         assert g["meta"]["counts"] == {
             "create": 1,
             "update": 0,
@@ -74,18 +77,22 @@ class TestDeriveGraph:
         assert g["meta"]["terraform_version"] == "1.12.3"
         by_id = {n["id"]: n for n in g["nodes"]}
         assert by_id["tls_private_key.ca"]["action"] == "replace"
-        assert by_id['tls_cert.svc["api"]']["action"] == "create"
-        assert by_id['tls_cert.svc["web"]']["action"] == "delete"
-        assert by_id['tls_cert.svc["api"]']["key"] == "api"
+        assert by_id["tls_private_key.ca"]["instances"] == 1
+        # the count/for_each block: node-level action is the most severe of its
+        # instances (delete > create), and every instance's action is preserved.
+        cert = by_id["tls_cert.svc"]
+        assert cert["action"] == "delete"
+        assert cert["instances"] == 2
+        assert sorted(cert["instance_actions"]) == ["create", "delete"]
         assert by_id["random_pet.deploy"]["provider"] == "random"
+        assert by_id["random_pet.deploy"]["instance_actions"] == ["noop"]
 
-    def test_edges_expanded_across_for_each(self):
+    def test_block_level_edges(self):
         g = plan_graph_service.derive_graph(json.dumps(_PLAN).encode())
         edges = {(e["source"], e["target"]) for e in g["edges"]}
-        # both for_each instances of the cert depend on the singleton CA
-        assert ('tls_cert.svc["api"]', "tls_private_key.ca") in edges
-        assert ('tls_cert.svc["web"]', "tls_private_key.ca") in edges
-        assert len(edges) == 2  # the no-op resource is disconnected
+        # ONE block-level edge: the cert block depends on the singleton CA
+        # (no per-instance expansion).
+        assert edges == {("tls_cert.svc", "tls_private_key.ca")}
 
     def test_empty_plan_is_empty_graph(self):
         g = plan_graph_service.derive_graph(b'{"resource_changes": []}')
@@ -114,8 +121,8 @@ class TestGetImpactGraph:
         st.get = AsyncMock(return_value=json.dumps(_PLAN).encode())
         g = await plan_graph_service.get_impact_graph(run)
         assert g is not None
-        assert len(g["nodes"]) == 4
-        assert len(g["edges"]) == 2
+        assert len(g["nodes"]) == 3  # per-block (for_each cert collapses to one)
+        assert len(g["edges"]) == 1
 
 
 # A modular plan: root calls `net` + `app`; `app` nests `inner`. Exercises
@@ -205,36 +212,35 @@ class TestModularGraph:
         g = plan_graph_service.derive_graph(json.dumps(_MODULAR_PLAN).encode())
         mods = {n["id"]: n["module"] for n in g["nodes"]}
         assert mods["module.net.random_id.vpc"] == "net"
-        assert mods['module.app.null_resource.svc["api"]'] == "app"
+        # the for_each svc instances collapse to one per-block node (#770)
+        assert mods["module.app.null_resource.svc"] == "app"
         assert mods["module.app.module.inner.random_pet.name"] == "app.inner"
+        inst = {n["id"]: n["instances"] for n in g["nodes"]}
+        assert inst["module.app.null_resource.svc"] == 2  # api + web
 
     def test_cross_module_var_binding(self):
         # app.svc depends (via var.vpc_id -> module.net.vpc_id) on net.random_id.vpc,
-        # fanned out to every for_each instance from the singleton source.
+        # as a single block-level edge from the collapsed for_each block.
         g = plan_graph_service.derive_graph(json.dumps(_MODULAR_PLAN).encode())
         edges = {(e["source"], e["target"]) for e in g["edges"]}
-        assert ('module.app.null_resource.svc["api"]', "module.net.random_id.vpc") in edges
-        assert ('module.app.null_resource.svc["web"]', "module.net.random_id.vpc") in edges
+        assert ("module.app.null_resource.svc", "module.net.random_id.vpc") in edges
 
     def test_nested_module_var_binds_to_parent_resource(self):
         # inner.random_pet.name references var.seed, bound to the PARENT module's
-        # null_resource.svc — proving recursion + parent-scope var resolution.
+        # null_resource.svc block — proving recursion + parent-scope var resolution.
         g = plan_graph_service.derive_graph(json.dumps(_MODULAR_PLAN).encode())
         edges = {(e["source"], e["target"]) for e in g["edges"]}
         assert (
             "module.app.module.inner.random_pet.name",
-            'module.app.null_resource.svc["api"]',
-        ) in edges
-        assert (
-            "module.app.module.inner.random_pet.name",
-            'module.app.null_resource.svc["web"]',
+            "module.app.null_resource.svc",
         ) in edges
 
     def test_no_spurious_self_or_cross_edges(self):
         g = plan_graph_service.derive_graph(json.dumps(_MODULAR_PLAN).encode())
         assert all(e["source"] != e["target"] for e in g["edges"])
-        # exactly the four dependency edges above, nothing else
-        assert len(g["edges"]) == 4
+        # exactly the two block-level dependency edges above, nothing else
+        # (the for_each instances no longer expand into per-instance edges)
+        assert len(g["edges"]) == 2
 
 
 class TestModuleOf:

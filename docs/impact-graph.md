@@ -14,10 +14,16 @@ plan run through an agent-mode workspace).
 
 ## What it shows
 
-- **Nodes** are the resources in the plan, coloured by their planned action:
-  create, update, replace, delete, or no-op. Each node is labelled with its
-  resource address (the module prefix is stripped — module membership is shown
-  by the cluster instead).
+- **Nodes** are the resources in the plan, one per resource *block*, coloured by
+  their planned action: create, update, replace, delete, or no-op. Each node is
+  labelled with its resource address (the module prefix is stripped — module
+  membership is shown by the cluster instead).
+- **Count / for_each "nucleus"** — a resource with `count`/`for_each` is one node
+  drawn as a **clump of small spheres, one pearl per instance**, and each pearl is
+  coloured by *its own* action. So a single `count` being partly created and
+  partly destroyed reads as a mixed-colour cluster, and a destroy among hundreds
+  of creates is guaranteed to stay visible on the clump's surface. The node label
+  shows the exact instance count.
 - **Edges** are dependencies: an arrow points from a resource to what it depends
   on. Selecting a node highlights its whole downstream cone (its blast radius)
   and reports the count of affected resources.
@@ -26,6 +32,13 @@ plan run through an agent-mode workspace).
   distinct regions rather than one hairball.
 - A filterable resource list on the right jumps the camera to any resource; the
   legend counts changes by action.
+
+## Navigating the 3D view
+
+Drag to rotate · scroll to zoom · right-drag to pan. **Click a resource to make
+it the rotation pivot** — the view then orbits around that resource. (This same
+renderer, controls, and interaction back the [state resource graph](state-resource-graph.md)
+and the [estate topology](../docs/index.md) view.)
 
 ## How the graph is derived
 
