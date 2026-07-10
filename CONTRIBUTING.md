@@ -129,4 +129,4 @@ best way to join the team is to start contributing — we'd love the help.
 ## License
 
 By contributing, you agree that your contributions are licensed under the
-project's [GPLv3](LICENSE) license.
+project's [MPL-2.0](LICENSE) license.

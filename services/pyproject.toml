@@ -3,7 +3,7 @@ name = "terrapod"
 version = "0.1.0"
 description = "Terrapod - Open-source Terraform Enterprise replacement - API Server"
 authors = ["Matt Robinson"]
-license = "GPL-3.0-or-later"
+license = "MPL-2.0"
 packages = [{include = "terrapod"}]
 
 [tool.poetry.dependencies]
