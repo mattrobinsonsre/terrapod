@@ -56,7 +56,12 @@ export function buildWorkspaceTree<T extends WsConstraint>(
 }
 
 function normalizeRepoUrl(url: string): string {
-  return url.replace(/\.git$/, '').toLowerCase()
+  let cleaned = url.replace(/\.git$/, '').toLowerCase()
+  // Normalize SSH (git@host:org/repo) to match HTTPS (https://host/org/repo)
+  const sshMatch = cleaned.match(/^[^@]+@([^:]+):(.+)$/)
+  if (sshMatch) cleaned = `${sshMatch[1]}/${sshMatch[2]}`
+  else cleaned = cleaned.replace(/^https?:\/\//, '')
+  return cleaned
 }
 
 function repoBasename(url: string): string {

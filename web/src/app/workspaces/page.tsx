@@ -152,6 +152,7 @@ function WorkspaceGroupRows({
                                 key={`${k}=${v}`}
                                 type="button"
                                 onClick={() => setFilterInput(serializeFilter(toggleLabelTerm(filter, k, v)))}
+                                title={active ? 'Click to remove from filter' : 'Click to filter by this label'}
                                 className={
                                   'inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-mono transition-colors ' +
                                   (active
@@ -166,7 +167,7 @@ function WorkspaceGroupRows({
                           })}
                         </div>
                       )}
-                      <div className="lg:hidden">
+                      <div className="lg:hidden" data-testid="ws-row-status-mobile">
                         <WorkspaceStatusBadges
                           workspaceId={ws.id}
                           def={def}
@@ -443,24 +444,6 @@ function WorkspacesPageInner() {
     })
   }, [workspaces, parsedFilter])
 
-  const workspaceTree = useMemo(
-    () => buildWorkspaceTree(filteredWorkspaces, groupMode),
-    [filteredWorkspaces, groupMode]
-  )
-
-  // All group paths — used for collapse/expand all toggle.
-  const allGroupPaths = useMemo(() => {
-    const paths = new Set<string>()
-    const collect = (groups: WorkspaceGroup[], prefix: string) => {
-      for (const g of groups) {
-        const p = prefix ? `${prefix}/${g.key}` : g.key
-        paths.add(p)
-        collect(g.children, p)
-      }
-    }
-    collect(workspaceTree, '')
-    return paths
-  }, [workspaceTree])
 
   // Create form
   const [showCreate, setShowCreate] = useState(false)
@@ -665,6 +648,24 @@ function WorkspacesPageInner() {
       }
     }, []),
   )
+
+  const workspaceTree = useMemo(
+    () => buildWorkspaceTree(sortedWorkspaces, groupMode),
+    [sortedWorkspaces, groupMode]
+  )
+
+  const allGroupPaths = useMemo(() => {
+    const paths = new Set<string>()
+    const collect = (groups: WorkspaceGroup[], prefix: string) => {
+      for (const g of groups) {
+        const p = prefix ? `${prefix}/${g.key}` : g.key
+        paths.add(p)
+        collect(g.children, p)
+      }
+    }
+    collect(workspaceTree, '')
+    return paths
+  }, [workspaceTree])
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
@@ -1372,12 +1373,12 @@ function WorkspacesPageInner() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
-                  <th className="text-left px-4 py-3 text-slate-400 font-medium text-sm">Name</th>
-                  <th className="text-left px-4 py-3 text-slate-400 font-medium text-sm hidden sm:table-cell">Mode</th>
-                  <th className="text-left px-4 py-3 text-slate-400 font-medium text-sm hidden md:table-cell">Pool</th>
-                  <th className="text-left px-4 py-3 text-slate-400 font-medium text-sm hidden lg:table-cell">Resources</th>
-                  <th className="text-left px-4 py-3 text-slate-400 font-medium text-sm hidden lg:table-cell">Status</th>
-                  <th className="text-left px-4 py-3 text-slate-400 font-medium text-sm hidden xl:table-cell">Created</th>
+                  <SortableHeader label="Name" sortKey="name" sortState={sortState} onSort={toggleSort} />
+                  <SortableHeader label="Mode" sortKey="mode" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
+                  <SortableHeader label="Pool" sortKey="pool" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortableHeader label="Resources" sortKey="resources" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
+                  <SortableHeader label="Status" sortKey="status" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
+                  <SortableHeader label="Created" sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden xl:table-cell" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/30">

@@ -128,8 +128,8 @@ describe('buildWorkspaceTree', () => {
     ]
     const result = buildWorkspaceTree(workspaces, 'repo')
     assert.equal(result.length, 2)
-    assert.equal(result[0].workspaces[0].name, 'org-a-infra')
-    assert.equal(result[1].workspaces[0].name, 'org-b-infra')
+    const names = result.map(g => g.workspaces[0].name).sort()
+    assert.deepEqual(names, ['org-a-infra', 'org-b-infra'])
   })
 
   it('sorts groups and workspaces alphabetically', () => {
