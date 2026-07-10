@@ -302,6 +302,17 @@ staged plan live in issue **#719**; the rules a contributor must follow:
   API pod `/tmp` is RAM-backed. Anything that can hold tens of MB (provider
   archives, VCS tarballs, state snapshots, config tarballs) must be written to
   the configured ephemeral PVC dir, not `/tmp`, or it will OOM the pod.
+- **The API route contract (heading to v1.0.0)** — every HTTP route is pinned
+  in a committed snapshot (`services/tests/api/api_route_contract.json`), and
+  `tests/api/test_route_contract.py` fails CI on any diff. Removing or renaming
+  a route is a **breaking change** for a consumer that lags the server across
+  version skew (the `terraform`/`tofu` `cloud` backend + `go-tfe` on `/api/v2/`,
+  or a runner/listener on `/api/terrapod/v1/`) — it requires a MAJOR bump or a
+  documented deprecation, **not** a snapshot regen. **Adding** a route is
+  additive: accept it by regenerating the snapshot in the same PR —
+  `UPDATE_API_CONTRACT=1 pytest tests/api/test_route_contract.py` — a conscious,
+  reviewed act so new surface never slips in silently. (More of the "no breaking
+  changes" program lands under #550.)
 - **The config-channel contract (hard requirement)** — a three-way contract
   binding the **config code**, the **Helm chart**, and the **chart tests**:
   the in-code config models (the API's Pydantic `Settings`, the listener's
