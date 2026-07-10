@@ -108,16 +108,16 @@ function WorkspaceGroupRows({
 
         return (
           <Fragment key={fullPath}>
-            <tr
-              tabIndex={0}
-              role="button"
-              aria-expanded={!isCollapsed}
-              className="hover:bg-slate-700/20 cursor-pointer transition-colors"
-              onClick={() => toggleGroup(fullPath)}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(fullPath) } }}
-            >
+            <tr className="hover:bg-slate-700/20 transition-colors">
               <td className="px-4 py-2" colSpan={6}>
-                <div className="flex items-center gap-2" style={{ paddingLeft: `${depth * 16}px` }}>
+                <button
+                  type="button"
+                  aria-expanded={!isCollapsed}
+                  onClick={() => toggleGroup(fullPath)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGroup(fullPath) } }}
+                  className="flex items-center gap-2 w-full"
+                  style={{ paddingLeft: `${depth * 16}px` }}
+                >
                   <svg
                     className={`w-3 h-3 text-slate-500 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
                     fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -126,7 +126,7 @@ function WorkspaceGroupRows({
                   </svg>
                   <span className="text-sm text-slate-400">{group.label}/</span>
                   <span className="text-xs text-slate-600 bg-slate-800 px-1.5 py-0.5 rounded-full">{count}</span>
-                </div>
+                </button>
               </td>
             </tr>
 
@@ -166,6 +166,14 @@ function WorkspaceGroupRows({
                           })}
                         </div>
                       )}
+                      <div className="lg:hidden">
+                        <WorkspaceStatusBadges
+                          workspaceId={ws.id}
+                          def={def}
+                          runId={runId}
+                          lifecycleState={ws.attributes['lifecycle-state']}
+                        />
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
@@ -253,42 +261,6 @@ function WorkspacesPageInner() {
     return 'flat'
   })
 
-  const setGroupMode = useCallback((mode: GroupMode) => {
-    setGroupModeState(mode)
-    const serialized = serializeGroupParam(mode)
-    if (typeof window !== 'undefined') {
-      if (serialized) localStorage.setItem('terrapod:workspace-group', serialized)
-      else localStorage.removeItem('terrapod:workspace-group')
-    }
-    const q = serializeFilter(parsedFilter)
-    const params = new URLSearchParams()
-    if (q) params.set('q', q)
-    if (serialized) params.set('group', serialized)
-    const qs = params.toString()
-    router.replace(qs ? `/workspaces?${qs}` : '/workspaces', { scroll: false })
-  }, [parsedFilter, router])
-
-  // Group by dropdown — same outside-click + Escape pattern as Status/Label.
-  const [groupMenuOpen, setGroupMenuOpen] = useState(false)
-  const groupMenuRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!groupMenuOpen) return
-    const onClick = (e: MouseEvent) => {
-      if (groupMenuRef.current && !groupMenuRef.current.contains(e.target as Node)) {
-        setGroupMenuOpen(false)
-      }
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setGroupMenuOpen(false)
-    }
-    document.addEventListener('mousedown', onClick)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onClick)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [groupMenuOpen])
-
   // Collapsed groups state — persisted in localStorage.
   const [collapsedGroups, setCollapsedGroupsRaw] = useState<Set<string>>(() => {
     if (typeof window !== 'undefined') {
@@ -317,6 +289,43 @@ function WorkspacesPageInner() {
       return next
     })
   }, [setCollapsedGroups])
+
+  const setGroupMode = useCallback((mode: GroupMode) => {
+    setGroupModeState(mode)
+    setCollapsedGroups(new Set())
+    const serialized = serializeGroupParam(mode)
+    if (typeof window !== 'undefined') {
+      if (serialized) localStorage.setItem('terrapod:workspace-group', serialized)
+      else localStorage.removeItem('terrapod:workspace-group')
+    }
+    const q = serializeFilter(parsedFilter)
+    const params = new URLSearchParams()
+    if (q) params.set('q', q)
+    if (serialized) params.set('group', serialized)
+    const qs = params.toString()
+    router.replace(qs ? `/workspaces?${qs}` : '/workspaces', { scroll: false })
+  }, [parsedFilter, router, setCollapsedGroups])
+
+  // Group by dropdown — same outside-click + Escape pattern as Status/Label.
+  const [groupMenuOpen, setGroupMenuOpen] = useState(false)
+  const groupMenuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!groupMenuOpen) return
+    const onClick = (e: MouseEvent) => {
+      if (groupMenuRef.current && !groupMenuRef.current.contains(e.target as Node)) {
+        setGroupMenuOpen(false)
+      }
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setGroupMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [groupMenuOpen])
 
   // Status dropdown state. Closes on outside-click and Escape — same pattern
   // used for the run-actions menu so the page feels consistent.
@@ -1282,33 +1291,24 @@ function WorkspacesPageInner() {
                   </button>
                   {groupMenuOpen && (
                     <div role="menu" className="absolute right-0 z-10 mt-1 w-52 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-96 overflow-y-auto">
-                      <button
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={groupMode === 'flat'}
-                        onClick={() => { setGroupMode('flat'); setGroupMenuOpen(false) }}
-                        className={'w-full flex items-center px-3 py-1.5 text-sm transition-colors ' + (groupMode === 'flat' ? 'text-brand-400 bg-slate-700/30' : 'text-slate-300 hover:bg-slate-700/40')}
-                      >
-                        Flat
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={groupMode === 'repo'}
-                        onClick={() => { setGroupMode('repo'); setGroupMenuOpen(false) }}
-                        className={'w-full flex items-center px-3 py-1.5 text-sm transition-colors ' + (groupMode === 'repo' ? 'text-brand-400 bg-slate-700/30' : 'text-slate-300 hover:bg-slate-700/40')}
-                      >
-                        Repository
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={groupMode === 'repo-path'}
-                        onClick={() => { setGroupMode('repo-path'); setGroupMenuOpen(false) }}
-                        className={'w-full flex items-center px-3 py-1.5 text-sm transition-colors ' + (groupMode === 'repo-path' ? 'text-brand-400 bg-slate-700/30' : 'text-slate-300 hover:bg-slate-700/40')}
-                      >
-                        Repository + Path
-                      </button>
+                      {([['flat', 'Flat'], ['repo', 'Repository'], ['repo-path', 'Repository + Path']] as const).map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={groupMode === value}
+                          onClick={() => { setGroupMode(value); setGroupMenuOpen(false) }}
+                          className={
+                            'w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors ' +
+                            (groupMode === value ? 'bg-slate-700/60 text-slate-100' : 'text-slate-300 hover:bg-slate-700/40')
+                          }
+                        >
+                          <span className="w-3 inline-flex justify-center text-brand-400">
+                            {groupMode === value ? '✓' : ''}
+                          </span>
+                          <span className="flex-1 text-left">{label}</span>
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>

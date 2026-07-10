@@ -121,6 +121,17 @@ describe('buildWorkspaceTree', () => {
     assert.equal(result[0].label, 'my-repo')
   })
 
+  it('does not merge repos with the same basename from different orgs', () => {
+    const workspaces = [
+      ws('1', 'org-a-infra', 'https://github.com/org-a/infra.git'),
+      ws('2', 'org-b-infra', 'https://github.com/org-b/infra.git'),
+    ]
+    const result = buildWorkspaceTree(workspaces, 'repo')
+    assert.equal(result.length, 2)
+    assert.equal(result[0].workspaces[0].name, 'org-a-infra')
+    assert.equal(result[1].workspaces[0].name, 'org-b-infra')
+  })
+
   it('sorts groups and workspaces alphabetically', () => {
     const workspaces = [
       ws('1', 'zulu', 'https://github.com/org/bravo.git'),

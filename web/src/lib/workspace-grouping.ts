@@ -1,14 +1,14 @@
-export interface WorkspaceGroup {
+export interface WorkspaceGroup<T = unknown> {
   key: string
   label: string
-  workspaces: WorkspaceItem[]
-  children: WorkspaceGroup[]
+  workspaces: WorkspaceItem<T>[]
+  children: WorkspaceGroup<T>[]
 }
 
-export interface WorkspaceItem {
+export interface WorkspaceItem<T = unknown> {
   id: string
   name: string
-  workspace: unknown
+  workspace: T
 }
 
 export type GroupMode = 'flat' | 'repo' | 'repo-path'
@@ -24,49 +24,39 @@ export function serializeGroupParam(mode: GroupMode): string | null {
   return mode
 }
 
-export function buildWorkspaceTree<T extends { id: string; attributes: { name: string; 'working-directory'?: string; 'vcs-repo-url'?: string } }>(
+type WsConstraint = { id: string; attributes: { name: string; 'working-directory'?: string; 'vcs-repo-url'?: string } }
+
+export function buildWorkspaceTree<T extends WsConstraint>(
   workspaces: T[],
   mode: GroupMode,
-): WorkspaceGroup[] {
+): WorkspaceGroup<T>[] {
   if (mode === 'flat') return []
-  if (mode === 'repo') return buildRepoTree(workspaces)
-  return buildRepoPathTree(workspaces)
-}
+  const { repoGroups, localWorkspaces } = partitionByRepo(workspaces)
+  const result: WorkspaceGroup<T>[] = []
 
-function buildRepoTree<T extends { id: string; attributes: { name: string; 'working-directory'?: string; 'vcs-repo-url'?: string } }>(
-  workspaces: T[],
-): WorkspaceGroup[] {
-  const vcsWorkspaces = workspaces.filter(ws => ws.attributes['vcs-repo-url'])
-  const localWorkspaces = workspaces.filter(ws => !ws.attributes['vcs-repo-url'])
-
-  const result: WorkspaceGroup[] = []
-
-  const byRepo = new Map<string, T[]>()
-  for (const ws of vcsWorkspaces) {
-    const repo = repoBasename(ws.attributes['vcs-repo-url']!)
-    if (!byRepo.has(repo)) byRepo.set(repo, [])
-    byRepo.get(repo)!.push(ws)
-  }
-
-  for (const [repo, repoWs] of Array.from(byRepo.entries()).sort(([a], [b]) => a.localeCompare(b))) {
-    const repoGroup: WorkspaceGroup = { key: repo, label: repo, workspaces: [], children: [] }
+  for (const { key, label, workspaces: repoWs } of repoGroups) {
+    const group: WorkspaceGroup<T> = { key, label, workspaces: [], children: [] }
     for (const ws of repoWs) {
-      repoGroup.workspaces.push({ id: ws.id, name: ws.attributes.name, workspace: ws })
+      insertWorkspace(group, ws, mode === 'repo-path')
     }
-    repoGroup.workspaces.sort((a, b) => a.name.localeCompare(b.name))
-    result.push(repoGroup)
+    sortGroups([group])
+    result.push(group)
   }
 
   if (localWorkspaces.length > 0) {
-    const localGroup: WorkspaceGroup = { key: '__local__', label: 'Local', workspaces: [], children: [] }
+    const local: WorkspaceGroup<T> = { key: '__local__', label: 'Local', workspaces: [], children: [] }
     for (const ws of localWorkspaces) {
-      localGroup.workspaces.push({ id: ws.id, name: ws.attributes.name, workspace: ws })
+      insertWorkspace(local, ws, mode === 'repo-path')
     }
-    localGroup.workspaces.sort((a, b) => a.name.localeCompare(b.name))
-    result.push(localGroup)
+    sortGroups([local])
+    result.push(local)
   }
 
   return result
+}
+
+function normalizeRepoUrl(url: string): string {
+  return url.replace(/\.git$/, '').toLowerCase()
 }
 
 function repoBasename(url: string): string {
@@ -76,91 +66,55 @@ function repoBasename(url: string): string {
   return lastSep >= 0 ? cleaned.slice(lastSep + 1) : cleaned
 }
 
-function buildRepoPathTree<T extends { id: string; attributes: { name: string; 'working-directory'?: string; 'vcs-repo-url'?: string } }>(
-  workspaces: T[],
-): WorkspaceGroup[] {
-  const vcsWorkspaces = workspaces.filter(ws => ws.attributes['vcs-repo-url'])
-  const localWorkspaces = workspaces.filter(ws => !ws.attributes['vcs-repo-url'])
+function partitionByRepo<T extends WsConstraint>(workspaces: T[]) {
+  const vcs = workspaces.filter(ws => ws.attributes['vcs-repo-url'])
+  const local = workspaces.filter(ws => !ws.attributes['vcs-repo-url'])
 
-  const result: WorkspaceGroup[] = []
-
-  const byRepo = new Map<string, T[]>()
-  for (const ws of vcsWorkspaces) {
-    const repo = repoBasename(ws.attributes['vcs-repo-url']!)
-    if (!byRepo.has(repo)) byRepo.set(repo, [])
-    byRepo.get(repo)!.push(ws)
+  const byRepo = new Map<string, { label: string; workspaces: T[] }>()
+  for (const ws of vcs) {
+    const url = ws.attributes['vcs-repo-url']!
+    const key = normalizeRepoUrl(url)
+    if (!byRepo.has(key)) byRepo.set(key, { label: repoBasename(url), workspaces: [] })
+    byRepo.get(key)!.workspaces.push(ws)
   }
 
-  for (const [repo, repoWs] of Array.from(byRepo.entries()).sort(([a], [b]) => a.localeCompare(b))) {
-    const repoGroup: WorkspaceGroup = { key: repo, label: repo, workspaces: [], children: [] }
+  const repoGroups = Array.from(byRepo.entries())
+    .sort(([, a], [, b]) => a.label.localeCompare(b.label))
+    .map(([key, { label, workspaces: ws }]) => ({ key, label, workspaces: ws }))
 
-    for (const ws of repoWs) {
-      const dir = (ws.attributes['working-directory'] || '').replace(/^\/+/, '')
-      if (!dir) {
-        repoGroup.workspaces.push({ id: ws.id, name: ws.attributes.name, workspace: ws })
-        continue
-      }
-
-      const segments = dir.split('/').filter(Boolean)
-      let current = repoGroup.children
-
-      for (let i = 0; i < segments.length; i++) {
-        const seg = segments[i]
-        let group = current.find(g => g.key === seg)
-        if (!group) {
-          group = { key: seg, label: seg, workspaces: [], children: [] }
-          current.push(group)
-        }
-
-        if (i === segments.length - 1) {
-          group.workspaces.push({ id: ws.id, name: ws.attributes.name, workspace: ws })
-        } else {
-          current = group.children
-        }
-      }
-    }
-
-    sortGroups([repoGroup])
-    result.push(repoGroup)
-  }
-
-  if (localWorkspaces.length > 0) {
-    const localGroup: WorkspaceGroup = { key: '__local__', label: 'Local', workspaces: [], children: [] }
-
-    for (const ws of localWorkspaces) {
-      const dir = (ws.attributes['working-directory'] || '').replace(/^\/+/, '')
-      if (!dir) {
-        localGroup.workspaces.push({ id: ws.id, name: ws.attributes.name, workspace: ws })
-        continue
-      }
-
-      const segments = dir.split('/').filter(Boolean)
-      let current = localGroup.children
-
-      for (let i = 0; i < segments.length; i++) {
-        const seg = segments[i]
-        let group = current.find(g => g.key === seg)
-        if (!group) {
-          group = { key: seg, label: seg, workspaces: [], children: [] }
-          current.push(group)
-        }
-
-        if (i === segments.length - 1) {
-          group.workspaces.push({ id: ws.id, name: ws.attributes.name, workspace: ws })
-        } else {
-          current = group.children
-        }
-      }
-    }
-
-    sortGroups([localGroup])
-    result.push(localGroup)
-  }
-
-  return result
+  return { repoGroups, localWorkspaces: local }
 }
 
-function sortGroups(groups: WorkspaceGroup[]): WorkspaceGroup[] {
+function insertWorkspace<T extends WsConstraint>(
+  group: WorkspaceGroup<T>,
+  ws: T,
+  nestByPath: boolean,
+) {
+  const dir = (ws.attributes['working-directory'] || '').replace(/^\/+/, '')
+  if (!nestByPath || !dir) {
+    group.workspaces.push({ id: ws.id, name: ws.attributes.name, workspace: ws })
+    return
+  }
+
+  const segments = dir.split('/').filter(Boolean)
+  let current = group.children
+
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]
+    let child = current.find(g => g.key === seg)
+    if (!child) {
+      child = { key: seg, label: seg, workspaces: [], children: [] }
+      current.push(child)
+    }
+    if (i === segments.length - 1) {
+      child.workspaces.push({ id: ws.id, name: ws.attributes.name, workspace: ws })
+    } else {
+      current = child.children
+    }
+  }
+}
+
+function sortGroups<T>(groups: WorkspaceGroup<T>[]): WorkspaceGroup<T>[] {
   groups.sort((a, b) => a.label.localeCompare(b.label))
   for (const g of groups) {
     g.workspaces.sort((a, b) => a.name.localeCompare(b.name))
