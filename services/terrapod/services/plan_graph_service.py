@@ -1,0 +1,149 @@
+"""Derive a compact dependency graph from a run's stored plan JSON (#761).
+
+Powers the run-page "Impact graph" — nodes are the resources in the plan
+(coloured by their planned action), edges are dependencies. Terraform/OpenTofu
+plan JSON has NO explicit instance-level edge list, so edges are DERIVED from
+`configuration.root_module.resources[].expressions.*.references` (block-level
+references), then expanded across `for_each` keys with a same-key heuristic
+(source["api"] -> target["api"]; singletons fan out). This is the standard way
+graph tools reconstruct the DAG.
+
+Deriving server-side (rather than shipping the raw, possibly multi-MB plan JSON
+to the browser) keeps the payload small and works uniformly through the BFF in
+every storage backend — the `json-output` endpoint's presigned redirect isn't
+browser-reachable with the filesystem backend. The parse + derivation is CPU
+work over a large buffer, so it runs in a thread (hard rule 13).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import re
+
+from terrapod.db.models import Run
+from terrapod.storage import get_storage
+from terrapod.storage.keys import plan_json_output_key
+
+# Normalised planned action per resource_change.
+_ACTION = {
+    ("create",): "create",
+    ("delete",): "delete",
+    ("update",): "update",
+    ("no-op",): "noop",
+    ("read",): "noop",
+    ("delete", "create"): "replace",
+    ("create", "delete"): "replace",
+}
+
+_INDEX_RE = re.compile(r"\[[^\]]*\]$")
+_KEY_RE = re.compile(r'\["?([^"\]]+)"?\]$')
+
+
+def _block_of(addr: str) -> str:
+    # strip a trailing for_each/count index: foo.bar["api"] -> foo.bar
+    return _INDEX_RE.sub("", addr)
+
+
+def _key_of(addr: str) -> str | None:
+    m = _KEY_RE.search(addr)
+    return m.group(1) if m else None
+
+
+def _collect_refs(expr: object, out: set[str]) -> None:
+    if isinstance(expr, dict):
+        refs = expr.get("references")
+        if isinstance(refs, list):
+            out.update(r for r in refs if isinstance(r, str))
+        for v in expr.values():
+            _collect_refs(v, out)
+    elif isinstance(expr, list):
+        for v in expr:
+            _collect_refs(v, out)
+
+
+def derive_graph(plan_bytes: bytes) -> dict:
+    """Pure, synchronous derivation (runs in a thread). Never raises on a
+    well-formed-but-empty plan — returns an empty graph."""
+    plan = json.loads(plan_bytes)
+    rcs = plan.get("resource_changes") or []
+
+    nodes: list[dict] = []
+    by_block: dict[str, list[dict]] = {}
+    for rc in rcs:
+        addr = rc.get("address")
+        if not addr:
+            continue
+        actions = tuple(rc.get("change", {}).get("actions", []))
+        node = {
+            "id": addr,
+            "type": rc.get("type", ""),
+            "name": rc.get("name", ""),
+            "provider": (rc.get("provider_name", "") or "").split("/")[-1],
+            "action": _ACTION.get(actions, "update"),
+            "key": _key_of(addr),
+        }
+        nodes.append(node)
+        by_block.setdefault(_block_of(addr), []).append(node)
+
+    resource_types = {n["type"] for n in nodes}
+
+    # Block-level reference map from the configuration.
+    cfg = plan.get("configuration", {}).get("root_module", {})
+    block_refs: dict[str, set[str]] = {}
+    for cr in cfg.get("resources", []) or []:
+        src_block = cr.get("address")
+        if not src_block:
+            continue
+        refs: set[str] = set()
+        _collect_refs(cr.get("expressions", {}), refs)
+        targets: set[str] = set()
+        for r in refs:
+            parts = r.split(".")
+            if len(parts) >= 2 and parts[0] in resource_types:
+                targets.add(f"{parts[0]}.{parts[1]}")
+        targets.discard(src_block)
+        block_refs[src_block] = targets
+
+    # Expand to instance-level edges (source depends-on target).
+    edges: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for src_block, targets in block_refs.items():
+        for s in by_block.get(src_block, []):
+            for tb in targets:
+                cands = by_block.get(tb, [])
+                same_key = [t for t in cands if s["key"] and t["key"] == s["key"]]
+                for t in same_key or cands:
+                    e = (s["id"], t["id"])
+                    if e not in seen and s["id"] != t["id"]:
+                        seen.add(e)
+                        edges.append({"source": s["id"], "target": t["id"]})
+
+    counts = {
+        a: sum(1 for n in nodes if n["action"] == a)
+        for a in ("create", "update", "replace", "delete", "noop")
+    }
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "meta": {
+            "terraform_version": plan.get("terraform_version"),
+            "counts": counts,
+        },
+    }
+
+
+async def get_impact_graph(run: Run) -> dict | None:
+    """Read the run's plan JSON from storage and derive its graph.
+
+    Returns None when the run has no stored JSON plan output (caller → 404).
+    """
+    if not getattr(run, "has_json_output", False):
+        return None
+    storage = get_storage()
+    key = plan_json_output_key(str(run.workspace_id), str(run.id))
+    if not await storage.exists(key):
+        return None
+    raw = await storage.get(key)
+    # Parse + derive off the event loop (large buffer, CPU-bound) — rule 13.
+    return await asyncio.to_thread(derive_graph, raw)
