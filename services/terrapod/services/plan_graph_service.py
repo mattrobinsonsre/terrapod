@@ -50,6 +50,19 @@ def _key_of(addr: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _module_of(addr: str) -> str:
+    """The module path a resource lives in, from its address — so the UI can
+    cluster + label by module on big estates. `module.vpc.aws_x.y` -> "vpc";
+    `module.eks.module.ng.aws_x.y` -> "eks.ng"; a root resource -> "" (#761)."""
+    parts = addr.split(".")
+    mods: list[str] = []
+    i = 0
+    while i + 1 < len(parts) and parts[i] == "module":
+        mods.append(_INDEX_RE.sub("", parts[i + 1]))
+        i += 2
+    return ".".join(mods)
+
+
 def _collect_refs(expr: object, out: set[str]) -> None:
     if isinstance(expr, dict):
         refs = expr.get("references")
@@ -82,6 +95,7 @@ def derive_graph(plan_bytes: bytes) -> dict:
             "provider": (rc.get("provider_name", "") or "").split("/")[-1],
             "action": _ACTION.get(actions, "update"),
             "key": _key_of(addr),
+            "module": _module_of(addr),
         }
         nodes.append(node)
         by_block.setdefault(_block_of(addr), []).append(node)

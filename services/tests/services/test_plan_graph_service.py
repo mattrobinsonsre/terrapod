@@ -116,3 +116,17 @@ class TestGetImpactGraph:
         assert g is not None
         assert len(g["nodes"]) == 4
         assert len(g["edges"]) == 2
+
+
+class TestModuleOf:
+    def test_module_paths(self):
+        assert plan_graph_service._module_of("aws_instance.web") == ""
+        assert plan_graph_service._module_of("module.vpc.aws_subnet.this[0]") == "vpc"
+        assert plan_graph_service._module_of("module.eks.module.ng.aws_x.y") == "eks.ng"
+
+    def test_node_carries_module(self):
+        import json as _json
+
+        g = plan_graph_service.derive_graph(_json.dumps(_PLAN).encode())
+        # every _PLAN resource is a root resource → module ""
+        assert all(n["module"] == "" for n in g["nodes"])
