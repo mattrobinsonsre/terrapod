@@ -70,7 +70,7 @@ async def _persist_live_log_if_missing(run: Run, phase: str) -> None:
 async def _refresh_pool_queue_depth(db: AsyncSession) -> None:
     """Publish the per-pool `queued` backlog as a Prometheus gauge (#750).
 
-    One grouped COUNT per reconciler cycle (~10s). Every existing pool is given
+    One grouped COUNT per reconciler cycle (2s). Every existing pool is given
     an explicit value (0 when idle) so the series is stable — a pool that drains
     to empty reads as 0, not absent. Queued runs on a since-deleted pool are
     still surfaced (they are a real backlog). Best-effort: never raises into the

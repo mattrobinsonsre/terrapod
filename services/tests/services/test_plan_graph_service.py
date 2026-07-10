@@ -100,6 +100,22 @@ class TestDeriveGraph:
         assert g["edges"] == []
         assert all(v == 0 for v in g["meta"]["counts"].values())
 
+    def test_null_change_and_configuration_do_not_raise(self):
+        # A parseable-but-weird plan (older/truncated/hand-rolled JSON) with
+        # `change: null` and `configuration: null` must degrade to a graph, not
+        # raise AttributeError → HTTP 500. Regression for the impact-graph 500.
+        plan = {
+            "resource_changes": [
+                {"address": "null_resource.a", "type": "null_resource", "change": None},
+            ],
+            "configuration": None,
+        }
+        g = plan_graph_service.derive_graph(json.dumps(plan).encode())
+        assert len(g["nodes"]) == 1
+        # unknown/absent actions fall back to the "update" default
+        assert g["nodes"][0]["instance_actions"] == ["update"]
+        assert g["edges"] == []
+
 
 class TestGetImpactGraph:
     async def test_none_when_no_json_output(self):
@@ -123,6 +139,15 @@ class TestGetImpactGraph:
         assert g is not None
         assert len(g["nodes"]) == 3  # per-block (for_each cert collapses to one)
         assert len(g["edges"]) == 1
+
+    @patch("terrapod.services.plan_graph_service.get_storage")
+    async def test_corrupt_plan_blob_returns_none(self, mock_storage):
+        # A truncated/corrupt plan blob degrades to None (caller → 404), not 500.
+        run = MagicMock(has_json_output=True, workspace_id=uuid.uuid4(), id=uuid.uuid4())
+        st = mock_storage.return_value
+        st.exists = AsyncMock(return_value=True)
+        st.get = AsyncMock(return_value=b'{"resource_changes": [trunc')
+        assert await plan_graph_service.get_impact_graph(run) is None
 
 
 # A modular plan: root calls `net` + `app`; `app` nests `inner`. Exercises

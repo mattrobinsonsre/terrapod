@@ -425,7 +425,7 @@ Enable encryption on your managed database and object storage services. For file
 | `listener.image.repository` | `ghcr.io/mattrobinsonsre/terrapod-listener` | Listener Docker image |
 | `listener.image.tag` | `""` (appVersion) | Image tag |
 | `listener.replicas` | `1` | Number of listener replicas |
-| `listener.maxConcurrent` | `3` | Max runner Jobs a single listener pod runs concurrently. Admission is gated on the **real** running-Job count, so the listener never exceeds this even under a burst. The primary knob for [sizing a fixed-resource cluster](#sizing-runner-concurrency-on-a-fixed-resource-cluster). |
+| `listener.maxConcurrent` | `3` | **Pool-wide** max concurrent runner Jobs. Admission is gated on the **real** namespace-wide running-Job count, which every listener replica shares — so this is the pool ceiling regardless of `listener.replicas` (replicas are for HA, not extra concurrency; raise this, not replicas, for more). The primary knob for [sizing a fixed-resource cluster](#sizing-runner-concurrency-on-a-fixed-resource-cluster). |
 | `listener.name` | `"listener"` | Listener name (registered in the pool) |
 | `listener.joinToken` | `""` | Raw join token (use `existingSecret` for production) |
 | `listener.existingSecret` | `""` | K8s Secret containing the join token |
@@ -480,18 +480,25 @@ don't fit. On a **fixed-size** pool (a single k3s VM, a capped node group, a
 size concurrency to the capacity you have — otherwise runner Jobs sit
 **Pending / unschedulable** and never start.
 
-**How the multiplier works.** Each listener pod runs up to `listener.maxConcurrent`
-runner Jobs at once (default **3**). Each Job requests its workspace's
-`resource_cpu` / `resource_memory` (default **1 CPU / 2Gi** *requests*; limits are
-computed as **2×** the requests). The Kubernetes scheduler fits pods by their
-**requests**, so the worst-case simultaneous runner demand a single listener can
-place is:
+**How the multiplier works.** A listener admits a run only while the **real**
+count of running runner Jobs in the pool's namespace is below
+`listener.maxConcurrent` (default **3**). Every listener replica counts that same
+namespace-wide Job total, so `listener.maxConcurrent` is the **pool-wide**
+concurrency ceiling — running multiple `listener.replicas` gives you
+**high availability** (any replica can claim a run and launch its Job; if one
+dies the others carry on), **not** more concurrency. To raise the ceiling,
+increase `listener.maxConcurrent`, not `listener.replicas`.
+
+Each Job requests its workspace's `resource_cpu` / `resource_memory` (default
+**1 CPU / 2Gi** *requests*; limits are computed as **2×** the requests). The
+Kubernetes scheduler fits pods by their **requests**, so the worst-case
+simultaneous runner demand across the whole pool is:
 
 ```
 listener.maxConcurrent × max(per-workspace resource_cpu / resource_memory requests)
 ```
 
-With multiple listener replicas, multiply again by `listener.replicas`.
+— independent of how many listener replicas you run.
 
 **The inequality to keep true** (per node, using requests):
 

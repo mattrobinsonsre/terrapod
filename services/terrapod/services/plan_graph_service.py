@@ -30,9 +30,13 @@ import asyncio
 import json
 import re
 
+import structlog
+
 from terrapod.db.models import Run
 from terrapod.storage import get_storage
 from terrapod.storage.keys import plan_json_output_key
+
+logger = structlog.get_logger(__name__)
 
 # Normalised planned action per resource_change.
 _ACTION = {
@@ -214,7 +218,10 @@ def derive_graph(plan_bytes: bytes) -> dict:
         if not addr:
             continue
         block = _block_of(addr)
-        action = _ACTION.get(tuple(rc.get("change", {}).get("actions", [])), "update")
+        # `change` is normally always present, but guard `change: null` (older /
+        # truncated / hand-rolled plan JSON) so a weird-but-parseable plan yields
+        # a graph instead of raising AttributeError → HTTP 500.
+        action = _ACTION.get(tuple((rc.get("change") or {}).get("actions", [])), "update")
         node = node_by_block.get(block)
         if node is None:
             node = {
@@ -240,7 +247,7 @@ def derive_graph(plan_bytes: bytes) -> dict:
 
     # Block-level reference map from the configuration, walked across the whole
     # module tree (root + every module_call) with cross-module var/output binding.
-    root_cfg = plan.get("configuration", {}).get("root_module", {}) or {}
+    root_cfg = (plan.get("configuration") or {}).get("root_module") or {}
     modules, calls = _index_modules(root_cfg)
     resolve_ref = _make_resolver(modules, calls, resource_types)
     block_refs: dict[str, set[str]] = {}
@@ -303,4 +310,10 @@ async def get_impact_graph(run: Run) -> dict | None:
         return None
     raw = await storage.get(key)
     # Parse + derive off the event loop (large buffer, CPU-bound) — rule 13.
-    return await asyncio.to_thread(derive_graph, raw)
+    # A corrupt / truncated plan blob must degrade to "no graph" (caller → 404),
+    # not a 500 — mirrors state_graph_service's parse guard.
+    try:
+        return await asyncio.to_thread(derive_graph, raw)
+    except (ValueError, TypeError) as exc:
+        logger.warning("impact_graph_parse_failed", run_id=str(run.id), error=str(exc))
+        return None

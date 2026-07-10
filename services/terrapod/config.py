@@ -133,7 +133,12 @@ class RunnerConfig(BaseSettings):
     )
     heartbeat_interval: int = Field(default=60, description="Listener heartbeat interval (s).")
     max_concurrent: int = Field(
-        default=3, description="Max concurrent run launches per listener pod."
+        default=3,
+        description=(
+            "Pool-wide max concurrent runner Jobs. Every listener replica admits on the "
+            "shared namespace-wide running-Job count, so this is the pool ceiling regardless "
+            "of replica count (raise this, not replicas, for more concurrency)."
+        ),
     )
     poll_interval: int = Field(
         default=30, description="Fallback poll interval when SSE is idle (s)."

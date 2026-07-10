@@ -262,7 +262,7 @@ POOL_QUEUED_RUNS = Gauge(
     "terrapod_pool_queued_runs",
     (
         "Runs currently in `queued` state per agent pool — the backlog waiting "
-        "for a listener slot. Refreshed each reconciler cycle (~10s) with a "
+        "for a listener slot. Refreshed each reconciler cycle (2s) with a "
         "single grouped COUNT. An operator watches this to see 'N runs waiting "
         "on pool X' and decide whether the pool needs more listener capacity "
         "(#750)."
