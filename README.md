@@ -161,6 +161,7 @@ Everything below is implemented and shipped today.
 | Execution hooks | Admin-managed custom shell steps run in the runner Job at pre_init / pre_plan / post_plan / pre_apply / post_apply, associated with workspaces |
 | Service catalog | No-code self-service provisioning over the module registry |
 | Impact graph | Interactive dependency + blast-radius view of a plan on the run page — module-clustered, click a resource to light up its transitive downstream impact |
+| Estate topology | Whole-estate dependency graph — workspaces + modules wired by run-triggers, remote-state, and module links; group by any label / pool / name prefix; RBAC-filtered; accessible table fallback |
 | Workspace health | Per-workspace health conditions, VCS polling status, drift detection indicators |
 
 ### AI (optional, off by default)
@@ -376,6 +377,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Remote State](docs/remote-state.md) | State versioning, locking, rollback, the `cloud` backend |
 | [AI Plan Summary](docs/ai-plan-summary.md) | LLM plan summaries, risk assessment, failure analysis, chat |
 | [Impact Graph](docs/impact-graph.md) | Interactive dependency + blast-radius view of a plan on the run page, clustered by module |
+| [Estate Topology](docs/estate-topology.md) | Whole-estate dependency + module-impact graph, grouped by any axis you choose; accessible table fallback |
 | [Notifications](docs/notifications.md) | Webhook, Slack, and email alerts on run events |
 | [Slack Integration](docs/slack-integration.md) | Interactive Socket Mode app — account linking, approvals, run notifications |
 | [Run Tasks](docs/run-tasks.md) | Pre/post-plan webhook hooks for external validation |

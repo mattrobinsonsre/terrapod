@@ -319,6 +319,25 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expectNoHorizontalPageScroll(page);
   });
 
+  test('estate topology defaults to the table at phone width (#763)', async ({ page }) => {
+    // On a phone the estate page defaults to the accessible Table view rather
+    // than heavy WebGL (#736 a11y + #719 mobile). Assert the table renders and
+    // the page does not scroll horizontally.
+    const token = getStoredToken()
+    const wsName = uniqueName('e2e-estate-mob')
+    await createWorkspace(token, wsName, { labels: { team: 'estate-mob' } })
+
+    await page.goto('/estate')
+    await expect(page.getByRole('heading', { name: 'Estate topology', level: 1 })).toBeVisible({
+      timeout: 15_000,
+    })
+    // Phone default is the table — its Workspaces heading is visible without a toggle.
+    await expect(page.getByRole('columnheader', { name: 'Workspace' })).toBeVisible({
+      timeout: 10_000,
+    })
+    await expectNoHorizontalPageScroll(page)
+  })
+
   test('impact graph is gated in the mobile view picker (#761)', async ({ page }) => {
     // The Impact graph (#761) lives on the run-detail page; per #719 the gating
     // must hold on mobile too. The E2E stack has no runner, so a seeded run has no

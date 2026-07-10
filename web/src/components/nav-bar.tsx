@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import {
   Layers,
+  Network,
   Package,
   Blocks,
   Key,
@@ -394,6 +395,7 @@ export default function NavBar() {
             </Link>
             <div className="flex items-center gap-1 flex-wrap flex-1">
               <NavLink href="/workspaces" icon={Layers} label="Workspaces" />
+              <NavLink href="/estate" icon={Network} label="Estate" />
               <NavDropdown label="Registry" icon={Library} items={REGISTRY_ITEMS} active={registryActive} />
               <NavLink href="/catalog" icon={LayoutGrid} label="Catalog" />
               <NavLink href="/admin/agent-pools" icon={Server} label="Agent Pools" />
@@ -467,6 +469,7 @@ export default function NavBar() {
           {menuOpen && (
             <MobileDrawer id="mobile-nav-menu" title="Menu" onClose={closeDrawers}>
               <MobileLink item={{ href: '/workspaces', label: 'Workspaces', icon: Layers }} onClick={closeDrawers} />
+              <MobileLink item={{ href: '/estate', label: 'Estate', icon: Network }} onClick={closeDrawers} />
               <MobileLink item={{ href: '/catalog', label: 'Catalog', icon: LayoutGrid }} onClick={closeDrawers} />
               <MobileLink
                 item={{ href: '/admin/agent-pools', label: 'Agent Pools', icon: Server }}

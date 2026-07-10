@@ -179,3 +179,25 @@ async def dismiss_drift(
             }
         }
     )
+
+
+@router.get("/estate-graph")
+async def show_estate_graph(
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Whole-estate topology graph for the Estate page (#763).
+
+    Terrapod-native. Derives ``{nodes, edges, meta}`` server-side from the
+    cross-workspace structure (remote-state consumers, run-triggers, module
+    links), RBAC-filtered to the workspaces the caller can read. See
+    ``estate_graph_service`` — the grouping axis is chosen client-side (the
+    platform enforces no labelling convention), so the payload is deliberately
+    label-agnostic.
+    """
+    from terrapod.services import estate_graph_service
+
+    graph = await estate_graph_service.derive_estate_graph(db, user)
+    return JSONResponse(
+        content={"data": {"id": "estate-graph", "type": "estate-graphs", "attributes": graph}}
+    )
