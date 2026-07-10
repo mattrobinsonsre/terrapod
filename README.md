@@ -5,7 +5,7 @@
 
 **A free, open-source, self-hosted platform replacement for Terraform Enterprise / HCP Terraform.**
 
-Get the collaboration, governance, state, registry, and UI layer of a commercial Terraform platform — self-hosted on your own Kubernetes, with no per-resource licensing and nothing proprietary in the stack. Terrapod gives you label-based RBAC and OPA/Rego policy-as-code (the open-source equivalent of TFE's Sentinel), versioned remote state, a private module + provider registry, and a modern web UI — all wrapped around `terraform` or `tofu`. It targets compatibility with the [TFE V2 API](https://developer.hashicorp.com/terraform/enterprise/api-docs), so existing `cloud` blocks, [`go-tfe`](https://pkg.go.dev/github.com/hashicorp/go-tfe) clients, and CI/CD point at a Terrapod instance with minimal reconfiguration — usually zero code changes. It's **MPL-2.0** (the same license as OpenTofu and the historical Terraform codebase), and self-hosted internal use triggers no source-disclosure obligation.
+Get the collaboration, governance, state, registry, and UI layer of a commercial Terraform platform — self-hosted on your own Kubernetes, with no per-resource licensing and nothing proprietary in the stack. Terrapod gives you label-based RBAC and OPA/Rego policy-as-code (the open-source equivalent of TFE's Sentinel), versioned remote state, a private module + provider registry, and a modern web UI — all wrapped around `terraform` or `tofu`. It is a drop-in backend for the `cloud` block in `terraform` and `tofu`: it implements the slice of the [TFE V2 API](https://developer.hashicorp.com/terraform/enterprise/api-docs) those CLIs actually consume — the `cloud`/`remote` backend protocol, spoken over [`go-tfe`](https://pkg.go.dev/github.com/hashicorp/go-tfe) — so your existing `cloud` blocks and CI/CD point at a Terrapod instance with usually zero code changes. It does **not** reimplement the whole TFE V2 API: everything past that CLI-consumed slice is Terrapod's own API. It's **MPL-2.0** (the same license as OpenTofu and the historical Terraform codebase), and self-hosted internal use triggers no source-disclosure obligation.
 
 Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
@@ -18,7 +18,7 @@ Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
 ## Coming from Terraform Enterprise / HCP Terraform?
 
-Terrapod targets API compatibility with the surface the `terraform`/`tofu` CLI and `go-tfe` consume, so most tooling points at it unchanged. Where the *models* differ (structural facts, not a feature-by-feature scorecard):
+Terrapod is compatible with the `terraform`/`tofu` **`cloud` backend** — the slice of the TFE V2 API the CLI consumes (over `go-tfe`) — so CLI-driven runs and CI/CD point at it unchanged. Everything else is Terrapod's own API, not a reimplementation of the full TFE V2 surface. Where the *models* differ (structural facts, not a feature-by-feature scorecard):
 
 | | HCP Terraform / TFE | Terrapod |
 |---|---|---|
@@ -30,7 +30,7 @@ Terrapod targets API compatibility with the surface the `terraform`/`tofu` CLI a
 | Restricted-network / air-gap execution | SaaS-dependent by default | First-class — outbound-only runners, polling VCS, pull-through mirror + sealed cache-only mode |
 | Private registry · RBAC · SSO · Audit | Yes | Yes — self-hosted equivalents (label RBAC; OIDC/SAML; immutable audit) |
 | Multi-organization | Yes | Single org by design ([run an instance per tenant](docs/architecture.md#why-a-single-organization)) |
-| CLI / `go-tfe` API | TFE V2 | TFE V2-compatible |
+| CLI `cloud`-backend API | TFE V2 | The CLI-consumed subset of TFE V2 (rest is Terrapod's own API) |
 
 *Model-level comparison — it deliberately avoids version-specific pricing and fast-moving feature claims; confirm current HCP terms with HashiCorp.*
 
@@ -40,14 +40,14 @@ Terrapod targets API compatibility with the surface the `terraform`/`tofu` CLI a
 
 ## Is Terrapod for you?
 
-If you want an open, self-hosted alternative to Terraform Enterprise / HCP Terraform, yes. Terrapod is the **full** platform layer, not a thin slice of it — point your existing `cloud` blocks, `go-tfe` clients, and CI/CD at it and it just works, with zero code changes.
+If you want an open, self-hosted alternative to Terraform Enterprise / HCP Terraform, yes. Terrapod is the **full** platform layer, not a thin slice of it — point your existing `cloud` blocks and CI/CD at it and it just works, with zero code changes. (Terrapod speaks the `terraform`/`tofu` `cloud`/`remote` backend protocol, not the entire `go-tfe` surface: arbitrary `go-tfe` automation, the `hashicorp/tfe` provider, and Backstage TFC plugins assume teams/projects/multi-org and aren't compatibility targets.)
 
 Everything you'd expect from the platform tier is here and first-class:
 
 - Workspaces with versioned remote state (locking, rollback), the full plan → apply run lifecycle, and both VCS-driven and CLI-driven runs.
 - A GPG-signed private module + provider registry, variables & variable sets, run triggers, notifications, drift detection, and a polished, mobile-friendly web UI.
 - Label-based RBAC and OPA/Rego policy-as-code (the open-source equivalent of Sentinel) — advisory or mandatory.
-- API compatibility with the TFE V2 surface the `terraform`/`tofu` CLI and `go-tfe` speak, so most tooling points at it unchanged.
+- Compatibility with the `terraform`/`tofu` `cloud` backend — the subset of the TFE V2 API the CLI speaks (over `go-tfe`) — so CLI-driven runs and CI/CD point at it unchanged. Beyond that subset, Terrapod has its own API rather than the full TFE V2 surface.
 
 And a few standout, first-class features you may really like:
 
@@ -117,7 +117,7 @@ Everything below is implemented and shipped today.
 | CLI-driven runs | `terraform` / `tofu` plan / apply via the `cloud` backend (both verified) |
 | Agent execution | Server-side plan / apply on ephemeral K8s Jobs (ARC pattern) |
 | Agent pools | Named runner-listener groups; join-token → certificate exchange for auth |
-| TFE V2 API | JSON:API surface compatible with `go-tfe` / `terraform login` |
+| TFE V2 CLI surface | The `cloud`-backend subset of the TFE V2 API (JSON:API) consumed by `terraform`/`tofu` + `terraform login` — not the full TFE V2 API |
 | Run triggers | Cross-workspace dependency chains — a source apply triggers downstream runs |
 | Stale-plan guards | Auto-discard a plan that no longer reflects reality: state-version drift (always on) + optional per-workspace time-based plan expiry |
 

@@ -2,7 +2,7 @@
 
 **Open-source platform replacement for Terraform Enterprise.**
 
-Terrapod provides the collaboration, governance, state management, and UI layer that wraps around `terraform` or `tofu` as pluggable execution backends. It targets API compatibility with the [HCP Terraform / TFE V2 API](https://developer.hashicorp.com/terraform/enterprise/api-docs) so that existing tooling -- the `terraform` CLI with `cloud` block, the [`go-tfe`](https://pkg.go.dev/github.com/hashicorp/go-tfe) client, CI/CD integrations -- can point at a Terrapod instance with minimal reconfiguration.
+Terrapod provides the collaboration, governance, state management, and UI layer that wraps around `terraform` or `tofu` as pluggable execution backends. It is compatible with the `terraform`/`tofu` **`cloud` backend**: it implements the subset of the [HCP Terraform / TFE V2 API](https://developer.hashicorp.com/terraform/enterprise/api-docs) those CLIs consume (over the [`go-tfe`](https://pkg.go.dev/github.com/hashicorp/go-tfe) protocol) as a stable contract at `/api/v2/`, so existing `cloud` blocks and CI/CD point at a Terrapod instance with minimal reconfiguration. Everything else -- workspace/registry/RBAC management, agent pools, and the rest -- is Terrapod's own API at `/api/terrapod/v1/`; Terrapod does not reimplement the full TFE V2 API, and is not a general drop-in for `go-tfe`-based automation or the `hashicorp/tfe` provider.
 
 Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 

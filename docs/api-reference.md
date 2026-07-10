@@ -1,6 +1,6 @@
 # API Reference
 
-Terrapod implements the TFE V2 API for compatibility with the `terraform` CLI, `go-tfe` client, and existing CI/CD integrations. All endpoints use JSON:API format.
+Terrapod implements the subset of the TFE V2 API that the `terraform`/`tofu` `cloud` backend consumes (over the `go-tfe` protocol) — a stable contract mounted at `/api/v2/` and catalogued in [`tfe-cli-surface.md`](tfe-cli-surface.md). It is **not** a reimplementation of the full TFE V2 API: everything beyond that CLI-consumed slice is Terrapod's own native API at `/api/terrapod/v1/`. All endpoints use JSON:API format.
 
 The interactive API documentation is also available in the web UI under **API** in the navigation bar, offering both ReDoc and Swagger UI views.
 
@@ -41,7 +41,7 @@ Terrapod exposes two API surfaces:
 
 | Prefix | Contract | Audience |
 |---|---|---|
-| `/api/v2/` | **Stable** TFE V2 subset consumed by `terraform`, `tofu`, and `tfci`. Documented in [`docs/tfe-cli-surface.md`](tfe-cli-surface.md). |  Terraform/OpenTofu CLI, `tfci`, `go-tfe`-based clients |
+| `/api/v2/` | **Stable** TFE V2 subset consumed by `terraform`, `tofu`, and `tfci`. Documented in [`docs/tfe-cli-surface.md`](tfe-cli-surface.md). |  Terraform/OpenTofu CLI, `tfci`, `go-tfe`-based clients that stay within this subset |
 | `/api/terrapod/v1/` | Terrapod-native management API (workspaces management, runs, registry CRUD, agent pools, audit, etc.) | Web UI, the Terraform provider for Terrapod, automation |
 
 Example:
@@ -1497,7 +1497,7 @@ GET /api/v2/registry/modules/{namespace}/{name}/{provider}/versions
 GET /api/v2/registry/modules/{namespace}/{name}/{provider}/{version}/download
 ```
 
-### TFE V2 Management API
+### Terrapod-native Management API
 
 ```
 GET  /api/terrapod/v1/registry-modules
@@ -1582,7 +1582,7 @@ in `signing_keys.gpg_public_keys`. Terrapod never re-signs a provider — the
 signature `terraform init` verifies is the one the publisher produced at
 publish time (see [Publishing a Version](#publishing-a-version-client-signed)).
 
-### TFE V2 Management API
+### Terrapod-native Management API
 
 ```
 GET  /api/terrapod/v1/registry-providers
