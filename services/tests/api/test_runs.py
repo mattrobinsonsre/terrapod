@@ -581,6 +581,81 @@ class TestShowRun:
         assert resp.status_code == 404
 
 
+# ── Impact Graph (#761) ────────────────────────────────────────────────
+
+
+class TestImpactGraph:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.plan_graph_service.get_impact_graph")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_impact_graph_with_read(self, mock_get_run, mock_resolve, mock_graph, *mocks):
+        mock_resolve.return_value = caps_for_level("read")
+        run = _mock_run(status="applied")
+        mock_get_run.return_value = run
+        mock_graph.return_value = {
+            "nodes": [{"id": "aws_s3_bucket.b", "type": "aws_s3_bucket", "action": "create"}],
+            "edges": [],
+            "meta": {"terraform_version": "1.12.3", "counts": {"create": 1}},
+        }
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/terrapod/v1/runs/run-{run.id}/impact-graph", headers=_AUTH)
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert data["type"] == "impact-graphs"
+        assert data["attributes"]["nodes"][0]["id"] == "aws_s3_bucket.b"
+        assert data["relationships"]["run"]["data"]["id"] == f"run-{run.id}"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.plan_graph_service.get_impact_graph")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_impact_graph_404_when_no_plan_output(
+        self, mock_get_run, mock_resolve, mock_graph, *mocks
+    ):
+        mock_resolve.return_value = caps_for_level("read")
+        run = _mock_run()
+        mock_get_run.return_value = run
+        mock_graph.return_value = None  # run produced no JSON plan output
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/terrapod/v1/runs/run-{run.id}/impact-graph", headers=_AUTH)
+        assert resp.status_code == 404
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs.plan_graph_service.get_impact_graph")
+    @patch("terrapod.api.routers.runs.resolve_workspace_capabilities_for")
+    @patch("terrapod.api.routers.runs.run_service.get_run")
+    async def test_impact_graph_forbidden_without_read(
+        self, mock_get_run, mock_resolve, mock_graph, *mocks
+    ):
+        # No capabilities on the workspace → RUN_READ gate rejects.
+        mock_resolve.return_value = set()
+        run = _mock_run()
+        mock_get_run.return_value = run
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        app, mock_db = _make_app(_user())
+        mock_db.get.return_value = ws
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+            resp = await c.get(f"/api/terrapod/v1/runs/run-{run.id}/impact-graph", headers=_AUTH)
+        assert resp.status_code == 403
+        mock_graph.assert_not_called()
+
+
 # ── Confirm Run ────────────────────────────────────────────────────────
 
 

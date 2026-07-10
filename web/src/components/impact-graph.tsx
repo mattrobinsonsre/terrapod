@@ -305,7 +305,7 @@ export function ImpactGraph({ runId }: { runId: string }) {
   return (
     <div className="relative w-full h-[70vh] min-h-[420px] rounded-xl overflow-hidden border border-slate-800 bg-[#0a0e17]">
       {/* HUD */}
-      <div className="absolute z-10 top-3 left-3 max-w-[320px] rounded-xl border border-slate-700/40 bg-slate-900/80 backdrop-blur px-4 py-3">
+      <div className="absolute z-10 top-3 left-3 max-w-[min(320px,52vw)] sm:max-w-[320px] rounded-xl border border-slate-700/40 bg-slate-900/80 backdrop-blur px-4 py-3">
         <div className="text-sm font-semibold">Impact graph</div>
         <div className="text-[11px] text-slate-400 mb-2">
           plan of {graph.nodes.length} resources
@@ -338,8 +338,9 @@ export function ImpactGraph({ runId }: { runId: string }) {
         </div>
       </div>
 
-      {/* Resource list */}
-      <div className="absolute z-10 top-3 right-3 w-[300px] max-h-[calc(70vh-24px)] flex flex-col gap-2 rounded-xl border border-slate-700/40 bg-slate-900/80 backdrop-blur p-3">
+      {/* Resource list. Narrows on small screens so it and the HUD coexist
+          without pushing the page into horizontal scroll; desktop width unchanged. */}
+      <div className="absolute z-10 top-3 right-3 w-[min(300px,44vw)] sm:w-[300px] max-h-[calc(70vh-24px)] flex flex-col gap-2 rounded-xl border border-slate-700/40 bg-slate-900/80 backdrop-blur p-3">
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
@@ -367,7 +368,7 @@ export function ImpactGraph({ runId }: { runId: string }) {
 
       {/* Selection detail */}
       {sel && byId[sel] && (
-        <div className="absolute z-10 bottom-3 left-3 max-w-[380px] rounded-xl border border-slate-700/40 bg-slate-900/80 backdrop-blur px-4 py-3">
+        <div className="absolute z-10 bottom-3 left-3 max-w-[min(380px,52vw)] sm:max-w-[380px] rounded-xl border border-slate-700/40 bg-slate-900/80 backdrop-blur px-4 py-3">
           <span
             className="inline-block text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded mb-1.5"
             style={{ background: COLOR[byId[sel].action] + '33', color: COLOR[byId[sel].action] }}
