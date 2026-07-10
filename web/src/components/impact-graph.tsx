@@ -41,8 +41,14 @@ interface D3Force {
   distance?: (n: number) => D3Force
   distanceMax?: (n: number) => D3Force
 }
+interface Vec3 {
+  x: number
+  y: number
+  z: number
+}
 interface FgMethods {
   zoomToFit: (ms?: number, px?: number) => void
+  cameraPosition: (pos?: Vec3, lookAt?: Vec3, ms?: number) => Vec3
   d3Force: (name: string) => D3Force | undefined
 }
 type FgProps = {
@@ -165,8 +171,24 @@ export function ImpactGraph({ runId }: { runId: string }) {
     setSel(null)
     setRadius(new Set())
   }
+  // Frame the whole graph, but never closer than a comfortable minimum —
+  // zoomToFit alone fills the viewport, which over-zooms tiny plans.
+  function frame() {
+    const fg = fgRef.current
+    if (!fg) return
+    fg.zoomToFit(400, 60)
+    window.setTimeout(() => {
+      const p = fg.cameraPosition()
+      const d = Math.hypot(p.x, p.y, p.z) || 1
+      const MIN = 180
+      if (d < MIN) {
+        const k = MIN / d
+        fg.cameraPosition({ x: p.x * k, y: p.y * k, z: p.z * k }, { x: 0, y: 0, z: 0 }, 300)
+      }
+    }, 450)
+  }
   function resetView() {
-    fgRef.current?.zoomToFit(500, 40)
+    frame()
     const ca = sorted.find((n) => n.action === 'replace') || sorted[0]
     if (ca) select(ca.id)
   }
@@ -275,7 +297,7 @@ export function ImpactGraph({ runId }: { runId: string }) {
           backgroundColor="#0a0e17"
           graphData={data}
           cooldownTicks={160}
-          onEngineStop={() => fgRef.current?.zoomToFit(500, 40)}
+          onEngineStop={frame}
           nodeVal={(n) => (n.action === 'noop' ? 1.4 : 3)}
           nodeColor={(n) => {
             if (!sel) return COLOR[n.action]
