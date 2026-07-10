@@ -314,7 +314,10 @@ jobs:
           # the same tables) and the suite is small enough that
           # serial is fine.
           - name: unit
-            paths: tests/auth tests/runner tests/storage tests/ai_eval tests/test_logging_config.py tests/test_dependency_pins.py
+            # Root-level tests/*.py are NOT auto-collected by the directory
+            # shards below — each must be listed here explicitly, or it silently
+            # never runs in CI. All of these are pure-unit (no Postgres/Redis/S3).
+            paths: tests/auth tests/runner tests/storage tests/ai_eval tests/test_logging_config.py tests/test_dependency_pins.py tests/test_api_sdk_contract.py tests/test_schema_version.py tests/test_gpg_verify.py tests/test_http_retry.py tests/test_db_iam_auth.py tests/test_redis_iam_auth.py
             pytest_args: -n auto
           - name: services-api
             paths: tests/services tests/api
