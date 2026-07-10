@@ -118,6 +118,125 @@ class TestGetImpactGraph:
         assert len(g["edges"]) == 2
 
 
+# A modular plan: root calls `net` + `app`; `app` nests `inner`. Exercises
+# cross-module `var` binding (app.svc -> net.vpc), output binding
+# (module.net.vpc_id -> net.random_id.vpc), for_each fan-out across a module
+# boundary, and nested-module recursion (inner.name binds var.seed -> app.svc).
+_MODULAR_PLAN = {
+    "terraform_version": "1.12.3",
+    "resource_changes": [
+        {
+            "address": "module.net.random_id.vpc",
+            "type": "random_id",
+            "name": "vpc",
+            "change": {"actions": ["create"]},
+        },
+        {
+            "address": 'module.app.null_resource.svc["api"]',
+            "type": "null_resource",
+            "name": "svc",
+            "change": {"actions": ["create"]},
+        },
+        {
+            "address": 'module.app.null_resource.svc["web"]',
+            "type": "null_resource",
+            "name": "svc",
+            "change": {"actions": ["create"]},
+        },
+        {
+            "address": "module.app.module.inner.random_pet.name",
+            "type": "random_pet",
+            "name": "name",
+            "change": {"actions": ["create"]},
+        },
+    ],
+    "configuration": {
+        "root_module": {
+            "module_calls": {
+                "net": {
+                    "module": {
+                        "resources": [{"address": "random_id.vpc", "expressions": {}}],
+                        "outputs": {
+                            "vpc_id": {
+                                "expression": {"references": ["random_id.vpc.hex", "random_id.vpc"]}
+                            }
+                        },
+                    }
+                },
+                "app": {
+                    "expressions": {
+                        "vpc_id": {"references": ["module.net.vpc_id", "module.net"]},
+                        "services": {"references": ["local.services"]},
+                    },
+                    "module": {
+                        "resources": [
+                            {
+                                "address": "null_resource.svc",
+                                "for_each_expression": {"references": ["var.services"]},
+                                "expressions": {"triggers": {"references": ["var.vpc_id"]}},
+                            }
+                        ],
+                        "module_calls": {
+                            "inner": {
+                                "expressions": {"seed": {"references": ["null_resource.svc"]}},
+                                "module": {
+                                    "resources": [
+                                        {
+                                            "address": "random_pet.name",
+                                            "expressions": {
+                                                "keepers": {"references": ["var.seed"]}
+                                            },
+                                        }
+                                    ],
+                                    "outputs": {},
+                                },
+                            }
+                        },
+                    },
+                },
+            }
+        }
+    },
+}
+
+
+class TestModularGraph:
+    def test_nodes_carry_module_path(self):
+        g = plan_graph_service.derive_graph(json.dumps(_MODULAR_PLAN).encode())
+        mods = {n["id"]: n["module"] for n in g["nodes"]}
+        assert mods["module.net.random_id.vpc"] == "net"
+        assert mods['module.app.null_resource.svc["api"]'] == "app"
+        assert mods["module.app.module.inner.random_pet.name"] == "app.inner"
+
+    def test_cross_module_var_binding(self):
+        # app.svc depends (via var.vpc_id -> module.net.vpc_id) on net.random_id.vpc,
+        # fanned out to every for_each instance from the singleton source.
+        g = plan_graph_service.derive_graph(json.dumps(_MODULAR_PLAN).encode())
+        edges = {(e["source"], e["target"]) for e in g["edges"]}
+        assert ('module.app.null_resource.svc["api"]', "module.net.random_id.vpc") in edges
+        assert ('module.app.null_resource.svc["web"]', "module.net.random_id.vpc") in edges
+
+    def test_nested_module_var_binds_to_parent_resource(self):
+        # inner.random_pet.name references var.seed, bound to the PARENT module's
+        # null_resource.svc — proving recursion + parent-scope var resolution.
+        g = plan_graph_service.derive_graph(json.dumps(_MODULAR_PLAN).encode())
+        edges = {(e["source"], e["target"]) for e in g["edges"]}
+        assert (
+            "module.app.module.inner.random_pet.name",
+            'module.app.null_resource.svc["api"]',
+        ) in edges
+        assert (
+            "module.app.module.inner.random_pet.name",
+            'module.app.null_resource.svc["web"]',
+        ) in edges
+
+    def test_no_spurious_self_or_cross_edges(self):
+        g = plan_graph_service.derive_graph(json.dumps(_MODULAR_PLAN).encode())
+        assert all(e["source"] != e["target"] for e in g["edges"])
+        # exactly the four dependency edges above, nothing else
+        assert len(g["edges"]) == 4
+
+
 class TestModuleOf:
     def test_module_paths(self):
         assert plan_graph_service._module_of("aws_instance.web") == ""

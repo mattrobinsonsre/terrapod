@@ -3,10 +3,19 @@
 Powers the run-page "Impact graph" — nodes are the resources in the plan
 (coloured by their planned action), edges are dependencies. Terraform/OpenTofu
 plan JSON has NO explicit instance-level edge list, so edges are DERIVED from
-`configuration.root_module.resources[].expressions.*.references` (block-level
-references), then expanded across `for_each` keys with a same-key heuristic
-(source["api"] -> target["api"]; singletons fan out). This is the standard way
-graph tools reconstruct the DAG.
+the `configuration` block's per-resource `expressions.*.references` (plus
+`for_each`/`count` references), then expanded across `for_each` keys with a
+same-key heuristic (source["api"] -> target["api"]; singletons fan out). This
+is the standard way graph tools reconstruct the DAG.
+
+Real infrastructure is almost always MODULAR, so the derivation walks the whole
+`root_module` → `module_calls[].module` tree, not just root resources. A
+reference is resolved in its own module scope: a sibling `type.name` becomes a
+block address qualified with the module prefix (`module.vpc.aws_subnet.this`); a
+`var.x` binds to the parent `module_call`'s input expression (resolved in the
+PARENT scope); a `module.child.out` binds to the child module's output
+expression (resolved in the CHILD scope). That cross-module binding is what
+makes edges span module boundaries — without it a modular plan shows zero edges.
 
 Deriving server-side (rather than shipping the raw, possibly multi-MB plan JSON
 to the browser) keeps the payload small and works uniformly through the BFF in
@@ -75,6 +84,118 @@ def _collect_refs(expr: object, out: set[str]) -> None:
             _collect_refs(v, out)
 
 
+def _qualify(path: tuple[str, ...], local_key: str) -> str:
+    """Fully-qualified block address for a module-local `type.name` key, matching
+    the `resource_changes[].address` shape: root → `type.name`, a module at
+    path ("vpc",) → `module.vpc.type.name`, nested → `module.a.module.b.type.name`."""
+    if not path:
+        return local_key
+    return ".".join(f"module.{m}" for m in path) + "." + local_key
+
+
+def _index_modules(
+    root: dict,
+) -> tuple[dict[tuple[str, ...], dict], dict[tuple[str, ...], dict]]:
+    """Flatten the configuration module tree into path-keyed lookups: `modules`
+    maps a module path → its config dict; `calls` maps a module path → its
+    `module_calls` dict (child name → call, whose `expressions` are the child's
+    inputs evaluated in THIS scope)."""
+    modules: dict[tuple[str, ...], dict] = {(): root}
+    calls: dict[tuple[str, ...], dict] = {}
+
+    def walk(path: tuple[str, ...], mod: dict) -> None:
+        mc = mod.get("module_calls", {}) or {}
+        calls[path] = mc
+        for name, call in mc.items():
+            child = (call or {}).get("module", {}) or {}
+            cpath = path + (name,)
+            modules[cpath] = child
+            walk(cpath, child)
+
+    walk((), root)
+    return modules, calls
+
+
+def _make_resolver(
+    modules: dict[tuple[str, ...], dict],
+    calls: dict[tuple[str, ...], dict],
+    resource_types: set[str],
+):
+    """Build a `resolve_ref(path, ref) -> set[block_addr]` closure that resolves a
+    single reference string, in the scope of module `path`, to the set of
+    fully-qualified resource *block* addresses it ultimately depends on —
+    following `var.*` up into the parent's input expression and `module.child.out`
+    down into the child's output expression. Memoised, with a cycle guard.
+
+    A plain `type.name` reference is a resource dependency iff `type` is a known
+    managed-resource type (from the plan's resource_changes); an unqualified HCL
+    resource reference always targets a resource in the SAME module, so it's
+    qualified with the current scope's prefix. This gate (rather than checking the
+    config's `resources` list) tolerates plans that omit no-expression resources
+    from a module's configuration block."""
+    memo_in: dict[tuple[tuple[str, ...], str], set[str]] = {}
+    memo_out: dict[tuple[tuple[str, ...], str], set[str]] = {}
+    in_progress: set[tuple[str, tuple[str, ...], str]] = set()
+
+    def refs_of(expr: object) -> set[str]:
+        s: set[str] = set()
+        _collect_refs(expr, s)
+        return s
+
+    def resolve_ref(path: tuple[str, ...], ref: str) -> set[str]:
+        parts = ref.split(".")
+        head = parts[0]
+        if head == "var" and len(parts) >= 2:
+            return resolve_input(path, parts[1])
+        if head == "module":
+            # `module.child.out.…` binds to the child's output; a bare `module.child`
+            # (no output name) always rides alongside a specific `.out` ref, so skip it.
+            if len(parts) >= 3 and (path + (parts[1],)) in modules:
+                return resolve_output(path + (parts[1],), parts[2])
+            return set()
+        if len(parts) >= 2 and parts[0] in resource_types:
+            return {_qualify(path, f"{parts[0]}.{parts[1]}")}
+        return set()
+
+    def resolve_input(path: tuple[str, ...], varname: str) -> set[str]:
+        if not path:
+            return set()
+        k = (path, varname)
+        if k in memo_in:
+            return memo_in[k]
+        guard = ("in", path, varname)
+        if guard in in_progress:
+            return set()
+        in_progress.add(guard)
+        parent, name = path[:-1], path[-1]
+        call = (calls.get(parent, {}) or {}).get(name, {}) or {}
+        expr = (call.get("expressions", {}) or {}).get(varname)
+        out: set[str] = set()
+        for r in refs_of(expr):
+            out |= resolve_ref(parent, r)
+        in_progress.discard(guard)
+        memo_in[k] = out
+        return out
+
+    def resolve_output(path: tuple[str, ...], outname: str) -> set[str]:
+        k = (path, outname)
+        if k in memo_out:
+            return memo_out[k]
+        guard = ("out", path, outname)
+        if guard in in_progress:
+            return set()
+        in_progress.add(guard)
+        o = ((modules.get(path, {}) or {}).get("outputs", {}) or {}).get(outname, {}) or {}
+        out: set[str] = set()
+        for r in refs_of(o.get("expression")):
+            out |= resolve_ref(path, r)
+        in_progress.discard(guard)
+        memo_out[k] = out
+        return out
+
+    return resolve_ref
+
+
 def derive_graph(plan_bytes: bytes) -> dict:
     """Pure, synchronous derivation (runs in a thread). Never raises on a
     well-formed-but-empty plan — returns an empty graph."""
@@ -102,22 +223,29 @@ def derive_graph(plan_bytes: bytes) -> dict:
 
     resource_types = {n["type"] for n in nodes}
 
-    # Block-level reference map from the configuration.
-    cfg = plan.get("configuration", {}).get("root_module", {})
+    # Block-level reference map from the configuration, walked across the whole
+    # module tree (root + every module_call) with cross-module var/output binding.
+    root_cfg = plan.get("configuration", {}).get("root_module", {}) or {}
+    modules, calls = _index_modules(root_cfg)
+    resolve_ref = _make_resolver(modules, calls, resource_types)
     block_refs: dict[str, set[str]] = {}
-    for cr in cfg.get("resources", []) or []:
-        src_block = cr.get("address")
-        if not src_block:
-            continue
-        refs: set[str] = set()
-        _collect_refs(cr.get("expressions", {}), refs)
-        targets: set[str] = set()
-        for r in refs:
-            parts = r.split(".")
-            if len(parts) >= 2 and parts[0] in resource_types:
-                targets.add(f"{parts[0]}.{parts[1]}")
-        targets.discard(src_block)
-        block_refs[src_block] = targets
+    for path, mod in modules.items():
+        for cr in mod.get("resources", []) or []:
+            local = cr.get("address")
+            if not local:
+                continue
+            src_block = _qualify(path, local)
+            refs: set[str] = set()
+            _collect_refs(cr.get("expressions", {}), refs)
+            # for_each / count references are real dependencies too (e.g. a
+            # per-instance resource keyed off another module's output map).
+            _collect_refs(cr.get("for_each_expression"), refs)
+            _collect_refs(cr.get("count_expression"), refs)
+            targets: set[str] = set()
+            for r in refs:
+                targets |= resolve_ref(path, r)
+            targets.discard(src_block)
+            block_refs[src_block] = block_refs.get(src_block, set()) | targets
 
     # Expand to instance-level edges (source depends-on target).
     edges: list[dict] = []
