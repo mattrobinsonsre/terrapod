@@ -196,7 +196,10 @@ export function ImpactGraph({ runId }: { runId: string }) {
     if (box.isEmpty()) return
     const c = box.getCenter(new THREE.Vector3())
     const radius = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 1)
-    const dist = Math.max(radius * 2.6, 220)
+    // Fill the viewport comfortably: ~1.9× the bounding-sphere radius frames the
+    // node cloud with a little margin. The floor keeps a tiny plan (a handful of
+    // nodes) from zooming uncomfortably close.
+    const dist = Math.max(radius * 1.9, 150)
     const cur = fg.cameraPosition()
     const dir = new THREE.Vector3(cur.x - c.x, cur.y - c.y, cur.z - c.z)
     if (dir.length() < 1) dir.set(0, 0, 1)

@@ -160,6 +160,7 @@ Everything below is implemented and shipped today.
 | Run tasks | Pre/post-plan webhook hooks for external validation |
 | Execution hooks | Admin-managed custom shell steps run in the runner Job at pre_init / pre_plan / post_plan / pre_apply / post_apply, associated with workspaces |
 | Service catalog | No-code self-service provisioning over the module registry |
+| Impact graph | Interactive dependency + blast-radius view of a plan on the run page — module-clustered, click a resource to light up its transitive downstream impact |
 | Workspace health | Per-workspace health conditions, VCS polling status, drift detection indicators |
 
 ### AI (optional, off by default)
@@ -178,6 +179,7 @@ Everything below is implemented and shipped today.
 ![Workspace overview with VCS integration, drift detection, and labels](docs/images/workspace-overview.png)
 ![Variables with sensitive masking and HCL support](docs/images/workspace-variables.png)
 ![Agent pools with listener health monitoring](docs/images/admin-agent-pools.png)
+![Impact graph: a plan clustered by module with a resource's downstream blast radius highlighted](docs/images/impact-graph.png)
 </details>
 
 ---
@@ -373,6 +375,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [Terragrunt](docs/terragrunt.md) | CLI-driven and agent-mode Terragrunt support |
 | [Remote State](docs/remote-state.md) | State versioning, locking, rollback, the `cloud` backend |
 | [AI Plan Summary](docs/ai-plan-summary.md) | LLM plan summaries, risk assessment, failure analysis, chat |
+| [Impact Graph](docs/impact-graph.md) | Interactive dependency + blast-radius view of a plan on the run page, clustered by module |
 | [Notifications](docs/notifications.md) | Webhook, Slack, and email alerts on run events |
 | [Slack Integration](docs/slack-integration.md) | Interactive Socket Mode app — account linking, approvals, run notifications |
 | [Run Tasks](docs/run-tasks.md) | Pre/post-plan webhook hooks for external validation |
