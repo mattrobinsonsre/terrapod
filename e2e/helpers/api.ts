@@ -437,6 +437,7 @@ export async function seedStateVersion(
   token: string,
   workspaceId: string,
   serial = 1,
+  md5 = 'd41d8cd98f00b204e9800998ecf8427e',
 ): Promise<string> {
   const res = await fetch(
     `${API_URL}/api/v2/workspaces/${workspaceId}/state-versions`,
@@ -451,7 +452,7 @@ export async function seedStateVersion(
           type: 'state-versions',
           attributes: {
             serial,
-            md5: 'd41d8cd98f00b204e9800998ecf8427e',
+            md5,
             lineage: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
           },
         },
@@ -476,7 +477,6 @@ export async function seedStateVersionWithContent(
   resources: unknown[],
   serial = 1,
 ): Promise<string> {
-  const svId = await seedStateVersion(token, workspaceId, serial);
   const body = JSON.stringify({
     version: 4,
     terraform_version: '1.9.0',
@@ -485,6 +485,10 @@ export async function seedStateVersionWithContent(
     outputs: {},
     resources,
   });
+  // The content endpoint enforces that the uploaded bytes hash to the md5
+  // declared at create time, so compute it up front and declare it.
+  const md5 = createHash('md5').update(body).digest('hex');
+  const svId = await seedStateVersion(token, workspaceId, serial, md5);
   // Content upload is unauthenticated — the state-version UUID is the capability
   // token (matches go-tfe's presigned-style upload).
   const res = await fetch(`${API_URL}/api/v2/state-versions/${svId}/content`, {
