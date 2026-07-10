@@ -132,7 +132,7 @@ describe('buildWorkspaceTree', () => {
     assert.deepEqual(names, ['org-a-infra', 'org-b-infra'])
   })
 
-  it('sorts groups and workspaces alphabetically', () => {
+  it('sorts groups alphabetically and preserves workspace input order', () => {
     const workspaces = [
       ws('1', 'zulu', 'https://github.com/org/bravo.git'),
       ws('2', 'alpha', 'https://github.com/org/bravo.git'),
@@ -141,8 +141,9 @@ describe('buildWorkspaceTree', () => {
     const result = buildWorkspaceTree(workspaces, 'repo')
     assert.equal(result[0].label, 'alpha')
     assert.equal(result[1].label, 'bravo')
-    assert.equal(result[1].workspaces[0].name, 'alpha')
-    assert.equal(result[1].workspaces[1].name, 'zulu')
+    // Workspace order is preserved from input (caller handles sorting)
+    assert.equal(result[1].workspaces[0].name, 'zulu')
+    assert.equal(result[1].workspaces[1].name, 'alpha')
   })
 })
 

@@ -56,8 +56,7 @@ export function buildWorkspaceTree<T extends WsConstraint>(
 }
 
 function normalizeRepoUrl(url: string): string {
-  let cleaned = url.replace(/\.git$/, '').toLowerCase()
-  // Normalize SSH (git@host:org/repo) to match HTTPS (https://host/org/repo)
+  let cleaned = url.replace(/\.git$/, '').replace(/\/+$/, '').toLowerCase()
   const sshMatch = cleaned.match(/^[^@]+@([^:]+):(.+)$/)
   if (sshMatch) cleaned = `${sshMatch[1]}/${sshMatch[2]}`
   else cleaned = cleaned.replace(/^https?:\/\//, '')
@@ -95,7 +94,7 @@ function insertWorkspace<T extends WsConstraint>(
   ws: T,
   nestByPath: boolean,
 ) {
-  const dir = (ws.attributes['working-directory'] || '').replace(/^\/+/, '')
+  const dir = (ws.attributes['working-directory'] || '').trim().replace(/^\/+/, '')
   if (!nestByPath || !dir) {
     group.workspaces.push({ id: ws.id, name: ws.attributes.name, workspace: ws })
     return
@@ -122,7 +121,6 @@ function insertWorkspace<T extends WsConstraint>(
 function sortGroups<T>(groups: WorkspaceGroup<T>[]): WorkspaceGroup<T>[] {
   groups.sort((a, b) => a.label.localeCompare(b.label))
   for (const g of groups) {
-    g.workspaces.sort((a, b) => a.name.localeCompare(b.name))
     g.children = sortGroups(g.children)
   }
   return groups
