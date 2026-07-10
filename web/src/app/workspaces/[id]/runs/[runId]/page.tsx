@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import Convert from 'ansi-to-html'
 import NavBar from '@/components/nav-bar'
@@ -16,6 +17,12 @@ import { apiFetch } from '@/lib/api'
 import { useRunEvents } from '@/lib/use-run-events'
 import { useIsTouch } from '@/lib/use-media-query'
 import { ArrowDownToLine, RefreshCw, Download, Copy, Check, Palette } from 'lucide-react'
+
+// WebGL (three.js) — client-only, never SSR'd. Loaded on demand (#761).
+const ImpactGraph = dynamic(() => import('@/components/impact-graph').then((m) => m.ImpactGraph), {
+  ssr: false,
+  loading: () => <LoadingSpinner />,
+})
 
 interface RunActions {
   'is-confirmable': boolean
@@ -44,6 +51,7 @@ interface RunAttrs {
   'vcs-branch': string | null
   'vcs-pull-request-number': number | null
   'has-changes': boolean
+  'json-output'?: string
   'plan-summary': {
     add: number
     change: number
@@ -88,7 +96,7 @@ interface PlanApply {
 // more to show has its own tab — AI analysis and OPA policy only appear when
 // the run actually has them. Details holds the metadata / timeline / run
 // options / resource usage.
-type RunView = 'overview' | 'ai' | 'opa' | 'plan' | 'apply' | 'details'
+type RunView = 'overview' | 'ai' | 'opa' | 'impact' | 'plan' | 'apply' | 'details'
 
 const ansiConverter = new Convert({
   fg: '#cbd5e1',
@@ -585,7 +593,7 @@ function RunDetailPageInner() {
   // onto the matching tab, so old links from the runs list and the
   // confirm-redirect keep working.
   const viewParam = searchParams.get('view')
-  const KNOWN_VIEWS: RunView[] = ['overview', 'ai', 'opa', 'plan', 'apply', 'details']
+  const KNOWN_VIEWS: RunView[] = ['overview', 'ai', 'opa', 'impact', 'plan', 'apply', 'details']
   const initialView: RunView = KNOWN_VIEWS.includes(viewParam as RunView)
     ? (viewParam as RunView)
     : viewParam === 'logs' || tabParam === 'plan'
@@ -909,6 +917,9 @@ function RunDetailPageInner() {
     ['overview', 'Overview', 'Overview'],
     ...((aiInfo?.present ? [['ai', 'AI', 'AI analysis']] : []) as [RunView, React.ReactNode, string][]),
     ...((policyInfo?.present ? [['opa', 'OPA', 'OPA policies']] : []) as [RunView, React.ReactNode, string][]),
+    ...((attrs['json-output']
+      ? [['impact', 'Impact', 'Impact graph']]
+      : []) as [RunView, React.ReactNode, string][]),
     ['plan', planLabel, 'Plan log'],
     ...((attrs['plan-only'] ? [] : [['apply', applyLabel, 'Apply log']]) as [RunView, React.ReactNode, string][]),
     ['details', 'Details', 'Details'],
@@ -1289,6 +1300,10 @@ function RunDetailPageInner() {
             }}
           />
         )}
+
+        {/* Impact graph tab (#761) — interactive plan dependency + blast-radius
+            view; the tab only appears when the run produced a JSON plan. */}
+        {view === 'impact' && <ImpactGraph runId={runId.replace(/^run-/, '')} />}
 
         {view === 'details' && (
         <>
