@@ -816,6 +816,20 @@ The result is **RBAC-filtered**: only workspaces the caller can read appear, and
 
 **Required permission:** any authenticated user (content is filtered by per-workspace read access).
 
+### State Graph
+
+```
+GET /api/terrapod/v1/workspaces/{workspace_id}/state-graph[?state_version=sv-...]
+```
+
+Returns the **single-workspace resource dependency graph** behind the [State Resource Graph](state-resource-graph.md) tab: one `resource` node per resource address in the workspace's Terraform state (each carrying `type`, `mode` (`managed`/`data`), `module`, `provider`, and in-degree), wired by `depends-on` edges derived from the `dependencies` Terraform records per resource. Defaults to the workspace's current (highest-serial) state version; `?state_version=sv-...` renders an older one.
+
+`meta.versions` lists every state version (for the picker) and `meta.state_version` names the one rendered. Very large states are capped at `meta.max_nodes` (2,000); `meta.truncated` and `meta.total_resources` report this honestly. A workspace with no state (or a version whose content was never uploaded) returns an empty graph, not an error.
+
+**Response:** `{"data": {"type": "state-graphs", "attributes": {"nodes": [...], "edges": [...], "meta": {"counts": {"resources": N, "edges": N}, "truncated": false, "total_resources": N, "max_nodes": 2000, "versions": [...], "state_version": {...}}}}}`
+
+**Required permission:** `state:read` on the workspace (the graph is derived from the secret-bearing state blob, so it requires the same access as downloading raw state).
+
 ### Plan Summary
 
 ```

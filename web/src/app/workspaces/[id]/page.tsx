@@ -15,6 +15,7 @@ import { PlanSummaryBadges } from '@/components/plan-summary-badges'
 import { WorkspacePicker } from '@/components/workspace-picker'
 import { SensitiveValueInput } from '@/components/sensitive-value-input'
 import { MobileCardList, MobileCard } from '@/components/mobile-card-list'
+import { StateGraphTab } from '@/components/state-graph-tab'
 import { useIsTouch } from '@/lib/use-media-query'
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
@@ -215,9 +216,9 @@ const ALL_TRIGGERS = [
 const ALL_STAGES = ['pre_plan', 'post_plan', 'pre_apply'] as const
 const ALL_ENFORCEMENT_LEVELS = ['mandatory', 'advisory'] as const
 
-type Tab = 'overview' | 'variables' | 'runs' | 'state' | 'configurations' | 'notifications' | 'run-tasks' | 'run-triggers' | 'sharing'
+type Tab = 'overview' | 'variables' | 'runs' | 'state' | 'state-graph' | 'configurations' | 'notifications' | 'run-tasks' | 'run-triggers' | 'sharing'
 
-const VALID_TABS: Set<string> = new Set(['overview', 'variables', 'runs', 'state', 'configurations', 'notifications', 'run-tasks', 'run-triggers', 'sharing'])
+const VALID_TABS: Set<string> = new Set(['overview', 'variables', 'runs', 'state', 'state-graph', 'configurations', 'notifications', 'run-tasks', 'run-triggers', 'sharing'])
 
 export default function WorkspaceDetailPage() {
   return (
@@ -1570,6 +1571,7 @@ function WorkspaceDetailContent() {
     { key: 'variables', label: 'Variables' },
     { key: 'runs', label: 'Runs' },
     { key: 'state', label: 'State' },
+    { key: 'state-graph', label: 'State Graph' },
     { key: 'configurations', label: 'Configurations' },
     { key: 'notifications', label: 'Notifications' },
     { key: 'run-tasks', label: 'Run Tasks' },
@@ -3331,6 +3333,11 @@ function WorkspaceDetailContent() {
               </>
             )}
           </div>
+        )}
+
+        {/* State Graph Tab (#765) */}
+        {activeTab === 'state-graph' && workspace && (
+          <StateGraphTab workspaceId={workspace.id} />
         )}
 
         {/* Configurations Tab */}

@@ -162,6 +162,7 @@ Everything below is implemented and shipped today.
 | Service catalog | No-code self-service provisioning over the module registry |
 | Impact graph | Interactive dependency + blast-radius view of a plan on the run page — module-clustered, click a resource to light up its transitive downstream impact |
 | Estate topology | Whole-estate dependency graph — workspaces + modules wired by run-triggers, remote-state, and module links; group by any label / pool / name prefix; RBAC-filtered; accessible table fallback |
+| State resource graph | Per-workspace resource dependency graph from Terraform state — resources wired by `depends-on`; current state version by default with an older-version picker; group by type / module / provider / mode; accessible table fallback |
 | Workspace health | Per-workspace health conditions, VCS polling status, drift detection indicators |
 
 ### AI (optional, off by default)
@@ -378,6 +379,7 @@ See [docs/authentication.md](docs/authentication.md) for setup guides.
 | [AI Plan Summary](docs/ai-plan-summary.md) | LLM plan summaries, risk assessment, failure analysis, chat |
 | [Impact Graph](docs/impact-graph.md) | Interactive dependency + blast-radius view of a plan on the run page, clustered by module |
 | [Estate Topology](docs/estate-topology.md) | Whole-estate dependency + module-impact graph, grouped by any axis you choose; accessible table fallback |
+| [State Resource Graph](docs/state-resource-graph.md) | Per-workspace resource dependency graph from Terraform state, with an older-version picker; accessible table fallback |
 | [Notifications](docs/notifications.md) | Webhook, Slack, and email alerts on run events |
 | [Slack Integration](docs/slack-integration.md) | Interactive Socket Mode app — account linking, approvals, run notifications |
 | [Run Tasks](docs/run-tasks.md) | Pre/post-plan webhook hooks for external validation |

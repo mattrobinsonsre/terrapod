@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { getStoredToken, createWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedRunTask, uniqueName } from '../helpers/api';
+import { getStoredToken, createWorkspace, createUser, createAgentPool, createRegistryModule, seedRun, seedStateVersion, seedStateVersionWithContent, seedRunTask, uniqueName } from '../helpers/api';
 
 /**
  * Responsive / mobile harness (#719).
@@ -184,6 +184,24 @@ test.describe('Responsive harness (phone viewport)', () => {
     await expect(page.getByText('#1', { exact: true }).filter({ visible: true })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('button', { name: 'Download' }).filter({ visible: true })).toBeVisible();
 
+    await expectNoHorizontalPageScroll(page);
+  });
+
+  test('workspace state graph defaults to the accessible table at phone width', async ({ page }) => {
+    // The state resource graph (#765) is WebGL-heavy and desktop-oriented, so a
+    // phone defaults to the accessible table (via useIsMobile) — never a blank
+    // canvas — and must not scroll horizontally.
+    const token = getStoredToken();
+    const wsName = uniqueName('resp-stategraph');
+    const wsId = await createWorkspace(token, wsName);
+    await seedStateVersionWithContent(token, wsId, [
+      { mode: 'managed', type: 'null_resource', name: 'hub', instances: [{ dependencies: [] }] },
+    ]);
+
+    await page.goto(`/workspaces/${wsId}?tab=state-graph`);
+
+    // Phone → Table view is the default: the resource is listed as a rowheader.
+    await expect(page.getByRole('rowheader', { name: 'null_resource.hub' })).toBeVisible({ timeout: 15_000 });
     await expectNoHorizontalPageScroll(page);
   });
 

@@ -201,3 +201,27 @@ async def show_estate_graph(
     return JSONResponse(
         content={"data": {"id": "estate-graph", "type": "estate-graphs", "attributes": graph}}
     )
+
+
+@router.get("/workspaces/{workspace_id}/state-graph")
+async def show_state_graph(
+    workspace_id: str = Path(...),
+    state_version: str | None = None,
+    user: AuthenticatedUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Resource dependency graph for a workspace's state version (#765).
+
+    Terrapod-native. Derives ``{nodes, edges, meta}`` from the Terraform state
+    blob — one node per resource address, ``depends-on`` edges from each
+    instance's ``dependencies``. Defaults to the current (highest-serial) state
+    version; ``?state_version=sv-...`` renders an older one. ``meta.versions``
+    carries the picker list. Gated on ``state:read`` (the graph is derived from
+    the secret-bearing state blob). See ``state_graph_service``.
+    """
+    from terrapod.services import state_graph_service
+
+    graph = await state_graph_service.derive_state_graph(db, user, workspace_id, state_version)
+    return JSONResponse(
+        content={"data": {"id": "state-graph", "type": "state-graphs", "attributes": graph}}
+    )

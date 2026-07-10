@@ -465,6 +465,40 @@ export async function seedStateVersion(
 }
 
 /**
+ * Seed a state version AND upload real state content, so the state graph
+ * (#765) has resources to parse. `resources` is a Terraform-state v4 resource
+ * list; each entry needs at least {mode, type, name, instances:[{dependencies}]}.
+ * Returns the state-version id.
+ */
+export async function seedStateVersionWithContent(
+  token: string,
+  workspaceId: string,
+  resources: unknown[],
+  serial = 1,
+): Promise<string> {
+  const svId = await seedStateVersion(token, workspaceId, serial);
+  const body = JSON.stringify({
+    version: 4,
+    terraform_version: '1.9.0',
+    serial,
+    lineage: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+    outputs: {},
+    resources,
+  });
+  // Content upload is unauthenticated — the state-version UUID is the capability
+  // token (matches go-tfe's presigned-style upload).
+  const res = await fetch(`${API_URL}/api/v2/state-versions/${svId}/content`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  });
+  if (!res.ok) {
+    throw new Error(`Upload state content failed: ${res.status} ${await res.text()}`);
+  }
+  return svId;
+}
+
+/**
  * Wait for the stack to be healthy by polling the API ping endpoint.
  */
 export async function waitForStack(timeoutMs = 120_000): Promise<void> {
