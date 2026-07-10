@@ -22,6 +22,15 @@ def _res(rows):
     return r
 
 
+def _named(**attrs):
+    # MagicMock(name=...) sets the mock's *name*, not a .name attribute — assign
+    # explicitly so pool/module `.name` reads return the real string.
+    m = MagicMock()
+    for k, v in attrs.items():
+        setattr(m, k, v)
+    return m
+
+
 def _mk_db(workspaces, pools, run_triggers, remote_states, links, modules):
     db = AsyncMock()
     # derive_estate_graph issues selects in this exact order:
@@ -55,7 +64,7 @@ class TestEstateGraph:
             _ws(W2, "app-web", {"team": "web"}),
             _ws(W3, "secret-ws", {"team": "sec"}),  # hidden
         ]
-        pools = [MagicMock(id=POOL, name="aws-use1")]
+        pools = [_named(id=POOL, name="aws-use1")]
         run_triggers = [
             MagicMock(source_workspace_id=W1, workspace_id=W2),  # both visible → kept
             MagicMock(source_workspace_id=W2, workspace_id=W3),  # touches hidden → dropped
@@ -65,7 +74,7 @@ class TestEstateGraph:
             MagicMock(module_id=M1, workspace_id=W1),  # visible → M1 included
             MagicMock(module_id=M2, workspace_id=W3),  # only hidden → M2 excluded
         ]
-        modules = [MagicMock(id=M1, name="vpc", provider="aws")]
+        modules = [_named(id=M1, name="vpc", provider="aws")]
         db = _mk_db(workspaces, pools, run_triggers, remote, links, modules)
 
         g = await _derive(db, {W1, W2})
@@ -85,7 +94,7 @@ class TestEstateGraph:
 
     async def test_pool_and_indegree(self):
         workspaces = [_ws(W1, "hub", {}, POOL), _ws(W2, "leaf", {}, None, mode="local")]
-        pools = [MagicMock(id=POOL, name="aws-use1")]
+        pools = [_named(id=POOL, name="aws-use1")]
         run_triggers = [MagicMock(source_workspace_id=W1, workspace_id=W2)]
         db = _mk_db(workspaces, pools, run_triggers, [], [], [])
 
