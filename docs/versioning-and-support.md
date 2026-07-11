@@ -60,6 +60,18 @@ rolling upgrade or live in a separate, independently-upgraded cluster.
 - **API ↔ go-terrapod / provider / `terraform` CLI:** an SDK/provider/CLI built
   against API version `N` keeps working against API `≥ N` within the same MAJOR.
 
+### Runtime version handshake
+
+The API advertises its running version as `terrapod-version` in the
+`/.well-known/terraform.json` discovery document, and `go-terrapod`'s
+`Client.VersionCheck` compares it against the SDK's build-pinned version using
+exactly the policy above: compatible when they share the same MAJOR and the API
+is at least as new as the SDK (`api >= sdk`). The provider (a startup warning
+diagnostic), `terrapod-migrate`, and `terrapod-publish` (a stderr warning) all
+run this check so a version-skew surfaces as a clear, actionable message instead
+of a confusing downstream failure. It only ever **warns** — never blocks — and a
+dev build on either side skips the check.
+
 ## Deprecation window
 
 Nothing on a stable surface is removed without notice. To remove or rename

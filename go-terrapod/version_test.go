@@ -45,10 +45,12 @@ func TestVersionCheck_ExactMatch(t *testing.T) {
 	}
 }
 
-func TestVersionCheck_Mismatch(t *testing.T) {
-	withSDKVersion(t, "0.27.0")
+func TestVersionCheck_APIOlderIsMismatch(t *testing.T) {
+	// Same major, but the API is OLDER than the SDK was built against —
+	// the SDK may call endpoints the older API lacks. Mismatch.
+	withSDKVersion(t, "1.4.0")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"terrapod-version": "0.26.0"}`))
+		_, _ = w.Write([]byte(`{"terrapod-version": "1.2.0"}`))
 	}))
 	defer srv.Close()
 
@@ -57,12 +59,43 @@ func TestVersionCheck_Mismatch(t *testing.T) {
 	if !errors.Is(err, ErrVersionMismatch) {
 		t.Fatalf("expected ErrVersionMismatch, got: %v", err)
 	}
-	// Message must name both versions and the release URL.
 	msg := err.Error()
-	for _, want := range []string{"SDK=0.27.0", "API=0.26.0", "v0.26.0"} {
+	for _, want := range []string{"SDK=1.4.0", "API=1.2.0"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("error message missing %q: %s", want, msg)
 		}
+	}
+}
+
+func TestVersionCheck_NewerAPISameMajorIsOK(t *testing.T) {
+	// The API is NEWER than the SDK, same major → forward-compatible → nil.
+	// This is the core case the old exact-match logic wrongly failed.
+	withSDKVersion(t, "1.0.0")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"terrapod-version": "1.7.3"}`))
+	}))
+	defer srv.Close()
+
+	c := makeClient(t, srv.URL)
+	if err := c.VersionCheck(context.Background()); err != nil {
+		t.Fatalf("newer API within same major must be compatible, got: %v", err)
+	}
+}
+
+func TestVersionCheck_DifferentMajorIsMismatch(t *testing.T) {
+	withSDKVersion(t, "1.9.0")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"terrapod-version": "2.0.0"}`))
+	}))
+	defer srv.Close()
+
+	c := makeClient(t, srv.URL)
+	err := c.VersionCheck(context.Background())
+	if !errors.Is(err, ErrVersionMismatch) {
+		t.Fatalf("expected ErrVersionMismatch across majors, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "major") {
+		t.Errorf("error should name the major mismatch: %v", err)
 	}
 }
 
@@ -95,14 +128,26 @@ func TestVersionCheck_EmptyFieldIsUnreported(t *testing.T) {
 	}
 }
 
-func TestVersionCheck_DevBuildIsMismatch(t *testing.T) {
-	// SDKVersion="dev" → can't compare; surface as Mismatch so the
-	// consuming tool can offer --allow-api-version-mismatch override.
+func TestVersionCheck_DevSDKSkips(t *testing.T) {
+	// SDKVersion="dev" → no pinned version to compare; skip silently
+	// (return nil) rather than false-alarm. Must not even probe the server.
 	withSDKVersion(t, "dev")
 	c := makeClient(t, "https://unreachable.example")
-	err := c.VersionCheck(context.Background())
-	if !errors.Is(err, ErrVersionMismatch) {
-		t.Errorf("expected ErrVersionMismatch for dev build, got: %v", err)
+	if err := c.VersionCheck(context.Background()); err != nil {
+		t.Errorf("dev SDK build should skip the check (nil), got: %v", err)
+	}
+}
+
+func TestVersionCheck_DevAPISkips(t *testing.T) {
+	// The target reports "dev" → no meaningful version; skip → nil.
+	withSDKVersion(t, "1.0.0")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"terrapod-version": "dev"}`))
+	}))
+	defer srv.Close()
+	c := makeClient(t, srv.URL)
+	if err := c.VersionCheck(context.Background()); err != nil {
+		t.Errorf("dev API build should skip the check (nil), got: %v", err)
 	}
 }
 

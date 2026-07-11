@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -10,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 	"github.com/mattrobinsonsre/terrapod/provider/internal/client"
 	agentPoolDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/agent_pool"
 	catalogInstancesDS "github.com/mattrobinsonsre/terrapod/provider/internal/datasources/catalog_instances"
@@ -121,6 +123,19 @@ func (p *terrapodProvider) Configure(ctx context.Context, req provider.Configure
 	}
 
 	c := client.NewClient(hostname, token, skipTLS)
+
+	// Compatibility check (#550): warn — never block — if this provider build
+	// is incompatible with the target Terrapod API version (different major, or
+	// an API older than the provider was built against). A warning keeps a
+	// version-skew from silently causing confusing downstream errors, without
+	// failing the plan on a probe that might itself be misconfigured.
+	if tc, err := terrapod.NewClient(terrapod.Options{
+		BaseURL: c.BaseURL, Token: c.Token, SkipTLSVerify: c.SkipTLSVerify,
+	}); err == nil {
+		if verr := tc.VersionCheck(ctx); verr != nil && errors.Is(verr, terrapod.ErrVersionMismatch) {
+			resp.Diagnostics.AddWarning("Terrapod provider/API version mismatch", verr.Error())
+		}
+	}
 
 	resp.DataSourceData = c
 	resp.ResourceData = c

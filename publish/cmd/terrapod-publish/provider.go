@@ -78,6 +78,7 @@ func providerCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "client: %v\n", err)
 		return 1
 	}
+	warnVersionMismatch(client)
 
 	err = publisher.PublishProvider(context.Background(), client, publisher.ProviderInput{
 		Name:       *name,

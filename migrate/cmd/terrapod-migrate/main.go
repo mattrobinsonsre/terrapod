@@ -18,9 +18,23 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
+
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 )
+
+// warnVersionMismatch prints a non-fatal stderr warning if this terrapod-migrate
+// build is incompatible with the target Terrapod API version (#550) — a
+// different major, or an API older than the SDK was built against. Never aborts:
+// a version probe that itself fails must not block a migration.
+func warnVersionMismatch(c *terrapod.Client) {
+	if err := c.VersionCheck(context.Background()); err != nil && errors.Is(err, terrapod.ErrVersionMismatch) {
+		fmt.Fprintf(os.Stderr, "warning: %v\n", err)
+	}
+}
 
 // Version is the build-time-pinned tool version. It MUST match the target
 // Terrapod API's reported version on startup (compared via
