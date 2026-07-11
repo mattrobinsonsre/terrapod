@@ -1,0 +1,560 @@
+{
+  "agent_pools._token_json": [
+    "created-at",
+    "created-by",
+    "description",
+    "expires-at",
+    "is-revoked",
+    "max-uses",
+    "use-count"
+  ],
+  "audit.list_audit_log": [
+    "action",
+    "actor-email",
+    "actor-ip",
+    "detail",
+    "duration-ms",
+    "request-id",
+    "resource-id",
+    "resource-type",
+    "status-code",
+    "timestamp"
+  ],
+  "autodiscovery_rules._rule_json": [
+    "agent-pool-id",
+    "auto-apply",
+    "branch",
+    "created-at",
+    "enabled",
+    "execution-backend",
+    "execution-hook-templates",
+    "execution-mode",
+    "ignore-patterns",
+    "labels",
+    "name",
+    "name-template",
+    "notification-templates",
+    "on-directory-delete",
+    "owner-email",
+    "pattern",
+    "repo-url",
+    "resource-cpu",
+    "resource-memory",
+    "run-task-templates",
+    "terraform-version",
+    "updated-at",
+    "var-files",
+    "vcs-connection-id"
+  ],
+  "autodiscovery_rules.preview_rule": [
+    "entries",
+    "files-walked",
+    "ref"
+  ],
+  "autodiscovery_rules.preview_unsaved_rule": [
+    "entries",
+    "files-walked",
+    "ref"
+  ],
+  "autodiscovery_rules.scan_rule": [
+    "files-walked",
+    "ref",
+    "workspace-ids",
+    "workspaces-created"
+  ],
+  "binary_cache.list_cached_binaries_endpoint": [
+    "arch",
+    "cached-at",
+    "download-url",
+    "os",
+    "shasum",
+    "tool",
+    "version"
+  ],
+  "binary_cache.list_cached_providers_endpoint": [
+    "arch",
+    "cached-at",
+    "hostname",
+    "namespace",
+    "os",
+    "provider-type",
+    "shasum",
+    "version"
+  ],
+  "catalog._instance_json": [
+    "agent-pool-id",
+    "catalog-item-id",
+    "catalog-version-pin",
+    "labels",
+    "name",
+    "owner-email"
+  ],
+  "catalog._item_json": [
+    "allowed-agent-pool-ids",
+    "created-at",
+    "default-version-pin",
+    "description",
+    "display-name",
+    "enabled",
+    "labels",
+    "module-id",
+    "module-name",
+    "module-provider",
+    "name",
+    "owner-email",
+    "provider-template-ids",
+    "updated-at",
+    "variable-options"
+  ],
+  "catalog._run_ref": [
+    "is-destroy",
+    "status"
+  ],
+  "catalog._template_json": [
+    "body",
+    "created-at",
+    "labels",
+    "name",
+    "owner-email",
+    "parameters",
+    "provider-type",
+    "updated-at"
+  ],
+  "catalog.get_catalog_item_form": [
+    "fields",
+    "resolved-version"
+  ],
+  "config_versions._cv_json": [
+    "auto-queue-runs",
+    "created-at",
+    "source",
+    "speculative",
+    "status",
+    "upload-url"
+  ],
+  "config_versions.diff_configuration_versions": [
+    "from-id",
+    "to-id"
+  ],
+  "config_versions.mint_download_ticket": [
+    "expires-at",
+    "ticket",
+    "url"
+  ],
+  "encryption.rotate_data_encryption_key": [
+    "rotated_to_version"
+  ],
+  "execution_hooks._hook_json": [
+    "created-at",
+    "description",
+    "enabled",
+    "hook-point",
+    "name",
+    "priority",
+    "script",
+    "updated-at",
+    "workspace-count"
+  ],
+  "gpg_keys._gpg_key_to_jsonapi": [
+    "ascii-armor",
+    "created-at",
+    "key-id",
+    "namespace",
+    "source",
+    "source-url",
+    "updated-at"
+  ],
+  "notification_configurations._nc_json": [
+    "created-at",
+    "delivery-responses",
+    "destination-type",
+    "email-addresses",
+    "enabled",
+    "has-token",
+    "name",
+    "triggers",
+    "updated-at",
+    "url"
+  ],
+  "policy_sets._evaluation_json": [
+    "created-at",
+    "enforcement-level",
+    "outcome",
+    "overridden-at",
+    "overridden-by",
+    "policy-set-name",
+    "result"
+  ],
+  "policy_sets._policy_json": [
+    "created-at",
+    "description",
+    "name",
+    "rego",
+    "updated-at"
+  ],
+  "registry_modules._link_to_jsonapi": [
+    "created-at",
+    "created-by",
+    "workspace-id",
+    "workspace-name"
+  ],
+  "registry_modules._module_to_jsonapi": [
+    "created-at",
+    "labels",
+    "name",
+    "namespace",
+    "owner-email",
+    "permissions",
+    "provider",
+    "source",
+    "status",
+    "updated-at",
+    "vcs-branch",
+    "vcs-connection-id",
+    "vcs-last-tag",
+    "vcs-repo-url",
+    "vcs-tag-pattern",
+    "version-statuses"
+  ],
+  "registry_modules.create_module_version_endpoint": [
+    "created-at",
+    "status",
+    "version"
+  ],
+  "registry_modules.module_interface_endpoint": [
+    "inputs",
+    "outputs",
+    "version"
+  ],
+  "registry_modules.upload_module_version_endpoint": [
+    "created-at",
+    "status",
+    "version"
+  ],
+  "registry_providers._platform_to_jsonapi": [
+    "arch",
+    "filename",
+    "os",
+    "shasum",
+    "upload-status"
+  ],
+  "registry_providers._provider_to_jsonapi": [
+    "created-at",
+    "labels",
+    "name",
+    "namespace",
+    "owner-email",
+    "permissions",
+    "updated-at"
+  ],
+  "registry_providers._version_to_jsonapi": [
+    "created-at",
+    "platforms",
+    "protocols",
+    "shasums-sig-uploaded",
+    "shasums-uploaded",
+    "version"
+  ],
+  "remote_state_consumers._consumer_json": [
+    "consumer-workspace-name",
+    "created-at",
+    "created-by",
+    "producer-workspace-name"
+  ],
+  "role_assignments._assignment_json": [
+    "created-at",
+    "email",
+    "provider-name",
+    "role-name"
+  ],
+  "roles._builtin_role_json": [
+    "allow-labels",
+    "allow-names",
+    "built-in",
+    "capabilities",
+    "catalog-permission",
+    "created-at",
+    "deny-labels",
+    "deny-names",
+    "description",
+    "pool-permission",
+    "registry-permission",
+    "updated-at",
+    "workspace-permission"
+  ],
+  "roles._role_json": [
+    "allow-labels",
+    "allow-names",
+    "built-in",
+    "capabilities",
+    "catalog-permission",
+    "created-at",
+    "deny-labels",
+    "deny-names",
+    "description",
+    "pool-permission",
+    "registry-permission",
+    "updated-at",
+    "workspace-permission"
+  ],
+  "run_tasks._run_task_json": [
+    "created-at",
+    "enabled",
+    "enforcement-level",
+    "has-hmac-key",
+    "name",
+    "stage",
+    "updated-at",
+    "url"
+  ],
+  "run_tasks._task_stage_json": [
+    "created-at",
+    "stage",
+    "status",
+    "updated-at"
+  ],
+  "run_tasks._task_stage_result_json": [
+    "created-at",
+    "finished-at",
+    "message",
+    "started-at",
+    "status"
+  ],
+  "run_triggers._trigger_json": [
+    "created-at",
+    "sourceable-name",
+    "workspace-name"
+  ],
+  "runs._apply_json": [
+    "log-read-url",
+    "status"
+  ],
+  "runs._run_json": [
+    "actions",
+    "allow-empty-apply",
+    "auto-apply",
+    "created-at",
+    "created-by",
+    "discard-reason",
+    "error-message",
+    "execution-backend",
+    "has-changes",
+    "has-json-output",
+    "is-destroy",
+    "is-drift-detection",
+    "message",
+    "module-overrides",
+    "peak-cpu-usec",
+    "peak-memory-bytes",
+    "permissions",
+    "plan-only",
+    "plan-summary",
+    "refresh",
+    "refresh-only",
+    "replace-addrs",
+    "resource-cpu",
+    "resource-memory",
+    "runner-exit-code",
+    "runner-exit-reason",
+    "runner-exit-status",
+    "source",
+    "status",
+    "status-timestamps",
+    "target-addrs",
+    "terraform-version",
+    "terragrunt-enabled",
+    "terragrunt-version",
+    "updated-at",
+    "vcs-branch",
+    "vcs-commit-sha",
+    "vcs-pull-request-number",
+    "workspace-has-vcs",
+    "workspace-name"
+  ],
+  "runs.list_run_events": [
+    "action",
+    "created-at"
+  ],
+  "runs.regenerate_plan_summary": [
+    "created-at",
+    "description",
+    "error-message",
+    "input-tokens",
+    "kind",
+    "model",
+    "output-tokens",
+    "risk-factors",
+    "risk-level",
+    "status",
+    "updated-at"
+  ],
+  "runs.show_plan_summary": [
+    "created-at",
+    "description",
+    "error-message",
+    "input-tokens",
+    "kind",
+    "model",
+    "output-tokens",
+    "risk-factors",
+    "risk-level",
+    "status",
+    "updated-at"
+  ],
+  "tfe_v2._state_version_json": [
+    "created-at",
+    "created-by",
+    "hosted-json-state-upload-url",
+    "hosted-state-download-url",
+    "hosted-state-upload-url",
+    "lineage",
+    "md5",
+    "serial",
+    "size"
+  ],
+  "tfe_v2._workspace_json": [
+    "actions",
+    "agent-pool-id",
+    "agent-pool-name",
+    "ai-summary-context",
+    "ai-summary-mode",
+    "auto-apply",
+    "auto-merge",
+    "auto-merge-strategy",
+    "created-at",
+    "drift-detection-enabled",
+    "drift-detection-interval-seconds",
+    "drift-ignore-rules",
+    "drift-last-checked-at",
+    "drift-latest-run-id",
+    "drift-status",
+    "execution-backend",
+    "execution-mode",
+    "health-conditions",
+    "labels",
+    "latest-run",
+    "lifecycle-reason",
+    "lifecycle-state",
+    "locked",
+    "name",
+    "operations",
+    "owner-email",
+    "permissions",
+    "plan-expiry-seconds",
+    "resource-cpu",
+    "resource-memory",
+    "slack-channel",
+    "state-diverged",
+    "tag-names",
+    "terraform-version",
+    "terragrunt-enabled",
+    "terragrunt-version",
+    "trigger-prefixes",
+    "updated-at",
+    "var-files",
+    "vcs-branch",
+    "vcs-connection-id",
+    "vcs-connection-name",
+    "vcs-last-error",
+    "vcs-last-error-at",
+    "vcs-last-polled-at",
+    "vcs-repo-url",
+    "vcs-workflow",
+    "working-directory"
+  ],
+  "tfe_v2.account_details": [
+    "avatar-url",
+    "email",
+    "is-service-account",
+    "permissions",
+    "username",
+    "v2-only"
+  ],
+  "tfe_v2.list_workspace_effective_tag_bindings": [
+    "key",
+    "value"
+  ],
+  "tfe_v2.list_workspace_tag_bindings": [
+    "key",
+    "value"
+  ],
+  "tfe_v2.organization_entitlements": [
+    "agents",
+    "audit-logging",
+    "configuration-designer",
+    "cost-estimation",
+    "global-run-tasks",
+    "operations",
+    "policy-enforcement",
+    "policy-limit",
+    "policy-mandatory-enforcement-limit",
+    "policy-set-limit",
+    "private-module-registry",
+    "private-policy-agents",
+    "private-vcs",
+    "run-task-limit",
+    "run-task-mandatory-enforcement-limit",
+    "run-task-workspace-limit",
+    "run-tasks",
+    "self-serve-billing",
+    "sentinel",
+    "sso",
+    "state-storage",
+    "teams",
+    "user-limit",
+    "vcs-integrations"
+  ],
+  "tfe_v2.show_organization": [
+    "created-at",
+    "email",
+    "external-id",
+    "name",
+    "permissions"
+  ],
+  "users._user_to_jsonapi": [
+    "created-at",
+    "display-name",
+    "email",
+    "has-password",
+    "is-active",
+    "last-login-at",
+    "updated-at"
+  ],
+  "variables._var_json": [
+    "category",
+    "created-at",
+    "description",
+    "hcl",
+    "key",
+    "sensitive",
+    "updated-at",
+    "value",
+    "version-id"
+  ],
+  "variables._varset_json": [
+    "created-at",
+    "description",
+    "global",
+    "name",
+    "priority",
+    "updated-at",
+    "var-count",
+    "workspace-count"
+  ],
+  "variables._vsvar_json": [
+    "category",
+    "created-at",
+    "description",
+    "hcl",
+    "key",
+    "sensitive",
+    "updated-at",
+    "value",
+    "version-id"
+  ],
+  "workspace_extensions.dismiss_drift": [
+    "drift-detection-enabled",
+    "drift-last-checked-at",
+    "drift-status"
+  ]
+}

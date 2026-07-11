@@ -103,6 +103,10 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 target-version = "py313"
 line-length = 100
+# Alembic migrations are auto-generated with the conventional revision-vars-
+# before-imports layout (E402) and are not hand-linted. (They're now present in
+# the test image so tests/db can parse them — this keeps ruff off them.)
+extend-exclude = ["alembic"]
 
 [tool.ruff.lint]
 select = [
