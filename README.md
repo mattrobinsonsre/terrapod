@@ -9,7 +9,7 @@ Get the collaboration, governance, state, registry, and UI layer of a commercial
 
 Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
-In short: it's a free, **self-hosted, open-source alternative to Terraform Cloud (HCP Terraform) and Terraform Enterprise** — a **TACOS** (Terraform Automation and Collaboration Software) platform for teams standardizing on `terraform`, OpenTofu (`tofu`), or Terragrunt. New here and comparing options? Start with **[Alternatives to Terraform Enterprise / Terraform Cloud](docs/alternatives.md)** and the **[FAQ](docs/faq.md)**.
+In short: it's a free, **self-hosted, open-source alternative to Terraform Cloud (HCP Terraform) and Terraform Enterprise** — a **TACOS** (Terraform Automation and Collaboration Software) platform for teams standardizing on `terraform`, OpenTofu (`tofu`), or Terragrunt. And it will **stay** free — there is no commercial edition, no open-core split, no paid tier, and no per-resource pricing, now or planned; the complete platform is in this repository. New here and comparing options? Start with **[Alternatives to Terraform Enterprise / Terraform Cloud](docs/alternatives.md)** and the **[FAQ](docs/faq.md)**.
 
 ![Terrapod run detail — plan output with an AI change summary, per-policy OPA pass/fail, and resource-change cards](docs/images/run-detail.png)
 *A single run: plan output, an AI-generated change summary and risk assessment, per-policy OPA results, and resource-change cards.*
@@ -478,9 +478,9 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 |---|---|---|
 | [Terrakube](https://terrakube.io/) | Open-source TFC/TFE replacement | Closest peer — comparable full-platform scope (see below) |
 | [OpenTofu](https://opentofu.org/) | Open-source Terraform fork (CLI) | CLI only — no collaboration platform; Terrapod runs it as an engine |
-| [Atlantis](https://www.runatlantis.io/) | PR-based plan/apply automation | No UI, no state management, no registry, no RBAC |
-| [Digger](https://digger.dev/) | CI-native Terraform orchestration | Runs inside CI; no standalone platform |
-| [Terrateam](https://terrateam.io/) | GitHub-integrated TF automation | GitHub-coupled; limited community edition |
+| [Atlantis](https://www.runatlantis.io/) | PR-based plan/apply automation | Focused PR automation; not a full state/registry/UI platform — pairs with your existing tooling |
+| [Digger](https://digger.dev/) | CI-native Terraform orchestration | Runs inside your CI; deliberately no separate execution engine to operate |
+| [Terrateam](https://terrateam.io/) | GitHub-integrated TF automation | GitHub-focused; open-core (community + paid tiers) |
 | [Spacelift](https://spacelift.io/) | Commercial TF management platform | Not open source |
 
 ### Terrakube
@@ -497,7 +497,7 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 
 **Where Terrapod is genuinely differentiated.** The first three share one theme — Terrapod is built for restricted-network, multi-cluster, low-upstream-dependency topologies:
 
-- **Firewall-friendly cross-cluster execution** — Terrapod runners connect *outbound* to the control plane over SSE and create Jobs locally, so the API holds no inbound reach and no Kubernetes access into the execution cluster. This suits isolated / NAT'd / outbound-only execution clusters. Per Terrakube's documented model, its API reaches into the executor (so the executor is exposed to the control plane) — a different network topology, better fit for different constraints.
+- **Firewall-friendly cross-cluster execution** — Terrapod runners connect *outbound* to the control plane over SSE and create Jobs locally, so the API holds no inbound reach and no Kubernetes access into the execution cluster. This suits isolated / NAT'd / outbound-only execution clusters. Terrakube integrates execution differently — a control-plane-coordinated executor model — a different network topology that fits different constraints.
 - **Polling-first VCS** — Terrapod supports inbound webhooks (GitHub and GitLab) but does not require them: it also polls VCS over outbound HTTPS, so the integration works behind firewalls/NATs with no inbound delivery. Terrakube uses webhook delivery. Different fits for inbound-restricted networks.
 - **Pull-through provider mirror + terraform/tofu binary cache** — runners have zero direct upstream dependency; Terrakube ships a local plugin cache.
 - **Monorepo autodiscovery** — Atlantis-style auto-creation of workspaces from glob-matched directories on PRs (Terrakube has directory filtering, but not auto-creation).
@@ -516,6 +516,8 @@ Licensing: Terrapod is **MPL-2.0** (file-level copyleft, the same license as Ope
 ## License
 
 [MPL-2.0](LICENSE) — file-level copyleft keeps Terrapod's own source open while staying friendly to enterprise adoption (the same license as OpenTofu and the historical Terraform codebase). For most operators this is a non-issue: **running Terrapod internally, self-hosted, imposes no obligation to disclose your own code or configuration** — MPL-2.0's copyleft is file-level (it attaches to modifications of Terrapod's *own* files you distribute), and there is no network-use trigger.
+
+**Terrapod is free, and always will be.** There is no commercial edition, no open-core split, no paid "enterprise" tier, and no per-resource or per-seat pricing — now or planned. The complete platform lives in this repository; nothing documented here is gated behind a paid plan.
 
 ---
 

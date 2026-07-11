@@ -13,10 +13,14 @@ OpenTofu (`tofu`) as pluggable execution backends. It is **not** a fork of the
 Terraform/OpenTofu engine — it orchestrates them. Deployed via a Helm chart on
 Kubernetes. License: MPL-2.0. Current release: **v1.0.0** (stable).
 
-## Is Terrapod free / open source?
+## Is Terrapod free / open source? Will it always be?
 
-Yes — MPL-2.0 (file-level copyleft, the same license as OpenTofu). There is no
-per-resource, per-run, or per-seat pricing; you run it on your own infrastructure.
+Yes, and yes. Terrapod is MPL-2.0 (file-level copyleft, the same license as
+OpenTofu), with no per-resource, per-run, or per-seat pricing — you run it on
+your own infrastructure. And it will **stay** free: there is no commercial
+edition, no open-core split, no paid "enterprise" tier, and no plan to introduce
+one. The complete platform is in the public repository; nothing here is gated
+behind a paid plan.
 
 ## Is there a free alternative to Terraform Cloud or Terraform Enterprise?
 
@@ -132,6 +136,18 @@ your repos to adopt Terrapod:
   that subtree**, so a large mixed repo doesn't pull everything on every run.
 
 See [Autodiscovery](autodiscovery.md) and [VCS workflows](vcs-workflows.md).
+
+## Can I size CPU and memory per workspace, or is it one worker size for everything?
+
+Per workspace. Each workspace carries its own `resource-cpu` and
+`resource-memory` (Kubernetes requests; the runner Job's limits are computed
+automatically at 2× the request), and the values are snapshotted onto each run,
+so changing a workspace later doesn't disturb runs already in flight. A small
+workspace can run in a fraction of a CPU while a large, provider-heavy one gets
+several GB — you don't have to size a single shared worker for the worst case.
+If a run is OOM-killed, Terrapod surfaces the peak memory it reached and names
+the exact value to raise before retrying. See
+[Per-workspace resources](architecture.md#per-workspace-resources).
 
 ## How is Terrapod different from Terrakube?
 

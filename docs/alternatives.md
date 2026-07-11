@@ -30,7 +30,10 @@ Terraform Cloud / Enterprise, self-hosted and open-source (MPL-2.0), with:
 - **A modern web UI**, audit logging, notifications, drift detection, a no-code
   service catalog, and an optional AI plan-review layer.
 
-No per-resource or per-run billing — you run it on your own cluster.
+No per-resource or per-run billing — you run it on your own cluster. And it will
+**stay** free: Terrapod has no commercial edition, no open-core split, and no
+paid tier, now or planned — the complete platform is open-source (MPL-2.0) in one
+repository, with nothing gated behind a paid plan.
 
 ## Does it work with my existing `terraform` / `tofu` and CI without a rewrite?
 
@@ -49,9 +52,9 @@ The main self-hosted, open-source options in this space, described neutrally:
 | Tool | What it is | Execution model | Notes |
 |---|---|---|---|
 | **Terrapod** | Full self-hosted TFE/TFC replacement (control plane + UI + registry) | Its own **outbound-only** runners on Kubernetes (ARC pattern) | TFE-V2 API parity; air-gap/firewall-friendly; native Terragrunt; AI review; OPA policy sets. MPL-2.0. |
-| **Terrakube** | Full self-hosted TFE/TFC replacement | Its own Kubernetes-Job executors | The most mature open-source peer; multi-org tenancy; webhook-driven VCS. Apache-2.0. |
-| **Digger** | Orchestration layer that reuses your CI | Runs inside your existing GitHub Actions / GitLab CI | Very lightweight; no separate execution engine. |
-| **Atlantis** | PR-based plan/apply automation | Webhook-driven, runs in its own server | No full UI/state/registry/RBAC platform; requires inbound webhooks. |
+| **Terrakube** | Full self-hosted TFE/TFC replacement | Its own Kubernetes-Job executors | The most mature open-source peer; multi-org tenancy; established community. Apache-2.0. |
+| **Digger** | Orchestration layer that reuses your CI | Runs inside your existing GitHub Actions / GitLab CI | Very lightweight — no separate execution engine to operate; you keep your CI as the runner. |
+| **Atlantis** | Focused PR-based plan/apply automation | Webhook-driven, runs in its own server | Battle-tested and widely deployed; lightweight to run. Works alongside your existing state/registry/RBAC tooling. |
 | **Scalr / env0 / Spacelift** | Commercial platforms (some with free tiers) | Vendor-managed or self-hosted | Not open-source; listed for completeness. |
 
 Terrapod sits in the **full-stack, self-hosted control-plane** category (like
@@ -88,6 +91,13 @@ head-to-head in the [README](../README.md#terrakube).
   are all first-class — a `working-directory` / `trigger-prefixes` scope means
   only changes to the Terraform subtree trigger runs, and the fetch is narrowed
   to that subtree. See [Autodiscovery](autodiscovery.md).
+- **Your workspaces aren't all the same size.** Each workspace sets its own
+  runner **CPU and memory** (Kubernetes requests; limits auto-computed at 2×),
+  snapshotted per run — a tiny workspace runs in a fraction of a CPU while a
+  large, provider-heavy one gets several GB, instead of every run sharing one
+  fixed worker size sized for the worst case. An OOM-killed run even reports the
+  peak memory it reached and the exact value to raise before retrying. See
+  [Per-workspace resources](architecture.md#per-workspace-resources).
 - **You want AI-assisted plan review**, OPA policy-as-code, drift detection, or a
   no-code self-service catalog — built in, disabled-by-default where relevant.
 
