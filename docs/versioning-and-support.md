@@ -16,10 +16,12 @@ for every public surface below.
 | **MINOR** (`0.58.0 → 0.59.0`) | New, **backward-compatible** features. Existing routes, response attributes, wire protocol, SDK methods, Helm values, and config keys keep working unchanged. Additive only. Safe to take without config changes. |
 | **MAJOR** (`0.x → 1.0`, `1.x → 2.0`) | The only release that may contain a **breaking change** to a stable surface — and only after the deprecation window below. Read the migration notes before upgrading. |
 
-> **Pre-1.0 note.** While Terrapod is `0.x`, the guarantees below are the ones we
-> hold ourselves to and enforce in CI, but SemVer formally permits breaking
-> changes in a `0.MINOR` bump. We call out any such change loudly in the release
-> notes. From **`1.0.0`** onward, the MAJOR/MINOR/PATCH contract is absolute.
+> **Stability note.** As of **`1.0.0`**, the MAJOR/MINOR/PATCH contract below is
+> absolute and enforced in CI: no stable surface is removed, renamed, or retyped
+> outside a MAJOR release that has completed the deprecation window. (Before
+> `1.0.0`, these were the guarantees we held ourselves to, but SemVer formally
+> permitted breaking changes in a `0.MINOR` bump; any such change was called out
+> loudly in the release notes.)
 
 ## The stable surfaces
 
@@ -103,13 +105,14 @@ Compatibility isn't a promise on paper — it's checked three ways:
 3. **An independent AI back-compatibility review** runs adversarially against the
    release diff to catch anything the gates and the audit missed.
 
-These gates are landing incrementally under
+All of these gates are live as of `1.0.0`, landed under
 [#550](https://github.com/mattrobinsonsre/terrapod/issues/550): the route,
-response-attribute, **runner/listener wire-protocol**, config-key, and migration
-(reversibility + expand/contract) gates are live today, as is the
-`Deprecation`/`Sunset` header mechanism (see [`deprecations.md`](deprecations.md));
-the go-terrapod, provider-schema, and Helm-value-removal gates follow before
-`1.0.0`.
+response-attribute, **runner/listener wire-protocol**, config-key, migration
+(reversibility + expand/contract), **Helm-values-removal**, **go-terrapod
+exported-surface**, and **provider-schema** snapshot gates all fail CI on a
+removal/rename, and the `Deprecation`/`Sunset` header mechanism (see
+[`deprecations.md`](deprecations.md)) is ready for the first deprecation. Every
+public surface in the table above is now guarded end to end.
 
 If you find a compatibility break that slipped through, it's a bug — please
 [open an issue](https://github.com/mattrobinsonsre/terrapod/issues).
