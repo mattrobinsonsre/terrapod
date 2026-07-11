@@ -294,10 +294,21 @@ staged plan live in issue **#719**; the rules a contributor must follow:
 - **Namespace package (hard requirement)** — `services/terrapod/__init__.py`
   must **not** exist. Its absence enables PEP 420 implicit namespace packages
   so each Docker image can include only the sub-packages it needs.
-- **Migrations** — Alembic with async SQLAlchemy and hash-based revision IDs
-  (generate with `python3 -c "import secrets; print(secrets.token_hex(6))"`),
-  not sequential numbers. Every migration has a real `upgrade()` **and**
-  `downgrade()`.
+- **Migrations — reversible + expand/contract (hard requirement, gated)** —
+  Alembic with async SQLAlchemy and hash-based revision IDs (generate with
+  `python3 -c "import secrets; print(secrets.token_hex(6))"`), not sequential
+  numbers. Every migration has a real `upgrade()` **and** `downgrade()` (no
+  stubs — enforced by `tests/db/test_migration_contract.py`). Because the API
+  runs multiple replicas, a rolling upgrade runs **old and new code against the
+  same database at once**, so a migration must never **contract** the schema
+  (drop/rename/retype a column or table in `upgrade()`) in the same release the
+  code stops using it — that breaks the old replica still serving traffic.
+  Follow **expand → migrate → wait a release → contract**: add the new column
+  and dual-write/backfill in release N, switch reads in N, and only drop the old
+  column in N+1 (or later). Every `upgrade()`-side contraction is ledgered
+  (`tests/db/migration_contractions.json`); a new one fails CI until you
+  consciously acknowledge it followed this discipline (regenerate the ledger
+  with `UPDATE_API_CONTRACT=1 pytest tests/db/test_migration_contract.py`).
 - **Substantial API tempfiles go on the attached PVC, not `/tmp`** — on the
   API pod `/tmp` is RAM-backed. Anything that can hold tens of MB (provider
   archives, VCS tarballs, state snapshots, config tarballs) must be written to
