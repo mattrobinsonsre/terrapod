@@ -52,10 +52,24 @@ def _runs_next_attributes() -> set[str]:
     return set(re.findall(r'attrs\.get\("([a-z][a-z0-9-]*)"', src))
 
 
+def _listener_read_keys() -> set[str]:
+    """Every dict key the listener reads off an API payload via ``.get("key")`` —
+    the *comprehensive* wire surface, beyond the top-level `runs/next` attrs:
+    nested item keys (`hcl` on a terraform-var, `hook_point`/`name`/`script` on an
+    execution-hook) and the `check_job_status`/`stream_logs` event-payload keys
+    the reconciler sends (`job_name`, `job_namespace`, `run_id`, `phase`,
+    `tail_lines`, …). Renaming any of these is a runner/listener wire break the
+    top-level attr freeze can't see. Restricted to lower-case-initial keys to skip
+    env-var reads like `os.environ.get("POD_NAME")`."""
+    src = _LISTENER.read_text()
+    return set(re.findall(r'\.get\("([a-z][a-z0-9_-]*)"', src))
+
+
 def wire_contract() -> dict[str, list[str]]:
     return {
         "sse_event_names": sorted(_sse_event_names()),
         "runs_next_attributes": sorted(_runs_next_attributes()),
+        "listener_read_keys": sorted(_listener_read_keys()),
     }
 
 

@@ -26,8 +26,25 @@ _NON_CONTRACT_PATHS = frozenset({"/openapi.json", "/docs", "/docs/oauth2-redirec
 _IGNORED_METHODS = frozenset({"HEAD", "OPTIONS"})
 
 
+def _query_params(route: object) -> str:
+    """Sorted `?a,b` suffix of a route's declared query-parameter names, or "".
+
+    A query param a consumer passes (a filter/pagination/flag) is part of the
+    contract too — renaming it or making an optional one required is a break the
+    bare ``METHOD /path`` signature can't see. Only appended when the route
+    declares query params, so param-less routes keep their original signature.
+    """
+    dependant = getattr(route, "dependant", None)
+    params = getattr(dependant, "query_params", None) if dependant is not None else None
+    if not params:
+        return ""
+    names = sorted({getattr(p, "name", "") for p in params if getattr(p, "name", "")})
+    return f" ?{','.join(names)}" if names else ""
+
+
 def route_signatures(app: FastAPI) -> list[str]:
-    """Return the app's route contract as a sorted list of ``"METHOD /path"``.
+    """Return the app's route contract as a sorted list of ``"METHOD /path"``
+    (with a ``?a,b`` suffix listing declared query-parameter names where present).
 
     Deterministic and stable: the templated path (e.g.
     ``/api/v2/workspaces/{workspace_id}``) is used, so the snapshot is
@@ -39,9 +56,10 @@ def route_signatures(app: FastAPI) -> list[str]:
         methods = getattr(route, "methods", None)
         if not path or not methods or path in _NON_CONTRACT_PATHS:
             continue
+        query = _query_params(route)
         for method in methods:
             if method not in _IGNORED_METHODS:
-                sigs.add(f"{method} {path}")
+                sigs.add(f"{method} {path}{query}")
     return sorted(sigs)
 
 

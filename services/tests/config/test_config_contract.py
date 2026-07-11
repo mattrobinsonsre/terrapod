@@ -20,7 +20,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from terrapod.config import Settings
+from terrapod.config import RunnerConfig, Settings
 
 _SNAPSHOT = Path(__file__).parent / "config_key_contract.json"
 
@@ -42,16 +42,50 @@ def _nested_model(annotation: object) -> type[BaseModel] | None:
     return None
 
 
-def config_key_paths(model: type[BaseModel] = Settings, prefix: str = "") -> set[str]:
-    """The full set of dotted config key paths on the Settings tree."""
+def _list_item_model(annotation: object) -> type[BaseModel] | None:
+    """If the annotation is a (possibly Optional) ``list[Model]``, return the
+    item model so per-item operator keys are frozen too — e.g. the ``issuer_url``
+    / ``client_id`` sub-keys under ``auth.sso.oidc[]``."""
+    origin = typing.get_origin(annotation)
+    if origin in (typing.Union, types.UnionType):
+        for arg in typing.get_args(annotation):
+            if arg is type(None):
+                continue
+            item = _list_item_model(arg)
+            if item is not None:
+                return item
+        return None
+    if origin is list:
+        args = typing.get_args(annotation)
+        if args:
+            return _nested_model(args[0])
+    return None
+
+
+def _model_key_paths(model: type[BaseModel], prefix: str = "") -> set[str]:
+    """Dotted config key paths for one model. Nested models recurse; a
+    ``list[Model]`` recurses under a ``[]`` marker; everything else is a leaf."""
     keys: set[str] = set()
     for name, field in model.model_fields.items():
         path = f"{prefix}{name}"
         nested = _nested_model(field.annotation)
         if nested is not None and nested is not model:
-            keys |= config_key_paths(nested, prefix=f"{path}.")
-        else:
-            keys.add(path)
+            keys |= _model_key_paths(nested, f"{path}.")
+            continue
+        item_model = _list_item_model(field.annotation)
+        if item_model is not None and item_model is not model:
+            keys |= _model_key_paths(item_model, f"{path}[].")
+            continue
+        keys.add(path)
+    return keys
+
+
+def config_key_paths() -> set[str]:
+    """The full operator-settable config surface: the API ``Settings`` tree
+    (``config.yaml`` / ``TERRAPOD_*``) plus the listener ``RunnerConfig`` tree
+    (``runners.yaml``), namespaced so the two files stay distinct."""
+    keys = _model_key_paths(Settings)
+    keys |= {f"[runners.yaml] {k}" for k in _model_key_paths(RunnerConfig)}
     return keys
 
 
