@@ -1,4 +1,23 @@
 {
+  "agent_pools._listener_json": [
+    "certificate-expires-at",
+    "certificate-fingerprint",
+    "created-at",
+    "name",
+    "replica-count",
+    "status",
+    "updated-at"
+  ],
+  "agent_pools._pool_json": [
+    "created-at",
+    "description",
+    "labels",
+    "name",
+    "owner-email",
+    "permission",
+    "status",
+    "updated-at"
+  ],
   "agent_pools._token_json": [
     "created-at",
     "created-by",
@@ -124,6 +143,9 @@
     "fields",
     "resolved-version"
   ],
+  "catalog.show_catalog_instance": [
+    "input-values"
+  ],
   "config_versions._cv_json": [
     "auto-queue-runs",
     "created-at",
@@ -176,6 +198,11 @@
     "updated-at",
     "url"
   ],
+  "notification_configurations.verify_notification_configuration": [
+    "body",
+    "status",
+    "success"
+  ],
   "policy_sets._evaluation_json": [
     "created-at",
     "enforcement-level",
@@ -191,6 +218,29 @@
     "name",
     "rego",
     "updated-at"
+  ],
+  "policy_sets._policy_set_json": [
+    "allow-labels",
+    "allow-names",
+    "created-at",
+    "created-by",
+    "deny-labels",
+    "deny-names",
+    "description",
+    "enabled",
+    "enforcement-level",
+    "global-scope",
+    "name",
+    "policy-count",
+    "policy-path",
+    "source",
+    "updated-at",
+    "vcs-branch",
+    "vcs-connection-id",
+    "vcs-last-commit-sha",
+    "vcs-last-error",
+    "vcs-last-synced-at",
+    "vcs-repo-url"
   ],
   "registry_modules._link_to_jsonapi": [
     "created-at",
@@ -327,6 +377,17 @@
   ],
   "runs._apply_json": [
     "log-read-url",
+    "status"
+  ],
+  "runs._plan_json": [
+    "ai-summary-url",
+    "has-changes",
+    "json-output",
+    "log-read-url",
+    "resource-additions",
+    "resource-changes",
+    "resource-destructions",
+    "resource-imports",
     "status"
   ],
   "runs._run_json": [
@@ -511,6 +572,20 @@
     "name",
     "permissions"
   ],
+  "tokens._token_to_jsonapi": [
+    "bound-to",
+    "created-at",
+    "created-by",
+    "description",
+    "expires-at",
+    "kind",
+    "last-used-at",
+    "lifespan-hours",
+    "pinned-roles",
+    "rotated-at",
+    "token",
+    "token-type"
+  ],
   "users._user_to_jsonapi": [
     "created-at",
     "display-name",
@@ -551,6 +626,20 @@
     "updated-at",
     "value",
     "version-id"
+  ],
+  "vcs_connections._connection_json": [
+    "created-at",
+    "github-account-login",
+    "github-account-type",
+    "github-app-id",
+    "github-installation-id",
+    "has-token",
+    "has-webhook-secret",
+    "name",
+    "provider",
+    "server-url",
+    "status",
+    "updated-at"
   ],
   "workspace_extensions.dismiss_drift": [
     "drift-detection-enabled",

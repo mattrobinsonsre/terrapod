@@ -7,18 +7,24 @@ error is raised — the field just vanishes. The existing `test_api_sdk_contract
 guards only the `workspace` resource; this gate covers **every** JSON:API
 serializer.
 
-It AST-parses each router, finds every serializer's inline `"attributes": {...}`
-block, and diffs the attribute-name set per serializer against a committed
-snapshot (`api_attribute_contract.json`):
+It AST-parses each router, finds every serializer's `"attributes"` block, and
+diffs the attribute-name set per serializer against a committed snapshot
+(`api_attribute_contract.json`):
 
 - a **removed / renamed** attribute is a **breaking change** — MAJOR bump or a
   documented deprecation window, NOT a snapshot regen;
 - a **new** attribute is additive — accept it by regenerating
   (`UPDATE_API_CONTRACT=1 pytest tests/api/test_attribute_contract.py`).
 
-Scope/limits: only statically-declared inline `"attributes": {...}` keys are
-frozen. Attributes added conditionally after the dict literal (rare) are not yet
-covered — a known gap, never a false failure.
+Both forms of serializer are covered: the inline `"attributes": {...}` literal,
+**and** the variable form `attrs = {...}; ...; "attributes": attrs` (very common
+— e.g. the `authentication-tokens` and `plans` serializers build the dict in a
+local first). For the variable form we resolve the local's dict-literal keys plus
+any later `attrs["key"] = ...` subscript additions in the same function.
+
+Scope/limits: keys must be string literals reachable this way. A key computed at
+runtime (a non-literal subscript, a `**spread`, or a dict built by a helper the
+serializer calls) is not frozen — a known gap, never a false failure.
 """
 
 from __future__ import annotations
@@ -34,23 +40,53 @@ _ROUTERS_DIR = Path(_routers_pkg.__file__).resolve().parent
 _SNAPSHOT = Path(__file__).parent / "api_attribute_contract.json"
 
 
+def _dict_literal_keys(d: ast.Dict) -> set[str]:
+    return {k.value for k in d.keys if isinstance(k, ast.Constant) and isinstance(k.value, str)}
+
+
+def _local_dict_keys(fn: ast.AST) -> dict[str, set[str]]:
+    """Map local var name -> string keys, from ``name = {literal}`` assignments and
+    later ``name["key"] = ...`` subscript additions in the function."""
+    var_keys: dict[str, set[str]] = {}
+    for node in ast.walk(fn):
+        # name = {dict literal}  (plain and annotated: `attrs: dict = {...}`)
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+            value = node.value
+        elif isinstance(node, ast.AnnAssign):
+            targets = [node.target]
+            value = node.value
+        else:
+            continue
+        if isinstance(value, ast.Dict) and len(targets) == 1 and isinstance(targets[0], ast.Name):
+            var_keys.setdefault(targets[0].id, set()).update(_dict_literal_keys(value))
+        # name["literal key"] = ...
+        for tgt in targets:
+            if (
+                isinstance(tgt, ast.Subscript)
+                and isinstance(tgt.value, ast.Name)
+                and isinstance(tgt.slice, ast.Constant)
+                and isinstance(tgt.slice.value, str)
+            ):
+                var_keys.setdefault(tgt.value.id, set()).add(tgt.slice.value)
+    return var_keys
+
+
 def _attributes_of_function(fn: ast.AST) -> set[str] | None:
-    """Return the string keys of the first inline ``"attributes": {...}`` dict in
-    a function, or None if it isn't a JSON:API serializer."""
+    """Return the string keys of the function's ``"attributes"`` block — whether
+    written inline (``"attributes": {...}``) or via a local variable
+    (``attrs = {...}; "attributes": attrs``) — or None if it isn't a serializer."""
+    var_keys = _local_dict_keys(fn)
     for node in ast.walk(fn):
         if not isinstance(node, ast.Dict):
             continue
         for key, value in zip(node.keys, node.values, strict=True):
-            if (
-                isinstance(key, ast.Constant)
-                and key.value == "attributes"
-                and isinstance(value, ast.Dict)
-            ):
-                return {
-                    k.value
-                    for k in value.keys
-                    if isinstance(k, ast.Constant) and isinstance(k.value, str)
-                }
+            if not (isinstance(key, ast.Constant) and key.value == "attributes"):
+                continue
+            if isinstance(value, ast.Dict):
+                return _dict_literal_keys(value)
+            if isinstance(value, ast.Name) and value.id in var_keys:
+                return var_keys[value.id]
     return None
 
 
@@ -126,3 +162,9 @@ def test_extractor_finds_the_known_serializers() -> None:
     assert "key" in contract["variables._var_json"]
     assert "runs._run_json" in contract
     assert "status" in contract["runs._run_json"]
+    # Variable-form serializers (attrs = {...}; "attributes": attrs) must be
+    # covered too — regression guard for the #550 blocker where they were missed.
+    assert "tokens._token_to_jsonapi" in contract
+    assert "bound-to" in contract["tokens._token_to_jsonapi"]
+    assert "runs._plan_json" in contract
+    assert "has-changes" in contract["runs._plan_json"]
