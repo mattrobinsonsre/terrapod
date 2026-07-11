@@ -82,6 +82,12 @@ head-to-head in the [README](../README.md#terrakube).
   **unopinionated** — engine, version, and workflow are chosen **per workspace** —
   so you consolidate onto one control plane **without first standardising
   everyone** on the same tool. See [Migration](migration.md).
+- **Your code doesn't live in one tidy shape.** Monorepos (autodiscovery
+  auto-creates a workspace per directory), dedicated one-repo-per-workspace, and
+  **mixed repos** where Terraform is one folder beside app code and Helm charts
+  are all first-class — a `working-directory` / `trigger-prefixes` scope means
+  only changes to the Terraform subtree trigger runs, and the fetch is narrowed
+  to that subtree. See [Autodiscovery](autodiscovery.md).
 - **You want AI-assisted plan review**, OPA policy-as-code, drift detection, or a
   no-code self-service catalog — built in, disabled-by-default where relevant.
 

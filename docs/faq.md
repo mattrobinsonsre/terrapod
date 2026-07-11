@@ -111,6 +111,28 @@ workflows, coming off different tools — onto one control plane **without first
 standardising everyone**. See [Migration](migration.md) and
 [Alternatives](alternatives.md).
 
+## Does Terrapod work with monorepos, dedicated repos, and mixed repos (Terraform alongside app code and Helm)?
+
+Yes — all three repository layouts are first-class, and you don't restructure
+your repos to adopt Terrapod:
+
+- **Dedicated repo** (one repo per workspace). Point the workspace at the repo;
+  runs use the root, or a `working-directory` subpath.
+- **Monorepo** (many Terraform root modules in one repo).
+  [Autodiscovery](autodiscovery.md) auto-creates a workspace the first time a PR
+  or push touches a directory matching your glob rules (with `ignore_paths`),
+  each scoped to its own directory — no pre-provisioning a workspace per folder.
+  Modelled on Atlantis's `autodiscover`, and proven on monorepos with thousands
+  of root modules.
+- **Mixed repo** (Terraform is one folder beside application code, Helm charts,
+  CI config, docs, …). Set the workspace's `working-directory` (or explicit
+  `trigger-prefixes`) to the Terraform subtree, and Terrapod **only starts a run
+  when files under that prefix change** — a commit that touches just the app
+  code or the Helm chart doesn't trigger a plan — while **sparse-fetching only
+  that subtree**, so a large mixed repo doesn't pull everything on every run.
+
+See [Autodiscovery](autodiscovery.md) and [VCS workflows](vcs-workflows.md).
+
 ## How is Terrapod different from Terrakube?
 
 Both are full self-hosted TFE/TFC replacements at rough feature parity. Terrapod's
