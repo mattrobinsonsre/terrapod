@@ -1,0 +1,29 @@
+{
+  "sse_event_names": [
+    "cancel_job",
+    "check_job_status",
+    "run_available",
+    "stream_logs"
+  ],
+  "runs_next_attributes": [
+    "allow-empty-apply",
+    "env-vars",
+    "execution-backend",
+    "execution-hooks",
+    "is-destroy",
+    "phase",
+    "plan-only",
+    "refresh",
+    "refresh-only",
+    "replace-addrs",
+    "resource-cpu",
+    "resource-memory",
+    "target-addrs",
+    "terraform-vars",
+    "terraform-version",
+    "terragrunt-enabled",
+    "terragrunt-version",
+    "var-files",
+    "working-directory"
+  ]
+}
