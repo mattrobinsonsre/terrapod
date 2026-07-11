@@ -1,6 +1,6 @@
-# Split-networking deployments
+# Air-gapped & network-isolated deployments (outbound-only runners, no inbound webhooks)
 
-> Part of Terrapod's **restricted-network & multi-cluster execution** design focus — see [Why Terrapod](../README.md#is-terrapod-for-you). Related: the [ARC execution model](architecture.md#runner-architecture-arc-pattern), the [webhook split](deployment-webhook-ingress.md), and [forward-proxy support](deployment-proxy.md).
+> **If your security team forbids inbound network access into your execution clusters, or they're air-gapped, this is the page.** Terrapod's runners connect **outbound only** (over SSE) and create Kubernetes Jobs locally, so the control plane needs **no inbound reach** into the execution cluster; VCS integration is **polling-first**, so it works with **no inbound webhooks**; and a pull-through provider mirror + CLI binary cache (with an air-gap **sealed mode**) let runners resolve providers/binaries with **no upstream internet** for cached platforms. This is Terrapod's core **restricted-network & multi-cluster execution** design focus — see [Why Terrapod](../README.md#is-terrapod-for-you). Related: the [ARC execution model](architecture.md#runner-architecture-arc-pattern), the [webhook split](deployment-webhook-ingress.md), and [forward-proxy support](deployment-proxy.md).
 
 By default, every Terrapod consumer — a human's browser, the `terraform` CLI cloud block, listener pods in remote clusters, runner Jobs uploading state — reaches the API through a single `Ingress`. That works fine when the management plane is freely reachable from every network the consumers live in.
 

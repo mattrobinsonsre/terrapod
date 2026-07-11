@@ -9,6 +9,8 @@ Get the collaboration, governance, state, registry, and UI layer of a commercial
 
 Terrapod is **not** a fork of Terraform or OpenTofu. It orchestrates them.
 
+In short: it's a free, **self-hosted, open-source alternative to Terraform Cloud (HCP Terraform) and Terraform Enterprise** — a **TACOS** (Terraform Automation and Collaboration Software) platform for teams standardizing on `terraform`, OpenTofu (`tofu`), or Terragrunt. New here and comparing options? Start with **[Alternatives to Terraform Enterprise / Terraform Cloud](docs/alternatives.md)** and the **[FAQ](docs/faq.md)**.
+
 ![Terrapod run detail — plan output with an AI change summary, per-policy OPA pass/fail, and resource-change cards](docs/images/run-detail.png)
 *A single run: plan output, an AI-generated change summary and risk assessment, per-policy OPA results, and resource-change cards.*
 
