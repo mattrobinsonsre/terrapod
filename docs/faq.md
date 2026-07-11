@@ -61,11 +61,55 @@ Yes — **v1.0.0** is released, with a SemVer compatibility contract enforced in
 across every public surface (API, wire protocol, config, Helm values, DB schema,
 SDK, provider). See [Versioning & support](versioning-and-support.md).
 
-## Do I need Kubernetes to run Terrapod?
+## Do I need Kubernetes to run Terrapod? Isn't that a heavy requirement?
 
-Yes — Kubernetes is the only supported deployment target (via the Helm chart).
-For a zero-dependency trial, `make eval` stands up a throwaway kind/k3d cluster
-with everything batteries-included. See [Getting started](getting-started.md).
+Kubernetes is the only supported deployment target — but the bar is far lower
+than "stand up and operate a cluster" makes it sound, and it's easy to over-read
+as a barrier. Terrapod installs as a **single Helm release**, and a **single-node
+[k3s](https://k3s.io/) VM is plenty to start**: k3s is fully-conformant
+Kubernetes in one binary that runs on a ~512 MB VM and ships an ingress
+controller and storage out of the box (`curl -sfL https://get.k3s.io | sh -` and
+you have a cluster). You do **not** need a managed cloud cluster, a fleet of
+nodes, or a dedicated platform team.
+
+Kubernetes isn't incidental, either — it's what gives Terrapod **ephemeral,
+isolated, autoscaling run execution** (each plan/apply is a fresh Job) and the
+outbound-only cross-cluster runner model. That's why full self-hosted
+Terraform-platform replacements generally build on it.
+
+If you specifically want a *single-binary* or *runs-inside-your-existing-CI*
+tool with no orchestrator, a lighter PR-automation tool (Atlantis as one binary,
+Digger inside your CI) has a lower deployment floor — the trade-off is you give
+up the integrated state backend, private registry, RBAC, policy engine, web UI,
+and server-side execution Terrapod provides. See [Alternatives](alternatives.md).
+
+Just trying it out? `make eval` stands up a throwaway kind/k3d cluster,
+batteries-included (filesystem storage, in-cluster Postgres/Redis, a local
+admin), and prints the URL and first-login credentials — no external
+dependencies. See [Getting started](getting-started.md).
+
+## Can teams using different tools and workflows (Terraform, OpenTofu, Terragrunt, CLI, VCS) share one Terrapod?
+
+Yes — being **unopinionated about how each team works** is a deliberate strength.
+Terrapod meets teams where they already are, **per workspace**, rather than
+forcing a house standard on the whole estate:
+
+- **Engine and version are per-workspace.** One workspace runs `terraform`, the
+  next `tofu`, the next `terragrunt` — each pinned to its own version. No global
+  engine choice, no forced lockstep upgrades.
+- **Workflow is per-workspace too.** A team can drive runs from the **CLI**
+  (`plan`/`apply` against the `cloud` block), from **VCS** (push/PR-triggered
+  runs on server-side runners), or a mix — and CLI-driven and VCS-driven
+  workspaces coexist in the same install.
+- **Multiple migration on-ramps.** [`terrapod-migrate`](migration.md) imports
+  from **HCP Terraform / TFE** *and* from **Atlantis** (`atlantis.yaml` or
+  autodiscovery), preserving state (serial + lineage); teams running Terraform in
+  plain **CI** just repoint their `cloud {}` block and keep their pipelines.
+
+So you can consolidate a fragmented estate — different engines, versions, and
+workflows, coming off different tools — onto one control plane **without first
+standardising everyone**. See [Migration](migration.md) and
+[Alternatives](alternatives.md).
 
 ## How is Terrapod different from Terrakube?
 

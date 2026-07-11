@@ -76,6 +76,12 @@ head-to-head in the [README](../README.md#terrakube).
   not an afterthought.
 - **You want the least migration friction from Terraform Cloud/Enterprise.** The
   `cloud` block just repoints; developers keep their workflow.
+- **You have a mixed / fragmented estate.** Different teams on Terraform,
+  OpenTofu, and Terragrunt; some driving runs from the CLI, some from VCS; some
+  coming off TFE, some off Atlantis, some off plain CI. Terrapod is deliberately
+  **unopinionated** — engine, version, and workflow are chosen **per workspace** —
+  so you consolidate onto one control plane **without first standardising
+  everyone** on the same tool. See [Migration](migration.md).
 - **You want AI-assisted plan review**, OPA policy-as-code, drift detection, or a
   no-code self-service catalog — built in, disabled-by-default where relevant.
 

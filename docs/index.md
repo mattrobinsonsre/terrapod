@@ -114,7 +114,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | Guide | Description |
 |---|---|
 | [Alternatives to Terraform Enterprise / Terraform Cloud](alternatives.md) | Where Terrapod fits among open-source TACOS (Terrakube, Digger, …); is-there-a-free-alternative answers, a neutral comparison, and when to pick Terrapod |
-| [FAQ](faq.md) | Straight answers to the common buyer questions (free? OpenTofu? Terragrunt? air-gapped? production-ready? vs Terrakube/Atlantis/Digger?) |
+| [FAQ](faq.md) | Straight answers to the common buyer questions (free? OpenTofu? Terragrunt? air-gapped? production-ready? do I really need Kubernetes? can mixed-tool teams share one install? vs Terrakube/Atlantis/Digger?) |
 | [Getting Started](getting-started.md) | Deploy the Helm chart on Kubernetes (or k3s), first workspace, first plan/apply |
 | [Migration](migration.md) | Move a TFE / HCP Terraform or Atlantis platform onto Terrapod with `terrapod-migrate` — dry-run-first, reversible, with an explicit "what transfers vs. what's a checklist" breakdown |
 | [Local Development](local-development.md) | Run Terrapod from source with Tilt (contributors only) |
