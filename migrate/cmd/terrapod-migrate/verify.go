@@ -67,6 +67,7 @@ func verifyCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "verify: build terrapod client: %v\n", err)
 		return 1
 	}
+	warnVersionMismatch(c)
 
 	report := runVerify(context.Background(), c, state)
 

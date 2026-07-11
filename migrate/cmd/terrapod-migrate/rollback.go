@@ -88,6 +88,7 @@ func rollbackCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "rollback: build terrapod client: %v\n", err)
 		return 1
 	}
+	warnVersionMismatch(c)
 
 	report := runRollback(context.Background(), c, state, *statePath, *apply, *force)
 

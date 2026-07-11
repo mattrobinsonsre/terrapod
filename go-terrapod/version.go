@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -41,8 +42,12 @@ const versionProbeTimeout = 10 * time.Second
 
 // VersionCheck probes the target Terrapod deployment's reported
 // version and compares it against the SDK's build-time-pinned
-// SDKVersion. Returns nil on exact match, wrapped ErrVersionMismatch
-// or ErrVersionUnreported otherwise, or a network/HTTP error.
+// SDKVersion using the support policy: compatible when they share the
+// same MAJOR and the API is at least as new as the SDK (api >= sdk).
+// Returns nil when compatible (or when either side is a dev build),
+// wrapped ErrVersionMismatch on an incompatible major / too-old API,
+// ErrVersionUnreported when the deployment doesn't report a version,
+// or a network/HTTP error.
 //
 // Most callers should invoke this once at startup (after constructing
 // a Client) as a fail-fast probe before any further work. Tools that
@@ -65,12 +70,10 @@ const versionProbeTimeout = 10 * time.Second
 // terrapod.Options when constructing the Client.
 func (c *Client) VersionCheck(ctx context.Context) error {
 	if SDKVersion == "" || SDKVersion == "dev" {
-		// Dev builds have no meaningful version to compare against.
-		// Surface as Mismatch (not Unreported) — the operator action
-		// is "use a tagged SDK build, or pass an override flag in
-		// the consuming tool".
-		return fmt.Errorf("%w: SDK version is %q (likely a development build); use a tagged SDK build or pass --allow-api-version-mismatch in the consuming tool",
-			ErrVersionMismatch, SDKVersion)
+		// Dev builds have no pinned version to compare against — the
+		// compatibility check can't be performed, so skip it silently
+		// rather than fail. A release build always has a real SDKVersion.
+		return nil
 	}
 
 	url := c.BaseURL + DiscoveryPath
@@ -112,10 +115,67 @@ func (c *Client) VersionCheck(ctx context.Context) error {
 	if !ok || api == "" {
 		return ErrVersionUnreported
 	}
-	if api != SDKVersion {
-		return fmt.Errorf("%w: SDK=%s API=%s — install the matching release: https://github.com/mattrobinsonsre/terrapod/releases/tag/v%s",
-			ErrVersionMismatch, SDKVersion, api, api)
+	if api == "dev" {
+		// The target is a dev build of Terrapod — no meaningful version to
+		// compare against; skip rather than false-alarm.
+		return nil
+	}
+	if compatible, reason := versionsCompatible(SDKVersion, api); !compatible {
+		return fmt.Errorf("%w: SDK=%s API=%s (%s) — install a matching SDK/provider release: https://github.com/mattrobinsonsre/terrapod/releases",
+			ErrVersionMismatch, SDKVersion, api, reason)
 	}
 	return nil
 }
 
+// parseSemver parses a "MAJOR.MINOR.PATCH" string (ignoring any leading "v" and
+// any "-prerelease"/"+build" suffix) into its numeric parts. ok is false if the
+// string isn't three dot-separated integers.
+func parseSemver(v string) (major, minor, patch int, ok bool) {
+	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+	if i := strings.IndexAny(v, "-+"); i >= 0 {
+		v = v[:i]
+	}
+	parts := strings.SplitN(v, ".", 3)
+	if len(parts) != 3 {
+		return 0, 0, 0, false
+	}
+	var err error
+	if major, err = strconv.Atoi(parts[0]); err != nil {
+		return 0, 0, 0, false
+	}
+	if minor, err = strconv.Atoi(parts[1]); err != nil {
+		return 0, 0, 0, false
+	}
+	if patch, err = strconv.Atoi(parts[2]); err != nil {
+		return 0, 0, 0, false
+	}
+	return major, minor, patch, true
+}
+
+// versionsCompatible implements the go-terrapod support policy: an SDK built at
+// version `sdk` works against an API at version `api` when they share the same
+// MAJOR and the API is at least as new as the SDK (`api >= sdk`). A newer API is
+// forward-compatible within the major; an older API may be missing endpoints the
+// SDK expects, and a different major is a hard break. If either version is
+// unparseable, treat as compatible (fail-open) so a non-semver tag never blocks.
+func versionsCompatible(sdk, api string) (ok bool, reason string) {
+	sMaj, sMin, sPat, sOK := parseSemver(sdk)
+	aMaj, aMin, aPat, aOK := parseSemver(api)
+	if !sOK || !aOK {
+		return true, ""
+	}
+	if aMaj != sMaj {
+		return false, fmt.Sprintf("incompatible major version — SDK is v%d.x, API is v%d.x", sMaj, aMaj)
+	}
+	sTuple := [3]int{sMaj, sMin, sPat}
+	aTuple := [3]int{aMaj, aMin, aPat}
+	for i := range 3 {
+		if aTuple[i] != sTuple[i] {
+			if aTuple[i] < sTuple[i] {
+				return false, "API is older than the SDK was built against; upgrade the Terrapod deployment or use an older SDK/provider"
+			}
+			return true, "" // API newer within the same major — forward-compatible
+		}
+	}
+	return true, "" // exact match
+}

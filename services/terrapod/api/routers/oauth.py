@@ -10,6 +10,7 @@ Endpoints:
 """
 
 import hmac
+import os
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, status
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -29,6 +30,14 @@ from terrapod.logging_config import get_logger
 from terrapod.redis.client import get_redis_client
 
 router = APIRouter(tags=["oauth"])
+
+
+def _terrapod_version() -> str:
+    """The running Terrapod version, injected by the release pipeline via the
+    ``TERRAPOD_VERSION`` env var (``"dev"`` for local/untagged builds). Read at
+    request time so tests and redeploys pick up the current value."""
+    return os.environ.get("TERRAPOD_VERSION", "dev")
+
 
 # Terrapod-only CLI login completion check. Terrapod-native: mounted
 # only under /api/terrapod/v1 (the /api/v2 alias was removed in
@@ -58,6 +67,10 @@ async def terraform_service_discovery() -> JSONResponse:
             "tfe.v2": "/api/v2/",
             "tfe.v2.1": "/api/v2/",
             "tfe.v2.2": "/api/v2/",
+            # The running Terrapod version, so the go-terrapod SDK / provider can
+            # run a compatibility check (Client.VersionCheck) at startup. Not
+            # consumed by terraform/tofu/tfci — they ignore unknown keys.
+            "terrapod-version": _terrapod_version(),
         }
     )
 

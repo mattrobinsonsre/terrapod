@@ -136,6 +136,7 @@ func applyCmd(args []string) int {
 		fmt.Fprintf(os.Stderr, "apply: build terrapod client: %v\n", err)
 		return 1
 	}
+	warnVersionMismatch(c)
 
 	// --workspace mode: pre-seed the state file with the existing
 	// workspace's Terrapod ID so the writer takes the "reused" path

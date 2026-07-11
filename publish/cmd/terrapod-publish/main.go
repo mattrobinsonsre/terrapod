@@ -4,10 +4,24 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
+
+	terrapod "github.com/mattrobinsonsre/terrapod/go-terrapod"
 )
+
+// warnVersionMismatch prints a non-fatal stderr warning if this terrapod-publish
+// build is incompatible with the target Terrapod API version (#550) — a
+// different major, or an API older than the SDK was built against. Never aborts:
+// a version probe that itself fails must not block a publish.
+func warnVersionMismatch(c *terrapod.Client) {
+	if err := c.VersionCheck(context.Background()); err != nil && errors.Is(err, terrapod.ErrVersionMismatch) {
+		fmt.Fprintf(os.Stderr, "warning: %v\n", err)
+	}
+}
 
 // Version is stamped at build time via -ldflags "-X main.Version=...".
 var Version = "dev"
@@ -50,7 +64,7 @@ Auth resolution order: --token, then $TERRAPOD_TOKEN, then
 // multiFlag is a repeatable string flag.
 type multiFlag []string
 
-func (m *multiFlag) String() string  { return strings.Join(*m, ",") }
+func (m *multiFlag) String() string { return strings.Join(*m, ",") }
 func (m *multiFlag) Set(v string) error {
 	*m = append(*m, v)
 	return nil

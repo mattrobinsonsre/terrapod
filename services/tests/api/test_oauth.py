@@ -56,6 +56,10 @@ class TestTerraformServiceDiscovery:
         assert data["tfe.v2"] == "/api/v2/"
         assert data["tfe.v2.1"] == "/api/v2/"
         assert data["tfe.v2.2"] == "/api/v2/"
+        # #550: the running version is advertised so go-terrapod/provider can
+        # run a compatibility check (Client.VersionCheck) at startup.
+        assert "terrapod-version" in data
+        assert isinstance(data["terrapod-version"], str) and data["terrapod-version"]
 
 
 class TestSessionStatus:
