@@ -1,0 +1,1010 @@
+const DiscoveryPath
+const VersionField
+field APIError.Body string
+field APIError.StatusCode int
+field APIToken.BoundTo string `json:"bound-to,omitempty"`
+field APIToken.CreatedAt string `json:"created-at,omitempty"`
+field APIToken.CreatedBy string `json:"created-by,omitempty"`
+field APIToken.Description string `json:"description,omitempty"`
+field APIToken.ExpiresAt string `json:"expires-at,omitempty"`
+field APIToken.ID string `json:"id"`
+field APIToken.Kind string `json:"kind"`
+field APIToken.LastUsedAt string `json:"last-used-at,omitempty"`
+field APIToken.LifespanHours int64 `json:"lifespan-hours,omitempty"`
+field APIToken.PinnedRoles []string `json:"pinned-roles,omitempty"`
+field APIToken.RotatedAt string `json:"rotated-at,omitempty"`
+field APIToken.Token string `json:"token,omitempty"`
+field APIToken.TokenType string `json:"token-type,omitempty"`
+field AddPolicyRequest.Description string
+field AddPolicyRequest.Name string
+field AddPolicyRequest.Rego string
+field AgentPool.CreatedAt string `json:"created-at,omitempty"`
+field AgentPool.Description string `json:"description,omitempty"`
+field AgentPool.ID string `json:"id"`
+field AgentPool.Labels map[string]string `json:"labels,omitempty"`
+field AgentPool.Name string `json:"name"`
+field AgentPool.OwnerEmail string `json:"owner-email,omitempty"`
+field AgentPool.UpdatedAt string `json:"updated-at,omitempty"`
+field AgentPoolToken.CreatedAt string `json:"created-at,omitempty"`
+field AgentPoolToken.CreatedBy string `json:"created-by,omitempty"`
+field AgentPoolToken.Description string `json:"description,omitempty"`
+field AgentPoolToken.ExpiresAt string `json:"expires-at,omitempty"`
+field AgentPoolToken.ID string `json:"id"`
+field AgentPoolToken.IsRevoked bool `json:"is-revoked"`
+field AgentPoolToken.MaxUses int64 `json:"max-uses,omitempty"`
+field AgentPoolToken.Token string `json:"token,omitempty"`
+field AgentPoolToken.UseCount int64 `json:"use-count"`
+field AuthenticationError.Detail string
+field AuthorizationError.Detail string
+field AutodiscoveryRule.Attributes map[string]any
+field AutodiscoveryRule.CreatedAt string
+field AutodiscoveryRule.ID string
+field AutodiscoveryRule.UpdatedAt string
+field BulkUpdateResult.Applied int `json:"applied"`
+field BulkUpdateResult.Changes []WorkspaceChange `json:"changes,omitempty"`
+field BulkUpdateResult.DryRun bool `json:"dry_run"`
+field BulkUpdateResult.Errors []string `json:"errors,omitempty"`
+field BulkUpdateResult.Matched int `json:"matched"`
+field BulkUpdateResult.Unchanged []WorkspaceChange `json:"unchanged,omitempty"`
+field BulkUpdateResult.WouldChange []WorkspaceChange `json:"would_change,omitempty"`
+field BulkWarmRequest.Binaries []WarmBinaryEntry `json:"binaries,omitempty"`
+field BulkWarmRequest.Providers []WarmProviderEntry `json:"providers,omitempty"`
+field BulkWarmResponse.Failed int `json:"failed"`
+field BulkWarmResponse.Results []WarmResult `json:"results"`
+field BulkWarmResponse.Succeeded int `json:"succeeded"`
+field BulkWarmResponse.Total int `json:"total"`
+field CatalogInstance.Attributes map[string]any
+field CatalogInstance.ID string
+field CatalogItem.Attributes map[string]any
+field CatalogItem.CreatedAt string
+field CatalogItem.ID string
+field CatalogItem.UpdatedAt string
+field CatalogRunRef.ID string
+field CatalogRunRef.IsDestroy bool
+field CatalogRunRef.Status string
+field Client.BaseURL string
+field Client.HTTPClient *http.Client
+field Client.MaxRetries int
+field Client.Token string
+field Client.UserAgent string
+field ConflictError.Detail string
+field CreateAPITokenRequest.Description string
+field CreateAPITokenRequest.Kind string
+field CreateAPITokenRequest.LifespanHours int64
+field CreateAPITokenRequest.PinnedRoles []string
+field CreateAgentPoolRequest.Description string
+field CreateAgentPoolRequest.Labels map[string]string
+field CreateAgentPoolRequest.Name string
+field CreateAgentPoolRequest.OwnerEmail string
+field CreateAgentPoolTokenRequest.Description string
+field CreateAgentPoolTokenRequest.ExpiresAt string
+field CreateAgentPoolTokenRequest.MaxUses int64
+field CreateExecutionHookRequest.Description string
+field CreateExecutionHookRequest.Enabled bool
+field CreateExecutionHookRequest.HookPoint string
+field CreateExecutionHookRequest.Name string
+field CreateExecutionHookRequest.Priority int64
+field CreateExecutionHookRequest.Script string
+field CreateGPGKeyRequest.ASCIIArmor string
+field CreateGPGKeyRequest.Namespace string
+field CreateGPGKeyRequest.Source string
+field CreateGPGKeyRequest.SourceURL string
+field CreateModuleWorkspaceLinkRequest.ModuleName string
+field CreateModuleWorkspaceLinkRequest.ModuleProvider string
+field CreateModuleWorkspaceLinkRequest.WorkspaceID string
+field CreateNotificationConfigurationRequest.DestinationType string
+field CreateNotificationConfigurationRequest.EmailAddresses []string
+field CreateNotificationConfigurationRequest.Enabled bool
+field CreateNotificationConfigurationRequest.Name string
+field CreateNotificationConfigurationRequest.Token string
+field CreateNotificationConfigurationRequest.Triggers []string
+field CreateNotificationConfigurationRequest.URL string
+field CreatePolicySetRequest.AllowLabels map[string]string
+field CreatePolicySetRequest.AllowNames []string
+field CreatePolicySetRequest.DenyLabels map[string]string
+field CreatePolicySetRequest.DenyNames []string
+field CreatePolicySetRequest.Description string
+field CreatePolicySetRequest.Enabled bool
+field CreatePolicySetRequest.EnforcementLevel string
+field CreatePolicySetRequest.GlobalScope bool
+field CreatePolicySetRequest.Name string
+field CreatePolicySetRequest.PolicyPath string
+field CreatePolicySetRequest.Source string
+field CreatePolicySetRequest.VCSBranch string
+field CreatePolicySetRequest.VCSConnectionID string
+field CreatePolicySetRequest.VCSRepoURL string
+field CreateRegistryModuleRequest.Labels map[string]string
+field CreateRegistryModuleRequest.Name string
+field CreateRegistryModuleRequest.ProviderName string
+field CreateRegistryModuleRequest.VCSBranch string
+field CreateRegistryModuleRequest.VCSConnectionID string
+field CreateRegistryModuleRequest.VCSRepoURL string
+field CreateRegistryModuleRequest.VCSTagPattern string
+field CreateRegistryProviderRequest.Labels map[string]string
+field CreateRegistryProviderRequest.Name string
+field CreateRemoteStateConsumerRequest.ConsumerWorkspaceID string
+field CreateRemoteStateConsumerRequest.ProducerWorkspaceID string
+field CreateRoleRequest.AllowLabels map[string]string
+field CreateRoleRequest.AllowNames []string
+field CreateRoleRequest.Capabilities []string
+field CreateRoleRequest.CatalogPermission string
+field CreateRoleRequest.DenyLabels map[string]string
+field CreateRoleRequest.DenyNames []string
+field CreateRoleRequest.Description string
+field CreateRoleRequest.Name string
+field CreateRoleRequest.PoolPermission string
+field CreateRoleRequest.RegistryPermission string
+field CreateRoleRequest.WorkspacePermission string
+field CreateRunTaskRequest.Enabled *bool
+field CreateRunTaskRequest.EnforcementLevel string
+field CreateRunTaskRequest.HMACKey string
+field CreateRunTaskRequest.Name string
+field CreateRunTaskRequest.Stage string
+field CreateRunTaskRequest.URL string
+field CreateRunTriggerRequest.DestinationWorkspaceID string
+field CreateRunTriggerRequest.SourceWorkspaceID string
+field CreateStateVersionRequest.Force bool
+field CreateStateVersionRequest.Lineage string
+field CreateStateVersionRequest.MD5 string
+field CreateStateVersionRequest.Serial int64
+field CreateUserRequest.DisplayName string
+field CreateUserRequest.Email string
+field CreateUserRequest.IsActive *bool
+field CreateUserRequest.Password string
+field CreateVCSConnectionRequest.GithubAppID int64
+field CreateVCSConnectionRequest.GithubInstallationID int64
+field CreateVCSConnectionRequest.Name string
+field CreateVCSConnectionRequest.PrivateKey string
+field CreateVCSConnectionRequest.Provider string
+field CreateVCSConnectionRequest.ServerURL string
+field CreateVCSConnectionRequest.Token string
+field CreateVCSConnectionRequest.WebhookSecret string
+field CreateVariableRequest.Category string `json:"category"`
+field CreateVariableRequest.Description string `json:"description,omitempty"`
+field CreateVariableRequest.HCL bool `json:"hcl,omitempty"`
+field CreateVariableRequest.Key string `json:"key"`
+field CreateVariableRequest.Sensitive bool `json:"sensitive,omitempty"`
+field CreateVariableRequest.Value string `json:"value"`
+field CreateVariableSetRequest.Description string
+field CreateVariableSetRequest.Global bool
+field CreateVariableSetRequest.Name string
+field CreateVariableSetRequest.Priority bool
+field CreateVarsetVariableRequest.Category string
+field CreateVarsetVariableRequest.Description string
+field CreateVarsetVariableRequest.HCL bool
+field CreateVarsetVariableRequest.Key string
+field CreateVarsetVariableRequest.Sensitive bool
+field CreateVarsetVariableRequest.Value string
+field CreateWorkspaceRequest.AISummaryContext string `json:"ai-summary-context,omitempty"`
+field CreateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
+field CreateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
+field CreateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
+field CreateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
+field CreateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
+field CreateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
+field CreateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
+field CreateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
+field CreateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,omitempty"`
+field CreateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
+field CreateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
+field CreateWorkspaceRequest.Name string `json:"name"`
+field CreateWorkspaceRequest.OwnerEmail string `json:"owner-email,omitempty"`
+field CreateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
+field CreateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
+field CreateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
+field CreateWorkspaceRequest.SlackChannel string `json:"slack-channel,omitempty"`
+field CreateWorkspaceRequest.TerraformVersion string `json:"terraform-version,omitempty"`
+field CreateWorkspaceRequest.TerragruntEnabled *bool `json:"terragrunt-enabled,omitempty"`
+field CreateWorkspaceRequest.TerragruntVersion string `json:"terragrunt-version,omitempty"`
+field CreateWorkspaceRequest.TriggerPrefixes []string `json:"trigger-prefixes,omitempty"`
+field CreateWorkspaceRequest.VCSBranch string `json:"vcs-branch,omitempty"`
+field CreateWorkspaceRequest.VCSConnectionID string `json:"-"`
+field CreateWorkspaceRequest.VCSRepoURL string `json:"vcs-repo-url,omitempty"`
+field CreateWorkspaceRequest.VCSWorkflow string `json:"vcs-workflow,omitempty"`
+field CreateWorkspaceRequest.VarFiles []string `json:"var-files,omitempty"`
+field CreateWorkspaceRequest.WorkingDirectory string `json:"working-directory,omitempty"`
+field Document.Data json.RawMessage `json:"data"`
+field Document.Included json.RawMessage `json:"included,omitempty"`
+field Document.Meta json.RawMessage `json:"meta,omitempty"`
+field EncryptionStatus.ActiveVersion *int `json:"active_version"`
+field EncryptionStatus.CanaryOK bool `json:"canary_ok"`
+field EncryptionStatus.DEKVersions []int `json:"dek_versions"`
+field EncryptionStatus.Decryptable bool `json:"decryptable"`
+field EncryptionStatus.Enabled bool `json:"enabled"`
+field EncryptionStatus.Provider string `json:"provider"`
+field ErrorObject.Detail string `json:"detail"`
+field ErrorObject.Status string `json:"status"`
+field ErrorObject.Title string `json:"title"`
+field ErrorResponse.Errors []ErrorObject `json:"errors"`
+field EstateEdge.Kind string `json:"kind"`
+field EstateEdge.Source string `json:"source"`
+field EstateEdge.Target string `json:"target"`
+field EstateGraph.Edges []EstateEdge `json:"edges"`
+field EstateGraph.Meta EstateGraphMeta `json:"meta"`
+field EstateGraph.Nodes []EstateNode `json:"nodes"`
+field EstateGraphMeta.Counts map[string]int `json:"counts"`
+field EstateNode.ID string `json:"id"`
+field EstateNode.InDeg int `json:"indeg"`
+field EstateNode.Kind string `json:"kind"`
+field EstateNode.Labels map[string]string `json:"labels"`
+field EstateNode.Name string `json:"name"`
+field EstateNode.Pool string `json:"pool"`
+field ExecutionHook.CreatedAt string `json:"created-at,omitempty"`
+field ExecutionHook.Description string `json:"description,omitempty"`
+field ExecutionHook.Enabled bool `json:"enabled"`
+field ExecutionHook.HookPoint string `json:"hook-point"`
+field ExecutionHook.ID string `json:"id"`
+field ExecutionHook.Name string `json:"name"`
+field ExecutionHook.Priority int64 `json:"priority"`
+field ExecutionHook.Script string `json:"script,omitempty"`
+field ExecutionHook.UpdatedAt string `json:"updated-at,omitempty"`
+field ExecutionHook.WorkspaceCount int64 `json:"workspace-count"`
+field GPGKey.CreatedAt string `json:"created-at,omitempty"`
+field GPGKey.ID string `json:"id"`
+field GPGKey.KeyID string `json:"key-id"`
+field GPGKey.Namespace string `json:"namespace,omitempty"`
+field GPGKey.Source string `json:"source,omitempty"`
+field GPGKey.SourceURL string `json:"source-url,omitempty"`
+field GPGKey.UpdatedAt string `json:"updated-at,omitempty"`
+field ImpactGraph.Edges []ImpactGraphEdge `json:"edges"`
+field ImpactGraph.Meta ImpactGraphMeta `json:"meta"`
+field ImpactGraph.Nodes []ImpactGraphNode `json:"nodes"`
+field ImpactGraph.RunID string `json:"-"`
+field ImpactGraphEdge.Source string `json:"source"`
+field ImpactGraphEdge.Target string `json:"target"`
+field ImpactGraphMeta.Counts map[string]int `json:"counts"`
+field ImpactGraphMeta.TerraformVersion string `json:"terraform_version"`
+field ImpactGraphNode.Action string `json:"action"`
+field ImpactGraphNode.ID string `json:"id"`
+field ImpactGraphNode.Key *string `json:"key"`
+field ImpactGraphNode.Module string `json:"module"`
+field ImpactGraphNode.Name string `json:"name"`
+field ImpactGraphNode.Provider string `json:"provider"`
+field ImpactGraphNode.Type string `json:"type"`
+field LabelEntity.ID string `json:"id"`
+field LabelEntity.Labels map[string]string `json:"labels"`
+field LabelEntity.Name string `json:"name"`
+field LabelEntity.Type string `json:"type"`
+field LabelKey.EntityCounts map[string]int `json:"entity-counts"`
+field LabelKey.Key string `json:"key"`
+field LabelKey.ValueCount int `json:"value-count"`
+field LabelValue.EntityCounts map[string]int `json:"entity-counts"`
+field LabelValue.Value string `json:"value"`
+field ListMeta.CurrentPage int `json:"current-page"`
+field ListMeta.TotalCount int `json:"total-count"`
+field ListMeta.TotalPages int `json:"total-pages"`
+field ModuleWorkspaceLink.CreatedAt string `json:"created-at,omitempty"`
+field ModuleWorkspaceLink.CreatedBy string `json:"created-by,omitempty"`
+field ModuleWorkspaceLink.ID string `json:"id"`
+field ModuleWorkspaceLink.WorkspaceID string `json:"workspace-id"`
+field ModuleWorkspaceLink.WorkspaceName string `json:"workspace-name,omitempty"`
+field NotFoundError.ID string
+field NotFoundError.Resource string
+field NotificationConfiguration.CreatedAt string `json:"created-at,omitempty"`
+field NotificationConfiguration.DestinationType string `json:"destination-type"`
+field NotificationConfiguration.EmailAddresses []string `json:"email-addresses,omitempty"`
+field NotificationConfiguration.Enabled bool `json:"enabled"`
+field NotificationConfiguration.HasToken bool `json:"has-token"`
+field NotificationConfiguration.ID string `json:"id"`
+field NotificationConfiguration.Name string `json:"name"`
+field NotificationConfiguration.Triggers []string `json:"triggers,omitempty"`
+field NotificationConfiguration.URL string `json:"url,omitempty"`
+field NotificationConfiguration.UpdatedAt string `json:"updated-at,omitempty"`
+field NotificationConfiguration.WorkspaceID string `json:"workspace-id,omitempty"`
+field Options.BaseURL string
+field Options.HTTPClient *http.Client
+field Options.MaxRetries int
+field Options.SkipTLSVerify bool
+field Options.Token string
+field Options.UserAgent string
+field PlanSummary.CreatedAt string `json:"created-at,omitempty"`
+field PlanSummary.Description string `json:"description,omitempty"`
+field PlanSummary.ErrorMessage string `json:"error-message,omitempty"`
+field PlanSummary.ID string `json:"id"`
+field PlanSummary.InputTokens int `json:"input-tokens"`
+field PlanSummary.Kind string `json:"kind"`
+field PlanSummary.Model string `json:"model,omitempty"`
+field PlanSummary.OutputTokens int `json:"output-tokens"`
+field PlanSummary.RiskFactors []PlanSummaryRiskFactor `json:"risk-factors,omitempty"`
+field PlanSummary.RiskLevel string `json:"risk-level,omitempty"`
+field PlanSummary.RunID string `json:"-"`
+field PlanSummary.Status string `json:"status"`
+field PlanSummary.UpdatedAt string `json:"updated-at,omitempty"`
+field PlanSummaryMessage.Content string `json:"content"`
+field PlanSummaryMessage.CreatedAt string `json:"created-at,omitempty"`
+field PlanSummaryMessage.ErrorMessage string `json:"error-message,omitempty"`
+field PlanSummaryMessage.ID string `json:"id"`
+field PlanSummaryMessage.InputTokens int `json:"input-tokens"`
+field PlanSummaryMessage.Model string `json:"model,omitempty"`
+field PlanSummaryMessage.OutputTokens int `json:"output-tokens"`
+field PlanSummaryMessage.Role string `json:"role"`
+field PlanSummaryRiskFactor.Detail string `json:"detail"`
+field PlanSummaryRiskFactor.ResourceAddress string `json:"resource_address,omitempty"`
+field PlanSummaryRiskFactor.Severity string `json:"severity"`
+field PlanSummaryRiskFactor.Title string `json:"title"`
+field Policy.CreatedAt string `json:"created-at,omitempty"`
+field Policy.Description string `json:"description,omitempty"`
+field Policy.ID string `json:"id"`
+field Policy.Name string `json:"name"`
+field Policy.PolicySetID string `json:"policy-set-id"`
+field Policy.Rego string `json:"rego"`
+field Policy.UpdatedAt string `json:"updated-at,omitempty"`
+field PolicySet.CreatedAt string `json:"created-at,omitempty"`
+field PolicySet.Description string `json:"description,omitempty"`
+field PolicySet.Enabled bool `json:"enabled"`
+field PolicySet.EnforcementLevel string `json:"enforcement-level"`
+field PolicySet.GlobalScope bool `json:"global-scope"`
+field PolicySet.ID string `json:"id"`
+field PolicySet.Name string `json:"name"`
+field PolicySet.PolicyCount int64 `json:"policy-count"`
+field PolicySet.PolicyPath string `json:"policy-path,omitempty"`
+field PolicySet.Source string `json:"source"`
+field PolicySet.UpdatedAt string `json:"updated-at,omitempty"`
+field PolicySet.VCSBranch string `json:"vcs-branch,omitempty"`
+field PolicySet.VCSConnectionID string `json:"vcs-connection-id,omitempty"`
+field PolicySet.VCSLastCommitSHA string `json:"vcs-last-commit-sha,omitempty"`
+field PolicySet.VCSLastError string `json:"vcs-last-error,omitempty"`
+field PolicySet.VCSLastSyncedAt string `json:"vcs-last-synced-at,omitempty"`
+field PolicySet.VCSRepoURL string `json:"vcs-repo-url,omitempty"`
+field ProviderTemplate.Attributes map[string]any
+field ProviderTemplate.CreatedAt string
+field ProviderTemplate.ID string
+field ProviderTemplate.UpdatedAt string
+field RegistryModule.CreatedAt string `json:"created-at,omitempty"`
+field RegistryModule.ID string `json:"id"`
+field RegistryModule.Labels map[string]string `json:"labels,omitempty"`
+field RegistryModule.Name string `json:"name"`
+field RegistryModule.Namespace string `json:"namespace,omitempty"`
+field RegistryModule.OwnerEmail string `json:"owner-email,omitempty"`
+field RegistryModule.ProviderName string `json:"provider"`
+field RegistryModule.Source string `json:"source,omitempty"`
+field RegistryModule.Status string `json:"status,omitempty"`
+field RegistryModule.UpdatedAt string `json:"updated-at,omitempty"`
+field RegistryModule.VCSBranch string `json:"vcs-branch,omitempty"`
+field RegistryModule.VCSConnectionID string `json:"vcs-connection-id,omitempty"`
+field RegistryModule.VCSRepoURL string `json:"vcs-repo-url,omitempty"`
+field RegistryModule.VCSTagPattern string `json:"vcs-tag-pattern,omitempty"`
+field RegistryProvider.CreatedAt string `json:"created-at,omitempty"`
+field RegistryProvider.ID string `json:"id"`
+field RegistryProvider.Labels map[string]string `json:"labels,omitempty"`
+field RegistryProvider.Name string `json:"name"`
+field RegistryProvider.Namespace string `json:"namespace,omitempty"`
+field RegistryProvider.OwnerEmail string `json:"owner-email,omitempty"`
+field RegistryProvider.UpdatedAt string `json:"updated-at,omitempty"`
+field Relationship.Data json.RawMessage `json:"data"`
+field RelationshipResource.ID string `json:"id"`
+field RelationshipResource.Type string `json:"type"`
+field RemoteStateConsumer.ConsumerWorkspaceID string `json:"consumer-workspace-id"`
+field RemoteStateConsumer.ConsumerWorkspaceName string `json:"consumer-workspace-name"`
+field RemoteStateConsumer.CreatedAt string `json:"created-at,omitempty"`
+field RemoteStateConsumer.CreatedBy string `json:"created-by,omitempty"`
+field RemoteStateConsumer.ID string `json:"id"`
+field RemoteStateConsumer.ProducerWorkspaceID string `json:"producer-workspace-id"`
+field RemoteStateConsumer.ProducerWorkspaceName string `json:"producer-workspace-name"`
+field Resource.Attributes map[string]json.RawMessage `json:"attributes"`
+field Resource.ID string `json:"id"`
+field Resource.Relationships map[string]Relationship `json:"relationships,omitempty"`
+field Resource.Type string `json:"type"`
+field Role.AllowLabels map[string]string `json:"allow-labels,omitempty"`
+field Role.AllowNames []string `json:"allow-names,omitempty"`
+field Role.BuiltIn bool `json:"built-in"`
+field Role.Capabilities []string `json:"capabilities,omitempty"`
+field Role.CatalogPermission string `json:"catalog-permission,omitempty"`
+field Role.CreatedAt string `json:"created-at,omitempty"`
+field Role.DenyLabels map[string]string `json:"deny-labels,omitempty"`
+field Role.DenyNames []string `json:"deny-names,omitempty"`
+field Role.Description string `json:"description,omitempty"`
+field Role.Name string `json:"name"`
+field Role.PoolPermission string `json:"pool-permission,omitempty"`
+field Role.RegistryPermission string `json:"registry-permission,omitempty"`
+field Role.UpdatedAt string `json:"updated-at,omitempty"`
+field Role.WorkspacePermission string `json:"workspace-permission"`
+field RoleAssignment.CreatedAt string `json:"created-at,omitempty"`
+field RoleAssignment.Email string `json:"email"`
+field RoleAssignment.ProviderName string `json:"provider-name"`
+field RoleAssignment.RoleName string `json:"role-name"`
+field RunTask.CreatedAt string `json:"created-at,omitempty"`
+field RunTask.Enabled bool `json:"enabled"`
+field RunTask.EnforcementLevel string `json:"enforcement-level"`
+field RunTask.HasHMACKey bool `json:"has-hmac-key"`
+field RunTask.ID string `json:"id"`
+field RunTask.Name string `json:"name"`
+field RunTask.Stage string `json:"stage"`
+field RunTask.URL string `json:"url"`
+field RunTask.UpdatedAt string `json:"updated-at,omitempty"`
+field RunTask.WorkspaceID string `json:"workspace-id,omitempty"`
+field RunTrigger.CreatedAt string `json:"created-at,omitempty"`
+field RunTrigger.ID string `json:"id"`
+field RunTrigger.SourceID string `json:"sourceable-id"`
+field RunTrigger.SourceableName string `json:"sourceable-name"`
+field RunTrigger.WorkspaceID string `json:"workspace-id"`
+field RunTrigger.WorkspaceName string `json:"workspace-name"`
+field SearchWorkspacesResult.Matched int `json:"matched"`
+field SearchWorkspacesResult.Workspaces []WorkspaceSummary `json:"workspaces"`
+field StateEdge.Kind string `json:"kind"`
+field StateEdge.Source string `json:"source"`
+field StateEdge.Target string `json:"target"`
+field StateGraph.Edges []StateEdge `json:"edges"`
+field StateGraph.Meta StateGraphMeta `json:"meta"`
+field StateGraph.Nodes []StateNode `json:"nodes"`
+field StateGraphMeta.Counts map[string]int `json:"counts"`
+field StateGraphMeta.MaxNodes int `json:"max_nodes"`
+field StateGraphMeta.StateVersion *StateGraphVersion `json:"state_version"`
+field StateGraphMeta.TotalResources int `json:"total_resources"`
+field StateGraphMeta.Truncated bool `json:"truncated"`
+field StateGraphMeta.Versions []StateGraphVersion `json:"versions"`
+field StateGraphVersion.CreatedAt string `json:"created_at"`
+field StateGraphVersion.ID string `json:"id"`
+field StateGraphVersion.IsCurrent bool `json:"is_current"`
+field StateGraphVersion.Serial int `json:"serial"`
+field StateNode.ID string `json:"id"`
+field StateNode.InDeg int `json:"indeg"`
+field StateNode.Instances int `json:"instances"`
+field StateNode.Kind string `json:"kind"`
+field StateNode.Mode string `json:"mode"`
+field StateNode.Module string `json:"module"`
+field StateNode.Name string `json:"name"`
+field StateNode.Provider string `json:"provider"`
+field StateNode.Type string `json:"type"`
+field StateVersion.CreatedAt string `json:"created-at,omitempty"`
+field StateVersion.HostedStateDLURL string `json:"hosted-state-download-url,omitempty"`
+field StateVersion.ID string `json:"id"`
+field StateVersion.Lineage string `json:"lineage"`
+field StateVersion.MD5 string `json:"md5,omitempty"`
+field StateVersion.Serial int64 `json:"serial"`
+field StateVersion.StateSize int64 `json:"state-size,omitempty"`
+field UpdateAgentPoolRequest.Description *string
+field UpdateAgentPoolRequest.Labels *map[string]string
+field UpdateAgentPoolRequest.Name string
+field UpdateAgentPoolRequest.OwnerEmail *string
+field UpdateExecutionHookRequest.Description *string
+field UpdateExecutionHookRequest.Enabled *bool
+field UpdateExecutionHookRequest.HookPoint *string
+field UpdateExecutionHookRequest.Name string
+field UpdateExecutionHookRequest.Priority *int64
+field UpdateExecutionHookRequest.Script *string
+field UpdateNotificationConfigurationRequest.EmailAddresses *[]string
+field UpdateNotificationConfigurationRequest.Enabled *bool
+field UpdateNotificationConfigurationRequest.Name string
+field UpdateNotificationConfigurationRequest.Token string
+field UpdateNotificationConfigurationRequest.Triggers *[]string
+field UpdateNotificationConfigurationRequest.URL *string
+field UpdatePolicyRequest.Description *string
+field UpdatePolicyRequest.Name *string
+field UpdatePolicyRequest.Rego *string
+field UpdatePolicySetRequest.AllowLabels map[string]string
+field UpdatePolicySetRequest.AllowNames []string
+field UpdatePolicySetRequest.DenyLabels map[string]string
+field UpdatePolicySetRequest.DenyNames []string
+field UpdatePolicySetRequest.Description *string
+field UpdatePolicySetRequest.Enabled *bool
+field UpdatePolicySetRequest.EnforcementLevel *string
+field UpdatePolicySetRequest.GlobalScope *bool
+field UpdatePolicySetRequest.Name *string
+field UpdatePolicySetRequest.PolicyPath *string
+field UpdatePolicySetRequest.VCSBranch *string
+field UpdatePolicySetRequest.VCSRepoURL *string
+field UpdateRegistryModuleRequest.Labels *map[string]string
+field UpdateRegistryModuleRequest.VCSBranch *string
+field UpdateRegistryModuleRequest.VCSConnectionID *string
+field UpdateRegistryModuleRequest.VCSRepoURL *string
+field UpdateRegistryModuleRequest.VCSTagPattern *string
+field UpdateRegistryProviderRequest.Labels *map[string]string
+field UpdateRoleRequest.AllowLabels *map[string]string
+field UpdateRoleRequest.AllowNames *[]string
+field UpdateRoleRequest.Capabilities []string
+field UpdateRoleRequest.CatalogPermission string
+field UpdateRoleRequest.DenyLabels *map[string]string
+field UpdateRoleRequest.DenyNames *[]string
+field UpdateRoleRequest.Description *string
+field UpdateRoleRequest.PoolPermission string
+field UpdateRoleRequest.RegistryPermission string
+field UpdateRoleRequest.WorkspacePermission string
+field UpdateRunTaskRequest.Enabled *bool
+field UpdateRunTaskRequest.EnforcementLevel string
+field UpdateRunTaskRequest.HMACKey string
+field UpdateRunTaskRequest.Name string
+field UpdateRunTaskRequest.Stage string
+field UpdateRunTaskRequest.URL string
+field UpdateUserRequest.DisplayName *string
+field UpdateUserRequest.IsActive *bool
+field UpdateUserRequest.Password string
+field UpdateVCSConnectionRequest.GithubAppID *int64
+field UpdateVCSConnectionRequest.GithubInstallationID *int64
+field UpdateVCSConnectionRequest.Name string
+field UpdateVCSConnectionRequest.PrivateKey string
+field UpdateVCSConnectionRequest.ServerURL string
+field UpdateVCSConnectionRequest.Token string
+field UpdateVCSConnectionRequest.WebhookSecret *string
+field UpdateVariableRequest.Category string `json:"category,omitempty"`
+field UpdateVariableRequest.Description *string `json:"description,omitempty"`
+field UpdateVariableRequest.HCL *bool `json:"hcl,omitempty"`
+field UpdateVariableRequest.Key string `json:"key,omitempty"`
+field UpdateVariableRequest.Sensitive *bool `json:"sensitive,omitempty"`
+field UpdateVariableRequest.Value *string `json:"value,omitempty"`
+field UpdateVariableSetRequest.Description *string
+field UpdateVariableSetRequest.Global *bool
+field UpdateVariableSetRequest.Name string
+field UpdateVariableSetRequest.Priority *bool
+field UpdateVarsetVariableRequest.Category string
+field UpdateVarsetVariableRequest.Description *string
+field UpdateVarsetVariableRequest.HCL *bool
+field UpdateVarsetVariableRequest.Key string
+field UpdateVarsetVariableRequest.Sensitive *bool
+field UpdateVarsetVariableRequest.Value *string
+field UpdateWorkspaceRequest.AISummaryContext *string `json:"ai-summary-context,omitempty"`
+field UpdateWorkspaceRequest.AISummaryMode string `json:"ai-summary-mode,omitempty"`
+field UpdateWorkspaceRequest.AgentPoolID string `json:"agent-pool-id,omitempty"`
+field UpdateWorkspaceRequest.AutoApply *bool `json:"auto-apply,omitempty"`
+field UpdateWorkspaceRequest.AutoMerge *bool `json:"auto-merge,omitempty"`
+field UpdateWorkspaceRequest.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
+field UpdateWorkspaceRequest.DriftDetectionEnabled *bool `json:"drift-detection-enabled,omitempty"`
+field UpdateWorkspaceRequest.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
+field UpdateWorkspaceRequest.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
+field UpdateWorkspaceRequest.ExecutionBackend string `json:"execution-backend,omitempty"`
+field UpdateWorkspaceRequest.ExecutionMode string `json:"execution-mode,omitempty"`
+field UpdateWorkspaceRequest.Labels map[string]string `json:"labels,omitempty"`
+field UpdateWorkspaceRequest.Name string `json:"name,omitempty"`
+field UpdateWorkspaceRequest.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
+field UpdateWorkspaceRequest.ResourceCPU string `json:"resource-cpu,omitempty"`
+field UpdateWorkspaceRequest.ResourceMemory string `json:"resource-memory,omitempty"`
+field UpdateWorkspaceRequest.SlackChannel *string `json:"slack-channel,omitempty"`
+field UpdateWorkspaceRequest.TerraformVersion string `json:"terraform-version,omitempty"`
+field UpdateWorkspaceRequest.TerragruntEnabled *bool `json:"terragrunt-enabled,omitempty"`
+field UpdateWorkspaceRequest.TerragruntVersion string `json:"terragrunt-version,omitempty"`
+field UpdateWorkspaceRequest.TriggerPrefixes []string `json:"trigger-prefixes,omitempty"`
+field UpdateWorkspaceRequest.VCSBranch string `json:"vcs-branch,omitempty"`
+field UpdateWorkspaceRequest.VCSConnectionID string `json:"-"`
+field UpdateWorkspaceRequest.VCSRepoURL string `json:"vcs-repo-url,omitempty"`
+field UpdateWorkspaceRequest.VCSWorkflow string `json:"vcs-workflow,omitempty"`
+field UpdateWorkspaceRequest.VarFiles []string `json:"var-files,omitempty"`
+field UpdateWorkspaceRequest.WorkingDirectory string `json:"working-directory,omitempty"`
+field User.CreatedAt string `json:"created-at,omitempty"`
+field User.DisplayName string `json:"display-name,omitempty"`
+field User.Email string `json:"email"`
+field User.HasPassword bool `json:"has-password"`
+field User.IsActive bool `json:"is-active"`
+field User.LastLoginAt string `json:"last-login-at,omitempty"`
+field User.UpdatedAt string `json:"updated-at,omitempty"`
+field VCSConnection.CreatedAt string `json:"created-at,omitempty"`
+field VCSConnection.GithubAccountLogin string `json:"github-account-login,omitempty"`
+field VCSConnection.GithubAccountType string `json:"github-account-type,omitempty"`
+field VCSConnection.GithubAppID int64 `json:"github-app-id,omitempty"`
+field VCSConnection.GithubInstallationID int64 `json:"github-installation-id,omitempty"`
+field VCSConnection.HasToken bool `json:"has-token"`
+field VCSConnection.HasWebhookSecret bool `json:"has-webhook-secret"`
+field VCSConnection.ID string `json:"id"`
+field VCSConnection.Name string `json:"name"`
+field VCSConnection.Provider string `json:"provider"`
+field VCSConnection.ServerURL string `json:"server-url,omitempty"`
+field VCSConnection.Status string `json:"status,omitempty"`
+field VCSConnection.UpdatedAt string `json:"updated-at,omitempty"`
+field ValidationError.Detail string
+field Variable.Category string `json:"category"`
+field Variable.CreatedAt string `json:"created-at,omitempty"`
+field Variable.Description string `json:"description,omitempty"`
+field Variable.HCL bool `json:"hcl"`
+field Variable.ID string `json:"id"`
+field Variable.Key string `json:"key"`
+field Variable.Sensitive bool `json:"sensitive"`
+field Variable.UpdatedAt string `json:"updated-at,omitempty"`
+field Variable.Value string `json:"value,omitempty"`
+field Variable.VersionID string `json:"version-id,omitempty"`
+field VariableSet.CreatedAt string `json:"created-at,omitempty"`
+field VariableSet.Description string `json:"description,omitempty"`
+field VariableSet.Global bool `json:"global"`
+field VariableSet.ID string `json:"id"`
+field VariableSet.Name string `json:"name"`
+field VariableSet.Priority bool `json:"priority"`
+field VariableSet.UpdatedAt string `json:"updated-at,omitempty"`
+field VariableSet.VarCount int64 `json:"var-count"`
+field VariableSet.WorkspaceCount int64 `json:"workspace-count"`
+field VariableSetVariable.Category string `json:"category"`
+field VariableSetVariable.CreatedAt string `json:"created-at,omitempty"`
+field VariableSetVariable.Description string `json:"description,omitempty"`
+field VariableSetVariable.HCL bool `json:"hcl"`
+field VariableSetVariable.ID string `json:"id"`
+field VariableSetVariable.Key string `json:"key"`
+field VariableSetVariable.Sensitive bool `json:"sensitive"`
+field VariableSetVariable.UpdatedAt string `json:"updated-at,omitempty"`
+field VariableSetVariable.Value string `json:"value,omitempty"`
+field VariableSetVariable.VersionID string `json:"version-id,omitempty"`
+field WarmBinaryEntry.Platforms []WarmPlatform `json:"platforms,omitempty"`
+field WarmBinaryEntry.Tool string `json:"tool,omitempty"`
+field WarmBinaryEntry.Version string `json:"version"`
+field WarmPlatform.Arch string `json:"arch"`
+field WarmPlatform.OS string `json:"os"`
+field WarmProviderEntry.Platforms []WarmPlatform `json:"platforms,omitempty"`
+field WarmProviderEntry.Source string `json:"source"`
+field WarmProviderEntry.Version string `json:"version"`
+field WarmResult.Error string `json:"error,omitempty"`
+field WarmResult.Kind string `json:"kind"`
+field WarmResult.OK bool `json:"ok"`
+field WarmResult.Ref string `json:"ref"`
+field Workspace.AISummaryContext string `json:"ai-summary-context,omitempty"`
+field Workspace.AISummaryMode string `json:"ai-summary-mode,omitempty"`
+field Workspace.AgentPoolID string `json:"agent-pool-id,omitempty"`
+field Workspace.AgentPoolName string `json:"agent-pool-name,omitempty"`
+field Workspace.AutoApply bool `json:"auto-apply"`
+field Workspace.AutoMerge bool `json:"auto-merge"`
+field Workspace.AutoMergeStrategy string `json:"auto-merge-strategy,omitempty"`
+field Workspace.CreatedAt string `json:"created-at,omitempty"`
+field Workspace.DriftDetectionEnabled bool `json:"drift-detection-enabled"`
+field Workspace.DriftDetectionIntervalSeconds *int64 `json:"drift-detection-interval-seconds,omitempty"`
+field Workspace.DriftIgnoreRules []string `json:"drift-ignore-rules,omitempty"`
+field Workspace.DriftLastCheckedAt string `json:"drift-last-checked-at,omitempty"`
+field Workspace.DriftLatestRunID string `json:"drift-latest-run-id,omitempty"`
+field Workspace.DriftStatus string `json:"drift-status,omitempty"`
+field Workspace.ExecutionBackend string `json:"execution-backend,omitempty"`
+field Workspace.ExecutionMode string `json:"execution-mode"`
+field Workspace.ID string `json:"id"`
+field Workspace.Labels map[string]string `json:"labels,omitempty"`
+field Workspace.LifecycleReason string `json:"lifecycle-reason,omitempty"`
+field Workspace.LifecycleState string `json:"lifecycle-state,omitempty"`
+field Workspace.Locked bool `json:"locked"`
+field Workspace.Name string `json:"name"`
+field Workspace.OwnerEmail string `json:"owner-email,omitempty"`
+field Workspace.PlanExpirySeconds *int64 `json:"plan-expiry-seconds,omitempty"`
+field Workspace.ResourceCPU string `json:"resource-cpu,omitempty"`
+field Workspace.ResourceMemory string `json:"resource-memory,omitempty"`
+field Workspace.SlackChannel string `json:"slack-channel,omitempty"`
+field Workspace.StateDiverged bool `json:"state-diverged"`
+field Workspace.TerraformVersion string `json:"terraform-version,omitempty"`
+field Workspace.TerragruntEnabled bool `json:"terragrunt-enabled"`
+field Workspace.TerragruntVersion string `json:"terragrunt-version,omitempty"`
+field Workspace.TriggerPrefixes []string `json:"trigger-prefixes,omitempty"`
+field Workspace.UpdatedAt string `json:"updated-at,omitempty"`
+field Workspace.VCSBranch string `json:"vcs-branch,omitempty"`
+field Workspace.VCSConnectionID string `json:"vcs-connection-id,omitempty"`
+field Workspace.VCSConnectionName string `json:"vcs-connection-name,omitempty"`
+field Workspace.VCSLastError string `json:"vcs-last-error,omitempty"`
+field Workspace.VCSLastErrorAt string `json:"vcs-last-error-at,omitempty"`
+field Workspace.VCSLastPolledAt string `json:"vcs-last-polled-at,omitempty"`
+field Workspace.VCSRepoURL string `json:"vcs-repo-url,omitempty"`
+field Workspace.VCSWorkflow string `json:"vcs-workflow,omitempty"`
+field Workspace.VarFiles []string `json:"var-files,omitempty"`
+field Workspace.WorkingDirectory string `json:"working-directory,omitempty"`
+field WorkspaceChange.Diff map[string]any `json:"diff,omitempty"`
+field WorkspaceChange.ID string `json:"id"`
+field WorkspaceChange.Name string `json:"name"`
+field WorkspaceFilter.AgentPoolID string `json:"agent_pool_id,omitempty"`
+field WorkspaceFilter.All bool `json:"all,omitempty"`
+field WorkspaceFilter.DriftStatus string `json:"drift_status,omitempty"`
+field WorkspaceFilter.ExecutionBackend string `json:"execution_backend,omitempty"`
+field WorkspaceFilter.ExecutionMode string `json:"execution_mode,omitempty"`
+field WorkspaceFilter.HasVCS *bool `json:"has_vcs,omitempty"`
+field WorkspaceFilter.Labels map[string]string `json:"labels,omitempty"`
+field WorkspaceFilter.Locked *bool `json:"locked,omitempty"`
+field WorkspaceFilter.NameGlob string `json:"name_glob,omitempty"`
+field WorkspaceFilter.NamePrefix string `json:"name_prefix,omitempty"`
+field WorkspaceFilter.OwnerEmail string `json:"owner_email,omitempty"`
+field WorkspaceFilter.TerraformVersion string `json:"terraform_version,omitempty"`
+field WorkspaceFilter.VCSConnectionID string `json:"vcs_connection_id,omitempty"`
+field WorkspaceFilter.WorkspaceIDs []string `json:"workspace_ids,omitempty"`
+field WorkspaceList.CurrentPage int
+field WorkspaceList.Items []Workspace
+field WorkspaceList.TotalCount int
+field WorkspaceList.TotalPages int
+field WorkspaceListOptions.PageNumber int
+field WorkspaceListOptions.PageSize int
+field WorkspaceListOptions.Search string
+field WorkspaceSummary.AgentPoolID *string `json:"agent-pool-id"`
+field WorkspaceSummary.ExecutionBackend string `json:"execution-backend"`
+field WorkspaceSummary.ExecutionMode string `json:"execution-mode"`
+field WorkspaceSummary.ID string `json:"id"`
+field WorkspaceSummary.Labels map[string]string `json:"labels"`
+field WorkspaceSummary.Name string `json:"name"`
+field WorkspaceSummary.TerraformVersion string `json:"terraform-version"`
+func AddPrefix(id, prefix string) string
+func GetBoolAttr(r *Resource, key string) bool
+func GetFloat64Attr(r *Resource, key string) float64
+func GetIntAttr(r *Resource, key string) int64
+func GetListAttr(r *Resource, key string) []string
+func GetMapAttr(r *Resource, key string) map[string]string
+func GetRelationshipID(r *Resource, name string) string
+func GetStringAttr(r *Resource, key string) string
+func IsAuth(err error) bool
+func IsConflict(err error) bool
+func IsNotFound(err error) bool
+func IsValidation(err error) bool
+func MarshalResource(resourceType string, attributes map[string]any, relationships map[string]any) ([]byte, error)
+func MarshalResourceWithID(id, resourceType string, attributes map[string]any) ([]byte, error)
+func MarshalResourceWithIDAndRels(id, resourceType string, attributes, relationships map[string]any) ([]byte, error)
+func NewClient(opts Options) (*Client, error)
+func ParseResource(body []byte) (*Resource, error)
+func ParseResourceList(body []byte) ([]Resource, error)
+func StripPrefix(id, prefix string) string
+method (*APIError) Error() string
+method (*AuthenticationError) Error() string
+method (*AuthorizationError) Error() string
+method (*Client) AddPolicy(ctx context.Context, policySetID string, req AddPolicyRequest) (*Policy, error)
+method (*Client) AddRoleToIdentity(ctx context.Context, providerName, email, roleName string) error
+method (*Client) AssignWorkspaceToExecutionHook(ctx context.Context, hookID, workspaceID string) error
+method (*Client) AssignWorkspaceToVarset(ctx context.Context, varsetID, workspaceID string) error
+method (*Client) BulkUpdateWorkspaces( ctx context.Context, filter WorkspaceFilter, update map[string]any, dryRun bool, ) (*BulkUpdateResult, error)
+method (*Client) ConfirmCatalogInstanceRun(ctx context.Context, wsID string) (*CatalogRunRef, error)
+method (*Client) CreateAPIToken(ctx context.Context, userID string, req CreateAPITokenRequest) (*APIToken, error)
+method (*Client) CreateAgentPool(ctx context.Context, req CreateAgentPoolRequest) (*AgentPool, error)
+method (*Client) CreateAgentPoolToken(ctx context.Context, poolID string, req CreateAgentPoolTokenRequest) (*AgentPoolToken, error)
+method (*Client) CreateAndUploadState(ctx context.Context, workspaceID string, raw []byte, req CreateStateVersionRequest) (*StateVersion, error)
+method (*Client) CreateAutodiscoveryRule(ctx context.Context, attrs map[string]any) (*AutodiscoveryRule, error)
+method (*Client) CreateCatalogItem(ctx context.Context, attrs map[string]any) (*CatalogItem, error)
+method (*Client) CreateExecutionHook(ctx context.Context, req CreateExecutionHookRequest) (*ExecutionHook, error)
+method (*Client) CreateGPGKey(ctx context.Context, req CreateGPGKeyRequest) (*GPGKey, error)
+method (*Client) CreateModuleWorkspaceLink(ctx context.Context, req CreateModuleWorkspaceLinkRequest) (*ModuleWorkspaceLink, error)
+method (*Client) CreateNotificationConfiguration(ctx context.Context, workspaceID string, req CreateNotificationConfigurationRequest) (*NotificationConfiguration, error)
+method (*Client) CreatePolicySet(ctx context.Context, req CreatePolicySetRequest) (*PolicySet, error)
+method (*Client) CreateProviderTemplate(ctx context.Context, attrs map[string]any) (*ProviderTemplate, error)
+method (*Client) CreateRegistryModule(ctx context.Context, req CreateRegistryModuleRequest) (*RegistryModule, error)
+method (*Client) CreateRegistryProvider(ctx context.Context, req CreateRegistryProviderRequest) (*RegistryProvider, error)
+method (*Client) CreateRemoteStateConsumer(ctx context.Context, req CreateRemoteStateConsumerRequest) (*RemoteStateConsumer, error)
+method (*Client) CreateRole(ctx context.Context, req CreateRoleRequest) (*Role, error)
+method (*Client) CreateRunTask(ctx context.Context, workspaceID string, req CreateRunTaskRequest) (*RunTask, error)
+method (*Client) CreateRunTrigger(ctx context.Context, req CreateRunTriggerRequest) (*RunTrigger, error)
+method (*Client) CreateStateVersion(ctx context.Context, workspaceID string, req CreateStateVersionRequest) (*StateVersion, error)
+method (*Client) CreateUser(ctx context.Context, req CreateUserRequest) (*User, error)
+method (*Client) CreateVCSConnection(ctx context.Context, req CreateVCSConnectionRequest) (*VCSConnection, error)
+method (*Client) CreateVariable(ctx context.Context, workspaceID string, req CreateVariableRequest) (*Variable, error)
+method (*Client) CreateVariableSet(ctx context.Context, req CreateVariableSetRequest) (*VariableSet, error)
+method (*Client) CreateVarsetVariable(ctx context.Context, varsetID string, req CreateVarsetVariableRequest) (*VariableSetVariable, error)
+method (*Client) CreateWorkspace(ctx context.Context, req CreateWorkspaceRequest) (*Workspace, error)
+method (*Client) Delete(ctx context.Context, path string) error
+method (*Client) DeleteAgentPool(ctx context.Context, id string) error
+method (*Client) DeleteAgentPoolToken(ctx context.Context, poolID, tokenID string) error
+method (*Client) DeleteAutodiscoveryRule(ctx context.Context, id string) error
+method (*Client) DeleteCatalogItem(ctx context.Context, id string) error
+method (*Client) DeleteExecutionHook(ctx context.Context, id string) error
+method (*Client) DeleteGPGKey(ctx context.Context, id string) error
+method (*Client) DeleteModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) error
+method (*Client) DeleteNotificationConfiguration(ctx context.Context, id string) error
+method (*Client) DeletePolicy(ctx context.Context, policyID string) error
+method (*Client) DeletePolicySet(ctx context.Context, id string) error
+method (*Client) DeleteProviderTemplate(ctx context.Context, id string) error
+method (*Client) DeleteRegistryModule(ctx context.Context, name, providerName string) error
+method (*Client) DeleteRegistryProvider(ctx context.Context, name string) error
+method (*Client) DeleteRemoteStateConsumer(ctx context.Context, id string) error
+method (*Client) DeleteRole(ctx context.Context, name string) error
+method (*Client) DeleteRunTask(ctx context.Context, id string) error
+method (*Client) DeleteRunTrigger(ctx context.Context, id string) error
+method (*Client) DeleteStateVersion(ctx context.Context, stateVersionID string) error
+method (*Client) DeleteUser(ctx context.Context, email string) error
+method (*Client) DeleteVCSConnection(ctx context.Context, id string) error
+method (*Client) DeleteVariable(ctx context.Context, workspaceID, id string) error
+method (*Client) DeleteVariableSet(ctx context.Context, id string) error
+method (*Client) DeleteVarsetVariable(ctx context.Context, varsetID, varID string) error
+method (*Client) DeleteWithBody(ctx context.Context, path string, payload []byte) error
+method (*Client) DeleteWorkspace(ctx context.Context, id string) error
+method (*Client) DestroyCatalogInstance(ctx context.Context, wsID string, attrs map[string]any) (*CatalogRunRef, error)
+method (*Client) DiscardCatalogInstanceRun(ctx context.Context, wsID string) (*CatalogRunRef, error)
+method (*Client) Get(ctx context.Context, path string) ([]byte, error)
+method (*Client) GetAPIToken(ctx context.Context, tokenID string) (*APIToken, error)
+method (*Client) GetAgentPool(ctx context.Context, id string) (*AgentPool, error)
+method (*Client) GetAgentPoolToken(ctx context.Context, poolID, tokenID string) (*AgentPoolToken, error)
+method (*Client) GetAutodiscoveryRule(ctx context.Context, id string) (*AutodiscoveryRule, error)
+method (*Client) GetCatalogInstance(ctx context.Context, wsID string) (*CatalogInstance, error)
+method (*Client) GetCatalogItem(ctx context.Context, id string) (*CatalogItem, error)
+method (*Client) GetCatalogItemForm(ctx context.Context, id string) (map[string]any, error)
+method (*Client) GetCurrentStateVersion(ctx context.Context, workspaceID string) (*StateVersion, error)
+method (*Client) GetEncryptionStatus(ctx context.Context) (*EncryptionStatus, error)
+method (*Client) GetEstateGraph(ctx context.Context) (*EstateGraph, error)
+method (*Client) GetExecutionHook(ctx context.Context, id string) (*ExecutionHook, error)
+method (*Client) GetGPGKey(ctx context.Context, id string) (*GPGKey, error)
+method (*Client) GetModuleWorkspaceLink(ctx context.Context, moduleName, moduleProvider, linkID string) (*ModuleWorkspaceLink, error)
+method (*Client) GetNotificationConfiguration(ctx context.Context, id string) (*NotificationConfiguration, error)
+method (*Client) GetPlanSummary(ctx context.Context, planID string) (*PlanSummary, error)
+method (*Client) GetPolicySet(ctx context.Context, id string) (*PolicySet, error)
+method (*Client) GetProviderTemplate(ctx context.Context, id string) (*ProviderTemplate, error)
+method (*Client) GetRegistryModule(ctx context.Context, name, providerName string) (*RegistryModule, error)
+method (*Client) GetRegistryProvider(ctx context.Context, name string) (*RegistryProvider, error)
+method (*Client) GetRemoteStateConsumer(ctx context.Context, id string) (*RemoteStateConsumer, error)
+method (*Client) GetRole(ctx context.Context, name string) (*Role, error)
+method (*Client) GetRoleAssignment(ctx context.Context, providerName, email, roleName string) (*RoleAssignment, error)
+method (*Client) GetRunImpactGraph(ctx context.Context, runID string) (*ImpactGraph, error)
+method (*Client) GetRunTask(ctx context.Context, id string) (*RunTask, error)
+method (*Client) GetRunTrigger(ctx context.Context, id string) (*RunTrigger, error)
+method (*Client) GetStateGraph(ctx context.Context, workspaceID, stateVersionID string) (*StateGraph, error)
+method (*Client) GetUser(ctx context.Context, email string) (*User, error)
+method (*Client) GetVCSConnection(ctx context.Context, id string) (*VCSConnection, error)
+method (*Client) GetVariable(ctx context.Context, workspaceID, id string) (*Variable, error)
+method (*Client) GetVariableByKey(ctx context.Context, workspaceID, key string) (*Variable, error)
+method (*Client) GetVariableSet(ctx context.Context, id string) (*VariableSet, error)
+method (*Client) GetVarsetVariable(ctx context.Context, varsetID, varID string) (*VariableSetVariable, error)
+method (*Client) GetWorkspace(ctx context.Context, id string) (*Workspace, error)
+method (*Client) GetWorkspaceByName(ctx context.Context, name string) (*Workspace, error)
+method (*Client) IsWorkspaceAssignedToExecutionHook(ctx context.Context, hookID, workspaceID string) (bool, error)
+method (*Client) IsWorkspaceAssignedToVarset(ctx context.Context, varsetID, workspaceID string) (bool, error)
+method (*Client) ListAgentPoolTokens(ctx context.Context, poolID string) ([]AgentPoolToken, error)
+method (*Client) ListAgentPools(ctx context.Context) ([]AgentPool, error)
+method (*Client) ListAllAPITokens(ctx context.Context, kind string) ([]APIToken, error)
+method (*Client) ListCatalogInstances(ctx context.Context, itemID string) ([]CatalogInstance, error)
+method (*Client) ListCatalogItems(ctx context.Context) ([]CatalogItem, error)
+method (*Client) ListExecutionHooks(ctx context.Context) ([]ExecutionHook, error)
+method (*Client) ListExpiringAPITokens(ctx context.Context) ([]APIToken, error)
+method (*Client) ListGPGKeys(ctx context.Context) ([]GPGKey, error)
+method (*Client) ListInboundRunTriggers(ctx context.Context, workspaceID string) ([]RunTrigger, error)
+method (*Client) ListLabelEntities(ctx context.Context, key, value string) (map[string][]LabelEntity, error)
+method (*Client) ListLabelKeys(ctx context.Context) ([]LabelKey, error)
+method (*Client) ListLabelValues(ctx context.Context, key string) ([]LabelValue, error)
+method (*Client) ListModuleWorkspaceLinks(ctx context.Context, moduleName, moduleProvider string) ([]ModuleWorkspaceLink, error)
+method (*Client) ListNotificationConfigurations(ctx context.Context, workspaceID string) ([]NotificationConfiguration, error)
+method (*Client) ListOutboundRunTriggers(ctx context.Context, workspaceID string) ([]RunTrigger, error)
+method (*Client) ListPlanSummaryMessages(ctx context.Context, runID string) ([]*PlanSummaryMessage, error)
+method (*Client) ListPolicySets(ctx context.Context) ([]PolicySet, error)
+method (*Client) ListProviderTemplates(ctx context.Context) ([]ProviderTemplate, error)
+method (*Client) ListRemoteStateConsumers(ctx context.Context, producerWorkspaceID string) ([]RemoteStateConsumer, error)
+method (*Client) ListRoleAssignments(ctx context.Context) ([]RoleAssignment, error)
+method (*Client) ListRoleAssignmentsForIdentity(ctx context.Context, providerName, email string) ([]RoleAssignment, error)
+method (*Client) ListRoles(ctx context.Context) ([]Role, error)
+method (*Client) ListRunTasks(ctx context.Context, workspaceID string) ([]RunTask, error)
+method (*Client) ListUserAPITokens(ctx context.Context, userID string) ([]APIToken, error)
+method (*Client) ListUsers(ctx context.Context) ([]User, error)
+method (*Client) ListVCSConnections(ctx context.Context) ([]VCSConnection, error)
+method (*Client) ListVariableSets(ctx context.Context) ([]VariableSet, error)
+method (*Client) ListVariables(ctx context.Context, workspaceID string) ([]Variable, error)
+method (*Client) ListVarsetVariables(ctx context.Context, varsetID string) ([]VariableSetVariable, error)
+method (*Client) ListWorkspaces(ctx context.Context, opts WorkspaceListOptions) (*WorkspaceList, error)
+method (*Client) OrphanCatalogInstance(ctx context.Context, wsID string) error
+method (*Client) Patch(ctx context.Context, path string, payload []byte) ([]byte, error)
+method (*Client) Post(ctx context.Context, path string, payload []byte) ([]byte, error)
+method (*Client) PostPlanSummaryMessage(ctx context.Context, runID, content string) (*PlanSummaryMessage, error)
+method (*Client) ProvisionCatalogItem(ctx context.Context, itemID string, attrs map[string]any) (*CatalogInstance, error)
+method (*Client) Put(ctx context.Context, path string, payload []byte) ([]byte, error)
+method (*Client) PutRaw(ctx context.Context, path, contentType string, payload []byte) ([]byte, error)
+method (*Client) ReconfigureCatalogInstance(ctx context.Context, wsID string, attrs map[string]any) (*CatalogRunRef, error)
+method (*Client) RegeneratePlanSummary(ctx context.Context, runID string) (*PlanSummary, error)
+method (*Client) RemoveRoleFromIdentity(ctx context.Context, providerName, email, roleName string) error
+method (*Client) RetagAPIToken(ctx context.Context, tokenID, kind string, pinnedRoles []string) (*APIToken, error)
+method (*Client) RevokeAPIToken(ctx context.Context, tokenID string) error
+method (*Client) RevokeAllAPITokensForUser(ctx context.Context, email string) (int64, error)
+method (*Client) RevokeGPGKey(ctx context.Context, id, revocationCertificate string) (*GPGKey, error)
+method (*Client) RotateAPIToken(ctx context.Context, tokenID string) (*APIToken, error)
+method (*Client) RotateDEK(ctx context.Context) (*EncryptionStatus, error)
+method (*Client) SearchWorkspaces(ctx context.Context, filter WorkspaceFilter) (*SearchWorkspacesResult, error)
+method (*Client) SetRolesForIdentity(ctx context.Context, providerName, email string, roles []string) error
+method (*Client) SyncPolicySet(ctx context.Context, id string) (*PolicySet, error)
+method (*Client) UnassignWorkspaceFromExecutionHook(ctx context.Context, hookID, workspaceID string) error
+method (*Client) UnassignWorkspaceFromVarset(ctx context.Context, varsetID, workspaceID string) error
+method (*Client) UpdateAgentPool(ctx context.Context, id string, req UpdateAgentPoolRequest) (*AgentPool, error)
+method (*Client) UpdateAutodiscoveryRule(ctx context.Context, id string, attrs map[string]any) (*AutodiscoveryRule, error)
+method (*Client) UpdateCatalogItem(ctx context.Context, id string, attrs map[string]any) (*CatalogItem, error)
+method (*Client) UpdateExecutionHook(ctx context.Context, id string, req UpdateExecutionHookRequest) (*ExecutionHook, error)
+method (*Client) UpdateNotificationConfiguration(ctx context.Context, id string, req UpdateNotificationConfigurationRequest) (*NotificationConfiguration, error)
+method (*Client) UpdatePolicy(ctx context.Context, policyID string, req UpdatePolicyRequest) (*Policy, error)
+method (*Client) UpdatePolicySet(ctx context.Context, id string, req UpdatePolicySetRequest) (*PolicySet, error)
+method (*Client) UpdateProviderTemplate(ctx context.Context, id string, attrs map[string]any) (*ProviderTemplate, error)
+method (*Client) UpdateRegistryModule(ctx context.Context, name, providerName string, req UpdateRegistryModuleRequest) (*RegistryModule, error)
+method (*Client) UpdateRegistryProvider(ctx context.Context, name string, req UpdateRegistryProviderRequest) (*RegistryProvider, error)
+method (*Client) UpdateRole(ctx context.Context, name string, req UpdateRoleRequest) (*Role, error)
+method (*Client) UpdateRunTask(ctx context.Context, id string, req UpdateRunTaskRequest) (*RunTask, error)
+method (*Client) UpdateUser(ctx context.Context, email string, req UpdateUserRequest) (*User, error)
+method (*Client) UpdateVCSConnection(ctx context.Context, id string, req UpdateVCSConnectionRequest) (*VCSConnection, error)
+method (*Client) UpdateVariable(ctx context.Context, workspaceID, id string, req UpdateVariableRequest) (*Variable, error)
+method (*Client) UpdateVariableSet(ctx context.Context, id string, req UpdateVariableSetRequest) (*VariableSet, error)
+method (*Client) UpdateVarsetVariable(ctx context.Context, varsetID, varID string, req UpdateVarsetVariableRequest) (*VariableSetVariable, error)
+method (*Client) UpdateWorkspace(ctx context.Context, id string, req UpdateWorkspaceRequest) (*Workspace, error)
+method (*Client) UploadModuleVersion(ctx context.Context, name, provider, version string, tarball []byte) error
+method (*Client) UploadProviderPlatform(ctx context.Context, name, version, goos, goarch string, zip []byte) error
+method (*Client) UploadProviderSHASUMS(ctx context.Context, name, version string, shasums []byte) error
+method (*Client) UploadProviderSignature(ctx context.Context, name, version string, sig []byte) error
+method (*Client) UploadStateContent(ctx context.Context, stateVersionID string, raw []byte) error
+method (*Client) VersionCheck(ctx context.Context) error
+method (*Client) WarmCacheBulk(ctx context.Context, req BulkWarmRequest) (*BulkWarmResponse, error)
+method (*ConflictError) Error() string
+method (*NotFoundError) Error() string
+method (*ValidationError) Error() string
+type APIError struct
+type APIToken struct
+type AddPolicyRequest struct
+type AgentPool struct
+type AgentPoolToken struct
+type AuthenticationError struct
+type AuthorizationError struct
+type AutodiscoveryRule struct
+type BulkUpdateResult struct
+type BulkWarmRequest struct
+type BulkWarmResponse struct
+type CatalogInstance struct
+type CatalogItem struct
+type CatalogRunRef struct
+type Client struct
+type ConflictError struct
+type CreateAPITokenRequest struct
+type CreateAgentPoolRequest struct
+type CreateAgentPoolTokenRequest struct
+type CreateExecutionHookRequest struct
+type CreateGPGKeyRequest struct
+type CreateModuleWorkspaceLinkRequest struct
+type CreateNotificationConfigurationRequest struct
+type CreatePolicySetRequest struct
+type CreateRegistryModuleRequest struct
+type CreateRegistryProviderRequest struct
+type CreateRemoteStateConsumerRequest struct
+type CreateRoleRequest struct
+type CreateRunTaskRequest struct
+type CreateRunTriggerRequest struct
+type CreateStateVersionRequest struct
+type CreateUserRequest struct
+type CreateVCSConnectionRequest struct
+type CreateVariableRequest struct
+type CreateVariableSetRequest struct
+type CreateVarsetVariableRequest struct
+type CreateWorkspaceRequest struct
+type Document struct
+type EncryptionStatus struct
+type ErrorObject struct
+type ErrorResponse struct
+type EstateEdge struct
+type EstateGraph struct
+type EstateGraphMeta struct
+type EstateNode struct
+type ExecutionHook struct
+type GPGKey struct
+type ImpactGraph struct
+type ImpactGraphEdge struct
+type ImpactGraphMeta struct
+type ImpactGraphNode struct
+type LabelEntity struct
+type LabelKey struct
+type LabelValue struct
+type ListMeta struct
+type ModuleWorkspaceLink struct
+type NotFoundError struct
+type NotificationConfiguration struct
+type Options struct
+type PlanSummary struct
+type PlanSummaryMessage struct
+type PlanSummaryRiskFactor struct
+type Policy struct
+type PolicySet struct
+type ProviderTemplate struct
+type RegistryModule struct
+type RegistryProvider struct
+type Relationship struct
+type RelationshipResource struct
+type RemoteStateConsumer struct
+type Resource struct
+type Role struct
+type RoleAssignment struct
+type RunTask struct
+type RunTrigger struct
+type SearchWorkspacesResult struct
+type StateEdge struct
+type StateGraph struct
+type StateGraphMeta struct
+type StateGraphVersion struct
+type StateNode struct
+type StateVersion struct
+type UpdateAgentPoolRequest struct
+type UpdateExecutionHookRequest struct
+type UpdateNotificationConfigurationRequest struct
+type UpdatePolicyRequest struct
+type UpdatePolicySetRequest struct
+type UpdateRegistryModuleRequest struct
+type UpdateRegistryProviderRequest struct
+type UpdateRoleRequest struct
+type UpdateRunTaskRequest struct
+type UpdateUserRequest struct
+type UpdateVCSConnectionRequest struct
+type UpdateVariableRequest struct
+type UpdateVariableSetRequest struct
+type UpdateVarsetVariableRequest struct
+type UpdateWorkspaceRequest struct
+type User struct
+type VCSConnection struct
+type ValidationError struct
+type Variable struct
+type VariableSet struct
+type VariableSetVariable struct
+type WarmBinaryEntry struct
+type WarmPlatform struct
+type WarmProviderEntry struct
+type WarmResult struct
+type Workspace struct
+type WorkspaceChange struct
+type WorkspaceFilter struct
+type WorkspaceList struct
+type WorkspaceListOptions struct
+type WorkspaceSummary struct
+var ErrVersionMismatch
+var ErrVersionUnreported
+var SDKVersion
