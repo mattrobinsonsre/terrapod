@@ -151,6 +151,7 @@ See [Architecture](architecture.md) for the full breakdown.
 | [Forward proxy & custom CA trust](deployment-proxy.md) | Route all outbound HTTP(S) through a corporate proxy and trust a private/MITM CA, across every component including runner Jobs |
 | [Security Hardening](security-hardening.md) | TLS, secrets management, network policies, rate limiting |
 | [Versioning & Support](versioning-and-support.md) | What each version bump guarantees, the stable surfaces + their CI gates, component version-skew support, the deprecation window, and the support matrix |
+| [Deprecations](deprecations.md) | The authoritative list of deprecated surfaces and their sunset dates, plus how to read the API's `Deprecation`/`Sunset` headers |
 | [Known Limitations](known-limitations.md) | What Terrapod does not (yet) do — deployment, scope, and feature constraints, stated plainly |
 | [Production Checklist](production-checklist.md) | Step-by-step checklist for go-live readiness |
 | [Disaster Recovery](disaster-recovery.md) | Break-glass state recovery, shipped DB backup CronJob + restore-verification DR drill, per-backend object-storage protection |

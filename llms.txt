@@ -112,6 +112,7 @@ How each capability is turned on. **Platform-level** features are Helm values un
 - [docs/deployment-proxy.md](docs/deployment-proxy.md): forward proxy (`proxy.*`) + custom outbound CA trust (`caBundle.*`) across all components incl. runner Jobs; for no-direct-egress / TLS-intercepting networks.
 - [docs/security-hardening.md](docs/security-hardening.md), [docs/production-checklist.md](docs/production-checklist.md), [docs/disaster-recovery.md](docs/disaster-recovery.md): go-live and break-glass.
 - [docs/versioning-and-support.md](docs/versioning-and-support.md): the SemVer compatibility contract — what each bump guarantees, the stable surfaces + their CI gates, runner/listener/SDK version-skew support (N-2), the deprecation window (`Deprecation`/`Sunset` headers + 2-minor grace), and the support matrix.
+- [docs/deprecations.md](docs/deprecations.md): the authoritative list of deprecated public surfaces and their sunset dates, plus how automated clients should read the `Deprecation`/`Sunset`/`Link` response headers (currently: nothing is deprecated).
 - [docs/known-limitations.md](docs/known-limitations.md): what Terrapod does **not** (yet) do — K8s-only deployment, single-org by design, no teams/projects, `local`/`agent` execution only, GitHub/GitLab VCS only, migration checklist gaps, OPA-only policy — each marked *by design* vs *not yet*.
 - [docs/runbooks.md](docs/runbooks.md): operator runbooks for high-blast-radius surfaces.
 - [docs/local-development.md](docs/local-development.md): run from source with Tilt (contributors).

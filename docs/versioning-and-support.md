@@ -63,12 +63,16 @@ rolling upgrade or live in a separate, independently-upgraded cluster.
 Nothing on a stable surface is removed without notice. To remove or rename
 anything:
 
-1. **Announce** — mark it deprecated in the release notes and (for API responses)
-   emit a `Deprecation` / `Sunset` HTTP header; keep the old behaviour working.
+1. **Announce** — mark it deprecated in the release notes, list it in
+   [`deprecations.md`](deprecations.md), and (for API responses) emit
+   `Deprecation` / `Sunset` / `Link` HTTP headers; keep the old behaviour working.
 2. **Grace period** — leave the deprecated surface in place for at least **2
    minor releases** (or until the next MAJOR, whichever is longer).
-3. **Remove** — only in a MAJOR release, with the removal listed in the migration
-   notes.
+3. **Remove** — only in a MAJOR release, on or after the published `Sunset` date,
+   with the removal listed in the migration notes.
+
+The live list of what is currently deprecated and when it sunsets is
+[`deprecations.md`](deprecations.md).
 
 Database columns follow the stricter **expand → migrate → wait a release →
 contract** rule (a rolling upgrade runs old and new code against the same DB, so
@@ -101,9 +105,11 @@ Compatibility isn't a promise on paper — it's checked three ways:
 
 These gates are landing incrementally under
 [#550](https://github.com/mattrobinsonsre/terrapod/issues/550): the route,
-response-attribute, config-key, and migration (reversibility + expand/contract)
-gates are live today; the go-terrapod, provider-schema, and Helm-value-removal
-gates and the `Deprecation`/`Sunset` header mechanism follow before `1.0.0`.
+response-attribute, **runner/listener wire-protocol**, config-key, and migration
+(reversibility + expand/contract) gates are live today, as is the
+`Deprecation`/`Sunset` header mechanism (see [`deprecations.md`](deprecations.md));
+the go-terrapod, provider-schema, and Helm-value-removal gates follow before
+`1.0.0`.
 
 If you find a compatibility break that slipped through, it's a bug — please
 [open an issue](https://github.com/mattrobinsonsre/terrapod/issues).
