@@ -65,6 +65,10 @@ COPY alembic ./alembic
 # AI-analysis evaluation harness (#602) — committed eval suite. Imported by
 # the offline corpus/rubric tests and run live (model sweep) on demand.
 COPY services/ai_eval ./ai_eval
+# Helm chart values — the Helm-value-removal contract test (tests/helm) parses
+# values.yaml as text/YAML to freeze the operator-facing value keys. Chart only
+# (values + templates); no helm binary is invoked in the Python image.
+COPY helm ./helm
 
 # Source for the API↔SDK↔provider contract test (tests/test_api_sdk_contract.py).
 # The test reads these files as raw text — no Go build is performed in the
