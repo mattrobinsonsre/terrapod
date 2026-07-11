@@ -158,7 +158,7 @@ Everything below is implemented and shipped today.
 | Notifications | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
 | Interactive Slack app | Outbound Socket Mode app — `/terrapod` account linking + opt-in per-workspace run notifications with RBAC-checked Approve/Discard buttons; multiple deployments can share one Slack workspace |
 | Run tasks | Pre/post-plan webhook hooks for external validation |
-| Execution hooks | Admin-managed custom shell steps run in the runner Job at pre_init / pre_plan / post_plan / pre_apply / post_apply, associated with workspaces |
+| Execution hooks | **Custom execution steps** — admin-managed shell run in the runner Job at pre_init / pre_plan / post_plan / pre_apply / post_apply, associated with workspaces (`pre_init` is the setup/tooling/auth slot; custom runner images cover heavier needs) |
 | Service catalog | No-code self-service provisioning over the module registry |
 | Impact graph | Interactive dependency + blast-radius view of a plan on the run page — module-clustered, click a resource to light up its transitive downstream impact |
 | Estate topology | Whole-estate dependency graph — workspaces + modules wired by run-triggers, remote-state, and module links; group by any label / pool / name prefix; RBAC-filtered; accessible table fallback |
@@ -500,6 +500,7 @@ Reports are written to `reports/pentest/`. See [SECURITY.md](SECURITY.md) for th
 - **Pull-through provider mirror + terraform/tofu binary cache** — runners have zero direct upstream dependency; Terrakube ships a local plugin cache.
 - **Monorepo autodiscovery** — Atlantis-style auto-creation of workspaces from glob-matched directories on PRs (Terrakube has directory filtering, but not auto-creation).
 - **Run tasks** — pre/post-plan external webhook validation hooks (not present in Terrakube).
+- **Custom execution steps** — *execution hooks* run operator-supplied shell at five run-lifecycle points (`pre_init`, `pre_plan`, `post_plan`, `pre_apply`, `post_apply`) inside the runner Job, as reusable, workspace-associated library entries with priority ordering, fail-the-run semantics, audit logging, and a platform kill-switch. `pre_init` is the pre-`init` slot for installing extra tooling, authenticating to a secret backend, or fetching certs; heavier or image-level customization uses a custom runner image. See [docs/execution-hooks.md](docs/execution-hooks.md).
 - **In-platform AI** — plan summaries, failure analysis, and chat (Terrakube integrates AI via an external MCP server).
 - **Native Terragrunt** — a per-workspace flag wraps agent-mode runs in `terragrunt` (pull-through binary cache, local-backend reconciliation) while Terrapod keeps owning state and the run lifecycle; CLI-driven runs need no config. See [docs/terragrunt.md](docs/terragrunt.md).
 - Additionally — first-class OPA **policy sets** with mandatory/advisory enforcement, native multi-channel **notifications** (Slack/email/webhook), and cross-workspace **run triggers**.

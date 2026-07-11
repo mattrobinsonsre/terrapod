@@ -41,7 +41,7 @@ Beyond broad TFE compatibility, Terrapod is built with three deliberate design f
 | **Notifications** | Webhook (HMAC-SHA512), Slack (Block Kit), and email alerts on run events |
 | **Interactive Slack app** | Outbound Socket Mode app: `/terrapod` account linking (explicit confirm step) + opt-in per-workspace run notifications with RBAC-checked Approve/Discard buttons; multiple deployments can share one Slack workspace via per-deployment `slack.command`/`slack.label` ([Slack integration](slack-integration.md)) |
 | **Run Tasks** | Pre/post-plan webhook hooks for external validation |
-| **Execution Hooks** | Admin-managed custom shell steps run in the runner Job at five lifecycle points, associated with workspaces |
+| **Execution Hooks** | **Custom execution steps** — admin-managed shell run in the runner Job at five run-lifecycle points, associated with workspaces (`pre_init` is the setup/tooling/auth slot; custom runner images cover heavier needs) |
 | **Policy-as-Code** | OPA/Rego policy sets evaluated on every run; advisory or mandatory enforcement, label-scoped |
 | **Drift Detection** | Scheduled plan-only runs to detect out-of-band infrastructure changes |
 | **Workspace Health** | Per-workspace health conditions with status indicators on workspace list |
