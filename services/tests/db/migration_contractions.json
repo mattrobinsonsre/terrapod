@@ -1,0 +1,36 @@
+{
+  "00a2cf7e0345_update_default_tofu_version": [
+    "alter_column(runs, terraform_version)",
+    "alter_column(workspaces, terraform_version)"
+  ],
+  "166efacb7b5d_ca_key_truthful_name": [
+    "alter_column(certificate_authority, ca_key_encrypted)"
+  ],
+  "1f15ac58564c_drop_agent_pool_service_account_name": [
+    "drop_column(agent_pools, service_account_name)"
+  ],
+  "2b369cd58093_widen_webhook_secret_for_encryption": [
+    "alter_column(vcs_connections, webhook_secret)"
+  ],
+  "3fbcb2885b93_service_token_kind_columns": [
+    "alter_column(api_tokens, created_by)",
+    "alter_column(api_tokens, user_email)"
+  ],
+  "7dac5695bc0e_default_tofu_1_12": [
+    "alter_column(autodiscovery_rules, terraform_version)",
+    "alter_column(workspaces, terraform_version)"
+  ],
+  "a0b6c95a281d_audit_dual_actor": [
+    "alter_column(audit_logs, action)"
+  ],
+  "a7e74cad11d5_drop_role_level_columns": [
+    "drop_column(roles)"
+  ],
+  "bb5e7f11d575_unify_working_directory": [
+    "drop_column(workspaces, vcs_working_directory)"
+  ],
+  "f3e984cc98cf_drop_runner_listeners": [
+    "drop_constraint(runs_listener_id_fkey, runs)",
+    "drop_table(runner_listeners)"
+  ]
+}
