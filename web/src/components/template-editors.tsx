@@ -1,5 +1,7 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
+
 /**
  * Repeatable nested editors shared by the autodiscovery rule form (#318)
  * and the bulk-update page (#318). Each editor owns a JS array in the
@@ -89,13 +91,14 @@ function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
 }
 
 function RemoveButton({ onClick }: { onClick: () => void }) {
+  const t = useTranslations('common')
   return (
     <button
       type="button"
       onClick={onClick}
       className="text-xs text-red-400 hover:text-red-300"
     >
-      Remove
+      {t('templateEditors.remove')}
     </button>
   )
 }
@@ -107,14 +110,15 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
 export function StringListEditor({
   values,
   onChange,
-  placeholder = 'value',
-  addLabel = 'Add',
+  placeholder,
+  addLabel,
 }: {
   values: string[]
   onChange: (next: string[]) => void
   placeholder?: string
   addLabel?: string
 }) {
+  const t = useTranslations('common')
   function setAt(i: number, v: string) {
     const next = values.slice()
     next[i] = v
@@ -131,13 +135,16 @@ export function StringListEditor({
             type="text"
             value={v}
             onChange={(e) => setAt(i, e.target.value)}
-            placeholder={placeholder}
+            placeholder={placeholder ?? t('templateEditors.valuePlaceholder')}
             className={`${inputCls} font-mono`}
           />
           <RemoveButton onClick={() => removeAt(i)} />
         </div>
       ))}
-      <AddButton onClick={() => onChange([...values, ''])} label={addLabel} />
+      <AddButton
+        onClick={() => onChange([...values, ''])}
+        label={addLabel ?? t('templateEditors.add')}
+      />
     </div>
   )
 }
@@ -153,6 +160,7 @@ export function RunTaskTemplatesEditor({
   items: RunTaskSpec[]
   onChange: (next: RunTaskSpec[]) => void
 }) {
+  const t = useTranslations('common')
   function patch(i: number, patch: Partial<RunTaskSpec>) {
     const next = items.slice()
     next[i] = { ...next[i], ...patch }
@@ -170,39 +178,39 @@ export function RunTaskTemplatesEditor({
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Name</label>
+              <label className={labelCls}>{t('templateEditors.name')}</label>
               <input
                 type="text"
                 value={it.name}
                 onChange={(e) => patch(i, { name: e.target.value })}
-                placeholder="security-scan"
+                placeholder={t('templateEditors.runTaskNamePlaceholder')}
                 className={inputCls}
               />
             </div>
             <div>
-              <label className={labelCls}>URL</label>
+              <label className={labelCls}>{t('templateEditors.url')}</label>
               <input
                 type="text"
                 value={it.url}
                 onChange={(e) => patch(i, { url: e.target.value })}
-                placeholder="https://hooks.example.com/task"
+                placeholder={t('templateEditors.runTaskUrlPlaceholder')}
                 className={inputCls}
               />
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className={labelCls}>HMAC key (optional)</label>
+              <label className={labelCls}>{t('templateEditors.hmacKey')}</label>
               <input
                 type="password"
                 value={it['hmac-key']}
                 onChange={(e) => patch(i, { 'hmac-key': e.target.value })}
-                placeholder="shared secret"
+                placeholder={t('templateEditors.hmacKeyPlaceholder')}
                 className={inputCls}
               />
             </div>
             <div>
-              <label className={labelCls}>Stage</label>
+              <label className={labelCls}>{t('templateEditors.stage')}</label>
               <select
                 value={it.stage}
                 onChange={(e) => patch(i, { stage: e.target.value })}
@@ -216,7 +224,7 @@ export function RunTaskTemplatesEditor({
               </select>
             </div>
             <div>
-              <label className={labelCls}>Enforcement</label>
+              <label className={labelCls}>{t('templateEditors.enforcement')}</label>
               <select
                 value={it['enforcement-level']}
                 onChange={(e) => patch(i, { 'enforcement-level': e.target.value })}
@@ -237,13 +245,16 @@ export function RunTaskTemplatesEditor({
                 checked={it.enabled}
                 onChange={(e) => patch(i, { enabled: e.target.checked })}
               />
-              Enabled
+              {t('templateEditors.enabled')}
             </label>
             <RemoveButton onClick={() => removeAt(i)} />
           </div>
         </div>
       ))}
-      <AddButton onClick={() => onChange([...items, emptyRunTask()])} label="Add run task" />
+      <AddButton
+        onClick={() => onChange([...items, emptyRunTask()])}
+        label={t('templateEditors.addRunTask')}
+      />
     </div>
   )
 }
@@ -259,6 +270,7 @@ export function NotificationTemplatesEditor({
   items: NotificationSpec[]
   onChange: (next: NotificationSpec[]) => void
 }) {
+  const t = useTranslations('common')
   function patch(i: number, patch: Partial<NotificationSpec>) {
     const next = items.slice()
     next[i] = { ...next[i], ...patch }
@@ -283,17 +295,17 @@ export function NotificationTemplatesEditor({
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Name</label>
+              <label className={labelCls}>{t('templateEditors.name')}</label>
               <input
                 type="text"
                 value={it.name}
                 onChange={(e) => patch(i, { name: e.target.value })}
-                placeholder="slack-alerts"
+                placeholder={t('templateEditors.notificationNamePlaceholder')}
                 className={inputCls}
               />
             </div>
             <div>
-              <label className={labelCls}>Destination type</label>
+              <label className={labelCls}>{t('templateEditors.destinationType')}</label>
               <select
                 value={it['destination-type']}
                 onChange={(e) => patch(i, { 'destination-type': e.target.value })}
@@ -310,22 +322,22 @@ export function NotificationTemplatesEditor({
           {it['destination-type'] !== 'email' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className={labelCls}>URL</label>
+                <label className={labelCls}>{t('templateEditors.url')}</label>
                 <input
                   type="text"
                   value={it.url}
                   onChange={(e) => patch(i, { url: e.target.value })}
-                  placeholder="https://hooks.slack.com/services/..."
+                  placeholder={t('templateEditors.notificationUrlPlaceholder')}
                   className={inputCls}
                 />
               </div>
               <div>
-                <label className={labelCls}>Token (optional)</label>
+                <label className={labelCls}>{t('templateEditors.token')}</label>
                 <input
                   type="password"
                   value={it.token}
                   onChange={(e) => patch(i, { token: e.target.value })}
-                  placeholder="HMAC / auth token"
+                  placeholder={t('templateEditors.tokenPlaceholder')}
                   className={inputCls}
                 />
               </div>
@@ -333,17 +345,17 @@ export function NotificationTemplatesEditor({
           )}
           {it['destination-type'] === 'email' && (
             <div>
-              <label className={labelCls}>Email addresses</label>
+              <label className={labelCls}>{t('templateEditors.emailAddresses')}</label>
               <StringListEditor
                 values={it['email-addresses']}
                 onChange={(next) => patch(i, { 'email-addresses': next })}
-                placeholder="ops@example.com"
-                addLabel="Add email"
+                placeholder={t('templateEditors.emailPlaceholder')}
+                addLabel={t('templateEditors.addEmail')}
               />
             </div>
           )}
           <div>
-            <label className={labelCls}>Triggers</label>
+            <label className={labelCls}>{t('templateEditors.triggers')}</label>
             <div className="flex flex-wrap gap-2">
               {NOTIFICATION_TRIGGERS.map((trig) => (
                 <label
@@ -367,7 +379,7 @@ export function NotificationTemplatesEditor({
                 checked={it.enabled}
                 onChange={(e) => patch(i, { enabled: e.target.checked })}
               />
-              Enabled
+              {t('templateEditors.enabled')}
             </label>
             <RemoveButton onClick={() => removeAt(i)} />
           </div>
@@ -375,7 +387,7 @@ export function NotificationTemplatesEditor({
       ))}
       <AddButton
         onClick={() => onChange([...items, emptyNotification()])}
-        label="Add notification"
+        label={t('templateEditors.addNotification')}
       />
     </div>
   )

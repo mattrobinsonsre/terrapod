@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { ConnectionStatus } from '@/components/connection-status'
@@ -229,6 +230,7 @@ export default function WorkspaceDetailPage() {
 }
 
 function WorkspaceDetailContent() {
+  const t = useTranslations('workspaceDetail')
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
@@ -485,15 +487,15 @@ function WorkspaceDetailContent() {
   const loadWorkspace = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}`)
-      if (!res.ok) throw new Error('Failed to load workspace')
+      if (!res.ok) throw new Error(t('errors.loadWorkspace'))
       const data = await res.json()
       setWorkspace(data.data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load workspace')
+      setError(err instanceof Error ? err.message : t('errors.loadWorkspace'))
     } finally {
       setLoading(false)
     }
-  }, [workspaceId])
+  }, [workspaceId, t])
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
@@ -503,15 +505,15 @@ function WorkspaceDetailContent() {
   const loadRuns = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/runs`)
-      if (!res.ok) throw new Error('Failed to load runs')
+      if (!res.ok) throw new Error(t('errors.loadRuns'))
       const data = await res.json()
       setRuns(data.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load runs')
+      setError(err instanceof Error ? err.message : t('errors.loadRuns'))
     } finally {
       setRunsLoading(false)
     }
-  }, [workspaceId])
+  }, [workspaceId, t])
 
   const loadVcsRefs = useCallback(async () => {
     if (vcsRefsLoaded || vcsRefsLoading) return
@@ -575,11 +577,11 @@ function WorkspaceDetailContent() {
   async function loadVariables() {
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/vars`)
-      if (!res.ok) throw new Error('Failed to load variables')
+      if (!res.ok) throw new Error(t('errors.loadVariables'))
       const data = await res.json()
       setVariables(data.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load variables')
+      setError(err instanceof Error ? err.message : t('errors.loadVariables'))
     } finally {
       setVarsLoading(false)
     }
@@ -588,11 +590,11 @@ function WorkspaceDetailContent() {
   async function loadStateVersions() {
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/state-versions`)
-      if (!res.ok) throw new Error('Failed to load state versions')
+      if (!res.ok) throw new Error(t('errors.loadStateVersions'))
       const data = await res.json()
       setStateVersions(data.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load state versions')
+      setError(err instanceof Error ? err.message : t('errors.loadStateVersions'))
     } finally {
       setStateLoading(false)
     }
@@ -609,7 +611,7 @@ function WorkspaceDetailContent() {
       a.click()
       URL.revokeObjectURL(url)
     } catch {
-      alert('Failed to download state file')
+      alert(t('errors.downloadStateFile'))
     }
   }
 
@@ -621,12 +623,12 @@ function WorkspaceDetailContent() {
       const res = await apiFetch(
         `/api/v2/workspaces/${workspaceId}/configuration-versions?page%5Bsize%5D=100`,
       )
-      if (!res.ok) throw new Error('Failed to load configuration versions')
+      if (!res.ok) throw new Error(t('errors.loadConfigurations'))
       const data = await res.json()
       setCvs(data.data || [])
       setCvCurrentId(data.meta?.['current-id'] ?? null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load configuration versions')
+      setError(err instanceof Error ? err.message : t('errors.loadConfigurations'))
     } finally {
       setCvLoading(false)
     }
@@ -661,11 +663,11 @@ function WorkspaceDetailContent() {
       )
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}))
-        throw new Error(errBody.detail || `Download failed (${res.status})`)
+        throw new Error(errBody.detail || t('errors.downloadFailedStatus', { status: res.status }))
       }
       const body = await res.json()
       const url = body?.data?.attributes?.url
-      if (!url) throw new Error('Download ticket response missing URL')
+      if (!url) throw new Error(t('errors.downloadTicketMissingUrl'))
       // Trigger via an anchor so the page stays put — the
       // Content-Disposition: attachment on the response makes the
       // browser download rather than navigate.
@@ -676,7 +678,7 @@ function WorkspaceDetailContent() {
       a.click()
       a.remove()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Download failed')
+      setError(err instanceof Error ? err.message : t('errors.downloadFailed'))
     }
   }
 
@@ -701,12 +703,12 @@ function WorkspaceDetailContent() {
       })
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}))
-        throw new Error(errBody.detail || `Diff failed (${res.status})`)
+        throw new Error(errBody.detail || t('errors.diffFailedStatus', { status: res.status }))
       }
       const data = await res.json()
       setCvDiff(data.data.attributes)
     } catch (err) {
-      setCvDiffError(err instanceof Error ? err.message : 'Diff failed')
+      setCvDiffError(err instanceof Error ? err.message : t('errors.diffFailed'))
     } finally {
       setCvDiffLoading(false)
     }
@@ -716,11 +718,11 @@ function WorkspaceDetailContent() {
     setNotifLoading(true)
     try {
       const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}/notification-configurations`)
-      if (!res.ok) throw new Error('Failed to load notifications')
+      if (!res.ok) throw new Error(t('errors.loadNotifications'))
       const data = await res.json()
       setNotifications(data.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load notifications')
+      setError(err instanceof Error ? err.message : t('errors.loadNotifications'))
     } finally {
       setNotifLoading(false)
     }
@@ -746,14 +748,14 @@ function WorkspaceDetailContent() {
         apiFetch(`${base}?filter[remote-state-consumer][type]=outbound`),
         apiFetch(`${base}?filter[remote-state-consumer][type]=inbound`),
       ])
-      if (!outRes.ok) throw new Error('Failed to load outbound remote-state consumers')
-      if (!inRes.ok) throw new Error('Failed to load inbound remote-state consumers')
+      if (!outRes.ok) throw new Error(t('errors.loadOutboundConsumers'))
+      if (!inRes.ok) throw new Error(t('errors.loadInboundConsumers'))
       const outData = await outRes.json()
       const inData = await inRes.json()
       setRscOutbound((outData.data || []).map(_rscFromRow))
       setRscInbound((inData.data || []).map(_rscFromRow))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load remote-state consumers')
+      setError(err instanceof Error ? err.message : t('errors.loadConsumers'))
     } finally {
       setRscLoading(false)
     }
@@ -775,12 +777,12 @@ function WorkspaceDetailContent() {
         },
       )
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: 'Failed to authorize consumer' }))
-        throw new Error(err.detail || 'Failed to authorize consumer')
+        const err = await res.json().catch(() => ({ detail: t('errors.authorizeConsumer') }))
+        throw new Error(err.detail || t('errors.authorizeConsumer'))
       }
       await loadRemoteStateConsumers()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to authorize consumer')
+      setError(err instanceof Error ? err.message : t('errors.authorizeConsumer'))
     } finally {
       setRscAdding(false)
       setRscAddingId('')
@@ -789,16 +791,16 @@ function WorkspaceDetailContent() {
 
   async function revokeRemoteStateConsumer(edgeId: string) {
     // Irreversible: the consumer loses access to this workspace's state.
-    if (!confirmDelete('Remove this remote state sharing? The consumer will lose access to this state.')) return
+    if (!confirmDelete(t('sharing.revokeConfirm'))) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/remote-state-consumers/${edgeId}`, { method: 'DELETE' })
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: 'Failed to revoke' }))
-        throw new Error(err.detail || 'Failed to revoke')
+        const err = await res.json().catch(() => ({ detail: t('errors.revoke') }))
+        throw new Error(err.detail || t('errors.revoke'))
       }
       await loadRemoteStateConsumers()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to revoke consumer')
+      setError(err instanceof Error ? err.message : t('errors.revokeConsumer'))
     }
   }
 
@@ -821,14 +823,14 @@ function WorkspaceDetailContent() {
         apiFetch(`${base}?filter[run-trigger][type]=inbound`),
         apiFetch(`${base}?filter[run-trigger][type]=outbound`),
       ])
-      if (!inRes.ok) throw new Error('Failed to load inbound run triggers')
-      if (!outRes.ok) throw new Error('Failed to load outbound run triggers')
+      if (!inRes.ok) throw new Error(t('errors.loadInboundTriggers'))
+      if (!outRes.ok) throw new Error(t('errors.loadOutboundTriggers'))
       const inData = await inRes.json()
       const outData = await outRes.json()
       setTrgInbound((inData.data || []).map(_trgFromRow))
       setTrgOutbound((outData.data || []).map(_trgFromRow))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load run triggers')
+      setError(err instanceof Error ? err.message : t('errors.loadTriggers'))
     } finally {
       setTrgLoading(false)
     }
@@ -850,12 +852,12 @@ function WorkspaceDetailContent() {
         },
       )
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: 'Failed to add run trigger' }))
-        throw new Error(err.detail || 'Failed to add run trigger')
+        const err = await res.json().catch(() => ({ detail: t('errors.addTrigger') }))
+        throw new Error(err.detail || t('errors.addTrigger'))
       }
       await loadRunTriggers()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add run trigger')
+      setError(err instanceof Error ? err.message : t('errors.addTrigger'))
     } finally {
       setTrgAdding(false)
       setTrgAddingId('')
@@ -864,16 +866,16 @@ function WorkspaceDetailContent() {
 
   async function removeRunTrigger(triggerId: string) {
     // Irreversible: removes the cross-workspace trigger edge.
-    if (!confirmDelete('Remove this run trigger?')) return
+    if (!confirmDelete(t('runTriggers.removeConfirm'))) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/run-triggers/${triggerId}`, { method: 'DELETE' })
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: 'Failed to remove run trigger' }))
-        throw new Error(err.detail || 'Failed to remove run trigger')
+        const err = await res.json().catch(() => ({ detail: t('errors.removeTrigger') }))
+        throw new Error(err.detail || t('errors.removeTrigger'))
       }
       await loadRunTriggers()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove run trigger')
+      setError(err instanceof Error ? err.message : t('errors.removeTrigger'))
     }
   }
 
@@ -881,11 +883,11 @@ function WorkspaceDetailContent() {
     setRunTasksLoading(true)
     try {
       const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}/run-tasks`)
-      if (!res.ok) throw new Error('Failed to load run tasks')
+      if (!res.ok) throw new Error(t('errors.loadRunTasks'))
       const data = await res.json()
       setRunTasks(data.data || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load run tasks')
+      setError(err instanceof Error ? err.message : t('errors.loadRunTasks'))
     } finally {
       setRunTasksLoading(false)
     }
@@ -912,7 +914,7 @@ function WorkspaceDetailContent() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to create run task (${res.status})`)
+        throw new Error(data.detail || t('errors.createRunTaskStatus', { status: res.status }))
       }
       setRtName('')
       setRtUrl('')
@@ -922,36 +924,36 @@ function WorkspaceDetailContent() {
       setShowAddRunTask(false)
       await loadRunTasks()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create run task')
+      setError(err instanceof Error ? err.message : t('errors.createRunTask'))
     } finally {
       setAddingRunTask(false)
     }
   }
 
   async function handleToggleRunTask(rt: RunTaskItem) {
-    if (!confirmTouchMutation(rt.attributes.enabled ? 'Disable this run task?' : 'Enable this run task?')) return
+    if (!confirmTouchMutation(rt.attributes.enabled ? t('runTasks.disableConfirm') : t('runTasks.enableConfirm'))) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/run-tasks/${rt.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'run-tasks', attributes: { enabled: !rt.attributes.enabled } } }),
       })
-      if (!res.ok) throw new Error('Failed to update')
+      if (!res.ok) throw new Error(t('errors.update'))
       await loadRunTasks()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to toggle run task')
+      setError(err instanceof Error ? err.message : t('errors.toggleRunTask'))
     }
   }
 
   async function handleDeleteRunTask(rtId: string) {
     // Irreversible delete → confirm in both modes.
-    if (!confirmDelete(`Delete run task "${runTasks.find(r => r.id === rtId)?.attributes.name ?? ''}"?`)) return
+    if (!confirmDelete(t('runTasks.deleteConfirm', { name: runTasks.find(r => r.id === rtId)?.attributes.name ?? '' }))) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/run-tasks/${rtId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete')
+      if (!res.ok) throw new Error(t('errors.delete'))
       await loadRunTasks()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete run task')
+      setError(err instanceof Error ? err.message : t('errors.deleteRunTask'))
     }
   }
 
@@ -1054,18 +1056,18 @@ function WorkspaceDetailContent() {
       })
       if (res.status === 409) {
         const errData = await res.json()
-        const detail = errData.errors?.[0]?.detail || 'This label change would reduce your access.'
+        const detail = errData.errors?.[0]?.detail || t('errors.labelLockout')
         setLockoutWarning(detail)
         return
       }
-      if (!res.ok) throw new Error('Failed to update workspace')
+      if (!res.ok) throw new Error(t('errors.updateWorkspace'))
       const data = await res.json()
       const wasRenamed = workspace && data.data.attributes.name !== workspace.attributes.name
       setWorkspace(data.data)
       setEditing(false)
       if (wasRenamed) setNameChanged(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update workspace')
+      setError(err instanceof Error ? err.message : t('errors.updateWorkspace'))
     } finally {
       setSaving(false)
     }
@@ -1074,16 +1076,16 @@ function WorkspaceDetailContent() {
   async function handleLockToggle() {
     if (!workspace) return
     const action = workspace.attributes.locked ? 'unlock' : 'lock'
-    if (!confirmTouchMutation(action === 'unlock' ? 'Unlock this workspace?' : 'Lock this workspace?')) return
+    if (!confirmTouchMutation(action === 'unlock' ? t('lock.unlockConfirm') : t('lock.lockConfirm'))) return
     try {
       // lock/unlock are TFE V2 CLI-contract endpoints — only at /api/v2/.
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/actions/${action}`, {
         method: 'POST',
       })
-      if (!res.ok) throw new Error(`Failed to ${action} workspace`)
+      if (!res.ok) throw new Error(action === 'unlock' ? t('errors.unlockWorkspace') : t('errors.lockWorkspace'))
       await loadWorkspace()
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to ${action} workspace`)
+      setError(err instanceof Error ? err.message : action === 'unlock' ? t('errors.unlockWorkspace') : t('errors.lockWorkspace'))
     }
   }
 
@@ -1099,13 +1101,13 @@ function WorkspaceDetailContent() {
       })
       if (!res.ok) {
         const body = await res.text()
-        throw new Error(body || 'Failed to update AI summary settings')
+        throw new Error(body || t('errors.updateAiSummary'))
       }
       const data = await res.json()
       setWorkspace(data.data)
       setAiSummaryContextDraft(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update AI summary settings')
+      setError(err instanceof Error ? err.message : t('errors.updateAiSummary'))
     } finally {
       setSavingAiSummary(false)
     }
@@ -1125,13 +1127,13 @@ function WorkspaceDetailContent() {
       })
       if (!res.ok) {
         const body = await res.text()
-        throw new Error(body || 'Failed to update Slack channel')
+        throw new Error(body || t('errors.updateSlackChannel'))
       }
       const data = await res.json()
       setWorkspace(data.data)
       setSlackChannelDraft(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update Slack channel')
+      setError(err instanceof Error ? err.message : t('errors.updateSlackChannel'))
     } finally {
       setSavingSlackChannel(false)
     }
@@ -1149,11 +1151,11 @@ function WorkspaceDetailContent() {
           data: { type: 'workspaces', attributes: { 'drift-detection-enabled': newEnabled } },
         }),
       })
-      if (!res.ok) throw new Error('Failed to update drift settings')
+      if (!res.ok) throw new Error(t('errors.updateDriftSettings'))
       const data = await res.json()
       setWorkspace(data.data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update drift settings')
+      setError(err instanceof Error ? err.message : t('errors.updateDriftSettings'))
     } finally {
       setSavingDrift(false)
     }
@@ -1169,11 +1171,11 @@ function WorkspaceDetailContent() {
           data: { type: 'workspaces', attributes: { 'drift-detection-interval-seconds': seconds } },
         }),
       })
-      if (!res.ok) throw new Error('Failed to update drift interval')
+      if (!res.ok) throw new Error(t('errors.updateDriftInterval'))
       const data = await res.json()
       setWorkspace(data.data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update drift interval')
+      setError(err instanceof Error ? err.message : t('errors.updateDriftInterval'))
     } finally {
       setSavingDrift(false)
     }
@@ -1193,11 +1195,11 @@ function WorkspaceDetailContent() {
           },
         }),
       })
-      if (!res.ok) throw new Error('Failed to update plan expiry')
+      if (!res.ok) throw new Error(t('errors.updatePlanExpiry'))
       const data = await res.json()
       setWorkspace(data.data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update plan expiry')
+      setError(err instanceof Error ? err.message : t('errors.updatePlanExpiry'))
     } finally {
       setSavingPlanExpiry(false)
     }
@@ -1216,7 +1218,7 @@ function WorkspaceDetailContent() {
             attributes: {
               'plan-only': true,
               'is-drift-detection': true,
-              message: 'Manual drift check from UI',
+              message: t('runMessages.manualDriftCheck'),
             },
             relationships: {
               workspace: { data: { type: 'workspaces', id: workspaceId } },
@@ -1226,7 +1228,7 @@ function WorkspaceDetailContent() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to queue drift check (${res.status})`)
+        throw new Error(data.detail || t('errors.queueDriftCheckStatus', { status: res.status }))
       }
       const runData = await res.json().catch(() => null)
       const newRunId = runData?.data?.id as string | undefined
@@ -1235,7 +1237,7 @@ function WorkspaceDetailContent() {
         setTimeout(() => setLastQueuedRunId((prev) => prev === newRunId ? null : prev), 8000)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to queue drift check')
+      setError(err instanceof Error ? err.message : t('errors.queueDriftCheck'))
     } finally {
       setCheckingDrift(false)
     }
@@ -1251,11 +1253,11 @@ function WorkspaceDetailContent() {
       )
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to dismiss drift (${res.status})`)
+        throw new Error(data.detail || t('errors.dismissDriftStatus', { status: res.status }))
       }
       await loadWorkspace()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to dismiss drift')
+      setError(err instanceof Error ? err.message : t('errors.dismissDrift'))
     } finally {
       setDismissingDrift(false)
     }
@@ -1265,10 +1267,10 @@ function WorkspaceDetailContent() {
     setDeleting(true)
     try {
       const res = await apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete workspace')
+      if (!res.ok) throw new Error(t('errors.deleteWorkspace'))
       router.push('/workspaces')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete workspace')
+      setError(err instanceof Error ? err.message : t('errors.deleteWorkspace'))
       setDeleting(false)
     }
   }
@@ -1296,7 +1298,7 @@ function WorkspaceDetailContent() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to add variable (${res.status})`)
+        throw new Error(data.detail || t('errors.addVariableStatus', { status: res.status }))
       }
       setVarKey('')
       setVarValue('')
@@ -1306,7 +1308,7 @@ function WorkspaceDetailContent() {
       setShowAddVar(false)
       await loadVariables()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add variable')
+      setError(err instanceof Error ? err.message : t('errors.addVariable'))
     } finally {
       setAddingVar(false)
     }
@@ -1314,13 +1316,13 @@ function WorkspaceDetailContent() {
 
   async function handleDeleteVariable(varId: string) {
     // Irreversible delete → confirm in both modes.
-    if (!confirmDelete(`Delete variable "${variables.find(v => v.id === varId)?.attributes.key ?? ''}"?`)) return
+    if (!confirmDelete(t('variables.deleteConfirm', { key: variables.find(v => v.id === varId)?.attributes.key ?? '' }))) return
     try {
       const res = await apiFetch(`/api/v2/workspaces/${workspaceId}/vars/${varId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete variable')
+      if (!res.ok) throw new Error(t('errors.deleteVariable'))
       await loadVariables()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete variable')
+      setError(err instanceof Error ? err.message : t('errors.deleteVariable'))
     }
   }
 
@@ -1331,8 +1333,8 @@ function WorkspaceDetailContent() {
     // precise pointer runs immediately.
     if (isTouch) {
       const msg = planOnly
-        ? 'Queue a speculative plan for this workspace?'
-        : 'Queue a plan + apply run? This can change infrastructure.'
+        ? t('runs.queuePlanConfirm')
+        : t('runs.queueApplyConfirm')
       if (!window.confirm(msg)) return
     }
     setQueueingPlan(true)
@@ -1340,7 +1342,7 @@ function WorkspaceDetailContent() {
     try {
       const attrs: Record<string, unknown> = {
         'plan-only': planOnly,
-        message: planOnly ? 'Queued from UI (speculative)' : 'Queued from UI',
+        message: planOnly ? t('runMessages.queuedSpeculative') : t('runMessages.queued'),
       }
       const targets = planTargets.split(',').map(s => s.trim()).filter(Boolean)
       const replaces = planReplaces.split(',').map(s => s.trim()).filter(Boolean)
@@ -1366,7 +1368,7 @@ function WorkspaceDetailContent() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to queue plan (${res.status})`)
+        throw new Error(data.detail || t('errors.queuePlanStatus', { status: res.status }))
       }
       const runData = await res.json().catch(() => null)
       const newRunId = runData?.data?.id as string | undefined
@@ -1384,7 +1386,7 @@ function WorkspaceDetailContent() {
       setVcsRef('')
       await loadRuns()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to queue plan')
+      setError(err instanceof Error ? err.message : t('errors.queuePlan'))
     } finally {
       setQueueingPlan(false)
     }
@@ -1402,7 +1404,7 @@ function WorkspaceDetailContent() {
             type: 'runs',
             attributes: {
               'is-destroy': true,
-              message: 'Destroy queued from UI',
+              message: t('runMessages.destroyQueued'),
             },
             relationships: {
               workspace: { data: { type: 'workspaces', id: workspaceId } },
@@ -1412,7 +1414,7 @@ function WorkspaceDetailContent() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to queue destroy (${res.status})`)
+        throw new Error(data.detail || t('errors.queueDestroyStatus', { status: res.status }))
       }
       const runData = await res.json().catch(() => null)
       const newRunId = runData?.data?.id as string | undefined
@@ -1423,7 +1425,7 @@ function WorkspaceDetailContent() {
       setShowDestroyConfirm(false)
       await loadRuns()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to queue destroy')
+      setError(err instanceof Error ? err.message : t('errors.queueDestroy'))
     } finally {
       setQueueingDestroy(false)
     }
@@ -1459,12 +1461,12 @@ function WorkspaceDetailContent() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || 'Failed to update variable')
+        throw new Error(data.detail || t('errors.updateVariable'))
       }
       setEditingVarId(null)
       await loadVariables()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update variable')
+      setError(err instanceof Error ? err.message : t('errors.updateVariable'))
     } finally {
       setSavingVar(false)
     }
@@ -1493,7 +1495,7 @@ function WorkspaceDetailContent() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to create notification (${res.status})`)
+        throw new Error(data.detail || t('errors.createNotificationStatus', { status: res.status }))
       }
       setNotifName('')
       setNotifUrl('')
@@ -1503,36 +1505,36 @@ function WorkspaceDetailContent() {
       setShowAddNotif(false)
       await loadNotifications()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create notification')
+      setError(err instanceof Error ? err.message : t('errors.createNotification'))
     } finally {
       setAddingNotif(false)
     }
   }
 
   async function handleToggleNotif(nc: NotificationConfig) {
-    if (!confirmTouchMutation(nc.attributes.enabled ? 'Disable this notification?' : 'Enable this notification?')) return
+    if (!confirmTouchMutation(nc.attributes.enabled ? t('notifications.disableConfirm') : t('notifications.enableConfirm'))) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/notification-configurations/${nc.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({ data: { type: 'notification-configurations', attributes: { enabled: !nc.attributes.enabled } } }),
       })
-      if (!res.ok) throw new Error('Failed to update')
+      if (!res.ok) throw new Error(t('errors.update'))
       await loadNotifications()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to toggle notification')
+      setError(err instanceof Error ? err.message : t('errors.toggleNotification'))
     }
   }
 
   async function handleDeleteNotif(ncId: string) {
     // Irreversible delete → confirm in both modes.
-    if (!confirmDelete(`Delete notification "${notifications.find(n => n.id === ncId)?.attributes.name ?? ''}"?`)) return
+    if (!confirmDelete(t('notifications.deleteConfirm', { name: notifications.find(n => n.id === ncId)?.attributes.name ?? '' }))) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/notification-configurations/${ncId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete')
+      if (!res.ok) throw new Error(t('errors.delete'))
       await loadNotifications()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete notification')
+      setError(err instanceof Error ? err.message : t('errors.deleteNotification'))
     }
   }
 
@@ -1541,17 +1543,17 @@ function WorkspaceDetailContent() {
     setError('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/notification-configurations/${ncId}/actions/verify`, { method: 'POST' })
-      if (!res.ok) throw new Error('Verification failed')
+      if (!res.ok) throw new Error(t('errors.verificationFailed'))
       const data = await res.json()
       const success = data?.data?.attributes?.success
       if (success) {
         setError('')
       } else {
-        setError(`Verification delivery failed: ${data?.data?.attributes?.body || 'Unknown error'}`)
+        setError(t('errors.verificationDeliveryFailed', { detail: data?.data?.attributes?.body || t('errors.unknownError') }))
       }
       await loadNotifications()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Verification failed')
+      setError(err instanceof Error ? err.message : t('errors.verificationFailed'))
     } finally {
       setVerifyingId(null)
     }
@@ -1567,16 +1569,16 @@ function WorkspaceDetailContent() {
   }
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'overview', label: 'Overview' },
-    { key: 'variables', label: 'Variables' },
-    { key: 'runs', label: 'Runs' },
-    { key: 'state', label: 'State' },
-    { key: 'state-graph', label: 'State Graph' },
-    { key: 'configurations', label: 'Configurations' },
-    { key: 'notifications', label: 'Notifications' },
-    { key: 'run-tasks', label: 'Run Tasks' },
-    { key: 'run-triggers', label: 'Run Triggers' },
-    { key: 'sharing', label: 'Sharing' },
+    { key: 'overview', label: t('tabs.overview') },
+    { key: 'variables', label: t('tabs.variables') },
+    { key: 'runs', label: t('tabs.runs') },
+    { key: 'state', label: t('tabs.state') },
+    { key: 'state-graph', label: t('tabs.stateGraph') },
+    { key: 'configurations', label: t('tabs.configurations') },
+    { key: 'notifications', label: t('tabs.notifications') },
+    { key: 'run-tasks', label: t('tabs.runTasks') },
+    { key: 'run-triggers', label: t('tabs.runTriggers') },
+    { key: 'sharing', label: t('tabs.sharing') },
   ]
 
   function statusColor(status: string): string {
@@ -1592,31 +1594,31 @@ function WorkspaceDetailContent() {
 
   function driftStatusBadge(s: string): { cls: string; label: string } {
     switch (s) {
-      case 'no_drift': return { cls: 'bg-green-900/50 text-green-300', label: 'No Drift' }
-      case 'drifted': return { cls: 'bg-amber-900/50 text-amber-300', label: 'Drifted' }
-      case 'errored': return { cls: 'bg-red-900/50 text-red-300', label: 'Errored' }
-      default: return { cls: 'bg-slate-700 text-slate-400', label: 'Unchecked' }
+      case 'no_drift': return { cls: 'bg-green-900/50 text-green-300', label: t('drift.statusNoDrift') }
+      case 'drifted': return { cls: 'bg-amber-900/50 text-amber-300', label: t('drift.statusDrifted') }
+      case 'errored': return { cls: 'bg-red-900/50 text-red-300', label: t('drift.statusErrored') }
+      default: return { cls: 'bg-slate-700 text-slate-400', label: t('drift.statusUnchecked') }
     }
   }
 
   const DRIFT_INTERVALS = [
-    { label: '1 hour', value: 3600 },
-    { label: '4 hours', value: 14400 },
-    { label: '12 hours', value: 43200 },
-    { label: '24 hours', value: 86400 },
-    { label: '48 hours', value: 172800 },
-    { label: '7 days', value: 604800 },
+    { label: t('intervals.1hour'), value: 3600 },
+    { label: t('intervals.4hours'), value: 14400 },
+    { label: t('intervals.12hours'), value: 43200 },
+    { label: t('intervals.24hours'), value: 86400 },
+    { label: t('intervals.48hours'), value: 172800 },
+    { label: t('intervals.7days'), value: 604800 },
   ]
 
   // #646 plan-expiry TTL choices; 0 = disabled (the default).
   const PLAN_EXPIRY_OPTIONS = [
-    { label: 'Disabled', value: 0 },
-    { label: '1 hour', value: 3600 },
-    { label: '4 hours', value: 14400 },
-    { label: '12 hours', value: 43200 },
-    { label: '24 hours', value: 86400 },
-    { label: '3 days', value: 259200 },
-    { label: '7 days', value: 604800 },
+    { label: t('intervals.disabled'), value: 0 },
+    { label: t('intervals.1hour'), value: 3600 },
+    { label: t('intervals.4hours'), value: 14400 },
+    { label: t('intervals.12hours'), value: 43200 },
+    { label: t('intervals.24hours'), value: 86400 },
+    { label: t('intervals.3days'), value: 259200 },
+    { label: t('intervals.7days'), value: 604800 },
   ]
 
   function stageBadge(s: string): string {
@@ -1646,7 +1648,7 @@ function WorkspaceDetailContent() {
   }
 
   if (loading) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><LoadingSpinner /></main></>
-  if (!workspace) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><ErrorBanner message="Workspace not found" /></main></>
+  if (!workspace) return <><NavBar /><main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto"><ErrorBanner message={t('notFound')} /></main></>
 
   const attrs = workspace.attributes
   const perms = attrs.permissions || {} as WorkspacePermissions
@@ -1657,7 +1659,7 @@ function WorkspaceDetailContent() {
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <PageHeader
           title={attrs.name}
-          description={`${attrs['execution-mode']} execution mode`}
+          description={t('header.executionMode', { mode: attrs['execution-mode'] })}
           actions={<ConnectionStatus connected={sseConnected} />}
         />
 
@@ -1665,18 +1667,18 @@ function WorkspaceDetailContent() {
 
         {attrs['lifecycle-state'] === 'pending_deletion' && (
           <div className="mb-4 p-4 rounded-lg bg-amber-900/30 border border-amber-700/50">
-            <p className="text-sm font-semibold text-amber-300">Pending deletion</p>
+            <p className="text-sm font-semibold text-amber-300">{t('lifecycle.pendingDeletion')}</p>
             <p className="text-sm text-amber-200/80 mt-1">
-              {attrs['lifecycle-reason'] || 'This workspace is marked for deletion and requires manual action.'}
+              {attrs['lifecycle-reason'] || t('lifecycle.pendingDeletionDefault')}
             </p>
           </div>
         )}
 
         {attrs['lifecycle-state'] === 'archived' && (
           <div className="mb-4 p-4 rounded-lg bg-slate-800/60 border border-slate-600/50">
-            <p className="text-sm font-semibold text-slate-300">Archived</p>
+            <p className="text-sm font-semibold text-slate-300">{t('lifecycle.archived')}</p>
             <p className="text-sm text-slate-400 mt-1">
-              {attrs['lifecycle-reason'] || 'This workspace has been archived.'}
+              {attrs['lifecycle-reason'] || t('lifecycle.archivedDefault')}
             </p>
           </div>
         )}
@@ -1684,13 +1686,13 @@ function WorkspaceDetailContent() {
         {lastQueuedRunId && (
           <div className="mb-4 p-3 bg-brand-900/30 rounded-lg border border-brand-700/50 flex items-center justify-between">
             <p className="text-sm text-brand-300">
-              Run queued successfully.
+              {t('runQueuedBanner.message')}
             </p>
             <button
               onClick={() => { setLastQueuedRunId(null); router.push(`/workspaces/${workspaceId}/runs/${lastQueuedRunId}`) }}
               className="text-sm font-medium text-brand-400 hover:text-brand-300 transition-colors"
             >
-              View Run &rarr;
+              {t('runQueuedBanner.viewRun')} &rarr;
             </button>
           </div>
         )}
@@ -1701,7 +1703,7 @@ function WorkspaceDetailContent() {
             presentations; the URL (?tab=) stays the source of truth either way. */}
         <div className="mb-6 md:hidden">
           <label htmlFor="ws-tab-select" className="sr-only">
-            Workspace section
+            {t('tabs.selectLabel')}
           </label>
           <select
             id="ws-tab-select"
@@ -1740,10 +1742,10 @@ function WorkspaceDetailContent() {
             <HealthConditions conditions={attrs['health-conditions'] || []} />
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-slate-300">Settings</h3>
+                <h3 className="text-sm font-medium text-slate-300">{t('settings.title')}</h3>
                 {!editing ? (
                   perms['can-update'] && <button onClick={startEditing} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">
-                    Edit
+                    {t('actions.edit')}
                   </button>
                 ) : (
                   <div className="flex gap-2">
@@ -1751,81 +1753,84 @@ function WorkspaceDetailContent() {
                       onClick={() => setEditing(false)}
                       className="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
                     >
-                      Cancel
+                      {t('actions.cancel')}
                     </button>
                     <button
                       onClick={() => handleSave()}
                       disabled={saving}
                       className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
                     >
-                      {saving ? 'Saving…' : 'Save changes'}
+                      {saving ? t('actions.saving') : t('settings.saveChanges')}
                     </button>
                   </div>
                 )}
               </div>
               {nameChanged && (
                 <div className="mb-4 rounded-lg border border-blue-500/50 bg-blue-500/10 p-3 text-sm text-blue-300">
-                  Workspace renamed. Update the <code className="bg-slate-700 px-1 rounded">name</code> field in your <code className="bg-slate-700 px-1 rounded">cloud {'{'}{'}' }</code> block to match.
+                  {t.rich('settings.renamedNotice', {
+                    name: () => <code className="bg-slate-700 px-1 rounded">name</code>,
+                    cloud: () => <code className="bg-slate-700 px-1 rounded">cloud {'{'}{'}' }</code>,
+                  })}
                 </div>
               )}
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <dt className="text-xs text-slate-500">Name</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.name')}</dt>
                   {editing ? (
                     <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
                       pattern="[a-zA-Z0-9][a-zA-Z0-9_\-]*" maxLength={90}
-                      title="Letters, numbers, hyphens, underscores. Must start with a letter or number."
+                      title={t('fields.nameTitle')}
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{attrs.name}</dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Execution Mode</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.executionMode')}</dt>
                   {editing ? (
                     <select value={editExecMode} onChange={(e) => setEditExecMode(e.target.value)} className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
-                      <option value="local">Local</option>
-                      <option value="agent">Agent</option>
+                      <option value="local">{t('fields.execModeLocal')}</option>
+                      <option value="agent">{t('fields.execModeAgent')}</option>
                     </select>
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{attrs['execution-mode']}</dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Auto Apply</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.autoApply')}</dt>
                   {editing ? (
                     <label className="flex items-center gap-2 mt-1">
                       <input type="checkbox" checked={editAutoApply} onChange={(e) => setEditAutoApply(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                      <span className="text-sm text-slate-200">{editAutoApply ? 'Enabled' : 'Disabled'}</span>
+                      <span className="text-sm text-slate-200">{editAutoApply ? t('common.enabled') : t('common.disabled')}</span>
                     </label>
                   ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['auto-apply'] ? 'Enabled' : 'Disabled'}</dd>
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['auto-apply'] ? t('common.enabled') : t('common.disabled')}</dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">CPU Request</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.cpuRequest')}</dt>
                   {editing ? (
                     <input type="text" value={editCpu} onChange={(e) => setEditCpu(e.target.value)}
                       pattern="[0-9]+m|[0-9]+(\.[0-9]+)?"
-                      title="Kubernetes CPU quantity: whole cores (1, 2) or millicores (500m, 100m)"
+                      title={t('fields.cpuRequestTitle')}
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{attrs['resource-cpu']}</dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Memory Request</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.memoryRequest')}</dt>
                   {editing ? (
                     <input type="text" value={editMemory} onChange={(e) => setEditMemory(e.target.value)}
                       pattern="[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E|m)?"
-                      title="Kubernetes memory quantity: bytes (1000) or with suffix (512Mi, 2Gi, 1Ti)"
+                      title={t('fields.memoryRequestTitle')}
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{attrs['resource-memory']}</dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Execution Backend</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.executionBackend')}</dt>
                   {editing ? (
                     <select value={editBackend} onChange={(e) => setEditBackend(e.target.value)} className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500">
                       <option value="tofu">OpenTofu</option>
@@ -1836,12 +1841,12 @@ function WorkspaceDetailContent() {
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Version</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.version')}</dt>
                   {editing ? (
                     <>
-                      <input type="text" list="edit-version-suggestions" value={editVersion} onChange={(e) => setEditVersion(e.target.value)} placeholder="e.g. 1.11 or 1.11.5"
+                      <input type="text" list="edit-version-suggestions" value={editVersion} onChange={(e) => setEditVersion(e.target.value)} placeholder={t('fields.versionPlaceholder')}
                         pattern="[0-9]+\.[0-9]+(\.[0-9]+)?"
-                        title="Version in X.Y or X.Y.Z format (e.g. 1.11 or 1.11.5)"
+                        title={t('fields.versionTitle')}
                         className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                       <datalist id="edit-version-suggestions">
                         {versionSuggestions.map(v => (
@@ -1850,7 +1855,7 @@ function WorkspaceDetailContent() {
                       </datalist>
                     </>
                   ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['terraform-version'] || 'Default'}</dd>
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['terraform-version'] || t('common.default')}</dd>
                   )}
                 </div>
                 <div>
@@ -1859,105 +1864,105 @@ function WorkspaceDetailContent() {
                     <div className="mt-1 space-y-2">
                       <label className="flex items-center gap-2">
                         <input type="checkbox" checked={editTerragruntEnabled} onChange={(e) => setEditTerragruntEnabled(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                        <span className="text-sm text-slate-200">{editTerragruntEnabled ? 'Enabled (agent mode)' : 'Disabled'}</span>
+                        <span className="text-sm text-slate-200">{editTerragruntEnabled ? t('fields.terragruntEnabledAgent') : t('common.disabled')}</span>
                       </label>
                       {editTerragruntEnabled && (
-                        <input type="text" value={editTerragruntVersion} onChange={(e) => setEditTerragruntVersion(e.target.value)} placeholder="e.g. 1.0"
+                        <input type="text" value={editTerragruntVersion} onChange={(e) => setEditTerragruntVersion(e.target.value)} placeholder={t('fields.terragruntVersionPlaceholder')}
                           pattern="[0-9]+\.[0-9]+(\.[0-9]+)?"
-                          title="Terragrunt version in X.Y or X.Y.Z format (e.g. 1.0)"
+                          title={t('fields.terragruntVersionTitle')}
                           className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                       )}
                     </div>
                   ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['terragrunt-enabled'] ? `Enabled (v${attrs['terragrunt-version'] || '1.0'})` : 'Disabled'}</dd>
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['terragrunt-enabled'] ? t('fields.terragruntEnabledVersion', { version: attrs['terragrunt-version'] || '1.0' }) : t('common.disabled')}</dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Working Directory</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.workingDirectory')}</dt>
                   {editing ? (
-                    <input type="text" value={editWorkingDir} onChange={(e) => setEditWorkingDir(e.target.value)} placeholder="e.g. environments/dev"
+                    <input type="text" value={editWorkingDir} onChange={(e) => setEditWorkingDir(e.target.value)} placeholder={t('fields.workingDirectoryPlaceholder')}
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{attrs['working-directory'] || '/'}</dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Agent Pool</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.agentPool')}</dt>
                   {editing ? (
                     <select
                       value={editPoolId || ''}
                       onChange={(e) => setEditPoolId(e.target.value || null)}
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
-                      <option value="">None</option>
+                      <option value="">{t('common.none')}</option>
                       {agentPools.map((p) => (
                         <option key={p.id} value={p.id}>{p.attributes.name}</option>
                       ))}
                     </select>
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">
-                      {attrs['agent-pool-name'] || (attrs['agent-pool-id'] ? attrs['agent-pool-id'] : 'None')}
+                      {attrs['agent-pool-name'] || (attrs['agent-pool-id'] ? attrs['agent-pool-id'] : t('common.none'))}
                     </dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Owner</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.owner')}</dt>
                   {editing && isAdmin() ? (
                     <input type="email" value={editOwner} onChange={(e) => setEditOwner(e.target.value)} placeholder="user@example.com" className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['owner-email'] || 'None'}</dd>
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['owner-email'] || t('common.none')}</dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">VCS Connection</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.vcsConnection')}</dt>
                   {editing ? (
                     <select
                       value={editVcsConnectionId || ''}
                       onChange={(e) => setEditVcsConnectionId(e.target.value || null)}
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
-                      <option value="">None</option>
+                      <option value="">{t('common.none')}</option>
                       {vcsConnections.map((c) => (
                         <option key={c.id} value={c.id}>{c.attributes.name} ({c.attributes.provider})</option>
                       ))}
                     </select>
                   ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['vcs-connection-name'] || 'None'}</dd>
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['vcs-connection-name'] || t('common.none')}</dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">VCS Repository</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.vcsRepository')}</dt>
                   {editing ? (
                     <input type="text" value={editVcsRepoUrl} onChange={(e) => setEditVcsRepoUrl(e.target.value)} placeholder="https://github.com/org/repo"
                       pattern="https?://.+"
-                      title="Must be an HTTP or HTTPS URL"
+                      title={t('fields.vcsRepositoryTitle')}
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">
                       {attrs['vcs-repo-url'] ? (
                         <a href={attrs['vcs-repo-url']} target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:text-brand-300">{attrs['vcs-repo-url']}</a>
-                      ) : 'None'}
+                      ) : t('common.none')}
                     </dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">VCS Branch</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.vcsBranch')}</dt>
                   {editing ? (
-                    <input type="text" value={editVcsBranch} onChange={(e) => setEditVcsBranch(e.target.value)} placeholder="main (default)" className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                    <input type="text" value={editVcsBranch} onChange={(e) => setEditVcsBranch(e.target.value)} placeholder={t('fields.vcsBranchPlaceholder')} className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['vcs-branch'] || 'Default'}</dd>
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['vcs-branch'] || t('common.default')}</dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">VCS Workflow</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.vcsWorkflow')}</dt>
                   {editing ? (
                     <select
                       value={editVcsWorkflow}
                       onChange={(e) => setEditVcsWorkflow(e.target.value as 'merge_then_apply' | 'apply_then_merge')}
                       className="mt-1 w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
-                      <option value="merge_then_apply">merge_then_apply (default — TFE / HCP standard)</option>
-                      <option value="apply_then_merge">apply_then_merge (Atlantis standard — opt-in)</option>
+                      <option value="merge_then_apply">{t('fields.vcsWorkflowMergeThenApply')}</option>
+                      <option value="apply_then_merge">{t('fields.vcsWorkflowApplyThenMerge')}</option>
                     </select>
                   ) : (
                     <dd className="mt-1 text-sm text-slate-200">{attrs['vcs-workflow']}</dd>
@@ -1965,25 +1970,24 @@ function WorkspaceDetailContent() {
                 </div>
                 {editing && editVcsWorkflow === 'apply_then_merge' && (
                   <div className="sm:col-span-2 rounded border border-amber-700 bg-amber-900/30 p-3 text-xs text-amber-100">
-                    <p className="font-medium">Authorization delegated to your VCS repository.</p>
+                    <p className="font-medium">{t('vcsWorkflowWarning.title')}</p>
                     <p className="mt-1">
-                      Anyone who can merge the PR can apply. Branch protection rules (required reviews,
-                      status checks, code owner approval) become the gate. Terrapod role/label RBAC does
-                      <em> not</em> apply to comment-driven actions in this mode.
+                      {t.rich('vcsWorkflowWarning.rbac', { em: (chunks) => <em> {chunks}</em> })}
                     </p>
                     <p className="mt-1">
-                      <strong>Recommended:</strong> require linear history (rebase/squash before merge) so the
-                      commit you apply is the commit that lands.
+                      {t.rich('vcsWorkflowWarning.recommended', { strong: (chunks) => <strong>{chunks}</strong> })}
                     </p>
                     <p className="mt-1">
-                      Credit: this workflow is modelled on{' '}
-                      <a href="https://www.runatlantis.io/" target="_blank" rel="noopener noreferrer" className="underline">Atlantis</a>.
-                      Atlantis remains the right tool for teams who only want PR-comment-driven applies and no platform UI.
+                      {t.rich('vcsWorkflowWarning.credit', {
+                        atlantis: (chunks) => (
+                          <a href="https://www.runatlantis.io/" target="_blank" rel="noopener noreferrer" className="underline">{chunks}</a>
+                        ),
+                      })}
                     </p>
                   </div>
                 )}
                 <div>
-                  <dt className="text-xs text-slate-500">Auto-merge after apply</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.autoMerge')}</dt>
                   {editing ? (
                     <label className="mt-1 flex items-center gap-2">
                       <input
@@ -1992,14 +1996,14 @@ function WorkspaceDetailContent() {
                         onChange={(e) => setEditAutoMerge(e.target.checked)}
                         className="rounded border-slate-600 bg-slate-700 text-brand-600"
                       />
-                      <span className="text-sm text-slate-200">{editAutoMerge ? 'Enabled' : 'Disabled'}</span>
+                      <span className="text-sm text-slate-200">{editAutoMerge ? t('common.enabled') : t('common.disabled')}</span>
                     </label>
                   ) : (
-                    <dd className="mt-1 text-sm text-slate-200">{attrs['auto-merge'] ? 'Enabled' : 'Disabled'}</dd>
+                    <dd className="mt-1 text-sm text-slate-200">{attrs['auto-merge'] ? t('common.enabled') : t('common.disabled')}</dd>
                   )}
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Auto-merge Strategy</dt>
+                  <dt className="text-xs text-slate-500">{t('fields.autoMergeStrategy')}</dt>
                   {editing ? (
                     <select
                       value={editAutoMergeStrategy}
@@ -2016,14 +2020,14 @@ function WorkspaceDetailContent() {
                 </div>
                 {attrs['vcs-connection-name'] && !editing && (
                   <div>
-                    <dt className="text-xs text-slate-500">VCS Polling</dt>
+                    <dt className="text-xs text-slate-500">{t('fields.vcsPolling')}</dt>
                     <dd className="mt-1 text-sm">
                       {attrs['vcs-last-error'] ? (
-                        <span className="text-red-400" title={attrs['vcs-last-error']}>Error{attrs['vcs-last-error-at'] ? ` (${new Date(attrs['vcs-last-error-at']).toLocaleString()})` : ''}</span>
+                        <span className="text-red-400" title={attrs['vcs-last-error']}>{t('vcsPolling.error')}{attrs['vcs-last-error-at'] ? ` (${new Date(attrs['vcs-last-error-at']).toLocaleString()})` : ''}</span>
                       ) : attrs['vcs-last-polled-at'] ? (
-                        <span className="text-green-400">OK ({new Date(attrs['vcs-last-polled-at']).toLocaleString()})</span>
+                        <span className="text-green-400">{t('vcsPolling.ok', { time: new Date(attrs['vcs-last-polled-at']).toLocaleString() })}</span>
                       ) : (
-                        <span className="text-slate-400">Not polled yet</span>
+                        <span className="text-slate-400">{t('vcsPolling.notPolled')}</span>
                       )}
                     </dd>
                   </div>
@@ -2031,9 +2035,9 @@ function WorkspaceDetailContent() {
                 <div className="sm:col-span-2">
                   <dt
                     className="text-xs text-slate-500 mb-1"
-                    title='Workspace labels do double duty: label-based RBAC matching, and as the "tags" matched by terraform/tofu cloud { workspaces { tags = ... } } blocks.'
+                    title={t('fields.labelsTitle')}
                   >
-                    Labels (tags)
+                    {t('fields.labels')}
                   </dt>
                   {editing && perms['can-update'] ? (
                     <LabelsEditor labels={editLabels} onChange={setEditLabels} />
@@ -2044,7 +2048,7 @@ function WorkspaceDetailContent() {
                   )}
                 </div>
                 <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-500 mb-1">Var Files</dt>
+                  <dt className="text-xs text-slate-500 mb-1">{t('fields.varFiles')}</dt>
                   {editing && perms['can-update'] ? (
                     <div className="space-y-2">
                       {editVarFiles.map((f, i) => (
@@ -2053,7 +2057,7 @@ function WorkspaceDetailContent() {
                           <button
                             onClick={() => setEditVarFiles(editVarFiles.filter((_, j) => j !== i))}
                             className="text-xs text-red-400 hover:text-red-300"
-                          >Remove</button>
+                          >{t('actions.remove')}</button>
                         </div>
                       ))}
                       <div className="flex items-center gap-2">
@@ -2071,7 +2075,7 @@ function WorkspaceDetailContent() {
                               setNewVarFile('')
                             }
                           }}
-                          placeholder="e.g. envs/dev.tfvars"
+                          placeholder={t('fields.varFilesPlaceholder')}
                           className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                         <button
@@ -2085,7 +2089,7 @@ function WorkspaceDetailContent() {
                             }
                           }}
                           className="text-xs text-brand-400 hover:text-brand-300"
-                        >Add</button>
+                        >{t('actions.add')}</button>
                       </div>
                     </div>
                   ) : (
@@ -2097,23 +2101,23 @@ function WorkspaceDetailContent() {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-slate-500">None</span>
+                        <span className="text-slate-500">{t('common.none')}</span>
                       )}
                     </dd>
                   )}
                 </div>
                 <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-500 mb-1">Trigger Prefixes</dt>
+                  <dt className="text-xs text-slate-500 mb-1">{t('fields.triggerPrefixes')}</dt>
                   {editing && perms['can-update'] ? (
                     <div className="space-y-2">
-                      <p className="text-xs text-slate-400">Directories that trigger runs. Overrides working directory filtering when set.</p>
+                      <p className="text-xs text-slate-400">{t('fields.triggerPrefixesHint')}</p>
                       {editTriggerPrefixes.map((f, i) => (
                         <div key={f} className="flex items-center gap-2">
                           <code className="text-sm text-slate-200 bg-slate-700 px-2 py-0.5 rounded flex-1 truncate">{f}</code>
                           <button
                             onClick={() => setEditTriggerPrefixes(editTriggerPrefixes.filter((_, j) => j !== i))}
                             className="text-xs text-red-400 hover:text-red-300"
-                          >Remove</button>
+                          >{t('actions.remove')}</button>
                         </div>
                       ))}
                       <div className="flex items-center gap-2">
@@ -2131,7 +2135,7 @@ function WorkspaceDetailContent() {
                               setNewTriggerPrefix('')
                             }
                           }}
-                          placeholder="e.g. modules"
+                          placeholder={t('fields.triggerPrefixesPlaceholder')}
                           className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                         <button
@@ -2145,7 +2149,7 @@ function WorkspaceDetailContent() {
                             }
                           }}
                           className="text-xs text-brand-400 hover:text-brand-300"
-                        >Add</button>
+                        >{t('actions.add')}</button>
                       </div>
                     </div>
                   ) : (
@@ -2157,17 +2161,23 @@ function WorkspaceDetailContent() {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-slate-500">None (uses working directory)</span>
+                        <span className="text-slate-500">{t('fields.triggerPrefixesNone')}</span>
                       )}
                     </dd>
                   )}
                 </div>
                 <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-500 mb-1">Drift Ignore Rules</dt>
+                  <dt className="text-xs text-slate-500 mb-1">{t('fields.driftIgnoreRules')}</dt>
                   {editing && perms['can-update'] ? (
                     <div className="space-y-2">
                       <p className="text-xs text-slate-400">
-                        Glob-aware Terraform address + attribute paths suppressed by the drift classifier. <code className="text-[10px] bg-slate-800 px-1">*</code> matches zero or more non-<code className="text-[10px] bg-slate-800 px-1">.</code> chars (spans <code className="text-[10px] bg-slate-800 px-1">[N]</code> indices); <code className="text-[10px] bg-slate-800 px-1">[*]</code> matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys. Affects drift only, not regular plan/apply. See <a href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/drift-ignore-rules.md" target="_blank" rel="noreferrer" className="text-brand-400 hover:underline">drift-ignore-rules.md</a> for the full grammar.
+                        {t.rich('fields.driftIgnoreRulesHint', {
+                          star: () => <code className="text-[10px] bg-slate-800 px-1">*</code>,
+                          dot: () => <code className="text-[10px] bg-slate-800 px-1">.</code>,
+                          n: () => <code className="text-[10px] bg-slate-800 px-1">[N]</code>,
+                          starIdx: () => <code className="text-[10px] bg-slate-800 px-1">[*]</code>,
+                          docs: (chunks) => <a href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/drift-ignore-rules.md" target="_blank" rel="noreferrer" className="text-brand-400 hover:underline">{chunks}</a>,
+                        })}
                       </p>
                       {editDriftIgnoreRules.map((r, i) => (
                         <div key={`${r}-${i}`} className="flex items-center gap-2">
@@ -2175,7 +2185,7 @@ function WorkspaceDetailContent() {
                           <button
                             onClick={() => setEditDriftIgnoreRules(editDriftIgnoreRules.filter((_, j) => j !== i))}
                             className="text-xs text-red-400 hover:text-red-300"
-                          >Remove</button>
+                          >{t('actions.remove')}</button>
                         </div>
                       ))}
                       <div className="flex items-center gap-2">
@@ -2207,7 +2217,7 @@ function WorkspaceDetailContent() {
                             }
                           }}
                           className="text-xs text-brand-400 hover:text-brand-300"
-                        >Add</button>
+                        >{t('actions.add')}</button>
                       </div>
                     </div>
                   ) : (
@@ -2219,7 +2229,7 @@ function WorkspaceDetailContent() {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-slate-500">None (every plan diff counts as drift)</span>
+                        <span className="text-slate-500">{t('fields.driftIgnoreRulesNone')}</span>
                       )}
                     </dd>
                   )}
@@ -2233,14 +2243,14 @@ function WorkspaceDetailContent() {
                       onClick={() => { setLockoutWarning(''); setEditLabels(attrs.labels || {}); }}
                       className="px-3 py-1 rounded text-xs text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600"
                     >
-                      Revert Labels
+                      {t('lockout.revertLabels')}
                     </button>
                     <button
                       onClick={() => handleSave(true)}
                       disabled={saving}
                       className="px-3 py-1 rounded text-xs text-amber-200 hover:text-white bg-amber-700 hover:bg-amber-600"
                     >
-                      {saving ? 'Saving...' : 'Save Anyway'}
+                      {saving ? t('actions.savingEllipsis') : t('lockout.saveAnyway')}
                     </button>
                   </div>
                 </div>
@@ -2251,9 +2261,9 @@ function WorkspaceDetailContent() {
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium text-slate-300">Lock Status</h3>
+                  <h3 className="text-sm font-medium text-slate-300">{t('lock.title')}</h3>
                   <p className="text-sm text-slate-400 mt-1">
-                    {attrs.locked ? 'This workspace is locked. No plans or applies can run.' : 'This workspace is unlocked and ready for runs.'}
+                    {attrs.locked ? t('lock.lockedDesc') : t('lock.unlockedDesc')}
                   </p>
                 </div>
                 {perms['can-lock'] && (
@@ -2265,7 +2275,7 @@ function WorkspaceDetailContent() {
                         : 'bg-slate-600 hover:bg-slate-500 text-slate-200'
                     }`}
                   >
-                    {attrs.locked ? 'Unlock' : 'Lock'}
+                    {attrs.locked ? t('lock.unlock') : t('lock.lock')}
                   </button>
                 )}
               </div>
@@ -2274,7 +2284,7 @@ function WorkspaceDetailContent() {
             {/* Drift Detection */}
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-slate-300">Drift Detection</h3>
+                <h3 className="text-sm font-medium text-slate-300">{t('drift.title')}</h3>
                 {perms['can-update'] ? (
                   <button
                     onClick={handleDriftToggle}
@@ -2285,19 +2295,19 @@ function WorkspaceDetailContent() {
                         : 'bg-slate-600 hover:bg-slate-500 text-slate-200'
                     }`}
                   >
-                    {savingDrift ? 'Saving...' : attrs['drift-detection-enabled'] ? 'Enabled' : 'Disabled'}
+                    {savingDrift ? t('actions.savingEllipsis') : attrs['drift-detection-enabled'] ? t('common.enabled') : t('common.disabled')}
                   </button>
                 ) : (
                   <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
                     attrs['drift-detection-enabled'] ? 'bg-green-900/50 text-green-300' : 'bg-slate-700 text-slate-400'
                   }`}>
-                    {attrs['drift-detection-enabled'] ? 'Enabled' : 'Disabled'}
+                    {attrs['drift-detection-enabled'] ? t('common.enabled') : t('common.disabled')}
                   </span>
                 )}
               </div>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <dt className="text-xs text-slate-500">Check Interval</dt>
+                  <dt className="text-xs text-slate-500">{t('drift.checkInterval')}</dt>
                   <dd className="mt-1">
                     <select
                       value={attrs['drift-detection-interval-seconds'] || 86400}
@@ -2312,7 +2322,7 @@ function WorkspaceDetailContent() {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Status</dt>
+                  <dt className="text-xs text-slate-500">{t('drift.status')}</dt>
                   <dd className="mt-1 flex items-center gap-2">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${driftStatusBadge(attrs['drift-status']).cls}`}>
                       {driftStatusBadge(attrs['drift-status']).label}
@@ -2321,18 +2331,18 @@ function WorkspaceDetailContent() {
                       <button
                         onClick={handleDismissDrift}
                         disabled={dismissingDrift}
-                        title="Clear the reported drift state. The next scheduled check will repopulate it from reality."
+                        title={t('drift.dismissTitle')}
                         className="text-xs text-slate-400 hover:text-slate-200 disabled:text-slate-600 transition-colors"
                       >
-                        {dismissingDrift ? 'Dismissing…' : 'Dismiss'}
+                        {dismissingDrift ? t('drift.dismissing') : t('drift.dismiss')}
                       </button>
                     )}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-slate-500">Last Checked</dt>
+                  <dt className="text-xs text-slate-500">{t('drift.lastChecked')}</dt>
                   <dd className="mt-1 text-sm text-slate-200">
-                    {attrs['drift-last-checked-at'] ? new Date(attrs['drift-last-checked-at']).toLocaleString() : 'Never'}
+                    {attrs['drift-last-checked-at'] ? new Date(attrs['drift-last-checked-at']).toLocaleString() : t('common.never')}
                   </dd>
                 </div>
                 {perms['can-queue-run'] && (
@@ -2341,9 +2351,9 @@ function WorkspaceDetailContent() {
                       onClick={handleCheckDriftNow}
                       disabled={checkingDrift || attrs.locked || !attrs['drift-detection-enabled']}
                       className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
-                      title={!attrs['drift-detection-enabled'] ? 'Enable drift detection first' : attrs.locked ? 'Workspace is locked' : 'Queue a plan-only run to check for drift'}
+                      title={!attrs['drift-detection-enabled'] ? t('drift.checkNowTitleDisabled') : attrs.locked ? t('common.workspaceLocked') : t('drift.checkNowTitle')}
                     >
-                      {checkingDrift ? 'Queuing...' : 'Check Now'}
+                      {checkingDrift ? t('actions.queuing') : t('drift.checkNow')}
                     </button>
                   </div>
                 )}
@@ -2353,16 +2363,14 @@ function WorkspaceDetailContent() {
             {/* Plan Expiry (#646) */}
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
               <div className="mb-4">
-                <h3 className="text-sm font-medium text-slate-300">Plan Expiry</h3>
+                <h3 className="text-sm font-medium text-slate-300">{t('planExpiry.title')}</h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Auto-discard an unconfirmed plan once it is older than this, so a stale
-                  plan can&apos;t be applied against a moved world. Off by default; the plan
-                  must then be re-run. (Applies to apply-capable runs only.)
+                  {t('planExpiry.description')}
                 </p>
               </div>
               <dl>
                 <div>
-                  <dt className="text-xs text-slate-500">Expire after</dt>
+                  <dt className="text-xs text-slate-500">{t('planExpiry.expireAfter')}</dt>
                   <dd className="mt-1">
                     <select
                       value={attrs['plan-expiry-seconds'] || 0}
@@ -2383,16 +2391,15 @@ function WorkspaceDetailContent() {
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-sm font-medium text-slate-300">AI Plan Summary</h3>
+                  <h3 className="text-sm font-medium text-slate-300">{t('aiSummary.title')}</h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    Automatic LLM-generated change summary, risk assessment, and failure
-                    analysis on every plan-phase outcome for this workspace.
+                    {t('aiSummary.description')}
                   </p>
                 </div>
               </div>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <dt className="text-xs text-slate-500">Mode</dt>
+                  <dt className="text-xs text-slate-500">{t('aiSummary.mode')}</dt>
                   <dd className="mt-1">
                     {perms['can-update'] ? (
                       <select
@@ -2401,25 +2408,25 @@ function WorkspaceDetailContent() {
                         disabled={savingAiSummary}
                         className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       >
-                        <option value="default">Follow deployment default</option>
-                        <option value="enabled">Always summarise</option>
-                        <option value="disabled">Never summarise</option>
+                        <option value="default">{t('aiSummary.modeDefault')}</option>
+                        <option value="enabled">{t('aiSummary.modeEnabled')}</option>
+                        <option value="disabled">{t('aiSummary.modeDisabled')}</option>
                       </select>
                     ) : (
                       <span className="text-sm text-slate-200">
                         {attrs['ai-summary-mode'] === 'enabled'
-                          ? 'Always summarise'
+                          ? t('aiSummary.modeEnabled')
                           : attrs['ai-summary-mode'] === 'disabled'
-                            ? 'Never summarise'
-                            : 'Follow deployment default'}
+                            ? t('aiSummary.modeDisabled')
+                            : t('aiSummary.modeDefault')}
                       </span>
                     )}
                   </dd>
                 </div>
                 <div className="sm:col-span-2">
                   <dt className="text-xs text-slate-500">
-                    Workspace context
-                    <span className="ml-2 text-slate-600">(optional, additive)</span>
+                    {t('aiSummary.contextLabel')}
+                    <span className="ml-2 text-slate-600">{t('aiSummary.contextLabelSuffix')}</span>
                   </dt>
                   <dd className="mt-1">
                     {perms['can-update'] ? (
@@ -2436,7 +2443,7 @@ function WorkspaceDetailContent() {
                             setAiSummaryContextDraft(null)
                           }
                         }}
-                        placeholder="Facts the AI should know about this workspace specifically. e.g. 'Fronts the vault for service X — destroying the KMS key causes a global outage.'"
+                        placeholder={t('aiSummary.contextPlaceholder')}
                         rows={3}
                         maxLength={4000}
                         disabled={savingAiSummary}
@@ -2445,11 +2452,11 @@ function WorkspaceDetailContent() {
                     ) : attrs['ai-summary-context'] ? (
                       <p className="text-sm text-slate-200 whitespace-pre-wrap">{attrs['ai-summary-context']}</p>
                     ) : (
-                      <p className="text-sm text-slate-500 italic">No workspace context set.</p>
+                      <p className="text-sm text-slate-500 italic">{t('aiSummary.noContext')}</p>
                     )}
                     <p className="text-xs text-slate-500 mt-1">
-                      Added on top of deployment-wide context. Max 4000 characters.
-                      {savingAiSummary && <span className="ml-2 text-brand-400">Saving…</span>}
+                      {t('aiSummary.contextHint')}
+                      {savingAiSummary && <span className="ml-2 text-brand-400">{t('actions.saving')}</span>}
                     </p>
                   </dd>
                 </div>
@@ -2458,16 +2465,13 @@ function WorkspaceDetailContent() {
 
             {/* Slack notifications (#556) */}
             <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6">
-              <h3 className="text-sm font-medium text-slate-200">Slack notifications</h3>
+              <h3 className="text-sm font-medium text-slate-200">{t('slack.title')}</h3>
               <p className="text-sm text-slate-400 mt-1">
-                Opt this workspace into Slack run notifications — approval requests, applies,
-                errors, and drift. Leave the channel empty and this workspace stays silent
-                (there is no deployment-wide fan-out). Requires the Slack app to be enabled
-                by an administrator.
+                {t('slack.description')}
               </p>
               <dl className="mt-4">
                 <div>
-                  <dt className="text-xs text-slate-500">Channel</dt>
+                  <dt className="text-xs text-slate-500">{t('slack.channel')}</dt>
                   <dd className="mt-1">
                     {perms['can-update'] ? (
                       <input
@@ -2484,7 +2488,7 @@ function WorkspaceDetailContent() {
                             setSlackChannelDraft(null)
                           }
                         }}
-                        placeholder="#deploys or a channel ID (e.g. C0123ABCD)"
+                        placeholder={t('slack.channelPlaceholder')}
                         maxLength={128}
                         disabled={savingSlackChannel}
                         className="w-full sm:w-96 px-3 py-2 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono"
@@ -2492,11 +2496,11 @@ function WorkspaceDetailContent() {
                     ) : attrs['slack-channel'] ? (
                       <p className="text-sm text-slate-200 font-mono">{attrs['slack-channel']}</p>
                     ) : (
-                      <p className="text-sm text-slate-500 italic">Not set — silent.</p>
+                      <p className="text-sm text-slate-500 italic">{t('slack.notSet')}</p>
                     )}
                     <p className="text-xs text-slate-500 mt-1">
-                      The Slack app must already be a member of the channel.
-                      {savingSlackChannel && <span className="ml-2 text-brand-400">Saving…</span>}
+                      {t('slack.hint')}
+                      {savingSlackChannel && <span className="ml-2 text-brand-400">{t('actions.saving')}</span>}
                     </p>
                   </dd>
                 </div>
@@ -2508,27 +2512,27 @@ function WorkspaceDetailContent() {
               <div className="bg-slate-800/50 rounded-lg border border-red-900/30 p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-medium text-red-400">Delete Workspace</h3>
-                    <p className="text-sm text-slate-400 mt-1">Permanently delete this workspace and all associated state, variables, and runs.</p>
+                    <h3 className="text-sm font-medium text-red-400">{t('delete.title')}</h3>
+                    <p className="text-sm text-slate-400 mt-1">{t('delete.description')}</p>
                   </div>
                   {!showDeleteConfirm ? (
                     <button
                       onClick={() => setShowDeleteConfirm(true)}
                       className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 text-red-400 transition-colors"
                     >
-                      Delete
+                      {t('actions.delete')}
                     </button>
                   ) : (
                     <div className="flex gap-2">
                       <button onClick={() => setShowDeleteConfirm(false)} className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200">
-                        Cancel
+                        {t('actions.cancel')}
                       </button>
                       <button
                         onClick={handleDelete}
                         disabled={deleting}
                         className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors"
                       >
-                        {deleting ? 'Deleting...' : 'Confirm Delete'}
+                        {deleting ? t('actions.deleting') : t('delete.confirm')}
                       </button>
                     </div>
                   )}
@@ -2547,7 +2551,7 @@ function WorkspaceDetailContent() {
                   onClick={() => setShowAddVar(!showAddVar)}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
                 >
-                  {showAddVar ? 'Cancel' : 'Add Variable'}
+                  {showAddVar ? t('actions.cancel') : t('variables.addVariable')}
                 </button>
               </div>
             )}
@@ -2556,24 +2560,24 @@ function WorkspaceDetailContent() {
               <form onSubmit={handleAddVariable} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="var-key" className="block text-sm font-medium text-slate-300 mb-1">Key</label>
+                    <label htmlFor="var-key" className="block text-sm font-medium text-slate-300 mb-1">{t('variables.key')}</label>
                     <input id="var-key" type="text" value={varKey} onChange={(e) => setVarKey(e.target.value)} required placeholder="AWS_REGION" className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">Value</label>
+                    <label htmlFor="var-val" className="block text-sm font-medium text-slate-300 mb-1">{t('variables.value')}</label>
                     <SensitiveValueInput id="var-val" value={varValue} onChange={setVarValue} sensitive={varSensitive} placeholder="us-east-1" rows={2} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent resize-y" />
                   </div>
                   <div>
-                    <label htmlFor="var-cat" className="block text-sm font-medium text-slate-300 mb-1">Category</label>
+                    <label htmlFor="var-cat" className="block text-sm font-medium text-slate-300 mb-1">{t('variables.category')}</label>
                     <select id="var-cat" value={varCategory} onChange={(e) => setVarCategory(e.target.value)} className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       <option value="terraform">Terraform</option>
-                      <option value="env">Environment</option>
+                      <option value="env">{t('variables.categoryEnv')}</option>
                     </select>
                   </div>
                   <div className="flex items-end gap-4">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={varSensitive} onChange={(e) => setVarSensitive(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
-                      <span className="text-sm text-slate-300">Sensitive</span>
+                      <span className="text-sm text-slate-300">{t('variables.sensitive')}</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={varHcl} onChange={(e) => setVarHcl(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
@@ -2582,7 +2586,7 @@ function WorkspaceDetailContent() {
                   </div>
                 </div>
                 <button type="submit" disabled={addingVar} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
-                  {addingVar ? 'Adding...' : 'Add Variable'}
+                  {addingVar ? t('actions.adding') : t('variables.addVariable')}
                 </button>
               </form>
             )}
@@ -2590,7 +2594,7 @@ function WorkspaceDetailContent() {
             {varsLoading ? (
               <LoadingSpinner />
             ) : variables.length === 0 ? (
-              <EmptyState message="No variables configured for this workspace." />
+              <EmptyState message={t('variables.empty')} />
             ) : (
               <>
               {/* Desktop (md+): the variables table. Below md it's replaced by
@@ -2600,10 +2604,10 @@ function WorkspaceDetailContent() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <SortableHeader label="Key" sortKey="key" sortState={varSortState} onSort={toggleVarSort} />
-                      <SortableHeader label="Value" sortKey="value" sortState={varSortState} onSort={toggleVarSort} />
-                      <SortableHeader label="Category" sortKey="category" sortState={varSortState} onSort={toggleVarSort} className="hidden sm:table-cell" />
-                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+                      <SortableHeader label={t('variables.key')} sortKey="key" sortState={varSortState} onSort={toggleVarSort} />
+                      <SortableHeader label={t('variables.value')} sortKey="value" sortState={varSortState} onSort={toggleVarSort} />
+                      <SortableHeader label={t('variables.category')} sortKey="category" sortState={varSortState} onSort={toggleVarSort} className="hidden sm:table-cell" />
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('common.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -2617,7 +2621,7 @@ function WorkspaceDetailContent() {
                           <td className="px-4 py-3">
                             <SensitiveValueInput value={editVarValue} onChange={setEditVarValue}
                               sensitive={editVarSensitive}
-                              placeholder={editVarSensitive ? 'Enter new value' : ''}
+                              placeholder={editVarSensitive ? t('variables.enterNewValue') : ''}
                               rows={2}
                               className="w-full px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500 resize-y" />
                           </td>
@@ -2631,7 +2635,7 @@ function WorkspaceDetailContent() {
                               <label className="flex items-center gap-1 cursor-pointer">
                                 <input type="checkbox" checked={editVarSensitive} onChange={(e) => setEditVarSensitive(e.target.checked)}
                                   className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                                <span className="text-xs text-slate-400">Sensitive</span>
+                                <span className="text-xs text-slate-400">{t('variables.sensitive')}</span>
                               </label>
                               <label className="flex items-center gap-1 cursor-pointer">
                                 <input type="checkbox" checked={editVarHcl} onChange={(e) => setEditVarHcl(e.target.checked)}
@@ -2642,9 +2646,9 @@ function WorkspaceDetailContent() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex justify-end gap-2">
-                              <button onClick={() => setEditingVarId(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Cancel</button>
+                              <button onClick={() => setEditingVarId(null)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('actions.cancel')}</button>
                               <button onClick={handleSaveVar} disabled={savingVar} className="px-2.5 py-1 rounded-md text-xs font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white">
-                                {savingVar ? 'Saving...' : 'Save'}
+                                {savingVar ? t('actions.savingEllipsis') : t('actions.save')}
                               </button>
                             </div>
                           </td>
@@ -2653,7 +2657,7 @@ function WorkspaceDetailContent() {
                         <tr key={v.id} className="hover:bg-slate-700/20 transition-colors">
                           <td className="px-4 py-3 text-sm text-slate-200 font-mono">{v.attributes.key}</td>
                           <td className="px-4 py-3 text-sm text-slate-400 font-mono">
-                            {v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">empty</span>)}
+                            {v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('variables.emptyValue')}</span>)}
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -2665,8 +2669,8 @@ function WorkspaceDetailContent() {
                           {perms['can-update-variable'] && (
                             <td className="px-4 py-3 text-right">
                               <div className="flex justify-end gap-2">
-                                <button onClick={() => startEditingVar(v)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Edit</button>
-                                <button onClick={() => handleDeleteVariable(v.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">Delete</button>
+                                <button onClick={() => startEditingVar(v)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('actions.edit')}</button>
+                                <button onClick={() => handleDeleteVariable(v.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">{t('actions.delete')}</button>
                               </div>
                             </td>
                           )}
@@ -2690,14 +2694,14 @@ function WorkspaceDetailContent() {
                           type="text"
                           value={editVarKey}
                           onChange={(e) => setEditVarKey(e.target.value)}
-                          placeholder="Key"
+                          placeholder={t('variables.key')}
                           className="w-full px-2 py-1.5 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                         <SensitiveValueInput
                           value={editVarValue}
                           onChange={setEditVarValue}
                           sensitive={editVarSensitive}
-                          placeholder={editVarSensitive ? 'Enter new value' : ''}
+                          placeholder={editVarSensitive ? t('variables.enterNewValue') : ''}
                           rows={2}
                           className="w-full px-2 py-1.5 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-brand-500 resize-y"
                         />
@@ -2712,7 +2716,7 @@ function WorkspaceDetailContent() {
                           </select>
                           <label className="flex items-center gap-1 cursor-pointer">
                             <input type="checkbox" checked={editVarSensitive} onChange={(e) => setEditVarSensitive(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600" />
-                            <span className="text-xs text-slate-400">Sensitive</span>
+                            <span className="text-xs text-slate-400">{t('variables.sensitive')}</span>
                           </label>
                           <label className="flex items-center gap-1 cursor-pointer">
                             <input type="checkbox" checked={editVarHcl} onChange={(e) => setEditVarHcl(e.target.checked)} className="rounded border-slate-600 bg-slate-700 text-brand-600" />
@@ -2720,9 +2724,9 @@ function WorkspaceDetailContent() {
                           </label>
                         </div>
                         <div className="flex gap-2 pt-1">
-                          <button onClick={() => setEditingVarId(null)} className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Cancel</button>
+                          <button onClick={() => setEditingVarId(null)} className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('actions.cancel')}</button>
                           <button onClick={handleSaveVar} disabled={savingVar} className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white">
-                            {savingVar ? 'Saving…' : 'Save'}
+                            {savingVar ? t('actions.saving') : t('actions.save')}
                           </button>
                         </div>
                       </div>
@@ -2737,16 +2741,16 @@ function WorkspaceDetailContent() {
                           </span>
                         </div>
                         <div className="mb-2 text-sm text-slate-400 font-mono break-all">
-                          {v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">empty</span>)}
+                          {v.attributes.sensitive ? '***' : (v.attributes.value || <span className="text-slate-600 italic">{t('variables.emptyValue')}</span>)}
                         </div>
                         {perms['can-update-variable'] && (
                           <div className="flex gap-2">
-                            <button onClick={() => startEditingVar(v)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Edit</button>
+                            <button onClick={() => startEditingVar(v)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('actions.edit')}</button>
                             <button
                               onClick={() => handleDeleteVariable(v.id)}
                               className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"
                             >
-                              Delete
+                              {t('actions.delete')}
                             </button>
                           </div>
                         )}
@@ -2770,32 +2774,32 @@ function WorkspaceDetailContent() {
                     onClick={() => setShowPlanOptions(!showPlanOptions)}
                     className="px-3 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
                   >
-                    {showPlanOptions ? 'Hide Options' : 'Options'}
+                    {showPlanOptions ? t('runs.hideOptions') : t('runs.options')}
                   </button>
                   {!showDestroyConfirm ? (
                     <button
                       onClick={() => setShowDestroyConfirm(true)}
                       disabled={queueingDestroy || attrs.locked}
                       className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600/20 hover:bg-red-600/40 text-red-400 transition-colors"
-                      title={attrs.locked ? 'Workspace is locked' : 'Queue a destroy plan'}
+                      title={attrs.locked ? t('common.workspaceLocked') : t('runs.queueDestroyTitle')}
                     >
-                      Queue Destroy
+                      {t('runs.queueDestroy')}
                     </button>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-red-400">Destroy all resources?</span>
+                      <span className="text-xs text-red-400">{t('runs.destroyAllConfirm')}</span>
                       <button
                         onClick={() => setShowDestroyConfirm(false)}
                         className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
                       >
-                        Cancel
+                        {t('actions.cancel')}
                       </button>
                       <button
                         onClick={handleQueueDestroy}
                         disabled={queueingDestroy}
                         className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 disabled:bg-red-800 text-white transition-colors"
                       >
-                        {queueingDestroy ? 'Queuing...' : 'Confirm Destroy'}
+                        {queueingDestroy ? t('actions.queuing') : t('runs.confirmDestroy')}
                       </button>
                     </div>
                   )}
@@ -2803,17 +2807,17 @@ function WorkspaceDetailContent() {
                     onClick={handleQueuePlan}
                     disabled={queueingPlan || attrs.locked}
                     className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors"
-                    title={attrs.locked ? 'Workspace is locked' : undefined}
+                    title={attrs.locked ? t('common.workspaceLocked') : undefined}
                   >
-                    {queueingPlan ? 'Queuing...' : planOnly ? 'Queue Plan' : 'Queue Run'}
+                    {queueingPlan ? t('actions.queuing') : planOnly ? t('runs.queuePlan') : t('runs.queueRun')}
                   </button>
                 </div>
                 {showPlanOptions && (
                   <div className="mt-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                    <h4 className="text-sm font-medium text-slate-300 mb-3">Plan Options</h4>
+                    <h4 className="text-sm font-medium text-slate-300 mb-3">{t('runs.planOptions')}</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs text-slate-400 mb-1">Target resources <span className="text-slate-500">(comma-separated)</span></label>
+                        <label className="block text-xs text-slate-400 mb-1">{t('runs.targetResources')} <span className="text-slate-500">{t('runs.commaSeparated')}</span></label>
                         <input
                           type="text"
                           value={planTargets}
@@ -2823,7 +2827,7 @@ function WorkspaceDetailContent() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-slate-400 mb-1">Replace resources <span className="text-slate-500">(comma-separated)</span></label>
+                        <label className="block text-xs text-slate-400 mb-1">{t('runs.replaceResources')} <span className="text-slate-500">{t('runs.commaSeparated')}</span></label>
                         <input
                           type="text"
                           value={planReplaces}
@@ -2842,7 +2846,7 @@ function WorkspaceDetailContent() {
                           disabled={!!vcsRef}
                           className="rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500 disabled:opacity-50"
                         />
-                        Plan Only
+                        {t('runs.planOnly')}
                       </label>
                       <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
                         <input
@@ -2854,7 +2858,7 @@ function WorkspaceDetailContent() {
                           }}
                           className="rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500"
                         />
-                        Refresh Only
+                        {t('runs.refreshOnly')}
                       </label>
                       <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
                         <input
@@ -2866,7 +2870,7 @@ function WorkspaceDetailContent() {
                           }}
                           className="rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500"
                         />
-                        Skip Refresh
+                        {t('runs.skipRefresh')}
                       </label>
                       {!vcsRef && (
                         <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
@@ -2876,13 +2880,13 @@ function WorkspaceDetailContent() {
                             onChange={e => setPlanAllowEmpty(e.target.checked)}
                             className="rounded border-slate-600 bg-slate-900 text-brand-500 focus:ring-brand-500"
                           />
-                          Allow Empty Apply
+                          {t('runs.allowEmptyApply')}
                         </label>
                       )}
                     </div>
                     {attrs['vcs-repo-url'] && (
                       <div className="mt-4 pt-3 border-t border-slate-700/50">
-                        <label className="block text-xs text-slate-400 mb-2">VCS Ref</label>
+                        <label className="block text-xs text-slate-400 mb-2">{t('runs.vcsRef')}</label>
                         <div className="flex gap-2">
                           <select
                             value={vcsRefType}
@@ -2892,8 +2896,8 @@ function WorkspaceDetailContent() {
                             }}
                             className="px-2 py-2 bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500"
                           >
-                            <option value="branch">Branch</option>
-                            <option value="tag">Tag</option>
+                            <option value="branch">{t('runs.branch')}</option>
+                            <option value="tag">{t('runs.tag')}</option>
                           </select>
                           <select
                             value={vcsRef}
@@ -2903,8 +2907,8 @@ function WorkspaceDetailContent() {
                           >
                             <option value="">
                               {vcsRefsLoading
-                                ? 'Loading...'
-                                : `Default${vcsDefaultBranch ? ` (${vcsDefaultBranch})` : ''}`}
+                                ? t('actions.loading')
+                                : vcsDefaultBranch ? t('runs.defaultBranch', { branch: vcsDefaultBranch }) : t('common.default')}
                             </option>
                             {(vcsRefType === 'branch' ? vcsBranches : vcsTags).map(ref => (
                               <option key={ref.name} value={ref.name}>
@@ -2915,7 +2919,7 @@ function WorkspaceDetailContent() {
                         </div>
                         {vcsRef && (
                           <p className="mt-2 text-xs text-amber-400">
-                            Non-default ref selected — run will be plan-only
+                            {t('runs.nonDefaultRefNote')}
                           </p>
                         )}
                       </div>
@@ -2927,7 +2931,7 @@ function WorkspaceDetailContent() {
             {runsLoading ? (
               <LoadingSpinner />
             ) : runs.length === 0 ? (
-              <EmptyState message="No runs yet for this workspace." />
+              <EmptyState message={t('runs.empty')} />
             ) : (
               <>
               {/* Desktop (md+): the sortable table, unchanged. Below md it is
@@ -2937,13 +2941,13 @@ function WorkspaceDetailContent() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      <SortableHeader label="Run ID" sortKey="id" sortState={runSortState} onSort={toggleRunSort} />
-                      <SortableHeader label="Status" sortKey="status" sortState={runSortState} onSort={toggleRunSort} />
-                      <SortableHeader label="Type" sortKey="type" sortState={runSortState} onSort={toggleRunSort} className="hidden sm:table-cell" />
-                      <th className="text-left px-4 py-2 text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Changes</th>
-                      <SortableHeader label="Source" sortKey="source" sortState={runSortState} onSort={toggleRunSort} className="hidden sm:table-cell" />
-                      <SortableHeader label="Triggered By" sortKey="created-by" sortState={runSortState} onSort={toggleRunSort} className="hidden lg:table-cell" />
-                      <SortableHeader label="Created" sortKey="created-at" sortState={runSortState} onSort={toggleRunSort} className="hidden md:table-cell" />
+                      <SortableHeader label={t('runs.runId')} sortKey="id" sortState={runSortState} onSort={toggleRunSort} />
+                      <SortableHeader label={t('runs.status')} sortKey="status" sortState={runSortState} onSort={toggleRunSort} />
+                      <SortableHeader label={t('runs.type')} sortKey="type" sortState={runSortState} onSort={toggleRunSort} className="hidden sm:table-cell" />
+                      <th className="text-left px-4 py-2 text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('runs.changes')}</th>
+                      <SortableHeader label={t('runs.source')} sortKey="source" sortState={runSortState} onSort={toggleRunSort} className="hidden sm:table-cell" />
+                      <SortableHeader label={t('runs.triggeredBy')} sortKey="created-by" sortState={runSortState} onSort={toggleRunSort} className="hidden lg:table-cell" />
+                      <SortableHeader label={t('runs.created')} sortKey="created-at" sortState={runSortState} onSort={toggleRunSort} className="hidden md:table-cell" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/30">
@@ -2957,7 +2961,7 @@ function WorkspaceDetailContent() {
                         <td className="px-4 py-3">
                           {run.attributes.actions?.['is-confirmable'] ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">
-                              needs confirm
+                              {t('runs.needsConfirm')}
                             </span>
                           ) : (
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(run.attributes.status)}`}>
@@ -2968,14 +2972,14 @@ function WorkspaceDetailContent() {
                         <td className="px-4 py-3 hidden sm:table-cell">
                           {run.attributes['is-destroy'] ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-300">
-                              destroy
+                              {t('runs.typeDestroy')}
                             </span>
                           ) : run.attributes['plan-only'] ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-900/50 text-cyan-300">
-                              plan only
+                              {t('runs.typePlanOnly')}
                             </span>
                           ) : (
-                            <span className="text-xs text-slate-500">plan + apply</span>
+                            <span className="text-xs text-slate-500">{t('runs.typePlanApply')}</span>
                           )}
                         </td>
                         <td className="px-4 py-3 hidden md:table-cell">
@@ -2987,9 +2991,9 @@ function WorkspaceDetailContent() {
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
                           {run.attributes.source === 'module-test' ? (
-                            <span className="text-purple-400">module test</span>
+                            <span className="text-purple-400">{t('runs.sourceModuleTest')}</span>
                           ) : run.attributes.source === 'module-publish' ? (
-                            <span className="text-purple-400">module publish</span>
+                            <span className="text-purple-400">{t('runs.sourceModulePublish')}</span>
                           ) : run.attributes.source}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden lg:table-cell">
@@ -3019,7 +3023,7 @@ function WorkspaceDetailContent() {
                       badge={
                         run.attributes.actions?.['is-confirmable'] ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">
-                            needs confirm
+                            {t('runs.needsConfirm')}
                           </span>
                         ) : (
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(run.attributes.status)}`}>
@@ -3029,42 +3033,42 @@ function WorkspaceDetailContent() {
                       }
                       fields={[
                         {
-                          label: 'Type',
+                          label: t('runs.type'),
                           value: run.attributes['is-destroy'] ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-300">
-                              destroy
+                              {t('runs.typeDestroy')}
                             </span>
                           ) : run.attributes['plan-only'] ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-cyan-900/50 text-cyan-300">
-                              plan only
+                              {t('runs.typePlanOnly')}
                             </span>
                           ) : (
-                            <span className="text-slate-400">plan + apply</span>
+                            <span className="text-slate-400">{t('runs.typePlanApply')}</span>
                           ),
                         },
                         ...(run.attributes['plan-summary']
                           ? [{
-                              label: 'Changes',
+                              label: t('runs.changes'),
                               value: <PlanSummaryBadges summary={run.attributes['plan-summary']} size="sm" />,
                             }]
                           : []),
                         {
-                          label: 'Source',
+                          label: t('runs.source'),
                           value:
                             run.attributes.source === 'module-test' ? (
-                              <span className="text-purple-400">module test</span>
+                              <span className="text-purple-400">{t('runs.sourceModuleTest')}</span>
                             ) : run.attributes.source === 'module-publish' ? (
-                              <span className="text-purple-400">module publish</span>
+                              <span className="text-purple-400">{t('runs.sourceModulePublish')}</span>
                             ) : (
                               run.attributes.source
                             ),
                         },
                         ...(run.attributes['created-by']
-                          ? [{ label: 'Triggered by', value: run.attributes['created-by'] }]
+                          ? [{ label: t('runs.triggeredBy'), value: run.attributes['created-by'] }]
                           : []),
                         ...(run.attributes['created-at']
                           ? [{
-                              label: 'Created',
+                              label: t('runs.created'),
                               value: new Date(run.attributes['created-at']).toLocaleString(),
                               valueClassName: 'text-slate-400',
                             }]
@@ -3087,8 +3091,8 @@ function WorkspaceDetailContent() {
               <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-4 mb-4">
                 <p className="text-sm text-red-200 mb-3">
                   {confirmStateAction.action === 'delete'
-                    ? `Delete state version #${confirmStateAction.sv.attributes.serial}? This cannot be undone.`
-                    : `Rollback to state version #${confirmStateAction.sv.attributes.serial}? A new version will be created with the same content.`}
+                    ? t('state.deleteConfirm', { serial: confirmStateAction.sv.attributes.serial })
+                    : t('state.rollbackConfirm', { serial: confirmStateAction.sv.attributes.serial })}
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -3100,20 +3104,20 @@ function WorkspaceDetailContent() {
                         if (action === 'delete') {
                           const resp = await apiFetch(`/api/terrapod/v1/state-versions/${sv.id}/manage`, { method: 'DELETE' })
                           if (!resp.ok) {
-                            const err = await resp.json().catch(() => ({ detail: 'Failed' }))
-                            throw new Error(err.detail || 'Failed to delete state version')
+                            const err = await resp.json().catch(() => ({ detail: t('errors.failed') }))
+                            throw new Error(err.detail || t('errors.deleteStateVersion'))
                           }
                         } else {
                           const resp = await apiFetch(`/api/terrapod/v1/state-versions/${sv.id}/actions/rollback`, { method: 'POST' })
                           if (!resp.ok) {
-                            const err = await resp.json().catch(() => ({ detail: 'Failed' }))
-                            throw new Error(err.detail || 'Failed to rollback state version')
+                            const err = await resp.json().catch(() => ({ detail: t('errors.failed') }))
+                            throw new Error(err.detail || t('errors.rollbackStateVersion'))
                           }
                         }
                         setConfirmStateAction(null)
                         loadStateVersions()
                       } catch (err) {
-                        setError(err instanceof Error ? err.message : 'State action failed')
+                        setError(err instanceof Error ? err.message : t('errors.stateActionFailed'))
                       } finally {
                         setStateActionLoading(null)
                       }
@@ -3124,13 +3128,13 @@ function WorkspaceDetailContent() {
                         : 'bg-amber-600 hover:bg-amber-500'
                     }`}
                   >
-                    {stateActionLoading ? 'Processing...' : confirmStateAction.action === 'delete' ? 'Confirm Delete' : 'Confirm Rollback'}
+                    {stateActionLoading ? t('actions.processing') : confirmStateAction.action === 'delete' ? t('state.confirmDelete') : t('state.confirmRollback')}
                   </button>
                   <button
                     onClick={() => setConfirmStateAction(null)}
                     className="px-3 py-1.5 rounded text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
                   >
-                    Cancel
+                    {t('actions.cancel')}
                   </button>
                 </div>
               </div>
@@ -3140,7 +3144,7 @@ function WorkspaceDetailContent() {
             {perms['can-create-state-versions'] && (
               <div className="flex justify-end mb-4">
                 <label className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors cursor-pointer">
-                  Upload State
+                  {t('state.uploadState')}
                   <input
                     type="file"
                     accept=".json,.tfstate"
@@ -3158,12 +3162,12 @@ function WorkspaceDetailContent() {
                           body,
                         })
                         if (!resp.ok) {
-                          const err = await resp.json().catch(() => ({ detail: 'Failed' }))
-                          throw new Error(err.detail || 'Failed to upload state')
+                          const err = await resp.json().catch(() => ({ detail: t('errors.failed') }))
+                          throw new Error(err.detail || t('errors.uploadState'))
                         }
                         loadStateVersions()
                       } catch (err) {
-                        setError(err instanceof Error ? err.message : 'Failed to upload state file')
+                        setError(err instanceof Error ? err.message : t('errors.uploadStateFile'))
                       } finally {
                         setStateActionLoading(null)
                         e.target.value = ''
@@ -3177,7 +3181,7 @@ function WorkspaceDetailContent() {
             {stateLoading ? (
               <LoadingSpinner />
             ) : stateVersions.length === 0 ? (
-              <EmptyState message="No state versions yet for this workspace." />
+              <EmptyState message={t('state.empty')} />
             ) : (
               <>
                 {/* Desktop (md+): the sortable table, unchanged columns. Actions
@@ -3186,12 +3190,12 @@ function WorkspaceDetailContent() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-slate-700/50">
-                        <SortableHeader label="Serial" sortKey="serial" sortState={stateSortState} onSort={toggleStateSort} />
-                        <SortableHeader label="Created By" sortKey="created-by" sortState={stateSortState} onSort={toggleStateSort} />
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Run</th>
-                        <SortableHeader label="Size" sortKey="size" sortState={stateSortState} onSort={toggleStateSort} />
-                        <SortableHeader label="Created" sortKey="created-at" sortState={stateSortState} onSort={toggleStateSort} className="hidden lg:table-cell" />
-                        <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+                        <SortableHeader label={t('state.serial')} sortKey="serial" sortState={stateSortState} onSort={toggleStateSort} />
+                        <SortableHeader label={t('state.createdBy')} sortKey="created-by" sortState={stateSortState} onSort={toggleStateSort} />
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('state.run')}</th>
+                        <SortableHeader label={t('state.size')} sortKey="size" sortState={stateSortState} onSort={toggleStateSort} />
+                        <SortableHeader label={t('state.created')} sortKey="created-at" sortState={stateSortState} onSort={toggleStateSort} className="hidden lg:table-cell" />
+                        <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('common.actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-700/30">
@@ -3203,7 +3207,7 @@ function WorkspaceDetailContent() {
                           <tr key={sv.id} className="hover:bg-slate-700/20 transition-colors">
                             <td className="px-4 py-3 text-sm text-slate-200 font-mono">#{sv.attributes.serial}</td>
                             <td className="px-4 py-3 text-xs text-slate-400">
-                              {sv.attributes['created-by'] || <span className="text-slate-500">runner</span>}
+                              {sv.attributes['created-by'] || <span className="text-slate-500">{t('state.runner')}</span>}
                             </td>
                             <td className="px-4 py-3 text-xs">
                               {runData ? (
@@ -3226,14 +3230,14 @@ function WorkspaceDetailContent() {
                                   onClick={() => downloadStateVersion(sv)}
                                   className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200"
                                 >
-                                  Download
+                                  {t('actions.download')}
                                 </button>
                                 {!isLatest && perms['can-create-state-versions'] && (
                                   <button
                                     onClick={() => setConfirmStateAction({ action: 'rollback', sv })}
                                     className="px-2.5 py-1 rounded-md text-xs font-medium bg-amber-900/40 hover:bg-amber-900/60 text-amber-300"
                                   >
-                                    Rollback
+                                    {t('actions.rollback')}
                                   </button>
                                 )}
                                 {!isLatest && perms['can-update'] && (
@@ -3241,7 +3245,7 @@ function WorkspaceDetailContent() {
                                     onClick={() => setConfirmStateAction({ action: 'delete', sv })}
                                     className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"
                                   >
-                                    Delete
+                                    {t('actions.delete')}
                                   </button>
                                 )}
                               </div>
@@ -3268,18 +3272,18 @@ function WorkspaceDetailContent() {
                         badge={
                           isLatest && (
                             <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/40 text-green-300">
-                              latest
+                              {t('state.latest')}
                             </span>
                           )
                         }
                         fields={[
                           {
-                            label: 'Created by',
-                            value: sv.attributes['created-by'] || 'runner',
+                            label: t('state.createdBy'),
+                            value: sv.attributes['created-by'] || t('state.runner'),
                             valueClassName: sv.attributes['created-by'] ? 'text-slate-300' : 'text-slate-500',
                           },
                           {
-                            label: 'Run',
+                            label: t('state.run'),
                             value: runData ? (
                               <a href={`/workspaces/${workspaceId}/runs/${runData.id}`} className="text-brand-400 hover:text-brand-300">
                                 {runData.id.replace('run-', '').slice(0, 8)}
@@ -3290,12 +3294,12 @@ function WorkspaceDetailContent() {
                             valueClassName: 'text-slate-400',
                           },
                           {
-                            label: 'Size',
+                            label: t('state.size'),
                             value: sv.attributes.size > 0 ? `${(sv.attributes.size / 1024).toFixed(1)} KB` : '—',
                             valueClassName: 'text-slate-400',
                           },
                           {
-                            label: 'Created',
+                            label: t('state.created'),
                             value: sv.attributes['created-at'] ? new Date(sv.attributes['created-at']).toLocaleString() : '—',
                             valueClassName: 'text-slate-500',
                           },
@@ -3306,14 +3310,14 @@ function WorkspaceDetailContent() {
                               onClick={() => downloadStateVersion(sv)}
                               className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200"
                             >
-                              Download
+                              {t('actions.download')}
                             </button>
                             {!isLatest && perms['can-create-state-versions'] && (
                               <button
                                 onClick={() => setConfirmStateAction({ action: 'rollback', sv })}
                                 className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-900/40 hover:bg-amber-900/60 text-amber-300"
                               >
-                                Rollback
+                                {t('actions.rollback')}
                               </button>
                             )}
                             {!isLatest && perms['can-update'] && (
@@ -3321,7 +3325,7 @@ function WorkspaceDetailContent() {
                                 onClick={() => setConfirmStateAction({ action: 'delete', sv })}
                                 className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"
                               >
-                                Delete
+                                {t('actions.delete')}
                               </button>
                             )}
                           </>
@@ -3345,17 +3349,17 @@ function WorkspaceDetailContent() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm text-slate-400">
-                Uploaded source archives for this workspace, newest first. Pick two rows to compare.
+                {t('configurations.description')}
               </p>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-slate-500">{cvSelected.size}/2 selected</span>
+                <span className="text-xs text-slate-500">{t('configurations.selectedCount', { count: cvSelected.size })}</span>
                 <button
                   type="button"
                   onClick={compareSelectedCvs}
                   disabled={cvSelected.size !== 2 || cvDiffLoading}
                   className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  {cvDiffLoading ? 'Comparing…' : 'Compare'}
+                  {cvDiffLoading ? t('configurations.comparing') : t('configurations.compare')}
                 </button>
               </div>
             </div>
@@ -3363,7 +3367,7 @@ function WorkspaceDetailContent() {
             {cvLoading ? (
               <LoadingSpinner />
             ) : cvs.length === 0 ? (
-              <EmptyState message="No configuration versions yet. They appear here as soon as a `terraform plan` uploads or a VCS push triggers a run." />
+              <EmptyState message={t('configurations.empty')} />
             ) : (
               <>
                 {/* Desktop (md+): the table with per-row compare checkboxes. */}
@@ -3372,11 +3376,11 @@ function WorkspaceDetailContent() {
                     <thead className="bg-slate-900/50 text-slate-400">
                       <tr>
                         <th className="w-8 px-2 py-3" aria-hidden />
-                        <th className="px-4 py-3 text-left font-medium">ID</th>
-                        <th className="px-4 py-3 text-left font-medium">Source</th>
-                        <th className="px-4 py-3 text-left font-medium">Status</th>
-                        <th className="px-4 py-3 text-left font-medium">Created</th>
-                        <th className="px-4 py-3 text-right font-medium">Download</th>
+                        <th className="px-4 py-3 text-left font-medium">{t('configurations.id')}</th>
+                        <th className="px-4 py-3 text-left font-medium">{t('configurations.source')}</th>
+                        <th className="px-4 py-3 text-left font-medium">{t('configurations.status')}</th>
+                        <th className="px-4 py-3 text-left font-medium">{t('configurations.created')}</th>
+                        <th className="px-4 py-3 text-right font-medium">{t('actions.download')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800">
@@ -3389,7 +3393,7 @@ function WorkspaceDetailContent() {
                             <td className="px-2 py-3 align-middle">
                               <input
                                 type="checkbox"
-                                aria-label={`Select ${cv.id} for compare`}
+                                aria-label={t('configurations.selectForCompare', { id: cv.id })}
                                 checked={isSelected}
                                 onChange={() => toggleCvSelected(cv.id)}
                                 className="h-4 w-4"
@@ -3400,7 +3404,7 @@ function WorkspaceDetailContent() {
                               <span className="text-slate-200">{cv.id}</span>
                               {isCurrent && (
                                 <span className="ml-2 inline-flex items-center rounded bg-green-900/40 px-1.5 py-0.5 text-xs font-medium text-green-300">
-                                  current
+                                  {t('configurations.current')}
                                 </span>
                               )}
                             </td>
@@ -3416,7 +3420,7 @@ function WorkspaceDetailContent() {
                                   onClick={() => downloadCv(cv.id)}
                                   className="text-blue-400 hover:text-blue-300 text-sm font-medium"
                                 >
-                                  Download
+                                  {t('actions.download')}
                                 </button>
                               ) : (
                                 <span className="text-slate-600 text-sm">—</span>
@@ -3445,15 +3449,15 @@ function WorkspaceDetailContent() {
                         badge={
                           isCurrent && (
                             <span className="shrink-0 inline-flex items-center rounded bg-green-900/40 px-1.5 py-0.5 text-xs font-medium text-green-300">
-                              current
+                              {t('configurations.current')}
                             </span>
                           )
                         }
                         fields={[
-                          { label: 'Source', value: cv.attributes.source },
-                          { label: 'Status', value: cv.attributes.status, valueClassName: 'text-slate-400' },
+                          { label: t('configurations.source'), value: cv.attributes.source },
+                          { label: t('configurations.status'), value: cv.attributes.status, valueClassName: 'text-slate-400' },
                           {
-                            label: 'Created',
+                            label: t('configurations.created'),
                             value: new Date(cv.attributes['created-at']).toLocaleString(),
                             valueClassName: 'text-slate-400',
                           },
@@ -3463,13 +3467,13 @@ function WorkspaceDetailContent() {
                             <label className={`flex items-center gap-1.5 text-xs ${canDownload ? 'text-slate-400' : 'text-slate-600'}`}>
                               <input
                                 type="checkbox"
-                                aria-label={`Select ${cv.id} for compare`}
+                                aria-label={t('configurations.selectForCompare', { id: cv.id })}
                                 checked={isSelected}
                                 onChange={() => toggleCvSelected(cv.id)}
                                 className="h-4 w-4"
                                 disabled={!canDownload}
                               />
-                              Compare
+                              {t('configurations.compareLabel')}
                             </label>
                             {canDownload && (
                               <button
@@ -3477,7 +3481,7 @@ function WorkspaceDetailContent() {
                                 onClick={() => downloadCv(cv.id)}
                                 className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200"
                               >
-                                Download
+                                {t('actions.download')}
                               </button>
                             )}
                           </>
@@ -3499,27 +3503,26 @@ function WorkspaceDetailContent() {
               <div className="mt-6 space-y-4">
                 <div className="flex items-baseline justify-between">
                   <h3 className="text-lg font-medium text-slate-100">
-                    Diff <span className="text-slate-500 text-sm font-normal">{cvDiff['total-files-changed']} files changed</span>
+                    {t('configurations.diff')} <span className="text-slate-500 text-sm font-normal">{t('configurations.filesChanged', { count: cvDiff['total-files-changed'] })}</span>
                   </h3>
                   <button
                     type="button"
                     onClick={() => { setCvDiff(null); setCvSelected(new Set()) }}
                     className="text-sm text-slate-400 hover:text-slate-200"
                   >
-                    Close
+                    {t('actions.close')}
                   </button>
                 </div>
 
                 {cvDiff.oversized.length > 0 && (
                   <div className="rounded-md border border-amber-900/50 bg-amber-900/20 px-4 py-3 text-sm text-amber-200">
-                    Skipped {cvDiff.oversized.length} oversized file
-                    {cvDiff.oversized.length > 1 ? 's' : ''}: {cvDiff.oversized.join(', ')}
+                    {t('configurations.oversized', { count: cvDiff.oversized.length, files: cvDiff.oversized.join(', ') })}
                   </div>
                 )}
 
                 {cvDiff.files.length === 0 ? (
                   <p className="text-slate-500 text-sm italic">
-                    No content differences between these versions.
+                    {t('configurations.noDiff')}
                   </p>
                 ) : (
                   cvDiff.files.map(f => (
@@ -3534,7 +3537,7 @@ function WorkspaceDetailContent() {
                              'bg-blue-900/50 text-blue-300')
                           }
                         >
-                          {f.type}
+                          {t(`configurations.diffType.${f.type}`)}
                         </span>
                         <span className="font-mono text-slate-200">{f.path}</span>
                       </div>
@@ -3556,7 +3559,7 @@ function WorkspaceDetailContent() {
                         </pre>
                       ) : (
                         <p className="px-4 py-3 text-sm text-slate-500 italic">
-                          Binary file changed — diff not rendered.
+                          {t('configurations.binaryChanged')}
                         </p>
                       )}
                     </div>
@@ -3576,7 +3579,7 @@ function WorkspaceDetailContent() {
                   onClick={() => setShowAddNotif(!showAddNotif)}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
                 >
-                  {showAddNotif ? 'Cancel' : 'Add Notification'}
+                  {showAddNotif ? t('actions.cancel') : t('notifications.addNotification')}
                 </button>
               </div>
             )}
@@ -3585,22 +3588,22 @@ function WorkspaceDetailContent() {
               <form onSubmit={handleAddNotification} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="notif-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
-                    <input id="notif-name" type="text" value={notifName} onChange={(e) => setNotifName(e.target.value)} required placeholder="Deploy notifications"
+                    <label htmlFor="notif-name" className="block text-sm font-medium text-slate-300 mb-1">{t('notifications.name')}</label>
+                    <input id="notif-name" type="text" value={notifName} onChange={(e) => setNotifName(e.target.value)} required placeholder={t('notifications.namePlaceholder')}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label htmlFor="notif-type" className="block text-sm font-medium text-slate-300 mb-1">Destination Type</label>
+                    <label htmlFor="notif-type" className="block text-sm font-medium text-slate-300 mb-1">{t('notifications.destinationType')}</label>
                     <select id="notif-type" value={notifType} onChange={(e) => setNotifType(e.target.value as 'generic' | 'slack' | 'email')}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
-                      <option value="generic">Generic Webhook</option>
+                      <option value="generic">{t('notifications.typeGeneric')}</option>
                       <option value="slack">Slack</option>
-                      <option value="email">Email</option>
+                      <option value="email">{t('notifications.typeEmail')}</option>
                     </select>
                   </div>
                   {notifType !== 'email' && (
                     <div>
-                      <label htmlFor="notif-url" className="block text-sm font-medium text-slate-300 mb-1">URL</label>
+                      <label htmlFor="notif-url" className="block text-sm font-medium text-slate-300 mb-1">{t('notifications.url')}</label>
                       <input id="notif-url" type="url" value={notifUrl} onChange={(e) => setNotifUrl(e.target.value)} required
                         placeholder={notifType === 'slack' ? 'https://hooks.slack.com/services/...' : 'https://example.com/webhook'}
                         className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
@@ -3608,15 +3611,15 @@ function WorkspaceDetailContent() {
                   )}
                   {notifType === 'generic' && (
                     <div>
-                      <label htmlFor="notif-token" className="block text-sm font-medium text-slate-300 mb-1">HMAC Token (optional)</label>
+                      <label htmlFor="notif-token" className="block text-sm font-medium text-slate-300 mb-1">{t('notifications.hmacToken')}</label>
                       <input id="notif-token" type="password" value={notifToken} onChange={(e) => setNotifToken(e.target.value)}
-                        placeholder="Signing secret"
+                        placeholder={t('notifications.signingSecret')}
                         className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                     </div>
                   )}
                   {notifType === 'email' && (
                     <div className="sm:col-span-2">
-                      <label htmlFor="notif-emails" className="block text-sm font-medium text-slate-300 mb-1">Email Addresses (comma-separated)</label>
+                      <label htmlFor="notif-emails" className="block text-sm font-medium text-slate-300 mb-1">{t('notifications.emailAddresses')}</label>
                       <input id="notif-emails" type="text" value={notifEmails} onChange={(e) => setNotifEmails(e.target.value)} required
                         placeholder="team@example.com, ops@example.com"
                         className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
@@ -3624,19 +3627,19 @@ function WorkspaceDetailContent() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Trigger Events</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">{t('notifications.triggerEvents')}</label>
                   <div className="flex flex-wrap gap-2">
-                    {ALL_TRIGGERS.map(t => (
-                      <label key={t} className="flex items-center gap-1.5 cursor-pointer">
-                        <input type="checkbox" checked={notifTriggers.has(t)} onChange={() => toggleTrigger(t)}
+                    {ALL_TRIGGERS.map(trg => (
+                      <label key={trg} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={notifTriggers.has(trg)} onChange={() => toggleTrigger(trg)}
                           className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
-                        <span className="text-xs text-slate-300">{t}</span>
+                        <span className="text-xs text-slate-300">{trg}</span>
                       </label>
                     ))}
                   </div>
                 </div>
                 <button type="submit" disabled={addingNotif} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
-                  {addingNotif ? 'Creating...' : 'Create Notification'}
+                  {addingNotif ? t('actions.creating') : t('notifications.createNotification')}
                 </button>
               </form>
             )}
@@ -3644,7 +3647,7 @@ function WorkspaceDetailContent() {
             {notifLoading ? (
               <LoadingSpinner />
             ) : notifications.length === 0 ? (
-              <EmptyState message="No notification configurations for this workspace." />
+              <EmptyState message={t('notifications.empty')} />
             ) : (
               <div className="space-y-3">
                 {notifications.map((nc) => {
@@ -3665,53 +3668,53 @@ function WorkspaceDetailContent() {
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                               a.enabled ? 'bg-green-900/50 text-green-300' : 'bg-slate-700 text-slate-400'
                             }`}>
-                              {a.enabled ? 'Enabled' : 'Disabled'}
+                              {a.enabled ? t('common.enabled') : t('common.disabled')}
                             </span>
                           </div>
                           <div className="flex flex-wrap gap-1">
-                            {a.triggers.map(t => (
-                              <span key={t} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-slate-700 text-slate-300">{t}</span>
+                            {a.triggers.map(trg => (
+                              <span key={trg} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-slate-700 text-slate-300">{trg}</span>
                             ))}
                           </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                           {lastResponse && (
                             <span className={`text-xs ${lastResponse.success ? 'text-green-400' : 'text-red-400'}`}>
-                              {lastResponse.success ? 'OK' : `Err ${lastResponse.status}`}
+                              {lastResponse.success ? t('notifications.ok') : t('notifications.err', { status: lastResponse.status })}
                             </span>
                           )}
                           {perms['can-update'] && (
                             <>
                               <button onClick={() => handleToggleNotif(nc)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">
-                                {a.enabled ? 'Disable' : 'Enable'}
+                                {a.enabled ? t('actions.disable') : t('actions.enable')}
                               </button>
                               <button onClick={() => handleVerifyNotif(nc.id)} disabled={verifyingId === nc.id}
                                 className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-50">
-                                {verifyingId === nc.id ? 'Sending...' : 'Verify'}
+                                {verifyingId === nc.id ? t('actions.sending') : t('notifications.verify')}
                               </button>
                             </>
                           )}
                           {responses.length > 0 && (
                             <button onClick={() => setExpandedNotifId(isExpanded ? null : nc.id)}
                               className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-300">
-                              {isExpanded ? 'Hide' : 'History'}
+                              {isExpanded ? t('actions.hide') : t('notifications.history')}
                             </button>
                           )}
                           {perms['can-update'] && (
-                            <button onClick={() => handleDeleteNotif(nc.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">Delete</button>
+                            <button onClick={() => handleDeleteNotif(nc.id)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">{t('actions.delete')}</button>
                           )}
                         </div>
                       </div>
                       {isExpanded && responses.length > 0 && (
                         <div className="border-t border-slate-700/50 px-4 py-2">
-                          <h4 className="text-xs font-medium text-slate-400 mb-2">Delivery History</h4>
+                          <h4 className="text-xs font-medium text-slate-400 mb-2">{t('notifications.deliveryHistory')}</h4>
                           <div className="space-y-1">
                             {[...responses].reverse().map((r, i) => (
                               <div key={i} className="flex items-center gap-3 text-xs">
                                 <span className={r.success ? 'text-green-400' : 'text-red-400'}>
-                                  {r.success ? 'OK' : 'FAIL'}
+                                  {r.success ? t('notifications.ok') : t('notifications.fail')}
                                 </span>
-                                <span className="text-slate-400">HTTP {r.status}</span>
+                                <span className="text-slate-400">{t('notifications.http', { status: r.status })}</span>
                                 <span className="text-slate-500 truncate flex-1">{r.body}</span>
                                 <span className="text-slate-600 shrink-0">{r.delivered_at ? new Date(r.delivered_at).toLocaleString() : ''}</span>
                               </div>
@@ -3735,7 +3738,7 @@ function WorkspaceDetailContent() {
                   onClick={() => setShowAddRunTask(!showAddRunTask)}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors"
                 >
-                  {showAddRunTask ? 'Cancel' : 'Add Run Task'}
+                  {showAddRunTask ? t('actions.cancel') : t('runTasks.addRunTask')}
                 </button>
               </div>
             )}
@@ -3744,18 +3747,18 @@ function WorkspaceDetailContent() {
               <form onSubmit={handleAddRunTask} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="rt-name" className="block text-sm font-medium text-slate-300 mb-1">Name</label>
-                    <input id="rt-name" type="text" value={rtName} onChange={(e) => setRtName(e.target.value)} required placeholder="OPA Policy Check"
+                    <label htmlFor="rt-name" className="block text-sm font-medium text-slate-300 mb-1">{t('runTasks.name')}</label>
+                    <input id="rt-name" type="text" value={rtName} onChange={(e) => setRtName(e.target.value)} required placeholder={t('runTasks.namePlaceholder')}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label htmlFor="rt-url" className="block text-sm font-medium text-slate-300 mb-1">Webhook URL</label>
+                    <label htmlFor="rt-url" className="block text-sm font-medium text-slate-300 mb-1">{t('runTasks.webhookUrl')}</label>
                     <input id="rt-url" type="url" value={rtUrl} onChange={(e) => setRtUrl(e.target.value)} required
                       placeholder="https://opa.example.com/check"
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                   <div>
-                    <label htmlFor="rt-stage" className="block text-sm font-medium text-slate-300 mb-1">Stage</label>
+                    <label htmlFor="rt-stage" className="block text-sm font-medium text-slate-300 mb-1">{t('runTasks.stage')}</label>
                     <select id="rt-stage" value={rtStage} onChange={(e) => setRtStage(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       {ALL_STAGES.map(s => (
@@ -3764,7 +3767,7 @@ function WorkspaceDetailContent() {
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="rt-enforcement" className="block text-sm font-medium text-slate-300 mb-1">Enforcement Level</label>
+                    <label htmlFor="rt-enforcement" className="block text-sm font-medium text-slate-300 mb-1">{t('runTasks.enforcementLevel')}</label>
                     <select id="rt-enforcement" value={rtEnforcement} onChange={(e) => setRtEnforcement(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent">
                       {ALL_ENFORCEMENT_LEVELS.map(l => (
@@ -3773,14 +3776,14 @@ function WorkspaceDetailContent() {
                     </select>
                   </div>
                   <div className="sm:col-span-2">
-                    <label htmlFor="rt-hmac" className="block text-sm font-medium text-slate-300 mb-1">HMAC Key (optional)</label>
+                    <label htmlFor="rt-hmac" className="block text-sm font-medium text-slate-300 mb-1">{t('runTasks.hmacKey')}</label>
                     <input id="rt-hmac" type="password" value={rtHmacKey} onChange={(e) => setRtHmacKey(e.target.value)}
-                      placeholder="Signing secret for webhook verification"
+                      placeholder={t('runTasks.hmacKeyPlaceholder')}
                       className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
                   </div>
                 </div>
                 <button type="submit" disabled={addingRunTask} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
-                  {addingRunTask ? 'Creating...' : 'Create Run Task'}
+                  {addingRunTask ? t('actions.creating') : t('runTasks.createRunTask')}
                 </button>
               </form>
             )}
@@ -3788,7 +3791,7 @@ function WorkspaceDetailContent() {
             {runTasksLoading ? (
               <LoadingSpinner />
             ) : runTasks.length === 0 ? (
-              <EmptyState message="No run tasks configured for this workspace." />
+              <EmptyState message={t('runTasks.empty')} />
             ) : (
               <div className="space-y-3">
                 {runTasks.map((rt) => {
@@ -3811,7 +3814,7 @@ function WorkspaceDetailContent() {
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                             a.enabled ? 'bg-green-900/50 text-green-300' : 'bg-slate-700 text-slate-400'
                           }`}>
-                            {a.enabled ? 'Enabled' : 'Disabled'}
+                            {a.enabled ? t('common.enabled') : t('common.disabled')}
                           </span>
                         </div>
                         <div className="text-xs text-slate-500 break-all sm:truncate">{a.url}</div>
@@ -3819,13 +3822,13 @@ function WorkspaceDetailContent() {
                       {perms['can-update'] && (
                         <div className="flex items-center gap-2 sm:shrink-0">
                           <button onClick={() => handleToggleRunTask(rt)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">
-                            {a.enabled ? 'Disable' : 'Enable'}
+                            {a.enabled ? t('actions.disable') : t('actions.enable')}
                           </button>
                           <button
                             onClick={() => handleDeleteRunTask(rt.id)}
                             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300"
                           >
-                            Delete
+                            {t('actions.delete')}
                           </button>
                         </div>
                       )}
@@ -3841,34 +3844,34 @@ function WorkspaceDetailContent() {
         {activeTab === 'run-triggers' && (
           <div>
             <div className="flex items-baseline justify-between mb-1">
-              <h3 className="text-lg font-semibold text-slate-200">Run Triggers</h3>
-              {trgLoading && <span className="text-xs text-slate-500">loading…</span>}
+              <h3 className="text-lg font-semibold text-slate-200">{t('runTriggers.title')}</h3>
+              {trgLoading && <span className="text-xs text-slate-500">{t('actions.loadingLower')}</span>}
             </div>
             <p className="text-xs text-slate-500 mb-6">
-              When a source workspace completes an apply, downstream workspaces get a new run queued automatically. Up to 20 source workspaces per destination.
+              {t('runTriggers.description')}
             </p>
 
             {/* Inbound — source workspaces that trigger runs HERE */}
             <div className="mb-8">
-              <h4 className="text-sm font-medium text-slate-300 mb-2">Source workspaces that trigger runs here</h4>
+              <h4 className="text-sm font-medium text-slate-300 mb-2">{t('runTriggers.inboundHeading')}</h4>
               {trgInbound.length === 0 ? (
-                <p className="text-sm text-slate-500 italic">No source workspaces trigger runs on this workspace.</p>
+                <p className="text-sm text-slate-500 italic">{t('runTriggers.inboundEmpty')}</p>
               ) : (
                 <ul className="space-y-1">
-                  {trgInbound.map((t) => (
-                    <li key={t.id} className="flex items-center justify-between gap-3 rounded bg-slate-800/40 px-3 py-2 text-sm">
+                  {trgInbound.map((edge) => (
+                    <li key={edge.id} className="flex items-center justify-between gap-3 rounded bg-slate-800/40 px-3 py-2 text-sm">
                       <div>
-                        <a href={`/workspaces/${t.sourceableId}`} className="text-brand-400 hover:text-brand-300 font-medium">
-                          {t.sourceableName || t.sourceableId}
+                        <a href={`/workspaces/${edge.sourceableId}`} className="text-brand-400 hover:text-brand-300 font-medium">
+                          {edge.sourceableName || edge.sourceableId}
                         </a>
                       </div>
                       {perms['can-update'] && (
                         <button
                           type="button"
-                          onClick={() => removeRunTrigger(t.id)}
+                          onClick={() => removeRunTrigger(edge.id)}
                           className="rounded px-2 py-1 text-xs font-medium bg-red-900/40 text-red-200 hover:bg-red-900/60"
                         >
-                          Remove
+                          {t('actions.remove')}
                         </button>
                       )}
                     </li>
@@ -3879,7 +3882,7 @@ function WorkspaceDetailContent() {
               {perms['can-update'] && (
                 <div className="mt-3" data-testid="run-trigger-picker">
                   <WorkspacePicker
-                    placeholder="Search workspaces to add as a source…"
+                    placeholder={t('runTriggers.pickerPlaceholder')}
                     excludeIds={[workspaceId, ...trgInbound.map((e) => e.sourceableId)]}
                     busyId={trgAddingId}
                     disabled={trgAdding}
@@ -3891,17 +3894,17 @@ function WorkspaceDetailContent() {
 
             {/* Outbound — destination workspaces this one triggers */}
             <div>
-              <h4 className="text-sm font-medium text-slate-300 mb-2">Destination workspaces this workspace triggers</h4>
+              <h4 className="text-sm font-medium text-slate-300 mb-2">{t('runTriggers.outboundHeading')}</h4>
               {trgOutbound.length === 0 ? (
-                <p className="text-sm text-slate-500 italic">This workspace does not trigger runs on any other workspace.</p>
+                <p className="text-sm text-slate-500 italic">{t('runTriggers.outboundEmpty')}</p>
               ) : (
                 <ul className="space-y-1">
-                  {trgOutbound.map((t) => (
-                    <li key={t.id} className="rounded bg-slate-800/40 px-3 py-2 text-sm">
-                      <a href={`/workspaces/${t.workspaceId}`} className="text-brand-400 hover:text-brand-300 font-medium">
-                        {t.workspaceName || t.workspaceId}
+                  {trgOutbound.map((edge) => (
+                    <li key={edge.id} className="rounded bg-slate-800/40 px-3 py-2 text-sm">
+                      <a href={`/workspaces/${edge.workspaceId}`} className="text-brand-400 hover:text-brand-300 font-medium">
+                        {edge.workspaceName || edge.workspaceId}
                       </a>
-                      <span className="ml-2 text-xs text-slate-500">(destination; remove from there)</span>
+                      <span className="ml-2 text-xs text-slate-500">{t('runTriggers.destinationNote')}</span>
                     </li>
                   ))}
                 </ul>
@@ -3914,23 +3917,23 @@ function WorkspaceDetailContent() {
         {activeTab === 'sharing' && (
           <div>
             <div className="flex items-baseline justify-between mb-1">
-              <h3 className="text-lg font-semibold text-slate-200">Remote State Sharing</h3>
-              {rscLoading && <span className="text-xs text-slate-500">loading…</span>}
+              <h3 className="text-lg font-semibold text-slate-200">{t('sharing.title')}</h3>
+              {rscLoading && <span className="text-xs text-slate-500">{t('actions.loadingLower')}</span>}
             </div>
             <p className="text-xs text-slate-500 mb-6">
-              Producer-controlled allowlist for cross-workspace{' '}
-              <code className="text-slate-400">terraform_remote_state</code>. State data is secret-bearing —
-              grant deliberately.{' '}
-              <a href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/remote-state.md" className="text-brand-400 hover:text-brand-300 underline" target="_blank" rel="noopener noreferrer">
-                Docs
-              </a>
+              {t.rich('sharing.description', {
+                code: () => <code className="text-slate-400">terraform_remote_state</code>,
+                docs: (chunks) => (
+                  <a href="https://github.com/mattrobinsonsre/terrapod/blob/main/docs/remote-state.md" className="text-brand-400 hover:text-brand-300 underline" target="_blank" rel="noopener noreferrer">{chunks}</a>
+                ),
+              })}
             </p>
 
             {/* Outbound — workspaces I share my state to */}
             <div className="mb-8">
-              <h4 className="text-sm font-medium text-slate-300 mb-2">Workspaces authorized to read this workspace&apos;s state</h4>
+              <h4 className="text-sm font-medium text-slate-300 mb-2">{t('sharing.outboundHeading')}</h4>
               {rscOutbound.length === 0 ? (
-                <p className="text-sm text-slate-500 italic">This workspace&apos;s state is not shared with any other workspace.</p>
+                <p className="text-sm text-slate-500 italic">{t('sharing.outboundEmpty')}</p>
               ) : (
                 <ul className="space-y-1">
                   {rscOutbound.map((e) => (
@@ -3940,7 +3943,7 @@ function WorkspaceDetailContent() {
                           {e.consumerName || e.consumerId}
                         </a>
                         {e.createdBy && (
-                          <span className="ml-2 text-xs text-slate-500">granted by {e.createdBy}</span>
+                          <span className="ml-2 text-xs text-slate-500">{t('sharing.grantedBy', { by: e.createdBy })}</span>
                         )}
                       </div>
                       {perms['can-update'] && (
@@ -3949,7 +3952,7 @@ function WorkspaceDetailContent() {
                           onClick={() => revokeRemoteStateConsumer(e.id)}
                           className="rounded px-2 py-1 text-xs font-medium bg-red-900/40 text-red-200 hover:bg-red-900/60"
                         >
-                          Revoke
+                          {t('sharing.revoke')}
                         </button>
                       )}
                     </li>
@@ -3960,7 +3963,7 @@ function WorkspaceDetailContent() {
               {perms['can-update'] && (
                 <div className="mt-3" data-testid="remote-state-consumer-picker">
                   <WorkspacePicker
-                    placeholder="Search workspaces to authorize as a consumer…"
+                    placeholder={t('sharing.pickerPlaceholder')}
                     excludeIds={[workspaceId, ...rscOutbound.map((e) => e.consumerId)]}
                     busyId={rscAddingId}
                     disabled={rscAdding}
@@ -3972,9 +3975,9 @@ function WorkspaceDetailContent() {
 
             {/* Inbound — workspaces I read state from */}
             <div>
-              <h4 className="text-sm font-medium text-slate-300 mb-2">Workspaces this workspace is authorized to read state from</h4>
+              <h4 className="text-sm font-medium text-slate-300 mb-2">{t('sharing.inboundHeading')}</h4>
               {rscInbound.length === 0 ? (
-                <p className="text-sm text-slate-500 italic">This workspace is not authorized to read state from any other workspace via terraform_remote_state.</p>
+                <p className="text-sm text-slate-500 italic">{t('sharing.inboundEmpty')}</p>
               ) : (
                 <ul className="space-y-1">
                   {rscInbound.map((e) => (
@@ -3982,7 +3985,7 @@ function WorkspaceDetailContent() {
                       <a href={`/workspaces/${e.producerId}`} className="text-brand-400 hover:text-brand-300 font-medium">
                         {e.producerName || e.producerId}
                       </a>
-                      <span className="ml-2 text-xs text-slate-500">(producer; revoke from there)</span>
+                      <span className="ml-2 text-xs text-slate-500">{t('sharing.producerNote')}</span>
                     </li>
                   ))}
                 </ul>

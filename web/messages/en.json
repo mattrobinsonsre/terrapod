@@ -1609,5 +1609,766 @@
       "orphan": "Failed to orphan",
       "orphanStatus": "Failed to orphan ({status})"
     }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "Reconnecting…"
+    },
+    "sessionExpiry": {
+      "banner": "Session expires in {minutes, plural, one {# minute} other {# minutes}} — <link>re-authenticate</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# service token} other {# service tokens}} expiring within {days, plural, one {# day} other {# days}} — <link>review</link>",
+      "soon": "{count, plural, one {# service token} other {# service tokens}} expiring soon — <link>review</link>",
+      "dismissAria": "Dismiss token expiry warning"
+    },
+    "resourceUsage": {
+      "title": "Resource usage",
+      "oomKilled": "OOM-killed",
+      "killedLikelyOom": "Killed (likely OOM)",
+      "memory": "Memory",
+      "requested": "Requested {value}",
+      "limit": "Limit {value}"
+    },
+    "labelsEditor": {
+      "none": "None",
+      "removeAria": "Remove {key}",
+      "keyPlaceholder": "key",
+      "valuePlaceholder": "value",
+      "add": "Add"
+    },
+    "sensitiveInput": {
+      "hide": "Hide",
+      "show": "Show",
+      "hideAria": "Hide value",
+      "showAria": "Show value"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "Search workspaces…",
+      "loading": "Loading…",
+      "empty": "No workspaces found",
+      "adding": "Adding…"
+    },
+    "templateEditors": {
+      "remove": "Remove",
+      "add": "Add",
+      "valuePlaceholder": "value",
+      "name": "Name",
+      "url": "URL",
+      "hmacKey": "HMAC key (optional)",
+      "hmacKeyPlaceholder": "shared secret",
+      "stage": "Stage",
+      "enforcement": "Enforcement",
+      "enabled": "Enabled",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "Add run task",
+      "destinationType": "Destination type",
+      "token": "Token (optional)",
+      "tokenPlaceholder": "HMAC / auth token",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "Email addresses",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "Add email",
+      "triggers": "Triggers",
+      "addNotification": "Add notification"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "AI generated",
+    "heading": {
+      "planSummary": "Plan summary",
+      "failureAnalysis": "Failure analysis"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "Regenerate",
+      "queueing": "Queueing…",
+      "tooltip": "Re-run the AI summary against the same plan inputs",
+      "ariaLabel": "Regenerate AI summary",
+      "confirm": "Regenerate the AI analysis? This runs the model again.",
+      "error": "Could not regenerate: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "Summarising plan…",
+      "analysingFailure": "Analysing failure…"
+    },
+    "skipped": {
+      "fallback": "Summary skipped for this run."
+    },
+    "errored": {
+      "heading": "Summariser failed"
+    },
+    "riskFactors": {
+      "heading": "Risk factors",
+      "suggestedFixes": "Suggested fixes"
+    },
+    "tokens": "{input} in / {output} out tokens",
+    "risk": {
+      "low": "low",
+      "medium": "medium",
+      "high": "high",
+      "critical": "critical",
+      "unknown": "unknown"
+    },
+    "badges": {
+      "noChanges": "No changes",
+      "noChangesLower": "no changes",
+      "noChangesTitle": "Plan reported no resource changes",
+      "toAdd": "{count, plural, one {# to add} other {# to add}}",
+      "toChange": "{count, plural, one {# to change} other {# to change}}",
+      "toDestroy": "{count, plural, one {# to destroy} other {# to destroy}}",
+      "toReplace": "{count, plural, one {# to replace} other {# to replace}}",
+      "toImport": "{count, plural, one {# to import} other {# to import}}"
+    },
+    "chat": {
+      "heading": "Follow-up",
+      "sharedThreadNote": "One shared thread, visible to anyone with workspace read.",
+      "placeholder": "Ask a follow-up question about this plan… (⌘/Ctrl + Enter to send)",
+      "send": "Send",
+      "thinking": "Thinking…",
+      "you": "You",
+      "assistant": "Assistant"
+    }
+  },
+  "runDetail": {
+    "notFound": "Run not found",
+    "runSection": "Run section",
+    "workspaceFallback": "workspace",
+    "backTo": "Back to {name}",
+    "errorHeading": "Error",
+    "discardedHeading": "Discarded — re-plan required",
+    "common": {
+      "yes": "Yes",
+      "no": "No"
+    },
+    "header": {
+      "title": "Run {id}",
+      "titleWithWorkspace": "{workspace} — run {id}",
+      "description": "{source} run"
+    },
+    "relTime": {
+      "justNow": "just now",
+      "minutesAgo": "{count, plural, one {# minute ago} other {# minutes ago}}",
+      "hoursAgo": "{count, plural, one {# hour ago} other {# hours ago}}",
+      "daysAgo": "{count, plural, one {# day ago} other {# days ago}}"
+    },
+    "status": {
+      "pending": "Pending",
+      "queued": "Queued",
+      "planning": "Planning",
+      "planned": "Planned",
+      "confirmed": "Confirmed",
+      "applying": "Applying",
+      "canceling": "Canceling",
+      "applied": "Applied",
+      "errored": "Errored",
+      "canceled": "Canceled",
+      "discarded": "Discarded"
+    },
+    "activity": {
+      "pending": "Preparing the run",
+      "queued": "Waiting for an available agent",
+      "planning": "Running terraform plan",
+      "plannedConfirmable": "Waiting for you to confirm & apply",
+      "plannedSpeculative": "Speculative plan complete",
+      "plannedComplete": "Plan complete",
+      "confirmed": "Starting apply",
+      "applying": "Running terraform apply",
+      "canceling": "Stopping the run",
+      "applied": "Apply complete",
+      "errored": "Run failed",
+      "canceled": "Run canceled",
+      "discarded": "Plan discarded",
+      "elapsedTitle": "Elapsed in this phase"
+    },
+    "badge": {
+      "destroy": "destroy",
+      "planOnly": "plan only"
+    },
+    "actions": {
+      "retryShort": "Retry",
+      "retryFull": "Retry Run",
+      "retrying": "Retrying…",
+      "confirmShort": "Apply",
+      "confirmFull": "Confirm & Apply",
+      "confirming": "Confirming…",
+      "discard": "Discard",
+      "discarding": "Discarding…",
+      "cancelShort": "Cancel",
+      "cancelFull": "Cancel Run",
+      "canceling": "Canceling…"
+    },
+    "confirm": {
+      "apply": "Apply this run? This applies the plan and changes infrastructure.",
+      "discard": "Discard this plan?",
+      "cancel": "Cancel this run?",
+      "retry": "Retry this run?"
+    },
+    "errors": {
+      "loadRun": "Failed to load run",
+      "action": {
+        "confirm": "Failed to confirm run",
+        "discard": "Failed to discard run",
+        "cancel": "Failed to cancel run",
+        "retry": "Failed to retry run"
+      }
+    },
+    "tabs": {
+      "overview": "Overview",
+      "ai": "AI",
+      "aiFull": "AI analysis",
+      "opa": "OPA",
+      "opaFull": "OPA policies",
+      "impact": "Impact",
+      "impactFull": "Impact graph",
+      "planLabel": "Plan<log>Log</log>",
+      "applyLabel": "Apply<log>Log</log>",
+      "planFull": "Plan log",
+      "applyFull": "Apply log",
+      "details": "Details"
+    },
+    "banner": {
+      "destroy": "This is a <strong>destroy</strong> run — all managed resources will be destroyed when applied.",
+      "planOnlyCli": "This is a <strong>plan-only</strong> run initiated from the CLI on a VCS-connected workspace. Apply is not available for CLI-uploaded code — only VCS-managed code can be applied.",
+      "moduleOverridesPrefix": "This run uses <strong>module overrides</strong>",
+      "moduleOverridesFromPr": "from PR #{number}",
+      "moduleOverridesSuffix": "will be fetched from the PR branch instead of the published registry version."
+    },
+    "cards": {
+      "changes": "Changes",
+      "aiAnalysis": "AI analysis",
+      "policyChecks": "Policy checks",
+      "resources": "Resources"
+    },
+    "changes": {
+      "noChanges": "No changes",
+      "planning": "Planning…",
+      "toAdd": "to add",
+      "toChange": "to change",
+      "toDestroy": "to destroy",
+      "toReplace": "to replace",
+      "toImport": "to import"
+    },
+    "ai": {
+      "notAvailable": "Not available",
+      "ready": "Ready",
+      "riskSub": "{risk} risk",
+      "generating": "Generating…",
+      "skipped": "Skipped",
+      "failed": "Failed",
+      "available": "Available"
+    },
+    "policy": {
+      "none": "None",
+      "blocked": "Blocked",
+      "failedSub": "{count, plural, one {# failed} other {# failed}}",
+      "advisoryIssues": "Advisory issues",
+      "passedSub": "{passed}/{total} passed",
+      "passed": "Passed"
+    },
+    "resources": {
+      "overLimit": "Over limit",
+      "oomKilled": "OOM-killed",
+      "recorded": "Recorded",
+      "nearLimit": "Near limit",
+      "high": "High",
+      "withinLimits": "Within limits"
+    },
+    "details": {
+      "heading": "Details",
+      "executionBackend": "Execution Backend",
+      "source": "Source",
+      "autoApply": "Auto Apply",
+      "planOnly": "Plan Only",
+      "triggeredBy": "Triggered By",
+      "created": "Created",
+      "commit": "Commit",
+      "branch": "Branch",
+      "prMr": "PR/MR",
+      "stateVersion": "State Version",
+      "viewState": "View State",
+      "runOptions": "Run Options"
+    },
+    "timeline": {
+      "heading": "Timeline",
+      "queued": "Queued",
+      "planningStarted": "Planning started",
+      "planComplete": "Plan complete",
+      "confirmed": "Confirmed",
+      "applyingStarted": "Applying started",
+      "applied": "Applied",
+      "errored": "Errored",
+      "canceled": "Canceled",
+      "discarded": "Discarded"
+    },
+    "log": {
+      "color": "Color",
+      "colorOnTitle": "Showing ANSI colours — click for plain text",
+      "colorOffTitle": "Showing plain text — click for colours",
+      "refresh": "Refresh",
+      "refreshTitle": "Refresh log",
+      "copy": "Copy",
+      "copied": "Copied!",
+      "copyTitle": "Copy plain text to clipboard",
+      "copyAria": "Copy log to clipboard",
+      "download": "Download",
+      "downloadColorTitle": "Download log (with ANSI colour codes)",
+      "downloadPlainTitle": "Download log (plain text)",
+      "downloadAria": "Download log",
+      "follow": "Follow",
+      "followOnTitle": "Following the live tail — click to stop",
+      "followOffTitle": "Follow the live tail",
+      "end": "End",
+      "endTitle": "Jump to the end of the log",
+      "planEmpty": "No plan output available yet.",
+      "applyEmpty": "No apply output available yet."
+    },
+    "policyPanel": {
+      "heading": "Policy Checks",
+      "passedCount": "{passed}/{total} passed",
+      "blockedMessage": "This run is <strong>blocked by a mandatory policy set</strong>. It will not apply until the failure is resolved or an admin overrides it.",
+      "overriding": "Overriding...",
+      "overrideContinue": "Override & Continue",
+      "overrideFailed": "Override failed",
+      "overrideFailedStatus": "Override failed ({status})",
+      "overriddenBy": "overridden by {by}",
+      "policyPassed": "passed",
+      "noDenyMessage": "Policy failed without producing a deny message or error output",
+      "enforcement": {
+        "mandatory": "mandatory",
+        "advisory": "advisory"
+      },
+      "outcome": {
+        "passed": "passed",
+        "failed": "failed",
+        "errored": "errored"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "Workspace not found",
+    "common": {
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "none": "None",
+      "default": "Default",
+      "never": "Never",
+      "actions": "Actions",
+      "workspaceLocked": "Workspace is locked"
+    },
+    "actions": {
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving…",
+      "savingEllipsis": "Saving...",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "add": "Add",
+      "adding": "Adding...",
+      "remove": "Remove",
+      "download": "Download",
+      "rollback": "Rollback",
+      "close": "Close",
+      "hide": "Hide",
+      "enable": "Enable",
+      "disable": "Disable",
+      "creating": "Creating...",
+      "sending": "Sending...",
+      "processing": "Processing...",
+      "queuing": "Queuing...",
+      "loading": "Loading...",
+      "loadingLower": "loading…"
+    },
+    "header": {
+      "executionMode": "{mode} execution mode"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "variables": "Variables",
+      "runs": "Runs",
+      "state": "State",
+      "stateGraph": "State Graph",
+      "configurations": "Configurations",
+      "notifications": "Notifications",
+      "runTasks": "Run Tasks",
+      "runTriggers": "Run Triggers",
+      "sharing": "Sharing",
+      "selectLabel": "Workspace section"
+    },
+    "lifecycle": {
+      "pendingDeletion": "Pending deletion",
+      "pendingDeletionDefault": "This workspace is marked for deletion and requires manual action.",
+      "archived": "Archived",
+      "archivedDefault": "This workspace has been archived."
+    },
+    "runQueuedBanner": {
+      "message": "Run queued successfully.",
+      "viewRun": "View Run"
+    },
+    "settings": {
+      "title": "Settings",
+      "saveChanges": "Save changes",
+      "renamedNotice": "Workspace renamed. Update the <name></name> field in your <cloud></cloud> block to match."
+    },
+    "fields": {
+      "name": "Name",
+      "nameTitle": "Letters, numbers, hyphens, underscores. Must start with a letter or number.",
+      "executionMode": "Execution Mode",
+      "execModeLocal": "Local",
+      "execModeAgent": "Agent",
+      "autoApply": "Auto Apply",
+      "cpuRequest": "CPU Request",
+      "cpuRequestTitle": "Kubernetes CPU quantity: whole cores (1, 2) or millicores (500m, 100m)",
+      "memoryRequest": "Memory Request",
+      "memoryRequestTitle": "Kubernetes memory quantity: bytes (1000) or with suffix (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "Execution Backend",
+      "version": "Version",
+      "versionPlaceholder": "e.g. 1.11 or 1.11.5",
+      "versionTitle": "Version in X.Y or X.Y.Z format (e.g. 1.11 or 1.11.5)",
+      "terragruntEnabledAgent": "Enabled (agent mode)",
+      "terragruntEnabledVersion": "Enabled (v{version})",
+      "terragruntVersionPlaceholder": "e.g. 1.0",
+      "terragruntVersionTitle": "Terragrunt version in X.Y or X.Y.Z format (e.g. 1.0)",
+      "workingDirectory": "Working Directory",
+      "workingDirectoryPlaceholder": "e.g. environments/dev",
+      "agentPool": "Agent Pool",
+      "owner": "Owner",
+      "vcsConnection": "VCS Connection",
+      "vcsRepository": "VCS Repository",
+      "vcsRepositoryTitle": "Must be an HTTP or HTTPS URL",
+      "vcsBranch": "VCS Branch",
+      "vcsBranchPlaceholder": "main (default)",
+      "vcsWorkflow": "VCS Workflow",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (default — TFE / HCP standard)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (Atlantis standard — opt-in)",
+      "autoMerge": "Auto-merge after apply",
+      "autoMergeStrategy": "Auto-merge Strategy",
+      "vcsPolling": "VCS Polling",
+      "labels": "Labels (tags)",
+      "labelsTitle": "Workspace labels do double duty: label-based RBAC matching, and as the \"tags\" matched by terraform/tofu cloud { workspaces { tags = ... } } blocks.",
+      "varFiles": "Var Files",
+      "varFilesPlaceholder": "e.g. envs/dev.tfvars",
+      "triggerPrefixes": "Trigger Prefixes",
+      "triggerPrefixesHint": "Directories that trigger runs. Overrides working directory filtering when set.",
+      "triggerPrefixesPlaceholder": "e.g. modules",
+      "triggerPrefixesNone": "None (uses working directory)",
+      "driftIgnoreRules": "Drift Ignore Rules",
+      "driftIgnoreRulesHint": "Glob-aware Terraform address + attribute paths suppressed by the drift classifier. <star></star> matches zero or more non-<dot></dot> chars (spans <n></n> indices); <starIdx></starIdx> matches any bracketed index. A bare address with no attribute suffix silences any change to that resource — including destroys. Affects drift only, not regular plan/apply. See <docs>drift-ignore-rules.md</docs> for the full grammar.",
+      "driftIgnoreRulesNone": "None (every plan diff counts as drift)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "Authorization delegated to your VCS repository.",
+      "rbac": "Anyone who can merge the PR can apply. Branch protection rules (required reviews, status checks, code owner approval) become the gate. Terrapod role/label RBAC does<em>not</em> apply to comment-driven actions in this mode.",
+      "recommended": "<strong>Recommended:</strong> require linear history (rebase/squash before merge) so the commit you apply is the commit that lands.",
+      "credit": "Credit: this workflow is modelled on <atlantis>Atlantis</atlantis>. Atlantis remains the right tool for teams who only want PR-comment-driven applies and no platform UI."
+    },
+    "vcsPolling": {
+      "error": "Error",
+      "ok": "OK ({time})",
+      "notPolled": "Not polled yet"
+    },
+    "lockout": {
+      "revertLabels": "Revert Labels",
+      "saveAnyway": "Save Anyway"
+    },
+    "lock": {
+      "title": "Lock Status",
+      "lockedDesc": "This workspace is locked. No plans or applies can run.",
+      "unlockedDesc": "This workspace is unlocked and ready for runs.",
+      "lock": "Lock",
+      "unlock": "Unlock",
+      "lockConfirm": "Lock this workspace?",
+      "unlockConfirm": "Unlock this workspace?"
+    },
+    "drift": {
+      "title": "Drift Detection",
+      "checkInterval": "Check Interval",
+      "status": "Status",
+      "statusNoDrift": "No Drift",
+      "statusDrifted": "Drifted",
+      "statusErrored": "Errored",
+      "statusUnchecked": "Unchecked",
+      "dismiss": "Dismiss",
+      "dismissing": "Dismissing…",
+      "dismissTitle": "Clear the reported drift state. The next scheduled check will repopulate it from reality.",
+      "lastChecked": "Last Checked",
+      "checkNow": "Check Now",
+      "checkNowTitle": "Queue a plan-only run to check for drift",
+      "checkNowTitleDisabled": "Enable drift detection first"
+    },
+    "intervals": {
+      "disabled": "Disabled",
+      "1hour": "1 hour",
+      "4hours": "4 hours",
+      "12hours": "12 hours",
+      "24hours": "24 hours",
+      "48hours": "48 hours",
+      "3days": "3 days",
+      "7days": "7 days"
+    },
+    "planExpiry": {
+      "title": "Plan Expiry",
+      "description": "Auto-discard an unconfirmed plan once it is older than this, so a stale plan can't be applied against a moved world. Off by default; the plan must then be re-run. (Applies to apply-capable runs only.)",
+      "expireAfter": "Expire after"
+    },
+    "aiSummary": {
+      "title": "AI Plan Summary",
+      "description": "Automatic LLM-generated change summary, risk assessment, and failure analysis on every plan-phase outcome for this workspace.",
+      "mode": "Mode",
+      "modeDefault": "Follow deployment default",
+      "modeEnabled": "Always summarise",
+      "modeDisabled": "Never summarise",
+      "contextLabel": "Workspace context",
+      "contextLabelSuffix": "(optional, additive)",
+      "contextPlaceholder": "Facts the AI should know about this workspace specifically. e.g. 'Fronts the vault for service X — destroying the KMS key causes a global outage.'",
+      "noContext": "No workspace context set.",
+      "contextHint": "Added on top of deployment-wide context. Max 4000 characters."
+    },
+    "slack": {
+      "title": "Slack notifications",
+      "description": "Opt this workspace into Slack run notifications — approval requests, applies, errors, and drift. Leave the channel empty and this workspace stays silent (there is no deployment-wide fan-out). Requires the Slack app to be enabled by an administrator.",
+      "channel": "Channel",
+      "channelPlaceholder": "#deploys or a channel ID (e.g. C0123ABCD)",
+      "notSet": "Not set — silent.",
+      "hint": "The Slack app must already be a member of the channel."
+    },
+    "delete": {
+      "title": "Delete Workspace",
+      "description": "Permanently delete this workspace and all associated state, variables, and runs.",
+      "confirm": "Confirm Delete"
+    },
+    "variables": {
+      "addVariable": "Add Variable",
+      "key": "Key",
+      "value": "Value",
+      "category": "Category",
+      "categoryEnv": "Environment",
+      "sensitive": "Sensitive",
+      "empty": "No variables configured for this workspace.",
+      "emptyValue": "empty",
+      "enterNewValue": "Enter new value",
+      "deleteConfirm": "Delete variable \"{key}\"?"
+    },
+    "runs": {
+      "options": "Options",
+      "hideOptions": "Hide Options",
+      "queueDestroy": "Queue Destroy",
+      "queueDestroyTitle": "Queue a destroy plan",
+      "destroyAllConfirm": "Destroy all resources?",
+      "confirmDestroy": "Confirm Destroy",
+      "queuePlan": "Queue Plan",
+      "queueRun": "Queue Run",
+      "queuePlanConfirm": "Queue a speculative plan for this workspace?",
+      "queueApplyConfirm": "Queue a plan + apply run? This can change infrastructure.",
+      "planOptions": "Plan Options",
+      "targetResources": "Target resources",
+      "replaceResources": "Replace resources",
+      "commaSeparated": "(comma-separated)",
+      "planOnly": "Plan Only",
+      "refreshOnly": "Refresh Only",
+      "skipRefresh": "Skip Refresh",
+      "allowEmptyApply": "Allow Empty Apply",
+      "vcsRef": "VCS Ref",
+      "branch": "Branch",
+      "tag": "Tag",
+      "defaultBranch": "Default ({branch})",
+      "nonDefaultRefNote": "Non-default ref selected — run will be plan-only",
+      "empty": "No runs yet for this workspace.",
+      "runId": "Run ID",
+      "status": "Status",
+      "type": "Type",
+      "changes": "Changes",
+      "source": "Source",
+      "triggeredBy": "Triggered By",
+      "created": "Created",
+      "needsConfirm": "needs confirm",
+      "typeDestroy": "destroy",
+      "typePlanOnly": "plan only",
+      "typePlanApply": "plan + apply",
+      "sourceModuleTest": "module test",
+      "sourceModulePublish": "module publish"
+    },
+    "state": {
+      "deleteConfirm": "Delete state version #{serial}? This cannot be undone.",
+      "rollbackConfirm": "Rollback to state version #{serial}? A new version will be created with the same content.",
+      "confirmDelete": "Confirm Delete",
+      "confirmRollback": "Confirm Rollback",
+      "uploadState": "Upload State",
+      "empty": "No state versions yet for this workspace.",
+      "serial": "Serial",
+      "createdBy": "Created By",
+      "run": "Run",
+      "size": "Size",
+      "created": "Created",
+      "runner": "runner",
+      "latest": "latest"
+    },
+    "configurations": {
+      "description": "Uploaded source archives for this workspace, newest first. Pick two rows to compare.",
+      "selectedCount": "{count}/2 selected",
+      "compare": "Compare",
+      "comparing": "Comparing…",
+      "empty": "No configuration versions yet. They appear here as soon as a `terraform plan` uploads or a VCS push triggers a run.",
+      "id": "ID",
+      "source": "Source",
+      "status": "Status",
+      "created": "Created",
+      "current": "current",
+      "selectForCompare": "Select {id} for compare",
+      "compareLabel": "Compare",
+      "diff": "Diff",
+      "filesChanged": "{count} files changed",
+      "oversized": "Skipped {count, plural, one {# oversized file} other {# oversized files}}: {files}",
+      "noDiff": "No content differences between these versions.",
+      "binaryChanged": "Binary file changed — diff not rendered.",
+      "diffType": {
+        "added": "added",
+        "removed": "removed",
+        "modified": "modified",
+        "binary-changed": "binary"
+      }
+    },
+    "notifications": {
+      "addNotification": "Add Notification",
+      "name": "Name",
+      "namePlaceholder": "Deploy notifications",
+      "destinationType": "Destination Type",
+      "typeGeneric": "Generic Webhook",
+      "typeEmail": "Email",
+      "url": "URL",
+      "hmacToken": "HMAC Token (optional)",
+      "signingSecret": "Signing secret",
+      "emailAddresses": "Email Addresses (comma-separated)",
+      "triggerEvents": "Trigger Events",
+      "createNotification": "Create Notification",
+      "empty": "No notification configurations for this workspace.",
+      "ok": "OK",
+      "err": "Err {status}",
+      "fail": "FAIL",
+      "http": "HTTP {status}",
+      "verify": "Verify",
+      "history": "History",
+      "deliveryHistory": "Delivery History",
+      "enableConfirm": "Enable this notification?",
+      "disableConfirm": "Disable this notification?",
+      "deleteConfirm": "Delete notification \"{name}\"?"
+    },
+    "runTasks": {
+      "addRunTask": "Add Run Task",
+      "name": "Name",
+      "namePlaceholder": "OPA Policy Check",
+      "webhookUrl": "Webhook URL",
+      "stage": "Stage",
+      "enforcementLevel": "Enforcement Level",
+      "hmacKey": "HMAC Key (optional)",
+      "hmacKeyPlaceholder": "Signing secret for webhook verification",
+      "createRunTask": "Create Run Task",
+      "empty": "No run tasks configured for this workspace.",
+      "enableConfirm": "Enable this run task?",
+      "disableConfirm": "Disable this run task?",
+      "deleteConfirm": "Delete run task \"{name}\"?"
+    },
+    "runTriggers": {
+      "title": "Run Triggers",
+      "description": "When a source workspace completes an apply, downstream workspaces get a new run queued automatically. Up to 20 source workspaces per destination.",
+      "inboundHeading": "Source workspaces that trigger runs here",
+      "inboundEmpty": "No source workspaces trigger runs on this workspace.",
+      "pickerPlaceholder": "Search workspaces to add as a source…",
+      "outboundHeading": "Destination workspaces this workspace triggers",
+      "outboundEmpty": "This workspace does not trigger runs on any other workspace.",
+      "destinationNote": "(destination; remove from there)",
+      "removeConfirm": "Remove this run trigger?"
+    },
+    "sharing": {
+      "title": "Remote State Sharing",
+      "description": "Producer-controlled allowlist for cross-workspace <code></code>. State data is secret-bearing — grant deliberately. <docs>Docs</docs>",
+      "outboundHeading": "Workspaces authorized to read this workspace's state",
+      "outboundEmpty": "This workspace's state is not shared with any other workspace.",
+      "grantedBy": "granted by {by}",
+      "revoke": "Revoke",
+      "revokeConfirm": "Remove this remote state sharing? The consumer will lose access to this state.",
+      "pickerPlaceholder": "Search workspaces to authorize as a consumer…",
+      "inboundHeading": "Workspaces this workspace is authorized to read state from",
+      "inboundEmpty": "This workspace is not authorized to read state from any other workspace via terraform_remote_state.",
+      "producerNote": "(producer; revoke from there)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "Manual drift check from UI",
+      "queued": "Queued from UI",
+      "queuedSpeculative": "Queued from UI (speculative)",
+      "destroyQueued": "Destroy queued from UI"
+    },
+    "errors": {
+      "loadWorkspace": "Failed to load workspace",
+      "loadRuns": "Failed to load runs",
+      "loadVariables": "Failed to load variables",
+      "loadStateVersions": "Failed to load state versions",
+      "loadConfigurations": "Failed to load configuration versions",
+      "loadNotifications": "Failed to load notifications",
+      "loadOutboundConsumers": "Failed to load outbound remote-state consumers",
+      "loadInboundConsumers": "Failed to load inbound remote-state consumers",
+      "loadConsumers": "Failed to load remote-state consumers",
+      "loadInboundTriggers": "Failed to load inbound run triggers",
+      "loadOutboundTriggers": "Failed to load outbound run triggers",
+      "loadTriggers": "Failed to load run triggers",
+      "loadRunTasks": "Failed to load run tasks",
+      "downloadStateFile": "Failed to download state file",
+      "downloadFailed": "Download failed",
+      "downloadFailedStatus": "Download failed ({status})",
+      "downloadTicketMissingUrl": "Download ticket response missing URL",
+      "diffFailed": "Diff failed",
+      "diffFailedStatus": "Diff failed ({status})",
+      "authorizeConsumer": "Failed to authorize consumer",
+      "revoke": "Failed to revoke",
+      "revokeConsumer": "Failed to revoke consumer",
+      "addTrigger": "Failed to add run trigger",
+      "removeTrigger": "Failed to remove run trigger",
+      "createRunTask": "Failed to create run task",
+      "createRunTaskStatus": "Failed to create run task ({status})",
+      "update": "Failed to update",
+      "toggleRunTask": "Failed to toggle run task",
+      "delete": "Failed to delete",
+      "deleteRunTask": "Failed to delete run task",
+      "labelLockout": "This label change would reduce your access.",
+      "updateWorkspace": "Failed to update workspace",
+      "lockWorkspace": "Failed to lock workspace",
+      "unlockWorkspace": "Failed to unlock workspace",
+      "updateAiSummary": "Failed to update AI summary settings",
+      "updateSlackChannel": "Failed to update Slack channel",
+      "updateDriftSettings": "Failed to update drift settings",
+      "updateDriftInterval": "Failed to update drift interval",
+      "updatePlanExpiry": "Failed to update plan expiry",
+      "queueDriftCheck": "Failed to queue drift check",
+      "queueDriftCheckStatus": "Failed to queue drift check ({status})",
+      "dismissDrift": "Failed to dismiss drift",
+      "dismissDriftStatus": "Failed to dismiss drift ({status})",
+      "deleteWorkspace": "Failed to delete workspace",
+      "addVariable": "Failed to add variable",
+      "addVariableStatus": "Failed to add variable ({status})",
+      "deleteVariable": "Failed to delete variable",
+      "updateVariable": "Failed to update variable",
+      "queuePlan": "Failed to queue plan",
+      "queuePlanStatus": "Failed to queue plan ({status})",
+      "queueDestroy": "Failed to queue destroy",
+      "queueDestroyStatus": "Failed to queue destroy ({status})",
+      "createNotification": "Failed to create notification",
+      "createNotificationStatus": "Failed to create notification ({status})",
+      "toggleNotification": "Failed to toggle notification",
+      "deleteNotification": "Failed to delete notification",
+      "verificationFailed": "Verification failed",
+      "verificationDeliveryFailed": "Verification delivery failed: {detail}",
+      "unknownError": "Unknown error",
+      "failed": "Failed",
+      "deleteStateVersion": "Failed to delete state version",
+      "rollbackStateVersion": "Failed to rollback state version",
+      "stateActionFailed": "State action failed",
+      "uploadState": "Failed to upload state",
+      "uploadStateFile": "Failed to upload state file"
+    }
   }
 }

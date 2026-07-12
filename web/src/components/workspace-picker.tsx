@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { apiFetch } from '@/lib/api'
 
 export interface WorkspaceOption {
@@ -33,11 +34,12 @@ interface WorkspacePickerProps {
 export function WorkspacePicker({
   excludeIds = [],
   onSelect,
-  placeholder = 'Search workspaces…',
+  placeholder,
   busyId,
   disabled,
   limit = 20,
 }: WorkspacePickerProps) {
+  const t = useTranslations('common')
   const [query, setQuery] = useState('')
   const [all, setAll] = useState<WorkspaceOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -83,7 +85,7 @@ export function WorkspacePicker({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={placeholder}
+          placeholder={placeholder ?? t('workspacePicker.searchPlaceholder')}
           disabled={disabled}
           autoFocus
           className="flex-1 px-2 py-1 text-sm border border-slate-600 rounded bg-slate-700 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
@@ -91,9 +93,13 @@ export function WorkspacePicker({
       </div>
       <div className="max-h-40 overflow-y-auto space-y-1">
         {loading ? (
-          <p className="text-xs text-slate-500 py-2 text-center">Loading…</p>
+          <p className="text-xs text-slate-500 py-2 text-center">
+            {t('workspacePicker.loading')}
+          </p>
         ) : results.length === 0 ? (
-          <p className="text-xs text-slate-500 py-2 text-center">No workspaces found</p>
+          <p className="text-xs text-slate-500 py-2 text-center">
+            {t('workspacePicker.empty')}
+          </p>
         ) : (
           results.map((ws) => (
             <button
@@ -104,7 +110,11 @@ export function WorkspacePicker({
               className="w-full text-left px-2 py-1.5 rounded text-sm text-slate-300 hover:bg-slate-700/50 transition-colors disabled:opacity-50"
             >
               {ws.name}
-              {busyId === ws.id && <span className="text-xs text-slate-500 ml-2">Adding…</span>}
+              {busyId === ws.id && (
+                <span className="text-xs text-slate-500 ml-2">
+                  {t('workspacePicker.adding')}
+                </span>
+              )}
             </button>
           ))
         )}

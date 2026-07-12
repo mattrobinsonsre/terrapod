@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { apiFetch } from '@/lib/api'
 import { getAuthState } from '@/lib/auth'
 
@@ -27,6 +28,7 @@ const DISMISS_KEY = 'tp:token_expiry_dismissed'
  * about other users' bound tokens — so the banner stays signal, not noise.
  */
 export function TokenExpiryBanner() {
+  const t = useTranslations('common')
   const [count, setCount] = useState(0)
   const [days, setDays] = useState<number | null>(null)
   const [dismissed, setDismissed] = useState(false)
@@ -66,16 +68,29 @@ export function TokenExpiryBanner() {
   return (
     <div className="bg-amber-900/50 border-b border-amber-700/50 px-4 py-2 text-sm text-amber-200 flex items-center justify-center gap-3">
       <span>
-        {count} service token{count !== 1 ? 's' : ''} expiring
-        {days !== null ? ` within ${days} day${days !== 1 ? 's' : ''}` : ' soon'} —{' '}
-        <Link href="/settings/tokens" className="underline hover:text-amber-100">
-          review
-        </Link>
+        {days !== null
+          ? t.rich('tokenExpiry.withinDays', {
+              count,
+              days,
+              link: (chunks) => (
+                <Link href="/settings/tokens" className="underline hover:text-amber-100">
+                  {chunks}
+                </Link>
+              ),
+            })
+          : t.rich('tokenExpiry.soon', {
+              count,
+              link: (chunks) => (
+                <Link href="/settings/tokens" className="underline hover:text-amber-100">
+                  {chunks}
+                </Link>
+              ),
+            })}
       </span>
       <button
         onClick={dismiss}
         className="text-amber-400 hover:text-amber-200 transition-colors"
-        aria-label="Dismiss token expiry warning"
+        aria-label={t('tokenExpiry.dismissAria')}
       >
         ✕
       </button>

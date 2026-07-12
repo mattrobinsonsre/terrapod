@@ -1,5 +1,7 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
+
 // ResourceUsage — surface the runner Job's actual memory + CPU usage
 // alongside its configured requests and limits (#430). Renders only
 // when peak data is available (post-#430 runs); silent for older runs.
@@ -67,6 +69,7 @@ export function ResourceUsage({
   peakMemoryBytes,
   runnerExitStatus,
 }: ResourceUsageProps) {
+  const t = useTranslations('common')
   // Only render when we have anything to show — peak from runner, OR an
   // abnormal exit signal from the listener (oom / killed). For runs that
   // pre-date #430, both are null/empty and the panel stays hidden.
@@ -98,20 +101,22 @@ export function ResourceUsage({
   return (
     <div className="rounded-lg border border-slate-700 bg-slate-900 p-4">
       <div className="mb-3 flex items-baseline justify-between">
-        <h3 className="text-sm font-semibold text-slate-200">Resource usage</h3>
+        <h3 className="text-sm font-semibold text-slate-200">{t('resourceUsage.title')}</h3>
         {isOom && (
           <span
             className="rounded bg-red-500/20 px-2 py-0.5 text-xs font-medium text-red-300"
             data-testid="resource-oom-indicator"
           >
-            {runnerExitStatus === 'oom' ? 'OOM-killed' : 'Killed (likely OOM)'}
+            {runnerExitStatus === 'oom'
+              ? t('resourceUsage.oomKilled')
+              : t('resourceUsage.killedLikelyOom')}
           </span>
         )}
       </div>
 
       <div data-testid="resource-usage-memory">
         <div className="mb-1 flex items-baseline justify-between text-xs text-slate-400">
-          <span>Memory</span>
+          <span>{t('resourceUsage.memory')}</span>
           <span className="font-mono">
             {peakMemoryBytes !== null ? humanBytes(peakMemoryBytes) : '—'}
             {memPct !== null && (
@@ -129,10 +134,13 @@ export function ResourceUsage({
           )}
         </div>
         <div className="mt-1 flex justify-between font-mono text-[10px] text-slate-500">
-          <span>Requested {resourceMemory}</span>
+          <span>{t('resourceUsage.requested', { value: resourceMemory })}</span>
           <span>
-            Limit{' '}
-            {Number.isFinite(limitMem) ? humanBytes(limitMem) : `${resourceMemory} × 2`}
+            {t('resourceUsage.limit', {
+              value: Number.isFinite(limitMem)
+                ? humanBytes(limitMem)
+                : `${resourceMemory} × 2`,
+            })}
           </span>
         </div>
       </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface SensitiveValueInputProps {
   id?: string
@@ -30,6 +31,7 @@ export function SensitiveValueInput({
   rows = 2,
   className,
 }: SensitiveValueInputProps) {
+  const t = useTranslations('common')
   const [reveal, setReveal] = useState(false)
 
   if (!sensitive) {
@@ -65,10 +67,10 @@ export function SensitiveValueInput({
         type="button"
         onClick={() => setReveal((r) => !r)}
         tabIndex={-1}
-        aria-label={reveal ? 'Hide value' : 'Show value'}
+        aria-label={reveal ? t('sensitiveInput.hideAria') : t('sensitiveInput.showAria')}
         className="absolute top-1.5 right-2 text-xs text-slate-400 hover:text-slate-200"
       >
-        {reveal ? 'Hide' : 'Show'}
+        {reveal ? t('sensitiveInput.hide') : t('sensitiveInput.show')}
       </button>
     </div>
   )
