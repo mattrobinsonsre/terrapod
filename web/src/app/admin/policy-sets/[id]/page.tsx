@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, use } from 'react'
+import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
@@ -65,6 +66,7 @@ function linesToList(text: string): string[] {
 
 export default function PolicySetDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const t = useTranslations('policySetDetail')
   const router = useRouter()
   const [ps, setPs] = useState<PolicySet | null>(null)
   const [loading, setLoading] = useState(true)
@@ -97,7 +99,7 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
   const load = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/terrapod/v1/policy-sets/${id}`)
-      if (!res.ok) throw new Error('Failed to load policy set')
+      if (!res.ok) throw new Error(t('errors.load'))
       const data = await res.json()
       const set: PolicySet = data.data
       setPs(set)
@@ -114,11 +116,11 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
       setVcsBranch(a['vcs-branch'] || '')
       setPolicyPath(a['policy-path'] || '')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load policy set')
+      setError(err instanceof Error ? err.message : t('errors.load'))
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, t])
 
   useEffect(() => {
     if (!getAuthState()) { router.push('/login'); return }
@@ -157,24 +159,24 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
-        throw new Error(d.detail || `Failed to save (${res.status})`)
+        throw new Error(d.detail || t('errors.saveStatus', { status: res.status }))
       }
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save policy set')
+      setError(err instanceof Error ? err.message : t('errors.save'))
     } finally {
       setSaving(false)
     }
   }
 
   async function deleteSet() {
-    if (!confirm('Delete this policy set and all its policies? Recorded run evaluations are kept.')) return
+    if (!confirm(t('confirm.deleteSet'))) return
     try {
       const res = await apiFetch(`/api/terrapod/v1/policy-sets/${id}`, { method: 'DELETE' })
-      if (!res.ok && res.status !== 204) throw new Error(`Failed to delete (${res.status})`)
+      if (!res.ok && res.status !== 204) throw new Error(t('errors.deleteStatus', { status: res.status }))
       router.push('/admin/policy-sets')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete policy set')
+      setError(err instanceof Error ? err.message : t('errors.delete'))
     }
   }
 
@@ -192,19 +194,19 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
-        throw new Error(d.detail || `Failed to add policy (${res.status})`)
+        throw new Error(d.detail || t('errors.addPolicyStatus', { status: res.status }))
       }
       setNpName(''); setNpDesc(''); setShowAddPolicy(false)
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add policy')
+      setError(err instanceof Error ? err.message : t('errors.addPolicy'))
     } finally {
       setNpSaving(false)
     }
   }
 
   if (loading) return (<><NavBar /><main className="px-6 py-8 max-w-5xl mx-auto"><LoadingSpinner /></main></>)
-  if (!ps) return (<><NavBar /><main className="px-6 py-8 max-w-5xl mx-auto"><ErrorBanner message={error || 'Not found'} /></main></>)
+  if (!ps) return (<><NavBar /><main className="px-6 py-8 max-w-5xl mx-auto"><ErrorBanner message={error || t('notFound')} /></main></>)
 
   const policies = ps.relationships?.policies?.data || []
 
@@ -212,14 +214,14 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
     <>
       <NavBar />
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-5xl mx-auto">
-        <Link href="/admin/policy-sets" className="text-sm text-brand-400 hover:text-brand-300">&larr; Policy Sets</Link>
+        <Link href="/admin/policy-sets" className="text-sm text-brand-400 hover:text-brand-300">&larr; {t('backLink')}</Link>
         <PageHeader
           title={ps.attributes.name}
-          description={`OPA policy set · created by ${ps.attributes['created-by'] || 'unknown'}`}
+          description={t('subtitle', { createdBy: ps.attributes['created-by'] || t('unknown') })}
           actions={
             <button onClick={deleteSet}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-red-900/60 hover:bg-red-800 text-red-200 transition-colors">
-              Delete Set
+              {t('actions.deleteSet')}
             </button>
           }
         />
@@ -227,53 +229,53 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
         {error && <ErrorBanner message={error} />}
 
         <form onSubmit={saveSet} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 space-y-4">
-          <h2 className="text-sm font-semibold text-slate-200">Settings</h2>
+          <h2 className="text-sm font-semibold text-slate-200">{t('settings.heading')}</h2>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Description</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">{t('fields.description')}</label>
             <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
               className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
           <div className="flex flex-wrap gap-6 items-center">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Enforcement</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">{t('fields.enforcement')}</label>
               <select value={enforcement} onChange={(e) => setEnforcement(e.target.value)}
                 className="px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500">
-                <option value="advisory">Advisory (warn)</option>
-                <option value="mandatory">Mandatory (block apply)</option>
+                <option value="advisory">{t('enforcement.advisory')}</option>
+                <option value="mandatory">{t('enforcement.mandatory')}</option>
               </select>
             </div>
             <label className="flex items-center gap-2 cursor-pointer mt-5">
               <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)}
                 className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
-              <span className="text-sm text-slate-300">Enabled</span>
+              <span className="text-sm text-slate-300">{t('fields.enabled')}</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer mt-5">
               <input type="checkbox" checked={globalScope} onChange={(e) => setGlobalScope(e.target.checked)}
                 className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500" />
-              <span className="text-sm text-slate-300">Global (every workspace)</span>
+              <span className="text-sm text-slate-300">{t('fields.globalScope')}</span>
             </label>
           </div>
 
           {!globalScope && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Allow labels (key: v1, v2)</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1">{t('scope.allowLabels')}</label>
                 <textarea value={allowLabels} onChange={(e) => setAllowLabels(e.target.value)} rows={3}
-                  placeholder="env: prod, staging"
+                  placeholder={t('scope.allowLabelsPlaceholder')}
                   className="w-full px-3 py-2 font-mono text-xs border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Allow names (one per line)</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1">{t('scope.allowNames')}</label>
                 <textarea value={allowNames} onChange={(e) => setAllowNames(e.target.value)} rows={3}
                   className="w-full px-3 py-2 font-mono text-xs border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Deny labels (key: v1, v2)</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1">{t('scope.denyLabels')}</label>
                 <textarea value={denyLabels} onChange={(e) => setDenyLabels(e.target.value)} rows={3}
                   className="w-full px-3 py-2 font-mono text-xs border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Deny names (one per line)</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1">{t('scope.denyNames')}</label>
                 <textarea value={denyNames} onChange={(e) => setDenyNames(e.target.value)} rows={3}
                   className="w-full px-3 py-2 font-mono text-xs border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
               </div>
@@ -281,22 +283,22 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
           )}
           {ps.attributes.source === 'vcs' && (
             <div className="border-t border-slate-700/50 pt-4">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase mb-3">VCS Configuration</h3>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase mb-3">{t('vcs.heading')}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Repository URL</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">{t('vcs.repoUrl')}</label>
                   <input type="text" value={vcsRepoUrl} onChange={(e) => setVcsRepoUrl(e.target.value)}
                     placeholder="https://github.com/org/policies"
                     className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Branch</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">{t('vcs.branch')}</label>
                   <input type="text" value={vcsBranch} onChange={(e) => setVcsBranch(e.target.value)}
-                    placeholder="main (default)"
+                    placeholder={t('vcs.branchPlaceholder')}
                     className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Policy Path</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">{t('vcs.policyPath')}</label>
                   <input type="text" value={policyPath} onChange={(e) => setPolicyPath(e.target.value)}
                     placeholder="policies/"
                     className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
@@ -306,7 +308,7 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
           )}
           <button type="submit" disabled={saving}
             className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 text-white transition-colors">
-            {saving ? 'Saving...' : 'Save Settings'}
+            {saving ? t('actions.saving') : t('actions.saveSettings')}
           </button>
         </form>
 
@@ -315,18 +317,18 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-blue-200">
-                  Policies synced from <span className="font-mono text-blue-300">{ps.attributes['vcs-repo-url']}</span>
+                  {t('vcsBanner.syncedFrom')} <span className="font-mono text-blue-300">{ps.attributes['vcs-repo-url']}</span>
                   {ps.attributes['vcs-branch'] && <> ({ps.attributes['vcs-branch']})</>}
-                  {ps.attributes['policy-path'] && <> at <span className="font-mono">{ps.attributes['policy-path']}/</span></>}
+                  {ps.attributes['policy-path'] && <> {t('vcsBanner.at')} <span className="font-mono">{ps.attributes['policy-path']}/</span></>}
                 </p>
                 {ps.attributes['vcs-last-synced-at'] && (
                   <p className="text-xs text-blue-400 mt-1">
-                    Last synced {new Date(ps.attributes['vcs-last-synced-at']).toLocaleString()}
-                    {ps.attributes['vcs-last-commit-sha'] && <> (commit {ps.attributes['vcs-last-commit-sha'].slice(0, 8)})</>}
+                    {t('vcsBanner.lastSynced', { time: new Date(ps.attributes['vcs-last-synced-at']).toLocaleString() })}
+                    {ps.attributes['vcs-last-commit-sha'] && <> {t('vcsBanner.commit', { sha: ps.attributes['vcs-last-commit-sha'].slice(0, 8) })}</>}
                   </p>
                 )}
                 {ps.attributes['vcs-last-error'] && (
-                  <p className="text-xs text-red-400 mt-1">Sync error: {ps.attributes['vcs-last-error']}</p>
+                  <p className="text-xs text-red-400 mt-1">{t('vcsBanner.syncError', { error: ps.attributes['vcs-last-error'] })}</p>
                 )}
               </div>
               <button
@@ -338,49 +340,47 @@ export default function PolicySetDetailPage({ params }: { params: Promise<{ id: 
                 }}
                 className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-700 hover:bg-blue-600 text-white transition-colors"
               >
-                Sync Now
+                {t('actions.syncNow')}
               </button>
             </div>
           </div>
         )}
 
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-slate-200">Policies ({policies.length})</h2>
+          <h2 className="text-sm font-semibold text-slate-200">{t('policies.heading', { count: policies.length })}</h2>
           {ps.attributes.source !== 'vcs' && (
             <button onClick={() => setShowAddPolicy(!showAddPolicy)}
               className="px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors">
-              {showAddPolicy ? 'Cancel' : 'Add Policy'}
+              {showAddPolicy ? t('actions.cancel') : t('actions.addPolicy')}
             </button>
           )}
           {ps.attributes.source === 'vcs' && (
-            <span className="text-xs text-slate-500">Managed by repository — push changes via PR</span>
+            <span className="text-xs text-slate-500">{t('policies.vcsManaged')}</span>
           )}
         </div>
 
         {showAddPolicy && (
           <form onSubmit={addPolicy} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-4 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <input type="text" value={npName} onChange={(e) => setNpName(e.target.value)} required placeholder="Policy name"
+              <input type="text" value={npName} onChange={(e) => setNpName(e.target.value)} required placeholder={t('addPolicy.namePlaceholder')}
                 className="px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
-              <input type="text" value={npDesc} onChange={(e) => setNpDesc(e.target.value)} placeholder="Description (optional)"
+              <input type="text" value={npDesc} onChange={(e) => setNpDesc(e.target.value)} placeholder={t('addPolicy.descPlaceholder')}
                 className="px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
             </div>
             <textarea value={npRego} onChange={(e) => setNpRego(e.target.value)} rows={10} spellCheck={false}
               className="w-full px-3 py-2 font-mono text-xs border border-slate-600 rounded-lg bg-slate-900 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
             <p className="text-xs text-slate-500">
-              Rego v1. Must declare <code className="text-slate-400">package terrapod</code> and express violations
-              via a <code className="text-slate-400">deny</code> set. The plan is <code className="text-slate-400">input</code>;
-              Terrapod context is <code className="text-slate-400">data.terrapod_context</code>.
+              {t.rich('addPolicy.regoHint', { code: (chunks) => <code className="text-slate-400">{chunks}</code> })}
             </p>
             <button type="submit" disabled={npSaving}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 text-white transition-colors">
-              {npSaving ? 'Validating Rego...' : 'Add Policy'}
+              {npSaving ? t('actions.validatingRego') : t('actions.addPolicy')}
             </button>
           </form>
         )}
 
         {policies.length === 0 ? (
-          <p className="text-sm text-slate-500">No policies in this set yet.</p>
+          <p className="text-sm text-slate-500">{t('policies.empty')}</p>
         ) : (
           <div className="space-y-3">
             {policies.map((p) => (
@@ -398,6 +398,7 @@ function PolicyCard({ policy, onChanged, onError }: {
   onChanged: () => void
   onError: (m: string) => void
 }) {
+  const t = useTranslations('policySetDetail')
   const [rego, setRego] = useState(policy.attributes.rego)
   const [desc, setDesc] = useState(policy.attributes.description || '')
   const [saving, setSaving] = useState(false)
@@ -414,25 +415,25 @@ function PolicyCard({ policy, onChanged, onError }: {
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
-        throw new Error(d.detail || `Failed to save policy (${res.status})`)
+        throw new Error(d.detail || t('errors.savePolicyStatus', { status: res.status }))
       }
       onChanged()
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to save policy')
+      onError(err instanceof Error ? err.message : t('errors.savePolicy'))
     } finally {
       setSaving(false)
     }
   }
 
   async function remove() {
-    if (!confirm(`Delete policy "${policy.attributes.name}"?`)) return
+    if (!confirm(t('confirm.deletePolicy', { name: policy.attributes.name }))) return
     onError('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/policies/${policy.id}`, { method: 'DELETE' })
-      if (!res.ok && res.status !== 204) throw new Error(`Failed to delete (${res.status})`)
+      if (!res.ok && res.status !== 204) throw new Error(t('errors.deletePolicyStatus', { status: res.status }))
       onChanged()
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to delete policy')
+      onError(err instanceof Error ? err.message : t('errors.deletePolicy'))
     }
   }
 
@@ -440,15 +441,15 @@ function PolicyCard({ policy, onChanged, onError }: {
     <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-medium text-slate-200">{policy.attributes.name}</span>
-        <button onClick={remove} className="text-xs text-red-400 hover:text-red-300">Delete</button>
+        <button onClick={remove} className="text-xs text-red-400 hover:text-red-300">{t('actions.delete')}</button>
       </div>
-      <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Description"
+      <input type="text" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={t('fields.description')}
         className="w-full mb-2 px-3 py-1.5 text-sm border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
       <textarea value={rego} onChange={(e) => setRego(e.target.value)} rows={10} spellCheck={false}
         className="w-full px-3 py-2 font-mono text-xs border border-slate-600 rounded-lg bg-slate-900 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500" />
       <button onClick={save} disabled={!dirty || saving}
         className="mt-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors">
-        {saving ? 'Validating Rego...' : 'Save Policy'}
+        {saving ? t('actions.validatingRego') : t('actions.savePolicy')}
       </button>
     </div>
   )

@@ -7,6 +7,7 @@
 // managed-vs-data), since state has no "what's happening" axis to spend colour
 // on. Client-only (WebGL): the tab imports this via next/dynamic { ssr: false }.
 import { useMemo } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   categoryOf,
   PALETTE,
@@ -24,6 +25,7 @@ export function StateGraph3D({
   groupBy: string
   subtitle: string
 }) {
+  const t = useTranslations('graphs')
   const categories = useMemo(
     () => [...new Set(graph.nodes.map((n) => categoryOf(n, groupBy)))].sort(),
     [graph, groupBy],
@@ -45,15 +47,10 @@ export function StateGraph3D({
     <ResourceGraph3D<StateNode>
       nodes={graph.nodes}
       edges={graph.edges}
-      title="State graph"
+      title={t('state3d.title')}
       subtitle={subtitle}
       legend={legend}
-      hint={
-        <>
-          Each sphere is a resource; each arrow points to what it depends on. Click a node → the
-          resources that transitively <b>depend on it</b> light up.
-        </>
-      }
+      hint={t.rich('state3d.hint', { b: (chunks) => <b>{chunks}</b> })}
       colorOf={colorOf}
       // A count/for_each resource becomes a nucleus of `instances` pearls. State
       // has no per-instance action to encode, so every pearl takes the node's
@@ -65,12 +62,12 @@ export function StateGraph3D({
         <>
           <div className="font-mono text-xs text-slate-100 break-all">{n.id}</div>
           <div className="text-[11px] text-slate-400 mt-1">
-            {n.mode === 'data' ? 'data source' : 'managed'}
+            {n.mode === 'data' ? t('state3d.dataSource') : t('state3d.managed')}
             {n.provider ? ` · ${n.provider}` : ''}
             {n.module ? ` · ${n.module}` : ''}
           </div>
           <div className="text-2xl font-bold mt-1.5">
-            {downstream} <span className="text-xs font-medium text-slate-400">depend on this</span>
+            {downstream} <span className="text-xs font-medium text-slate-400">{t('state3d.dependOnThis')}</span>
           </div>
         </>
       )}

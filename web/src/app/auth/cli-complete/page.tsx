@@ -2,10 +2,12 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 
 type Status = 'delivering' | 'polling' | 'complete' | 'timeout' | 'fallback'
 
 function CliCompleteInner() {
+  const t = useTranslations('cliComplete')
   const params = useSearchParams()
   const code = params.get('code') ?? ''
   const state = params.get('state') ?? ''
@@ -77,8 +79,8 @@ function CliCompleteInner() {
     return (
       <main className="min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-md text-center">
-          <h1 className="text-xl font-bold mb-2">Invalid Request</h1>
-          <p className="text-slate-400">Missing required parameters.</p>
+          <h1 className="text-xl font-bold mb-2">{t('invalid.title')}</h1>
+          <p className="text-slate-400">{t('invalid.description')}</p>
         </div>
       </main>
     )
@@ -105,37 +107,35 @@ function CliCompleteInner() {
                 <polyline points="22 4 12 14.01 9 11.01" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold mb-2">Login Successful</h1>
-            <p className="text-slate-400">API token created. You can close this tab.</p>
+            <h1 className="text-2xl font-bold mb-2">{t('success.title')}</h1>
+            <p className="text-slate-400">{t('success.complete')}</p>
           </>
         ) : status === 'fallback' ? (
           <>
-            <h1 className="text-2xl font-bold mb-2">Login Successful</h1>
-            <p className="text-slate-400 mb-4">Could not reach the CLI automatically.</p>
+            <h1 className="text-2xl font-bold mb-2">{t('success.title')}</h1>
+            <p className="text-slate-400 mb-4">{t('fallback.description')}</p>
             <button
               onClick={handleManualRedirect}
               className="bg-brand-600 hover:bg-brand-500 text-white font-medium py-2 px-6 rounded-lg transition-colors inline-block btn-smoke"
             >
-              Click here to complete manually
+              {t('fallback.button')}
             </button>
           </>
         ) : status === 'timeout' ? (
           <>
-            <h1 className="text-2xl font-bold mb-2">Login Successful</h1>
-            <p className="text-slate-400">
-              The CLI may not have completed the token exchange. Check your terminal.
-            </p>
+            <h1 className="text-2xl font-bold mb-2">{t('success.title')}</h1>
+            <p className="text-slate-400">{t('timeout.description')}</p>
           </>
         ) : (
           <>
-            <h1 className="text-2xl font-bold mb-2">Login Successful</h1>
+            <h1 className="text-2xl font-bold mb-2">{t('success.title')}</h1>
             {/* Spinner */}
             <div className="flex items-center justify-center gap-2 text-slate-400">
               <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              <span>Completing authentication...</span>
+              <span>{t('completing')}</span>
             </div>
           </>
         )}
@@ -144,17 +144,20 @@ function CliCompleteInner() {
   )
 }
 
+function CliCompleteFallback() {
+  const t = useTranslations('cliComplete')
+  return (
+    <main className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <p className="text-slate-500">{t('loading')}</p>
+      </div>
+    </main>
+  )
+}
+
 export default function CliCompletePage() {
   return (
-    <Suspense
-      fallback={
-        <main className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-slate-500">Loading...</p>
-          </div>
-        </main>
-      }
-    >
+    <Suspense fallback={<CliCompleteFallback />}>
       <CliCompleteInner />
     </Suspense>
   )

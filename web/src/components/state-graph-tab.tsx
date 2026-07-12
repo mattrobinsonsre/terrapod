@@ -7,6 +7,7 @@
 // current state version; a picker drops back to any older one.
 import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { useTranslations } from 'next-intl'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
 import { EmptyState } from '@/components/empty-state'
@@ -37,6 +38,7 @@ function ToggleBtn({ v, label, view, onClick }: { v: View; label: string; view: 
 }
 
 export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
+  const t = useTranslations('graphs')
   const [graph, setGraph] = useState<StateGraphData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [version, setVersion] = useState<string>('') // '' = current
@@ -52,7 +54,7 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
     const q = version ? `?state_version=${encodeURIComponent(version)}` : ''
     apiFetch(`/api/terrapod/v1/workspaces/${workspaceId}/state-graph${q}`)
       .then(async (r) => {
-        if (!r.ok) throw new Error('Failed to load the state graph.')
+        if (!r.ok) throw new Error(t('stateTab.loadError'))
         const b = await r.json()
         if (!cancelled) {
           setGraph(b.data.attributes as StateGraphData)
@@ -63,7 +65,7 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
     return () => {
       cancelled = true
     }
-  }, [workspaceId, version])
+  }, [workspaceId, version, t])
 
   const axes = useMemo(() => (graph ? groupAxes(graph.nodes) : []), [graph])
 
@@ -77,14 +79,14 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
 
   const versions = graph.meta.versions
   if (versions.length === 0) {
-    return <EmptyState message="No state yet — run a plan and apply, or upload state, then this graph will populate." />
+    return <EmptyState message={t('stateTab.emptyState')} />
   }
 
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <label className="text-xs text-slate-400">
-          State version{' '}
+          {t('stateTab.stateVersionLabel')}{' '}
           <select
             value={version}
             onChange={(e) => setVersion(e.target.value)}
@@ -93,13 +95,13 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
             {versions.map((v) => (
               <option key={v.id} value={v.is_current ? '' : v.id}>
                 v{v.serial}
-                {v.is_current ? ' (current)' : ''} · {new Date(v.created_at).toLocaleString()}
+                {v.is_current ? ` ${t('stateTab.currentSuffix')}` : ''} · {new Date(v.created_at).toLocaleString()}
               </option>
             ))}
           </select>
         </label>
         <label className="text-xs text-slate-400">
-          Color by{' '}
+          {t('stateTab.colorByLabel')}{' '}
           <select
             value={groupBy}
             onChange={(e) => setGroupBy(e.target.value)}
@@ -113,18 +115,18 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
           </select>
         </label>
         <div className="flex gap-1">
-          <ToggleBtn v="graph" label="Graph" view={view} onClick={setViewOverride} />
-          <ToggleBtn v="table" label="Table" view={view} onClick={setViewOverride} />
+          <ToggleBtn v="graph" label={t('stateTab.viewGraph')} view={view} onClick={setViewOverride} />
+          <ToggleBtn v="table" label={t('stateTab.viewTable')} view={view} onClick={setViewOverride} />
         </div>
         <span className="text-xs text-slate-500">
-          {graph.meta.counts.resources} resources · {graph.meta.counts.edges} dependencies
+          {t('stateTab.resourceCount', { count: graph.meta.counts.resources })} ·{' '}
+          {t('stateTab.dependencyCount', { count: graph.meta.counts.edges })}
         </span>
       </div>
 
       {graph.meta.truncated && (
         <p className="mb-3 text-xs text-amber-400">
-          Showing the first {graph.meta.max_nodes} of {graph.meta.total_resources} resources — the
-          graph is capped for legibility.
+          {t('stateTab.truncated', { shown: graph.meta.max_nodes, total: graph.meta.total_resources })}
         </p>
       )}
 
@@ -132,18 +134,18 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
         <StateGraph3D
           graph={graph}
           groupBy={groupBy}
-          subtitle={`${graph.meta.state_version ? `v${graph.meta.state_version.serial}${graph.meta.state_version.is_current ? ' (current)' : ''} · ` : ''}${graph.meta.counts.resources} resources`}
+          subtitle={`${graph.meta.state_version ? `v${graph.meta.state_version.serial}${graph.meta.state_version.is_current ? ` ${t('stateTab.currentSuffix')}` : ''} · ` : ''}${t('stateTab.resourceCount', { count: graph.meta.counts.resources })}`}
         />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-800">
           <table className="w-full text-sm">
             <thead className="bg-slate-800/50 text-slate-400 text-xs">
               <tr>
-                <th scope="col" className="text-left px-3 py-2">Resource</th>
-                <th scope="col" className="text-left px-3 py-2">Type</th>
-                <th scope="col" className="text-left px-3 py-2">Mode</th>
-                <th scope="col" className="text-left px-3 py-2">Module</th>
-                <th scope="col" className="text-right px-3 py-2">Depended on by</th>
+                <th scope="col" className="text-left px-3 py-2">{t('stateTab.colResource')}</th>
+                <th scope="col" className="text-left px-3 py-2">{t('stateTab.colType')}</th>
+                <th scope="col" className="text-left px-3 py-2">{t('stateTab.colMode')}</th>
+                <th scope="col" className="text-left px-3 py-2">{t('stateTab.colModule')}</th>
+                <th scope="col" className="text-right px-3 py-2">{t('stateTab.colDependedOnBy')}</th>
               </tr>
             </thead>
             <tbody>
@@ -154,7 +156,7 @@ export function StateGraphTab({ workspaceId }: { workspaceId: string }) {
                   </th>
                   <td className="px-3 py-2 text-slate-300">{n.type}</td>
                   <td className="px-3 py-2 text-slate-400">{n.mode}</td>
-                  <td className="px-3 py-2 text-slate-400 text-xs">{n.module || '(root)'}</td>
+                  <td className="px-3 py-2 text-slate-400 text-xs">{n.module || t('stateTab.rootModule')}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-slate-300">{n.indeg}</td>
                 </tr>
               ))}

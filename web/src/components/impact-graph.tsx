@@ -6,6 +6,7 @@
 // here, the plan change action (create/update/delete). Client-only (WebGL): the
 // run page imports this via next/dynamic { ssr: false }.
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { apiFetch } from '@/lib/api'
 import { LoadingSpinner } from '@/components/loading-spinner'
 import { ErrorBanner } from '@/components/error-banner'
@@ -32,7 +33,8 @@ const COLOR: Record<Action, string> = {
   delete: '#ef4444',
   noop: '#475569',
 }
-const LABEL: Record<Action, string> = {
+// Action → translation-key suffix under graphs.impact.action.*
+const LABEL_KEY: Record<Action, string> = {
   create: 'create',
   update: 'update',
   replace: 'replace',
@@ -42,6 +44,8 @@ const LABEL: Record<Action, string> = {
 const ACT_ORDER: Record<Action, number> = { replace: 0, delete: 1, create: 2, update: 3, noop: 4 }
 
 export function ImpactGraph({ runId }: { runId: string }) {
+  const t = useTranslations('graphs')
+  const label = (a: Action) => t(`impact.action.${LABEL_KEY[a]}`)
   const [graph, setGraph] = useState<Graph | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -49,7 +53,7 @@ export function ImpactGraph({ runId }: { runId: string }) {
     let cancelled = false
     apiFetch(`/api/terrapod/v1/runs/${runId}/impact-graph`)
       .then(async (res) => {
-        if (!res.ok) throw new Error('Impact graph is not available for this run.')
+        if (!res.ok) throw new Error(t('impact.notAvailable'))
         const body = await res.json()
         if (!cancelled) setGraph(body.data.attributes as Graph)
       })
@@ -57,7 +61,7 @@ export function ImpactGraph({ runId }: { runId: string }) {
     return () => {
       cancelled = true
     }
-  }, [runId])
+  }, [runId, t])
 
   if (error) return <ErrorBanner message={error} />
   if (!graph) return <LoadingSpinner />
@@ -71,7 +75,7 @@ export function ImpactGraph({ runId }: { runId: string }) {
         className="flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-full bg-slate-700/25"
       >
         <span className="w-2 h-2 rounded-full" style={{ background: COLOR[a] }} />
-        {counts[a]} {LABEL[a]}
+        {counts[a]} {label(a)}
       </span>
     ))
 
@@ -79,17 +83,12 @@ export function ImpactGraph({ runId }: { runId: string }) {
     <ResourceGraph3D<GNode>
       nodes={graph.nodes}
       edges={graph.edges}
-      title="Impact graph"
-      subtitle={`plan of ${graph.nodes.length} resources${
+      title={t('impact.title')}
+      subtitle={`${t('impact.subtitle', { count: graph.nodes.length })}${
         graph.meta.terraform_version ? ` · ${graph.meta.terraform_version}` : ''
       }`}
       legend={legend}
-      hint={
-        <>
-          Each sphere is a resource; each arrow points to what it depends on. Click a node → its
-          transitive <b>impact</b> (everything downstream) lights up.
-        </>
-      }
+      hint={t.rich('impact.hint', { b: (chunks) => <b>{chunks}</b> })}
       colorOf={(n) => COLOR[n.action]}
       // A count/for_each resource becomes a nucleus: one pearl per instance,
       // each coloured by its OWN planned action (a single count can be
@@ -103,11 +102,11 @@ export function ImpactGraph({ runId }: { runId: string }) {
             className="inline-block text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded mb-1.5"
             style={{ background: COLOR[n.action] + '33', color: COLOR[n.action] }}
           >
-            {LABEL[n.action]}
+            {label(n.action)}
           </span>
           <div className="font-mono text-xs text-slate-100 break-all">{n.id}</div>
           <div className="text-2xl font-bold mt-1.5">
-            {downstream} <span className="text-xs font-medium text-slate-400">downstream affected</span>
+            {downstream} <span className="text-xs font-medium text-slate-400">{t('impact.downstreamAffected')}</span>
           </div>
         </>
       )}

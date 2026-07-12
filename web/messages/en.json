@@ -2370,5 +2370,250 @@
       "uploadState": "Failed to upload state",
       "uploadStateFile": "Failed to upload state file"
     }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Failed to load the state graph.",
+      "emptyState": "No state yet — run a plan and apply, or upload state, then this graph will populate.",
+      "stateVersionLabel": "State version",
+      "currentSuffix": "(current)",
+      "colorByLabel": "Color by",
+      "viewGraph": "Graph",
+      "viewTable": "Table",
+      "resourceCount": "{count, plural, one {# resource} other {# resources}}",
+      "dependencyCount": "{count, plural, one {# dependency} other {# dependencies}}",
+      "truncated": "Showing the first {shown} of {total} resources — the graph is capped for legibility.",
+      "colResource": "Resource",
+      "colType": "Type",
+      "colMode": "Mode",
+      "colModule": "Module",
+      "colDependedOnBy": "Depended on by",
+      "rootModule": "(root)"
+    },
+    "impact": {
+      "notAvailable": "Impact graph is not available for this run.",
+      "title": "Impact graph",
+      "subtitle": "plan of {count, plural, one {# resource} other {# resources}}",
+      "hint": "Each sphere is a resource; each arrow points to what it depends on. Click a node → its transitive <b>impact</b> (everything downstream) lights up.",
+      "downstreamAffected": "downstream affected",
+      "action": {
+        "create": "create",
+        "update": "update",
+        "replace": "replace",
+        "destroy": "destroy",
+        "unchanged": "unchanged"
+      }
+    },
+    "estate": {
+      "navHint": "Drag to rotate · scroll to zoom · right-drag to pan · <em>click a node to orbit around it</em>"
+    },
+    "state3d": {
+      "title": "State graph",
+      "hint": "Each sphere is a resource; each arrow points to what it depends on. Click a node → the resources that transitively <b>depend on it</b> light up.",
+      "dataSource": "data source",
+      "managed": "managed",
+      "dependOnThis": "depend on this"
+    },
+    "resource3d": {
+      "resetView": "Reset view",
+      "clear": "Clear",
+      "key": "Key",
+      "resources": "Resources",
+      "hideKey": "Hide key",
+      "hideResources": "Hide resources",
+      "resourcesCount": "Resources ({count})",
+      "filterPlaceholder": "Filter resources…",
+      "navHint": "Drag to rotate · scroll to zoom · right-drag to pan · <em>click a resource to orbit around it</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "Back to execution hooks",
+    "defaultDescription": "Execution hook",
+    "notFound": "Execution hook not found",
+    "scriptEmpty": "(empty)",
+    "tabs": {
+      "settings": "Settings",
+      "workspaces": "Workspaces"
+    },
+    "common": {
+      "yes": "Yes",
+      "no": "No"
+    },
+    "actions": {
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving...",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "confirmDelete": "Confirm Delete",
+      "add": "Add",
+      "adding": "Adding...",
+      "remove": "Remove"
+    },
+    "settings": {
+      "heading": "Settings"
+    },
+    "fields": {
+      "name": "Name",
+      "description": "Description",
+      "hookPoint": "Hook Point",
+      "priority": "Priority",
+      "enabled": "Enabled",
+      "script": "Script (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "Delete Execution Hook",
+      "description": "Permanently delete this hook and remove it from all workspaces."
+    },
+    "workspaces": {
+      "scopeNote": "This hook runs only on the workspaces associated below. There is no global scope.",
+      "associate": "Associate Workspace",
+      "workspaceLabel": "Workspace",
+      "selectPlaceholder": "Select a workspace...",
+      "empty": "No workspaces associated with this hook.",
+      "colWorkspace": "Workspace",
+      "colActions": "Actions"
+    },
+    "confirm": {
+      "removeWorkspace": "Remove this workspace from the hook? The hook will no longer run for it."
+    },
+    "success": {
+      "updated": "Execution hook updated",
+      "workspaceAssociated": "Workspace associated",
+      "workspaceRemoved": "Workspace removed"
+    },
+    "errors": {
+      "load": "Failed to load execution hook",
+      "update": "Failed to update execution hook",
+      "delete": "Failed to delete execution hook",
+      "addWorkspace": "Failed to add workspace",
+      "removeWorkspace": "Failed to remove workspace"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "Policy Sets",
+    "notFound": "Not found",
+    "unknown": "unknown",
+    "subtitle": "OPA policy set · created by {createdBy}",
+    "settings": {
+      "heading": "Settings"
+    },
+    "fields": {
+      "description": "Description",
+      "enforcement": "Enforcement",
+      "enabled": "Enabled",
+      "globalScope": "Global (every workspace)"
+    },
+    "enforcement": {
+      "advisory": "Advisory (warn)",
+      "mandatory": "Mandatory (block apply)"
+    },
+    "scope": {
+      "allowLabels": "Allow labels (key: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "Allow names (one per line)",
+      "denyLabels": "Deny labels (key: v1, v2)",
+      "denyNames": "Deny names (one per line)"
+    },
+    "vcs": {
+      "heading": "VCS Configuration",
+      "repoUrl": "Repository URL",
+      "branch": "Branch",
+      "branchPlaceholder": "main (default)",
+      "policyPath": "Policy Path"
+    },
+    "vcsBanner": {
+      "syncedFrom": "Policies synced from",
+      "at": "at",
+      "lastSynced": "Last synced {time}",
+      "commit": "(commit {sha})",
+      "syncError": "Sync error: {error}"
+    },
+    "policies": {
+      "heading": "Policies ({count})",
+      "vcsManaged": "Managed by repository — push changes via PR",
+      "empty": "No policies in this set yet."
+    },
+    "addPolicy": {
+      "namePlaceholder": "Policy name",
+      "descPlaceholder": "Description (optional)",
+      "regoHint": "Rego v1. Must declare <code>package terrapod</code> and express violations via a <code>deny</code> set. The plan is <code>input</code>; Terrapod context is <code>data.terrapod_context</code>."
+    },
+    "actions": {
+      "saving": "Saving...",
+      "saveSettings": "Save Settings",
+      "syncNow": "Sync Now",
+      "cancel": "Cancel",
+      "addPolicy": "Add Policy",
+      "deleteSet": "Delete Set",
+      "validatingRego": "Validating Rego...",
+      "delete": "Delete",
+      "savePolicy": "Save Policy"
+    },
+    "confirm": {
+      "deleteSet": "Delete this policy set and all its policies? Recorded run evaluations are kept.",
+      "deletePolicy": "Delete policy \"{name}\"?"
+    },
+    "errors": {
+      "load": "Failed to load policy set",
+      "save": "Failed to save policy set",
+      "saveStatus": "Failed to save ({status})",
+      "delete": "Failed to delete policy set",
+      "deleteStatus": "Failed to delete ({status})",
+      "addPolicy": "Failed to add policy",
+      "addPolicyStatus": "Failed to add policy ({status})",
+      "savePolicy": "Failed to save policy",
+      "savePolicyStatus": "Failed to save policy ({status})",
+      "deletePolicy": "Failed to delete policy",
+      "deletePolicyStatus": "Failed to delete ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "Connect Slack to Terrapod",
+    "loading": "Loading…",
+    "checking": "Checking your link…",
+    "linking": "Linking your Slack account…",
+    "unknown": "unknown",
+    "confirm": {
+      "prompt": "Link this Slack account to <em>your</em> Terrapod identity? Every future Slack action (approve/discard) will run as this Terrapod user with their permissions.",
+      "slackUser": "Slack user",
+      "slackTeam": "Slack team",
+      "terrapodAccount": "Terrapod account",
+      "warning": "Only continue if you just started this link from Slack yourself. If you didn't, close this tab and don't link — this binds the Slack account above to <em>your</em> Terrapod identity.",
+      "button": "Confirm & link"
+    },
+    "success": {
+      "message": "Your Slack account is now linked to Terrapod.",
+      "linkedAs": "Linked as <em>{email}</em>. You can close this tab and return to Slack."
+    },
+    "errors": {
+      "missingLink": "Missing or invalid link. Start again with the Terrapod link command in Slack.",
+      "invalidLink": "This link is invalid, expired, or already used. Start the link again from Slack.",
+      "linkingFailed": "Linking failed."
+    }
+  },
+  "cliComplete": {
+    "loading": "Loading...",
+    "completing": "Completing authentication...",
+    "invalid": {
+      "title": "Invalid Request",
+      "description": "Missing required parameters."
+    },
+    "success": {
+      "title": "Login Successful",
+      "complete": "API token created. You can close this tab."
+    },
+    "fallback": {
+      "description": "Could not reach the CLI automatically.",
+      "button": "Click here to complete manually"
+    },
+    "timeout": {
+      "description": "The CLI may not have completed the token exchange. Check your terminal."
+    }
+  },
+  "apiDocs": {
+    "view": "View:",
+    "redocTitle": "ReDoc API Documentation"
   }
 }

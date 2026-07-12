@@ -2370,5 +2370,250 @@
       "uploadState": "State konnte nicht hochgeladen werden",
       "uploadStateFile": "State-Datei konnte nicht hochgeladen werden"
     }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Der Status-Graph konnte nicht geladen werden.",
+      "emptyState": "Noch kein Status vorhanden — führen Sie einen Plan und Apply aus oder laden Sie einen Status hoch, dann wird dieser Graph gefüllt.",
+      "stateVersionLabel": "Status-Version",
+      "currentSuffix": "(aktuell)",
+      "colorByLabel": "Einfärben nach",
+      "viewGraph": "Graph",
+      "viewTable": "Tabelle",
+      "resourceCount": "{count, plural, one {# Ressource} other {# Ressourcen}}",
+      "dependencyCount": "{count, plural, one {# Abhängigkeit} other {# Abhängigkeiten}}",
+      "truncated": "Es werden die ersten {shown} von {total} Ressourcen angezeigt — der Graph ist zur besseren Lesbarkeit begrenzt.",
+      "colResource": "Ressource",
+      "colType": "Typ",
+      "colMode": "Modus",
+      "colModule": "Modul",
+      "colDependedOnBy": "Abhängig davon",
+      "rootModule": "(Root)"
+    },
+    "impact": {
+      "notAvailable": "Für diesen Lauf ist kein Impact-Graph verfügbar.",
+      "title": "Impact-Graph",
+      "subtitle": "Plan von {count, plural, one {# Ressource} other {# Ressourcen}}",
+      "hint": "Jede Kugel ist eine Ressource; jeder Pfeil zeigt auf das, wovon sie abhängt. Klicken Sie auf einen Knoten → dessen transitiver <b>Impact</b> (alles Nachgelagerte) leuchtet auf.",
+      "downstreamAffected": "nachgelagert betroffen",
+      "action": {
+        "create": "erstellen",
+        "update": "aktualisieren",
+        "replace": "ersetzen",
+        "destroy": "zerstören",
+        "unchanged": "unverändert"
+      }
+    },
+    "estate": {
+      "navHint": "Ziehen zum Drehen · Scrollen zum Zoomen · Rechts-Ziehen zum Verschieben · <em>Klicken Sie auf einen Knoten, um ihn zu umkreisen</em>"
+    },
+    "state3d": {
+      "title": "Status-Graph",
+      "hint": "Jede Kugel ist eine Ressource; jeder Pfeil zeigt auf das, wovon sie abhängt. Klicken Sie auf einen Knoten → die Ressourcen, die transitiv <b>davon abhängen</b>, leuchten auf.",
+      "dataSource": "Datenquelle",
+      "managed": "verwaltet",
+      "dependOnThis": "hängen davon ab"
+    },
+    "resource3d": {
+      "resetView": "Ansicht zurücksetzen",
+      "clear": "Zurücksetzen",
+      "key": "Legende",
+      "resources": "Ressourcen",
+      "hideKey": "Legende ausblenden",
+      "hideResources": "Ressourcen ausblenden",
+      "resourcesCount": "Ressourcen ({count})",
+      "filterPlaceholder": "Ressourcen filtern…",
+      "navHint": "Ziehen zum Drehen · Scrollen zum Zoomen · Rechts-Ziehen zum Verschieben · <em>Klicken Sie auf eine Ressource, um sie zu umkreisen</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "Zurück zu den Ausführungs-Hooks",
+    "defaultDescription": "Ausführungs-Hook",
+    "notFound": "Ausführungs-Hook nicht gefunden",
+    "scriptEmpty": "(leer)",
+    "tabs": {
+      "settings": "Einstellungen",
+      "workspaces": "Workspaces"
+    },
+    "common": {
+      "yes": "Ja",
+      "no": "Nein"
+    },
+    "actions": {
+      "edit": "Bearbeiten",
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "saving": "Wird gespeichert...",
+      "delete": "Löschen",
+      "deleting": "Wird gelöscht...",
+      "confirmDelete": "Löschen bestätigen",
+      "add": "Hinzufügen",
+      "adding": "Wird hinzugefügt...",
+      "remove": "Entfernen"
+    },
+    "settings": {
+      "heading": "Einstellungen"
+    },
+    "fields": {
+      "name": "Name",
+      "description": "Beschreibung",
+      "hookPoint": "Hook-Punkt",
+      "priority": "Priorität",
+      "enabled": "Aktiviert",
+      "script": "Skript (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "Ausführungs-Hook löschen",
+      "description": "Diesen Hook dauerhaft löschen und aus allen Workspaces entfernen."
+    },
+    "workspaces": {
+      "scopeNote": "Dieser Hook wird nur auf den unten zugeordneten Workspaces ausgeführt. Es gibt keinen globalen Geltungsbereich.",
+      "associate": "Workspace zuordnen",
+      "workspaceLabel": "Workspace",
+      "selectPlaceholder": "Wählen Sie einen Workspace...",
+      "empty": "Diesem Hook sind keine Workspaces zugeordnet.",
+      "colWorkspace": "Workspace",
+      "colActions": "Aktionen"
+    },
+    "confirm": {
+      "removeWorkspace": "Diesen Workspace aus dem Hook entfernen? Der Hook wird dafür nicht mehr ausgeführt."
+    },
+    "success": {
+      "updated": "Ausführungs-Hook aktualisiert",
+      "workspaceAssociated": "Workspace zugeordnet",
+      "workspaceRemoved": "Workspace entfernt"
+    },
+    "errors": {
+      "load": "Ausführungs-Hook konnte nicht geladen werden",
+      "update": "Ausführungs-Hook konnte nicht aktualisiert werden",
+      "delete": "Ausführungs-Hook konnte nicht gelöscht werden",
+      "addWorkspace": "Workspace konnte nicht hinzugefügt werden",
+      "removeWorkspace": "Workspace konnte nicht entfernt werden"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "Policy-Sets",
+    "notFound": "Nicht gefunden",
+    "unknown": "unbekannt",
+    "subtitle": "OPA-Policy-Set · erstellt von {createdBy}",
+    "settings": {
+      "heading": "Einstellungen"
+    },
+    "fields": {
+      "description": "Beschreibung",
+      "enforcement": "Durchsetzung",
+      "enabled": "Aktiviert",
+      "globalScope": "Global (jeder Workspace)"
+    },
+    "enforcement": {
+      "advisory": "Beratend (warnen)",
+      "mandatory": "Verbindlich (Apply blockieren)"
+    },
+    "scope": {
+      "allowLabels": "Zugelassene Labels (key: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "Zugelassene Namen (einer pro Zeile)",
+      "denyLabels": "Abgelehnte Labels (key: v1, v2)",
+      "denyNames": "Abgelehnte Namen (einer pro Zeile)"
+    },
+    "vcs": {
+      "heading": "VCS-Konfiguration",
+      "repoUrl": "Repository-URL",
+      "branch": "Branch",
+      "branchPlaceholder": "main (Standard)",
+      "policyPath": "Policy-Pfad"
+    },
+    "vcsBanner": {
+      "syncedFrom": "Policies synchronisiert von",
+      "at": "unter",
+      "lastSynced": "Zuletzt synchronisiert {time}",
+      "commit": "(Commit {sha})",
+      "syncError": "Synchronisierungsfehler: {error}"
+    },
+    "policies": {
+      "heading": "Policies ({count})",
+      "vcsManaged": "Vom Repository verwaltet — Änderungen per PR übermitteln",
+      "empty": "Noch keine Policies in diesem Set."
+    },
+    "addPolicy": {
+      "namePlaceholder": "Policy-Name",
+      "descPlaceholder": "Beschreibung (optional)",
+      "regoHint": "Rego v1. Muss <code>package terrapod</code> deklarieren und Verstöße über ein <code>deny</code>-Set ausdrücken. Der Plan ist <code>input</code>; der Terrapod-Kontext ist <code>data.terrapod_context</code>."
+    },
+    "actions": {
+      "saving": "Wird gespeichert...",
+      "saveSettings": "Einstellungen speichern",
+      "syncNow": "Jetzt synchronisieren",
+      "cancel": "Abbrechen",
+      "addPolicy": "Policy hinzufügen",
+      "deleteSet": "Set löschen",
+      "validatingRego": "Rego wird validiert...",
+      "delete": "Löschen",
+      "savePolicy": "Policy speichern"
+    },
+    "confirm": {
+      "deleteSet": "Dieses Policy-Set und alle zugehörigen Policies löschen? Aufgezeichnete Run-Auswertungen bleiben erhalten.",
+      "deletePolicy": "Policy \"{name}\" löschen?"
+    },
+    "errors": {
+      "load": "Policy-Set konnte nicht geladen werden",
+      "save": "Policy-Set konnte nicht gespeichert werden",
+      "saveStatus": "Speichern fehlgeschlagen ({status})",
+      "delete": "Policy-Set konnte nicht gelöscht werden",
+      "deleteStatus": "Löschen fehlgeschlagen ({status})",
+      "addPolicy": "Policy konnte nicht hinzugefügt werden",
+      "addPolicyStatus": "Policy konnte nicht hinzugefügt werden ({status})",
+      "savePolicy": "Policy konnte nicht gespeichert werden",
+      "savePolicyStatus": "Policy konnte nicht gespeichert werden ({status})",
+      "deletePolicy": "Policy konnte nicht gelöscht werden",
+      "deletePolicyStatus": "Löschen fehlgeschlagen ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "Slack mit Terrapod verbinden",
+    "loading": "Wird geladen…",
+    "checking": "Ihr Link wird überprüft…",
+    "linking": "Ihr Slack-Konto wird verknüpft…",
+    "unknown": "unbekannt",
+    "confirm": {
+      "prompt": "Möchten Sie dieses Slack-Konto mit <em>Ihrer</em> Terrapod-Identität verknüpfen? Jede zukünftige Slack-Aktion (Genehmigen/Verwerfen) wird als dieser Terrapod-Benutzer mit dessen Berechtigungen ausgeführt.",
+      "slackUser": "Slack-Benutzer",
+      "slackTeam": "Slack-Team",
+      "terrapodAccount": "Terrapod-Konto",
+      "warning": "Fahren Sie nur fort, wenn Sie diese Verknüpfung soeben selbst in Slack gestartet haben. Falls nicht, schließen Sie diesen Tab und verknüpfen Sie nicht — dadurch wird das oben genannte Slack-Konto mit <em>Ihrer</em> Terrapod-Identität verbunden.",
+      "button": "Bestätigen & verknüpfen"
+    },
+    "success": {
+      "message": "Ihr Slack-Konto ist jetzt mit Terrapod verknüpft.",
+      "linkedAs": "Verknüpft als <em>{email}</em>. Sie können diesen Tab schließen und zu Slack zurückkehren."
+    },
+    "errors": {
+      "missingLink": "Fehlender oder ungültiger Link. Starten Sie erneut mit dem Terrapod-Link-Befehl in Slack.",
+      "invalidLink": "Dieser Link ist ungültig, abgelaufen oder bereits verwendet. Starten Sie die Verknüpfung erneut über Slack.",
+      "linkingFailed": "Verknüpfung fehlgeschlagen."
+    }
+  },
+  "cliComplete": {
+    "loading": "Wird geladen...",
+    "completing": "Authentifizierung wird abgeschlossen...",
+    "invalid": {
+      "title": "Ungültige Anfrage",
+      "description": "Erforderliche Parameter fehlen."
+    },
+    "success": {
+      "title": "Anmeldung erfolgreich",
+      "complete": "API-Token erstellt. Sie können diesen Tab schließen."
+    },
+    "fallback": {
+      "description": "Die CLI konnte nicht automatisch erreicht werden.",
+      "button": "Hier klicken, um manuell abzuschließen"
+    },
+    "timeout": {
+      "description": "Die CLI hat den Token-Austausch möglicherweise nicht abgeschlossen. Prüfen Sie Ihr Terminal."
+    }
+  },
+  "apiDocs": {
+    "view": "Ansicht:",
+    "redocTitle": "ReDoc-API-Dokumentation"
   }
 }
