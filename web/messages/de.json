@@ -35,5 +35,93 @@
   "switcher": {
     "language": "Sprache",
     "changeLanguage": "Sprache ändern"
+  },
+  "workspaces": {
+    "title": "Arbeitsbereiche",
+    "description": "Terraform-Arbeitsbereiche, Status und Ausführungen verwalten",
+    "new": "Neuer Arbeitsbereich",
+    "cancel": "Abbrechen",
+    "create": "Arbeitsbereich erstellen",
+    "creating": "Wird erstellt…",
+    "loadFailed": "Arbeitsbereiche konnten nicht geladen werden",
+    "createFailed": "Arbeitsbereich konnte nicht erstellt werden",
+    "form": {
+      "name": "Name",
+      "namePattern": "Nur Buchstaben, Zahlen, Bindestriche und Unterstriche. Muss mit einem Buchstaben oder einer Zahl beginnen.",
+      "namePlaceholder": "mein-arbeitsbereich",
+      "executionMode": "Ausführungsmodus",
+      "local": "Lokal",
+      "agent": "Agent",
+      "executionBackend": "Ausführungs-Backend",
+      "version": "Version",
+      "versionTitle": "Version im Format X.Y oder X.Y.Z (z. B. 1.11 oder 1.11.5)",
+      "versionPlaceholder": "z. B. 1.11 oder 1.11.5",
+      "cpuRequest": "CPU-Anforderung",
+      "cpuTitle": "Kubernetes-CPU-Menge: ganze Kerne (1, 2) oder Millicores (500m, 100m)",
+      "cpuHint": "z. B. 1, 0.5, 500m",
+      "memoryRequest": "Speicheranforderung",
+      "memoryTitle": "Kubernetes-Speichermenge: Bytes (1000) oder mit Suffix (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "z. B. 2Gi, 512Mi, 1Ti",
+      "agentPool": "Agent-Pool",
+      "none": "Keiner",
+      "autoApply": "Automatisch anwenden",
+      "enabled": "Aktiviert",
+      "workingDirectory": "Arbeitsverzeichnis",
+      "workingDirectoryPlaceholder": "z. B. environments/dev",
+      "workingDirectoryHint": "Unterverzeichnis im Repository mit .tf-Dateien",
+      "vcsConnection": "VCS-Verbindung",
+      "vcsRepoUrl": "VCS-Repository-URL",
+      "vcsRepoUrlTitle": "Muss eine HTTP- oder HTTPS-URL sein",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "VCS-Branch",
+      "vcsBranchPlaceholder": "main (Standard)"
+    },
+    "stats": {
+      "total": "Gesamt",
+      "health": "Zustand",
+      "locked": "Gesperrt",
+      "clearAllFilters": "Alle Filter zurücksetzen",
+      "clearHealthFilter": "Zustandsfilter zurücksetzen",
+      "filterHealth": "Auf Arbeitsbereiche mit Zustandsproblemen filtern",
+      "clearLockedFilter": "Sperrfilter zurücksetzen",
+      "filterLocked": "Auf gesperrte Arbeitsbereiche filtern"
+    },
+    "filter": {
+      "placeholder": "Nach Name, Label oder Status filtern – z. B. „eu1“, „env:prod“, „status:errored“",
+      "ariaLabel": "Arbeitsbereiche filtern",
+      "clear": "Zurücksetzen",
+      "status": "Status",
+      "label": "Label",
+      "back": "zurück",
+      "valueCount": "{count, plural, one {# Wert} other {# Werte}}",
+      "removeTerm": "Diesen Begriff entfernen",
+      "showing": "{filtered} von {total} werden angezeigt",
+      "termName": "name: {value}",
+      "termStatus": "status: {value}",
+      "termLabelAny": "{key}: (beliebig)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "Status",
+      "hintHealth": "Zustand",
+      "hintLabel": "Label",
+      "hintLabelKey": "Label-Schlüssel",
+      "hintName": "Name"
+    },
+    "row": {
+      "removeLabelFilter": "Klicken, um aus dem Filter zu entfernen",
+      "addLabelFilter": "Klicken, um nach diesem Label zu filtern"
+    },
+    "table": {
+      "name": "Name",
+      "mode": "Modus",
+      "pool": "Pool",
+      "resources": "Ressourcen",
+      "status": "Status",
+      "created": "Erstellt",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "Noch keine Arbeitsbereiche. Erstellen Sie einen, um zu beginnen.",
+      "noMatch": "Keine Arbeitsbereiche entsprechen diesem Filter."
+    }
   }
 }

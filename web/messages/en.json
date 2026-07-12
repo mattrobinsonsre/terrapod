@@ -35,5 +35,93 @@
   "switcher": {
     "language": "Language",
     "changeLanguage": "Change language"
+  },
+  "workspaces": {
+    "title": "Workspaces",
+    "description": "Manage Terraform workspaces, state, and runs",
+    "new": "New Workspace",
+    "cancel": "Cancel",
+    "create": "Create Workspace",
+    "creating": "Creating…",
+    "loadFailed": "Failed to load workspaces",
+    "createFailed": "Failed to create workspace",
+    "form": {
+      "name": "Name",
+      "namePattern": "Letters, numbers, hyphens, and underscores only. Must start with a letter or number.",
+      "namePlaceholder": "my-workspace",
+      "executionMode": "Execution Mode",
+      "local": "Local",
+      "agent": "Agent",
+      "executionBackend": "Execution Backend",
+      "version": "Version",
+      "versionTitle": "Version in X.Y or X.Y.Z format (e.g. 1.11 or 1.11.5)",
+      "versionPlaceholder": "e.g. 1.11 or 1.11.5",
+      "cpuRequest": "CPU Request",
+      "cpuTitle": "Kubernetes CPU quantity: whole cores (1, 2) or millicores (500m, 100m)",
+      "cpuHint": "e.g. 1, 0.5, 500m",
+      "memoryRequest": "Memory Request",
+      "memoryTitle": "Kubernetes memory quantity: bytes (1000) or with suffix (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "e.g. 2Gi, 512Mi, 1Ti",
+      "agentPool": "Agent Pool",
+      "none": "None",
+      "autoApply": "Auto Apply",
+      "enabled": "Enabled",
+      "workingDirectory": "Working Directory",
+      "workingDirectoryPlaceholder": "e.g. environments/dev",
+      "workingDirectoryHint": "Subdirectory within repo containing .tf files",
+      "vcsConnection": "VCS Connection",
+      "vcsRepoUrl": "VCS Repository URL",
+      "vcsRepoUrlTitle": "Must be an HTTP or HTTPS URL",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "VCS Branch",
+      "vcsBranchPlaceholder": "main (default)"
+    },
+    "stats": {
+      "total": "Total",
+      "health": "Health",
+      "locked": "Locked",
+      "clearAllFilters": "Clear all filters",
+      "clearHealthFilter": "Clear health issues filter",
+      "filterHealth": "Filter to workspaces with health issues",
+      "clearLockedFilter": "Clear locked filter",
+      "filterLocked": "Filter to locked workspaces"
+    },
+    "filter": {
+      "placeholder": "Filter by name, label, or status — e.g. \"eu1\", \"env:prod\", \"status:errored\"",
+      "ariaLabel": "Filter workspaces",
+      "clear": "Clear",
+      "status": "Status",
+      "label": "Label",
+      "back": "back",
+      "valueCount": "{count, plural, one {# value} other {# values}}",
+      "removeTerm": "Remove this term",
+      "showing": "Showing {filtered} of {total}",
+      "termName": "name: {value}",
+      "termStatus": "status: {value}",
+      "termLabelAny": "{key}: (any)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "status",
+      "hintHealth": "health",
+      "hintLabel": "label",
+      "hintLabelKey": "label key",
+      "hintName": "name"
+    },
+    "row": {
+      "removeLabelFilter": "Click to remove from filter",
+      "addLabelFilter": "Click to filter by this label"
+    },
+    "table": {
+      "name": "Name",
+      "mode": "Mode",
+      "pool": "Pool",
+      "resources": "Resources",
+      "status": "Status",
+      "created": "Created",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "No workspaces yet. Create one to get started.",
+      "noMatch": "No workspaces match this filter."
+    }
   }
 }
