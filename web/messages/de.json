@@ -527,5 +527,623 @@
         "confirm": "Löschen"
       }
     }
+  },
+  "adminUsers": {
+    "title": "Benutzer",
+    "description": "Lokale Benutzerkonten verwalten",
+    "empty": "Keine Benutzer gefunden.",
+    "columns": {
+      "email": "E-Mail",
+      "displayName": "Anzeigename",
+      "status": "Status",
+      "lastLogin": "Letzte Anmeldung",
+      "created": "Erstellt",
+      "actions": "Aktionen"
+    },
+    "form": {
+      "email": "E-Mail",
+      "displayName": "Anzeigename",
+      "displayNamePlaceholder": "Jane Doe",
+      "passwordOptional": "Passwort (optional)",
+      "passwordPlaceholder": "Ein starkes Passwort eingeben"
+    },
+    "reset": {
+      "title": "Passwort zurücksetzen für {email}",
+      "newPassword": "Neues Passwort"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "Sehr schwach",
+        "weak": "Schwach",
+        "fair": "Mittel",
+        "good": "Gut",
+        "strong": "Stark"
+      }
+    },
+    "status": {
+      "active": "Aktiv",
+      "inactive": "Inaktiv",
+      "never": "Nie"
+    },
+    "actions": {
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "saving": "Wird gespeichert...",
+      "createUser": "Benutzer erstellen",
+      "creating": "Wird erstellt...",
+      "resetPassword": "Passwort zurücksetzen",
+      "edit": "Bearbeiten",
+      "delete": "Löschen",
+      "resetPw": "PW zurücksetzen",
+      "setPw": "PW festlegen",
+      "cancelPw": "PW abbrechen"
+    },
+    "confirm": {
+      "activate": "Benutzer \"{email}\" aktivieren?",
+      "deactivate": "Benutzer \"{email}\" deaktivieren?",
+      "delete": "Benutzer \"{email}\" löschen? Dies kann nicht rückgängig gemacht werden."
+    },
+    "success": {
+      "created": "Benutzer \"{email}\" erstellt",
+      "updated": "Benutzer \"{email}\" aktualisiert",
+      "activated": "Benutzer \"{email}\" aktiviert",
+      "deactivated": "Benutzer \"{email}\" deaktiviert",
+      "passwordReset": "Passwort für \"{email}\" zurückgesetzt",
+      "deleted": "Benutzer \"{email}\" gelöscht"
+    },
+    "errors": {
+      "load": "Benutzer konnten nicht geladen werden",
+      "create": "Benutzer konnte nicht erstellt werden",
+      "createStatus": "Benutzer konnte nicht erstellt werden ({status})",
+      "update": "Benutzer konnte nicht aktualisiert werden",
+      "resetPassword": "Passwort konnte nicht zurückgesetzt werden",
+      "delete": "Benutzer konnte nicht gelöscht werden"
+    }
+  },
+  "adminRoles": {
+    "title": "Rollen & Zuweisungen",
+    "description": "RBAC-Rollen und Benutzer-Rollenzuweisungen verwalten",
+    "builtIn": "integriert",
+    "emptyRoles": "Keine Rollen definiert.",
+    "emptyAssignments": "Keine Rollenzuweisungen.",
+    "tabs": {
+      "roles": "Rollen",
+      "assignments": "Zuweisungen"
+    },
+    "columns": {
+      "provider": "Anbieter",
+      "email": "E-Mail",
+      "role": "Rolle",
+      "created": "Erstellt",
+      "actions": "Aktionen"
+    },
+    "form": {
+      "name": "Name",
+      "namePattern": "Nur Buchstaben, Zahlen, Bindestriche und Unterstriche. Muss mit einem Buchstaben oder einer Zahl beginnen.",
+      "workspacePermission": "Workspace-Berechtigung",
+      "poolPermission": "Pool-Berechtigung",
+      "registryPermission": "Registry-Berechtigung",
+      "catalogPermission": "Katalog-Berechtigung",
+      "descriptionLabel": "Beschreibung",
+      "descriptionPlaceholder": "Entwicklerzugriff",
+      "allowLabels": "Zulassen-Labels (Schlüssel=Wert, kommagetrennt)",
+      "allowNames": "Zulassen-Namen (kommagetrennt)",
+      "denyLabels": "Verweigern-Labels (Schlüssel=Wert, kommagetrennt)",
+      "denyNames": "Verweigern-Namen (kommagetrennt)",
+      "allowLabelsShort": "Zulassen-Labels",
+      "allowNamesShort": "Zulassen-Namen",
+      "denyLabelsShort": "Verweigern-Labels",
+      "denyNamesShort": "Verweigern-Namen"
+    },
+    "assignForm": {
+      "provider": "Anbieter",
+      "email": "E-Mail",
+      "roles": "Rollen"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# Berechtigung} other {# Berechtigungen}} ausgewählt",
+      "count": "{count, plural, one {# Berechtigung} other {# Berechtigungen}}",
+      "custom": "Benutzerdefiniert",
+      "matchesPresets": "Entspricht Voreinstellungen",
+      "advanced": "Erweitert — Berechtigungen",
+      "otherPreserved": "Weitere Berechtigungen (beim Speichern erhalten)",
+      "presetHelp": {
+        "before": "Die Auswahl einer Voreinstellung oben aktiviert deren Berechtigungen vorab. Das An- oder Abwählen eines Kästchens über eine Voreinstellung hinaus markiert die Rolle als",
+        "after": "und ihre Vergabe wird als expliziter Berechtigungssatz gesendet."
+      },
+      "groups": {
+        "workspace": "Workspace",
+        "run": "Ausführung",
+        "state": "State",
+        "var": "Variablen",
+        "config": "Konfiguration",
+        "drift": "Drift",
+        "run-task": "Ausführungsaufgaben",
+        "notification": "Benachrichtigungen",
+        "run-trigger": "Ausführungs-Trigger",
+        "pool": "Agent-Pools",
+        "registry": "Registry",
+        "catalog": "Servicekatalog"
+      }
+    },
+    "display": {
+      "allow": "Zulassen: {value}",
+      "allowNames": "Zulassen-Namen: {value}",
+      "deny": "Verweigern: {value}",
+      "denyNames": "Verweigern-Namen: {value}"
+    },
+    "actions": {
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "saving": "Wird gespeichert...",
+      "edit": "Bearbeiten",
+      "delete": "Löschen",
+      "remove": "Entfernen",
+      "createRole": "Rolle erstellen",
+      "creating": "Wird erstellt...",
+      "addAssignment": "Zuweisung hinzufügen",
+      "setRoles": "Rollen festlegen"
+    },
+    "confirm": {
+      "deleteRole": "Rolle \"{name}\" löschen? Alle Zuweisungen, die darauf verweisen, sind betroffen.",
+      "removeAssignment": "Rolle \"{roleName}\" von {email} entfernen?"
+    },
+    "success": {
+      "roleCreated": "Rolle \"{name}\" erstellt",
+      "roleUpdated": "Rolle \"{name}\" aktualisiert",
+      "roleDeleted": "Rolle \"{name}\" gelöscht",
+      "rolesAssigned": "Rollen zugewiesen an {email}",
+      "assignmentRemoved": "Zuweisung entfernt"
+    },
+    "errors": {
+      "loadRoles": "Rollen konnten nicht geladen werden",
+      "loadAssignments": "Zuweisungen konnten nicht geladen werden",
+      "createRole": "Rolle konnte nicht erstellt werden",
+      "createRoleStatus": "Rolle konnte nicht erstellt werden ({status})",
+      "updateRole": "Rolle konnte nicht aktualisiert werden",
+      "deleteRole": "Rolle konnte nicht gelöscht werden",
+      "setAssignment": "Zuweisung konnte nicht festgelegt werden",
+      "setAssignmentStatus": "Zuweisung konnte nicht festgelegt werden ({status})",
+      "deleteAssignment": "Zuweisung konnte nicht gelöscht werden"
+    }
+  },
+  "adminVcs": {
+    "title": "VCS-Verbindungen",
+    "description": "Integrationen mit Versionsverwaltungssystemen verwalten",
+    "empty": "Keine VCS-Verbindungen konfiguriert.",
+    "actions": {
+      "new": "Neue Verbindung",
+      "cancel": "Abbrechen",
+      "edit": "Bearbeiten",
+      "delete": "Löschen"
+    },
+    "confirmDelete": "Diese VCS-Verbindung löschen? Workspaces, die sie verwenden, verlieren die VCS-Integration. Dies kann nicht rückgängig gemacht werden.",
+    "form": {
+      "name": "Name",
+      "namePattern": "Nur Buchstaben, Zahlen, Bindestriche und Unterstriche. Muss mit einem Buchstaben oder einer Zahl beginnen.",
+      "provider": "Anbieter",
+      "providerImmutable": "Der Anbieter ist unveränderlich — zum Ändern löschen und neu erstellen",
+      "serverUrl": "Server-URL (optional)",
+      "serverUrlHint": "Muss eine HTTP- oder HTTPS-URL sein (z. B. https://github.mycompany.com)",
+      "appId": "App-ID",
+      "appIdHint": "GitHub-App-ID — nur Ziffern",
+      "installationId": "Installations-ID",
+      "installationIdHint": "GitHub-App-Installations-ID — nur Ziffern",
+      "privateKey": "Privater Schlüssel (PEM)",
+      "browse": "Durchsuchen...",
+      "privateKeyKeep": "Leer lassen, um den aktuellen Schlüssel zu behalten — neues PEM einfügen zum Rotieren",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nEine .pem-Datei hierher ziehen oder auf Durchsuchen klicken",
+      "webhookSecret": "Webhook-Geheimnis",
+      "optional": "(optional)",
+      "webhookSecretSet": "Gesetzt — leer lassen zum Behalten, neuen Wert eingeben zum Rotieren",
+      "webhookSecretGlobal": "Leer lassen, um das globale Webhook-Geheimnis zu verwenden",
+      "webhookSecretHelp": "Verbindungsspezifisches HMAC-Geheimnis für die Webhooks dieser Installation. Ist es nicht gesetzt, wird das globale Geheimnis verwendet.",
+      "accessToken": "Zugriffstoken",
+      "accessTokenKeep": "Leer lassen, um das aktuelle Token zu behalten",
+      "saving": "Wird gespeichert...",
+      "creating": "Wird erstellt...",
+      "saveChanges": "Änderungen speichern",
+      "createConnection": "Verbindung erstellen"
+    },
+    "table": {
+      "name": "Name",
+      "provider": "Anbieter",
+      "serverUrl": "Server-URL",
+      "status": "Status",
+      "created": "Erstellt",
+      "actions": "Aktionen"
+    },
+    "success": {
+      "created": "VCS-Verbindung \"{name}\" erstellt",
+      "updated": "VCS-Verbindung \"{name}\" aktualisiert",
+      "deleted": "VCS-Verbindung gelöscht"
+    },
+    "errors": {
+      "load": "VCS-Verbindungen konnten nicht geladen werden",
+      "save": "Verbindung konnte nicht gespeichert werden",
+      "delete": "Verbindung konnte nicht gelöscht werden",
+      "createStatus": "Verbindung konnte nicht erstellt werden ({status})",
+      "updateStatus": "Verbindung konnte nicht aktualisiert werden ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "Variablensätze",
+    "description": "Organisationsweite Variablensätze für Workspace-Gruppen verwalten",
+    "empty": "Keine Variablensätze konfiguriert.",
+    "none": "-",
+    "actions": {
+      "new": "Neuer Variablensatz",
+      "cancel": "Abbrechen"
+    },
+    "form": {
+      "name": "Name",
+      "namePattern": "Nur Buchstaben, Zahlen, Bindestriche und Unterstriche. Muss mit einem Buchstaben oder einer Zahl beginnen.",
+      "descriptionLabel": "Beschreibung",
+      "descriptionPlaceholder": "AWS-Anmeldedaten für alle Workspaces",
+      "global": "Global (auf alle Workspaces anwenden)",
+      "priority": "Priorität (Workspace-Variablen überschreiben)",
+      "creating": "Wird erstellt...",
+      "create": "Variablensatz erstellen"
+    },
+    "table": {
+      "name": "Name",
+      "description": "Beschreibung",
+      "scope": "Geltungsbereich",
+      "variables": "Variablen",
+      "created": "Erstellt"
+    },
+    "scope": {
+      "global": "Global",
+      "priority": "Priorität",
+      "standard": "Standard"
+    },
+    "errors": {
+      "load": "Variablensätze konnten nicht geladen werden",
+      "create": "Variablensatz konnte nicht erstellt werden",
+      "createStatus": "Variablensatz konnte nicht erstellt werden ({status})"
+    },
+    "detail": {
+      "back": "Zurück zu den Variablensätzen",
+      "headerFallback": "Variablensatz",
+      "notFound": "Variablensatz nicht gefunden",
+      "global": "Global",
+      "priority": "Priorität",
+      "yes": "Ja",
+      "no": "Nein",
+      "edit": "Bearbeiten",
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "saving": "Wird gespeichert...",
+      "delete": "Löschen",
+      "deleting": "Wird gelöscht...",
+      "confirmDelete": "Löschen bestätigen",
+      "deleteTitle": "Variablensatz löschen",
+      "deleteDescription": "Diesen Variablensatz und alle seine Variablen dauerhaft löschen.",
+      "tabs": {
+        "settings": "Einstellungen",
+        "variables": "Variablen",
+        "workspaces": "Workspaces"
+      },
+      "addVariable": "Variable hinzufügen",
+      "adding": "Wird hinzugefügt...",
+      "varKey": "Schlüssel",
+      "varValue": "Wert",
+      "varCategory": "Kategorie",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Umgebung",
+      "sensitive": "Sensibel",
+      "sensAbbr": "Sens.",
+      "enterNewValue": "Neuen Wert eingeben",
+      "empty": "leer",
+      "emptyVars": "Keine Variablen in diesem Satz.",
+      "actions": "Aktionen",
+      "remove": "Entfernen",
+      "add": "Hinzufügen",
+      "addWorkspace": "Workspace hinzufügen",
+      "workspace": "Workspace",
+      "selectWorkspace": "Workspace auswählen...",
+      "globalBanner": "Dieser Variablensatz ist global und gilt automatisch für alle Workspaces.",
+      "emptyWorkspaces": "Diesem Variablensatz sind keine Workspaces zugewiesen.",
+      "confirmDeleteVar": "Diese Variable löschen? Dies kann nicht rückgängig gemacht werden.",
+      "confirmRemoveWorkspace": "Diesen Workspace aus dem Variablensatz entfernen? Seine Variablen gelten dann nicht mehr für diesen Workspace.",
+      "success": {
+        "updated": "Variablensatz aktualisiert",
+        "workspaceAdded": "Workspace hinzugefügt",
+        "workspaceRemoved": "Workspace entfernt"
+      },
+      "errors": {
+        "load": "Variablensatz konnte nicht geladen werden",
+        "update": "Variablensatz konnte nicht aktualisiert werden",
+        "delete": "Variablensatz konnte nicht gelöscht werden",
+        "loadVars": "Variablen konnten nicht geladen werden",
+        "loadWorkspaces": "Workspaces konnten nicht geladen werden",
+        "addVar": "Variable konnte nicht hinzugefügt werden",
+        "addVarStatus": "Variable konnte nicht hinzugefügt werden ({status})",
+        "updateVar": "Variable konnte nicht aktualisiert werden",
+        "deleteVar": "Variable konnte nicht gelöscht werden",
+        "addWorkspace": "Workspace konnte nicht hinzugefügt werden",
+        "removeWorkspace": "Workspace konnte nicht entfernt werden"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "Autodiscovery",
+    "description": "Workspaces in Monorepos automatisch anlegen, wenn PRs passende Pfade berühren",
+    "empty": "Noch keine Autodiscovery-Regeln. Legen Sie eine an, um Workspaces automatisch aus PRs in Ihrem Monorepo bereitzustellen.",
+    "unsavedRule": "(nicht gespeicherte Regel)",
+    "actions": {
+      "newRule": "Neue Regel",
+      "cancel": "Abbrechen",
+      "create": "Anlegen",
+      "update": "Aktualisieren",
+      "preview": "Vorschau",
+      "edit": "Bearbeiten",
+      "delete": "Löschen",
+      "close": "Schließen"
+    },
+    "status": {
+      "enabled": "aktiviert",
+      "disabled": "deaktiviert"
+    },
+    "form": {
+      "createTitle": "Regel anlegen",
+      "editTitle": "Regel bearbeiten",
+      "name": "Name",
+      "vcsConnection": "VCS-Verbindung",
+      "selectConnection": "Verbindung auswählen",
+      "repoUrl": "Repo-URL",
+      "branch": "Branch (leer = Standard)",
+      "matchPattern": "Übereinstimmungsmuster",
+      "matchPatternHint": "Globs im Gitignore-Stil. <code>**</code> passt über Pfadsegmente hinweg. Nur <code>*.tf*</code>-Dateien lösen Autodiscovery aus.",
+      "ignorePatterns": "Ignorier-Muster (eines pro Zeile)",
+      "nameTemplate": "Workspace-Namensvorlage (optional)",
+      "nameTemplateHint": "Verwenden Sie <path></path> für das Verzeichnis mit <code>/</code> ersetzt durch <code>-</code>, oder <root></root> für das Verzeichnis unverändert. Leer = Standard (nur der bindestrichgetrennte Pfad).",
+      "templateDefaults": "Standardwerte der Workspace-Vorlage",
+      "executionMode": "Ausführungsmodus",
+      "executionModeHint": "Autodiscovery ist VCS-gesteuert; nur die Agent-Ausführung wird unterstützt.",
+      "agentPool": "Agent-Pool",
+      "none": "(keiner)",
+      "executionBackend": "Ausführungs-Backend",
+      "terraformVersion": "Terraform-Version",
+      "cpuRequest": "CPU-Anforderung",
+      "memoryRequest": "Speicher-Anforderung",
+      "ownerEmail": "E-Mail des Besitzers",
+      "autoApply": "Auto-Apply",
+      "enabled": "Aktiviert",
+      "onDirectoryDelete": "Bei Verzeichnislöschung",
+      "onDeleteFlag": "Markieren (sicher — als zur Löschung vorgemerkt markieren, erfordert manuelle Aktion)",
+      "onDeleteDestroy": "Zerstören (GEFAHR — baut Infrastruktur ab und archiviert dann den Workspace)",
+      "onDirectoryDeleteHint": "Was mit einem per Autodiscovery angelegten Workspace geschieht, wenn sein Verzeichnis im verfolgten Branch entfernt wird.",
+      "onDeleteDestroyWarning": "Dies führt ein echtes terraform destroy auf dem Workspace aus, wenn sein Verzeichnis im verfolgten Branch entfernt wird.",
+      "labels": "Labels (von angelegten Workspaces geerbt)",
+      "varFiles": "Var-Dateien (von angelegten Workspaces geerbt)",
+      "varFilesHint": "Relative <code>.tfvars</code>-Pfade, die an plan/apply übergeben werden.",
+      "addVarFile": "Var-Datei hinzufügen",
+      "executionHooks": "Execution Hooks (jedem neuen Workspace zugeordnet)",
+      "executionHooksHint": "Wählen Sie aus den auf der Admin-Seite <page>Execution Hooks</page> definierten Hooks — jeder ausgewählte Hook wird jedem Workspace zugeordnet, den diese Regel anlegt.",
+      "noHooks": "Noch keine Execution Hooks definiert. Legen Sie zuerst einen auf der Admin-Seite Execution Hooks an.",
+      "hookDisabled": "(deaktiviert)",
+      "hookNotInLibrary": "(nicht in der Bibliothek — zum Entfernen abwählen)",
+      "runTaskTemplates": "Run-Task-Vorlagen (auf jedem neuen Workspace angelegt)",
+      "notificationTemplates": "Benachrichtigungsvorlagen (auf jedem neuen Workspace angelegt)",
+      "saving": "Wird gespeichert...",
+      "previewTitle": "Das Repo durchlaufen und in der Vorschau zeigen, welche Workspaces diese Regel anlegen WÜRDE — keine Persistenz"
+    },
+    "table": {
+      "name": "Name",
+      "repo": "Repo",
+      "pattern": "Muster",
+      "enabled": "Aktiviert",
+      "created": "Erstellt",
+      "previewTitle": "Das Repo durchlaufen und in der Vorschau zeigen, welche Workspaces diese Regel anlegen würde"
+    },
+    "deleteModal": {
+      "title": "Regel löschen?",
+      "body": "Von dieser Regel automatisch angelegte Workspaces funktionieren weiterhin. Künftige PRs, die neue Pfade unter dieser Regel berühren, legen keine weiteren Workspaces automatisch an."
+    },
+    "preview": {
+      "title": "Vorschau: {ruleName}",
+      "walkedFiles": "<files>{count}</files> Dateien durchlaufen auf <refspan>{ref}</refspan>",
+      "walking": "Repository wird durchlaufen…",
+      "noMatches": "Keine Verzeichnisse in diesem Repo passen zum Muster der Regel. Nichts anzulegen.",
+      "colWorkspace": "Workspace",
+      "colDirectory": "Verzeichnis",
+      "colAction": "Aktion",
+      "repoRoot": "(Repo-Wurzel)",
+      "actionCreate": "Anlegen",
+      "skipDiscovered": "Überspringen (bereits erkannt)",
+      "skipDiscoveredTitle": "Bereits von dieser Regel angelegt",
+      "skipCollision": "Überspringen (Namenskonflikt)",
+      "skipCollisionTitle": "Ein Workspace mit diesem Namen existiert bereits aus einem anderen Grund",
+      "willCreate": "{count, plural, one {# Workspace wird angelegt.} other {# Workspaces werden angelegt.}} Bestehende Workspaces (Konflikte) bleiben unberührt.",
+      "provision": "{count, plural, one {# Workspace bereitstellen} other {# Workspaces bereitstellen}}",
+      "provisioning": "Wird bereitgestellt…",
+      "saveToProvision": "Speichern Sie die Regel, um diese Workspaces bereitzustellen."
+    },
+    "success": {
+      "created": "{name} angelegt",
+      "updated": "{name} aktualisiert",
+      "deleted": "Regel gelöscht",
+      "provisioned": "{count, plural, one {# Workspace aus \"{ruleName}\" angelegt} other {# Workspaces aus \"{ruleName}\" angelegt}}"
+    },
+    "errors": {
+      "loadRules": "Autodiscovery-Regeln konnten nicht geladen werden",
+      "load": "Laden fehlgeschlagen",
+      "createFailed": "Anlegen fehlgeschlagen: {status} {detail}",
+      "updateFailed": "Aktualisieren fehlgeschlagen: {status} {detail}",
+      "save": "Speichern fehlgeschlagen",
+      "deleteRule": "Regel konnte nicht gelöscht werden",
+      "delete": "Löschen fehlgeschlagen",
+      "previewFailed": "Vorschau fehlgeschlagen ({status})",
+      "preview": "Vorschau fehlgeschlagen",
+      "previewPrereq": "Setzen Sie VCS-Verbindung, Repo-URL und Muster, bevor Sie die Vorschau anzeigen",
+      "scanFailed": "Scan fehlgeschlagen ({status})",
+      "scan": "Scan fehlgeschlagen"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Massenaktualisierung",
+    "description": "Workspaces per Filter auswählen und dann eine Einstellungsänderung auf alle anwenden",
+    "none": "(keiner)",
+    "anyOption": "(beliebig)",
+    "unchanged": "(unverändert)",
+    "unchangedOption": "(unverändert)",
+    "filter": {
+      "heading": "1. Workspaces auswählen",
+      "matchAll": "<strong>Alle</strong> Workspaces treffen (ignoriert die Filter unten)",
+      "namePrefix": "Namenspräfix",
+      "executionBackend": "Ausführungs-Backend",
+      "ownerEmail": "E-Mail des Besitzers",
+      "agentPool": "Agent-Pool",
+      "vcsConnection": "VCS-Verbindung",
+      "labels": "Labels",
+      "search": "Suchen",
+      "searching": "Wird gesucht..."
+    },
+    "results": {
+      "matched": "<strong>{count}</strong> {count, plural, one {Workspace} other {Workspaces}} getroffen.",
+      "noMatch": "Keine Workspaces trafen auf diesen Filter zu.",
+      "colName": "Name",
+      "colMode": "Modus",
+      "colBackend": "Backend",
+      "colTfVersion": "TF-Version",
+      "colLabels": "Labels"
+    },
+    "update": {
+      "heading": "2. Änderungen anwenden",
+      "hint": "Nur die unten gesetzten Felder werden geändert. Der Filter oben wählt aus, welche Workspaces die Änderung erhalten.",
+      "terraformVersion": "Terraform-Version",
+      "executionBackend": "Ausführungs-Backend",
+      "executionMode": "Ausführungsmodus",
+      "autoApply": "Auto-Apply",
+      "agentPool": "Agent-Pool",
+      "cpuRequest": "CPU-Anforderung",
+      "memoryRequest": "Speicher-Anforderung",
+      "setLabels": "Labels setzen (ersetzt die Label-Map auf jedem getroffenen Workspace)",
+      "setVarFiles": "Var-Dateien setzen",
+      "addVarFile": "Var-Datei hinzufügen",
+      "setRunTasks": "Run-Tasks setzen (per Name auf jedem getroffenen Workspace aktualisiert/eingefügt)",
+      "setNotifications": "Benachrichtigungskonfigurationen setzen (per Name aktualisiert/eingefügt)",
+      "dryRun": "Probelauf (nur Vorschau — keine Änderungen geschrieben)",
+      "confirmWarning": "Dies schreibt Änderungen auf jeden getroffenen Workspace.",
+      "confirmApply": "Anwenden bestätigen",
+      "applying": "Wird angewendet...",
+      "cancel": "Abbrechen",
+      "working": "Wird verarbeitet...",
+      "previewDryRun": "Vorschau (Probelauf)",
+      "applyChanges": "Änderungen anwenden"
+    },
+    "diff": {
+      "colWorkspace": "Workspace",
+      "colChanges": "Änderungen"
+    },
+    "dryResult": {
+      "heading": "Ergebnis des Probelaufs",
+      "summary": "<strong>{matched}</strong> getroffen; <strong>{wouldChange}</strong> würden sich ändern; {unchanged} unverändert. Nichts wurde geschrieben.",
+      "wouldChange": "Würde sich ändern",
+      "noChange": "Mit dieser Aktualisierung würde sich kein Workspace ändern."
+    },
+    "applyResult": {
+      "heading": "Ergebnis der Anwendung",
+      "summary": "<strong>{matched}</strong> getroffen; <appliedstrong>{applied}</appliedstrong> angewendet; {unchanged} unverändert; {errors, plural, one {# Fehler} other {# Fehler}}.",
+      "applied": "Angewendet",
+      "unnamedWorkspace": "(Workspace)",
+      "noChange": "Keine Workspaces geändert."
+    },
+    "errors": {
+      "searchFailed": "Suche fehlgeschlagen ({status})",
+      "search": "Suche fehlgeschlagen",
+      "bulkUpdateFailed": "Massenaktualisierung fehlgeschlagen ({status})",
+      "bulkUpdate": "Massenaktualisierung fehlgeschlagen"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "Execution Hooks",
+    "description": "Benutzerdefinierte Shell-Schritte, die in Runner-Jobs an Pre-/Post-Plan-/Apply-Punkten laufen, Workspaces zugeordnet",
+    "empty": "Keine Execution Hooks konfiguriert.",
+    "actions": {
+      "cancel": "Abbrechen",
+      "new": "Neuer Execution Hook",
+      "creating": "Wird erstellt...",
+      "create": "Execution Hook erstellen"
+    },
+    "badges": {
+      "disabled": "Deaktiviert",
+      "enabled": "Aktiviert"
+    },
+    "columns": {
+      "name": "Name",
+      "hookPoint": "Hook-Punkt",
+      "enabled": "Aktiviert",
+      "priority": "Priorität",
+      "workspaces": "Workspaces"
+    },
+    "form": {
+      "name": "Name",
+      "namePatternTitle": "Nur Buchstaben, Zahlen, Bindestriche und Unterstriche. Muss mit einem Buchstaben oder einer Zahl beginnen.",
+      "description": "Beschreibung",
+      "descriptionPlaceholder": "Einen internen Hosts-Eintrag vor init hinzufügen",
+      "hookPoint": "Hook-Punkt",
+      "priority": "Priorität",
+      "priorityTitle": "Niedrigere laufen zuerst, wenn mehrere Hooks denselben Punkt teilen (Gleichstand nach Name aufgelöst).",
+      "scriptLabel": "Skript (<code>/bin/sh -c</code>)",
+      "scriptHelp": "Läuft mit der Cloud-Identität des Runners. Ein Exit ungleich null lässt die Ausführung fehlschlagen. Geheimnisse sollten aus Workspace-Variablen stammen, nicht hier inline."
+    },
+    "errors": {
+      "load": "Execution Hooks konnten nicht geladen werden",
+      "createStatus": "Execution Hook konnte nicht erstellt werden ({status})",
+      "create": "Execution Hook konnte nicht erstellt werden"
+    }
+  },
+  "adminPolicySets": {
+    "title": "Policy Sets",
+    "description": "OPA-Policy-as-Code-Durchsetzung, per Label auf Workspaces beschränkt",
+    "empty": "Keine Policy Sets konfiguriert.",
+    "actions": {
+      "cancel": "Abbrechen",
+      "new": "Neues Policy Set",
+      "creating": "Wird erstellt...",
+      "create": "Policy Set erstellen"
+    },
+    "badges": {
+      "disabled": "Deaktiviert",
+      "mandatory": "Verpflichtend",
+      "advisory": "Empfehlend",
+      "global": "Global",
+      "labelScoped": "Label-beschränkt"
+    },
+    "columns": {
+      "name": "Name",
+      "description": "Beschreibung",
+      "enforcement": "Durchsetzung",
+      "scope": "Geltungsbereich",
+      "policies": "Policies"
+    },
+    "form": {
+      "name": "Name",
+      "namePatternTitle": "Nur Buchstaben, Zahlen, Bindestriche und Unterstriche. Muss mit einem Buchstaben oder einer Zahl beginnen.",
+      "description": "Beschreibung",
+      "descriptionPlaceholder": "Verpflichtende Leitplanken für Produktions-Workspaces",
+      "enforcement": "Durchsetzung",
+      "enforcementAdvisory": "Empfehlend (warnen, nicht blockieren)",
+      "enforcementMandatory": "Verpflichtend (Apply bei Fehlschlag blockieren)",
+      "globalScope": "Global (auf jeden Workspace anwenden)",
+      "sourceInline": "Inline (Policies in der UI verwalten)",
+      "sourceVcs": "Aus VCS-Repository",
+      "vcsConnection": "VCS-Verbindung",
+      "selectConnection": "Verbindung auswählen...",
+      "repoUrl": "Repository-URL",
+      "branch": "Branch",
+      "branchPlaceholder": "main (Standard)",
+      "policyPath": "Policy-Pfad",
+      "policyPathPlaceholder": "policies/ (Verzeichnis mit .rego-Dateien)",
+      "helpVcs": "Policies werden automatisch aus dem Repository synchronisiert.",
+      "helpInline": "Policies hinzufügen und die Label-Beschränkung verfeinern, nachdem das Set erstellt wurde."
+    },
+    "errors": {
+      "load": "Policy Sets konnten nicht geladen werden",
+      "createStatus": "Policy Set konnte nicht erstellt werden ({status})",
+      "create": "Policy Set konnte nicht erstellt werden"
+    }
   }
 }

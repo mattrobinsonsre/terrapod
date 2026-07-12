@@ -527,5 +527,623 @@
         "confirm": "Delete"
       }
     }
+  },
+  "adminUsers": {
+    "title": "Users",
+    "description": "Manage local user accounts",
+    "empty": "No users found.",
+    "columns": {
+      "email": "Email",
+      "displayName": "Display Name",
+      "status": "Status",
+      "lastLogin": "Last Login",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "form": {
+      "email": "Email",
+      "displayName": "Display Name",
+      "displayNamePlaceholder": "Jane Doe",
+      "passwordOptional": "Password (optional)",
+      "passwordPlaceholder": "Enter a strong password"
+    },
+    "reset": {
+      "title": "Reset password for {email}",
+      "newPassword": "New Password"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "Very weak",
+        "weak": "Weak",
+        "fair": "Fair",
+        "good": "Good",
+        "strong": "Strong"
+      }
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "never": "Never"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving...",
+      "createUser": "Create User",
+      "creating": "Creating...",
+      "resetPassword": "Reset Password",
+      "edit": "Edit",
+      "delete": "Delete",
+      "resetPw": "Reset PW",
+      "setPw": "Set PW",
+      "cancelPw": "Cancel PW"
+    },
+    "confirm": {
+      "activate": "Activate user \"{email}\"?",
+      "deactivate": "Deactivate user \"{email}\"?",
+      "delete": "Delete user \"{email}\"? This cannot be undone."
+    },
+    "success": {
+      "created": "User \"{email}\" created",
+      "updated": "User \"{email}\" updated",
+      "activated": "User \"{email}\" activated",
+      "deactivated": "User \"{email}\" deactivated",
+      "passwordReset": "Password reset for \"{email}\"",
+      "deleted": "User \"{email}\" deleted"
+    },
+    "errors": {
+      "load": "Failed to load users",
+      "create": "Failed to create user",
+      "createStatus": "Failed to create user ({status})",
+      "update": "Failed to update user",
+      "resetPassword": "Failed to reset password",
+      "delete": "Failed to delete user"
+    }
+  },
+  "adminRoles": {
+    "title": "Roles & Assignments",
+    "description": "Manage RBAC roles and user role assignments",
+    "builtIn": "built-in",
+    "emptyRoles": "No roles defined.",
+    "emptyAssignments": "No role assignments.",
+    "tabs": {
+      "roles": "Roles",
+      "assignments": "Assignments"
+    },
+    "columns": {
+      "provider": "Provider",
+      "email": "Email",
+      "role": "Role",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "form": {
+      "name": "Name",
+      "namePattern": "Letters, numbers, hyphens, and underscores only. Must start with a letter or number.",
+      "workspacePermission": "Workspace Permission",
+      "poolPermission": "Pool Permission",
+      "registryPermission": "Registry Permission",
+      "catalogPermission": "Catalog Permission",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Developer access",
+      "allowLabels": "Allow Labels (key=value, comma-separated)",
+      "allowNames": "Allow Names (comma-separated)",
+      "denyLabels": "Deny Labels (key=value, comma-separated)",
+      "denyNames": "Deny Names (comma-separated)",
+      "allowLabelsShort": "Allow Labels",
+      "allowNamesShort": "Allow Names",
+      "denyLabelsShort": "Deny Labels",
+      "denyNamesShort": "Deny Names"
+    },
+    "assignForm": {
+      "provider": "Provider",
+      "email": "Email",
+      "roles": "Roles"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# capability} other {# capabilities}} selected",
+      "count": "{count, plural, one {# capability} other {# capabilities}}",
+      "custom": "Custom",
+      "matchesPresets": "Matches presets",
+      "advanced": "Advanced — capabilities",
+      "otherPreserved": "Other capabilities (preserved on save)",
+      "presetHelp": {
+        "before": "Selecting a preset above pre-checks its capabilities. Ticking or unticking a box past a preset marks the role",
+        "after": "and its grant is sent as an explicit capability set."
+      },
+      "groups": {
+        "workspace": "Workspace",
+        "run": "Run",
+        "state": "State",
+        "var": "Variables",
+        "config": "Config",
+        "drift": "Drift",
+        "run-task": "Run tasks",
+        "notification": "Notifications",
+        "run-trigger": "Run triggers",
+        "pool": "Agent pools",
+        "registry": "Registry",
+        "catalog": "Service catalog"
+      }
+    },
+    "display": {
+      "allow": "Allow: {value}",
+      "allowNames": "Allow names: {value}",
+      "deny": "Deny: {value}",
+      "denyNames": "Deny names: {value}"
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving...",
+      "edit": "Edit",
+      "delete": "Delete",
+      "remove": "Remove",
+      "createRole": "Create Role",
+      "creating": "Creating...",
+      "addAssignment": "Add Assignment",
+      "setRoles": "Set Roles"
+    },
+    "confirm": {
+      "deleteRole": "Delete role \"{name}\"? Any assignments referencing it are affected.",
+      "removeAssignment": "Remove role \"{roleName}\" from {email}?"
+    },
+    "success": {
+      "roleCreated": "Role \"{name}\" created",
+      "roleUpdated": "Role \"{name}\" updated",
+      "roleDeleted": "Role \"{name}\" deleted",
+      "rolesAssigned": "Roles assigned to {email}",
+      "assignmentRemoved": "Assignment removed"
+    },
+    "errors": {
+      "loadRoles": "Failed to load roles",
+      "loadAssignments": "Failed to load assignments",
+      "createRole": "Failed to create role",
+      "createRoleStatus": "Failed to create role ({status})",
+      "updateRole": "Failed to update role",
+      "deleteRole": "Failed to delete role",
+      "setAssignment": "Failed to set assignment",
+      "setAssignmentStatus": "Failed to set assignment ({status})",
+      "deleteAssignment": "Failed to delete assignment"
+    }
+  },
+  "adminVcs": {
+    "title": "VCS Connections",
+    "description": "Manage version control system integrations",
+    "empty": "No VCS connections configured.",
+    "actions": {
+      "new": "New Connection",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "confirmDelete": "Delete this VCS connection? Workspaces using it will lose VCS integration. This cannot be undone.",
+    "form": {
+      "name": "Name",
+      "namePattern": "Letters, numbers, hyphens, and underscores only. Must start with a letter or number.",
+      "provider": "Provider",
+      "providerImmutable": "Provider is immutable — delete and recreate to change it",
+      "serverUrl": "Server URL (optional)",
+      "serverUrlHint": "Must be an HTTP or HTTPS URL (e.g. https://github.mycompany.com)",
+      "appId": "App ID",
+      "appIdHint": "GitHub App ID — numeric digits only",
+      "installationId": "Installation ID",
+      "installationIdHint": "GitHub App Installation ID — numeric digits only",
+      "privateKey": "Private Key (PEM)",
+      "browse": "Browse...",
+      "privateKeyKeep": "Leave blank to keep the current key — paste a new PEM to rotate",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nDrop a .pem file here or click Browse",
+      "webhookSecret": "Webhook Secret",
+      "optional": "(optional)",
+      "webhookSecretSet": "Set — leave blank to keep, enter a new value to rotate",
+      "webhookSecretGlobal": "Leave blank to use the global webhook secret",
+      "webhookSecretHelp": "Per-connection HMAC secret for this installation's webhooks. When unset, the global secret is used.",
+      "accessToken": "Access Token",
+      "accessTokenKeep": "Leave blank to keep the current token",
+      "saving": "Saving...",
+      "creating": "Creating...",
+      "saveChanges": "Save Changes",
+      "createConnection": "Create Connection"
+    },
+    "table": {
+      "name": "Name",
+      "provider": "Provider",
+      "serverUrl": "Server URL",
+      "status": "Status",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "success": {
+      "created": "VCS connection \"{name}\" created",
+      "updated": "VCS connection \"{name}\" updated",
+      "deleted": "VCS connection deleted"
+    },
+    "errors": {
+      "load": "Failed to load VCS connections",
+      "save": "Failed to save connection",
+      "delete": "Failed to delete connection",
+      "createStatus": "Failed to create connection ({status})",
+      "updateStatus": "Failed to update connection ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "Variable Sets",
+    "description": "Manage org-scoped variable sets for workspace groups",
+    "empty": "No variable sets configured.",
+    "none": "-",
+    "actions": {
+      "new": "New Variable Set",
+      "cancel": "Cancel"
+    },
+    "form": {
+      "name": "Name",
+      "namePattern": "Letters, numbers, hyphens, and underscores only. Must start with a letter or number.",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "AWS credentials for all workspaces",
+      "global": "Global (apply to all workspaces)",
+      "priority": "Priority (override workspace vars)",
+      "creating": "Creating...",
+      "create": "Create Variable Set"
+    },
+    "table": {
+      "name": "Name",
+      "description": "Description",
+      "scope": "Scope",
+      "variables": "Variables",
+      "created": "Created"
+    },
+    "scope": {
+      "global": "Global",
+      "priority": "Priority",
+      "standard": "Standard"
+    },
+    "errors": {
+      "load": "Failed to load variable sets",
+      "create": "Failed to create variable set",
+      "createStatus": "Failed to create variable set ({status})"
+    },
+    "detail": {
+      "back": "Back to variable sets",
+      "headerFallback": "Variable set",
+      "notFound": "Variable set not found",
+      "global": "Global",
+      "priority": "Priority",
+      "yes": "Yes",
+      "no": "No",
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving...",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "confirmDelete": "Confirm Delete",
+      "deleteTitle": "Delete Variable Set",
+      "deleteDescription": "Permanently delete this variable set and all its variables.",
+      "tabs": {
+        "settings": "Settings",
+        "variables": "Variables",
+        "workspaces": "Workspaces"
+      },
+      "addVariable": "Add Variable",
+      "adding": "Adding...",
+      "varKey": "Key",
+      "varValue": "Value",
+      "varCategory": "Category",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Environment",
+      "sensitive": "Sensitive",
+      "sensAbbr": "Sens.",
+      "enterNewValue": "Enter new value",
+      "empty": "empty",
+      "emptyVars": "No variables in this set.",
+      "actions": "Actions",
+      "remove": "Remove",
+      "add": "Add",
+      "addWorkspace": "Add Workspace",
+      "workspace": "Workspace",
+      "selectWorkspace": "Select a workspace...",
+      "globalBanner": "This variable set is global and applies to all workspaces automatically.",
+      "emptyWorkspaces": "No workspaces assigned to this variable set.",
+      "confirmDeleteVar": "Delete this variable? This cannot be undone.",
+      "confirmRemoveWorkspace": "Remove this workspace from the variable set? Its variables will no longer apply to that workspace.",
+      "success": {
+        "updated": "Variable set updated",
+        "workspaceAdded": "Workspace added",
+        "workspaceRemoved": "Workspace removed"
+      },
+      "errors": {
+        "load": "Failed to load variable set",
+        "update": "Failed to update variable set",
+        "delete": "Failed to delete variable set",
+        "loadVars": "Failed to load variables",
+        "loadWorkspaces": "Failed to load workspaces",
+        "addVar": "Failed to add variable",
+        "addVarStatus": "Failed to add variable ({status})",
+        "updateVar": "Failed to update variable",
+        "deleteVar": "Failed to delete variable",
+        "addWorkspace": "Failed to add workspace",
+        "removeWorkspace": "Failed to remove workspace"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "Autodiscovery",
+    "description": "Auto-create workspaces in monorepos when PRs touch matching paths",
+    "empty": "No autodiscovery rules yet. Create one to start auto-provisioning workspaces from PRs in your monorepo.",
+    "unsavedRule": "(unsaved rule)",
+    "actions": {
+      "newRule": "New Rule",
+      "cancel": "Cancel",
+      "create": "Create",
+      "update": "Update",
+      "preview": "Preview",
+      "edit": "Edit",
+      "delete": "Delete",
+      "close": "Close"
+    },
+    "status": {
+      "enabled": "enabled",
+      "disabled": "disabled"
+    },
+    "form": {
+      "createTitle": "Create rule",
+      "editTitle": "Edit rule",
+      "name": "Name",
+      "vcsConnection": "VCS connection",
+      "selectConnection": "Select connection",
+      "repoUrl": "Repo URL",
+      "branch": "Branch (empty = default)",
+      "matchPattern": "Match pattern",
+      "matchPatternHint": "Gitignore-style globs. <code>**</code> matches across path segments. Only <code>*.tf*</code> files trigger autodiscovery.",
+      "ignorePatterns": "Ignore patterns (one per line)",
+      "nameTemplate": "Workspace name template (optional)",
+      "nameTemplateHint": "Use <path></path> for the directory with <code>/</code> replaced by <code>-</code>, or <root></root> for the directory as-is. Empty = default (just the dashed path).",
+      "templateDefaults": "Workspace template defaults",
+      "executionMode": "Execution mode",
+      "executionModeHint": "Autodiscovery is VCS-driven; only agent execution is supported.",
+      "agentPool": "Agent pool",
+      "none": "(none)",
+      "executionBackend": "Execution backend",
+      "terraformVersion": "Terraform version",
+      "cpuRequest": "CPU request",
+      "memoryRequest": "Memory request",
+      "ownerEmail": "Owner email",
+      "autoApply": "Auto-apply",
+      "enabled": "Enabled",
+      "onDirectoryDelete": "On directory delete",
+      "onDeleteFlag": "Flag (safe — mark pending deletion, requires manual action)",
+      "onDeleteDestroy": "Destroy (DANGER — tears down infrastructure then archives the workspace)",
+      "onDirectoryDeleteHint": "What happens to an autodiscovered workspace when its directory is removed on the tracked branch.",
+      "onDeleteDestroyWarning": "This will run a real terraform destroy on the workspace when its directory is removed on the tracked branch.",
+      "labels": "Labels (inherited by created workspaces)",
+      "varFiles": "Var files (inherited by created workspaces)",
+      "varFilesHint": "Relative <code>.tfvars</code> paths passed to plan/apply.",
+      "addVarFile": "Add var file",
+      "executionHooks": "Execution hooks (associated with each new workspace)",
+      "executionHooksHint": "Pick from hooks defined on the <page>Execution Hooks</page> admin page — each selected hook is associated with every workspace this rule creates.",
+      "noHooks": "No execution hooks defined yet. Create one on the Execution Hooks admin page first.",
+      "hookDisabled": "(disabled)",
+      "hookNotInLibrary": "(not in library — untick to remove)",
+      "runTaskTemplates": "Run task templates (created on each new workspace)",
+      "notificationTemplates": "Notification templates (created on each new workspace)",
+      "saving": "Saving...",
+      "previewTitle": "Walk the repo and preview which workspaces this rule WOULD create — no persistence"
+    },
+    "table": {
+      "name": "Name",
+      "repo": "Repo",
+      "pattern": "Pattern",
+      "enabled": "Enabled",
+      "created": "Created",
+      "previewTitle": "Walk the repo and preview which workspaces this rule would create"
+    },
+    "deleteModal": {
+      "title": "Delete rule?",
+      "body": "Workspaces auto-created by this rule keep working. Future PRs touching new paths under this rule won't auto-create more workspaces."
+    },
+    "preview": {
+      "title": "Preview: {ruleName}",
+      "walkedFiles": "Walked <files>{count}</files> files on <refspan>{ref}</refspan>",
+      "walking": "Walking repository…",
+      "noMatches": "No directories in this repo match the rule's pattern. Nothing to create.",
+      "colWorkspace": "Workspace",
+      "colDirectory": "Directory",
+      "colAction": "Action",
+      "repoRoot": "(repo root)",
+      "actionCreate": "Create",
+      "skipDiscovered": "Skip (already discovered)",
+      "skipDiscoveredTitle": "Already created by this rule",
+      "skipCollision": "Skip (name collision)",
+      "skipCollisionTitle": "A workspace with this name already exists for another reason",
+      "willCreate": "{count, plural, one {# workspace will be created.} other {# workspaces will be created.}} Existing workspaces (collisions) are left untouched.",
+      "provision": "{count, plural, one {Provision # workspace} other {Provision # workspaces}}",
+      "provisioning": "Provisioning…",
+      "saveToProvision": "Save the rule to provision these workspaces."
+    },
+    "success": {
+      "created": "Created {name}",
+      "updated": "Updated {name}",
+      "deleted": "Deleted rule",
+      "provisioned": "{count, plural, one {Created # workspace from \"{ruleName}\"} other {Created # workspaces from \"{ruleName}\"}}"
+    },
+    "errors": {
+      "loadRules": "Failed to load autodiscovery rules",
+      "load": "Failed to load",
+      "createFailed": "Create failed: {status} {detail}",
+      "updateFailed": "Update failed: {status} {detail}",
+      "save": "Failed to save",
+      "deleteRule": "Failed to delete rule",
+      "delete": "Failed to delete",
+      "previewFailed": "Preview failed ({status})",
+      "preview": "Preview failed",
+      "previewPrereq": "Set VCS connection, repo URL, and pattern before previewing",
+      "scanFailed": "Scan failed ({status})",
+      "scan": "Scan failed"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Bulk Update",
+    "description": "Select workspaces by filter, then apply a settings change across all of them",
+    "none": "(none)",
+    "anyOption": "(any)",
+    "unchanged": "(unchanged)",
+    "unchangedOption": "(unchanged)",
+    "filter": {
+      "heading": "1. Select workspaces",
+      "matchAll": "Match <strong>all</strong> workspaces (ignores the filters below)",
+      "namePrefix": "Name prefix",
+      "executionBackend": "Execution backend",
+      "ownerEmail": "Owner email",
+      "agentPool": "Agent pool",
+      "vcsConnection": "VCS connection",
+      "labels": "Labels",
+      "search": "Search",
+      "searching": "Searching..."
+    },
+    "results": {
+      "matched": "Matched <strong>{count}</strong> {count, plural, one {workspace} other {workspaces}}.",
+      "noMatch": "No workspaces matched this filter.",
+      "colName": "Name",
+      "colMode": "Mode",
+      "colBackend": "Backend",
+      "colTfVersion": "TF version",
+      "colLabels": "Labels"
+    },
+    "update": {
+      "heading": "2. Apply changes",
+      "hint": "Only fields you set below are changed. The filter above selects which workspaces receive the change.",
+      "terraformVersion": "Terraform version",
+      "executionBackend": "Execution backend",
+      "executionMode": "Execution mode",
+      "autoApply": "Auto-apply",
+      "agentPool": "Agent pool",
+      "cpuRequest": "CPU request",
+      "memoryRequest": "Memory request",
+      "setLabels": "Set labels (replaces the labels map on every matched workspace)",
+      "setVarFiles": "Set var files",
+      "addVarFile": "Add var file",
+      "setRunTasks": "Set run tasks (upserted by name on every matched workspace)",
+      "setNotifications": "Set notification configurations (upserted by name)",
+      "dryRun": "Dry run (preview only — no changes written)",
+      "confirmWarning": "This writes changes to every matched workspace.",
+      "confirmApply": "Confirm apply",
+      "applying": "Applying...",
+      "cancel": "Cancel",
+      "working": "Working...",
+      "previewDryRun": "Preview (dry run)",
+      "applyChanges": "Apply changes"
+    },
+    "diff": {
+      "colWorkspace": "Workspace",
+      "colChanges": "Changes"
+    },
+    "dryResult": {
+      "heading": "Dry run result",
+      "summary": "Matched <strong>{matched}</strong>; <strong>{wouldChange}</strong> would change; {unchanged} unchanged. Nothing was written.",
+      "wouldChange": "Would change",
+      "noChange": "No workspaces would change with this update."
+    },
+    "applyResult": {
+      "heading": "Apply result",
+      "summary": "Matched <strong>{matched}</strong>; <appliedstrong>{applied}</appliedstrong> applied; {unchanged} unchanged; {errors, plural, one {# error} other {# errors}}.",
+      "applied": "Applied",
+      "unnamedWorkspace": "(workspace)",
+      "noChange": "No workspaces changed."
+    },
+    "errors": {
+      "searchFailed": "Search failed ({status})",
+      "search": "Search failed",
+      "bulkUpdateFailed": "Bulk update failed ({status})",
+      "bulkUpdate": "Bulk update failed"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "Execution Hooks",
+    "description": "Custom shell steps run inside runner Jobs at pre/post-plan/apply points, associated with workspaces",
+    "empty": "No execution hooks configured.",
+    "actions": {
+      "cancel": "Cancel",
+      "new": "New Execution Hook",
+      "creating": "Creating...",
+      "create": "Create Execution Hook"
+    },
+    "badges": {
+      "disabled": "Disabled",
+      "enabled": "Enabled"
+    },
+    "columns": {
+      "name": "Name",
+      "hookPoint": "Hook Point",
+      "enabled": "Enabled",
+      "priority": "Priority",
+      "workspaces": "Workspaces"
+    },
+    "form": {
+      "name": "Name",
+      "namePatternTitle": "Letters, numbers, hyphens, and underscores only. Must start with a letter or number.",
+      "description": "Description",
+      "descriptionPlaceholder": "Add an internal hosts entry before init",
+      "hookPoint": "Hook Point",
+      "priority": "Priority",
+      "priorityTitle": "Lower runs first when several hooks share a point (ties broken by name).",
+      "scriptLabel": "Script (<code>/bin/sh -c</code>)",
+      "scriptHelp": "Runs with the runner's cloud identity. A non-zero exit fails the run. Secrets should come from workspace variables, not inline here."
+    },
+    "errors": {
+      "load": "Failed to load execution hooks",
+      "createStatus": "Failed to create execution hook ({status})",
+      "create": "Failed to create execution hook"
+    }
+  },
+  "adminPolicySets": {
+    "title": "Policy Sets",
+    "description": "OPA policy-as-code enforcement, scoped to workspaces by label",
+    "empty": "No policy sets configured.",
+    "actions": {
+      "cancel": "Cancel",
+      "new": "New Policy Set",
+      "creating": "Creating...",
+      "create": "Create Policy Set"
+    },
+    "badges": {
+      "disabled": "Disabled",
+      "mandatory": "Mandatory",
+      "advisory": "Advisory",
+      "global": "Global",
+      "labelScoped": "Label-scoped"
+    },
+    "columns": {
+      "name": "Name",
+      "description": "Description",
+      "enforcement": "Enforcement",
+      "scope": "Scope",
+      "policies": "Policies"
+    },
+    "form": {
+      "name": "Name",
+      "namePatternTitle": "Letters, numbers, hyphens, and underscores only. Must start with a letter or number.",
+      "description": "Description",
+      "descriptionPlaceholder": "Mandatory guardrails for production workspaces",
+      "enforcement": "Enforcement",
+      "enforcementAdvisory": "Advisory (warn, do not block)",
+      "enforcementMandatory": "Mandatory (block apply on failure)",
+      "globalScope": "Global (apply to every workspace)",
+      "sourceInline": "Inline (manage policies in UI)",
+      "sourceVcs": "From VCS Repository",
+      "vcsConnection": "VCS Connection",
+      "selectConnection": "Select connection...",
+      "repoUrl": "Repository URL",
+      "branch": "Branch",
+      "branchPlaceholder": "main (default)",
+      "policyPath": "Policy Path",
+      "policyPathPlaceholder": "policies/ (directory containing .rego files)",
+      "helpVcs": "Policies will be synced from the repository automatically.",
+      "helpInline": "Add policies and refine label scoping after creating the set."
+    },
+    "errors": {
+      "load": "Failed to load policy sets",
+      "createStatus": "Failed to create policy set ({status})",
+      "create": "Failed to create policy set"
+    }
   }
 }

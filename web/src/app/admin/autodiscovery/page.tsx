@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
 import { LoadingSpinner } from '@/components/loading-spinner'
@@ -19,6 +20,7 @@ import {
 import { getAuthState, isAdmin } from '@/lib/auth'
 import { apiFetch } from '@/lib/api'
 import { useSortable } from '@/lib/use-sortable'
+import { useFormat } from '@/lib/format'
 
 interface AutodiscoveryRule {
   id: string
@@ -69,6 +71,8 @@ type SortKey = 'name' | 'repo' | 'pattern' | 'enabled' | 'created'
 
 export default function AutodiscoveryPage() {
   const router = useRouter()
+  const t = useTranslations('adminAutodiscovery')
+  const fmt = useFormat()
   const [rules, setRules] = useState<AutodiscoveryRule[]>([])
   const [connections, setConnections] = useState<VCSConnection[]>([])
   const [pools, setPools] = useState<AgentPool[]>([])
@@ -155,7 +159,7 @@ export default function AutodiscoveryPage() {
         apiFetch('/api/terrapod/v1/agent-pools'),
         apiFetch('/api/terrapod/v1/execution-hooks'),
       ])
-      if (!rulesRes.ok) throw new Error('Failed to load autodiscovery rules')
+      if (!rulesRes.ok) throw new Error(t('errors.loadRules'))
       const rulesData = await rulesRes.json()
       setRules(rulesData.data || [])
       if (connsRes.ok) {
@@ -171,7 +175,7 @@ export default function AutodiscoveryPage() {
         setHooks(hd.data || [])
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load')
+      setError(err instanceof Error ? err.message : t('errors.load'))
     } finally {
       setLoading(false)
     }
@@ -284,14 +288,18 @@ export default function AutodiscoveryPage() {
       })
       if (!res.ok) {
         const txt = await res.text()
-        throw new Error(`${editingId ? 'Update' : 'Create'} failed: ${res.status} ${txt}`)
+        throw new Error(
+          editingId
+            ? t('errors.updateFailed', { status: res.status, detail: txt })
+            : t('errors.createFailed', { status: res.status, detail: txt }),
+        )
       }
-      setSuccess(editingId ? `Updated ${name}` : `Created ${name}`)
+      setSuccess(editingId ? t('success.updated', { name }) : t('success.created', { name }))
       setShowForm(false)
       resetForm()
       loadAll()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save')
+      setError(err instanceof Error ? err.message : t('errors.save'))
     } finally {
       setSubmitting(false)
     }
@@ -301,12 +309,12 @@ export default function AutodiscoveryPage() {
     setError('')
     try {
       const res = await apiFetch(`/api/terrapod/v1/autodiscovery-rules/${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete rule')
-      setSuccess('Deleted rule')
+      if (!res.ok) throw new Error(t('errors.deleteRule'))
+      setSuccess(t('success.deleted'))
       setDeleteId(null)
       loadAll()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete')
+      setError(err instanceof Error ? err.message : t('errors.delete'))
     }
   }
 
@@ -316,7 +324,7 @@ export default function AutodiscoveryPage() {
       const res = await apiFetch(`/api/terrapod/v1/autodiscovery-rules/${id}/preview`)
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        throw new Error(body.detail || `Preview failed (${res.status})`)
+        throw new Error(body.detail || t('errors.previewFailed', { status: res.status }))
       }
       const json = await res.json()
       const attrs = json?.data?.attributes ?? {}
@@ -331,7 +339,7 @@ export default function AutodiscoveryPage() {
       setPreviewModal({
         id,
         ruleName,
-        error: err instanceof Error ? err.message : 'Preview failed',
+        error: err instanceof Error ? err.message : t('errors.preview'),
       })
     }
   }
@@ -342,12 +350,12 @@ export default function AutodiscoveryPage() {
   // immediate initial scan).
   async function previewFormRule() {
     if (!vcsConnectionId || !repoUrl || !pattern) {
-      setError('Set VCS connection, repo URL, and pattern before previewing')
+      setError(t('errors.previewPrereq'))
       return
     }
     // id is empty for the unsaved-rule preview; the modal hides the
     // Provision button when collisions === 0 or when no id is set.
-    setPreviewModal({ id: '', ruleName: name || '(unsaved rule)', loading: true })
+    setPreviewModal({ id: '', ruleName: name || t('unsavedRule'), loading: true })
     try {
       const payload = {
         data: {
@@ -382,13 +390,13 @@ export default function AutodiscoveryPage() {
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        throw new Error(body.detail || `Preview failed (${res.status})`)
+        throw new Error(body.detail || t('errors.previewFailed', { status: res.status }))
       }
       const json = await res.json()
       const attrs = json?.data?.attributes ?? {}
       setPreviewModal({
         id: '',
-        ruleName: name || '(unsaved rule)',
+        ruleName: name || t('unsavedRule'),
         ref: attrs.ref,
         filesWalked: attrs['files-walked'],
         entries: attrs.entries ?? [],
@@ -396,8 +404,8 @@ export default function AutodiscoveryPage() {
     } catch (err) {
       setPreviewModal({
         id: '',
-        ruleName: name || '(unsaved rule)',
-        error: err instanceof Error ? err.message : 'Preview failed',
+        ruleName: name || t('unsavedRule'),
+        error: err instanceof Error ? err.message : t('errors.preview'),
       })
     }
   }
@@ -412,18 +420,18 @@ export default function AutodiscoveryPage() {
       )
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        throw new Error(body.detail || `Scan failed (${res.status})`)
+        throw new Error(body.detail || t('errors.scanFailed', { status: res.status }))
       }
       const json = await res.json()
       const created = json?.data?.attributes?.['workspaces-created'] ?? 0
-      setSuccess(`Created ${created} workspace${created === 1 ? '' : 's'} from "${previewModal.ruleName}"`)
+      setSuccess(t('success.provisioned', { count: created, ruleName: previewModal.ruleName }))
       setPreviewModal(null)
       loadAll()
     } catch (err) {
       setPreviewModal({
         ...previewModal,
         scanning: false,
-        error: err instanceof Error ? err.message : 'Scan failed',
+        error: err instanceof Error ? err.message : t('errors.scan'),
       })
     }
   }
@@ -435,14 +443,14 @@ export default function AutodiscoveryPage() {
       <NavBar />
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <PageHeader
-          title="Autodiscovery"
-          description="Auto-create workspaces in monorepos when PRs touch matching paths"
+          title={t('title')}
+          description={t('description')}
           actions={
             <button
               onClick={() => (showForm ? setShowForm(false) : openCreateForm())}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors btn-smoke"
             >
-              {showForm ? 'Cancel' : 'New Rule'}
+              {showForm ? t('actions.cancel') : t('actions.newRule')}
             </button>
           }
         />
@@ -457,12 +465,12 @@ export default function AutodiscoveryPage() {
         {showForm && (
           <form onSubmit={handleSubmit} className="mb-6 p-6 rounded-lg bg-slate-900/60 border border-slate-800 space-y-4">
             <h2 className="text-lg font-semibold text-slate-100">
-              {editingId ? 'Edit rule' : 'Create rule'}
+              {editingId ? t('form.editTitle') : t('form.createTitle')}
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-slate-300 mb-1">Name</label>
+                <label className="block text-sm text-slate-300 mb-1">{t('form.name')}</label>
                 <input
                   required
                   value={name}
@@ -472,14 +480,14 @@ export default function AutodiscoveryPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-300 mb-1">VCS connection</label>
+                <label className="block text-sm text-slate-300 mb-1">{t('form.vcsConnection')}</label>
                 <select
                   required
                   value={vcsConnectionId}
                   onChange={e => setVcsConnectionId(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
                 >
-                  <option value="">Select connection</option>
+                  <option value="">{t('form.selectConnection')}</option>
                   {connections.map(c => (
                     <option key={c.id} value={c.id}>
                       {c.attributes.name} ({c.attributes.provider})
@@ -491,7 +499,7 @@ export default function AutodiscoveryPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-slate-300 mb-1">Repo URL</label>
+                <label className="block text-sm text-slate-300 mb-1">{t('form.repoUrl')}</label>
                 <input
                   required
                   value={repoUrl}
@@ -501,7 +509,7 @@ export default function AutodiscoveryPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-300 mb-1">Branch (empty = default)</label>
+                <label className="block text-sm text-slate-300 mb-1">{t('form.branch')}</label>
                 <input
                   value={branch}
                   onChange={e => setBranch(e.target.value)}
@@ -512,7 +520,7 @@ export default function AutodiscoveryPage() {
             </div>
 
             <div>
-              <label className="block text-sm text-slate-300 mb-1">Match pattern</label>
+              <label className="block text-sm text-slate-300 mb-1">{t('form.matchPattern')}</label>
               <input
                 required
                 value={pattern}
@@ -520,11 +528,11 @@ export default function AutodiscoveryPage() {
                 placeholder="accounts/*/**/*.tf"
                 className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm font-mono"
               />
-              <p className="text-xs text-slate-500 mt-1">Gitignore-style globs. <code>**</code> matches across path segments. Only <code>*.tf*</code> files trigger autodiscovery.</p>
+              <p className="text-xs text-slate-500 mt-1">{t.rich('form.matchPatternHint', { code: (c) => <code>{c}</code> })}</p>
             </div>
 
             <div>
-              <label className="block text-sm text-slate-300 mb-1">Ignore patterns (one per line)</label>
+              <label className="block text-sm text-slate-300 mb-1">{t('form.ignorePatterns')}</label>
               <textarea
                 rows={3}
                 value={ignorePatternsText}
@@ -535,43 +543,43 @@ export default function AutodiscoveryPage() {
             </div>
 
             <div>
-              <label className="block text-sm text-slate-300 mb-1">Workspace name template (optional)</label>
+              <label className="block text-sm text-slate-300 mb-1">{t('form.nameTemplate')}</label>
               <input
                 value={nameTemplate}
                 onChange={e => setNameTemplate(e.target.value)}
                 placeholder="ws-{path}"
                 className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm font-mono"
               />
-              <p className="text-xs text-slate-500 mt-1">Use <code>{'{path}'}</code> for the directory with <code>/</code> replaced by <code>-</code>, or <code>{'{root}'}</code> for the directory as-is. Empty = default (just the dashed path).</p>
+              <p className="text-xs text-slate-500 mt-1">{t.rich('form.nameTemplateHint', { code: (c) => <code>{c}</code>, path: () => <code>{'{path}'}</code>, root: () => <code>{'{root}'}</code> })}</p>
             </div>
 
             <details className="group">
-              <summary className="text-sm text-slate-300 cursor-pointer">Workspace template defaults</summary>
+              <summary className="text-sm text-slate-300 cursor-pointer">{t('form.templateDefaults')}</summary>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-800">
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Execution mode</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('form.executionMode')}</label>
                   <input
                     value="agent"
                     disabled
                     className="w-full bg-slate-950/60 border border-slate-800 rounded px-3 py-2 text-sm text-slate-500"
                   />
-                  <p className="text-xs text-slate-500 mt-1">Autodiscovery is VCS-driven; only agent execution is supported.</p>
+                  <p className="text-xs text-slate-500 mt-1">{t('form.executionModeHint')}</p>
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Agent pool</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('form.agentPool')}</label>
                   <select
                     value={agentPoolId}
                     onChange={e => setAgentPoolId(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
                   >
-                    <option value="">(none)</option>
+                    <option value="">{t('form.none')}</option>
                     {pools.map(p => (
                       <option key={p.id} value={p.id}>{p.attributes.name}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Execution backend</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('form.executionBackend')}</label>
                   <select
                     value={executionBackend}
                     onChange={e => setExecutionBackend(e.target.value as 'tofu' | 'terraform')}
@@ -582,7 +590,7 @@ export default function AutodiscoveryPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Terraform version</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('form.terraformVersion')}</label>
                   <input
                     value={terraformVersion}
                     onChange={e => setTerraformVersion(e.target.value)}
@@ -590,7 +598,7 @@ export default function AutodiscoveryPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">CPU request</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('form.cpuRequest')}</label>
                   <input
                     value={resourceCpu}
                     onChange={e => setResourceCpu(e.target.value)}
@@ -598,7 +606,7 @@ export default function AutodiscoveryPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Memory request</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('form.memoryRequest')}</label>
                   <input
                     value={resourceMemory}
                     onChange={e => setResourceMemory(e.target.value)}
@@ -606,7 +614,7 @@ export default function AutodiscoveryPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Owner email</label>
+                  <label className="block text-sm text-slate-300 mb-1">{t('form.ownerEmail')}</label>
                   <input
                     value={ownerEmail}
                     onChange={e => setOwnerEmail(e.target.value)}
@@ -621,7 +629,7 @@ export default function AutodiscoveryPage() {
                       checked={autoApply}
                       onChange={e => setAutoApply(e.target.checked)}
                     />
-                    Auto-apply
+                    {t('form.autoApply')}
                   </label>
                   <label className="flex items-center gap-2 text-sm text-slate-300">
                     <input
@@ -629,53 +637,51 @@ export default function AutodiscoveryPage() {
                       checked={enabled}
                       onChange={e => setEnabled(e.target.checked)}
                     />
-                    Enabled
+                    {t('form.enabled')}
                   </label>
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">On directory delete</label>
+                <label className="block text-sm text-slate-300 mb-1">{t('form.onDirectoryDelete')}</label>
                 <select
                   value={onDirectoryDelete}
                   onChange={e => setOnDirectoryDelete(e.target.value as 'flag' | 'destroy')}
                   className="w-full sm:w-1/2 bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm"
                 >
-                  <option value="flag">Flag (safe — mark pending deletion, requires manual action)</option>
-                  <option value="destroy">Destroy (DANGER — tears down infrastructure then archives the workspace)</option>
+                  <option value="flag">{t('form.onDeleteFlag')}</option>
+                  <option value="destroy">{t('form.onDeleteDestroy')}</option>
                 </select>
                 <p className="text-xs text-slate-500 mt-1">
-                  What happens to an autodiscovered workspace when its directory is removed on the tracked branch.
+                  {t('form.onDirectoryDeleteHint')}
                 </p>
                 {onDirectoryDelete === 'destroy' && (
                   <p className="text-xs text-red-400 mt-2 font-medium">
-                    This will run a real terraform destroy on the workspace when its directory is removed on the tracked branch.
+                    {t('form.onDeleteDestroyWarning')}
                   </p>
                 )}
               </div>
               <div className="mt-4">
-                <label className="block text-sm text-slate-300 mb-1">Labels (inherited by created workspaces)</label>
+                <label className="block text-sm text-slate-300 mb-1">{t('form.labels')}</label>
                 <LabelsEditor labels={labels} onChange={setLabels} />
               </div>
               <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">Var files (inherited by created workspaces)</label>
-                <p className="text-xs text-slate-500 mb-2">Relative <code>.tfvars</code> paths passed to plan/apply.</p>
+                <label className="block text-sm text-slate-300 mb-1">{t('form.varFiles')}</label>
+                <p className="text-xs text-slate-500 mb-2">{t.rich('form.varFilesHint', { code: (c) => <code>{c}</code> })}</p>
                 <StringListEditor
                   values={varFiles}
                   onChange={setVarFiles}
                   placeholder="env/prod.tfvars"
-                  addLabel="Add var file"
+                  addLabel={t('form.addVarFile')}
                 />
               </div>
               <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">Execution hooks (associated with each new workspace)</label>
+                <label className="block text-sm text-slate-300 mb-1">{t('form.executionHooks')}</label>
                 <p className="text-xs text-slate-500 mb-2">
-                  Pick from hooks defined on the{' '}
-                  <span className="text-slate-400">Execution Hooks</span> admin page — each selected hook is
-                  associated with every workspace this rule creates.
+                  {t.rich('form.executionHooksHint', { page: (c) => <span className="text-slate-400">{c}</span> })}
                 </p>
                 {hooks.length === 0 ? (
                   <p className="text-xs text-slate-500 italic">
-                    No execution hooks defined yet. Create one on the Execution Hooks admin page first.
+                    {t('form.noHooks')}
                   </p>
                 ) : (
                   <div className="space-y-1.5 rounded-lg border border-slate-800 bg-slate-900/40 p-3 max-h-56 overflow-y-auto">
@@ -698,7 +704,7 @@ export default function AutodiscoveryPage() {
                           <span className="text-slate-200">{h.attributes.name}</span>
                           <span className="font-mono text-xs text-slate-500">{h.attributes['hook-point']}</span>
                           {!h.attributes.enabled && (
-                            <span className="text-xs text-amber-400/80">(disabled)</span>
+                            <span className="text-xs text-amber-400/80">{t('form.hookDisabled')}</span>
                           )}
                         </label>
                       )
@@ -720,16 +726,16 @@ export default function AutodiscoveryPage() {
                         className="rounded border-slate-600 bg-slate-800 text-brand-500 focus:ring-brand-500"
                       />
                       <span className="font-mono">{id}</span>
-                      <span className="text-amber-400/80">(not in library — untick to remove)</span>
+                      <span className="text-amber-400/80">{t('form.hookNotInLibrary')}</span>
                     </label>
                   ))}
               </div>
               <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">Run task templates (created on each new workspace)</label>
+                <label className="block text-sm text-slate-300 mb-1">{t('form.runTaskTemplates')}</label>
                 <RunTaskTemplatesEditor items={runTaskTemplates} onChange={setRunTaskTemplates} />
               </div>
               <div className="mt-4 pt-4 border-t border-slate-800">
-                <label className="block text-sm text-slate-300 mb-1">Notification templates (created on each new workspace)</label>
+                <label className="block text-sm text-slate-300 mb-1">{t('form.notificationTemplates')}</label>
                 <NotificationTemplatesEditor
                   items={notificationTemplates}
                   onChange={setNotificationTemplates}
@@ -743,40 +749,40 @@ export default function AutodiscoveryPage() {
                 disabled={submitting}
                 className="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-sm font-medium disabled:opacity-50"
               >
-                {submitting ? 'Saving...' : (editingId ? 'Update' : 'Create')}
+                {submitting ? t('form.saving') : (editingId ? t('actions.update') : t('actions.create'))}
               </button>
               <button
                 type="button"
                 onClick={previewFormRule}
                 disabled={submitting}
                 className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-100 text-sm disabled:opacity-50"
-                title="Walk the repo and preview which workspaces this rule WOULD create — no persistence"
+                title={t('form.previewTitle')}
               >
-                Preview
+                {t('actions.preview')}
               </button>
               <button
                 type="button"
                 onClick={() => { setShowForm(false); resetForm() }}
                 className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm"
               >
-                Cancel
+                {t('actions.cancel')}
               </button>
             </div>
           </form>
         )}
 
         {sortedItems.length === 0 ? (
-          <EmptyState message="No autodiscovery rules yet. Create one to start auto-provisioning workspaces from PRs in your monorepo." />
+          <EmptyState message={t('empty')} />
         ) : (
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-slate-400 border-b border-slate-800">
               <tr>
-                <SortableHeader label="Name" sortKey="name" sortState={sortState} onSort={toggleSort} />
-                <SortableHeader label="Repo" sortKey="repo" sortState={sortState} onSort={toggleSort} />
-                <SortableHeader label="Pattern" sortKey="pattern" sortState={sortState} onSort={toggleSort} />
-                <SortableHeader label="Enabled" sortKey="enabled" sortState={sortState} onSort={toggleSort} />
-                <SortableHeader label="Created" sortKey="created" sortState={sortState} onSort={toggleSort} />
+                <SortableHeader label={t('table.name')} sortKey="name" sortState={sortState} onSort={toggleSort} />
+                <SortableHeader label={t('table.repo')} sortKey="repo" sortState={sortState} onSort={toggleSort} />
+                <SortableHeader label={t('table.pattern')} sortKey="pattern" sortState={sortState} onSort={toggleSort} />
+                <SortableHeader label={t('table.enabled')} sortKey="enabled" sortState={sortState} onSort={toggleSort} />
+                <SortableHeader label={t('table.created')} sortKey="created" sortState={sortState} onSort={toggleSort} />
                 <th className="py-2"></th>
               </tr>
             </thead>
@@ -790,36 +796,34 @@ export default function AutodiscoveryPage() {
                   <td className="py-3 text-slate-400 font-mono text-xs">{r.attributes.pattern}</td>
                   <td className="py-3">
                     {r.attributes.enabled ? (
-                      <span className="text-green-400">enabled</span>
+                      <span className="text-green-400">{t('status.enabled')}</span>
                     ) : (
-                      <span className="text-slate-500">disabled</span>
+                      <span className="text-slate-500">{t('status.disabled')}</span>
                     )}
                   </td>
                   <td className="py-3 text-slate-400">
-                    {r.attributes['created-at']
-                      ? new Date(r.attributes['created-at']).toLocaleDateString()
-                      : ''}
+                    {fmt.date(r.attributes['created-at'])}
                   </td>
                   <td className="py-3 text-right">
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => openPreview(r.id, r.attributes.name)}
                         className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-brand-300 transition-colors"
-                        title="Walk the repo and preview which workspaces this rule would create"
+                        title={t('table.previewTitle')}
                       >
-                        Preview
+                        {t('actions.preview')}
                       </button>
                       <button
                         onClick={() => openEditForm(r)}
                         className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
                       >
-                        Edit
+                        {t('actions.edit')}
                       </button>
                       <button
                         onClick={() => setDeleteId(r.id)}
                         className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300 transition-colors"
                       >
-                        Delete
+                        {t('actions.delete')}
                       </button>
                     </div>
                   </td>
@@ -833,22 +837,22 @@ export default function AutodiscoveryPage() {
         {deleteId && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
             <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 max-w-md w-full">
-              <h3 className="text-lg font-semibold text-slate-100 mb-2">Delete rule?</h3>
+              <h3 className="text-lg font-semibold text-slate-100 mb-2">{t('deleteModal.title')}</h3>
               <p className="text-sm text-slate-400 mb-4">
-                Workspaces auto-created by this rule keep working. Future PRs touching new paths under this rule won&apos;t auto-create more workspaces.
+                {t('deleteModal.body')}
               </p>
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => setDeleteId(null)}
                   className="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm"
                 >
-                  Cancel
+                  {t('actions.cancel')}
                 </button>
                 <button
                   onClick={() => handleDelete(deleteId)}
                   className="px-4 py-2 rounded bg-red-700 hover:bg-red-600 text-white text-sm"
                 >
-                  Delete
+                  {t('actions.delete')}
                 </button>
               </div>
             </div>
@@ -859,16 +863,18 @@ export default function AutodiscoveryPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
             <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 max-w-3xl w-full max-h-[90vh] flex flex-col">
               <h3 className="text-lg font-semibold text-slate-100 mb-1">
-                Preview: {previewModal.ruleName}
+                {t('preview.title', { ruleName: previewModal.ruleName })}
               </h3>
               <p className="text-xs text-slate-500 mb-4">
                 {previewModal.ref ? (
-                  <>
-                    Walked <span className="text-slate-300">{previewModal.filesWalked}</span> files on{' '}
-                    <span className="text-slate-300 font-mono">{previewModal.ref}</span>
-                  </>
+                  t.rich('preview.walkedFiles', {
+                    count: previewModal.filesWalked ?? 0,
+                    ref: previewModal.ref,
+                    files: (c) => <span className="text-slate-300">{c}</span>,
+                    refspan: (c) => <span className="text-slate-300 font-mono">{c}</span>,
+                  })
                 ) : (
-                  'Walking repository…'
+                  t('preview.walking')
                 )}
               </p>
 
@@ -882,7 +888,7 @@ export default function AutodiscoveryPage() {
 
               {previewModal.entries && previewModal.entries.length === 0 && (
                 <div className="text-sm text-slate-400 py-4">
-                  No directories in this repo match the rule&apos;s pattern. Nothing to create.
+                  {t('preview.noMatches')}
                 </div>
               )}
 
@@ -891,28 +897,28 @@ export default function AutodiscoveryPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-slate-800/50 sticky top-0">
                       <tr className="border-b border-slate-700/50">
-                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">Workspace</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">Directory</th>
-                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">Action</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('preview.colWorkspace')}</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('preview.colDirectory')}</th>
+                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-400 uppercase">{t('preview.colAction')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-700/30">
                       {previewModal.entries.map(e => (
                         <tr key={e.working_directory}>
                           <td className="px-3 py-2 font-mono text-slate-200">{e.workspace_name}</td>
-                          <td className="px-3 py-2 font-mono text-slate-400">{e.working_directory || '(repo root)'}</td>
+                          <td className="px-3 py-2 font-mono text-slate-400">{e.working_directory || t('preview.repoRoot')}</td>
                           <td className="px-3 py-2">
                             {!e.collision ? (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/40 text-green-300">
-                                Create
+                                {t('preview.actionCreate')}
                               </span>
                             ) : e.existing_autodiscovered ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/40 text-slate-300" title="Already created by this rule">
-                                Skip (already discovered)
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700/40 text-slate-300" title={t('preview.skipDiscoveredTitle')}>
+                                {t('preview.skipDiscovered')}
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/40 text-amber-300" title="A workspace with this name already exists for another reason">
-                                Skip (name collision)
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/40 text-amber-300" title={t('preview.skipCollisionTitle')}>
+                                {t('preview.skipCollision')}
                               </span>
                             )}
                           </td>
@@ -925,8 +931,7 @@ export default function AutodiscoveryPage() {
 
               {previewModal.entries && previewModal.entries.length > 0 && (
                 <p className="text-xs text-slate-500 mb-4">
-                  {previewModal.entries.filter(e => !e.collision).length} workspace(s) will be created.{' '}
-                  Existing workspaces (collisions) are left untouched.
+                  {t('preview.willCreate', { count: previewModal.entries.filter(e => !e.collision).length })}
                 </p>
               )}
 
@@ -936,7 +941,7 @@ export default function AutodiscoveryPage() {
                   disabled={previewModal.scanning}
                   className="px-4 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm disabled:opacity-50"
                 >
-                  Close
+                  {t('actions.close')}
                 </button>
                 {previewModal.id && previewModal.entries && previewModal.entries.filter(e => !e.collision).length > 0 && (
                   <button
@@ -945,13 +950,13 @@ export default function AutodiscoveryPage() {
                     className="px-4 py-2 rounded bg-brand-600 hover:bg-brand-500 text-white text-sm disabled:opacity-50"
                   >
                     {previewModal.scanning
-                      ? 'Provisioning…'
-                      : `Provision ${previewModal.entries.filter(e => !e.collision).length} workspace(s)`}
+                      ? t('preview.provisioning')
+                      : t('preview.provision', { count: previewModal.entries.filter(e => !e.collision).length })}
                   </button>
                 )}
                 {!previewModal.id && previewModal.entries && previewModal.entries.length > 0 && (
                   <span className="self-center text-xs text-slate-500 italic">
-                    Save the rule to provision these workspaces.
+                    {t('preview.saveToProvision')}
                   </span>
                 )}
               </div>
