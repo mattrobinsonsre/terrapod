@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "workspaces": "Marklars",
+    "estate": "Marklar",
+    "registry": "Marklar",
+    "modules": "Marklars",
+    "providers": "Marklars",
+    "catalog": "Marklar",
+    "agentPools": "Marklar Marklars",
+    "admin": "Marklar",
+    "users": "Marklars",
+    "roles": "Marklars",
+    "vcsConnections": "VCS Marklars",
+    "variableSets": "Marklar Marklars",
+    "autodiscovery": "Marklar",
+    "bulkUpdate": "Marklar Marklar",
+    "executionHooks": "Marklar Marklars",
+    "policySets": "Marklar Marklars",
+    "providerTemplates": "Marklar Marklars",
+    "catalogAdmin": "Marklar Marklar",
+    "cache": "Marklar",
+    "auditLog": "Marklar Marklar",
+    "help": "Marklar",
+    "apiReference": "API Marklar",
+    "docs": "Marklars",
+    "account": "Marklar",
+    "apiTokens": "API Marklars",
+    "sessions": "Marklars",
+    "logOut": "Marklar the Marklar",
+    "menu": "Marklar",
+    "openMenu": "Marklar the Marklar",
+    "openAccountMenu": "Marklar the Marklar Marklar",
+    "closeMenu": "Marklar the Marklar"
+  },
+  "switcher": {
+    "language": "Marklar",
+    "changeLanguage": "Marklar the Marklar"
+  }
+}

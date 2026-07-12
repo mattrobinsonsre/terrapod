@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "workspaces": "Espacios de trabajo",
+    "estate": "Panorama",
+    "registry": "Registro",
+    "modules": "Módulos",
+    "providers": "Proveedores",
+    "catalog": "Catálogo",
+    "agentPools": "Grupos de agentes",
+    "admin": "Administración",
+    "users": "Usuarios",
+    "roles": "Roles",
+    "vcsConnections": "Conexiones VCS",
+    "variableSets": "Conjuntos de variables",
+    "autodiscovery": "Autodescubrimiento",
+    "bulkUpdate": "Actualización masiva",
+    "executionHooks": "Hooks de ejecución",
+    "policySets": "Conjuntos de políticas",
+    "providerTemplates": "Plantillas de proveedor",
+    "catalogAdmin": "Administración del catálogo",
+    "cache": "Caché",
+    "auditLog": "Registro de auditoría",
+    "help": "Ayuda",
+    "apiReference": "Referencia de la API",
+    "docs": "Documentación",
+    "account": "Cuenta",
+    "apiTokens": "Tokens de API",
+    "sessions": "Sesiones",
+    "logOut": "Cerrar sesión",
+    "menu": "Menú",
+    "openMenu": "Abrir menú",
+    "openAccountMenu": "Abrir menú de cuenta",
+    "closeMenu": "Cerrar menú"
+  },
+  "switcher": {
+    "language": "Idioma",
+    "changeLanguage": "Cambiar idioma"
+  }
+}

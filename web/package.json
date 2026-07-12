@@ -21,6 +21,7 @@
     "fflate": "^0.8.3",
     "lucide-react": "^1.22.0",
     "next": "^16.2.9",
+    "next-intl": "^4.13.2",
     "prom-client": "^15.1.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

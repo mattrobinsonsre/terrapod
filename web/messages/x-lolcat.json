@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "workspaces": "WERKSPACEZ",
+    "estate": "TEH ESTAYT",
+    "registry": "REJISTRY",
+    "modules": "MODULZ",
+    "providers": "PROVIDRZ",
+    "catalog": "KATALOG",
+    "agentPools": "AJENT POOLZ",
+    "admin": "ADMIN",
+    "users": "USERZ",
+    "roles": "ROLEZ",
+    "vcsConnections": "VCS KONEKSHUNZ",
+    "variableSets": "VARYABLE SETZ",
+    "autodiscovery": "AUTO-FINDZ",
+    "bulkUpdate": "BIG UPDAYT",
+    "executionHooks": "EXEKUSHUN HUKZ",
+    "policySets": "POLISY SETZ",
+    "providerTemplates": "PROVIDR TEMPLATEZ",
+    "catalogAdmin": "KATALOG ADMIN",
+    "cache": "STASH",
+    "auditLog": "AUDIT LOG",
+    "help": "HALP",
+    "apiReference": "API REFRUNS",
+    "docs": "DOCZ",
+    "account": "AKOWNT",
+    "apiTokens": "API TOKENZ",
+    "sessions": "SESHUNZ",
+    "logOut": "BAI BAI",
+    "menu": "MENU",
+    "openMenu": "OPEN TEH MENU",
+    "openAccountMenu": "OPEN TEH AKOWNT MENU",
+    "closeMenu": "CLOZE TEH MENU"
+  },
+  "switcher": {
+    "language": "LANGWIJ",
+    "changeLanguage": "CHAENJ UR LANGWIJ"
+  }
+}

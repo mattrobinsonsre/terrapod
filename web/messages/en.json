@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "workspaces": "Workspaces",
+    "estate": "Estate",
+    "registry": "Registry",
+    "modules": "Modules",
+    "providers": "Providers",
+    "catalog": "Catalog",
+    "agentPools": "Agent Pools",
+    "admin": "Admin",
+    "users": "Users",
+    "roles": "Roles",
+    "vcsConnections": "VCS Connections",
+    "variableSets": "Variable Sets",
+    "autodiscovery": "Autodiscovery",
+    "bulkUpdate": "Bulk Update",
+    "executionHooks": "Execution Hooks",
+    "policySets": "Policy Sets",
+    "providerTemplates": "Provider Templates",
+    "catalogAdmin": "Catalog Admin",
+    "cache": "Cache",
+    "auditLog": "Audit Log",
+    "help": "Help",
+    "apiReference": "API Reference",
+    "docs": "Docs",
+    "account": "Account",
+    "apiTokens": "API Tokens",
+    "sessions": "Sessions",
+    "logOut": "Log out",
+    "menu": "Menu",
+    "openMenu": "Open menu",
+    "openAccountMenu": "Open account menu",
+    "closeMenu": "Close menu"
+  },
+  "switcher": {
+    "language": "Language",
+    "changeLanguage": "Change language"
+  }
+}

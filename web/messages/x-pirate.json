@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "workspaces": "Work Decks",
+    "estate": "Yer Fleet",
+    "registry": "Ship's Ledger",
+    "modules": "Riggin's",
+    "providers": "Merchants",
+    "catalog": "Treasure Map",
+    "agentPools": "Crews",
+    "admin": "Cap'n's Quarters",
+    "users": "Hands",
+    "roles": "Ranks",
+    "vcsConnections": "VCS Moorin's",
+    "variableSets": "Sacks o' Booty",
+    "autodiscovery": "Spyglass",
+    "bulkUpdate": "Broadside Update",
+    "executionHooks": "Grapplin' Hooks",
+    "policySets": "The Pirate Code",
+    "providerTemplates": "Merchant Charts",
+    "catalogAdmin": "Map Room",
+    "cache": "The Hold",
+    "auditLog": "Log Book",
+    "help": "Help, Matey",
+    "apiReference": "API Charts",
+    "docs": "Scrolls",
+    "account": "Yer Berth",
+    "apiTokens": "API Doubloons",
+    "sessions": "Voyages",
+    "logOut": "Abandon Ship",
+    "menu": "The Manifest",
+    "openMenu": "Open the Manifest",
+    "openAccountMenu": "Open yer Berth",
+    "closeMenu": "Batten the Hatches"
+  },
+  "switcher": {
+    "language": "Tongue",
+    "changeLanguage": "Change yer Tongue"
+  }
+}

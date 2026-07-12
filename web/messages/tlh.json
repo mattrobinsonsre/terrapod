@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "workspaces": "Qu'meH Daqmey",
+    "estate": "Sep",
+    "registry": "ghItlh pol",
+    "modules": "boqHa'moHwI'mey",
+    "providers": "nobwI'pu'",
+    "catalog": "tetlh",
+    "agentPools": "Duy ghommey",
+    "admin": "che'wI'",
+    "users": "lo'wI'pu'",
+    "roles": "Seghmey",
+    "vcsConnections": "VCS rarmey",
+    "variableSets": "choHlaHbogh Seghmey",
+    "autodiscovery": "tu'qa'ghach",
+    "bulkUpdate": "chevlu'ta' choH",
+    "executionHooks": "taghwI'mey",
+    "policySets": "chut Seghmey",
+    "providerTemplates": "nobwI' velmey",
+    "catalogAdmin": "tetlh che'wI'",
+    "cache": "pol",
+    "auditLog": "nughItlh",
+    "help": "QaH",
+    "apiReference": "API De'",
+    "docs": "ghItlhmey",
+    "account": "je'",
+    "apiTokens": "API SIQwI'mey",
+    "sessions": "qeplu'",
+    "logOut": "mej",
+    "menu": "raQ",
+    "openMenu": "raQ poSmoH",
+    "openAccountMenu": "je' raQ poSmoH",
+    "closeMenu": "raQ SoQmoH"
+  },
+  "switcher": {
+    "language": "Hol",
+    "changeLanguage": "Hol choH"
+  }
+}

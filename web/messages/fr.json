@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "workspaces": "Espaces de travail",
+    "estate": "Panorama",
+    "registry": "Registre",
+    "modules": "Modules",
+    "providers": "Fournisseurs",
+    "catalog": "Catalogue",
+    "agentPools": "Pools d'agents",
+    "admin": "Administration",
+    "users": "Utilisateurs",
+    "roles": "Rôles",
+    "vcsConnections": "Connexions VCS",
+    "variableSets": "Ensembles de variables",
+    "autodiscovery": "Découverte automatique",
+    "bulkUpdate": "Mise à jour en masse",
+    "executionHooks": "Hooks d'exécution",
+    "policySets": "Ensembles de règles",
+    "providerTemplates": "Modèles de fournisseur",
+    "catalogAdmin": "Administration du catalogue",
+    "cache": "Cache",
+    "auditLog": "Journal d'audit",
+    "help": "Aide",
+    "apiReference": "Référence de l'API",
+    "docs": "Documentation",
+    "account": "Compte",
+    "apiTokens": "Jetons d'API",
+    "sessions": "Sessions",
+    "logOut": "Se déconnecter",
+    "menu": "Menu",
+    "openMenu": "Ouvrir le menu",
+    "openAccountMenu": "Ouvrir le menu du compte",
+    "closeMenu": "Fermer le menu"
+  },
+  "switcher": {
+    "language": "Langue",
+    "changeLanguage": "Changer de langue"
+  }
+}

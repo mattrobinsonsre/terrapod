@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "workspaces": "Workspaces",
+    "estate": "Estate, your",
+    "registry": "Registry",
+    "modules": "Modules",
+    "providers": "Providers",
+    "catalog": "Catalog",
+    "agentPools": "Pools, Agent",
+    "admin": "Admin",
+    "users": "Users",
+    "roles": "Roles",
+    "vcsConnections": "Connections, VCS",
+    "variableSets": "Sets, Variable",
+    "autodiscovery": "Autodiscovery",
+    "bulkUpdate": "Update, Bulk",
+    "executionHooks": "Hooks, Execution",
+    "policySets": "Sets, Policy",
+    "providerTemplates": "Templates, Provider",
+    "catalogAdmin": "Admin, Catalog",
+    "cache": "Cache",
+    "auditLog": "Log, Audit",
+    "help": "Help you, I can",
+    "apiReference": "Reference, API",
+    "docs": "Docs",
+    "account": "Account",
+    "apiTokens": "Tokens, API",
+    "sessions": "Sessions",
+    "logOut": "Leave, you must",
+    "menu": "Menu",
+    "openMenu": "The menu, open",
+    "openAccountMenu": "The account menu, open",
+    "closeMenu": "The menu, close"
+  },
+  "switcher": {
+    "language": "Language",
+    "changeLanguage": "Change language, you will"
+  }
+}

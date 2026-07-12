@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "workspaces": "W0rk5p4c35",
+    "estate": "3574t3",
+    "registry": "R3g157ry",
+    "modules": "M0dul35",
+    "providers": "Pr0v1d3r5",
+    "catalog": "C474l0g",
+    "agentPools": "4g3n7 P00l5",
+    "admin": "4dm1n",
+    "users": "U53r5",
+    "roles": "R0l35",
+    "vcsConnections": "VC5 C0nn3c710n5",
+    "variableSets": "V4r14bl3 5375",
+    "autodiscovery": "4u70d15c0v3ry",
+    "bulkUpdate": "8ulk Upd473",
+    "executionHooks": "3x3cu710n H00k5",
+    "policySets": "P0l1cy 5375",
+    "providerTemplates": "Pr0v1d3r T3mpl4735",
+    "catalogAdmin": "C474l0g 4dm1n",
+    "cache": "C4ch3",
+    "auditLog": "4ud17 L0g",
+    "help": "H31p",
+    "apiReference": "4P1 R3f3r3nc3",
+    "docs": "D0c5",
+    "account": "4cc0un7",
+    "apiTokens": "4P1 T0k3n5",
+    "sessions": "535510n5",
+    "logOut": "L0g 0u7",
+    "menu": "M3nu",
+    "openMenu": "0p3n m3nu",
+    "openAccountMenu": "0p3n 4cc0un7 m3nu",
+    "closeMenu": "Cl053 m3nu"
+  },
+  "switcher": {
+    "language": "L4ngu4g3",
+    "changeLanguage": "Ch4ng3 l4ngu4g3"
+  }
+}

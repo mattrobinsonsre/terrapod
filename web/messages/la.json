@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "workspaces": "Loca Operis",
+    "estate": "Patrimonium",
+    "registry": "Tabularium",
+    "modules": "Moduli",
+    "providers": "Praebitores",
+    "catalog": "Catalogus",
+    "agentPools": "Copiae Agentium",
+    "admin": "Administratio",
+    "users": "Usuarii",
+    "roles": "Partes",
+    "vcsConnections": "Nexus VCS",
+    "variableSets": "Copiae Variabilium",
+    "autodiscovery": "Inventio Automata",
+    "bulkUpdate": "Renovatio in Massa",
+    "executionHooks": "Unci Exsecutionis",
+    "policySets": "Copiae Normarum",
+    "providerTemplates": "Exempla Praebitorum",
+    "catalogAdmin": "Administratio Catalogi",
+    "cache": "Promptuarium",
+    "auditLog": "Acta Recognitionis",
+    "help": "Auxilium",
+    "apiReference": "Consultatio API",
+    "docs": "Documenta",
+    "account": "Ratio",
+    "apiTokens": "Tesserae API",
+    "sessions": "Sessiones",
+    "logOut": "Exire",
+    "menu": "Index",
+    "openMenu": "Indicem aperire",
+    "openAccountMenu": "Indicem rationis aperire",
+    "closeMenu": "Indicem claudere"
+  },
+  "switcher": {
+    "language": "Lingua",
+    "changeLanguage": "Linguam mutare"
+  }
+}

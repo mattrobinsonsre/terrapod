@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "workspaces": "Gweithfannau",
+    "estate": "Ystâd",
+    "registry": "Cofrestrfa",
+    "modules": "Modiwlau",
+    "providers": "Darparwyr",
+    "catalog": "Catalog",
+    "agentPools": "Pyllau Asiant",
+    "admin": "Gweinyddu",
+    "users": "Defnyddwyr",
+    "roles": "Rolau",
+    "vcsConnections": "Cysylltiadau VCS",
+    "variableSets": "Setiau Newidynnau",
+    "autodiscovery": "Awtoganfod",
+    "bulkUpdate": "Diweddaru Swmp",
+    "executionHooks": "Bachau Gweithredu",
+    "policySets": "Setiau Polisi",
+    "providerTemplates": "Templedi Darparwr",
+    "catalogAdmin": "Gweinyddu Catalog",
+    "cache": "Storfa",
+    "auditLog": "Cofnod Archwilio",
+    "help": "Cymorth",
+    "apiReference": "Cyfeirlyfr API",
+    "docs": "Dogfennau",
+    "account": "Cyfrif",
+    "apiTokens": "Tocynnau API",
+    "sessions": "Sesiynau",
+    "logOut": "Allgofnodi",
+    "menu": "Dewislen",
+    "openMenu": "Agor y ddewislen",
+    "openAccountMenu": "Agor dewislen y cyfrif",
+    "closeMenu": "Cau'r ddewislen"
+  },
+  "switcher": {
+    "language": "Iaith",
+    "changeLanguage": "Newid iaith"
+  }
+}
