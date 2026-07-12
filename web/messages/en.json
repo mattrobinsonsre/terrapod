@@ -142,5 +142,390 @@
     "discarded": "Discarded",
     "pendingDeletion": "Pending deletion",
     "archived": "Archived"
+  },
+  "auth": {
+    "loading": "Loading...",
+    "subtitle": "Sign in to manage your infrastructure",
+    "subtitleCli": "Sign in to authorize the CLI",
+    "emailLabel": "Email",
+    "passwordLabel": "Password",
+    "signIn": "Sign in",
+    "signingIn": "Signing in...",
+    "signInWith": "Sign in with {provider}",
+    "or": "or",
+    "noProviders": "No authentication providers configured",
+    "completingSignIn": "Completing sign in...",
+    "callbackFailedTitle": "Authentication Failed",
+    "tryAgain": "Try Again",
+    "errors": {
+      "loadProviders": "Failed to load providers",
+      "authenticationFailed": "Authentication failed ({status})",
+      "tokenExchangeFailed": "Token exchange failed ({status})",
+      "loginFailed": "Login failed",
+      "startLoginFailed": "Failed to start login",
+      "missingCodeOrState": "Missing authorization code or state",
+      "stateMismatch": "State mismatch — possible CSRF attack",
+      "missingVerifier": "Missing PKCE verifier — please try logging in again"
+    }
+  },
+  "estate": {
+    "title": "Estate topology",
+    "description": "Every workspace you can see and the modules they use, wired by run-triggers, remote-state, and module links. Group by whatever axis fits your estate — the platform enforces no labelling convention.",
+    "errors": {
+      "load": "Failed to load the estate graph."
+    },
+    "groupBy": {
+      "label": "Group by"
+    },
+    "view": {
+      "graph": "Graph",
+      "table": "Table"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# workspace} other {# workspaces}}",
+      "modules": "{count, plural, one {# module} other {# modules}}",
+      "dependencies": "{count, plural, one {# dependency} other {# dependencies}}"
+    },
+    "legend": {
+      "registryModule": "registry module"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {workspace uses this — bumping it re-plans it} other {workspaces use this — bumping it re-plans them all}}",
+      "dependOnThis": "{count, plural, one {depends on this} other {depend on this}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Workspaces",
+        "col": {
+          "workspace": "Workspace",
+          "group": "Group",
+          "agentPool": "Agent pool",
+          "dependedOnBy": "Depended on by",
+          "modulesUsed": "Modules used"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Modules",
+        "col": {
+          "module": "Module",
+          "usedBy": "Used by (workspaces)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "Labels",
+    "description": "Browse labels in use across workspaces, agent pools, registry modules, and registry providers. Read-only — labels are edited on each entity's own page.",
+    "none": "None.",
+    "emptyKeys": "No labels in use yet. Label any workspace, agent pool, registry module, or registry provider to start grouping things here.",
+    "emptyValues": "No values for \"{key}\". Either no readable entity carries this label, or it was removed since the last view.",
+    "loadKeysFailed": "Failed to load labels ({status})",
+    "loadValuesFailed": "Failed to load values for {key} ({status})",
+    "loadEntitiesFailed": "Failed to load entities ({status})",
+    "columns": {
+      "labelKey": "Label key",
+      "distinctValues": "Distinct values",
+      "value": "Value",
+      "total": "Total"
+    },
+    "entity": {
+      "workspaces": "Workspaces",
+      "agentPools": "Agent pools",
+      "modules": "Modules",
+      "providers": "Providers"
+    },
+    "deprecated": {
+      "badge": "Deprecated & unsupported.",
+      "body": "The Labels browser is no longer in the main navigation and will be removed in a future release. Filter by label from the <workspacesLink>Workspaces</workspacesLink> page instead. If you rely on this page, please <issueLink>open an issue</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "API Tokens",
+      "description": "Manage authentication tokens for CLI and automation",
+      "descriptionAll": "All tokens across all users",
+      "myTokens": "My Tokens",
+      "allTokens": "All Tokens",
+      "createToken": "Create Token",
+      "cancel": "Cancel",
+      "tokenReady": "Token ready",
+      "tokenReadyHelp": "Copy this token now — it will not be shown again.",
+      "dismissToken": "Dismiss token",
+      "hide": "Hide",
+      "show": "Show",
+      "copy": "Copy",
+      "empty": "No API tokens yet.",
+      "noDescription": "No description",
+      "detached": "detached",
+      "never": "Never",
+      "selected": "{count, plural, one {# token selected} other {# tokens selected}}",
+      "revokeSelected": "Revoke Selected",
+      "revoking": "Revoking...",
+      "clearSelection": "Clear selection",
+      "rotate": "Rotate",
+      "rotating": "Rotating...",
+      "revoke": "Revoke",
+      "confirmRotate": "Rotate this token? The current secret stops working immediately and a new one is issued.",
+      "confirmBulkRevoke": "{count, plural, one {Revoke # token?} other {Revoke # tokens?}}",
+      "kinds": {
+        "interactive": {
+          "label": "Personal",
+          "help": "A personal token for the CLI and ad-hoc automation. Carries your full live permissions."
+        },
+        "service_bound": {
+          "label": "Service · bound",
+          "help": "A service token scoped to a subset of your roles. Its access is the intersection of those roles and your own — and it stops working if your account is removed."
+        },
+        "service_detached": {
+          "label": "Service · detached",
+          "help": "An admin-managed service token with an absolute pinned scope, bound to no user. Use for critical machine-to-machine automation that must survive any one person leaving."
+        }
+      },
+      "lifespans": {
+        "720": "30 days",
+        "2160": "90 days",
+        "4320": "180 days",
+        "8760": "1 year"
+      },
+      "filter": {
+        "all": "All kinds"
+      },
+      "form": {
+        "description": "Description",
+        "descriptionPlaceholder": "CI/CD pipeline token",
+        "kind": "Kind",
+        "lifespan": "Lifespan",
+        "create": "Create",
+        "creating": "Creating...",
+        "pinnedRoles": "Pinned roles",
+        "pinnedRolesHelp": "— the scope this token is limited to",
+        "pinnedRolesCapped": "(capped to your own access)",
+        "noCustomRoles": "No custom roles defined. Create roles under Admin → Roles first.",
+        "noScopedRoles": "You hold no scoped roles to pin. This token would have no access."
+      },
+      "columns": {
+        "description": "Description",
+        "kind": "Kind",
+        "boundTo": "Bound To",
+        "created": "Created",
+        "lastUsed": "Last Used",
+        "expires": "Expires",
+        "actions": "Actions"
+      },
+      "errors": {
+        "load": "Failed to load tokens",
+        "create": "Failed to create token ({status})",
+        "createGeneric": "Failed to create token",
+        "rotate": "Failed to rotate token ({status})",
+        "rotateGeneric": "Failed to rotate token",
+        "revoke": "Failed to revoke token ({status})",
+        "revokeGeneric": "Failed to revoke token",
+        "bulkRevoke": "Failed to revoke tokens"
+      }
+    },
+    "sessions": {
+      "title": "Sessions",
+      "description": "Your active sessions",
+      "descriptionAll": "All active sessions across the platform",
+      "empty": "No active sessions.",
+      "revokeAll": "Revoke All",
+      "current": "Current",
+      "columns": {
+        "provider": "Provider",
+        "created": "Created",
+        "expires": "Expires",
+        "lastActive": "Last Active",
+        "token": "Token"
+      },
+      "errors": {
+        "load": "Failed to load sessions",
+        "revoke": "Failed to revoke sessions ({status})",
+        "revokeGeneric": "Failed to revoke sessions"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Modules",
+      "description": "Private Terraform module registry",
+      "cancel": "Cancel",
+      "createModule": "Create Module",
+      "empty": "No modules yet. Create one to get started.",
+      "providerLabel": "Provider: {provider}",
+      "versionCount": "{count, plural, one {# version} other {# versions}}",
+      "loadFailed": "Failed to load modules",
+      "createFailed": "Failed to create module",
+      "createFailedStatus": "Failed to create module ({status})",
+      "form": {
+        "name": "Name",
+        "provider": "Provider",
+        "slugTitle": "Lowercase letters, numbers, and hyphens only. Must start with a lowercase letter.",
+        "addressNote": "Name and provider form the module's registry address and cannot be changed after creation.",
+        "vcsConnectionOptional": "VCS Connection (optional)",
+        "noneUploadManually": "None — upload versions manually",
+        "repositoryUrl": "Repository URL",
+        "branchOptional": "Branch (optional)",
+        "branchPlaceholder": "main (leave empty for default)",
+        "tagPattern": "Tag Pattern",
+        "tagPatternHint": "Only tags matching this pattern create versions (e.g. v1.0.0)",
+        "labelsOptional": "Labels (optional)",
+        "creating": "Creating...",
+        "create": "Create"
+      }
+    },
+    "providers": {
+      "title": "Providers",
+      "description": "Private Terraform provider registry",
+      "cancel": "Cancel",
+      "createProvider": "Create Provider",
+      "empty": "No providers yet. Create one to get started.",
+      "loadFailed": "Failed to load providers",
+      "createFailed": "Failed to create provider",
+      "createFailedStatus": "Failed to create provider ({status})",
+      "form": {
+        "name": "Name",
+        "slugTitle": "Lowercase letters, numbers, and hyphens only. Must start with a lowercase letter.",
+        "creating": "Creating...",
+        "create": "Create"
+      }
+    },
+    "meta": {
+      "title": "Metadata",
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving...",
+      "saveAnyway": "Save Anyway",
+      "revertLabels": "Revert Labels",
+      "owner": "Owner",
+      "ownerNone": "None",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "Labels"
+    },
+    "moduleDetail": {
+      "notFound": "Module not found",
+      "loadFailed": "Failed to load module",
+      "updateFailed": "Failed to update module",
+      "labelLockoutDefault": "This label change would reduce your access.",
+      "providerLabel": "Provider: {provider}",
+      "cancel": "Cancel",
+      "uploadVersion": "Upload Version",
+      "vcsConnected": "VCS Connected",
+      "connectVcs": "Connect VCS",
+      "deleteModule": "Delete Module",
+      "linkFailed": "Failed to link workspace",
+      "linkFailedStatus": "Link failed ({status})",
+      "unlinkConfirm": "Unlink this workspace from the module? Impact analysis will no longer run for it.",
+      "unlinkFailed": "Failed to unlink workspace",
+      "unlinkFailedStatus": "Unlink failed ({status})",
+      "uploadFailed": "Upload failed",
+      "uploadFailedStatus": "Upload failed ({status})",
+      "saveVcsFailed": "Failed to save VCS config",
+      "saveVcsFailedStatus": "Failed to save VCS config ({status})",
+      "disableVcsFailed": "Failed to disable VCS",
+      "disableVcsFailedStatus": "Failed to disable VCS ({status})",
+      "deleteFailed": "Delete failed",
+      "deleteFailedStatus": "Delete failed ({status})",
+      "upload": {
+        "intro": "Select a directory containing your Terraform module files. They will be packaged into a tarball and uploaded.",
+        "version": "Version",
+        "moduleDirectory": "Module Directory",
+        "selectDirectory": "Select Directory",
+        "fileCount": "{count, plural, one {# file} other {# files}}",
+        "filesToInclude": "{count, plural, one {# file to include:} other {# files to include:}}",
+        "andMore": "...and {count} more",
+        "uploading": "Uploading...",
+        "upload": "Upload"
+      },
+      "vcs": {
+        "intro": "Connect this module to a VCS repository. New versions are published automatically when semver tags matching the tag pattern are pushed. Branch commits alone do not create versions.",
+        "connection": "VCS Connection",
+        "selectConnection": "Select a connection...",
+        "repositoryUrl": "Repository URL",
+        "branchOptional": "Branch (optional)",
+        "branchPlaceholder": "main (leave empty for default)",
+        "tagPattern": "Tag Pattern",
+        "tagPatternHint": "Only tags matching this pattern create versions (e.g. v1.0.0)",
+        "saving": "Saving...",
+        "saveConfiguration": "Save VCS Configuration",
+        "disconnect": "Disconnect VCS"
+      },
+      "vcsStatus": {
+        "connected": "VCS connected:",
+        "lastTag": "Last tag: {tag}",
+        "firstVersionHint": "Push a semver tag (e.g. <code>v1.0.0</code>) matching the tag pattern to publish the first version."
+      },
+      "links": {
+        "title": "Linked Workspaces",
+        "linkWorkspace": "Link Workspace",
+        "description": "Linked workspaces receive speculative plans when PRs are opened against this module, and standard runs when new versions are published.",
+        "searchPlaceholder": "Search workspaces to link…",
+        "empty": "No workspaces linked yet.",
+        "unlinkTitle": "Unlink workspace"
+      },
+      "interface": {
+        "title": "Inputs & Outputs",
+        "counts": "{inputs} inputs, {outputs} outputs",
+        "versionLabel": "Version:",
+        "noData": "No interface data available for this version.",
+        "inputs": "Inputs",
+        "outputs": "Outputs",
+        "name": "Name",
+        "type": "Type",
+        "description": "Description",
+        "default": "Default",
+        "required": "Required",
+        "sensitive": "Sensitive",
+        "requiredBadge": "required",
+        "optionalBadge": "optional",
+        "sensitiveBadge": "sensitive",
+        "noneDeclared": "This module version declares no inputs or outputs."
+      },
+      "versions": {
+        "title": "Versions",
+        "count": "{count, plural, one {# version} other {# versions}}",
+        "emptyVcs": "No versions yet. Push a semver tag matching \"{pattern}\" to the connected repository to publish a version.",
+        "emptyUpload": "No versions yet. Upload a module or connect VCS to get started.",
+        "version": "Version",
+        "status": "Status",
+        "source": "Source",
+        "actions": "Actions",
+        "manualUpload": "manual upload",
+        "delete": "Delete"
+      },
+      "deleteDialog": {
+        "title": "Confirm Delete",
+        "moduleBody": "This will permanently delete this module and all its versions.",
+        "versionBody": "This will permanently delete version {version}.",
+        "cancel": "Cancel",
+        "confirm": "Delete"
+      }
+    },
+    "providerDetail": {
+      "description": "Provider registry",
+      "deleteProvider": "Delete Provider",
+      "publishNote": "Provider versions are published with the <code>terrapod-publish</code> CLI, which client-signs the binaries. Uploading and signing provider binaries from the browser is no longer supported. This page is read-only for versions and platforms.",
+      "empty": "No versions yet. Publish with the terrapod-publish CLI to get started.",
+      "loadVersionsFailed": "Failed to load versions",
+      "updateFailed": "Failed to update provider",
+      "labelLockoutDefault": "This label change would reduce your access.",
+      "deleteFailed": "Delete failed",
+      "deleteFailedStatus": "Delete failed ({status})",
+      "platformCount": "{count, plural, one {# platform} other {# platforms}}",
+      "delete": "Delete",
+      "os": "OS",
+      "arch": "Arch",
+      "filename": "Filename",
+      "actions": "Actions",
+      "deleteDialog": {
+        "title": "Confirm Delete",
+        "providerBody": "This will permanently delete this provider and all its versions.",
+        "versionBody": "This will permanently delete version {version} and its platforms.",
+        "platformBody": "This will permanently delete the {os}/{arch} platform.",
+        "cancel": "Cancel",
+        "confirm": "Delete"
+      }
+    }
   }
 }

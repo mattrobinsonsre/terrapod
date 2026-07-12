@@ -142,5 +142,390 @@
     "discarded": "Verworfen",
     "pendingDeletion": "Löschung ausstehend",
     "archived": "Archiviert"
+  },
+  "auth": {
+    "loading": "Wird geladen...",
+    "subtitle": "Melden Sie sich an, um Ihre Infrastruktur zu verwalten",
+    "subtitleCli": "Melden Sie sich an, um die CLI zu autorisieren",
+    "emailLabel": "E-Mail",
+    "passwordLabel": "Passwort",
+    "signIn": "Anmelden",
+    "signingIn": "Anmeldung läuft...",
+    "signInWith": "Anmelden mit {provider}",
+    "or": "oder",
+    "noProviders": "Keine Authentifizierungsanbieter konfiguriert",
+    "completingSignIn": "Anmeldung wird abgeschlossen...",
+    "callbackFailedTitle": "Authentifizierung fehlgeschlagen",
+    "tryAgain": "Erneut versuchen",
+    "errors": {
+      "loadProviders": "Anbieter konnten nicht geladen werden",
+      "authenticationFailed": "Authentifizierung fehlgeschlagen ({status})",
+      "tokenExchangeFailed": "Token-Austausch fehlgeschlagen ({status})",
+      "loginFailed": "Anmeldung fehlgeschlagen",
+      "startLoginFailed": "Anmeldung konnte nicht gestartet werden",
+      "missingCodeOrState": "Autorisierungscode oder Status fehlt",
+      "stateMismatch": "Status stimmt nicht überein — möglicher CSRF-Angriff",
+      "missingVerifier": "PKCE-Verifier fehlt — bitte versuchen Sie erneut, sich anzumelden"
+    }
+  },
+  "estate": {
+    "title": "Bestandstopologie",
+    "description": "Jeder Workspace, den Sie sehen können, und die von ihm genutzten Module, verbunden durch Run-Trigger, Remote-State und Modul-Verknüpfungen. Gruppieren Sie nach der Achse, die zu Ihrem Bestand passt — die Plattform erzwingt keine Labelling-Konvention.",
+    "errors": {
+      "load": "Der Bestandsgraph konnte nicht geladen werden."
+    },
+    "groupBy": {
+      "label": "Gruppieren nach"
+    },
+    "view": {
+      "graph": "Graph",
+      "table": "Tabelle"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# Workspace} other {# Workspaces}}",
+      "modules": "{count, plural, one {# Modul} other {# Module}}",
+      "dependencies": "{count, plural, one {# Abhängigkeit} other {# Abhängigkeiten}}"
+    },
+    "legend": {
+      "registryModule": "Registry-Modul"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {Workspace nutzt dies — eine Aktualisierung plant ihn neu} other {Workspaces nutzen dies — eine Aktualisierung plant sie alle neu}}",
+      "dependOnThis": "{count, plural, one {hängt davon ab} other {hängen davon ab}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Workspaces",
+        "col": {
+          "workspace": "Workspace",
+          "group": "Gruppe",
+          "agentPool": "Agent-Pool",
+          "dependedOnBy": "Abhängig gemacht von",
+          "modulesUsed": "Genutzte Module"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Module",
+        "col": {
+          "module": "Modul",
+          "usedBy": "Genutzt von (Workspaces)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "Labels",
+    "description": "Durchsuchen Sie die verwendeten Labels über Workspaces, Agent-Pools, Registry-Module und Registry-Provider hinweg. Schreibgeschützt — Labels werden auf der jeweiligen Seite der Entität bearbeitet.",
+    "none": "Keine.",
+    "emptyKeys": "Es werden noch keine Labels verwendet. Versehen Sie einen Workspace, einen Agent-Pool, ein Registry-Modul oder einen Registry-Provider mit einem Label, um hier mit der Gruppierung zu beginnen.",
+    "emptyValues": "Keine Werte für \"{key}\". Entweder trägt keine lesbare Entität dieses Label, oder es wurde seit der letzten Ansicht entfernt.",
+    "loadKeysFailed": "Labels konnten nicht geladen werden ({status})",
+    "loadValuesFailed": "Werte für {key} konnten nicht geladen werden ({status})",
+    "loadEntitiesFailed": "Entitäten konnten nicht geladen werden ({status})",
+    "columns": {
+      "labelKey": "Label-Schlüssel",
+      "distinctValues": "Eindeutige Werte",
+      "value": "Wert",
+      "total": "Gesamt"
+    },
+    "entity": {
+      "workspaces": "Workspaces",
+      "agentPools": "Agent-Pools",
+      "modules": "Module",
+      "providers": "Provider"
+    },
+    "deprecated": {
+      "badge": "Veraltet & nicht unterstützt.",
+      "body": "Der Labels-Browser befindet sich nicht mehr in der Hauptnavigation und wird in einem zukünftigen Release entfernt. Filtern Sie stattdessen nach Label auf der Seite <workspacesLink>Workspaces</workspacesLink>. Wenn Sie auf diese Seite angewiesen sind, <issueLink>erstellen Sie bitte ein Issue</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "API-Tokens",
+      "description": "Authentifizierungstokens für CLI und Automatisierung verwalten",
+      "descriptionAll": "Alle Tokens aller Benutzer",
+      "myTokens": "Meine Tokens",
+      "allTokens": "Alle Tokens",
+      "createToken": "Token erstellen",
+      "cancel": "Abbrechen",
+      "tokenReady": "Token bereit",
+      "tokenReadyHelp": "Kopieren Sie dieses Token jetzt — es wird nicht erneut angezeigt.",
+      "dismissToken": "Token schließen",
+      "hide": "Verbergen",
+      "show": "Anzeigen",
+      "copy": "Kopieren",
+      "empty": "Noch keine API-Tokens.",
+      "noDescription": "Keine Beschreibung",
+      "detached": "losgelöst",
+      "never": "Nie",
+      "selected": "{count, plural, one {# Token ausgewählt} other {# Tokens ausgewählt}}",
+      "revokeSelected": "Ausgewählte widerrufen",
+      "revoking": "Wird widerrufen...",
+      "clearSelection": "Auswahl aufheben",
+      "rotate": "Rotieren",
+      "rotating": "Wird rotiert...",
+      "revoke": "Widerrufen",
+      "confirmRotate": "Dieses Token rotieren? Das aktuelle Geheimnis wird sofort ungültig und ein neues wird ausgestellt.",
+      "confirmBulkRevoke": "{count, plural, one {# Token widerrufen?} other {# Tokens widerrufen?}}",
+      "kinds": {
+        "interactive": {
+          "label": "Persönlich",
+          "help": "Ein persönliches Token für die CLI und Ad-hoc-Automatisierung. Trägt Ihre vollständigen aktiven Berechtigungen."
+        },
+        "service_bound": {
+          "label": "Dienst · gebunden",
+          "help": "Ein Dienst-Token, das auf eine Teilmenge Ihrer Rollen beschränkt ist. Sein Zugriff ist die Schnittmenge dieser Rollen und Ihrer eigenen — und es funktioniert nicht mehr, wenn Ihr Konto entfernt wird."
+        },
+        "service_detached": {
+          "label": "Dienst · losgelöst",
+          "help": "Ein von Administratoren verwaltetes Dienst-Token mit absolutem, fixiertem Geltungsbereich, an keinen Benutzer gebunden. Verwenden Sie es für kritische Maschine-zu-Maschine-Automatisierung, die das Ausscheiden einer einzelnen Person überstehen muss."
+        }
+      },
+      "lifespans": {
+        "720": "30 Tage",
+        "2160": "90 Tage",
+        "4320": "180 Tage",
+        "8760": "1 Jahr"
+      },
+      "filter": {
+        "all": "Alle Arten"
+      },
+      "form": {
+        "description": "Beschreibung",
+        "descriptionPlaceholder": "CI/CD-Pipeline-Token",
+        "kind": "Art",
+        "lifespan": "Lebensdauer",
+        "create": "Erstellen",
+        "creating": "Wird erstellt...",
+        "pinnedRoles": "Fixierte Rollen",
+        "pinnedRolesHelp": "— der Geltungsbereich, auf den dieses Token beschränkt ist",
+        "pinnedRolesCapped": "(auf Ihren eigenen Zugriff begrenzt)",
+        "noCustomRoles": "Keine benutzerdefinierten Rollen definiert. Erstellen Sie zuerst Rollen unter Admin → Rollen.",
+        "noScopedRoles": "Sie besitzen keine eingeschränkten Rollen zum Fixieren. Dieses Token hätte keinen Zugriff."
+      },
+      "columns": {
+        "description": "Beschreibung",
+        "kind": "Art",
+        "boundTo": "Gebunden an",
+        "created": "Erstellt",
+        "lastUsed": "Zuletzt verwendet",
+        "expires": "Läuft ab",
+        "actions": "Aktionen"
+      },
+      "errors": {
+        "load": "Tokens konnten nicht geladen werden",
+        "create": "Token konnte nicht erstellt werden ({status})",
+        "createGeneric": "Token konnte nicht erstellt werden",
+        "rotate": "Token konnte nicht rotiert werden ({status})",
+        "rotateGeneric": "Token konnte nicht rotiert werden",
+        "revoke": "Token konnte nicht widerrufen werden ({status})",
+        "revokeGeneric": "Token konnte nicht widerrufen werden",
+        "bulkRevoke": "Tokens konnten nicht widerrufen werden"
+      }
+    },
+    "sessions": {
+      "title": "Sitzungen",
+      "description": "Ihre aktiven Sitzungen",
+      "descriptionAll": "Alle aktiven Sitzungen auf der Plattform",
+      "empty": "Keine aktiven Sitzungen.",
+      "revokeAll": "Alle widerrufen",
+      "current": "Aktuell",
+      "columns": {
+        "provider": "Anbieter",
+        "created": "Erstellt",
+        "expires": "Läuft ab",
+        "lastActive": "Zuletzt aktiv",
+        "token": "Token"
+      },
+      "errors": {
+        "load": "Sitzungen konnten nicht geladen werden",
+        "revoke": "Sitzungen konnten nicht widerrufen werden ({status})",
+        "revokeGeneric": "Sitzungen konnten nicht widerrufen werden"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Module",
+      "description": "Private Terraform-Modul-Registry",
+      "cancel": "Abbrechen",
+      "createModule": "Modul erstellen",
+      "empty": "Noch keine Module. Erstellen Sie eines, um zu beginnen.",
+      "providerLabel": "Provider: {provider}",
+      "versionCount": "{count, plural, one {# Version} other {# Versionen}}",
+      "loadFailed": "Module konnten nicht geladen werden",
+      "createFailed": "Modul konnte nicht erstellt werden",
+      "createFailedStatus": "Modul konnte nicht erstellt werden ({status})",
+      "form": {
+        "name": "Name",
+        "provider": "Provider",
+        "slugTitle": "Nur Kleinbuchstaben, Zahlen und Bindestriche. Muss mit einem Kleinbuchstaben beginnen.",
+        "addressNote": "Name und Provider bilden die Registry-Adresse des Moduls und können nach der Erstellung nicht geändert werden.",
+        "vcsConnectionOptional": "VCS-Verbindung (optional)",
+        "noneUploadManually": "Keine — Versionen manuell hochladen",
+        "repositoryUrl": "Repository-URL",
+        "branchOptional": "Branch (optional)",
+        "branchPlaceholder": "main (leer lassen für Standard)",
+        "tagPattern": "Tag-Muster",
+        "tagPatternHint": "Nur Tags, die diesem Muster entsprechen, erstellen Versionen (z. B. v1.0.0)",
+        "labelsOptional": "Labels (optional)",
+        "creating": "Wird erstellt...",
+        "create": "Erstellen"
+      }
+    },
+    "providers": {
+      "title": "Provider",
+      "description": "Private Terraform-Provider-Registry",
+      "cancel": "Abbrechen",
+      "createProvider": "Provider erstellen",
+      "empty": "Noch keine Provider. Erstellen Sie einen, um zu beginnen.",
+      "loadFailed": "Provider konnten nicht geladen werden",
+      "createFailed": "Provider konnte nicht erstellt werden",
+      "createFailedStatus": "Provider konnte nicht erstellt werden ({status})",
+      "form": {
+        "name": "Name",
+        "slugTitle": "Nur Kleinbuchstaben, Zahlen und Bindestriche. Muss mit einem Kleinbuchstaben beginnen.",
+        "creating": "Wird erstellt...",
+        "create": "Erstellen"
+      }
+    },
+    "meta": {
+      "title": "Metadaten",
+      "edit": "Bearbeiten",
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "saving": "Wird gespeichert...",
+      "saveAnyway": "Trotzdem speichern",
+      "revertLabels": "Labels zurücksetzen",
+      "owner": "Eigentümer",
+      "ownerNone": "Keiner",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "Labels"
+    },
+    "moduleDetail": {
+      "notFound": "Modul nicht gefunden",
+      "loadFailed": "Modul konnte nicht geladen werden",
+      "updateFailed": "Modul konnte nicht aktualisiert werden",
+      "labelLockoutDefault": "Diese Label-Änderung würde Ihren Zugriff einschränken.",
+      "providerLabel": "Provider: {provider}",
+      "cancel": "Abbrechen",
+      "uploadVersion": "Version hochladen",
+      "vcsConnected": "VCS verbunden",
+      "connectVcs": "VCS verbinden",
+      "deleteModule": "Modul löschen",
+      "linkFailed": "Workspace konnte nicht verknüpft werden",
+      "linkFailedStatus": "Verknüpfung fehlgeschlagen ({status})",
+      "unlinkConfirm": "Diesen Workspace vom Modul trennen? Die Auswirkungsanalyse wird dafür nicht mehr ausgeführt.",
+      "unlinkFailed": "Workspace-Verknüpfung konnte nicht aufgehoben werden",
+      "unlinkFailedStatus": "Aufheben der Verknüpfung fehlgeschlagen ({status})",
+      "uploadFailed": "Hochladen fehlgeschlagen",
+      "uploadFailedStatus": "Hochladen fehlgeschlagen ({status})",
+      "saveVcsFailed": "VCS-Konfiguration konnte nicht gespeichert werden",
+      "saveVcsFailedStatus": "VCS-Konfiguration konnte nicht gespeichert werden ({status})",
+      "disableVcsFailed": "VCS konnte nicht deaktiviert werden",
+      "disableVcsFailedStatus": "VCS konnte nicht deaktiviert werden ({status})",
+      "deleteFailed": "Löschen fehlgeschlagen",
+      "deleteFailedStatus": "Löschen fehlgeschlagen ({status})",
+      "upload": {
+        "intro": "Wählen Sie ein Verzeichnis mit Ihren Terraform-Moduldateien aus. Sie werden in ein Tarball verpackt und hochgeladen.",
+        "version": "Version",
+        "moduleDirectory": "Modulverzeichnis",
+        "selectDirectory": "Verzeichnis auswählen",
+        "fileCount": "{count, plural, one {# Datei} other {# Dateien}}",
+        "filesToInclude": "{count, plural, one {# einzuschließende Datei:} other {# einzuschließende Dateien:}}",
+        "andMore": "...und {count} weitere",
+        "uploading": "Wird hochgeladen...",
+        "upload": "Hochladen"
+      },
+      "vcs": {
+        "intro": "Verbinden Sie dieses Modul mit einem VCS-Repository. Neue Versionen werden automatisch veröffentlicht, wenn semver-Tags gepusht werden, die dem Tag-Muster entsprechen. Branch-Commits allein erstellen keine Versionen.",
+        "connection": "VCS-Verbindung",
+        "selectConnection": "Verbindung auswählen...",
+        "repositoryUrl": "Repository-URL",
+        "branchOptional": "Branch (optional)",
+        "branchPlaceholder": "main (leer lassen für Standard)",
+        "tagPattern": "Tag-Muster",
+        "tagPatternHint": "Nur Tags, die diesem Muster entsprechen, erstellen Versionen (z. B. v1.0.0)",
+        "saving": "Wird gespeichert...",
+        "saveConfiguration": "VCS-Konfiguration speichern",
+        "disconnect": "VCS trennen"
+      },
+      "vcsStatus": {
+        "connected": "VCS verbunden:",
+        "lastTag": "Letztes Tag: {tag}",
+        "firstVersionHint": "Pushen Sie ein semver-Tag (z. B. <code>v1.0.0</code>), das dem Tag-Muster entspricht, um die erste Version zu veröffentlichen."
+      },
+      "links": {
+        "title": "Verknüpfte Workspaces",
+        "linkWorkspace": "Workspace verknüpfen",
+        "description": "Verknüpfte Workspaces erhalten spekulative Pläne, wenn PRs gegen dieses Modul geöffnet werden, und Standard-Läufe, wenn neue Versionen veröffentlicht werden.",
+        "searchPlaceholder": "Workspaces zum Verknüpfen suchen…",
+        "empty": "Noch keine Workspaces verknüpft.",
+        "unlinkTitle": "Workspace-Verknüpfung aufheben"
+      },
+      "interface": {
+        "title": "Eingaben & Ausgaben",
+        "counts": "{inputs} Eingaben, {outputs} Ausgaben",
+        "versionLabel": "Version:",
+        "noData": "Für diese Version sind keine Schnittstellendaten verfügbar.",
+        "inputs": "Eingaben",
+        "outputs": "Ausgaben",
+        "name": "Name",
+        "type": "Typ",
+        "description": "Beschreibung",
+        "default": "Standard",
+        "required": "Erforderlich",
+        "sensitive": "Vertraulich",
+        "requiredBadge": "erforderlich",
+        "optionalBadge": "optional",
+        "sensitiveBadge": "vertraulich",
+        "noneDeclared": "Diese Modulversion deklariert keine Eingaben oder Ausgaben."
+      },
+      "versions": {
+        "title": "Versionen",
+        "count": "{count, plural, one {# Version} other {# Versionen}}",
+        "emptyVcs": "Noch keine Versionen. Pushen Sie ein semver-Tag, das \"{pattern}\" entspricht, in das verbundene Repository, um eine Version zu veröffentlichen.",
+        "emptyUpload": "Noch keine Versionen. Laden Sie ein Modul hoch oder verbinden Sie VCS, um zu beginnen.",
+        "version": "Version",
+        "status": "Status",
+        "source": "Quelle",
+        "actions": "Aktionen",
+        "manualUpload": "manueller Upload",
+        "delete": "Löschen"
+      },
+      "deleteDialog": {
+        "title": "Löschen bestätigen",
+        "moduleBody": "Dadurch werden dieses Modul und alle seine Versionen dauerhaft gelöscht.",
+        "versionBody": "Dadurch wird Version {version} dauerhaft gelöscht.",
+        "cancel": "Abbrechen",
+        "confirm": "Löschen"
+      }
+    },
+    "providerDetail": {
+      "description": "Provider-Registry",
+      "deleteProvider": "Provider löschen",
+      "publishNote": "Provider-Versionen werden mit der <code>terrapod-publish</code>-CLI veröffentlicht, die die Binärdateien clientseitig signiert. Das Hochladen und Signieren von Provider-Binärdateien im Browser wird nicht mehr unterstützt. Diese Seite ist für Versionen und Plattformen schreibgeschützt.",
+      "empty": "Noch keine Versionen. Veröffentlichen Sie mit der terrapod-publish-CLI, um zu beginnen.",
+      "loadVersionsFailed": "Versionen konnten nicht geladen werden",
+      "updateFailed": "Provider konnte nicht aktualisiert werden",
+      "labelLockoutDefault": "Diese Label-Änderung würde Ihren Zugriff einschränken.",
+      "deleteFailed": "Löschen fehlgeschlagen",
+      "deleteFailedStatus": "Löschen fehlgeschlagen ({status})",
+      "platformCount": "{count, plural, one {# Plattform} other {# Plattformen}}",
+      "delete": "Löschen",
+      "os": "OS",
+      "arch": "Arch",
+      "filename": "Dateiname",
+      "actions": "Aktionen",
+      "deleteDialog": {
+        "title": "Löschen bestätigen",
+        "providerBody": "Dadurch werden dieser Provider und alle seine Versionen dauerhaft gelöscht.",
+        "versionBody": "Dadurch werden Version {version} und ihre Plattformen dauerhaft gelöscht.",
+        "platformBody": "Dadurch wird die Plattform {os}/{arch} dauerhaft gelöscht.",
+        "cancel": "Abbrechen",
+        "confirm": "Löschen"
+      }
+    }
   }
 }

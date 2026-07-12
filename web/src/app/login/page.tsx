@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { setAuth } from '@/lib/auth'
 import { STORAGE_AUTH_STATE, STORAGE_PKCE_VERIFIER, STORAGE_REDIRECT_AFTER_LOGIN } from '@/lib/constants'
 import { generatePKCE, generateState } from '@/lib/pkce'
@@ -12,10 +13,11 @@ interface Provider {
 }
 
 export default function LoginPage() {
+  const t = useTranslations('auth')
   return (
     <Suspense fallback={
       <main className="h-dvh flex items-center justify-center p-4">
-        <div className="text-slate-500">Loading...</div>
+        <div className="text-slate-500">{t('loading')}</div>
       </main>
     }>
       <LoginContent />
@@ -24,6 +26,7 @@ export default function LoginPage() {
 }
 
 function LoginContent() {
+  const t = useTranslations('auth')
   const router = useRouter()
   const searchParams = useSearchParams()
   const [providers, setProviders] = useState<Provider[]>([])
@@ -43,7 +46,7 @@ function LoginContent() {
   useEffect(() => {
     fetch('/api/terrapod/v1/auth/providers')
       .then(async (res) => {
-        if (!res.ok) throw new Error('Failed to load providers')
+        if (!res.ok) throw new Error(t('errors.loadProviders'))
         const data = await res.json()
         setProviders(data.providers || [])
       })
@@ -92,7 +95,7 @@ function LoginContent() {
 
       if (!authRes.ok) {
         const data = await authRes.json().catch(() => ({}))
-        throw new Error(data.detail || `Authentication failed (${authRes.status})`)
+        throw new Error(data.detail || t('errors.authenticationFailed', { status: authRes.status }))
       }
 
       const { code } = await authRes.json()
@@ -110,7 +113,7 @@ function LoginContent() {
 
       if (!tokenRes.ok) {
         const data = await tokenRes.json().catch(() => ({}))
-        throw new Error(data.detail || `Token exchange failed (${tokenRes.status})`)
+        throw new Error(data.detail || t('errors.tokenExchangeFailed', { status: tokenRes.status }))
       }
 
       const tokenData = await tokenRes.json()
@@ -122,7 +125,7 @@ function LoginContent() {
         router.push('/')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(err instanceof Error ? err.message : t('errors.loginFailed'))
     } finally {
       setSubmitting(false)
     }
@@ -157,7 +160,7 @@ function LoginContent() {
 
       window.location.href = `/api/terrapod/v1/auth/authorize?${params.toString()}`
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start login')
+      setError(err instanceof Error ? err.message : t('errors.startLoginFailed'))
     }
   }
 
@@ -168,7 +171,7 @@ function LoginContent() {
           <img src="/logo.svg" alt="Terrapod" className="w-24 h-24 mx-auto mb-4" />
           <h1 className="text-3xl font-bold">Terrapod</h1>
           <p className="text-slate-400 mt-2">
-            {cliState ? 'Sign in to authorize the CLI' : 'Sign in to manage your infrastructure'}
+            {cliState ? t('subtitleCli') : t('subtitle')}
           </p>
         </div>
 
@@ -180,14 +183,14 @@ function LoginContent() {
           )}
 
           {loading ? (
-            <div className="text-center text-slate-500 py-4">Loading...</div>
+            <div className="text-center text-slate-500 py-4">{t('loading')}</div>
           ) : (
             <div className="space-y-4">
               {hasLocalProvider && (
                 <form onSubmit={handleLocalLogin} className="space-y-3">
                   <div>
                     <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">
-                      Email
+                      {t('emailLabel')}
                     </label>
                     <input
                       id="email"
@@ -202,7 +205,7 @@ function LoginContent() {
                   </div>
                   <div>
                     <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1">
-                      Password
+                      {t('passwordLabel')}
                     </label>
                     <input
                       id="password"
@@ -219,7 +222,7 @@ function LoginContent() {
                     disabled={submitting}
                     className="w-full font-medium py-3 px-4 rounded-lg transition-colors bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white btn-smoke"
                   >
-                    {submitting ? 'Signing in...' : 'Sign in'}
+                    {submitting ? t('signingIn') : t('signIn')}
                   </button>
                 </form>
               )}
@@ -230,7 +233,7 @@ function LoginContent() {
                     <div className="w-full border-t border-slate-600" />
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-slate-800 text-slate-500">or</span>
+                    <span className="px-2 bg-slate-800 text-slate-500">{t('or')}</span>
                   </div>
                 </div>
               )}
@@ -241,13 +244,13 @@ function LoginContent() {
                   onClick={() => startExternalLogin(provider.name)}
                   className="w-full font-medium py-3 px-4 rounded-lg transition-colors bg-brand-700 hover:bg-brand-600 text-white"
                 >
-                  Sign in with {provider.name}
+                  {t('signInWith', { provider: provider.name })}
                 </button>
               ))}
 
               {providers.length === 0 && !error && (
                 <p className="text-center text-slate-500">
-                  No authentication providers configured
+                  {t('noProviders')}
                 </p>
               )}
             </div>
