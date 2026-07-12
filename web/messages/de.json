@@ -1145,5 +1145,469 @@
       "createStatus": "Policy Set konnte nicht erstellt werden ({status})",
       "create": "Policy Set konnte nicht erstellt werden"
     }
+  },
+  "adminCatalog": {
+    "title": "Katalog-Verwaltung",
+    "description": "Service-Katalog-Einträge verwalten",
+    "notEnabled": "Der Service-Katalog ist nicht aktiviert.",
+    "empty": "Noch keine Katalog-Einträge vorhanden.",
+    "actions": {
+      "new": "Neuer Katalog-Eintrag",
+      "cancel": "Abbrechen",
+      "create": "Katalog-Eintrag erstellen",
+      "creating": "Wird erstellt…",
+      "saveChanges": "Änderungen speichern",
+      "saving": "Wird gespeichert…",
+      "edit": "Bearbeiten",
+      "delete": "Löschen"
+    },
+    "form": {
+      "name": "Name",
+      "nameTitle": "Nur Buchstaben, Ziffern, Bindestriche und Unterstriche. Muss mit einem Buchstaben oder einer Ziffer beginnen.",
+      "module": "Modul",
+      "moduleSelect": "Modul auswählen…",
+      "moduleImmutable": "Das Modul kann nach der Erstellung nicht mehr geändert werden",
+      "displayName": "Anzeigename",
+      "displayNamePlaceholder": "Standard-S3-Bucket",
+      "versionPin": "Standard-Versionsfestlegung",
+      "versionPinPlaceholder": "z. B. 1.2.0 (leer = neueste)",
+      "descriptionLabel": "Beschreibung",
+      "descriptionPlaceholder": "Was dieser Katalog-Eintrag bereitstellt…",
+      "enabled": "Aktiviert (im Durchsuchen-Katalog sichtbar)",
+      "providerTemplates": "Provider-Vorlagen",
+      "noProviderTemplates": "Keine Provider-Vorlagen definiert.",
+      "restrictPools": "Auf bestimmte Agent-Pools beschränken",
+      "noAgentPools": "Keine Agent-Pools verfügbar.",
+      "anyPool": "Jeder Agent-Pool kann verwendet werden.",
+      "labels": "Labels",
+      "variableOptions": "Variablen-Optionen (erweitert, JSON)",
+      "variableOptionsHint": "Überschreibungen pro Eingabe (Optionen, ausgeblendet, Standard). Lassen Sie <code>[]</code> stehen, wenn nicht verwendet."
+    },
+    "table": {
+      "name": "Name",
+      "module": "Modul",
+      "enabled": "Aktiviert",
+      "actions": "Aktionen"
+    },
+    "badge": {
+      "enabled": "aktiviert",
+      "disabled": "deaktiviert"
+    },
+    "confirm": {
+      "delete": "Diesen Katalog-Eintrag löschen? Bereits bereitgestellte Instanzen sind nicht betroffen."
+    },
+    "success": {
+      "created": "Katalog-Eintrag „{name}“ erstellt",
+      "updated": "Katalog-Eintrag „{name}“ aktualisiert",
+      "deleted": "Katalog-Eintrag gelöscht"
+    },
+    "errors": {
+      "load": "Katalog-Einträge konnten nicht geladen werden",
+      "save": "Katalog-Eintrag konnte nicht gespeichert werden",
+      "createStatus": "Katalog-Eintrag konnte nicht erstellt werden ({status})",
+      "updateStatus": "Katalog-Eintrag konnte nicht aktualisiert werden ({status})",
+      "delete": "Katalog-Eintrag konnte nicht gelöscht werden",
+      "deleteConflict": "Löschen nicht möglich: Für diesen Katalog-Eintrag bestehen bereitgestellte Instanzen.",
+      "varOptsInvalidJson": "Variablen-Optionen müssen gültiges JSON (ein Array) sein.",
+      "varOptsNotArray": "Variablen-Optionen müssen ein JSON-Array sein."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Provider-Vorlagen",
+    "description": "Wiederverwendbare Provider-Konfigurationsblöcke für Katalog-Einträge",
+    "notEnabled": "Der Service-Katalog ist nicht aktiviert.",
+    "empty": "Noch keine Provider-Vorlagen vorhanden.",
+    "actions": {
+      "new": "Neue Vorlage",
+      "cancel": "Abbrechen",
+      "create": "Vorlage erstellen",
+      "creating": "Wird erstellt…",
+      "saveChanges": "Änderungen speichern",
+      "saving": "Wird gespeichert…",
+      "edit": "Bearbeiten",
+      "delete": "Löschen"
+    },
+    "form": {
+      "name": "Name",
+      "providerType": "Provider-Typ",
+      "body": "Inhalt (HCL)",
+      "parameters": "Parameter (erweitert, JSON)",
+      "parametersHint": "Jeder Parameter wird zu einem Feld im Bereitstellungsformular. Lassen Sie <code>[]</code> stehen, wenn nicht verwendet.",
+      "labels": "Labels"
+    },
+    "table": {
+      "name": "Name",
+      "providerType": "Provider-Typ",
+      "parameters": "Parameter",
+      "actions": "Aktionen"
+    },
+    "confirm": {
+      "delete": "Diese Provider-Vorlage löschen? Katalog-Einträge, die sie referenzieren, können nicht mehr bereitgestellt werden. Dies kann nicht rückgängig gemacht werden."
+    },
+    "success": {
+      "created": "Provider-Vorlage „{name}“ erstellt",
+      "updated": "Provider-Vorlage „{name}“ aktualisiert",
+      "deleted": "Provider-Vorlage gelöscht"
+    },
+    "errors": {
+      "load": "Provider-Vorlagen konnten nicht geladen werden",
+      "save": "Provider-Vorlage konnte nicht gespeichert werden",
+      "createStatus": "Vorlage konnte nicht erstellt werden ({status})",
+      "updateStatus": "Vorlage konnte nicht aktualisiert werden ({status})",
+      "delete": "Provider-Vorlage konnte nicht gelöscht werden",
+      "deleteConflict": "Löschen nicht möglich: Diese Vorlage wird von einem Katalog-Eintrag referenziert.",
+      "paramsInvalidJson": "Parameter müssen gültiges JSON (ein Array) sein.",
+      "paramsNotArray": "Parameter müssen ein JSON-Array sein."
+    }
+  },
+  "adminAgentPools": {
+    "title": "Agent-Pools",
+    "description": "Runner-Agent-Pools und ihre Listener verwalten",
+    "empty": "Keine Agent-Pools konfiguriert.",
+    "actions": {
+      "newPool": "Neuer Pool",
+      "createPool": "Pool erstellen",
+      "creating": "Wird erstellt...",
+      "cancel": "Abbrechen",
+      "edit": "Bearbeiten",
+      "save": "Speichern",
+      "saving": "Wird gespeichert...",
+      "delete": "Löschen",
+      "deleting": "Wird gelöscht...",
+      "confirmDelete": "Löschen bestätigen"
+    },
+    "form": {
+      "name": "Name",
+      "namePattern": "Nur Buchstaben, Zahlen, Bindestriche und Unterstriche. Muss mit einem Buchstaben oder einer Zahl beginnen.",
+      "description": "Beschreibung",
+      "descriptionPlaceholder": "Produktions-AWS-Runner",
+      "labels": "Labels"
+    },
+    "columns": {
+      "name": "Name",
+      "description": "Beschreibung",
+      "status": "Status",
+      "created": "Erstellt"
+    },
+    "badges": {
+      "default": "Standard",
+      "degradedTooltip": "Die Listener senden Heartbeats, aber ihre Zertifikate sind abgelaufen — Läufe können nicht gestartet werden.",
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "beeinträchtigt"
+      }
+    },
+    "detail": {
+      "back": "Zurück zu den Agent-Pools",
+      "defaultDescription": "Agent-Pool"
+    },
+    "tabs": {
+      "settings": "Einstellungen",
+      "tokens": "Token",
+      "listeners": "Listener"
+    },
+    "settings": {
+      "title": "Pool-Einstellungen",
+      "fields": {
+        "name": "Name",
+        "description": "Beschreibung",
+        "created": "Erstellt",
+        "owner": "Eigentümer",
+        "yourPermission": "Ihre Berechtigung",
+        "labels": "Labels"
+      },
+      "permissions": {
+        "read": "read",
+        "write": "write",
+        "admin": "admin"
+      }
+    },
+    "danger": {
+      "title": "Pool löschen",
+      "description": "Diesen Agent-Pool und alle zugehörigen Token dauerhaft löschen."
+    },
+    "tokens": {
+      "create": "Token erstellen",
+      "empty": "Keine Token für diesen Pool.",
+      "revoke": "Widerrufen",
+      "created": {
+        "title": "Token erfolgreich erstellt",
+        "copyNow": "Kopieren Sie dieses Token jetzt — es wird nicht erneut angezeigt.",
+        "copy": "Kopieren"
+      },
+      "form": {
+        "description": "Beschreibung",
+        "descriptionPlaceholder": "Produktions-Listener-Token",
+        "maxUses": "Maximale Verwendungen",
+        "maxUsesHint": "Standard 2 — toleriert einen erneuten Versuch bei einem Bootstrap-Rennen über Listener-Replikate hinweg.",
+        "expiresAt": "Läuft ab am",
+        "expiresAtHint": "Standardmäßig in 1 Stunde ab jetzt."
+      },
+      "columns": {
+        "description": "Beschreibung",
+        "uses": "Verwendungen",
+        "expires": "Läuft ab",
+        "status": "Status",
+        "createdBy": "Erstellt von",
+        "actions": "Aktionen"
+      },
+      "badges": {
+        "revoked": "Widerrufen",
+        "active": "Aktiv"
+      }
+    },
+    "listeners": {
+      "empty": "Keine Listener für diesen Pool registriert.",
+      "columns": {
+        "name": "Name",
+        "status": "Status",
+        "replicas": "Replikate",
+        "certExpires": "Zertifikat läuft ab",
+        "actions": "Aktionen"
+      },
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "beeinträchtigt",
+        "cert-expired": "Zertifikat abgelaufen"
+      },
+      "tooltips": {
+        "certExpired": "Der Listener sendet Heartbeats, aber sein Zertifikat ist abgelaufen — jeder zertifikatsauthentifizierte Aufruf (Lauf beanspruchen, erneuern, Runner-Token) wird fehlschlagen. Wahrscheinlichste Ursache: Die API hat das neueste Zertifikat nie registriert, oder die Zertifikats-TTL ist vor der Erneuerung abgelaufen.",
+        "degraded": "Die Listener senden Heartbeats, aber ihre Zertifikate sind abgelaufen — Läufe können nicht gestartet werden."
+      }
+    },
+    "confirm": {
+      "revokeToken": "Dieses Beitritts-Token widerrufen? Listener, die es verwenden, können nicht mehr beitreten, und dies kann nicht rückgängig gemacht werden.",
+      "deleteListener": "Diesen Listener löschen? Er registriert sich beim nächsten Heartbeat erneut, sofern der Pod noch läuft."
+    },
+    "success": {
+      "poolUpdated": "Pool aktualisiert",
+      "tokenRevoked": "Token widerrufen",
+      "listenerDeleted": "Listener gelöscht"
+    },
+    "errors": {
+      "loadPools": "Agent-Pools konnten nicht geladen werden",
+      "loadPool": "Pool konnte nicht geladen werden",
+      "loadTokens": "Token konnten nicht geladen werden",
+      "loadListeners": "Listener konnten nicht geladen werden",
+      "createPool": "Pool konnte nicht erstellt werden",
+      "createStatus": "Pool konnte nicht erstellt werden ({status})",
+      "updatePool": "Pool konnte nicht aktualisiert werden",
+      "deletePool": "Pool konnte nicht gelöscht werden",
+      "poolNotFound": "Pool nicht gefunden",
+      "createToken": "Token konnte nicht erstellt werden",
+      "createTokenStatus": "Token konnte nicht erstellt werden ({status})",
+      "revokeToken": "Token konnte nicht widerrufen werden",
+      "deleteListener": "Listener konnte nicht gelöscht werden"
+    }
+  },
+  "adminAuditLog": {
+    "title": "Auditprotokoll",
+    "description": "Unveränderliches Protokoll aller API-Anfragen",
+    "empty": "Keine Auditprotokoll-Einträge gefunden.",
+    "errors": {
+      "load": "Auditprotokoll konnte nicht geladen werden"
+    },
+    "filters": {
+      "actorEmail": "E-Mail-Adresse des Akteurs",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "Ressourcentyp",
+      "resourceTypePlaceholder": "workspaces",
+      "method": "Methode",
+      "methodAll": "Alle",
+      "since": "Von",
+      "until": "Bis",
+      "clear": "Zurücksetzen",
+      "apply": "Filter anwenden"
+    },
+    "columns": {
+      "timestamp": "Zeitstempel",
+      "actor": "Akteur",
+      "action": "Aktion",
+      "resourceType": "Ressourcentyp",
+      "resourceId": "Ressourcen-ID",
+      "status": "Status",
+      "duration": "Dauer"
+    },
+    "pagination": {
+      "summary": "Seite {current} von {total} ({count, plural, one {# Eintrag} other {# Einträge}})",
+      "previous": "Zurück",
+      "next": "Weiter"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "Cache",
+    "description": "Verwaltung des CLI-Binär- und Provider-Caches",
+    "errors": {
+      "loadBinary": "Binär-Cache konnte nicht geladen werden",
+      "loadCache": "Cache konnte nicht geladen werden"
+    },
+    "sections": {
+      "cliBinaries": "CLI-Binärdateien",
+      "providerBinaries": "Provider-Binärdateien"
+    },
+    "empty": {
+      "binaries": "Noch keine CLI-Binärdateien im Cache.",
+      "providers": "Noch keine Provider-Binärdateien im Cache."
+    },
+    "columns": {
+      "tool": "Werkzeug",
+      "version": "Version",
+      "os": "OS",
+      "arch": "Arch",
+      "cachedAt": "Zwischengespeichert am",
+      "provider": "Provider",
+      "hostname": "Hostname",
+      "actions": "Aktionen"
+    },
+    "warm": {
+      "heading": "Cache vorwärmen",
+      "hide": "Ausblenden",
+      "prePopulate": "Vorbefüllen…",
+      "help": "Laden Sie Binärdateien und Provider-Plattformen vorab in den Cache (eine pro Zeile). Nachgestellte <code>os/arch</code>-Token sind optional — lassen Sie sie weg, um die konfigurierten Standardplattformen zu verwenden.",
+      "binariesLabel": "Binärdateien",
+      "providersLabel": "Provider",
+      "warm": "Vorwärmen",
+      "warming": "Wird vorgewärmt…",
+      "confirm": "Die ausgewählten Cache-Einträge jetzt vorwärmen?",
+      "errorEmpty": "Fügen Sie mindestens eine Binär- oder Provider-Zeile zum Vorwärmen hinzu.",
+      "errorFailedStatus": "Vorwärmen fehlgeschlagen ({status})",
+      "errorFailed": "Cache konnte nicht vorgewärmt werden",
+      "success": "{succeeded}/{total} vorgewärmt ({failed} fehlgeschlagen)"
+    },
+    "purge": {
+      "button": "Löschen",
+      "confirmBinary": "{tool} {version} aus dem Cache löschen? Es wird bei der nächsten Anfrage erneut vom Upstream abgerufen.",
+      "confirmProvider": "{provider} {version} aus dem Provider-Cache löschen? Es wird bei der nächsten Anfrage erneut vom Upstream abgerufen.",
+      "successBinary": "{count} Einträge für {tool} {version} gelöscht",
+      "successProvider": "{count} Einträge für {provider} {version} gelöscht",
+      "errorStatus": "Löschen fehlgeschlagen ({status})",
+      "error": "Löschen fehlgeschlagen",
+      "errorProvider": "Provider konnte nicht gelöscht werden",
+      "errorProviders": "Provider konnten nicht gelöscht werden"
+    },
+    "batchPurge": {
+      "purging": "Wird gelöscht...",
+      "purgeSelected": "Ausgewählte löschen ({count})",
+      "confirmBinary": "Alle ausgewählten Binär-Cache-Einträge löschen? Sie werden bei der nächsten Anfrage erneut vom Upstream abgerufen.",
+      "confirmProvider": "Alle ausgewählten Provider-Cache-Einträge löschen? Sie werden bei der nächsten Anfrage erneut vom Upstream abgerufen.",
+      "errorBinaryItem": "Löschen für {tool} {version} fehlgeschlagen",
+      "errorProviderItem": "Löschen für {provider} {version} fehlgeschlagen",
+      "successBinary": "{count} Binär-Cache-Einträge gelöscht",
+      "successProvider": "{count} Provider-Cache-Einträge gelöscht"
+    }
+  },
+  "catalog": {
+    "title": "Servicekatalog",
+    "description": "Stellen Sie Self-Service-Infrastruktur aus kuratierten Modulen bereit",
+    "notEnabled": "Der Servicekatalog ist nicht aktiviert.",
+    "empty": "Keine Katalogeinträge verfügbar.",
+    "card": {
+      "pinned": "angeheftet {version}",
+      "latest": "aktuellste"
+    },
+    "errors": {
+      "loadItems": "Katalogeinträge konnten nicht geladen werden"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← Katalog",
+    "backToCatalog": "Zurück zum Katalog",
+    "fallbackTitle": "Katalogeintrag",
+    "notFound": "Katalogeintrag nicht gefunden oder der Servicekatalog ist nicht aktiviert.",
+    "common": {
+      "cancel": "Abbrechen"
+    },
+    "info": {
+      "module": "Modul:",
+      "resolvedVersion": "Aufgelöste Version:",
+      "latest": "aktuellste",
+      "disabled": "deaktiviert"
+    },
+    "pending": {
+      "banner": "Der Lauf für <strong>{name}</strong> ist geplant und wartet auf die Überprüfung. Bestätigen Sie, um anzuwenden, oder verwerfen Sie ihn.",
+      "working": "Wird verarbeitet…",
+      "confirmApply": "Bestätigen & anwenden",
+      "discard": "Verwerfen"
+    },
+    "field": {
+      "select": "Auswählen…"
+    },
+    "provision": {
+      "title": "Bereitstellen",
+      "workspaceName": "Workspace-Name",
+      "workspaceNameTitle": "Nur Buchstaben, Zahlen, Bindestriche und Unterstriche. Muss mit einem Buchstaben oder einer Zahl beginnen.",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "Agent-Pool",
+      "selectPool": "Einen Pool auswählen…",
+      "noPoolsAvailable": "Ihnen stehen keine Agent-Pools zur Verfügung. Zum Bereitstellen benötigen Sie Schreibzugriff auf einen Agent-Pool – bitten Sie einen Administrator, ihn zu gewähren.",
+      "noPoolsAllowed": "Keiner der Agent-Pools, auf die Sie zugreifen können, ist für diesen Katalogeintrag zugelassen. Bitten Sie einen Administrator, die zugelassenen Pools des Eintrags zu erweitern oder Ihnen Zugriff auf einen davon zu gewähren.",
+      "version": "Version",
+      "latestFloat": "Aktuellste (fließend)",
+      "defaultPinOption": "{version} (Standard-Anheftung)",
+      "labelsOptional": "Labels (optional)",
+      "autoApplyHint": "Auto-Apply wendet Änderungen ohne manuellen Überprüfungsschritt an.",
+      "provisioning": "Wird bereitgestellt…",
+      "submit": "Bereitstellen"
+    },
+    "instances": {
+      "title": "Instanzen",
+      "empty": "Aus diesem Eintrag wurden noch keine Instanzen bereitgestellt.",
+      "colName": "Name",
+      "colVersion": "Version",
+      "colPool": "Pool",
+      "colActions": "Aktionen",
+      "reconfigure": "Neu konfigurieren",
+      "destroy": "Zerstören",
+      "orphan": "Verwaisen…",
+      "orphanTitle": "Den Katalogeintrag löschen, ohne die zugehörige Infrastruktur zu zerstören (nicht empfohlen)"
+    },
+    "reconfigure": {
+      "title": "{name} neu konfigurieren",
+      "description": "Aktualisieren Sie die Eingaben und/oder die Version und stellen Sie dann einen Lauf in die Warteschlange.",
+      "currentOption": "{version} (aktuell)",
+      "queuing": "Wird eingereiht…",
+      "queueRun": "Lauf einreihen"
+    },
+    "destroy": {
+      "title": "{name} zerstören",
+      "heading": "{name} zerstören?",
+      "description": "Dies reiht einen Zerstörungslauf ein, der die Infrastruktur dieser Instanz abbaut. Bei einer erfolgreichen Anwendung wird der Workspace archiviert. Dies kann nicht rückgängig gemacht werden.",
+      "autoApplyHint": "Auto-Apply baut sofort ohne Überprüfung ab."
+    },
+    "orphan": {
+      "title": "{name} verwaisen",
+      "heading": "{name} verwaisen?",
+      "description": "Dadurch wird der Katalog-Instanzeintrag gelöscht, die zugehörige Infrastruktur wird jedoch <warn>nicht</warn> zerstört – die bereitgestellten Ressourcen laufen weiter, <warn>ungetrackt und unverwaltet</warn>. Dies wird nicht empfohlen. Um die Infrastruktur zurückzugewinnen, brechen Sie ab und verwenden Sie stattdessen <emph>Zerstören</emph>.",
+      "confirmPrompt": "Geben Sie zur Bestätigung den Instanznamen <mono>{name}</mono> ein:",
+      "orphaning": "Wird verwaist…",
+      "submit": "Verwaisen & Infrastruktur aufgeben"
+    },
+    "actions": {
+      "confirmed": "Lauf bestätigt – wird angewendet.",
+      "discarded": "Lauf verworfen.",
+      "provisioned": "{name} bereitgestellt – der Plan steht zur Überprüfung bereit.",
+      "reconfigureQueued": "Neukonfiguration eingereiht – Lauf erstellt.",
+      "reconfigureQueuedStatus": "Neukonfiguration eingereiht – Lauf ist {status}.",
+      "destroyQueued": "Zerstörung eingereiht – Lauf erstellt.",
+      "destroyQueuedStatus": "Zerstörung eingereiht – Lauf ist {status}.",
+      "orphaned": "{name} verwaist – Katalogeintrag gelöscht; die zugehörige Infrastruktur läuft weiter, ungetrackt und unverwaltet."
+    },
+    "errors": {
+      "loadItem": "Katalogeintrag konnte nicht geladen werden",
+      "confirm": "Bestätigung fehlgeschlagen",
+      "confirmStatus": "Bestätigung fehlgeschlagen ({status})",
+      "discard": "Verwerfen fehlgeschlagen",
+      "discardStatus": "Verwerfen fehlgeschlagen ({status})",
+      "provision": "Bereitstellung fehlgeschlagen",
+      "provisionStatus": "Bereitstellung fehlgeschlagen ({status})",
+      "reconfigure": "Neukonfiguration fehlgeschlagen",
+      "reconfigureStatus": "Neukonfiguration fehlgeschlagen ({status})",
+      "destroy": "Zerstörung fehlgeschlagen",
+      "destroyStatus": "Zerstörung fehlgeschlagen ({status})",
+      "orphan": "Verwaisen fehlgeschlagen",
+      "orphanStatus": "Verwaisen fehlgeschlagen ({status})"
+    }
   }
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import NavBar from '@/components/nav-bar'
 import { PageHeader } from '@/components/page-header'
@@ -70,6 +71,7 @@ function defaultStr(v: unknown): string {
 }
 
 export default function CatalogItemPage() {
+  const t = useTranslations('catalogDetail')
   const router = useRouter()
   const params = useParams()
   const itemId = params.id as string
@@ -131,13 +133,24 @@ export default function CatalogItemPage() {
       )
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to ${action} (${res.status})`)
+        throw new Error(
+          data.detail ||
+            (action === 'confirm'
+              ? t('errors.confirmStatus', { status: res.status })
+              : t('errors.discardStatus', { status: res.status })),
+        )
       }
-      setActionResult(action === 'confirm' ? 'Run confirmed — applying.' : 'Run discarded.')
+      setActionResult(action === 'confirm' ? t('actions.confirmed') : t('actions.discarded'))
       setPendingRun(null)
       await loadInstances()
     } catch (err) {
-      setActionResult(err instanceof Error ? err.message : `Failed to ${action}`)
+      setActionResult(
+        err instanceof Error
+          ? err.message
+          : action === 'confirm'
+            ? t('errors.confirm')
+            : t('errors.discard'),
+      )
     } finally {
       setPendingBusy(false)
     }
@@ -168,7 +181,7 @@ export default function CatalogItemPage() {
         ])
         if (cancelled) return
         if (itemRes.status === 404) { setNotFound(true); return }
-        if (!itemRes.ok) throw new Error('Failed to load catalog item')
+        if (!itemRes.ok) throw new Error(t('errors.loadItem'))
         const itemData = await itemRes.json()
         setItem(itemData.data)
 
@@ -189,7 +202,7 @@ export default function CatalogItemPage() {
 
         await loadInstances()
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load catalog item')
+        if (!cancelled) setError(err instanceof Error ? err.message : t('errors.loadItem'))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -231,7 +244,7 @@ export default function CatalogItemPage() {
             onChange={(e) => onChange(e.target.value)}
             className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
           >
-            <option value="">Select…</option>
+            <option value="">{t('field.select')}</option>
             {field.options.map((opt) => (
               <option key={opt} value={opt}>{opt}</option>
             ))}
@@ -271,7 +284,7 @@ export default function CatalogItemPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to provision (${res.status})`)
+        throw new Error(data.detail || t('errors.provisionStatus', { status: res.status }))
       }
       const data = await res.json()
       const newId = data.data?.id
@@ -288,10 +301,10 @@ export default function CatalogItemPage() {
       await loadInstances()
       if (newId) {
         setPendingRun({ id: newId, name: provisionedName })
-        setActionResult(`Provisioned ${provisionedName} — plan is ready for review.`)
+        setActionResult(t('actions.provisioned', { name: provisionedName }))
       }
     } catch (err) {
-      setProvError(err instanceof Error ? err.message : 'Failed to provision')
+      setProvError(err instanceof Error ? err.message : t('errors.provision'))
     } finally {
       setProvisioning(false)
     }
@@ -346,18 +359,22 @@ export default function CatalogItemPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to reconfigure (${res.status})`)
+        throw new Error(data.detail || t('errors.reconfigureStatus', { status: res.status }))
       }
       const data = await res.json()
       const status = data.data?.attributes?.status
-      setActionResult(`Reconfigure queued — run ${status ? `is ${status}` : 'created'}.`)
+      setActionResult(
+        status
+          ? t('actions.reconfigureQueuedStatus', { status })
+          : t('actions.reconfigureQueued'),
+      )
       if (status === 'planned') {
         setPendingRun({ id: reconfigInstance.id, name: reconfigInstance.attributes.name })
       }
       setReconfigInstance(null)
       await loadInstances()
     } catch (err) {
-      setReconfigError(err instanceof Error ? err.message : 'Failed to reconfigure')
+      setReconfigError(err instanceof Error ? err.message : t('errors.reconfigure'))
     } finally {
       setReconfigBusy(false)
     }
@@ -375,11 +392,15 @@ export default function CatalogItemPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to destroy (${res.status})`)
+        throw new Error(data.detail || t('errors.destroyStatus', { status: res.status }))
       }
       const data = await res.json()
       const status = data.data?.attributes?.status
-      setActionResult(`Destroy queued — run ${status ? `is ${status}` : 'created'}.`)
+      setActionResult(
+        status
+          ? t('actions.destroyQueuedStatus', { status })
+          : t('actions.destroyQueued'),
+      )
       if (status === 'planned') {
         setPendingRun({ id: destroyInstance.id, name: destroyInstance.attributes.name })
       }
@@ -387,7 +408,7 @@ export default function CatalogItemPage() {
       setDestroyAutoApply(false)
       await loadInstances()
     } catch (err) {
-      setDestroyError(err instanceof Error ? err.message : 'Failed to destroy')
+      setDestroyError(err instanceof Error ? err.message : t('errors.destroy'))
     } finally {
       setDestroyBusy(false)
     }
@@ -404,14 +425,14 @@ export default function CatalogItemPage() {
       )
       if (!res.ok && res.status !== 204) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || `Failed to orphan (${res.status})`)
+        throw new Error(data.detail || t('errors.orphanStatus', { status: res.status }))
       }
-      setActionResult(`Orphaned ${orphanInstance.attributes.name} — catalog record deleted; its infrastructure is left running, untracked and unmanaged.`)
+      setActionResult(t('actions.orphaned', { name: orphanInstance.attributes.name }))
       setOrphanInstance(null)
       setOrphanConfirm('')
       await loadInstances()
     } catch (err) {
-      setOrphanError(err instanceof Error ? err.message : 'Failed to orphan')
+      setOrphanError(err instanceof Error ? err.message : t('errors.orphan'))
     } finally {
       setOrphanBusy(false)
     }
@@ -432,8 +453,8 @@ export default function CatalogItemPage() {
         <NavBar />
         <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
           <div className="p-4 bg-slate-800/50 text-slate-400 rounded-lg text-sm border border-slate-700/50">
-            Catalog item not found, or the service catalog is not enabled.{' '}
-            <Link href="/catalog" className="text-brand-400 hover:text-brand-300">Back to catalog</Link>
+            {t('notFound')}{' '}
+            <Link href="/catalog" className="text-brand-400 hover:text-brand-300">{t('backToCatalog')}</Link>
           </div>
         </main>
       </>
@@ -447,10 +468,10 @@ export default function CatalogItemPage() {
       <NavBar />
       <main className="px-4 sm:px-6 lg:px-8 py-8 max-w-6xl mx-auto">
         <div className="mb-2">
-          <Link href="/catalog" className="text-sm text-brand-400 hover:text-brand-300">← Catalog</Link>
+          <Link href="/catalog" className="text-sm text-brand-400 hover:text-brand-300">{t('backLink')}</Link>
         </div>
         <PageHeader
-          title={a?.['display-name'] || a?.name || 'Catalog item'}
+          title={a?.['display-name'] || a?.name || t('fallbackTitle')}
           description={a?.description || undefined}
         />
 
@@ -461,7 +482,10 @@ export default function CatalogItemPage() {
         {pendingRun && (
           <div className="mb-4 p-3 bg-amber-900/20 text-amber-200 rounded-lg text-sm border border-amber-800/50 flex items-center justify-between gap-3">
             <span>
-              The run for <span className="font-medium">{pendingRun.name}</span> is planned and waiting for review. Confirm to apply, or discard.
+              {t.rich('pending.banner', {
+                name: pendingRun.name,
+                strong: (chunks) => <span className="font-medium">{chunks}</span>,
+              })}
             </span>
             <span className="flex gap-2 shrink-0">
               <button
@@ -470,7 +494,7 @@ export default function CatalogItemPage() {
                 disabled={pendingBusy}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors"
               >
-                {pendingBusy ? 'Working…' : 'Confirm & apply'}
+                {pendingBusy ? t('pending.working') : t('pending.confirmApply')}
               </button>
               <button
                 type="button"
@@ -478,7 +502,7 @@ export default function CatalogItemPage() {
                 disabled={pendingBusy}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-slate-100 transition-colors"
               >
-                Discard
+                {t('pending.discard')}
               </button>
             </span>
           </div>
@@ -487,27 +511,27 @@ export default function CatalogItemPage() {
         {a && (
           <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 mb-6 flex flex-wrap gap-x-6 gap-y-2 text-sm">
             <div>
-              <span className="text-slate-500">Module: </span>
+              <span className="text-slate-500">{t('info.module')} </span>
               <span className="text-slate-200">{a['module-name']}{a['module-provider'] ? `/${a['module-provider']}` : ''}</span>
             </div>
             <div>
-              <span className="text-slate-500">Resolved version: </span>
-              <span className="text-slate-200">{form?.['resolved-version'] || 'latest'}</span>
+              <span className="text-slate-500">{t('info.resolvedVersion')} </span>
+              <span className="text-slate-200">{form?.['resolved-version'] || t('info.latest')}</span>
             </div>
             {!a.enabled && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">disabled</span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/50 text-amber-300">{t('info.disabled')}</span>
             )}
           </div>
         )}
 
         {/* Provision panel */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold text-slate-100 mb-3">Provision</h2>
+          <h2 className="text-lg font-semibold text-slate-100 mb-3">{t('provision.title')}</h2>
           <form onSubmit={handleProvision} className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-4 space-y-3">
             {provError && <ErrorBanner message={provError} />}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label htmlFor="prov-name" className="block text-sm font-medium text-slate-300 mb-1">Workspace name<span className="text-red-400 ml-0.5">*</span></label>
+                <label htmlFor="prov-name" className="block text-sm font-medium text-slate-300 mb-1">{t('provision.workspaceName')}<span className="text-red-400 ml-0.5">*</span></label>
                 <input
                   id="prov-name"
                   type="text"
@@ -515,13 +539,13 @@ export default function CatalogItemPage() {
                   onChange={(e) => setProvName(e.target.value)}
                   required
                   pattern="[a-zA-Z0-9][a-zA-Z0-9_\-]*"
-                  title="Letters, numbers, hyphens, and underscores only. Must start with a letter or number."
-                  placeholder="my-instance"
+                  title={t('provision.workspaceNameTitle')}
+                  placeholder={t('provision.workspaceNamePlaceholder')}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 />
               </div>
               <div>
-                <label htmlFor="prov-pool" className="block text-sm font-medium text-slate-300 mb-1">Agent pool<span className="text-red-400 ml-0.5">*</span></label>
+                <label htmlFor="prov-pool" className="block text-sm font-medium text-slate-300 mb-1">{t('provision.agentPool')}<span className="text-red-400 ml-0.5">*</span></label>
                 <select
                   id="prov-pool"
                   value={provPoolId}
@@ -529,7 +553,7 @@ export default function CatalogItemPage() {
                   onChange={(e) => setProvPoolId(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 >
-                  <option value="">Select a pool…</option>
+                  <option value="">{t('provision.selectPool')}</option>
                   {selectablePools.map((p) => (
                     <option key={p.id} value={p.id}>{p.attributes.name}</option>
                   ))}
@@ -537,22 +561,22 @@ export default function CatalogItemPage() {
                 {selectablePools.length === 0 && (
                   <p className="mt-1 text-xs text-amber-400">
                     {pools.length === 0
-                      ? 'No agent pools are available to you. You need write access to an agent pool to provision — ask an administrator to grant it.'
-                      : 'None of the agent pools you can access are allowed by this catalog item. Ask an administrator to widen the item’s allowed pools or grant you access to one of them.'}
+                      ? t('provision.noPoolsAvailable')
+                      : t('provision.noPoolsAllowed')}
                   </p>
                 )}
               </div>
               <div>
-                <label htmlFor="prov-version" className="block text-sm font-medium text-slate-300 mb-1">Version</label>
+                <label htmlFor="prov-version" className="block text-sm font-medium text-slate-300 mb-1">{t('provision.version')}</label>
                 <select
                   id="prov-version"
                   value={provVersion}
                   onChange={(e) => setProvVersion(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 >
-                  <option value="">Latest (float)</option>
+                  <option value="">{t('provision.latestFloat')}</option>
                   {a?.['default-version-pin'] && (
-                    <option value={a['default-version-pin']}>{a['default-version-pin']} (default pin)</option>
+                    <option value={a['default-version-pin']}>{t('provision.defaultPinOption', { version: a['default-version-pin'] })}</option>
                   )}
                 </select>
               </div>
@@ -573,7 +597,7 @@ export default function CatalogItemPage() {
             )}
 
             <div className="pt-2">
-              <label className="block text-sm font-medium text-slate-300 mb-1">Labels (optional)</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">{t('provision.labelsOptional')}</label>
               <LabelsEditor labels={provLabels} onChange={setProvLabels} />
             </div>
 
@@ -584,7 +608,7 @@ export default function CatalogItemPage() {
                 onChange={(e) => setProvAutoApply(e.target.checked)}
                 className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
               />
-              <span className="text-sm text-amber-300">Auto-apply applies changes without a manual review step.</span>
+              <span className="text-sm text-amber-300">{t('provision.autoApplyHint')}</span>
             </label>
 
             <button
@@ -592,25 +616,25 @@ export default function CatalogItemPage() {
               disabled={provisioning}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors btn-smoke"
             >
-              {provisioning ? 'Provisioning…' : 'Provision'}
+              {provisioning ? t('provision.provisioning') : t('provision.submit')}
             </button>
           </form>
         </section>
 
         {/* Instances */}
         <section>
-          <h2 className="text-lg font-semibold text-slate-100 mb-3">Instances</h2>
+          <h2 className="text-lg font-semibold text-slate-100 mb-3">{t('instances.title')}</h2>
           {instances.length === 0 ? (
-            <EmptyState message="No instances provisioned from this item yet." />
+            <EmptyState message={t('instances.empty')} />
           ) : (
             <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-700/50">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">Version</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Pool</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">{t('instances.colName')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden sm:table-cell">{t('instances.colVersion')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">{t('instances.colPool')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">{t('instances.colActions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/30">
@@ -624,17 +648,17 @@ export default function CatalogItemPage() {
                           </Link>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden sm:table-cell">
-                          {inst.attributes['catalog-version-pin'] || 'latest'}
+                          {inst.attributes['catalog-version-pin'] || t('info.latest')}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">
                           {poolName || inst.attributes['agent-pool-id'] || '—'}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
-                            <button onClick={() => startReconfigure(inst)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">Reconfigure</button>
-                            <button onClick={() => { setDestroyInstance(inst); setDestroyError(''); setDestroyAutoApply(false) }} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">Destroy</button>
+                            <button onClick={() => startReconfigure(inst)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200">{t('instances.reconfigure')}</button>
+                            <button onClick={() => { setDestroyInstance(inst); setDestroyError(''); setDestroyAutoApply(false) }} className="px-2.5 py-1 rounded-md text-xs font-medium bg-red-900/40 hover:bg-red-900/60 text-red-300">{t('instances.destroy')}</button>
                             {canOrphan && (
-                              <button onClick={() => { setOrphanInstance(inst); setOrphanError(''); setOrphanConfirm('') }} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-400" title="Delete the catalog record without destroying its infrastructure (discouraged)">Orphan…</button>
+                              <button onClick={() => { setOrphanInstance(inst); setOrphanError(''); setOrphanConfirm('') }} className="px-2.5 py-1 rounded-md text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-400" title={t('instances.orphanTitle')}>{t('instances.orphan')}</button>
                             )}
                           </div>
                         </td>
@@ -653,30 +677,30 @@ export default function CatalogItemPage() {
         <Modal
           open
           onClose={() => setReconfigInstance(null)}
-          title={`Reconfigure ${reconfigInstance.attributes.name}`}
+          title={t('reconfigure.title', { name: reconfigInstance.attributes.name })}
           panelClassName="bg-slate-800 rounded-lg border border-slate-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5"
         >
           <div>
-            <h3 className="text-lg font-semibold text-slate-100 mb-1">Reconfigure {reconfigInstance.attributes.name}</h3>
-            <p className="text-sm text-slate-400 mb-4">Update inputs and/or version, then queue a run.</p>
+            <h3 className="text-lg font-semibold text-slate-100 mb-1">{t('reconfigure.title', { name: reconfigInstance.attributes.name })}</h3>
+            <p className="text-sm text-slate-400 mb-4">{t('reconfigure.description')}</p>
             {reconfigError && <ErrorBanner message={reconfigError} />}
             <form onSubmit={handleReconfigure} className="space-y-3">
               <div>
-                <label htmlFor="recfg-version" className="block text-sm font-medium text-slate-300 mb-1">Version</label>
+                <label htmlFor="recfg-version" className="block text-sm font-medium text-slate-300 mb-1">{t('provision.version')}</label>
                 <select
                   id="recfg-version"
                   value={reconfigVersion}
                   onChange={(e) => setReconfigVersion(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-600 rounded-lg bg-slate-700 text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 >
-                  <option value="">Latest (float)</option>
+                  <option value="">{t('provision.latestFloat')}</option>
                   {a?.['default-version-pin'] && (
-                    <option value={a['default-version-pin']}>{a['default-version-pin']} (default pin)</option>
+                    <option value={a['default-version-pin']}>{t('provision.defaultPinOption', { version: a['default-version-pin'] })}</option>
                   )}
                   {reconfigInstance.attributes['catalog-version-pin'] &&
                     reconfigInstance.attributes['catalog-version-pin'] !== a?.['default-version-pin'] && (
                     <option value={reconfigInstance.attributes['catalog-version-pin'] as string}>
-                      {reconfigInstance.attributes['catalog-version-pin']} (current)
+                      {t('reconfigure.currentOption', { version: reconfigInstance.attributes['catalog-version-pin'] as string })}
                     </option>
                   )}
                 </select>
@@ -700,12 +724,12 @@ export default function CatalogItemPage() {
                   onChange={(e) => setReconfigAutoApply(e.target.checked)}
                   className="rounded border-slate-600 bg-slate-700 text-brand-600 focus:ring-brand-500"
                 />
-                <span className="text-sm text-amber-300">Auto-apply applies changes without a manual review step.</span>
+                <span className="text-sm text-amber-300">{t('provision.autoApplyHint')}</span>
               </label>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setReconfigInstance(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">Cancel</button>
+                <button type="button" onClick={() => setReconfigInstance(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">{t('common.cancel')}</button>
                 <button type="submit" disabled={reconfigBusy} className="px-4 py-2 rounded-lg text-sm font-medium bg-brand-600 hover:bg-brand-500 disabled:bg-brand-800 disabled:text-brand-400 text-white transition-colors">
-                  {reconfigBusy ? 'Queuing…' : 'Queue run'}
+                  {reconfigBusy ? t('reconfigure.queuing') : t('reconfigure.queueRun')}
                 </button>
               </div>
             </form>
@@ -718,13 +742,13 @@ export default function CatalogItemPage() {
         <Modal
           open
           onClose={() => setDestroyInstance(null)}
-          title={`Destroy ${destroyInstance.attributes.name}`}
+          title={t('destroy.title', { name: destroyInstance.attributes.name })}
           panelClassName="bg-slate-800 rounded-lg border border-slate-700 w-full max-w-md p-5"
         >
           <div>
-            <h3 className="text-lg font-semibold text-slate-100 mb-1">Destroy {destroyInstance.attributes.name}?</h3>
+            <h3 className="text-lg font-semibold text-slate-100 mb-1">{t('destroy.heading', { name: destroyInstance.attributes.name })}</h3>
             <p className="text-sm text-slate-400 mb-4">
-              This queues a destroy run that tears down this instance&apos;s infrastructure. On a successful apply the workspace is archived. This cannot be undone.
+              {t('destroy.description')}
             </p>
             {destroyError && <ErrorBanner message={destroyError} />}
             <label className="flex items-center gap-2 cursor-pointer mb-4">
@@ -734,12 +758,12 @@ export default function CatalogItemPage() {
                 onChange={(e) => setDestroyAutoApply(e.target.checked)}
                 className="rounded border-slate-600 bg-slate-700 text-red-600 focus:ring-red-500"
               />
-              <span className="text-sm text-amber-300">Auto-apply tears down immediately without review.</span>
+              <span className="text-sm text-amber-300">{t('destroy.autoApplyHint')}</span>
             </label>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setDestroyInstance(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">Cancel</button>
+              <button type="button" onClick={() => setDestroyInstance(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">{t('common.cancel')}</button>
               <button type="button" onClick={handleDestroy} disabled={destroyBusy} className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 disabled:bg-red-900 disabled:text-red-400 text-white transition-colors">
-                {destroyBusy ? 'Queuing…' : 'Destroy'}
+                {destroyBusy ? t('reconfigure.queuing') : t('instances.destroy')}
               </button>
             </div>
           </div>
@@ -750,17 +774,23 @@ export default function CatalogItemPage() {
         <Modal
           open
           onClose={() => { setOrphanInstance(null); setOrphanConfirm('') }}
-          title={`Orphan ${orphanInstance.attributes.name}`}
+          title={t('orphan.title', { name: orphanInstance.attributes.name })}
           panelClassName="bg-slate-800 rounded-lg border border-red-900/60 w-full max-w-md p-5"
         >
           <div>
-            <h3 className="text-lg font-semibold text-slate-100 mb-1">Orphan {orphanInstance.attributes.name}?</h3>
+            <h3 className="text-lg font-semibold text-slate-100 mb-1">{t('orphan.heading', { name: orphanInstance.attributes.name })}</h3>
             <p className="text-sm text-slate-400 mb-3">
-              This deletes the catalog instance record but does <span className="text-amber-300 font-medium">not</span> destroy its infrastructure — the provisioned resources keep running, <span className="text-amber-300 font-medium">untracked and unmanaged</span>. This is discouraged. To reclaim the infrastructure, cancel and use <span className="text-slate-200 font-medium">Destroy</span> instead.
+              {t.rich('orphan.description', {
+                warn: (chunks) => <span className="text-amber-300 font-medium">{chunks}</span>,
+                emph: (chunks) => <span className="text-slate-200 font-medium">{chunks}</span>,
+              })}
             </p>
             {orphanError && <ErrorBanner message={orphanError} />}
             <label className="block text-xs text-slate-400 mb-1">
-              Type the instance name <span className="text-slate-200 font-mono">{orphanInstance.attributes.name}</span> to confirm:
+              {t.rich('orphan.confirmPrompt', {
+                name: orphanInstance.attributes.name,
+                mono: (chunks) => <span className="text-slate-200 font-mono">{chunks}</span>,
+              })}
             </label>
             <input
               type="text"
@@ -770,14 +800,14 @@ export default function CatalogItemPage() {
               placeholder={orphanInstance.attributes.name}
             />
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => { setOrphanInstance(null); setOrphanConfirm('') }} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">Cancel</button>
+              <button type="button" onClick={() => { setOrphanInstance(null); setOrphanConfirm('') }} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">{t('common.cancel')}</button>
               <button
                 type="button"
                 onClick={handleOrphan}
                 disabled={orphanBusy || orphanConfirm !== orphanInstance.attributes.name}
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-red-700 hover:bg-red-600 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors"
               >
-                {orphanBusy ? 'Orphaning…' : 'Orphan & abandon infrastructure'}
+                {orphanBusy ? t('orphan.orphaning') : t('orphan.submit')}
               </button>
             </div>
           </div>

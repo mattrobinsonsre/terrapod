@@ -1145,5 +1145,469 @@
       "createStatus": "Failed to create policy set ({status})",
       "create": "Failed to create policy set"
     }
+  },
+  "adminCatalog": {
+    "title": "Catalog Admin",
+    "description": "Manage service catalog items",
+    "notEnabled": "Service catalog is not enabled.",
+    "empty": "No catalog items yet.",
+    "actions": {
+      "new": "New Catalog Item",
+      "cancel": "Cancel",
+      "create": "Create Catalog Item",
+      "creating": "Creating…",
+      "saveChanges": "Save Changes",
+      "saving": "Saving…",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "form": {
+      "name": "Name",
+      "nameTitle": "Letters, numbers, hyphens, and underscores only. Must start with a letter or number.",
+      "module": "Module",
+      "moduleSelect": "Select a module…",
+      "moduleImmutable": "Module is immutable after creation",
+      "displayName": "Display name",
+      "displayNamePlaceholder": "Standard S3 Bucket",
+      "versionPin": "Default version pin",
+      "versionPinPlaceholder": "e.g. 1.2.0 (empty = latest)",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "What this catalog item provisions…",
+      "enabled": "Enabled (visible in the browse catalog)",
+      "providerTemplates": "Provider templates",
+      "noProviderTemplates": "No provider templates defined.",
+      "restrictPools": "Restrict to specific agent pools",
+      "noAgentPools": "No agent pools available.",
+      "anyPool": "Any agent pool may be used.",
+      "labels": "Labels",
+      "variableOptions": "Variable options (advanced, JSON)",
+      "variableOptionsHint": "Per-input overrides (options, hidden, default). Leave as <code>[]</code> if unused."
+    },
+    "table": {
+      "name": "Name",
+      "module": "Module",
+      "enabled": "Enabled",
+      "actions": "Actions"
+    },
+    "badge": {
+      "enabled": "enabled",
+      "disabled": "disabled"
+    },
+    "confirm": {
+      "delete": "Delete this catalog item? Existing provisioned instances are unaffected."
+    },
+    "success": {
+      "created": "Catalog item \"{name}\" created",
+      "updated": "Catalog item \"{name}\" updated",
+      "deleted": "Catalog item deleted"
+    },
+    "errors": {
+      "load": "Failed to load catalog items",
+      "save": "Failed to save catalog item",
+      "createStatus": "Failed to create catalog item ({status})",
+      "updateStatus": "Failed to update catalog item ({status})",
+      "delete": "Failed to delete catalog item",
+      "deleteConflict": "Cannot delete: this catalog item has provisioned instances.",
+      "varOptsInvalidJson": "Variable options must be valid JSON (an array).",
+      "varOptsNotArray": "Variable options must be a JSON array."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Provider Templates",
+    "description": "Reusable provider configuration blocks for catalog items",
+    "notEnabled": "Service catalog is not enabled.",
+    "empty": "No provider templates yet.",
+    "actions": {
+      "new": "New Template",
+      "cancel": "Cancel",
+      "create": "Create Template",
+      "creating": "Creating…",
+      "saveChanges": "Save Changes",
+      "saving": "Saving…",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "form": {
+      "name": "Name",
+      "providerType": "Provider type",
+      "body": "Body (HCL)",
+      "parameters": "Parameters (advanced, JSON)",
+      "parametersHint": "Each parameter becomes a provision form field. Leave as <code>[]</code> if unused.",
+      "labels": "Labels"
+    },
+    "table": {
+      "name": "Name",
+      "providerType": "Provider type",
+      "parameters": "Parameters",
+      "actions": "Actions"
+    },
+    "confirm": {
+      "delete": "Delete this provider template? Catalog items referencing it will fail to provision. This cannot be undone."
+    },
+    "success": {
+      "created": "Provider template \"{name}\" created",
+      "updated": "Provider template \"{name}\" updated",
+      "deleted": "Provider template deleted"
+    },
+    "errors": {
+      "load": "Failed to load provider templates",
+      "save": "Failed to save provider template",
+      "createStatus": "Failed to create template ({status})",
+      "updateStatus": "Failed to update template ({status})",
+      "delete": "Failed to delete provider template",
+      "deleteConflict": "Cannot delete: this template is referenced by a catalog item.",
+      "paramsInvalidJson": "Parameters must be valid JSON (an array).",
+      "paramsNotArray": "Parameters must be a JSON array."
+    }
+  },
+  "adminAgentPools": {
+    "title": "Agent Pools",
+    "description": "Manage runner agent pools and their listeners",
+    "empty": "No agent pools configured.",
+    "actions": {
+      "newPool": "New Pool",
+      "createPool": "Create Pool",
+      "creating": "Creating...",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "save": "Save",
+      "saving": "Saving...",
+      "delete": "Delete",
+      "deleting": "Deleting...",
+      "confirmDelete": "Confirm Delete"
+    },
+    "form": {
+      "name": "Name",
+      "namePattern": "Letters, numbers, hyphens, and underscores only. Must start with a letter or number.",
+      "description": "Description",
+      "descriptionPlaceholder": "Production AWS runners",
+      "labels": "Labels"
+    },
+    "columns": {
+      "name": "Name",
+      "description": "Description",
+      "status": "Status",
+      "created": "Created"
+    },
+    "badges": {
+      "default": "default",
+      "degradedTooltip": "Listeners are heartbeating but their certificates have expired — runs will fail to launch.",
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "degraded"
+      }
+    },
+    "detail": {
+      "back": "Back to agent pools",
+      "defaultDescription": "Agent pool"
+    },
+    "tabs": {
+      "settings": "Settings",
+      "tokens": "Tokens",
+      "listeners": "Listeners"
+    },
+    "settings": {
+      "title": "Pool Settings",
+      "fields": {
+        "name": "Name",
+        "description": "Description",
+        "created": "Created",
+        "owner": "Owner",
+        "yourPermission": "Your Permission",
+        "labels": "Labels"
+      },
+      "permissions": {
+        "read": "read",
+        "write": "write",
+        "admin": "admin"
+      }
+    },
+    "danger": {
+      "title": "Delete Pool",
+      "description": "Permanently delete this agent pool and all associated tokens."
+    },
+    "tokens": {
+      "create": "Create Token",
+      "empty": "No tokens for this pool.",
+      "revoke": "Revoke",
+      "created": {
+        "title": "Token created successfully",
+        "copyNow": "Copy this token now — it will not be shown again.",
+        "copy": "Copy"
+      },
+      "form": {
+        "description": "Description",
+        "descriptionPlaceholder": "Production listener token",
+        "maxUses": "Max Uses",
+        "maxUsesHint": "Default 2 — tolerates one bootstrap-race retry across listener replicas.",
+        "expiresAt": "Expires At",
+        "expiresAtHint": "Default 1 hour from now."
+      },
+      "columns": {
+        "description": "Description",
+        "uses": "Uses",
+        "expires": "Expires",
+        "status": "Status",
+        "createdBy": "Created By",
+        "actions": "Actions"
+      },
+      "badges": {
+        "revoked": "Revoked",
+        "active": "Active"
+      }
+    },
+    "listeners": {
+      "empty": "No listeners registered for this pool.",
+      "columns": {
+        "name": "Name",
+        "status": "Status",
+        "replicas": "Replicas",
+        "certExpires": "Cert Expires",
+        "actions": "Actions"
+      },
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "degraded",
+        "cert-expired": "cert-expired"
+      },
+      "tooltips": {
+        "certExpired": "Listener is heartbeating but its certificate has expired — every cert-authenticated call (claim run, renew, runner-token) will fail. Most likely cause: the API never registered the latest cert, or the cert TTL elapsed before renewal.",
+        "degraded": "Listeners are heartbeating but their certificates have expired — runs will fail to launch."
+      }
+    },
+    "confirm": {
+      "revokeToken": "Revoke this join token? Listeners using it can no longer join, and this cannot be undone.",
+      "deleteListener": "Delete this listener? It will re-register on its next heartbeat if the pod is still running."
+    },
+    "success": {
+      "poolUpdated": "Pool updated",
+      "tokenRevoked": "Token revoked",
+      "listenerDeleted": "Listener deleted"
+    },
+    "errors": {
+      "loadPools": "Failed to load agent pools",
+      "loadPool": "Failed to load pool",
+      "loadTokens": "Failed to load tokens",
+      "loadListeners": "Failed to load listeners",
+      "createPool": "Failed to create pool",
+      "createStatus": "Failed to create pool ({status})",
+      "updatePool": "Failed to update pool",
+      "deletePool": "Failed to delete pool",
+      "poolNotFound": "Pool not found",
+      "createToken": "Failed to create token",
+      "createTokenStatus": "Failed to create token ({status})",
+      "revokeToken": "Failed to revoke token",
+      "deleteListener": "Failed to delete listener"
+    }
+  },
+  "adminAuditLog": {
+    "title": "Audit Log",
+    "description": "Immutable log of all API requests",
+    "empty": "No audit log entries found.",
+    "errors": {
+      "load": "Failed to load audit log"
+    },
+    "filters": {
+      "actorEmail": "Actor Email",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "Resource Type",
+      "resourceTypePlaceholder": "workspaces",
+      "method": "Method",
+      "methodAll": "All",
+      "since": "Since",
+      "until": "Until",
+      "clear": "Clear",
+      "apply": "Apply Filters"
+    },
+    "columns": {
+      "timestamp": "Timestamp",
+      "actor": "Actor",
+      "action": "Action",
+      "resourceType": "Resource Type",
+      "resourceId": "Resource ID",
+      "status": "Status",
+      "duration": "Duration"
+    },
+    "pagination": {
+      "summary": "Page {current} of {total} ({count, plural, one {# entry} other {# entries}})",
+      "previous": "Previous",
+      "next": "Next"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "Cache",
+    "description": "CLI binary and provider cache management",
+    "errors": {
+      "loadBinary": "Failed to load binary cache",
+      "loadCache": "Failed to load cache"
+    },
+    "sections": {
+      "cliBinaries": "CLI Binaries",
+      "providerBinaries": "Provider Binaries"
+    },
+    "empty": {
+      "binaries": "No cached CLI binaries yet.",
+      "providers": "No cached provider binaries yet."
+    },
+    "columns": {
+      "tool": "Tool",
+      "version": "Version",
+      "os": "OS",
+      "arch": "Arch",
+      "cachedAt": "Cached At",
+      "provider": "Provider",
+      "hostname": "Hostname",
+      "actions": "Actions"
+    },
+    "warm": {
+      "heading": "Warm cache",
+      "hide": "Hide",
+      "prePopulate": "Pre-populate…",
+      "help": "Pre-pull binaries and provider platforms into the cache (one per line). Trailing <code>os/arch</code> tokens are optional — omit them to use the configured default platforms.",
+      "binariesLabel": "Binaries",
+      "providersLabel": "Providers",
+      "warm": "Warm",
+      "warming": "Warming…",
+      "confirm": "Warm the selected cache entries now?",
+      "errorEmpty": "Add at least one binary or provider line to warm.",
+      "errorFailedStatus": "Warm failed ({status})",
+      "errorFailed": "Failed to warm cache",
+      "success": "Warmed {succeeded}/{total} ({failed} failed)"
+    },
+    "purge": {
+      "button": "Purge",
+      "confirmBinary": "Purge {tool} {version} from the cache? It will be re-fetched from upstream on the next request.",
+      "confirmProvider": "Purge {provider} {version} from the provider cache? It will be re-fetched from upstream on the next request.",
+      "successBinary": "Purged {count} entries for {tool} {version}",
+      "successProvider": "Purged {count} entries for {provider} {version}",
+      "errorStatus": "Purge failed ({status})",
+      "error": "Failed to purge",
+      "errorProvider": "Failed to purge provider",
+      "errorProviders": "Failed to purge providers"
+    },
+    "batchPurge": {
+      "purging": "Purging...",
+      "purgeSelected": "Purge Selected ({count})",
+      "confirmBinary": "Purge all selected binary cache entries? They will be re-fetched from upstream on the next request.",
+      "confirmProvider": "Purge all selected provider cache entries? They will be re-fetched from upstream on the next request.",
+      "errorBinaryItem": "Purge failed for {tool} {version}",
+      "errorProviderItem": "Purge failed for {provider} {version}",
+      "successBinary": "Purged {count} binary cache entries",
+      "successProvider": "Purged {count} provider cache entries"
+    }
+  },
+  "catalog": {
+    "title": "Service Catalog",
+    "description": "Provision self-service infrastructure from curated modules",
+    "notEnabled": "Service catalog is not enabled.",
+    "empty": "No catalog items available.",
+    "card": {
+      "pinned": "pinned {version}",
+      "latest": "latest"
+    },
+    "errors": {
+      "loadItems": "Failed to load catalog items"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← Catalog",
+    "backToCatalog": "Back to catalog",
+    "fallbackTitle": "Catalog item",
+    "notFound": "Catalog item not found, or the service catalog is not enabled.",
+    "common": {
+      "cancel": "Cancel"
+    },
+    "info": {
+      "module": "Module:",
+      "resolvedVersion": "Resolved version:",
+      "latest": "latest",
+      "disabled": "disabled"
+    },
+    "pending": {
+      "banner": "The run for <strong>{name}</strong> is planned and waiting for review. Confirm to apply, or discard.",
+      "working": "Working…",
+      "confirmApply": "Confirm & apply",
+      "discard": "Discard"
+    },
+    "field": {
+      "select": "Select…"
+    },
+    "provision": {
+      "title": "Provision",
+      "workspaceName": "Workspace name",
+      "workspaceNameTitle": "Letters, numbers, hyphens, and underscores only. Must start with a letter or number.",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "Agent pool",
+      "selectPool": "Select a pool…",
+      "noPoolsAvailable": "No agent pools are available to you. You need write access to an agent pool to provision — ask an administrator to grant it.",
+      "noPoolsAllowed": "None of the agent pools you can access are allowed by this catalog item. Ask an administrator to widen the item’s allowed pools or grant you access to one of them.",
+      "version": "Version",
+      "latestFloat": "Latest (float)",
+      "defaultPinOption": "{version} (default pin)",
+      "labelsOptional": "Labels (optional)",
+      "autoApplyHint": "Auto-apply applies changes without a manual review step.",
+      "provisioning": "Provisioning…",
+      "submit": "Provision"
+    },
+    "instances": {
+      "title": "Instances",
+      "empty": "No instances provisioned from this item yet.",
+      "colName": "Name",
+      "colVersion": "Version",
+      "colPool": "Pool",
+      "colActions": "Actions",
+      "reconfigure": "Reconfigure",
+      "destroy": "Destroy",
+      "orphan": "Orphan…",
+      "orphanTitle": "Delete the catalog record without destroying its infrastructure (discouraged)"
+    },
+    "reconfigure": {
+      "title": "Reconfigure {name}",
+      "description": "Update inputs and/or version, then queue a run.",
+      "currentOption": "{version} (current)",
+      "queuing": "Queuing…",
+      "queueRun": "Queue run"
+    },
+    "destroy": {
+      "title": "Destroy {name}",
+      "heading": "Destroy {name}?",
+      "description": "This queues a destroy run that tears down this instance's infrastructure. On a successful apply the workspace is archived. This cannot be undone.",
+      "autoApplyHint": "Auto-apply tears down immediately without review."
+    },
+    "orphan": {
+      "title": "Orphan {name}",
+      "heading": "Orphan {name}?",
+      "description": "This deletes the catalog instance record but does <warn>not</warn> destroy its infrastructure — the provisioned resources keep running, <warn>untracked and unmanaged</warn>. This is discouraged. To reclaim the infrastructure, cancel and use <emph>Destroy</emph> instead.",
+      "confirmPrompt": "Type the instance name <mono>{name}</mono> to confirm:",
+      "orphaning": "Orphaning…",
+      "submit": "Orphan & abandon infrastructure"
+    },
+    "actions": {
+      "confirmed": "Run confirmed — applying.",
+      "discarded": "Run discarded.",
+      "provisioned": "Provisioned {name} — plan is ready for review.",
+      "reconfigureQueued": "Reconfigure queued — run created.",
+      "reconfigureQueuedStatus": "Reconfigure queued — run is {status}.",
+      "destroyQueued": "Destroy queued — run created.",
+      "destroyQueuedStatus": "Destroy queued — run is {status}.",
+      "orphaned": "Orphaned {name} — catalog record deleted; its infrastructure is left running, untracked and unmanaged."
+    },
+    "errors": {
+      "loadItem": "Failed to load catalog item",
+      "confirm": "Failed to confirm",
+      "confirmStatus": "Failed to confirm ({status})",
+      "discard": "Failed to discard",
+      "discardStatus": "Failed to discard ({status})",
+      "provision": "Failed to provision",
+      "provisionStatus": "Failed to provision ({status})",
+      "reconfigure": "Failed to reconfigure",
+      "reconfigureStatus": "Failed to reconfigure ({status})",
+      "destroy": "Failed to destroy",
+      "destroyStatus": "Failed to destroy ({status})",
+      "orphan": "Failed to orphan",
+      "orphanStatus": "Failed to orphan ({status})"
+    }
   }
 }
