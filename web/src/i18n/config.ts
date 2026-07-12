@@ -29,14 +29,17 @@ export const locales = [
   'es',
   'fr',
   'la',
-  // Novelty / joke locales — full renderings, real (or private-use) tags so the
-  // tooling accepts them; they format dates/numbers via a real fallback locale.
+  // Novelty / joke locales. `tlh` (Klingon) is a real ISO 639-2 subtag. The
+  // rest use a valid BCP-47 shape — a real base language plus a `-x-` private-use
+  // subtag (`en-x-marklar`) — NOT a private-use-only tag (`x-marklar`), which
+  // `Intl.Locale`/next-intl reject as an invalid locale identifier. The `en-`
+  // base also gives them English date/number formatting for free.
   'tlh',
-  'x-marklar',
-  'x-lolcat',
-  'x-leet',
-  'x-pirate',
-  'x-yoda',
+  'en-x-marklar',
+  'en-x-lolcat',
+  'en-x-leet',
+  'en-x-pirate',
+  'en-x-yoda',
 ] as const
 
 export type Locale = (typeof locales)[number]
@@ -52,11 +55,11 @@ export const localeNames: Record<Locale, string> = {
   fr: 'Français',
   la: 'Latina',
   tlh: 'tlhIngan Hol',
-  'x-marklar': 'Marklar',
-  'x-lolcat': 'LOLCAT',
-  'x-leet': '1337 5p34k',
-  'x-pirate': 'Pirate',
-  'x-yoda': 'Yoda',
+  'en-x-marklar': 'Marklar',
+  'en-x-lolcat': 'LOLCAT',
+  'en-x-leet': '1337 5p34k',
+  'en-x-pirate': 'Pirate',
+  'en-x-yoda': 'Yoda',
 }
 
 // Some seed locales are not valid BCP-47 tags that `Intl` understands
@@ -64,13 +67,12 @@ export const localeNames: Record<Locale, string> = {
 // formatting we fall back to a real locale so `Intl.*Format` never throws —
 // the *prose* is joke-localized, the *number/date shapes* borrow a real locale.
 const formattingFallback: Partial<Record<Locale, string>> = {
+  // Klingon and Latin are valid subtags but have no CLDR formatting data — pin
+  // them to English so Intl.* never lands on the system default. The en-x-*
+  // joke locales already format as English via their `en` base, so they need
+  // no entry here.
   la: 'en',
   tlh: 'en',
-  'x-marklar': 'en',
-  'x-lolcat': 'en',
-  'x-leet': 'en',
-  'x-pirate': 'en',
-  'x-yoda': 'en',
 }
 
 export function formattingLocale(locale: string): string {

@@ -19,11 +19,11 @@ const shortLabel: Record<Locale, string> = {
   fr: 'FR',
   la: 'LA',
   tlh: 'tlh',
-  'x-marklar': 'MAR',
-  'x-lolcat': 'LOL',
-  'x-leet': '1337',
-  'x-pirate': 'ARR',
-  'x-yoda': 'YOD',
+  'en-x-marklar': 'MAR',
+  'en-x-lolcat': 'LOL',
+  'en-x-leet': '1337',
+  'en-x-pirate': 'ARR',
+  'en-x-yoda': 'YOD',
 }
 
 /**
