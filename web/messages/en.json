@@ -123,5 +123,24 @@
       "none": "No workspaces yet. Create one to get started.",
       "noMatch": "No workspaces match this filter."
     }
+  },
+  "status": {
+    "state-diverged": "State Diverged",
+    "vcs-error": "VCS Error",
+    "drifted": "Drifted",
+    "errored": "Errored",
+    "needs-confirm": "Needs Confirm",
+    "planning": "Planning",
+    "applying": "Applying",
+    "canceling": "Canceling",
+    "confirmed": "Confirmed",
+    "queued": "Queued",
+    "pending": "Pending",
+    "applied": "Applied",
+    "planned": "Planned",
+    "canceled": "Canceled",
+    "discarded": "Discarded",
+    "pendingDeletion": "Pending deletion",
+    "archived": "Archived"
   }
 }

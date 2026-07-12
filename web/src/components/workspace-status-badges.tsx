@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import type { WorkspaceStatusDef } from '@/lib/workspace-status'
 
 // Colour → Tailwind pill classes for the workspace status/lifecycle badges.
@@ -34,6 +37,10 @@ export function WorkspaceStatusBadges({
   runId: string | null
   lifecycleState?: 'active' | 'pending_deletion' | 'archived'
 }) {
+  // Status labels live in the `status` namespace keyed by the stable `filter`
+  // token (state-diverged, errored, …), so the shared workspace-status.ts data
+  // module stays i18n-free while the displayed text localizes (#767).
+  const t = useTranslations('status')
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {!def ? (
@@ -43,16 +50,16 @@ export function WorkspaceStatusBadges({
           href={`/workspaces/${workspaceId}/runs/${runId}`}
           className={`${pill} hover:opacity-80 transition-opacity ${badgeColors[def.color]}`}
         >
-          {def.label}
+          {t(def.filter)}
         </Link>
       ) : (
-        <span className={`${pill} ${badgeColors[def.color]}`}>{def.label}</span>
+        <span className={`${pill} ${badgeColors[def.color]}`}>{t(def.filter)}</span>
       )}
       {lifecycleState === 'pending_deletion' && (
-        <span className={`${pill} ${badgeColors.amber}`}>Pending deletion</span>
+        <span className={`${pill} ${badgeColors.amber}`}>{t('pendingDeletion')}</span>
       )}
       {lifecycleState === 'archived' && (
-        <span className={`${pill} ${badgeColors.slate}`}>Archived</span>
+        <span className={`${pill} ${badgeColors.slate}`}>{t('archived')}</span>
       )}
     </div>
   )

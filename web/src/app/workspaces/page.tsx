@@ -77,6 +77,7 @@ function WorkspacesPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const t = useTranslations('workspaces')
+  const ts = useTranslations('status')
   const fmt = useFormat()
   // Translate a filter-suggestion's category hint (its stable English key stays
   // the internal value; only the displayed label is localized).
@@ -896,7 +897,7 @@ function WorkspacesPageInner() {
                               {active ? '✓' : ''}
                             </span>
                             <span className={'w-1.5 h-1.5 rounded-full ' + opt.dot} />
-                            <span className="flex-1 text-left">{opt.label}</span>
+                            <span className="flex-1 text-left">{ts(opt.filter)}</span>
                             <span className={'text-xs ' + (count > 0 ? 'text-slate-400' : 'text-slate-600')}>{count}</span>
                           </button>
                         )

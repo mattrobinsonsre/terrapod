@@ -123,5 +123,24 @@
       "none": "Noch keine Arbeitsbereiche. Erstellen Sie einen, um zu beginnen.",
       "noMatch": "Keine Arbeitsbereiche entsprechen diesem Filter."
     }
+  },
+  "status": {
+    "state-diverged": "Status abgewichen",
+    "vcs-error": "VCS-Fehler",
+    "drifted": "Abgedriftet",
+    "errored": "Fehlgeschlagen",
+    "needs-confirm": "Bestätigung erforderlich",
+    "planning": "Wird geplant",
+    "applying": "Wird angewendet",
+    "canceling": "Wird abgebrochen",
+    "confirmed": "Bestätigt",
+    "queued": "In Warteschlange",
+    "pending": "Ausstehend",
+    "applied": "Angewendet",
+    "planned": "Geplant",
+    "canceled": "Abgebrochen",
+    "discarded": "Verworfen",
+    "pendingDeletion": "Löschung ausstehend",
+    "archived": "Archiviert"
   }
 }
