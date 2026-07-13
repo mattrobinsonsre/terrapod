@@ -2050,7 +2050,7 @@
       "autoMergeStrategy": "Auto-merge Strategy",
       "vcsPolling": "VCS Polling",
       "labels": "Labels (tags)",
-      "labelsTitle": "Workspace labels do double duty: label-based RBAC matching, and as the \"tags\" matched by terraform/tofu cloud { workspaces { tags = ... } } blocks.",
+      "labelsTitle": "Workspace labels do double duty: label-based RBAC matching, and as the \"tags\" matched by terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}' blocks.",
       "varFiles": "Var Files",
       "varFilesPlaceholder": "e.g. envs/dev.tfvars",
       "triggerPrefixes": "Trigger Prefixes",
