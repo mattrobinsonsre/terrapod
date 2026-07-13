@@ -44,6 +44,13 @@ updates:
       # language-common and core PRs). Lift when doing the coordinated v4 upgrade.
       - dependency-name: "@zxcvbn-ts/*"
         versions: [">=4"]
+      # TypeScript 7 (the native/Go compiler rewrite) breaks `next build`
+      # under Next.js 16 — `tsc --noEmit` passes but the Next build worker
+      # crashes ("The 'id' argument must be of type string", exit 1). Verified
+      # on a spike; see #816. Hold the major until Next.js supports the TS 7
+      # toolchain; lift then.
+      - dependency-name: typescript
+        versions: [">=7"]
 
   - package-ecosystem: docker
     directory: /docker
