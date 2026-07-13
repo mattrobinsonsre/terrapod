@@ -99,6 +99,7 @@ function WorkspaceGroupRows({
   setFilterInput: (v: string) => void
   depth?: number
 }) {
+  const t = useTranslations('workspaces')
   return (
     <>
       {groups.map(group => {
@@ -184,7 +185,7 @@ function WorkspaceGroupRows({
                     <span className="text-xs text-slate-400">{ws.attributes['agent-pool-name'] || '—'}</span>
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
-                    <span className="text-xs text-slate-400">{ws.attributes['resource-cpu']} CPU / {ws.attributes['resource-memory']}</span>
+                    <span className="text-xs text-slate-400">{t('table.resourcesValue', { cpu: ws.attributes['resource-cpu'], memory: ws.attributes['resource-memory'] })}</span>
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
                     <WorkspaceStatusBadges
@@ -1280,7 +1281,7 @@ function WorkspacesPageInner() {
                         : 'bg-slate-800/50 text-slate-300 border-slate-700/50 hover:bg-slate-700/60')
                     }
                   >
-                    <span>Group</span>
+                    <span>{t('group.label')}</span>
                     {groupMode !== 'flat' && (
                       <span className="inline-flex items-center justify-center min-w-5 px-1.5 rounded-full text-[10px] font-semibold bg-brand-600 text-white">
                         1
@@ -1292,7 +1293,7 @@ function WorkspacesPageInner() {
                   </button>
                   {groupMenuOpen && (
                     <div role="menu" className="absolute right-0 z-10 mt-1 w-52 rounded-lg bg-slate-800 border border-slate-700 shadow-xl py-1 max-h-96 overflow-y-auto">
-                      {([['flat', 'Flat'], ['repo', 'Repository'], ['repo-path', 'Repository + Path']] as const).map(([value, label]) => (
+                      {([['flat', t('group.flat')], ['repo', t('group.repo')], ['repo-path', t('group.repoPath')]] as const).map(([value, label]) => (
                         <button
                           key={value}
                           type="button"
@@ -1367,18 +1368,18 @@ function WorkspacesPageInner() {
                 }}
                 className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
               >
-                {collapsedGroups.size === 0 ? 'Collapse all' : 'Expand all'}
+                {collapsedGroups.size === 0 ? t('group.collapseAll') : t('group.expandAll')}
               </button>
             </div>
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-700/50">
-                  <SortableHeader label="Name" sortKey="name" sortState={sortState} onSort={toggleSort} />
-                  <SortableHeader label="Mode" sortKey="mode" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
-                  <SortableHeader label="Pool" sortKey="pool" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
-                  <SortableHeader label="Resources" sortKey="resources" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
-                  <SortableHeader label="Status" sortKey="status" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
-                  <SortableHeader label="Created" sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden xl:table-cell" />
+                  <SortableHeader label={t('table.name')} sortKey="name" sortState={sortState} onSort={toggleSort} />
+                  <SortableHeader label={t('table.mode')} sortKey="mode" sortState={sortState} onSort={toggleSort} className="hidden sm:table-cell" />
+                  <SortableHeader label={t('table.pool')} sortKey="pool" sortState={sortState} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortableHeader label={t('table.resources')} sortKey="resources" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
+                  <SortableHeader label={t('table.status')} sortKey="status" sortState={sortState} onSort={toggleSort} className="hidden lg:table-cell" />
+                  <SortableHeader label={t('table.created')} sortKey="created" sortState={sortState} onSort={toggleSort} className="hidden xl:table-cell" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/30">
