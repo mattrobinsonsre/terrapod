@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "Arbejdsområder",
+    "estate": "Ejendom",
+    "registry": "Registry",
+    "modules": "Moduler",
+    "providers": "Providere",
+    "catalog": "Katalog",
+    "agentPools": "Agentpuljer",
+    "admin": "Administration",
+    "users": "Brugere",
+    "roles": "Roller",
+    "vcsConnections": "VCS-forbindelser",
+    "variableSets": "Variabelsæt",
+    "autodiscovery": "Automatisk registrering",
+    "bulkUpdate": "Masseopdatering",
+    "executionHooks": "Eksekverings-hooks",
+    "policySets": "Politiksæt",
+    "providerTemplates": "Providerskabeloner",
+    "catalogAdmin": "Katalogadministration",
+    "cache": "Cache",
+    "auditLog": "Revisionslog",
+    "help": "Hjælp",
+    "apiReference": "API-reference",
+    "docs": "Dokumentation",
+    "account": "Konto",
+    "apiTokens": "API-tokens",
+    "sessions": "Sessioner",
+    "logOut": "Log ud",
+    "menu": "Menu",
+    "openMenu": "Åbn menu",
+    "openAccountMenu": "Åbn kontomenu",
+    "closeMenu": "Luk menu"
+  },
+  "switcher": {
+    "language": "Sprog",
+    "changeLanguage": "Skift sprog"
+  },
+  "workspaces": {
+    "title": "Arbejdsområder",
+    "description": "Administrer Terraform-arbejdsområder, tilstand og kørsler",
+    "new": "Nyt arbejdsområde",
+    "cancel": "Annuller",
+    "create": "Opret arbejdsområde",
+    "creating": "Opretter…",
+    "loadFailed": "Kunne ikke indlæse arbejdsområder",
+    "createFailed": "Kunne ikke oprette arbejdsområde",
+    "form": {
+      "name": "Navn",
+      "namePattern": "Kun bogstaver, tal, bindestreger og understregninger. Skal begynde med et bogstav eller tal.",
+      "namePlaceholder": "mit-arbejdsomraade",
+      "executionMode": "Eksekveringstilstand",
+      "local": "Lokal",
+      "agent": "Agent",
+      "executionBackend": "Eksekverings-backend",
+      "version": "Version",
+      "versionTitle": "Version i formatet X.Y eller X.Y.Z (f.eks. 1.11 eller 1.11.5)",
+      "versionPlaceholder": "f.eks. 1.11 eller 1.11.5",
+      "cpuRequest": "CPU-anmodning",
+      "cpuTitle": "Kubernetes CPU-mængde: hele kerner (1, 2) eller millicores (500m, 100m)",
+      "cpuHint": "f.eks. 1, 0.5, 500m",
+      "memoryRequest": "Hukommelsesanmodning",
+      "memoryTitle": "Kubernetes hukommelsesmængde: bytes (1000) eller med suffiks (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "f.eks. 2Gi, 512Mi, 1Ti",
+      "agentPool": "Agentpulje",
+      "none": "Ingen",
+      "autoApply": "Anvend automatisk",
+      "enabled": "Aktiveret",
+      "workingDirectory": "Arbejdsmappe",
+      "workingDirectoryPlaceholder": "f.eks. environments/dev",
+      "workingDirectoryHint": "Undermappe i repoet, der indeholder .tf-filer",
+      "vcsConnection": "VCS-forbindelse",
+      "vcsRepoUrl": "VCS-repository-URL",
+      "vcsRepoUrlTitle": "Skal være en HTTP- eller HTTPS-URL",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "VCS-branch",
+      "vcsBranchPlaceholder": "main (standard)"
+    },
+    "stats": {
+      "total": "I alt",
+      "health": "Tilstand",
+      "locked": "Låst",
+      "clearAllFilters": "Ryd alle filtre",
+      "clearHealthFilter": "Ryd filter for tilstandsproblemer",
+      "filterHealth": "Filtrér til arbejdsområder med tilstandsproblemer",
+      "clearLockedFilter": "Ryd filter for låste",
+      "filterLocked": "Filtrér til låste arbejdsområder"
+    },
+    "filter": {
+      "placeholder": "Filtrér efter navn, label eller status — f.eks. \"eu1\", \"env:prod\", \"status:errored\"",
+      "ariaLabel": "Filtrér arbejdsområder",
+      "clear": "Ryd",
+      "status": "Status",
+      "label": "Label",
+      "back": "tilbage",
+      "valueCount": "{count, plural, one {# værdi} other {# værdier}}",
+      "removeTerm": "Fjern dette led",
+      "showing": "Viser {filtered} af {total}",
+      "termName": "navn: {value}",
+      "termStatus": "status: {value}",
+      "termLabelAny": "{key}: (enhver)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "status",
+      "hintHealth": "tilstand",
+      "hintLabel": "label",
+      "hintLabelKey": "labelnøgle",
+      "hintName": "navn"
+    },
+    "row": {
+      "removeLabelFilter": "Klik for at fjerne fra filter",
+      "addLabelFilter": "Klik for at filtrere efter denne label"
+    },
+    "table": {
+      "name": "Navn",
+      "mode": "Tilstand",
+      "pool": "Pulje",
+      "resources": "Ressourcer",
+      "status": "Status",
+      "created": "Oprettet",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "Ingen arbejdsområder endnu. Opret et for at komme i gang.",
+      "noMatch": "Ingen arbejdsområder matcher dette filter."
+    }
+  },
+  "status": {
+    "state-diverged": "Tilstand afveget",
+    "vcs-error": "VCS-fejl",
+    "drifted": "Afdriftet",
+    "errored": "Fejlet",
+    "needs-confirm": "Kræver bekræftelse",
+    "planning": "Planlægger",
+    "applying": "Anvender",
+    "canceling": "Annullerer",
+    "confirmed": "Bekræftet",
+    "queued": "I kø",
+    "pending": "Afventer",
+    "applied": "Anvendt",
+    "planned": "Planlagt",
+    "canceled": "Annulleret",
+    "discarded": "Kasseret",
+    "pendingDeletion": "Afventer sletning",
+    "archived": "Arkiveret"
+  },
+  "auth": {
+    "loading": "Indlæser...",
+    "subtitle": "Log ind for at administrere din infrastruktur",
+    "subtitleCli": "Log ind for at autorisere CLI'en",
+    "emailLabel": "E-mail",
+    "passwordLabel": "Adgangskode",
+    "signIn": "Log ind",
+    "signingIn": "Logger ind...",
+    "signInWith": "Log ind med {provider}",
+    "or": "eller",
+    "noProviders": "Ingen godkendelsesprovidere konfigureret",
+    "completingSignIn": "Fuldfører login...",
+    "callbackFailedTitle": "Godkendelse mislykkedes",
+    "tryAgain": "Prøv igen",
+    "errors": {
+      "loadProviders": "Kunne ikke indlæse providere",
+      "authenticationFailed": "Godkendelse mislykkedes ({status})",
+      "tokenExchangeFailed": "Tokenudveksling mislykkedes ({status})",
+      "loginFailed": "Login mislykkedes",
+      "startLoginFailed": "Kunne ikke starte login",
+      "missingCodeOrState": "Manglende autorisationskode eller state",
+      "stateMismatch": "State-uoverensstemmelse — muligt CSRF-angreb",
+      "missingVerifier": "Manglende PKCE-verifier — prøv venligst at logge ind igen"
+    }
+  },
+  "estate": {
+    "title": "Ejendomstopologi",
+    "description": "Alle arbejdsområder, du kan se, og de moduler, de bruger, forbundet via run-triggers, remote-state og modullinks. Gruppér efter den akse, der passer til din ejendom — platformen håndhæver ingen labelkonvention.",
+    "errors": {
+      "load": "Kunne ikke indlæse ejendomsgrafen."
+    },
+    "groupBy": {
+      "label": "Gruppér efter"
+    },
+    "view": {
+      "graph": "Graf",
+      "table": "Tabel"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# arbejdsområde} other {# arbejdsområder}}",
+      "modules": "{count, plural, one {# modul} other {# moduler}}",
+      "dependencies": "{count, plural, one {# afhængighed} other {# afhængigheder}}"
+    },
+    "legend": {
+      "registryModule": "registry-modul"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {arbejdsområde bruger dette — en versionsbump genplanlægger det} other {arbejdsområder bruger dette — en versionsbump genplanlægger dem alle}}",
+      "dependOnThis": "{count, plural, one {afhænger af dette} other {afhænger af dette}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Arbejdsområder",
+        "col": {
+          "workspace": "Arbejdsområde",
+          "group": "Gruppe",
+          "agentPool": "Agentpulje",
+          "dependedOnBy": "Afhængige",
+          "modulesUsed": "Anvendte moduler"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Moduler",
+        "col": {
+          "module": "Modul",
+          "usedBy": "Brugt af (arbejdsområder)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "Labels",
+    "description": "Gennemse labels, der er i brug på tværs af arbejdsområder, agentpuljer, registry-moduler og registry-providere. Skrivebeskyttet — labels redigeres på hver enheds egen side.",
+    "none": "Ingen.",
+    "emptyKeys": "Ingen labels i brug endnu. Sæt en label på et arbejdsområde, en agentpulje, et registry-modul eller en registry-provider for at begynde at gruppere her.",
+    "emptyValues": "Ingen værdier for \"{key}\". Enten bærer ingen læsbar enhed denne label, eller den blev fjernet siden sidste visning.",
+    "loadKeysFailed": "Kunne ikke indlæse labels ({status})",
+    "loadValuesFailed": "Kunne ikke indlæse værdier for {key} ({status})",
+    "loadEntitiesFailed": "Kunne ikke indlæse enheder ({status})",
+    "columns": {
+      "labelKey": "Labelnøgle",
+      "distinctValues": "Distinkte værdier",
+      "value": "Værdi",
+      "total": "I alt"
+    },
+    "entity": {
+      "workspaces": "Arbejdsområder",
+      "agentPools": "Agentpuljer",
+      "modules": "Moduler",
+      "providers": "Providere"
+    },
+    "deprecated": {
+      "badge": "Forældet og ikke understøttet.",
+      "body": "Label-browseren er ikke længere i hovednavigationen og fjernes i en fremtidig udgivelse. Filtrér efter label fra siden <workspacesLink>Arbejdsområder</workspacesLink> i stedet. Hvis du er afhængig af denne side, så <issueLink>opret en issue</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "API-tokens",
+      "description": "Administrer godkendelsestokens til CLI og automatisering",
+      "descriptionAll": "Alle tokens på tværs af alle brugere",
+      "myTokens": "Mine tokens",
+      "allTokens": "Alle tokens",
+      "createToken": "Opret token",
+      "cancel": "Annuller",
+      "tokenReady": "Token klar",
+      "tokenReadyHelp": "Kopiér denne token nu — den vises ikke igen.",
+      "dismissToken": "Afvis token",
+      "hide": "Skjul",
+      "show": "Vis",
+      "copy": "Kopiér",
+      "empty": "Ingen API-tokens endnu.",
+      "noDescription": "Ingen beskrivelse",
+      "detached": "løsrevet",
+      "never": "Aldrig",
+      "selected": "{count, plural, one {# token valgt} other {# tokens valgt}}",
+      "revokeSelected": "Tilbagekald valgte",
+      "revoking": "Tilbagekalder...",
+      "clearSelection": "Ryd markering",
+      "rotate": "Rotér",
+      "rotating": "Roterer...",
+      "revoke": "Tilbagekald",
+      "confirmRotate": "Rotér denne token? Den nuværende hemmelighed holder op med at virke øjeblikkeligt, og en ny udstedes.",
+      "confirmBulkRevoke": "{count, plural, one {Tilbagekald # token?} other {Tilbagekald # tokens?}}",
+      "kinds": {
+        "interactive": {
+          "label": "Personlig",
+          "help": "En personlig token til CLI'en og ad hoc-automatisering. Bærer dine fulde aktive tilladelser."
+        },
+        "service_bound": {
+          "label": "Tjeneste · bundet",
+          "help": "En tjenestetoken afgrænset til en delmængde af dine roller. Dens adgang er skæringen mellem disse roller og dine egne — og den holder op med at virke, hvis din konto fjernes."
+        },
+        "service_detached": {
+          "label": "Tjeneste · løsrevet",
+          "help": "En administratorstyret tjenestetoken med et absolut fastlåst omfang, ikke bundet til nogen bruger. Bruges til kritisk maskine-til-maskine-automatisering, der skal overleve, at én person forlader teamet."
+        }
+      },
+      "lifespans": {
+        "720": "30 dage",
+        "2160": "90 dage",
+        "4320": "180 dage",
+        "8760": "1 år"
+      },
+      "filter": {
+        "all": "Alle typer"
+      },
+      "form": {
+        "description": "Beskrivelse",
+        "descriptionPlaceholder": "CI/CD-pipeline-token",
+        "kind": "Type",
+        "lifespan": "Levetid",
+        "create": "Opret",
+        "creating": "Opretter...",
+        "pinnedRoles": "Fastlåste roller",
+        "pinnedRolesHelp": "— det omfang, denne token er begrænset til",
+        "pinnedRolesCapped": "(begrænset til din egen adgang)",
+        "noCustomRoles": "Ingen brugerdefinerede roller defineret. Opret roller under Administration → Roller først.",
+        "noScopedRoles": "Du har ingen afgrænsede roller at fastlåse. Denne token ville ikke have nogen adgang."
+      },
+      "columns": {
+        "description": "Beskrivelse",
+        "kind": "Type",
+        "boundTo": "Bundet til",
+        "created": "Oprettet",
+        "lastUsed": "Sidst brugt",
+        "expires": "Udløber",
+        "actions": "Handlinger"
+      },
+      "errors": {
+        "load": "Kunne ikke indlæse tokens",
+        "create": "Kunne ikke oprette token ({status})",
+        "createGeneric": "Kunne ikke oprette token",
+        "rotate": "Kunne ikke rotere token ({status})",
+        "rotateGeneric": "Kunne ikke rotere token",
+        "revoke": "Kunne ikke tilbagekalde token ({status})",
+        "revokeGeneric": "Kunne ikke tilbagekalde token",
+        "bulkRevoke": "Kunne ikke tilbagekalde tokens"
+      }
+    },
+    "sessions": {
+      "title": "Sessioner",
+      "description": "Dine aktive sessioner",
+      "descriptionAll": "Alle aktive sessioner på tværs af platformen",
+      "empty": "Ingen aktive sessioner.",
+      "revokeAll": "Tilbagekald alle",
+      "current": "Nuværende",
+      "columns": {
+        "provider": "Provider",
+        "created": "Oprettet",
+        "expires": "Udløber",
+        "lastActive": "Sidst aktiv",
+        "token": "Token"
+      },
+      "errors": {
+        "load": "Kunne ikke indlæse sessioner",
+        "revoke": "Kunne ikke tilbagekalde sessioner ({status})",
+        "revokeGeneric": "Kunne ikke tilbagekalde sessioner"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Moduler",
+      "description": "Privat Terraform-modulregistry",
+      "cancel": "Annuller",
+      "createModule": "Opret modul",
+      "empty": "Ingen moduler endnu. Opret et for at komme i gang.",
+      "providerLabel": "Provider: {provider}",
+      "versionCount": "{count, plural, one {# version} other {# versioner}}",
+      "loadFailed": "Kunne ikke indlæse moduler",
+      "createFailed": "Kunne ikke oprette modul",
+      "createFailedStatus": "Kunne ikke oprette modul ({status})",
+      "form": {
+        "name": "Navn",
+        "provider": "Provider",
+        "slugTitle": "Kun små bogstaver, tal og bindestreger. Skal begynde med et lille bogstav.",
+        "addressNote": "Navn og provider udgør modulets registry-adresse og kan ikke ændres efter oprettelse.",
+        "vcsConnectionOptional": "VCS-forbindelse (valgfri)",
+        "noneUploadManually": "Ingen — upload versioner manuelt",
+        "repositoryUrl": "Repository-URL",
+        "branchOptional": "Branch (valgfri)",
+        "branchPlaceholder": "main (lad stå tom for standard)",
+        "tagPattern": "Tag-mønster",
+        "tagPatternHint": "Kun tags, der matcher dette mønster, opretter versioner (f.eks. v1.0.0)",
+        "labelsOptional": "Labels (valgfri)",
+        "creating": "Opretter...",
+        "create": "Opret"
+      }
+    },
+    "providers": {
+      "title": "Providere",
+      "description": "Privat Terraform-providerregistry",
+      "cancel": "Annuller",
+      "createProvider": "Opret provider",
+      "empty": "Ingen providere endnu. Opret en for at komme i gang.",
+      "loadFailed": "Kunne ikke indlæse providere",
+      "createFailed": "Kunne ikke oprette provider",
+      "createFailedStatus": "Kunne ikke oprette provider ({status})",
+      "form": {
+        "name": "Navn",
+        "slugTitle": "Kun små bogstaver, tal og bindestreger. Skal begynde med et lille bogstav.",
+        "creating": "Opretter...",
+        "create": "Opret"
+      }
+    },
+    "meta": {
+      "title": "Metadata",
+      "edit": "Rediger",
+      "cancel": "Annuller",
+      "save": "Gem",
+      "saving": "Gemmer...",
+      "saveAnyway": "Gem alligevel",
+      "revertLabels": "Fortryd labels",
+      "owner": "Ejer",
+      "ownerNone": "Ingen",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "Labels"
+    },
+    "moduleDetail": {
+      "notFound": "Modul ikke fundet",
+      "loadFailed": "Kunne ikke indlæse modul",
+      "updateFailed": "Kunne ikke opdatere modul",
+      "labelLockoutDefault": "Denne labelændring ville reducere din adgang.",
+      "providerLabel": "Provider: {provider}",
+      "cancel": "Annuller",
+      "uploadVersion": "Upload version",
+      "vcsConnected": "VCS-forbundet",
+      "connectVcs": "Forbind VCS",
+      "deleteModule": "Slet modul",
+      "linkFailed": "Kunne ikke sammenkæde arbejdsområde",
+      "linkFailedStatus": "Sammenkædning mislykkedes ({status})",
+      "unlinkConfirm": "Fjern sammenkædning af dette arbejdsområde fra modulet? Konsekvensanalyse kører ikke længere for det.",
+      "unlinkFailed": "Kunne ikke fjerne sammenkædning af arbejdsområde",
+      "unlinkFailedStatus": "Fjernelse af sammenkædning mislykkedes ({status})",
+      "uploadFailed": "Upload mislykkedes",
+      "uploadFailedStatus": "Upload mislykkedes ({status})",
+      "saveVcsFailed": "Kunne ikke gemme VCS-konfiguration",
+      "saveVcsFailedStatus": "Kunne ikke gemme VCS-konfiguration ({status})",
+      "disableVcsFailed": "Kunne ikke deaktivere VCS",
+      "disableVcsFailedStatus": "Kunne ikke deaktivere VCS ({status})",
+      "deleteFailed": "Sletning mislykkedes",
+      "deleteFailedStatus": "Sletning mislykkedes ({status})",
+      "upload": {
+        "intro": "Vælg en mappe, der indeholder dine Terraform-modulfiler. De pakkes ind i en tarball og uploades.",
+        "version": "Version",
+        "moduleDirectory": "Modulmappe",
+        "selectDirectory": "Vælg mappe",
+        "fileCount": "{count, plural, one {# fil} other {# filer}}",
+        "filesToInclude": "{count, plural, one {# fil at inkludere:} other {# filer at inkludere:}}",
+        "andMore": "...og {count} mere",
+        "uploading": "Uploader...",
+        "upload": "Upload"
+      },
+      "vcs": {
+        "intro": "Forbind dette modul til et VCS-repository. Nye versioner publiceres automatisk, når semver-tags, der matcher tag-mønsteret, pushes. Branch-commits alene opretter ikke versioner.",
+        "connection": "VCS-forbindelse",
+        "selectConnection": "Vælg en forbindelse...",
+        "repositoryUrl": "Repository-URL",
+        "branchOptional": "Branch (valgfri)",
+        "branchPlaceholder": "main (lad stå tom for standard)",
+        "tagPattern": "Tag-mønster",
+        "tagPatternHint": "Kun tags, der matcher dette mønster, opretter versioner (f.eks. v1.0.0)",
+        "saving": "Gemmer...",
+        "saveConfiguration": "Gem VCS-konfiguration",
+        "disconnect": "Afbryd VCS"
+      },
+      "vcsStatus": {
+        "connected": "VCS forbundet:",
+        "lastTag": "Sidste tag: {tag}",
+        "firstVersionHint": "Push et semver-tag (f.eks. <code>v1.0.0</code>), der matcher tag-mønsteret, for at publicere den første version."
+      },
+      "links": {
+        "title": "Sammenkædede arbejdsområder",
+        "linkWorkspace": "Sammenkæd arbejdsområde",
+        "description": "Sammenkædede arbejdsområder modtager spekulative planer, når der åbnes PR'er mod dette modul, og standardkørsler, når nye versioner publiceres.",
+        "searchPlaceholder": "Søg efter arbejdsområder at sammenkæde…",
+        "empty": "Ingen arbejdsområder sammenkædet endnu.",
+        "unlinkTitle": "Fjern sammenkædning af arbejdsområde"
+      },
+      "interface": {
+        "title": "Input og output",
+        "counts": "{inputs} input, {outputs} output",
+        "versionLabel": "Version:",
+        "noData": "Ingen interfacedata tilgængelige for denne version.",
+        "inputs": "Input",
+        "outputs": "Output",
+        "name": "Navn",
+        "type": "Type",
+        "description": "Beskrivelse",
+        "default": "Standard",
+        "required": "Påkrævet",
+        "sensitive": "Følsom",
+        "requiredBadge": "påkrævet",
+        "optionalBadge": "valgfri",
+        "sensitiveBadge": "følsom",
+        "noneDeclared": "Denne modulversion erklærer ingen input eller output."
+      },
+      "versions": {
+        "title": "Versioner",
+        "count": "{count, plural, one {# version} other {# versioner}}",
+        "emptyVcs": "Ingen versioner endnu. Push et semver-tag, der matcher \"{pattern}\", til det forbundne repository for at publicere en version.",
+        "emptyUpload": "Ingen versioner endnu. Upload et modul eller forbind VCS for at komme i gang.",
+        "version": "Version",
+        "status": "Status",
+        "source": "Kilde",
+        "actions": "Handlinger",
+        "manualUpload": "manuel upload",
+        "delete": "Slet"
+      },
+      "deleteDialog": {
+        "title": "Bekræft sletning",
+        "moduleBody": "Dette sletter permanent dette modul og alle dets versioner.",
+        "versionBody": "Dette sletter permanent version {version}.",
+        "cancel": "Annuller",
+        "confirm": "Slet"
+      }
+    },
+    "providerDetail": {
+      "description": "Providerregistry",
+      "deleteProvider": "Slet provider",
+      "publishNote": "Providerversioner publiceres med <code>terrapod-publish</code>-CLI'en, som client-signerer binærfilerne. Upload og signering af provider-binærfiler fra browseren understøttes ikke længere. Denne side er skrivebeskyttet for versioner og platforme.",
+      "empty": "Ingen versioner endnu. Publicér med terrapod-publish-CLI'en for at komme i gang.",
+      "loadVersionsFailed": "Kunne ikke indlæse versioner",
+      "updateFailed": "Kunne ikke opdatere provider",
+      "labelLockoutDefault": "Denne labelændring ville reducere din adgang.",
+      "deleteFailed": "Sletning mislykkedes",
+      "deleteFailedStatus": "Sletning mislykkedes ({status})",
+      "platformCount": "{count, plural, one {# platform} other {# platforme}}",
+      "delete": "Slet",
+      "os": "OS",
+      "arch": "Arch",
+      "filename": "Filnavn",
+      "actions": "Handlinger",
+      "deleteDialog": {
+        "title": "Bekræft sletning",
+        "providerBody": "Dette sletter permanent denne provider og alle dens versioner.",
+        "versionBody": "Dette sletter permanent version {version} og dens platforme.",
+        "platformBody": "Dette sletter permanent platformen {os}/{arch}.",
+        "cancel": "Annuller",
+        "confirm": "Slet"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "Brugere",
+    "description": "Administrer lokale brugerkonti",
+    "empty": "Ingen brugere fundet.",
+    "columns": {
+      "email": "E-mail",
+      "displayName": "Visningsnavn",
+      "status": "Status",
+      "lastLogin": "Sidste login",
+      "created": "Oprettet",
+      "actions": "Handlinger"
+    },
+    "form": {
+      "email": "E-mail",
+      "displayName": "Visningsnavn",
+      "displayNamePlaceholder": "Jane Doe",
+      "passwordOptional": "Adgangskode (valgfri)",
+      "passwordPlaceholder": "Indtast en stærk adgangskode"
+    },
+    "reset": {
+      "title": "Nulstil adgangskode for {email}",
+      "newPassword": "Ny adgangskode"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "Meget svag",
+        "weak": "Svag",
+        "fair": "Nogenlunde",
+        "good": "God",
+        "strong": "Stærk"
+      }
+    },
+    "status": {
+      "active": "Aktiv",
+      "inactive": "Inaktiv",
+      "never": "Aldrig"
+    },
+    "actions": {
+      "cancel": "Annuller",
+      "save": "Gem",
+      "saving": "Gemmer...",
+      "createUser": "Opret bruger",
+      "creating": "Opretter...",
+      "resetPassword": "Nulstil adgangskode",
+      "edit": "Rediger",
+      "delete": "Slet",
+      "resetPw": "Nulstil adg.",
+      "setPw": "Sæt adg.",
+      "cancelPw": "Annuller adg."
+    },
+    "confirm": {
+      "activate": "Aktivér bruger \"{email}\"?",
+      "deactivate": "Deaktivér bruger \"{email}\"?",
+      "delete": "Slet bruger \"{email}\"? Dette kan ikke fortrydes."
+    },
+    "success": {
+      "created": "Bruger \"{email}\" oprettet",
+      "updated": "Bruger \"{email}\" opdateret",
+      "activated": "Bruger \"{email}\" aktiveret",
+      "deactivated": "Bruger \"{email}\" deaktiveret",
+      "passwordReset": "Adgangskode nulstillet for \"{email}\"",
+      "deleted": "Bruger \"{email}\" slettet"
+    },
+    "errors": {
+      "load": "Kunne ikke indlæse brugere",
+      "create": "Kunne ikke oprette bruger",
+      "createStatus": "Kunne ikke oprette bruger ({status})",
+      "update": "Kunne ikke opdatere bruger",
+      "resetPassword": "Kunne ikke nulstille adgangskode",
+      "delete": "Kunne ikke slette bruger"
+    }
+  },
+  "adminRoles": {
+    "title": "Roller og tildelinger",
+    "description": "Administrer RBAC-roller og brugerrolletildelinger",
+    "builtIn": "indbygget",
+    "emptyRoles": "Ingen roller defineret.",
+    "emptyAssignments": "Ingen rolletildelinger.",
+    "tabs": {
+      "roles": "Roller",
+      "assignments": "Tildelinger"
+    },
+    "columns": {
+      "provider": "Provider",
+      "email": "E-mail",
+      "role": "Rolle",
+      "created": "Oprettet",
+      "actions": "Handlinger"
+    },
+    "form": {
+      "name": "Navn",
+      "namePattern": "Kun bogstaver, tal, bindestreger og understregninger. Skal begynde med et bogstav eller tal.",
+      "workspacePermission": "Arbejdsområdetilladelse",
+      "poolPermission": "Puljetilladelse",
+      "registryPermission": "Registry-tilladelse",
+      "catalogPermission": "Katalogtilladelse",
+      "descriptionLabel": "Beskrivelse",
+      "descriptionPlaceholder": "Udvikleradgang",
+      "allowLabels": "Tillad labels (nøgle=værdi, kommasepareret)",
+      "allowNames": "Tillad navne (kommasepareret)",
+      "denyLabels": "Afvis labels (nøgle=værdi, kommasepareret)",
+      "denyNames": "Afvis navne (kommasepareret)",
+      "allowLabelsShort": "Tillad labels",
+      "allowNamesShort": "Tillad navne",
+      "denyLabelsShort": "Afvis labels",
+      "denyNamesShort": "Afvis navne"
+    },
+    "assignForm": {
+      "provider": "Provider",
+      "email": "E-mail",
+      "roles": "Roller"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# funktion} other {# funktioner}} valgt",
+      "count": "{count, plural, one {# funktion} other {# funktioner}}",
+      "custom": "Brugerdefineret",
+      "matchesPresets": "Matcher forudindstillinger",
+      "advanced": "Avanceret — funktioner",
+      "otherPreserved": "Andre funktioner (bevares ved gem)",
+      "presetHelp": {
+        "before": "Ved at vælge en forudindstilling ovenfor forhåndsmarkeres dens funktioner. Hvis du sætter eller fjerner en markering ud over en forudindstilling, markeres rollen",
+        "after": "og dens tildeling sendes som et eksplicit funktionssæt."
+      },
+      "groups": {
+        "workspace": "Arbejdsområde",
+        "run": "Kørsel",
+        "state": "Tilstand",
+        "var": "Variabler",
+        "config": "Konfiguration",
+        "drift": "Afdrift",
+        "run-task": "Kørselsopgaver",
+        "notification": "Notifikationer",
+        "run-trigger": "Kørselstriggere",
+        "pool": "Agentpuljer",
+        "registry": "Registry",
+        "catalog": "Tjenestekatalog"
+      }
+    },
+    "display": {
+      "allow": "Tillad: {value}",
+      "allowNames": "Tillad navne: {value}",
+      "deny": "Afvis: {value}",
+      "denyNames": "Afvis navne: {value}"
+    },
+    "actions": {
+      "cancel": "Annuller",
+      "save": "Gem",
+      "saving": "Gemmer...",
+      "edit": "Rediger",
+      "delete": "Slet",
+      "remove": "Fjern",
+      "createRole": "Opret rolle",
+      "creating": "Opretter...",
+      "addAssignment": "Tilføj tildeling",
+      "setRoles": "Angiv roller"
+    },
+    "confirm": {
+      "deleteRole": "Slet rolle \"{name}\"? Alle tildelinger, der refererer til den, påvirkes.",
+      "removeAssignment": "Fjern rolle \"{roleName}\" fra {email}?"
+    },
+    "success": {
+      "roleCreated": "Rolle \"{name}\" oprettet",
+      "roleUpdated": "Rolle \"{name}\" opdateret",
+      "roleDeleted": "Rolle \"{name}\" slettet",
+      "rolesAssigned": "Roller tildelt til {email}",
+      "assignmentRemoved": "Tildeling fjernet"
+    },
+    "errors": {
+      "loadRoles": "Kunne ikke indlæse roller",
+      "loadAssignments": "Kunne ikke indlæse tildelinger",
+      "createRole": "Kunne ikke oprette rolle",
+      "createRoleStatus": "Kunne ikke oprette rolle ({status})",
+      "updateRole": "Kunne ikke opdatere rolle",
+      "deleteRole": "Kunne ikke slette rolle",
+      "setAssignment": "Kunne ikke angive tildeling",
+      "setAssignmentStatus": "Kunne ikke angive tildeling ({status})",
+      "deleteAssignment": "Kunne ikke slette tildeling"
+    }
+  },
+  "adminVcs": {
+    "title": "VCS-forbindelser",
+    "description": "Administrer integrationer med versionsstyringssystemer",
+    "empty": "Ingen VCS-forbindelser konfigureret.",
+    "actions": {
+      "new": "Ny forbindelse",
+      "cancel": "Annuller",
+      "edit": "Rediger",
+      "delete": "Slet"
+    },
+    "confirmDelete": "Slet denne VCS-forbindelse? Arbejdsområder, der bruger den, mister VCS-integration. Dette kan ikke fortrydes.",
+    "form": {
+      "name": "Navn",
+      "namePattern": "Kun bogstaver, tal, bindestreger og understregninger. Skal begynde med et bogstav eller tal.",
+      "provider": "Provider",
+      "providerImmutable": "Provideren er uforanderlig — slet og genopret for at ændre den",
+      "serverUrl": "Server-URL (valgfri)",
+      "serverUrlHint": "Skal være en HTTP- eller HTTPS-URL (f.eks. https://github.mycompany.com)",
+      "appId": "App-ID",
+      "appIdHint": "GitHub App-ID — kun numeriske cifre",
+      "installationId": "Installations-ID",
+      "installationIdHint": "GitHub App-installations-ID — kun numeriske cifre",
+      "privateKey": "Privat nøgle (PEM)",
+      "browse": "Gennemse...",
+      "privateKeyKeep": "Lad stå tom for at beholde den nuværende nøgle — indsæt en ny PEM for at rotere",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nSlip en .pem-fil her, eller klik på Gennemse",
+      "webhookSecret": "Webhook-hemmelighed",
+      "optional": "(valgfri)",
+      "webhookSecretSet": "Angivet — lad stå tom for at beholde, indtast en ny værdi for at rotere",
+      "webhookSecretGlobal": "Lad stå tom for at bruge den globale webhook-hemmelighed",
+      "webhookSecretHelp": "HMAC-hemmelighed pr. forbindelse til denne installations webhooks. Når den ikke er angivet, bruges den globale hemmelighed.",
+      "accessToken": "Adgangstoken",
+      "accessTokenKeep": "Lad stå tom for at beholde den nuværende token",
+      "saving": "Gemmer...",
+      "creating": "Opretter...",
+      "saveChanges": "Gem ændringer",
+      "createConnection": "Opret forbindelse"
+    },
+    "table": {
+      "name": "Navn",
+      "provider": "Provider",
+      "serverUrl": "Server-URL",
+      "status": "Status",
+      "created": "Oprettet",
+      "actions": "Handlinger"
+    },
+    "success": {
+      "created": "VCS-forbindelse \"{name}\" oprettet",
+      "updated": "VCS-forbindelse \"{name}\" opdateret",
+      "deleted": "VCS-forbindelse slettet"
+    },
+    "errors": {
+      "load": "Kunne ikke indlæse VCS-forbindelser",
+      "save": "Kunne ikke gemme forbindelse",
+      "delete": "Kunne ikke slette forbindelse",
+      "createStatus": "Kunne ikke oprette forbindelse ({status})",
+      "updateStatus": "Kunne ikke opdatere forbindelse ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "Variabelsæt",
+    "description": "Administrer org-afgrænsede variabelsæt til arbejdsområdegrupper",
+    "empty": "Ingen variabelsæt konfigureret.",
+    "none": "-",
+    "actions": {
+      "new": "Nyt variabelsæt",
+      "cancel": "Annuller"
+    },
+    "form": {
+      "name": "Navn",
+      "namePattern": "Kun bogstaver, tal, bindestreger og understregninger. Skal begynde med et bogstav eller tal.",
+      "descriptionLabel": "Beskrivelse",
+      "descriptionPlaceholder": "AWS-legitimationsoplysninger til alle arbejdsområder",
+      "global": "Global (anvend på alle arbejdsområder)",
+      "priority": "Prioritet (tilsidesæt arbejdsområdevariabler)",
+      "creating": "Opretter...",
+      "create": "Opret variabelsæt"
+    },
+    "table": {
+      "name": "Navn",
+      "description": "Beskrivelse",
+      "scope": "Omfang",
+      "variables": "Variabler",
+      "created": "Oprettet"
+    },
+    "scope": {
+      "global": "Global",
+      "priority": "Prioritet",
+      "standard": "Standard"
+    },
+    "errors": {
+      "load": "Kunne ikke indlæse variabelsæt",
+      "create": "Kunne ikke oprette variabelsæt",
+      "createStatus": "Kunne ikke oprette variabelsæt ({status})"
+    },
+    "detail": {
+      "back": "Tilbage til variabelsæt",
+      "headerFallback": "Variabelsæt",
+      "notFound": "Variabelsæt ikke fundet",
+      "global": "Global",
+      "priority": "Prioritet",
+      "yes": "Ja",
+      "no": "Nej",
+      "edit": "Rediger",
+      "cancel": "Annuller",
+      "save": "Gem",
+      "saving": "Gemmer...",
+      "delete": "Slet",
+      "deleting": "Sletter...",
+      "confirmDelete": "Bekræft sletning",
+      "deleteTitle": "Slet variabelsæt",
+      "deleteDescription": "Slet permanent dette variabelsæt og alle dets variabler.",
+      "tabs": {
+        "settings": "Indstillinger",
+        "variables": "Variabler",
+        "workspaces": "Arbejdsområder"
+      },
+      "addVariable": "Tilføj variabel",
+      "adding": "Tilføjer...",
+      "varKey": "Nøgle",
+      "varValue": "Værdi",
+      "varCategory": "Kategori",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Miljø",
+      "sensitive": "Følsom",
+      "sensAbbr": "Føls.",
+      "enterNewValue": "Indtast ny værdi",
+      "empty": "tom",
+      "emptyVars": "Ingen variabler i dette sæt.",
+      "actions": "Handlinger",
+      "remove": "Fjern",
+      "add": "Tilføj",
+      "addWorkspace": "Tilføj arbejdsområde",
+      "workspace": "Arbejdsområde",
+      "selectWorkspace": "Vælg et arbejdsområde...",
+      "globalBanner": "Dette variabelsæt er globalt og anvendes automatisk på alle arbejdsområder.",
+      "emptyWorkspaces": "Ingen arbejdsområder tildelt dette variabelsæt.",
+      "confirmDeleteVar": "Slet denne variabel? Dette kan ikke fortrydes.",
+      "confirmRemoveWorkspace": "Fjern dette arbejdsområde fra variabelsættet? Dets variabler gælder ikke længere for det arbejdsområde.",
+      "success": {
+        "updated": "Variabelsæt opdateret",
+        "workspaceAdded": "Arbejdsområde tilføjet",
+        "workspaceRemoved": "Arbejdsområde fjernet"
+      },
+      "errors": {
+        "load": "Kunne ikke indlæse variabelsæt",
+        "update": "Kunne ikke opdatere variabelsæt",
+        "delete": "Kunne ikke slette variabelsæt",
+        "loadVars": "Kunne ikke indlæse variabler",
+        "loadWorkspaces": "Kunne ikke indlæse arbejdsområder",
+        "addVar": "Kunne ikke tilføje variabel",
+        "addVarStatus": "Kunne ikke tilføje variabel ({status})",
+        "updateVar": "Kunne ikke opdatere variabel",
+        "deleteVar": "Kunne ikke slette variabel",
+        "addWorkspace": "Kunne ikke tilføje arbejdsområde",
+        "removeWorkspace": "Kunne ikke fjerne arbejdsområde"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "Automatisk registrering",
+    "description": "Opret automatisk arbejdsområder i monorepos, når PR'er berører matchende stier",
+    "empty": "Ingen regler for automatisk registrering endnu. Opret en for at begynde at oprette arbejdsområder automatisk fra PR'er i dit monorepo.",
+    "unsavedRule": "(ugemt regel)",
+    "actions": {
+      "newRule": "Ny regel",
+      "cancel": "Annuller",
+      "create": "Opret",
+      "update": "Opdater",
+      "preview": "Forhåndsvis",
+      "edit": "Rediger",
+      "delete": "Slet",
+      "close": "Luk"
+    },
+    "status": {
+      "enabled": "aktiveret",
+      "disabled": "deaktiveret"
+    },
+    "form": {
+      "createTitle": "Opret regel",
+      "editTitle": "Rediger regel",
+      "name": "Navn",
+      "vcsConnection": "VCS-forbindelse",
+      "selectConnection": "Vælg forbindelse",
+      "repoUrl": "Repo-URL",
+      "branch": "Branch (tom = standard)",
+      "matchPattern": "Matchmønster",
+      "matchPatternHint": "Gitignore-lignende globs. <code>**</code> matcher på tværs af stisegmenter. Kun <code>*.tf*</code>-filer udløser automatisk registrering.",
+      "ignorePatterns": "Ignorér-mønstre (ét pr. linje)",
+      "nameTemplate": "Skabelon for arbejdsområdenavn (valgfri)",
+      "nameTemplateHint": "Brug <path></path> for mappen med <code>/</code> erstattet af <code>-</code>, eller <root></root> for mappen som den er. Tom = standard (blot den bindestregede sti).",
+      "templateDefaults": "Standarder for arbejdsområdeskabelon",
+      "executionMode": "Eksekveringstilstand",
+      "executionModeHint": "Automatisk registrering er VCS-drevet; kun agent-eksekvering understøttes.",
+      "agentPool": "Agentpulje",
+      "none": "(ingen)",
+      "executionBackend": "Eksekverings-backend",
+      "terraformVersion": "Terraform-version",
+      "cpuRequest": "CPU-anmodning",
+      "memoryRequest": "Hukommelsesanmodning",
+      "ownerEmail": "Ejer-e-mail",
+      "autoApply": "Anvend automatisk",
+      "enabled": "Aktiveret",
+      "onDirectoryDelete": "Ved sletning af mappe",
+      "onDeleteFlag": "Markér (sikkert — markér som afventer sletning, kræver manuel handling)",
+      "onDeleteDestroy": "Nedriv (FARE — river infrastrukturen ned og arkiverer derefter arbejdsområdet)",
+      "onDirectoryDeleteHint": "Hvad der sker med et automatisk registreret arbejdsområde, når dets mappe fjernes på den sporede branch.",
+      "onDeleteDestroyWarning": "Dette kører en rigtig terraform destroy på arbejdsområdet, når dets mappe fjernes på den sporede branch.",
+      "labels": "Labels (nedarves af oprettede arbejdsområder)",
+      "varFiles": "Var-filer (nedarves af oprettede arbejdsområder)",
+      "varFilesHint": "Relative <code>.tfvars</code>-stier videregivet til plan/apply.",
+      "addVarFile": "Tilføj var-fil",
+      "executionHooks": "Eksekverings-hooks (tilknyttet hvert nyt arbejdsområde)",
+      "executionHooksHint": "Vælg blandt hooks defineret på administrationssiden <page>Eksekverings-hooks</page> — hvert valgt hook tilknyttes hvert arbejdsområde, denne regel opretter.",
+      "noHooks": "Ingen eksekverings-hooks defineret endnu. Opret et på administrationssiden Eksekverings-hooks først.",
+      "hookDisabled": "(deaktiveret)",
+      "hookNotInLibrary": "(ikke i biblioteket — fjern markering for at fjerne)",
+      "runTaskTemplates": "Skabeloner for kørselsopgaver (oprettes på hvert nyt arbejdsområde)",
+      "notificationTemplates": "Notifikationsskabeloner (oprettes på hvert nyt arbejdsområde)",
+      "saving": "Gemmer...",
+      "previewTitle": "Gennemgå repoet og forhåndsvis, hvilke arbejdsområder denne regel VILLE oprette — ingen persistens"
+    },
+    "table": {
+      "name": "Navn",
+      "repo": "Repo",
+      "pattern": "Mønster",
+      "enabled": "Aktiveret",
+      "created": "Oprettet",
+      "previewTitle": "Gennemgå repoet og forhåndsvis, hvilke arbejdsområder denne regel ville oprette"
+    },
+    "deleteModal": {
+      "title": "Slet regel?",
+      "body": "Arbejdsområder, der er oprettet automatisk af denne regel, fortsætter med at virke. Fremtidige PR'er, der berører nye stier under denne regel, opretter ikke automatisk flere arbejdsområder."
+    },
+    "preview": {
+      "title": "Forhåndsvisning: {ruleName}",
+      "walkedFiles": "Gennemgik <files>{count}</files> filer på <refspan>{ref}</refspan>",
+      "walking": "Gennemgår repository…",
+      "noMatches": "Ingen mapper i dette repo matcher reglens mønster. Intet at oprette.",
+      "colWorkspace": "Arbejdsområde",
+      "colDirectory": "Mappe",
+      "colAction": "Handling",
+      "repoRoot": "(repo-rod)",
+      "actionCreate": "Opret",
+      "skipDiscovered": "Spring over (allerede registreret)",
+      "skipDiscoveredTitle": "Allerede oprettet af denne regel",
+      "skipCollision": "Spring over (navnekollision)",
+      "skipCollisionTitle": "Et arbejdsområde med dette navn findes allerede af en anden grund",
+      "willCreate": "{count, plural, one {# arbejdsområde vil blive oprettet.} other {# arbejdsområder vil blive oprettet.}} Eksisterende arbejdsområder (kollisioner) forbliver urørte.",
+      "provision": "{count, plural, one {Klargør # arbejdsområde} other {Klargør # arbejdsområder}}",
+      "provisioning": "Klargør…",
+      "saveToProvision": "Gem reglen for at klargøre disse arbejdsområder."
+    },
+    "success": {
+      "created": "Oprettede {name}",
+      "updated": "Opdaterede {name}",
+      "deleted": "Slettede regel",
+      "provisioned": "{count, plural, one {Oprettede # arbejdsområde fra \"{ruleName}\"} other {Oprettede # arbejdsområder fra \"{ruleName}\"}}"
+    },
+    "errors": {
+      "loadRules": "Kunne ikke indlæse regler for automatisk registrering",
+      "load": "Kunne ikke indlæse",
+      "createFailed": "Oprettelse mislykkedes: {status} {detail}",
+      "updateFailed": "Opdatering mislykkedes: {status} {detail}",
+      "save": "Kunne ikke gemme",
+      "deleteRule": "Kunne ikke slette regel",
+      "delete": "Kunne ikke slette",
+      "previewFailed": "Forhåndsvisning mislykkedes ({status})",
+      "preview": "Forhåndsvisning mislykkedes",
+      "previewPrereq": "Angiv VCS-forbindelse, repo-URL og mønster før forhåndsvisning",
+      "scanFailed": "Scanning mislykkedes ({status})",
+      "scan": "Scanning mislykkedes"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Masseopdatering",
+    "description": "Vælg arbejdsområder efter filter, og anvend derefter en indstillingsændring på tværs af dem alle",
+    "none": "(ingen)",
+    "anyOption": "(enhver)",
+    "unchanged": "(uændret)",
+    "unchangedOption": "(uændret)",
+    "filter": {
+      "heading": "1. Vælg arbejdsområder",
+      "matchAll": "Match <strong>alle</strong> arbejdsområder (ignorerer filtrene nedenfor)",
+      "namePrefix": "Navnepræfiks",
+      "executionBackend": "Eksekverings-backend",
+      "ownerEmail": "Ejer-e-mail",
+      "agentPool": "Agentpulje",
+      "vcsConnection": "VCS-forbindelse",
+      "labels": "Labels",
+      "search": "Søg",
+      "searching": "Søger..."
+    },
+    "results": {
+      "matched": "Matchede <strong>{count}</strong> {count, plural, one {arbejdsområde} other {arbejdsområder}}.",
+      "noMatch": "Ingen arbejdsområder matchede dette filter.",
+      "colName": "Navn",
+      "colMode": "Tilstand",
+      "colBackend": "Backend",
+      "colTfVersion": "TF-version",
+      "colLabels": "Labels"
+    },
+    "update": {
+      "heading": "2. Anvend ændringer",
+      "hint": "Kun felter, du angiver nedenfor, ændres. Filteret ovenfor vælger, hvilke arbejdsområder der modtager ændringen.",
+      "terraformVersion": "Terraform-version",
+      "executionBackend": "Eksekverings-backend",
+      "executionMode": "Eksekveringstilstand",
+      "autoApply": "Anvend automatisk",
+      "agentPool": "Agentpulje",
+      "cpuRequest": "CPU-anmodning",
+      "memoryRequest": "Hukommelsesanmodning",
+      "setLabels": "Angiv labels (erstatter labelkortet på hvert matchet arbejdsområde)",
+      "setVarFiles": "Angiv var-filer",
+      "addVarFile": "Tilføj var-fil",
+      "setRunTasks": "Angiv kørselsopgaver (upsertes efter navn på hvert matchet arbejdsområde)",
+      "setNotifications": "Angiv notifikationskonfigurationer (upsertes efter navn)",
+      "dryRun": "Prøvekørsel (kun forhåndsvisning — ingen ændringer skrives)",
+      "confirmWarning": "Dette skriver ændringer til hvert matchet arbejdsområde.",
+      "confirmApply": "Bekræft anvendelse",
+      "applying": "Anvender...",
+      "cancel": "Annuller",
+      "working": "Arbejder...",
+      "previewDryRun": "Forhåndsvis (prøvekørsel)",
+      "applyChanges": "Anvend ændringer"
+    },
+    "diff": {
+      "colWorkspace": "Arbejdsområde",
+      "colChanges": "Ændringer"
+    },
+    "dryResult": {
+      "heading": "Resultat af prøvekørsel",
+      "summary": "Matchede <strong>{matched}</strong>; <strong>{wouldChange}</strong> ville ændres; {unchanged} uændret. Intet blev skrevet.",
+      "wouldChange": "Ville ændres",
+      "noChange": "Ingen arbejdsområder ville ændres med denne opdatering."
+    },
+    "applyResult": {
+      "heading": "Resultat af anvendelse",
+      "summary": "Matchede <strong>{matched}</strong>; <appliedstrong>{applied}</appliedstrong> anvendt; {unchanged} uændret; {errors, plural, one {# fejl} other {# fejl}}.",
+      "applied": "Anvendt",
+      "unnamedWorkspace": "(arbejdsområde)",
+      "noChange": "Ingen arbejdsområder ændret."
+    },
+    "errors": {
+      "searchFailed": "Søgning mislykkedes ({status})",
+      "search": "Søgning mislykkedes",
+      "bulkUpdateFailed": "Masseopdatering mislykkedes ({status})",
+      "bulkUpdate": "Masseopdatering mislykkedes"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "Eksekverings-hooks",
+    "description": "Brugerdefinerede shell-trin, der køres inde i runner-Jobs ved pre/post-plan/apply-punkter, tilknyttet arbejdsområder",
+    "empty": "Ingen eksekverings-hooks konfigureret.",
+    "actions": {
+      "cancel": "Annuller",
+      "new": "Nyt eksekverings-hook",
+      "creating": "Opretter...",
+      "create": "Opret eksekverings-hook"
+    },
+    "badges": {
+      "disabled": "Deaktiveret",
+      "enabled": "Aktiveret"
+    },
+    "columns": {
+      "name": "Navn",
+      "hookPoint": "Hook-punkt",
+      "enabled": "Aktiveret",
+      "priority": "Prioritet",
+      "workspaces": "Arbejdsområder"
+    },
+    "form": {
+      "name": "Navn",
+      "namePatternTitle": "Kun bogstaver, tal, bindestreger og understregninger. Skal begynde med et bogstav eller tal.",
+      "description": "Beskrivelse",
+      "descriptionPlaceholder": "Tilføj en intern hosts-post før init",
+      "hookPoint": "Hook-punkt",
+      "priority": "Prioritet",
+      "priorityTitle": "Lavere kører først, når flere hooks deler et punkt (uafgjorte afgøres efter navn).",
+      "scriptLabel": "Script (<code>/bin/sh -c</code>)",
+      "scriptHelp": "Kører med runnerens cloud-identitet. En ikke-nul exit får kørslen til at fejle. Hemmeligheder bør komme fra arbejdsområdevariabler, ikke inline her."
+    },
+    "errors": {
+      "load": "Kunne ikke indlæse eksekverings-hooks",
+      "createStatus": "Kunne ikke oprette eksekverings-hook ({status})",
+      "create": "Kunne ikke oprette eksekverings-hook"
+    }
+  },
+  "adminPolicySets": {
+    "title": "Politiksæt",
+    "description": "OPA policy-as-code-håndhævelse, afgrænset til arbejdsområder efter label",
+    "empty": "Ingen politiksæt konfigureret.",
+    "actions": {
+      "cancel": "Annuller",
+      "new": "Nyt politiksæt",
+      "creating": "Opretter...",
+      "create": "Opret politiksæt"
+    },
+    "badges": {
+      "disabled": "Deaktiveret",
+      "mandatory": "Obligatorisk",
+      "advisory": "Vejledende",
+      "global": "Global",
+      "labelScoped": "Label-afgrænset"
+    },
+    "columns": {
+      "name": "Navn",
+      "description": "Beskrivelse",
+      "enforcement": "Håndhævelse",
+      "scope": "Omfang",
+      "policies": "Politikker"
+    },
+    "form": {
+      "name": "Navn",
+      "namePatternTitle": "Kun bogstaver, tal, bindestreger og understregninger. Skal begynde med et bogstav eller tal.",
+      "description": "Beskrivelse",
+      "descriptionPlaceholder": "Obligatoriske sikkerhedsværn for produktionsarbejdsområder",
+      "enforcement": "Håndhævelse",
+      "enforcementAdvisory": "Vejledende (advar, bloker ikke)",
+      "enforcementMandatory": "Obligatorisk (bloker apply ved fejl)",
+      "globalScope": "Global (anvend på hvert arbejdsområde)",
+      "sourceInline": "Inline (administrer politikker i brugergrænsefladen)",
+      "sourceVcs": "Fra VCS-repository",
+      "vcsConnection": "VCS-forbindelse",
+      "selectConnection": "Vælg forbindelse...",
+      "repoUrl": "Repository-URL",
+      "branch": "Branch",
+      "branchPlaceholder": "main (standard)",
+      "policyPath": "Politiksti",
+      "policyPathPlaceholder": "policies/ (mappe med .rego-filer)",
+      "helpVcs": "Politikker synkroniseres automatisk fra repositoryet.",
+      "helpInline": "Tilføj politikker og finjustér label-afgrænsning efter oprettelse af sættet."
+    },
+    "errors": {
+      "load": "Kunne ikke indlæse politiksæt",
+      "createStatus": "Kunne ikke oprette politiksæt ({status})",
+      "create": "Kunne ikke oprette politiksæt"
+    }
+  },
+  "adminCatalog": {
+    "title": "Katalogadministration",
+    "description": "Administrer tjenestekatalogelementer",
+    "notEnabled": "Tjenestekatalog er ikke aktiveret.",
+    "empty": "Ingen katalogelementer endnu.",
+    "actions": {
+      "new": "Nyt katalogelement",
+      "cancel": "Annuller",
+      "create": "Opret katalogelement",
+      "creating": "Opretter…",
+      "saveChanges": "Gem ændringer",
+      "saving": "Gemmer…",
+      "edit": "Rediger",
+      "delete": "Slet"
+    },
+    "form": {
+      "name": "Navn",
+      "nameTitle": "Kun bogstaver, tal, bindestreger og understregninger. Skal begynde med et bogstav eller tal.",
+      "module": "Modul",
+      "moduleSelect": "Vælg et modul…",
+      "moduleImmutable": "Modulet er uforanderligt efter oprettelse",
+      "displayName": "Visningsnavn",
+      "displayNamePlaceholder": "Standard S3-bucket",
+      "versionPin": "Standard versionsfastlåsning",
+      "versionPinPlaceholder": "f.eks. 1.2.0 (tom = seneste)",
+      "descriptionLabel": "Beskrivelse",
+      "descriptionPlaceholder": "Hvad dette katalogelement klargør…",
+      "enabled": "Aktiveret (synlig i gennemsynskataloget)",
+      "providerTemplates": "Providerskabeloner",
+      "noProviderTemplates": "Ingen providerskabeloner defineret.",
+      "restrictPools": "Begræns til bestemte agentpuljer",
+      "noAgentPools": "Ingen agentpuljer tilgængelige.",
+      "anyPool": "Enhver agentpulje kan bruges.",
+      "labels": "Labels",
+      "variableOptions": "Variabelindstillinger (avanceret, JSON)",
+      "variableOptionsHint": "Tilsidesættelser pr. input (options, hidden, default). Lad stå som <code>[]</code>, hvis den ikke bruges."
+    },
+    "table": {
+      "name": "Navn",
+      "module": "Modul",
+      "enabled": "Aktiveret",
+      "actions": "Handlinger"
+    },
+    "badge": {
+      "enabled": "aktiveret",
+      "disabled": "deaktiveret"
+    },
+    "confirm": {
+      "delete": "Slet dette katalogelement? Eksisterende klargjorte instanser påvirkes ikke."
+    },
+    "success": {
+      "created": "Katalogelement \"{name}\" oprettet",
+      "updated": "Katalogelement \"{name}\" opdateret",
+      "deleted": "Katalogelement slettet"
+    },
+    "errors": {
+      "load": "Kunne ikke indlæse katalogelementer",
+      "save": "Kunne ikke gemme katalogelement",
+      "createStatus": "Kunne ikke oprette katalogelement ({status})",
+      "updateStatus": "Kunne ikke opdatere katalogelement ({status})",
+      "delete": "Kunne ikke slette katalogelement",
+      "deleteConflict": "Kan ikke slette: dette katalogelement har klargjorte instanser.",
+      "varOptsInvalidJson": "Variabelindstillinger skal være gyldig JSON (et array).",
+      "varOptsNotArray": "Variabelindstillinger skal være et JSON-array."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Providerskabeloner",
+    "description": "Genanvendelige providerkonfigurationsblokke til katalogelementer",
+    "notEnabled": "Tjenestekatalog er ikke aktiveret.",
+    "empty": "Ingen providerskabeloner endnu.",
+    "actions": {
+      "new": "Ny skabelon",
+      "cancel": "Annuller",
+      "create": "Opret skabelon",
+      "creating": "Opretter…",
+      "saveChanges": "Gem ændringer",
+      "saving": "Gemmer…",
+      "edit": "Rediger",
+      "delete": "Slet"
+    },
+    "form": {
+      "name": "Navn",
+      "providerType": "Providertype",
+      "body": "Indhold (HCL)",
+      "parameters": "Parametre (avanceret, JSON)",
+      "parametersHint": "Hver parameter bliver til et felt i klargøringsformularen. Lad stå som <code>[]</code>, hvis den ikke bruges.",
+      "labels": "Labels"
+    },
+    "table": {
+      "name": "Navn",
+      "providerType": "Providertype",
+      "parameters": "Parametre",
+      "actions": "Handlinger"
+    },
+    "confirm": {
+      "delete": "Slet denne providerskabelon? Katalogelementer, der refererer til den, vil ikke kunne klargøres. Dette kan ikke fortrydes."
+    },
+    "success": {
+      "created": "Providerskabelon \"{name}\" oprettet",
+      "updated": "Providerskabelon \"{name}\" opdateret",
+      "deleted": "Providerskabelon slettet"
+    },
+    "errors": {
+      "load": "Kunne ikke indlæse providerskabeloner",
+      "save": "Kunne ikke gemme providerskabelon",
+      "createStatus": "Kunne ikke oprette skabelon ({status})",
+      "updateStatus": "Kunne ikke opdatere skabelon ({status})",
+      "delete": "Kunne ikke slette providerskabelon",
+      "deleteConflict": "Kan ikke slette: denne skabelon refereres af et katalogelement.",
+      "paramsInvalidJson": "Parametre skal være gyldig JSON (et array).",
+      "paramsNotArray": "Parametre skal være et JSON-array."
+    }
+  },
+  "adminAgentPools": {
+    "title": "Agentpuljer",
+    "description": "Administrer runner-agentpuljer og deres listeners",
+    "empty": "Ingen agentpuljer konfigureret.",
+    "actions": {
+      "newPool": "Ny pulje",
+      "createPool": "Opret pulje",
+      "creating": "Opretter...",
+      "cancel": "Annuller",
+      "edit": "Rediger",
+      "save": "Gem",
+      "saving": "Gemmer...",
+      "delete": "Slet",
+      "deleting": "Sletter...",
+      "confirmDelete": "Bekræft sletning"
+    },
+    "form": {
+      "name": "Navn",
+      "namePattern": "Kun bogstaver, tal, bindestreger og understregninger. Skal begynde med et bogstav eller tal.",
+      "description": "Beskrivelse",
+      "descriptionPlaceholder": "Produktions-AWS-runnere",
+      "labels": "Labels"
+    },
+    "columns": {
+      "name": "Navn",
+      "description": "Beskrivelse",
+      "status": "Status",
+      "created": "Oprettet"
+    },
+    "badges": {
+      "default": "standard",
+      "degradedTooltip": "Listeners sender heartbeats, men deres certifikater er udløbet — kørsler vil ikke kunne startes.",
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "forringet"
+      }
+    },
+    "detail": {
+      "back": "Tilbage til agentpuljer",
+      "defaultDescription": "Agentpulje"
+    },
+    "tabs": {
+      "settings": "Indstillinger",
+      "tokens": "Tokens",
+      "listeners": "Listeners"
+    },
+    "settings": {
+      "title": "Puljeindstillinger",
+      "fields": {
+        "name": "Navn",
+        "description": "Beskrivelse",
+        "created": "Oprettet",
+        "owner": "Ejer",
+        "yourPermission": "Din tilladelse",
+        "labels": "Labels"
+      },
+      "permissions": {
+        "read": "læs",
+        "write": "skriv",
+        "admin": "administrator"
+      }
+    },
+    "danger": {
+      "title": "Slet pulje",
+      "description": "Slet permanent denne agentpulje og alle tilknyttede tokens."
+    },
+    "tokens": {
+      "create": "Opret token",
+      "empty": "Ingen tokens for denne pulje.",
+      "revoke": "Tilbagekald",
+      "created": {
+        "title": "Token oprettet",
+        "copyNow": "Kopiér denne token nu — den vises ikke igen.",
+        "copy": "Kopiér"
+      },
+      "form": {
+        "description": "Beskrivelse",
+        "descriptionPlaceholder": "Produktions-listener-token",
+        "maxUses": "Maks. anvendelser",
+        "maxUsesHint": "Standard 2 — tolererer ét bootstrap-race-forsøg på tværs af listener-replikaer.",
+        "expiresAt": "Udløber",
+        "expiresAtHint": "Standard 1 time fra nu."
+      },
+      "columns": {
+        "description": "Beskrivelse",
+        "uses": "Anvendelser",
+        "expires": "Udløber",
+        "status": "Status",
+        "createdBy": "Oprettet af",
+        "actions": "Handlinger"
+      },
+      "badges": {
+        "revoked": "Tilbagekaldt",
+        "active": "Aktiv"
+      }
+    },
+    "listeners": {
+      "empty": "Ingen listeners registreret for denne pulje.",
+      "columns": {
+        "name": "Navn",
+        "status": "Status",
+        "replicas": "Replikaer",
+        "certExpires": "Certifikat udløber",
+        "actions": "Handlinger"
+      },
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "forringet",
+        "cert-expired": "certifikat udløbet"
+      },
+      "tooltips": {
+        "certExpired": "Listeneren sender heartbeats, men dens certifikat er udløbet — hvert certifikat-godkendt kald (krav på kørsel, fornyelse, runner-token) vil fejle. Mest sandsynlige årsag: API'en registrerede aldrig det seneste certifikat, eller certifikatets TTL udløb før fornyelse.",
+        "degraded": "Listeners sender heartbeats, men deres certifikater er udløbet — kørsler vil ikke kunne startes."
+      }
+    },
+    "confirm": {
+      "revokeToken": "Tilbagekald denne join-token? Listeners, der bruger den, kan ikke længere tilslutte sig, og dette kan ikke fortrydes.",
+      "deleteListener": "Slet denne listener? Den registrerer sig igen ved sin næste heartbeat, hvis poden stadig kører."
+    },
+    "success": {
+      "poolUpdated": "Pulje opdateret",
+      "tokenRevoked": "Token tilbagekaldt",
+      "listenerDeleted": "Listener slettet"
+    },
+    "errors": {
+      "loadPools": "Kunne ikke indlæse agentpuljer",
+      "loadPool": "Kunne ikke indlæse pulje",
+      "loadTokens": "Kunne ikke indlæse tokens",
+      "loadListeners": "Kunne ikke indlæse listeners",
+      "createPool": "Kunne ikke oprette pulje",
+      "createStatus": "Kunne ikke oprette pulje ({status})",
+      "updatePool": "Kunne ikke opdatere pulje",
+      "deletePool": "Kunne ikke slette pulje",
+      "poolNotFound": "Pulje ikke fundet",
+      "createToken": "Kunne ikke oprette token",
+      "createTokenStatus": "Kunne ikke oprette token ({status})",
+      "revokeToken": "Kunne ikke tilbagekalde token",
+      "deleteListener": "Kunne ikke slette listener"
+    }
+  },
+  "adminAuditLog": {
+    "title": "Revisionslog",
+    "description": "Uforanderlig log over alle API-anmodninger",
+    "empty": "Ingen revisionslogposter fundet.",
+    "errors": {
+      "load": "Kunne ikke indlæse revisionslog"
+    },
+    "filters": {
+      "actorEmail": "Aktør-e-mail",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "Ressourcetype",
+      "resourceTypePlaceholder": "workspaces",
+      "method": "Metode",
+      "methodAll": "Alle",
+      "since": "Fra",
+      "until": "Til",
+      "clear": "Ryd",
+      "apply": "Anvend filtre"
+    },
+    "columns": {
+      "timestamp": "Tidsstempel",
+      "actor": "Aktør",
+      "action": "Handling",
+      "resourceType": "Ressourcetype",
+      "resourceId": "Ressource-ID",
+      "status": "Status",
+      "duration": "Varighed"
+    },
+    "pagination": {
+      "summary": "Side {current} af {total} ({count, plural, one {# post} other {# poster}})",
+      "previous": "Forrige",
+      "next": "Næste"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "Cache",
+    "description": "Administration af CLI-binærfiler og providercache",
+    "errors": {
+      "loadBinary": "Kunne ikke indlæse binærfilcache",
+      "loadCache": "Kunne ikke indlæse cache"
+    },
+    "sections": {
+      "cliBinaries": "CLI-binærfiler",
+      "providerBinaries": "Provider-binærfiler"
+    },
+    "empty": {
+      "binaries": "Ingen cachelagrede CLI-binærfiler endnu.",
+      "providers": "Ingen cachelagrede provider-binærfiler endnu."
+    },
+    "columns": {
+      "tool": "Værktøj",
+      "version": "Version",
+      "os": "OS",
+      "arch": "Arch",
+      "cachedAt": "Cachelagret",
+      "provider": "Provider",
+      "hostname": "Værtsnavn",
+      "actions": "Handlinger"
+    },
+    "warm": {
+      "heading": "Opvarm cache",
+      "hide": "Skjul",
+      "prePopulate": "Forudfyld…",
+      "help": "Forudhent binærfiler og providerplatforme ind i cachen (én pr. linje). Efterfølgende <code>os/arch</code>-tokens er valgfrie — udelad dem for at bruge de konfigurerede standardplatforme.",
+      "binariesLabel": "Binærfiler",
+      "providersLabel": "Providere",
+      "warm": "Opvarm",
+      "warming": "Opvarmer…",
+      "confirm": "Opvarm de valgte cacheposter nu?",
+      "errorEmpty": "Tilføj mindst én binærfil- eller providerlinje at opvarme.",
+      "errorFailedStatus": "Opvarmning mislykkedes ({status})",
+      "errorFailed": "Kunne ikke opvarme cache",
+      "success": "Opvarmede {succeeded}/{total} ({failed} mislykkedes)"
+    },
+    "purge": {
+      "button": "Ryd",
+      "confirmBinary": "Ryd {tool} {version} fra cachen? Den hentes igen fra upstream ved næste anmodning.",
+      "confirmProvider": "Ryd {provider} {version} fra providercachen? Den hentes igen fra upstream ved næste anmodning.",
+      "successBinary": "Ryddede {count} poster for {tool} {version}",
+      "successProvider": "Ryddede {count} poster for {provider} {version}",
+      "errorStatus": "Rydning mislykkedes ({status})",
+      "error": "Kunne ikke rydde",
+      "errorProvider": "Kunne ikke rydde provider",
+      "errorProviders": "Kunne ikke rydde providere"
+    },
+    "batchPurge": {
+      "purging": "Rydder...",
+      "purgeSelected": "Ryd valgte ({count})",
+      "confirmBinary": "Ryd alle valgte binærfilcacheposter? De hentes igen fra upstream ved næste anmodning.",
+      "confirmProvider": "Ryd alle valgte providercacheposter? De hentes igen fra upstream ved næste anmodning.",
+      "errorBinaryItem": "Rydning mislykkedes for {tool} {version}",
+      "errorProviderItem": "Rydning mislykkedes for {provider} {version}",
+      "successBinary": "Ryddede {count} binærfilcacheposter",
+      "successProvider": "Ryddede {count} providercacheposter"
+    }
+  },
+  "catalog": {
+    "title": "Tjenestekatalog",
+    "description": "Klargør selvbetjent infrastruktur fra kuraterede moduler",
+    "notEnabled": "Tjenestekatalog er ikke aktiveret.",
+    "empty": "Ingen katalogelementer tilgængelige.",
+    "card": {
+      "pinned": "fastlåst {version}",
+      "latest": "seneste"
+    },
+    "errors": {
+      "loadItems": "Kunne ikke indlæse katalogelementer"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← Katalog",
+    "backToCatalog": "Tilbage til katalog",
+    "fallbackTitle": "Katalogelement",
+    "notFound": "Katalogelement ikke fundet, eller tjenestekataloget er ikke aktiveret.",
+    "common": {
+      "cancel": "Annuller"
+    },
+    "info": {
+      "module": "Modul:",
+      "resolvedVersion": "Løst version:",
+      "latest": "seneste",
+      "disabled": "deaktiveret"
+    },
+    "pending": {
+      "banner": "Kørslen for <strong>{name}</strong> er planlagt og afventer gennemgang. Bekræft for at anvende, eller kassér.",
+      "working": "Arbejder…",
+      "confirmApply": "Bekræft og anvend",
+      "discard": "Kassér"
+    },
+    "field": {
+      "select": "Vælg…"
+    },
+    "provision": {
+      "title": "Klargør",
+      "workspaceName": "Arbejdsområdenavn",
+      "workspaceNameTitle": "Kun bogstaver, tal, bindestreger og understregninger. Skal begynde med et bogstav eller tal.",
+      "workspaceNamePlaceholder": "min-instans",
+      "agentPool": "Agentpulje",
+      "selectPool": "Vælg en pulje…",
+      "noPoolsAvailable": "Ingen agentpuljer er tilgængelige for dig. Du skal have skriveadgang til en agentpulje for at klargøre — bed en administrator om at tildele den.",
+      "noPoolsAllowed": "Ingen af de agentpuljer, du har adgang til, er tilladt af dette katalogelement. Bed en administrator om at udvide elementets tilladte puljer eller give dig adgang til en af dem.",
+      "version": "Version",
+      "latestFloat": "Seneste (flydende)",
+      "defaultPinOption": "{version} (standardfastlåsning)",
+      "labelsOptional": "Labels (valgfri)",
+      "autoApplyHint": "Automatisk anvendelse anvender ændringer uden et manuelt gennemgangstrin.",
+      "provisioning": "Klargør…",
+      "submit": "Klargør"
+    },
+    "instances": {
+      "title": "Instanser",
+      "empty": "Ingen instanser klargjort fra dette element endnu.",
+      "colName": "Navn",
+      "colVersion": "Version",
+      "colPool": "Pulje",
+      "colActions": "Handlinger",
+      "reconfigure": "Omkonfigurér",
+      "destroy": "Nedriv",
+      "orphan": "Forældreløs…",
+      "orphanTitle": "Slet katalogposten uden at nedrive dens infrastruktur (frarådes)"
+    },
+    "reconfigure": {
+      "title": "Omkonfigurér {name}",
+      "description": "Opdater input og/eller version, og sæt derefter en kørsel i kø.",
+      "currentOption": "{version} (nuværende)",
+      "queuing": "Sætter i kø…",
+      "queueRun": "Sæt kørsel i kø"
+    },
+    "destroy": {
+      "title": "Nedriv {name}",
+      "heading": "Nedriv {name}?",
+      "description": "Dette sætter en nedrivningskørsel i kø, der river denne instans' infrastruktur ned. Ved en vellykket apply arkiveres arbejdsområdet. Dette kan ikke fortrydes.",
+      "autoApplyHint": "Automatisk anvendelse river ned med det samme uden gennemgang."
+    },
+    "orphan": {
+      "title": "Forældreløs {name}",
+      "heading": "Gør {name} forældreløs?",
+      "description": "Dette sletter kataloginstansposten, men <warn>nedriver ikke</warn> dens infrastruktur — de klargjorte ressourcer fortsætter med at køre, <warn>usporet og ustyret</warn>. Dette frarådes. For at genvinde infrastrukturen skal du annullere og bruge <emph>Nedriv</emph> i stedet.",
+      "confirmPrompt": "Skriv instansnavnet <mono>{name}</mono> for at bekræfte:",
+      "orphaning": "Gør forældreløs…",
+      "submit": "Gør forældreløs og opgiv infrastruktur"
+    },
+    "actions": {
+      "confirmed": "Kørsel bekræftet — anvender.",
+      "discarded": "Kørsel kasseret.",
+      "provisioned": "Klargjorde {name} — planen er klar til gennemgang.",
+      "reconfigureQueued": "Omkonfiguration sat i kø — kørsel oprettet.",
+      "reconfigureQueuedStatus": "Omkonfiguration sat i kø — kørslen er {status}.",
+      "destroyQueued": "Nedrivning sat i kø — kørsel oprettet.",
+      "destroyQueuedStatus": "Nedrivning sat i kø — kørslen er {status}.",
+      "orphaned": "Gjorde {name} forældreløs — katalogpost slettet; dens infrastruktur er efterladt kørende, usporet og ustyret."
+    },
+    "errors": {
+      "loadItem": "Kunne ikke indlæse katalogelement",
+      "confirm": "Kunne ikke bekræfte",
+      "confirmStatus": "Kunne ikke bekræfte ({status})",
+      "discard": "Kunne ikke kassere",
+      "discardStatus": "Kunne ikke kassere ({status})",
+      "provision": "Kunne ikke klargøre",
+      "provisionStatus": "Kunne ikke klargøre ({status})",
+      "reconfigure": "Kunne ikke omkonfigurere",
+      "reconfigureStatus": "Kunne ikke omkonfigurere ({status})",
+      "destroy": "Kunne ikke nedrive",
+      "destroyStatus": "Kunne ikke nedrive ({status})",
+      "orphan": "Kunne ikke gøre forældreløs",
+      "orphanStatus": "Kunne ikke gøre forældreløs ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "Genopretter forbindelse…"
+    },
+    "sessionExpiry": {
+      "banner": "Sessionen udløber om {minutes, plural, one {# minut} other {# minutter}} — <link>godkend igen</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# tjenestetoken} other {# tjenestetokens}} udløber inden for {days, plural, one {# dag} other {# dage}} — <link>gennemgå</link>",
+      "soon": "{count, plural, one {# tjenestetoken} other {# tjenestetokens}} udløber snart — <link>gennemgå</link>",
+      "dismissAria": "Afvis advarsel om tokenudløb"
+    },
+    "resourceUsage": {
+      "title": "Ressourceforbrug",
+      "oomKilled": "OOM-dræbt",
+      "killedLikelyOom": "Dræbt (sandsynligvis OOM)",
+      "memory": "Hukommelse",
+      "requested": "Anmodet {value}",
+      "limit": "Grænse {value}"
+    },
+    "labelsEditor": {
+      "none": "Ingen",
+      "removeAria": "Fjern {key}",
+      "keyPlaceholder": "nøgle",
+      "valuePlaceholder": "værdi",
+      "add": "Tilføj"
+    },
+    "sensitiveInput": {
+      "hide": "Skjul",
+      "show": "Vis",
+      "hideAria": "Skjul værdi",
+      "showAria": "Vis værdi"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "Søg efter arbejdsområder…",
+      "loading": "Indlæser…",
+      "empty": "Ingen arbejdsområder fundet",
+      "adding": "Tilføjer…"
+    },
+    "templateEditors": {
+      "remove": "Fjern",
+      "add": "Tilføj",
+      "valuePlaceholder": "værdi",
+      "name": "Navn",
+      "url": "URL",
+      "hmacKey": "HMAC-nøgle (valgfri)",
+      "hmacKeyPlaceholder": "delt hemmelighed",
+      "stage": "Stadie",
+      "enforcement": "Håndhævelse",
+      "enabled": "Aktiveret",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "Tilføj kørselsopgave",
+      "destinationType": "Destinationstype",
+      "token": "Token (valgfri)",
+      "tokenPlaceholder": "HMAC-/godkendelsestoken",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "E-mailadresser",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "Tilføj e-mail",
+      "triggers": "Triggere",
+      "addNotification": "Tilføj notifikation"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "AI-genereret",
+    "heading": {
+      "planSummary": "Planoversigt",
+      "failureAnalysis": "Fejlanalyse"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "Regenerér",
+      "queueing": "Sætter i kø…",
+      "tooltip": "Kør AI-oversigten igen mod de samme planinput",
+      "ariaLabel": "Regenerér AI-oversigt",
+      "confirm": "Regenerér AI-analysen? Dette kører modellen igen.",
+      "error": "Kunne ikke regenerere: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "Opsummerer plan…",
+      "analysingFailure": "Analyserer fejl…"
+    },
+    "skipped": {
+      "fallback": "Oversigt sprunget over for denne kørsel."
+    },
+    "errored": {
+      "heading": "Opsummeringen mislykkedes"
+    },
+    "riskFactors": {
+      "heading": "Risikofaktorer",
+      "suggestedFixes": "Foreslåede rettelser"
+    },
+    "tokens": "{input} ind / {output} ud tokens",
+    "risk": {
+      "low": "lav",
+      "medium": "mellem",
+      "high": "høj",
+      "critical": "kritisk",
+      "unknown": "ukendt"
+    },
+    "badges": {
+      "noChanges": "Ingen ændringer",
+      "noChangesLower": "ingen ændringer",
+      "noChangesTitle": "Planen rapporterede ingen ressourceændringer",
+      "toAdd": "{count, plural, one {# at tilføje} other {# at tilføje}}",
+      "toChange": "{count, plural, one {# at ændre} other {# at ændre}}",
+      "toDestroy": "{count, plural, one {# at nedrive} other {# at nedrive}}",
+      "toReplace": "{count, plural, one {# at erstatte} other {# at erstatte}}",
+      "toImport": "{count, plural, one {# at importere} other {# at importere}}"
+    },
+    "chat": {
+      "heading": "Opfølgning",
+      "sharedThreadNote": "Én delt tråd, synlig for alle med læseadgang til arbejdsområdet.",
+      "placeholder": "Stil et opfølgende spørgsmål om denne plan… (⌘/Ctrl + Enter for at sende)",
+      "send": "Send",
+      "thinking": "Tænker…",
+      "you": "Dig",
+      "assistant": "Assistent"
+    },
+    "translatedNote": "Automatisk oversat til dit sprog. Den autoritative oversigt er originalen.",
+    "translating": "Oversætter…"
+  },
+  "runDetail": {
+    "notFound": "Kørsel ikke fundet",
+    "runSection": "Kørselssektion",
+    "workspaceFallback": "arbejdsområde",
+    "backTo": "Tilbage til {name}",
+    "errorHeading": "Fejl",
+    "discardedHeading": "Kasseret — genplanlægning påkrævet",
+    "common": {
+      "yes": "Ja",
+      "no": "Nej"
+    },
+    "header": {
+      "title": "Kørsel {id}",
+      "titleWithWorkspace": "{workspace} — kørsel {id}",
+      "description": "{source}-kørsel"
+    },
+    "relTime": {
+      "justNow": "lige nu",
+      "minutesAgo": "{count, plural, one {# minut siden} other {# minutter siden}}",
+      "hoursAgo": "{count, plural, one {# time siden} other {# timer siden}}",
+      "daysAgo": "{count, plural, one {# dag siden} other {# dage siden}}"
+    },
+    "status": {
+      "pending": "Afventer",
+      "queued": "I kø",
+      "planning": "Planlægger",
+      "planned": "Planlagt",
+      "confirmed": "Bekræftet",
+      "applying": "Anvender",
+      "canceling": "Annullerer",
+      "applied": "Anvendt",
+      "errored": "Fejlet",
+      "canceled": "Annulleret",
+      "discarded": "Kasseret"
+    },
+    "activity": {
+      "pending": "Forbereder kørslen",
+      "queued": "Venter på en tilgængelig agent",
+      "planning": "Kører terraform plan",
+      "plannedConfirmable": "Venter på, at du bekræfter og anvender",
+      "plannedSpeculative": "Spekulativ plan fuldført",
+      "plannedComplete": "Plan fuldført",
+      "confirmed": "Starter apply",
+      "applying": "Kører terraform apply",
+      "canceling": "Stopper kørslen",
+      "applied": "Apply fuldført",
+      "errored": "Kørsel mislykkedes",
+      "canceled": "Kørsel annulleret",
+      "discarded": "Plan kasseret",
+      "elapsedTitle": "Forløbet i denne fase"
+    },
+    "badge": {
+      "destroy": "nedriv",
+      "planOnly": "kun plan"
+    },
+    "actions": {
+      "retryShort": "Prøv igen",
+      "retryFull": "Kør igen",
+      "retrying": "Prøver igen…",
+      "confirmShort": "Anvend",
+      "confirmFull": "Bekræft og anvend",
+      "confirming": "Bekræfter…",
+      "discard": "Kassér",
+      "discarding": "Kasserer…",
+      "cancelShort": "Annuller",
+      "cancelFull": "Annuller kørsel",
+      "canceling": "Annullerer…"
+    },
+    "confirm": {
+      "apply": "Anvend denne kørsel? Dette anvender planen og ændrer infrastrukturen.",
+      "discard": "Kassér denne plan?",
+      "cancel": "Annuller denne kørsel?",
+      "retry": "Kør denne kørsel igen?"
+    },
+    "errors": {
+      "loadRun": "Kunne ikke indlæse kørsel",
+      "action": {
+        "confirm": "Kunne ikke bekræfte kørsel",
+        "discard": "Kunne ikke kassere kørsel",
+        "cancel": "Kunne ikke annullere kørsel",
+        "retry": "Kunne ikke køre kørslen igen"
+      }
+    },
+    "tabs": {
+      "overview": "Oversigt",
+      "ai": "AI",
+      "aiFull": "AI-analyse",
+      "opa": "OPA",
+      "opaFull": "OPA-politikker",
+      "impact": "Konsekvens",
+      "impactFull": "Konsekvensgraf",
+      "planLabel": "Plan<log>log</log>",
+      "applyLabel": "Apply<log>log</log>",
+      "planFull": "Plan-log",
+      "applyFull": "Apply-log",
+      "details": "Detaljer"
+    },
+    "banner": {
+      "destroy": "Dette er en <strong>nedrivnings</strong>kørsel — alle styrede ressourcer nedrives, når den anvendes.",
+      "planOnlyCli": "Dette er en <strong>kun-plan</strong>-kørsel startet fra CLI'en på et VCS-forbundet arbejdsområde. Apply er ikke tilgængelig for CLI-uploadet kode — kun VCS-styret kode kan anvendes.",
+      "moduleOverridesPrefix": "Denne kørsel bruger <strong>modultilsidesættelser</strong>",
+      "moduleOverridesFromPr": "fra PR #{number}",
+      "moduleOverridesSuffix": "hentes fra PR-branchen i stedet for den publicerede registry-version."
+    },
+    "cards": {
+      "changes": "Ændringer",
+      "aiAnalysis": "AI-analyse",
+      "policyChecks": "Politiktjek",
+      "resources": "Ressourcer"
+    },
+    "changes": {
+      "noChanges": "Ingen ændringer",
+      "planning": "Planlægger…",
+      "toAdd": "at tilføje",
+      "toChange": "at ændre",
+      "toDestroy": "at nedrive",
+      "toReplace": "at erstatte",
+      "toImport": "at importere"
+    },
+    "ai": {
+      "notAvailable": "Ikke tilgængelig",
+      "ready": "Klar",
+      "riskSub": "{risk} risiko",
+      "generating": "Genererer…",
+      "skipped": "Sprunget over",
+      "failed": "Mislykkedes",
+      "available": "Tilgængelig"
+    },
+    "policy": {
+      "none": "Ingen",
+      "blocked": "Blokeret",
+      "failedSub": "{count, plural, one {# mislykkedes} other {# mislykkedes}}",
+      "advisoryIssues": "Vejledende problemer",
+      "passedSub": "{passed}/{total} bestået",
+      "passed": "Bestået"
+    },
+    "resources": {
+      "overLimit": "Over grænsen",
+      "oomKilled": "OOM-dræbt",
+      "recorded": "Registreret",
+      "nearLimit": "Nær grænsen",
+      "high": "Høj",
+      "withinLimits": "Inden for grænserne"
+    },
+    "details": {
+      "heading": "Detaljer",
+      "executionBackend": "Eksekverings-backend",
+      "source": "Kilde",
+      "autoApply": "Anvend automatisk",
+      "planOnly": "Kun plan",
+      "triggeredBy": "Udløst af",
+      "created": "Oprettet",
+      "commit": "Commit",
+      "branch": "Branch",
+      "prMr": "PR/MR",
+      "stateVersion": "Tilstandsversion",
+      "viewState": "Vis tilstand",
+      "runOptions": "Kørselsindstillinger"
+    },
+    "timeline": {
+      "heading": "Tidslinje",
+      "queued": "I kø",
+      "planningStarted": "Planlægning startet",
+      "planComplete": "Plan fuldført",
+      "confirmed": "Bekræftet",
+      "applyingStarted": "Anvendelse startet",
+      "applied": "Anvendt",
+      "errored": "Fejlet",
+      "canceled": "Annulleret",
+      "discarded": "Kasseret"
+    },
+    "log": {
+      "color": "Farve",
+      "colorOnTitle": "Viser ANSI-farver — klik for almindelig tekst",
+      "colorOffTitle": "Viser almindelig tekst — klik for farver",
+      "refresh": "Opdater",
+      "refreshTitle": "Opdater log",
+      "copy": "Kopiér",
+      "copied": "Kopieret!",
+      "copyTitle": "Kopiér almindelig tekst til udklipsholderen",
+      "copyAria": "Kopiér log til udklipsholderen",
+      "download": "Download",
+      "downloadColorTitle": "Download log (med ANSI-farvekoder)",
+      "downloadPlainTitle": "Download log (almindelig tekst)",
+      "downloadAria": "Download log",
+      "follow": "Følg",
+      "followOnTitle": "Følger den live hale — klik for at stoppe",
+      "followOffTitle": "Følg den live hale",
+      "end": "Slut",
+      "endTitle": "Hop til slutningen af loggen",
+      "planEmpty": "Ingen plan-output tilgængelig endnu.",
+      "applyEmpty": "Ingen apply-output tilgængelig endnu."
+    },
+    "policyPanel": {
+      "heading": "Politiktjek",
+      "passedCount": "{passed}/{total} bestået",
+      "blockedMessage": "Denne kørsel er <strong>blokeret af et obligatorisk politiksæt</strong>. Den anvendes ikke, før fejlen er løst, eller en administrator tilsidesætter den.",
+      "overriding": "Tilsidesætter...",
+      "overrideContinue": "Tilsidesæt og fortsæt",
+      "overrideFailed": "Tilsidesættelse mislykkedes",
+      "overrideFailedStatus": "Tilsidesættelse mislykkedes ({status})",
+      "overriddenBy": "tilsidesat af {by}",
+      "policyPassed": "bestået",
+      "noDenyMessage": "Politikken fejlede uden at producere en afvisningsbesked eller fejloutput",
+      "enforcement": {
+        "mandatory": "obligatorisk",
+        "advisory": "vejledende"
+      },
+      "outcome": {
+        "passed": "bestået",
+        "failed": "fejlet",
+        "errored": "fejl"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "Arbejdsområde ikke fundet",
+    "common": {
+      "enabled": "Aktiveret",
+      "disabled": "Deaktiveret",
+      "none": "Ingen",
+      "default": "Standard",
+      "never": "Aldrig",
+      "actions": "Handlinger",
+      "workspaceLocked": "Arbejdsområdet er låst"
+    },
+    "actions": {
+      "edit": "Rediger",
+      "cancel": "Annuller",
+      "save": "Gem",
+      "saving": "Gemmer…",
+      "savingEllipsis": "Gemmer...",
+      "delete": "Slet",
+      "deleting": "Sletter...",
+      "add": "Tilføj",
+      "adding": "Tilføjer...",
+      "remove": "Fjern",
+      "download": "Download",
+      "rollback": "Rul tilbage",
+      "close": "Luk",
+      "hide": "Skjul",
+      "enable": "Aktivér",
+      "disable": "Deaktivér",
+      "creating": "Opretter...",
+      "sending": "Sender...",
+      "processing": "Behandler...",
+      "queuing": "Sætter i kø...",
+      "loading": "Indlæser...",
+      "loadingLower": "indlæser…"
+    },
+    "header": {
+      "executionMode": "{mode}-eksekveringstilstand"
+    },
+    "tabs": {
+      "overview": "Oversigt",
+      "variables": "Variabler",
+      "runs": "Kørsler",
+      "state": "Tilstand",
+      "stateGraph": "Tilstandsgraf",
+      "configurations": "Konfigurationer",
+      "notifications": "Notifikationer",
+      "runTasks": "Kørselsopgaver",
+      "runTriggers": "Kørselstriggere",
+      "sharing": "Deling",
+      "selectLabel": "Arbejdsområdesektion"
+    },
+    "lifecycle": {
+      "pendingDeletion": "Afventer sletning",
+      "pendingDeletionDefault": "Dette arbejdsområde er markeret til sletning og kræver manuel handling.",
+      "archived": "Arkiveret",
+      "archivedDefault": "Dette arbejdsområde er blevet arkiveret."
+    },
+    "runQueuedBanner": {
+      "message": "Kørsel sat i kø.",
+      "viewRun": "Vis kørsel"
+    },
+    "settings": {
+      "title": "Indstillinger",
+      "saveChanges": "Gem ændringer",
+      "renamedNotice": "Arbejdsområde omdøbt. Opdater feltet <name></name> i din <cloud></cloud>-blok, så det matcher."
+    },
+    "fields": {
+      "name": "Navn",
+      "nameTitle": "Bogstaver, tal, bindestreger, understregninger. Skal begynde med et bogstav eller tal.",
+      "executionMode": "Eksekveringstilstand",
+      "execModeLocal": "Lokal",
+      "execModeAgent": "Agent",
+      "autoApply": "Anvend automatisk",
+      "cpuRequest": "CPU-anmodning",
+      "cpuRequestTitle": "Kubernetes CPU-mængde: hele kerner (1, 2) eller millicores (500m, 100m)",
+      "memoryRequest": "Hukommelsesanmodning",
+      "memoryRequestTitle": "Kubernetes hukommelsesmængde: bytes (1000) eller med suffiks (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "Eksekverings-backend",
+      "version": "Version",
+      "versionPlaceholder": "f.eks. 1.11 eller 1.11.5",
+      "versionTitle": "Version i formatet X.Y eller X.Y.Z (f.eks. 1.11 eller 1.11.5)",
+      "terragruntEnabledAgent": "Aktiveret (agenttilstand)",
+      "terragruntEnabledVersion": "Aktiveret (v{version})",
+      "terragruntVersionPlaceholder": "f.eks. 1.0",
+      "terragruntVersionTitle": "Terragrunt-version i formatet X.Y eller X.Y.Z (f.eks. 1.0)",
+      "workingDirectory": "Arbejdsmappe",
+      "workingDirectoryPlaceholder": "f.eks. environments/dev",
+      "agentPool": "Agentpulje",
+      "owner": "Ejer",
+      "vcsConnection": "VCS-forbindelse",
+      "vcsRepository": "VCS-repository",
+      "vcsRepositoryTitle": "Skal være en HTTP- eller HTTPS-URL",
+      "vcsBranch": "VCS-branch",
+      "vcsBranchPlaceholder": "main (standard)",
+      "vcsWorkflow": "VCS-arbejdsgang",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (standard — TFE/HCP-standard)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (Atlantis-standard — tilvalg)",
+      "autoMerge": "Auto-merge efter apply",
+      "autoMergeStrategy": "Auto-merge-strategi",
+      "vcsPolling": "VCS-polling",
+      "labels": "Labels (tags)",
+      "labelsTitle": "Arbejdsområdelabels har en dobbeltfunktion: label-baseret RBAC-matchning og som de \"tags\", der matches af terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}'-blokke.",
+      "varFiles": "Var-filer",
+      "varFilesPlaceholder": "f.eks. envs/dev.tfvars",
+      "triggerPrefixes": "Trigger-præfikser",
+      "triggerPrefixesHint": "Mapper, der udløser kørsler. Tilsidesætter arbejdsmappefiltrering, når den er angivet.",
+      "triggerPrefixesPlaceholder": "f.eks. modules",
+      "triggerPrefixesNone": "Ingen (bruger arbejdsmappe)",
+      "driftIgnoreRules": "Regler for ignorering af afdrift",
+      "driftIgnoreRulesHint": "Glob-bevidste Terraform-adresse- + attributstier, der undertrykkes af afdriftsklassificeringen. <star></star> matcher nul eller flere ikke-<dot></dot>-tegn (spænder over <n></n> indekser); <starIdx></starIdx> matcher ethvert indeks i firkantede parenteser. En bar adresse uden attributsuffiks lyddæmper enhver ændring af den ressource — inklusive nedrivninger. Påvirker kun afdrift, ikke almindelig plan/apply. Se <docs>drift-ignore-rules.md</docs> for den fulde grammatik.",
+      "driftIgnoreRulesNone": "Ingen (hver plan-diff tæller som afdrift)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "Autorisation delegeret til dit VCS-repository.",
+      "rbac": "Enhver, der kan merge PR'en, kan anvende. Branch-beskyttelsesregler (påkrævede reviews, statustjek, code owner-godkendelse) bliver porten. Terrapods rolle-/label-RBAC gælder<em>ikke</em> for kommentar-drevne handlinger i denne tilstand.",
+      "recommended": "<strong>Anbefalet:</strong> kræv lineær historik (rebase/squash før merge), så den commit, du anvender, er den commit, der lander.",
+      "credit": "Kredit: denne arbejdsgang er modelleret efter <atlantis>Atlantis</atlantis>. Atlantis er fortsat det rette værktøj for teams, der kun vil have PR-kommentar-drevne applies og ingen platform-brugergrænseflade."
+    },
+    "vcsPolling": {
+      "error": "Fejl",
+      "ok": "OK ({time})",
+      "notPolled": "Ikke pollet endnu"
+    },
+    "lockout": {
+      "revertLabels": "Fortryd labels",
+      "saveAnyway": "Gem alligevel"
+    },
+    "lock": {
+      "title": "Låsestatus",
+      "lockedDesc": "Dette arbejdsområde er låst. Ingen planer eller applies kan køre.",
+      "unlockedDesc": "Dette arbejdsområde er ulåst og klar til kørsler.",
+      "lock": "Lås",
+      "unlock": "Lås op",
+      "lockConfirm": "Lås dette arbejdsområde?",
+      "unlockConfirm": "Lås dette arbejdsområde op?"
+    },
+    "drift": {
+      "title": "Afdriftsregistrering",
+      "checkInterval": "Tjekinterval",
+      "status": "Status",
+      "statusNoDrift": "Ingen afdrift",
+      "statusDrifted": "Afdriftet",
+      "statusErrored": "Fejlet",
+      "statusUnchecked": "Ikke tjekket",
+      "dismiss": "Afvis",
+      "dismissing": "Afviser…",
+      "dismissTitle": "Ryd den rapporterede afdriftstilstand. Det næste planlagte tjek genudfylder den fra virkeligheden.",
+      "lastChecked": "Sidst tjekket",
+      "checkNow": "Tjek nu",
+      "checkNowTitle": "Sæt en kun-plan-kørsel i kø for at tjekke for afdrift",
+      "checkNowTitleDisabled": "Aktivér afdriftsregistrering først"
+    },
+    "intervals": {
+      "disabled": "Deaktiveret",
+      "1hour": "1 time",
+      "4hours": "4 timer",
+      "12hours": "12 timer",
+      "24hours": "24 timer",
+      "48hours": "48 timer",
+      "3days": "3 dage",
+      "7days": "7 dage"
+    },
+    "planExpiry": {
+      "title": "Planudløb",
+      "description": "Kassér automatisk en ubekræftet plan, når den er ældre end dette, så en forældet plan ikke kan anvendes mod en verden, der har flyttet sig. Fra som standard; planen skal så køres igen. (Gælder kun for apply-egnede kørsler.)",
+      "expireAfter": "Udløb efter"
+    },
+    "aiSummary": {
+      "title": "AI-planoversigt",
+      "description": "Automatisk LLM-genereret ændringsoversigt, risikovurdering og fejlanalyse på hvert plan-fase-udfald for dette arbejdsområde.",
+      "mode": "Tilstand",
+      "modeDefault": "Følg deployment-standard",
+      "modeEnabled": "Opsummer altid",
+      "modeDisabled": "Opsummer aldrig",
+      "contextLabel": "Arbejdsområdekontekst",
+      "contextLabelSuffix": "(valgfri, additiv)",
+      "contextPlaceholder": "Fakta, som AI'en bør kende specifikt om dette arbejdsområde. F.eks. 'Fronter vaulten for tjeneste X — nedrivning af KMS-nøglen forårsager et globalt nedbrud.'",
+      "noContext": "Ingen arbejdsområdekontekst angivet.",
+      "contextHint": "Tilføjet oven på deployment-dækkende kontekst. Maks. 4000 tegn."
+    },
+    "slack": {
+      "title": "Slack-notifikationer",
+      "description": "Tilmeld dette arbejdsområde Slack-kørselsnotifikationer — godkendelsesanmodninger, applies, fejl og afdrift. Lad kanalen stå tom, og dette arbejdsområde forbliver tavst (der er ingen deployment-dækkende udsendelse). Kræver, at Slack-appen er aktiveret af en administrator.",
+      "channel": "Kanal",
+      "channelPlaceholder": "#deploys eller et kanal-ID (f.eks. C0123ABCD)",
+      "notSet": "Ikke angivet — tavs.",
+      "hint": "Slack-appen skal allerede være medlem af kanalen."
+    },
+    "delete": {
+      "title": "Slet arbejdsområde",
+      "description": "Slet permanent dette arbejdsområde og al tilknyttet tilstand, variabler og kørsler.",
+      "confirm": "Bekræft sletning"
+    },
+    "variables": {
+      "addVariable": "Tilføj variabel",
+      "key": "Nøgle",
+      "value": "Værdi",
+      "category": "Kategori",
+      "categoryEnv": "Miljø",
+      "sensitive": "Følsom",
+      "empty": "Ingen variabler konfigureret for dette arbejdsområde.",
+      "emptyValue": "tom",
+      "enterNewValue": "Indtast ny værdi",
+      "deleteConfirm": "Slet variabel \"{key}\"?"
+    },
+    "runs": {
+      "options": "Indstillinger",
+      "hideOptions": "Skjul indstillinger",
+      "queueDestroy": "Sæt nedrivning i kø",
+      "queueDestroyTitle": "Sæt en nedrivningsplan i kø",
+      "destroyAllConfirm": "Nedriv alle ressourcer?",
+      "confirmDestroy": "Bekræft nedrivning",
+      "queuePlan": "Sæt plan i kø",
+      "queueRun": "Sæt kørsel i kø",
+      "queuePlanConfirm": "Sæt en spekulativ plan i kø for dette arbejdsområde?",
+      "queueApplyConfirm": "Sæt en plan + apply-kørsel i kø? Dette kan ændre infrastrukturen.",
+      "planOptions": "Planindstillinger",
+      "targetResources": "Målressourcer",
+      "replaceResources": "Erstat ressourcer",
+      "commaSeparated": "(kommasepareret)",
+      "planOnly": "Kun plan",
+      "refreshOnly": "Kun refresh",
+      "skipRefresh": "Spring refresh over",
+      "allowEmptyApply": "Tillad tom apply",
+      "vcsRef": "VCS-ref",
+      "branch": "Branch",
+      "tag": "Tag",
+      "defaultBranch": "Standard ({branch})",
+      "nonDefaultRefNote": "Ikke-standard-ref valgt — kørslen bliver kun-plan",
+      "empty": "Ingen kørsler endnu for dette arbejdsområde.",
+      "runId": "Kørsels-ID",
+      "status": "Status",
+      "type": "Type",
+      "changes": "Ændringer",
+      "source": "Kilde",
+      "triggeredBy": "Udløst af",
+      "created": "Oprettet",
+      "needsConfirm": "kræver bekræftelse",
+      "typeDestroy": "nedriv",
+      "typePlanOnly": "kun plan",
+      "typePlanApply": "plan + apply",
+      "sourceModuleTest": "modultest",
+      "sourceModulePublish": "modulpublicering"
+    },
+    "state": {
+      "deleteConfirm": "Slet tilstandsversion #{serial}? Dette kan ikke fortrydes.",
+      "rollbackConfirm": "Rul tilbage til tilstandsversion #{serial}? En ny version oprettes med samme indhold.",
+      "confirmDelete": "Bekræft sletning",
+      "confirmRollback": "Bekræft tilbagerulning",
+      "uploadState": "Upload tilstand",
+      "empty": "Ingen tilstandsversioner endnu for dette arbejdsområde.",
+      "serial": "Serienr.",
+      "createdBy": "Oprettet af",
+      "run": "Kørsel",
+      "size": "Størrelse",
+      "created": "Oprettet",
+      "runner": "runner",
+      "latest": "seneste"
+    },
+    "configurations": {
+      "description": "Uploadede kildearkiver for dette arbejdsområde, nyeste først. Vælg to rækker for at sammenligne.",
+      "selectedCount": "{count}/2 valgt",
+      "compare": "Sammenlign",
+      "comparing": "Sammenligner…",
+      "empty": "Ingen konfigurationsversioner endnu. De vises her, så snart en `terraform plan` uploader, eller et VCS-push udløser en kørsel.",
+      "id": "ID",
+      "source": "Kilde",
+      "status": "Status",
+      "created": "Oprettet",
+      "current": "nuværende",
+      "selectForCompare": "Vælg {id} til sammenligning",
+      "compareLabel": "Sammenlign",
+      "diff": "Diff",
+      "filesChanged": "{count} filer ændret",
+      "oversized": "Sprang {count, plural, one {# for stor fil} other {# for store filer}} over: {files}",
+      "noDiff": "Ingen indholdsforskelle mellem disse versioner.",
+      "binaryChanged": "Binær fil ændret — diff ikke gengivet.",
+      "diffType": {
+        "added": "tilføjet",
+        "removed": "fjernet",
+        "modified": "ændret",
+        "binary-changed": "binær"
+      }
+    },
+    "notifications": {
+      "addNotification": "Tilføj notifikation",
+      "name": "Navn",
+      "namePlaceholder": "Deploy-notifikationer",
+      "destinationType": "Destinationstype",
+      "typeGeneric": "Generisk webhook",
+      "typeEmail": "E-mail",
+      "url": "URL",
+      "hmacToken": "HMAC-token (valgfri)",
+      "signingSecret": "Signeringshemmelighed",
+      "emailAddresses": "E-mailadresser (kommasepareret)",
+      "triggerEvents": "Trigger-hændelser",
+      "createNotification": "Opret notifikation",
+      "empty": "Ingen notifikationskonfigurationer for dette arbejdsområde.",
+      "ok": "OK",
+      "err": "Fejl {status}",
+      "fail": "FEJL",
+      "http": "HTTP {status}",
+      "verify": "Verificér",
+      "history": "Historik",
+      "deliveryHistory": "Leveringshistorik",
+      "enableConfirm": "Aktivér denne notifikation?",
+      "disableConfirm": "Deaktivér denne notifikation?",
+      "deleteConfirm": "Slet notifikation \"{name}\"?"
+    },
+    "runTasks": {
+      "addRunTask": "Tilføj kørselsopgave",
+      "name": "Navn",
+      "namePlaceholder": "OPA-politiktjek",
+      "webhookUrl": "Webhook-URL",
+      "stage": "Stadie",
+      "enforcementLevel": "Håndhævelsesniveau",
+      "hmacKey": "HMAC-nøgle (valgfri)",
+      "hmacKeyPlaceholder": "Signeringshemmelighed til webhook-verificering",
+      "createRunTask": "Opret kørselsopgave",
+      "empty": "Ingen kørselsopgaver konfigureret for dette arbejdsområde.",
+      "enableConfirm": "Aktivér denne kørselsopgave?",
+      "disableConfirm": "Deaktivér denne kørselsopgave?",
+      "deleteConfirm": "Slet kørselsopgave \"{name}\"?"
+    },
+    "runTriggers": {
+      "title": "Kørselstriggere",
+      "description": "Når et kilde-arbejdsområde fuldfører en apply, får downstream-arbejdsområder automatisk sat en ny kørsel i kø. Op til 20 kilde-arbejdsområder pr. destination.",
+      "inboundHeading": "Kilde-arbejdsområder, der udløser kørsler her",
+      "inboundEmpty": "Ingen kilde-arbejdsområder udløser kørsler på dette arbejdsområde.",
+      "pickerPlaceholder": "Søg efter arbejdsområder at tilføje som kilde…",
+      "outboundHeading": "Destinationsarbejdsområder, dette arbejdsområde udløser",
+      "outboundEmpty": "Dette arbejdsområde udløser ikke kørsler på noget andet arbejdsområde.",
+      "destinationNote": "(destination; fjern derfra)",
+      "removeConfirm": "Fjern denne kørselstrigger?"
+    },
+    "sharing": {
+      "title": "Deling af remote-tilstand",
+      "description": "Producent-styret tilladelsesliste for arbejdsområde-krydsende <code></code>. Tilstandsdata er hemmelighedsbærende — tildel bevidst. <docs>Dokumentation</docs>",
+      "outboundHeading": "Arbejdsområder, der er autoriseret til at læse dette arbejdsområdes tilstand",
+      "outboundEmpty": "Dette arbejdsområdes tilstand deles ikke med noget andet arbejdsområde.",
+      "grantedBy": "tildelt af {by}",
+      "revoke": "Tilbagekald",
+      "revokeConfirm": "Fjern denne remote-tilstandsdeling? Forbrugeren mister adgang til denne tilstand.",
+      "pickerPlaceholder": "Søg efter arbejdsområder at autorisere som forbruger…",
+      "inboundHeading": "Arbejdsområder, dette arbejdsområde er autoriseret til at læse tilstand fra",
+      "inboundEmpty": "Dette arbejdsområde er ikke autoriseret til at læse tilstand fra noget andet arbejdsområde via terraform_remote_state.",
+      "producerNote": "(producent; tilbagekald derfra)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "Manuelt afdriftstjek fra brugergrænsefladen",
+      "queued": "Sat i kø fra brugergrænsefladen",
+      "queuedSpeculative": "Sat i kø fra brugergrænsefladen (spekulativ)",
+      "destroyQueued": "Nedrivning sat i kø fra brugergrænsefladen"
+    },
+    "errors": {
+      "loadWorkspace": "Kunne ikke indlæse arbejdsområde",
+      "loadRuns": "Kunne ikke indlæse kørsler",
+      "loadVariables": "Kunne ikke indlæse variabler",
+      "loadStateVersions": "Kunne ikke indlæse tilstandsversioner",
+      "loadConfigurations": "Kunne ikke indlæse konfigurationsversioner",
+      "loadNotifications": "Kunne ikke indlæse notifikationer",
+      "loadOutboundConsumers": "Kunne ikke indlæse udgående remote-tilstandsforbrugere",
+      "loadInboundConsumers": "Kunne ikke indlæse indgående remote-tilstandsforbrugere",
+      "loadConsumers": "Kunne ikke indlæse remote-tilstandsforbrugere",
+      "loadInboundTriggers": "Kunne ikke indlæse indgående kørselstriggere",
+      "loadOutboundTriggers": "Kunne ikke indlæse udgående kørselstriggere",
+      "loadTriggers": "Kunne ikke indlæse kørselstriggere",
+      "loadRunTasks": "Kunne ikke indlæse kørselsopgaver",
+      "downloadStateFile": "Kunne ikke downloade tilstandsfil",
+      "downloadFailed": "Download mislykkedes",
+      "downloadFailedStatus": "Download mislykkedes ({status})",
+      "downloadTicketMissingUrl": "Download-billetsvar mangler URL",
+      "diffFailed": "Diff mislykkedes",
+      "diffFailedStatus": "Diff mislykkedes ({status})",
+      "authorizeConsumer": "Kunne ikke autorisere forbruger",
+      "revoke": "Kunne ikke tilbagekalde",
+      "revokeConsumer": "Kunne ikke tilbagekalde forbruger",
+      "addTrigger": "Kunne ikke tilføje kørselstrigger",
+      "removeTrigger": "Kunne ikke fjerne kørselstrigger",
+      "createRunTask": "Kunne ikke oprette kørselsopgave",
+      "createRunTaskStatus": "Kunne ikke oprette kørselsopgave ({status})",
+      "update": "Kunne ikke opdatere",
+      "toggleRunTask": "Kunne ikke skifte kørselsopgave",
+      "delete": "Kunne ikke slette",
+      "deleteRunTask": "Kunne ikke slette kørselsopgave",
+      "labelLockout": "Denne labelændring ville reducere din adgang.",
+      "updateWorkspace": "Kunne ikke opdatere arbejdsområde",
+      "lockWorkspace": "Kunne ikke låse arbejdsområde",
+      "unlockWorkspace": "Kunne ikke låse arbejdsområde op",
+      "updateAiSummary": "Kunne ikke opdatere AI-oversigtsindstillinger",
+      "updateSlackChannel": "Kunne ikke opdatere Slack-kanal",
+      "updateDriftSettings": "Kunne ikke opdatere afdriftsindstillinger",
+      "updateDriftInterval": "Kunne ikke opdatere afdriftsinterval",
+      "updatePlanExpiry": "Kunne ikke opdatere planudløb",
+      "queueDriftCheck": "Kunne ikke sætte afdriftstjek i kø",
+      "queueDriftCheckStatus": "Kunne ikke sætte afdriftstjek i kø ({status})",
+      "dismissDrift": "Kunne ikke afvise afdrift",
+      "dismissDriftStatus": "Kunne ikke afvise afdrift ({status})",
+      "deleteWorkspace": "Kunne ikke slette arbejdsområde",
+      "addVariable": "Kunne ikke tilføje variabel",
+      "addVariableStatus": "Kunne ikke tilføje variabel ({status})",
+      "deleteVariable": "Kunne ikke slette variabel",
+      "updateVariable": "Kunne ikke opdatere variabel",
+      "queuePlan": "Kunne ikke sætte plan i kø",
+      "queuePlanStatus": "Kunne ikke sætte plan i kø ({status})",
+      "queueDestroy": "Kunne ikke sætte nedrivning i kø",
+      "queueDestroyStatus": "Kunne ikke sætte nedrivning i kø ({status})",
+      "createNotification": "Kunne ikke oprette notifikation",
+      "createNotificationStatus": "Kunne ikke oprette notifikation ({status})",
+      "toggleNotification": "Kunne ikke skifte notifikation",
+      "deleteNotification": "Kunne ikke slette notifikation",
+      "verificationFailed": "Verificering mislykkedes",
+      "verificationDeliveryFailed": "Verificeringslevering mislykkedes: {detail}",
+      "unknownError": "Ukendt fejl",
+      "failed": "Mislykkedes",
+      "deleteStateVersion": "Kunne ikke slette tilstandsversion",
+      "rollbackStateVersion": "Kunne ikke rulle tilstandsversion tilbage",
+      "stateActionFailed": "Tilstandshandling mislykkedes",
+      "uploadState": "Kunne ikke uploade tilstand",
+      "uploadStateFile": "Kunne ikke uploade tilstandsfil"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Kunne ikke indlæse tilstandsgrafen.",
+      "emptyState": "Ingen tilstand endnu — kør en plan og apply, eller upload tilstand, så udfyldes denne graf.",
+      "stateVersionLabel": "Tilstandsversion",
+      "currentSuffix": "(nuværende)",
+      "colorByLabel": "Farvelæg efter",
+      "viewGraph": "Graf",
+      "viewTable": "Tabel",
+      "resourceCount": "{count, plural, one {# ressource} other {# ressourcer}}",
+      "dependencyCount": "{count, plural, one {# afhængighed} other {# afhængigheder}}",
+      "truncated": "Viser de første {shown} af {total} ressourcer — grafen er begrænset af hensyn til læsbarheden.",
+      "colResource": "Ressource",
+      "colType": "Type",
+      "colMode": "Tilstand",
+      "colModule": "Modul",
+      "colDependedOnBy": "Afhængige",
+      "rootModule": "(rod)"
+    },
+    "impact": {
+      "notAvailable": "Konsekvensgraf er ikke tilgængelig for denne kørsel.",
+      "title": "Konsekvensgraf",
+      "subtitle": "plan over {count, plural, one {# ressource} other {# ressourcer}}",
+      "hint": "Hver kugle er en ressource; hver pil peger mod det, den afhænger af. Klik på en node → dens transitive <b>konsekvens</b> (alt downstream) lyser op.",
+      "downstreamAffected": "downstream påvirket",
+      "action": {
+        "create": "opret",
+        "update": "opdater",
+        "replace": "erstat",
+        "destroy": "nedriv",
+        "unchanged": "uændret"
+      }
+    },
+    "estate": {
+      "navHint": "Træk for at rotere · scroll for at zoome · højre-træk for at panorere · <em>klik på en node for at kredse om den</em>"
+    },
+    "state3d": {
+      "title": "Tilstandsgraf",
+      "hint": "Hver kugle er en ressource; hver pil peger mod det, den afhænger af. Klik på en node → de ressourcer, der transitivt <b>afhænger af den</b>, lyser op.",
+      "dataSource": "datakilde",
+      "managed": "styret",
+      "dependOnThis": "afhænger af dette"
+    },
+    "resource3d": {
+      "resetView": "Nulstil visning",
+      "clear": "Ryd",
+      "key": "Signaturforklaring",
+      "resources": "Ressourcer",
+      "hideKey": "Skjul signaturforklaring",
+      "hideResources": "Skjul ressourcer",
+      "resourcesCount": "Ressourcer ({count})",
+      "filterPlaceholder": "Filtrér ressourcer…",
+      "navHint": "Træk for at rotere · scroll for at zoome · højre-træk for at panorere · <em>klik på en ressource for at kredse om den</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "Tilbage til eksekverings-hooks",
+    "defaultDescription": "Eksekverings-hook",
+    "notFound": "Eksekverings-hook ikke fundet",
+    "scriptEmpty": "(tom)",
+    "tabs": {
+      "settings": "Indstillinger",
+      "workspaces": "Arbejdsområder"
+    },
+    "common": {
+      "yes": "Ja",
+      "no": "Nej"
+    },
+    "actions": {
+      "edit": "Rediger",
+      "cancel": "Annuller",
+      "save": "Gem",
+      "saving": "Gemmer...",
+      "delete": "Slet",
+      "deleting": "Sletter...",
+      "confirmDelete": "Bekræft sletning",
+      "add": "Tilføj",
+      "adding": "Tilføjer...",
+      "remove": "Fjern"
+    },
+    "settings": {
+      "heading": "Indstillinger"
+    },
+    "fields": {
+      "name": "Navn",
+      "description": "Beskrivelse",
+      "hookPoint": "Hook-punkt",
+      "priority": "Prioritet",
+      "enabled": "Aktiveret",
+      "script": "Script (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "Slet eksekverings-hook",
+      "description": "Slet permanent dette hook og fjern det fra alle arbejdsområder."
+    },
+    "workspaces": {
+      "scopeNote": "Dette hook kører kun på de arbejdsområder, der er tilknyttet nedenfor. Der er intet globalt omfang.",
+      "associate": "Tilknyt arbejdsområde",
+      "workspaceLabel": "Arbejdsområde",
+      "selectPlaceholder": "Vælg et arbejdsområde...",
+      "empty": "Ingen arbejdsområder tilknyttet dette hook.",
+      "colWorkspace": "Arbejdsområde",
+      "colActions": "Handlinger"
+    },
+    "confirm": {
+      "removeWorkspace": "Fjern dette arbejdsområde fra hooket? Hooket kører ikke længere for det."
+    },
+    "success": {
+      "updated": "Eksekverings-hook opdateret",
+      "workspaceAssociated": "Arbejdsområde tilknyttet",
+      "workspaceRemoved": "Arbejdsområde fjernet"
+    },
+    "errors": {
+      "load": "Kunne ikke indlæse eksekverings-hook",
+      "update": "Kunne ikke opdatere eksekverings-hook",
+      "delete": "Kunne ikke slette eksekverings-hook",
+      "addWorkspace": "Kunne ikke tilføje arbejdsområde",
+      "removeWorkspace": "Kunne ikke fjerne arbejdsområde"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "Politiksæt",
+    "notFound": "Ikke fundet",
+    "unknown": "ukendt",
+    "subtitle": "OPA-politiksæt · oprettet af {createdBy}",
+    "settings": {
+      "heading": "Indstillinger"
+    },
+    "fields": {
+      "description": "Beskrivelse",
+      "enforcement": "Håndhævelse",
+      "enabled": "Aktiveret",
+      "globalScope": "Global (hvert arbejdsområde)"
+    },
+    "enforcement": {
+      "advisory": "Vejledende (advar)",
+      "mandatory": "Obligatorisk (bloker apply)"
+    },
+    "scope": {
+      "allowLabels": "Tillad labels (nøgle: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "Tillad navne (ét pr. linje)",
+      "denyLabels": "Afvis labels (nøgle: v1, v2)",
+      "denyNames": "Afvis navne (ét pr. linje)"
+    },
+    "vcs": {
+      "heading": "VCS-konfiguration",
+      "repoUrl": "Repository-URL",
+      "branch": "Branch",
+      "branchPlaceholder": "main (standard)",
+      "policyPath": "Politiksti"
+    },
+    "vcsBanner": {
+      "syncedFrom": "Politikker synkroniseret fra",
+      "at": "kl.",
+      "lastSynced": "Sidst synkroniseret {time}",
+      "commit": "(commit {sha})",
+      "syncError": "Synkroniseringsfejl: {error}"
+    },
+    "policies": {
+      "heading": "Politikker ({count})",
+      "vcsManaged": "Styret af repository — push ændringer via PR",
+      "empty": "Ingen politikker i dette sæt endnu."
+    },
+    "addPolicy": {
+      "namePlaceholder": "Politiknavn",
+      "descPlaceholder": "Beskrivelse (valgfri)",
+      "regoHint": "Rego v1. Skal erklære <code>package terrapod</code> og udtrykke overtrædelser via et <code>deny</code>-sæt. Planen er <code>input</code>; Terrapod-kontekst er <code>data.terrapod_context</code>."
+    },
+    "actions": {
+      "saving": "Gemmer...",
+      "saveSettings": "Gem indstillinger",
+      "syncNow": "Synkroniser nu",
+      "cancel": "Annuller",
+      "addPolicy": "Tilføj politik",
+      "deleteSet": "Slet sæt",
+      "validatingRego": "Validerer Rego...",
+      "delete": "Slet",
+      "savePolicy": "Gem politik"
+    },
+    "confirm": {
+      "deleteSet": "Slet dette politiksæt og alle dets politikker? Registrerede kørselsevalueringer bevares.",
+      "deletePolicy": "Slet politik \"{name}\"?"
+    },
+    "errors": {
+      "load": "Kunne ikke indlæse politiksæt",
+      "save": "Kunne ikke gemme politiksæt",
+      "saveStatus": "Kunne ikke gemme ({status})",
+      "delete": "Kunne ikke slette politiksæt",
+      "deleteStatus": "Kunne ikke slette ({status})",
+      "addPolicy": "Kunne ikke tilføje politik",
+      "addPolicyStatus": "Kunne ikke tilføje politik ({status})",
+      "savePolicy": "Kunne ikke gemme politik",
+      "savePolicyStatus": "Kunne ikke gemme politik ({status})",
+      "deletePolicy": "Kunne ikke slette politik",
+      "deletePolicyStatus": "Kunne ikke slette ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "Forbind Slack til Terrapod",
+    "loading": "Indlæser…",
+    "checking": "Tjekker din sammenkædning…",
+    "linking": "Sammenkæder din Slack-konto…",
+    "unknown": "ukendt",
+    "confirm": {
+      "prompt": "Sammenkæd denne Slack-konto med <em>din</em> Terrapod-identitet? Enhver fremtidig Slack-handling (godkend/kassér) vil køre som denne Terrapod-bruger med deres tilladelser.",
+      "slackUser": "Slack-bruger",
+      "slackTeam": "Slack-team",
+      "terrapodAccount": "Terrapod-konto",
+      "warning": "Fortsæt kun, hvis du selv lige har startet denne sammenkædning fra Slack. Hvis du ikke gjorde det, så luk denne fane og sammenkæd ikke — dette binder Slack-kontoen ovenfor til <em>din</em> Terrapod-identitet.",
+      "button": "Bekræft og sammenkæd"
+    },
+    "success": {
+      "message": "Din Slack-konto er nu sammenkædet med Terrapod.",
+      "linkedAs": "Sammenkædet som <em>{email}</em>. Du kan lukke denne fane og vende tilbage til Slack."
+    },
+    "errors": {
+      "missingLink": "Manglende eller ugyldig sammenkædning. Start forfra med Terrapod-sammenkædningskommandoen i Slack.",
+      "invalidLink": "Denne sammenkædning er ugyldig, udløbet eller allerede brugt. Start sammenkædningen igen fra Slack.",
+      "linkingFailed": "Sammenkædning mislykkedes."
+    }
+  },
+  "cliComplete": {
+    "loading": "Indlæser...",
+    "completing": "Fuldfører godkendelse...",
+    "invalid": {
+      "title": "Ugyldig anmodning",
+      "description": "Manglende påkrævede parametre."
+    },
+    "success": {
+      "title": "Login gennemført",
+      "complete": "API-token oprettet. Du kan lukke denne fane."
+    },
+    "fallback": {
+      "description": "Kunne ikke nå CLI'en automatisk.",
+      "button": "Klik her for at fuldføre manuelt"
+    },
+    "timeout": {
+      "description": "CLI'en har muligvis ikke fuldført tokenudvekslingen. Tjek din terminal."
+    }
+  },
+  "apiDocs": {
+    "view": "Visning:",
+    "redocTitle": "ReDoc API-dokumentation"
+  }
+}

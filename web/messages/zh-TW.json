@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "工作區",
+    "estate": "資產全景",
+    "registry": "登錄庫",
+    "modules": "模組",
+    "providers": "提供者",
+    "catalog": "目錄",
+    "agentPools": "代理池",
+    "admin": "管理",
+    "users": "使用者",
+    "roles": "角色",
+    "vcsConnections": "VCS 連線",
+    "variableSets": "變數集",
+    "autodiscovery": "自動發現",
+    "bulkUpdate": "批次更新",
+    "executionHooks": "執行鉤子",
+    "policySets": "策略集",
+    "providerTemplates": "提供者模板",
+    "catalogAdmin": "目錄管理",
+    "cache": "快取",
+    "auditLog": "審計日誌",
+    "help": "幫助",
+    "apiReference": "API 參考",
+    "docs": "文件",
+    "account": "帳戶",
+    "apiTokens": "API 令牌",
+    "sessions": "會話",
+    "logOut": "登出",
+    "menu": "選單",
+    "openMenu": "開啟選單",
+    "openAccountMenu": "開啟帳戶選單",
+    "closeMenu": "關閉選單"
+  },
+  "switcher": {
+    "language": "語言",
+    "changeLanguage": "切換語言"
+  },
+  "workspaces": {
+    "title": "工作區",
+    "description": "管理 Terraform 工作區、狀態和執行",
+    "new": "新建工作區",
+    "cancel": "取消",
+    "create": "建立工作區",
+    "creating": "正在建立…",
+    "loadFailed": "載入工作區失敗",
+    "createFailed": "建立工作區失敗",
+    "form": {
+      "name": "名稱",
+      "namePattern": "僅限字母、數字、連字元和下劃線。必須以字母或數字開頭。",
+      "namePlaceholder": "my-workspace",
+      "executionMode": "執行模式",
+      "local": "本地",
+      "agent": "代理",
+      "executionBackend": "執行後端",
+      "version": "版本",
+      "versionTitle": "版本採用 X.Y 或 X.Y.Z 格式（例如 1.11 或 1.11.5）",
+      "versionPlaceholder": "例如 1.11 或 1.11.5",
+      "cpuRequest": "CPU 請求",
+      "cpuTitle": "Kubernetes CPU 數量：整核（1、2）或毫核（500m、100m）",
+      "cpuHint": "例如 1、0.5、500m",
+      "memoryRequest": "記憶體請求",
+      "memoryTitle": "Kubernetes 記憶體數量：位元組（1000）或帶字尾（512Mi、2Gi、1Ti）",
+      "memoryHint": "例如 2Gi、512Mi、1Ti",
+      "agentPool": "代理池",
+      "none": "無",
+      "autoApply": "自動應用",
+      "enabled": "已啟用",
+      "workingDirectory": "工作目錄",
+      "workingDirectoryPlaceholder": "例如 environments/dev",
+      "workingDirectoryHint": "倉庫中包含 .tf 檔案的子目錄",
+      "vcsConnection": "VCS 連線",
+      "vcsRepoUrl": "VCS 倉庫 URL",
+      "vcsRepoUrlTitle": "必須是 HTTP 或 HTTPS URL",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "VCS 分支",
+      "vcsBranchPlaceholder": "main（預設）"
+    },
+    "stats": {
+      "total": "總計",
+      "health": "健康狀況",
+      "locked": "已鎖定",
+      "clearAllFilters": "清除所有篩選條件",
+      "clearHealthFilter": "清除健康問題篩選",
+      "filterHealth": "篩選存在健康問題的工作區",
+      "clearLockedFilter": "清除已鎖定篩選",
+      "filterLocked": "篩選已鎖定的工作區"
+    },
+    "filter": {
+      "placeholder": "按名稱、標籤或狀態篩選 — 例如 \"eu1\"、\"env:prod\"、\"status:errored\"",
+      "ariaLabel": "篩選工作區",
+      "clear": "清除",
+      "status": "狀態",
+      "label": "標籤",
+      "back": "返回",
+      "valueCount": "{count, plural, one {# 個值} other {# 個值}}",
+      "removeTerm": "移除此條件",
+      "showing": "正在顯示 {total} 中的 {filtered} 個",
+      "termName": "name: {value}",
+      "termStatus": "status: {value}",
+      "termLabelAny": "{key}: (任意)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "狀態",
+      "hintHealth": "健康狀況",
+      "hintLabel": "標籤",
+      "hintLabelKey": "標籤鍵",
+      "hintName": "名稱"
+    },
+    "row": {
+      "removeLabelFilter": "點選以從篩選中移除",
+      "addLabelFilter": "點選以按此標籤篩選"
+    },
+    "table": {
+      "name": "名稱",
+      "mode": "模式",
+      "pool": "池",
+      "resources": "資源",
+      "status": "狀態",
+      "created": "建立時間",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "暫無工作區。建立一個以開始使用。",
+      "noMatch": "沒有工作區符合此篩選條件。"
+    }
+  },
+  "status": {
+    "state-diverged": "狀態已偏離",
+    "vcs-error": "VCS 錯誤",
+    "drifted": "已漂移",
+    "errored": "已出錯",
+    "needs-confirm": "需要確認",
+    "planning": "正在計畫",
+    "applying": "正在應用",
+    "canceling": "正在取消",
+    "confirmed": "已確認",
+    "queued": "已排隊",
+    "pending": "待處理",
+    "applied": "已應用",
+    "planned": "已計畫",
+    "canceled": "已取消",
+    "discarded": "已丟棄",
+    "pendingDeletion": "待刪除",
+    "archived": "已歸檔"
+  },
+  "auth": {
+    "loading": "正在載入...",
+    "subtitle": "登入以管理您的基礎設施",
+    "subtitleCli": "登入以授權 CLI",
+    "emailLabel": "電子郵箱",
+    "passwordLabel": "密碼",
+    "signIn": "登入",
+    "signingIn": "正在登入...",
+    "signInWith": "使用 {provider} 登入",
+    "or": "或",
+    "noProviders": "未配置任何身分驗證提供者",
+    "completingSignIn": "正在完成登入...",
+    "callbackFailedTitle": "身分驗證失敗",
+    "tryAgain": "重試",
+    "errors": {
+      "loadProviders": "載入提供者失敗",
+      "authenticationFailed": "身分驗證失敗（{status}）",
+      "tokenExchangeFailed": "令牌交換失敗（{status}）",
+      "loginFailed": "登入失敗",
+      "startLoginFailed": "啟動登入失敗",
+      "missingCodeOrState": "缺少授權碼或狀態",
+      "stateMismatch": "狀態不匹配 — 可能存在 CSRF 攻擊",
+      "missingVerifier": "缺少 PKCE 驗證器 — 請重新嘗試登入"
+    }
+  },
+  "estate": {
+    "title": "資產拓撲",
+    "description": "您可見的所有工作區及其使用的模組，透過執行觸發器、遠端狀態和模組連結相互關聯。可按任意適合您資產的維度分組 — 平台不強制任何標籤約定。",
+    "errors": {
+      "load": "載入資產圖失敗。"
+    },
+    "groupBy": {
+      "label": "分組依據"
+    },
+    "view": {
+      "graph": "圖形",
+      "table": "表格"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# 個工作區} other {# 個工作區}}",
+      "modules": "{count, plural, one {# 個模組} other {# 個模組}}",
+      "dependencies": "{count, plural, one {# 個依賴項} other {# 個依賴項}}"
+    },
+    "legend": {
+      "registryModule": "登錄庫模組"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {個工作區使用此項 — 升級它會重新計畫該工作區} other {個工作區使用此項 — 升級它會重新計畫所有工作區}}",
+      "dependOnThis": "{count, plural, one {依賴於此} other {依賴於此}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "工作區",
+        "col": {
+          "workspace": "工作區",
+          "group": "分組",
+          "agentPool": "代理池",
+          "dependedOnBy": "被依賴於",
+          "modulesUsed": "使用的模組"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "模組",
+        "col": {
+          "module": "模組",
+          "usedBy": "使用者（工作區）"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "標籤",
+    "description": "瀏覽工作區、代理池、登錄庫模組和登錄庫提供者中使用的標籤。唯讀 — 標籤在各實體自身的頁面上編輯。",
+    "none": "無。",
+    "emptyKeys": "尚未使用任何標籤。為任意工作區、代理池、登錄庫模組或登錄庫提供者新增標籤，即可在此處開始分組。",
+    "emptyValues": "\"{key}\" 沒有值。可能是沒有可讀實體攜帶此標籤，或它自上次檢視以來已被移除。",
+    "loadKeysFailed": "載入標籤失敗（{status}）",
+    "loadValuesFailed": "載入 {key} 的值失敗（{status}）",
+    "loadEntitiesFailed": "載入實體失敗（{status}）",
+    "columns": {
+      "labelKey": "標籤鍵",
+      "distinctValues": "不同值",
+      "value": "值",
+      "total": "總計"
+    },
+    "entity": {
+      "workspaces": "工作區",
+      "agentPools": "代理池",
+      "modules": "模組",
+      "providers": "提供者"
+    },
+    "deprecated": {
+      "badge": "已棄用且不受支援。",
+      "body": "標籤瀏覽器已不在主導航中，並將在未來版本中移除。請改在<workspacesLink>工作區</workspacesLink>頁面按標籤篩選。如果您依賴此頁面，請<issueLink>提交一個 issue</issueLink>。"
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "API 令牌",
+      "description": "管理用於 CLI 和自動化的身分驗證令牌",
+      "descriptionAll": "所有使用者的全部令牌",
+      "myTokens": "我的令牌",
+      "allTokens": "所有令牌",
+      "createToken": "建立令牌",
+      "cancel": "取消",
+      "tokenReady": "令牌已就緒",
+      "tokenReadyHelp": "請立即複製此令牌 — 它將不會再次顯示。",
+      "dismissToken": "關閉令牌",
+      "hide": "隱藏",
+      "show": "顯示",
+      "copy": "複製",
+      "empty": "暫無 API 令牌。",
+      "noDescription": "無描述",
+      "detached": "已分離",
+      "never": "從不",
+      "selected": "{count, plural, one {已選擇 # 個令牌} other {已選擇 # 個令牌}}",
+      "revokeSelected": "撤銷所選",
+      "revoking": "正在撤銷...",
+      "clearSelection": "清除選擇",
+      "rotate": "輪換",
+      "rotating": "正在輪換...",
+      "revoke": "撤銷",
+      "confirmRotate": "輪換此令牌？當前金鑰將立即停止工作，並頒發一個新金鑰。",
+      "confirmBulkRevoke": "{count, plural, one {撤銷 # 個令牌？} other {撤銷 # 個令牌？}}",
+      "kinds": {
+        "interactive": {
+          "label": "個人",
+          "help": "用於 CLI 和臨時自動化的個人令牌。攜帶您的完整實時權限。"
+        },
+        "service_bound": {
+          "label": "服務 · 繫結",
+          "help": "作用域限定為您角色子集的服務令牌。其訪問權限是這些角色與您自身權限的交集 — 並且如果您的帳戶被移除，它將停止工作。"
+        },
+        "service_detached": {
+          "label": "服務 · 分離",
+          "help": "由管理員管理的服務令牌，具有絕對固定的作用域，不繫結任何使用者。用於必須在任何人離職後仍能存續的關鍵機器對機器自動化。"
+        }
+      },
+      "lifespans": {
+        "720": "30 天",
+        "2160": "90 天",
+        "4320": "180 天",
+        "8760": "1 年"
+      },
+      "filter": {
+        "all": "所有型別"
+      },
+      "form": {
+        "description": "描述",
+        "descriptionPlaceholder": "CI/CD 流水線令牌",
+        "kind": "型別",
+        "lifespan": "有效期",
+        "create": "建立",
+        "creating": "正在建立...",
+        "pinnedRoles": "固定角色",
+        "pinnedRolesHelp": "— 此令牌被限定的作用域",
+        "pinnedRolesCapped": "（受限於您自己的訪問權限）",
+        "noCustomRoles": "尚未定義自定義角色。請先在 管理 → 角色 下建立角色。",
+        "noScopedRoles": "您沒有可固定的作用域角色。此令牌將沒有任何訪問權限。"
+      },
+      "columns": {
+        "description": "描述",
+        "kind": "型別",
+        "boundTo": "繫結至",
+        "created": "建立時間",
+        "lastUsed": "最後使用",
+        "expires": "過期時間",
+        "actions": "操作"
+      },
+      "errors": {
+        "load": "載入令牌失敗",
+        "create": "建立令牌失敗（{status}）",
+        "createGeneric": "建立令牌失敗",
+        "rotate": "輪換令牌失敗（{status}）",
+        "rotateGeneric": "輪換令牌失敗",
+        "revoke": "撤銷令牌失敗（{status}）",
+        "revokeGeneric": "撤銷令牌失敗",
+        "bulkRevoke": "撤銷令牌失敗"
+      }
+    },
+    "sessions": {
+      "title": "會話",
+      "description": "您的活動會話",
+      "descriptionAll": "平台上的所有活動會話",
+      "empty": "無活動會話。",
+      "revokeAll": "全部撤銷",
+      "current": "當前",
+      "columns": {
+        "provider": "提供者",
+        "created": "建立時間",
+        "expires": "過期時間",
+        "lastActive": "最後活動",
+        "token": "令牌"
+      },
+      "errors": {
+        "load": "載入會話失敗",
+        "revoke": "撤銷會話失敗（{status}）",
+        "revokeGeneric": "撤銷會話失敗"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "模組",
+      "description": "私有 Terraform 模組登錄庫",
+      "cancel": "取消",
+      "createModule": "建立模組",
+      "empty": "暫無模組。建立一個以開始使用。",
+      "providerLabel": "提供者：{provider}",
+      "versionCount": "{count, plural, one {# 個版本} other {# 個版本}}",
+      "loadFailed": "載入模組失敗",
+      "createFailed": "建立模組失敗",
+      "createFailedStatus": "建立模組失敗（{status}）",
+      "form": {
+        "name": "名稱",
+        "provider": "提供者",
+        "slugTitle": "僅限小寫字母、數字和連字元。必須以小寫字母開頭。",
+        "addressNote": "名稱和提供者共同構成模組的登錄庫地址，建立後不可更改。",
+        "vcsConnectionOptional": "VCS 連線（可選）",
+        "noneUploadManually": "無 — 手動上傳版本",
+        "repositoryUrl": "倉庫 URL",
+        "branchOptional": "分支（可選）",
+        "branchPlaceholder": "main（留空則使用預設）",
+        "tagPattern": "標籤模式",
+        "tagPatternHint": "僅匹配此模式的標籤會建立版本（例如 v1.0.0）",
+        "labelsOptional": "標籤（可選）",
+        "creating": "正在建立...",
+        "create": "建立"
+      }
+    },
+    "providers": {
+      "title": "提供者",
+      "description": "私有 Terraform 提供者登錄庫",
+      "cancel": "取消",
+      "createProvider": "建立提供者",
+      "empty": "暫無提供者。建立一個以開始使用。",
+      "loadFailed": "載入提供者失敗",
+      "createFailed": "建立提供者失敗",
+      "createFailedStatus": "建立提供者失敗（{status}）",
+      "form": {
+        "name": "名稱",
+        "slugTitle": "僅限小寫字母、數字和連字元。必須以小寫字母開頭。",
+        "creating": "正在建立...",
+        "create": "建立"
+      }
+    },
+    "meta": {
+      "title": "後設資料",
+      "edit": "編輯",
+      "cancel": "取消",
+      "save": "儲存",
+      "saving": "正在儲存...",
+      "saveAnyway": "仍然儲存",
+      "revertLabels": "還原標籤",
+      "owner": "所有者",
+      "ownerNone": "無",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "標籤"
+    },
+    "moduleDetail": {
+      "notFound": "未找到模組",
+      "loadFailed": "載入模組失敗",
+      "updateFailed": "更新模組失敗",
+      "labelLockoutDefault": "此標籤更改會降低您的訪問權限。",
+      "providerLabel": "提供者：{provider}",
+      "cancel": "取消",
+      "uploadVersion": "上傳版本",
+      "vcsConnected": "已連線 VCS",
+      "connectVcs": "連線 VCS",
+      "deleteModule": "刪除模組",
+      "linkFailed": "關聯工作區失敗",
+      "linkFailedStatus": "關聯失敗（{status}）",
+      "unlinkConfirm": "取消此工作區與模組的關聯？將不再為其執行影響分析。",
+      "unlinkFailed": "取消關聯工作區失敗",
+      "unlinkFailedStatus": "取消關聯失敗（{status}）",
+      "uploadFailed": "上傳失敗",
+      "uploadFailedStatus": "上傳失敗（{status}）",
+      "saveVcsFailed": "儲存 VCS 配置失敗",
+      "saveVcsFailedStatus": "儲存 VCS 配置失敗（{status}）",
+      "disableVcsFailed": "停用 VCS 失敗",
+      "disableVcsFailedStatus": "停用 VCS 失敗（{status}）",
+      "deleteFailed": "刪除失敗",
+      "deleteFailedStatus": "刪除失敗（{status}）",
+      "upload": {
+        "intro": "選擇一個包含您的 Terraform 模組檔案的目錄。它們將被打包成 tarball 並上傳。",
+        "version": "版本",
+        "moduleDirectory": "模組目錄",
+        "selectDirectory": "選擇目錄",
+        "fileCount": "{count, plural, one {# 個檔案} other {# 個檔案}}",
+        "filesToInclude": "{count, plural, one {# 個待包含檔案：} other {# 個待包含檔案：}}",
+        "andMore": "…以及另外 {count} 個",
+        "uploading": "正在上傳...",
+        "upload": "上傳"
+      },
+      "vcs": {
+        "intro": "將此模組連線到 VCS 倉庫。當推送匹配標籤模式的語義化版本標籤時，會自動釋出新版本。僅分支提交不會建立版本。",
+        "connection": "VCS 連線",
+        "selectConnection": "選擇一個連線...",
+        "repositoryUrl": "倉庫 URL",
+        "branchOptional": "分支（可選）",
+        "branchPlaceholder": "main（留空則使用預設）",
+        "tagPattern": "標籤模式",
+        "tagPatternHint": "僅匹配此模式的標籤會建立版本（例如 v1.0.0）",
+        "saving": "正在儲存...",
+        "saveConfiguration": "儲存 VCS 配置",
+        "disconnect": "斷開 VCS 連線"
+      },
+      "vcsStatus": {
+        "connected": "已連線 VCS：",
+        "lastTag": "最後標籤：{tag}",
+        "firstVersionHint": "推送匹配標籤模式的語義化版本標籤（例如 <code>v1.0.0</code>）以釋出第一個版本。"
+      },
+      "links": {
+        "title": "已關聯的工作區",
+        "linkWorkspace": "關聯工作區",
+        "description": "當針對此模組提交 PR 時，已關聯的工作區會收到推測性計畫；當釋出新版本時，會觸發標準執行。",
+        "searchPlaceholder": "搜尋要關聯的工作區…",
+        "empty": "尚未關聯任何工作區。",
+        "unlinkTitle": "取消關聯工作區"
+      },
+      "interface": {
+        "title": "輸入與輸出",
+        "counts": "{inputs} 個輸入，{outputs} 個輸出",
+        "versionLabel": "版本：",
+        "noData": "此版本沒有可用的介面資料。",
+        "inputs": "輸入",
+        "outputs": "輸出",
+        "name": "名稱",
+        "type": "型別",
+        "description": "描述",
+        "default": "預設值",
+        "required": "必填",
+        "sensitive": "敏感",
+        "requiredBadge": "必填",
+        "optionalBadge": "可選",
+        "sensitiveBadge": "敏感",
+        "noneDeclared": "此模組版本未宣告任何輸入或輸出。"
+      },
+      "versions": {
+        "title": "版本",
+        "count": "{count, plural, one {# 個版本} other {# 個版本}}",
+        "emptyVcs": "暫無版本。向已連線的倉庫推送匹配 \"{pattern}\" 的語義化版本標籤以釋出版本。",
+        "emptyUpload": "暫無版本。上傳模組或連線 VCS 以開始使用。",
+        "version": "版本",
+        "status": "狀態",
+        "source": "來源",
+        "actions": "操作",
+        "manualUpload": "手動上傳",
+        "delete": "刪除"
+      },
+      "deleteDialog": {
+        "title": "確認刪除",
+        "moduleBody": "這將永久刪除此模組及其所有版本。",
+        "versionBody": "這將永久刪除版本 {version}。",
+        "cancel": "取消",
+        "confirm": "刪除"
+      }
+    },
+    "providerDetail": {
+      "description": "提供者登錄庫",
+      "deleteProvider": "刪除提供者",
+      "publishNote": "提供者版本透過 <code>terrapod-publish</code> CLI 釋出，該 CLI 會對二進位制檔案進行客戶端簽名。不再支援從瀏覽器上傳和簽名提供者二進位制檔案。此頁面對版本和平台為唯讀。",
+      "empty": "暫無版本。使用 terrapod-publish CLI 釋出以開始使用。",
+      "loadVersionsFailed": "載入版本失敗",
+      "updateFailed": "更新提供者失敗",
+      "labelLockoutDefault": "此標籤更改會降低您的訪問權限。",
+      "deleteFailed": "刪除失敗",
+      "deleteFailedStatus": "刪除失敗（{status}）",
+      "platformCount": "{count, plural, one {# 個平台} other {# 個平台}}",
+      "delete": "刪除",
+      "os": "OS",
+      "arch": "Arch",
+      "filename": "檔名",
+      "actions": "操作",
+      "deleteDialog": {
+        "title": "確認刪除",
+        "providerBody": "這將永久刪除此提供者及其所有版本。",
+        "versionBody": "這將永久刪除版本 {version} 及其平台。",
+        "platformBody": "這將永久刪除 {os}/{arch} 平台。",
+        "cancel": "取消",
+        "confirm": "刪除"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "使用者",
+    "description": "管理本地使用者帳戶",
+    "empty": "未找到使用者。",
+    "columns": {
+      "email": "電子郵箱",
+      "displayName": "顯示名稱",
+      "status": "狀態",
+      "lastLogin": "最後登入",
+      "created": "建立時間",
+      "actions": "操作"
+    },
+    "form": {
+      "email": "電子郵箱",
+      "displayName": "顯示名稱",
+      "displayNamePlaceholder": "張三",
+      "passwordOptional": "密碼（可選）",
+      "passwordPlaceholder": "輸入強密碼"
+    },
+    "reset": {
+      "title": "為 {email} 重置密碼",
+      "newPassword": "新密碼"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "非常弱",
+        "weak": "弱",
+        "fair": "一般",
+        "good": "良好",
+        "strong": "強"
+      }
+    },
+    "status": {
+      "active": "活動",
+      "inactive": "非活動",
+      "never": "從不"
+    },
+    "actions": {
+      "cancel": "取消",
+      "save": "儲存",
+      "saving": "正在儲存...",
+      "createUser": "建立使用者",
+      "creating": "正在建立...",
+      "resetPassword": "重置密碼",
+      "edit": "編輯",
+      "delete": "刪除",
+      "resetPw": "重置密碼",
+      "setPw": "設定密碼",
+      "cancelPw": "取消密碼"
+    },
+    "confirm": {
+      "activate": "啟用使用者 \"{email}\"？",
+      "deactivate": "停用使用者 \"{email}\"？",
+      "delete": "刪除使用者 \"{email}\"？此操作無法撤銷。"
+    },
+    "success": {
+      "created": "已建立使用者 \"{email}\"",
+      "updated": "已更新使用者 \"{email}\"",
+      "activated": "已啟用使用者 \"{email}\"",
+      "deactivated": "已停用使用者 \"{email}\"",
+      "passwordReset": "已為 \"{email}\" 重置密碼",
+      "deleted": "已刪除使用者 \"{email}\""
+    },
+    "errors": {
+      "load": "載入使用者失敗",
+      "create": "建立使用者失敗",
+      "createStatus": "建立使用者失敗（{status}）",
+      "update": "更新使用者失敗",
+      "resetPassword": "重置密碼失敗",
+      "delete": "刪除使用者失敗"
+    }
+  },
+  "adminRoles": {
+    "title": "角色與分配",
+    "description": "管理 RBAC 角色和使用者角色分配",
+    "builtIn": "內建",
+    "emptyRoles": "未定義任何角色。",
+    "emptyAssignments": "無角色分配。",
+    "tabs": {
+      "roles": "角色",
+      "assignments": "分配"
+    },
+    "columns": {
+      "provider": "提供者",
+      "email": "電子郵箱",
+      "role": "角色",
+      "created": "建立時間",
+      "actions": "操作"
+    },
+    "form": {
+      "name": "名稱",
+      "namePattern": "僅限字母、數字、連字元和下劃線。必須以字母或數字開頭。",
+      "workspacePermission": "工作區權限",
+      "poolPermission": "池權限",
+      "registryPermission": "登錄庫權限",
+      "catalogPermission": "目錄權限",
+      "descriptionLabel": "描述",
+      "descriptionPlaceholder": "開發者訪問權限",
+      "allowLabels": "允許標籤（key=value，逗號分隔）",
+      "allowNames": "允許名稱（逗號分隔）",
+      "denyLabels": "拒絕標籤（key=value，逗號分隔）",
+      "denyNames": "拒絕名稱（逗號分隔）",
+      "allowLabelsShort": "允許標籤",
+      "allowNamesShort": "允許名稱",
+      "denyLabelsShort": "拒絕標籤",
+      "denyNamesShort": "拒絕名稱"
+    },
+    "assignForm": {
+      "provider": "提供者",
+      "email": "電子郵箱",
+      "roles": "角色"
+    },
+    "caps": {
+      "selected": "已選擇 {count, plural, one {# 項能力} other {# 項能力}}",
+      "count": "{count, plural, one {# 項能力} other {# 項能力}}",
+      "custom": "自定義",
+      "matchesPresets": "與預設匹配",
+      "advanced": "高階 — 能力",
+      "otherPreserved": "其他能力（儲存時保留）",
+      "presetHelp": {
+        "before": "選擇上方的預設會預先勾選其能力。在預設之外勾選或取消勾選某個核取方塊會將角色標記為",
+        "after": "並且其授權將作為顯式能力集傳送。"
+      },
+      "groups": {
+        "workspace": "工作區",
+        "run": "執行",
+        "state": "狀態",
+        "var": "變數",
+        "config": "配置",
+        "drift": "漂移",
+        "run-task": "執行任務",
+        "notification": "通知",
+        "run-trigger": "執行觸發器",
+        "pool": "代理池",
+        "registry": "登錄庫",
+        "catalog": "服務目錄"
+      }
+    },
+    "display": {
+      "allow": "允許：{value}",
+      "allowNames": "允許名稱：{value}",
+      "deny": "拒絕：{value}",
+      "denyNames": "拒絕名稱：{value}"
+    },
+    "actions": {
+      "cancel": "取消",
+      "save": "儲存",
+      "saving": "正在儲存...",
+      "edit": "編輯",
+      "delete": "刪除",
+      "remove": "移除",
+      "createRole": "建立角色",
+      "creating": "正在建立...",
+      "addAssignment": "新增分配",
+      "setRoles": "設定角色"
+    },
+    "confirm": {
+      "deleteRole": "刪除角色 \"{name}\"？任何引用它的分配都會受到影響。",
+      "removeAssignment": "從 {email} 移除角色 \"{roleName}\"？"
+    },
+    "success": {
+      "roleCreated": "已建立角色 \"{name}\"",
+      "roleUpdated": "已更新角色 \"{name}\"",
+      "roleDeleted": "已刪除角色 \"{name}\"",
+      "rolesAssigned": "已將角色分配給 {email}",
+      "assignmentRemoved": "已移除分配"
+    },
+    "errors": {
+      "loadRoles": "載入角色失敗",
+      "loadAssignments": "載入分配失敗",
+      "createRole": "建立角色失敗",
+      "createRoleStatus": "建立角色失敗（{status}）",
+      "updateRole": "更新角色失敗",
+      "deleteRole": "刪除角色失敗",
+      "setAssignment": "設定分配失敗",
+      "setAssignmentStatus": "設定分配失敗（{status}）",
+      "deleteAssignment": "刪除分配失敗"
+    }
+  },
+  "adminVcs": {
+    "title": "VCS 連線",
+    "description": "管理版本控制系統整合",
+    "empty": "未配置任何 VCS 連線。",
+    "actions": {
+      "new": "新建連線",
+      "cancel": "取消",
+      "edit": "編輯",
+      "delete": "刪除"
+    },
+    "confirmDelete": "刪除此 VCS 連線？使用它的工作區將失去 VCS 整合。此操作無法撤銷。",
+    "form": {
+      "name": "名稱",
+      "namePattern": "僅限字母、數字、連字元和下劃線。必須以字母或數字開頭。",
+      "provider": "提供者",
+      "providerImmutable": "提供者不可更改 — 請刪除並重新建立以更改它",
+      "serverUrl": "伺服器 URL（可選）",
+      "serverUrlHint": "必須是 HTTP 或 HTTPS URL（例如 https://github.mycompany.com）",
+      "appId": "App ID",
+      "appIdHint": "GitHub App ID — 僅限數字",
+      "installationId": "Installation ID",
+      "installationIdHint": "GitHub App Installation ID — 僅限數字",
+      "privateKey": "私鑰（PEM）",
+      "browse": "瀏覽...",
+      "privateKeyKeep": "留空以保留當前金鑰 — 貼上新的 PEM 以輪換",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\n將 .pem 檔案拖放到此處或點選瀏覽",
+      "webhookSecret": "Webhook 金鑰",
+      "optional": "（可選）",
+      "webhookSecretSet": "已設定 — 留空以保留，輸入新值以輪換",
+      "webhookSecretGlobal": "留空以使用全域 webhook 金鑰",
+      "webhookSecretHelp": "用於此安裝 webhook 的每連線 HMAC 金鑰。未設定時使用全域金鑰。",
+      "accessToken": "訪問令牌",
+      "accessTokenKeep": "留空以保留當前令牌",
+      "saving": "正在儲存...",
+      "creating": "正在建立...",
+      "saveChanges": "儲存更改",
+      "createConnection": "建立連線"
+    },
+    "table": {
+      "name": "名稱",
+      "provider": "提供者",
+      "serverUrl": "伺服器 URL",
+      "status": "狀態",
+      "created": "建立時間",
+      "actions": "操作"
+    },
+    "success": {
+      "created": "已建立 VCS 連線 \"{name}\"",
+      "updated": "已更新 VCS 連線 \"{name}\"",
+      "deleted": "已刪除 VCS 連線"
+    },
+    "errors": {
+      "load": "載入 VCS 連線失敗",
+      "save": "儲存連線失敗",
+      "delete": "刪除連線失敗",
+      "createStatus": "建立連線失敗（{status}）",
+      "updateStatus": "更新連線失敗（{status}）"
+    }
+  },
+  "adminVariableSets": {
+    "title": "變數集",
+    "description": "管理面向工作區分組的組織級變數集",
+    "empty": "未配置任何變數集。",
+    "none": "-",
+    "actions": {
+      "new": "新建變數集",
+      "cancel": "取消"
+    },
+    "form": {
+      "name": "名稱",
+      "namePattern": "僅限字母、數字、連字元和下劃線。必須以字母或數字開頭。",
+      "descriptionLabel": "描述",
+      "descriptionPlaceholder": "所有工作區的 AWS 憑證",
+      "global": "全域（應用於所有工作區）",
+      "priority": "優先（覆蓋工作區變數）",
+      "creating": "正在建立...",
+      "create": "建立變數集"
+    },
+    "table": {
+      "name": "名稱",
+      "description": "描述",
+      "scope": "作用域",
+      "variables": "變數",
+      "created": "建立時間"
+    },
+    "scope": {
+      "global": "全域",
+      "priority": "優先",
+      "standard": "標準"
+    },
+    "errors": {
+      "load": "載入變數集失敗",
+      "create": "建立變數集失敗",
+      "createStatus": "建立變數集失敗（{status}）"
+    },
+    "detail": {
+      "back": "返回變數集",
+      "headerFallback": "變數集",
+      "notFound": "未找到變數集",
+      "global": "全域",
+      "priority": "優先",
+      "yes": "是",
+      "no": "否",
+      "edit": "編輯",
+      "cancel": "取消",
+      "save": "儲存",
+      "saving": "正在儲存...",
+      "delete": "刪除",
+      "deleting": "正在刪除...",
+      "confirmDelete": "確認刪除",
+      "deleteTitle": "刪除變數集",
+      "deleteDescription": "永久刪除此變數集及其所有變數。",
+      "tabs": {
+        "settings": "設定",
+        "variables": "變數",
+        "workspaces": "工作區"
+      },
+      "addVariable": "新增變數",
+      "adding": "正在新增...",
+      "varKey": "鍵",
+      "varValue": "值",
+      "varCategory": "類別",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "環境",
+      "sensitive": "敏感",
+      "sensAbbr": "敏感",
+      "enterNewValue": "輸入新值",
+      "empty": "空",
+      "emptyVars": "此變數集中沒有變數。",
+      "actions": "操作",
+      "remove": "移除",
+      "add": "新增",
+      "addWorkspace": "新增工作區",
+      "workspace": "工作區",
+      "selectWorkspace": "選擇一個工作區...",
+      "globalBanner": "此變數集為全域變數集，會自動應用於所有工作區。",
+      "emptyWorkspaces": "未向此變數集分配任何工作區。",
+      "confirmDeleteVar": "刪除此變數？此操作無法撤銷。",
+      "confirmRemoveWorkspace": "從變數集中移除此工作區？其變數將不再應用於該工作區。",
+      "success": {
+        "updated": "已更新變數集",
+        "workspaceAdded": "已新增工作區",
+        "workspaceRemoved": "已移除工作區"
+      },
+      "errors": {
+        "load": "載入變數集失敗",
+        "update": "更新變數集失敗",
+        "delete": "刪除變數集失敗",
+        "loadVars": "載入變數失敗",
+        "loadWorkspaces": "載入工作區失敗",
+        "addVar": "新增變數失敗",
+        "addVarStatus": "新增變數失敗（{status}）",
+        "updateVar": "更新變數失敗",
+        "deleteVar": "刪除變數失敗",
+        "addWorkspace": "新增工作區失敗",
+        "removeWorkspace": "移除工作區失敗"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "自動發現",
+    "description": "當 PR 觸及匹配的路徑時，在單一倉庫中自動建立工作區",
+    "empty": "尚無自動發現規則。建立一個以開始從單一倉庫的 PR 自動預配工作區。",
+    "unsavedRule": "（未儲存的規則）",
+    "actions": {
+      "newRule": "新建規則",
+      "cancel": "取消",
+      "create": "建立",
+      "update": "更新",
+      "preview": "預覽",
+      "edit": "編輯",
+      "delete": "刪除",
+      "close": "關閉"
+    },
+    "status": {
+      "enabled": "已啟用",
+      "disabled": "已停用"
+    },
+    "form": {
+      "createTitle": "建立規則",
+      "editTitle": "編輯規則",
+      "name": "名稱",
+      "vcsConnection": "VCS 連線",
+      "selectConnection": "選擇連線",
+      "repoUrl": "倉庫 URL",
+      "branch": "分支（留空 = 預設）",
+      "matchPattern": "匹配模式",
+      "matchPatternHint": "Gitignore 風格的萬用字元。<code>**</code> 可跨路徑段匹配。僅 <code>*.tf*</code> 檔案會觸發自動發現。",
+      "ignorePatterns": "忽略模式（每行一個）",
+      "nameTemplate": "工作區名稱模板（可選）",
+      "nameTemplateHint": "使用 <path></path> 表示目錄（其中 <code>/</code> 被替換為 <code>-</code>），或使用 <root></root> 表示原樣目錄。留空 = 預設（僅使用連字元路徑）。",
+      "templateDefaults": "工作區模板預設值",
+      "executionMode": "執行模式",
+      "executionModeHint": "自動發現由 VCS 驅動；僅支援代理執行。",
+      "agentPool": "代理池",
+      "none": "（無）",
+      "executionBackend": "執行後端",
+      "terraformVersion": "Terraform 版本",
+      "cpuRequest": "CPU 請求",
+      "memoryRequest": "記憶體請求",
+      "ownerEmail": "所有者電子郵箱",
+      "autoApply": "自動應用",
+      "enabled": "已啟用",
+      "onDirectoryDelete": "目錄刪除時",
+      "onDeleteFlag": "標記（安全 — 標記為待刪除，需手動操作）",
+      "onDeleteDestroy": "銷毀（危險 — 拆除基礎設施後歸檔工作區）",
+      "onDirectoryDeleteHint": "當自動發現的工作區所在目錄在跟蹤分支上被移除時，對其執行的操作。",
+      "onDeleteDestroyWarning": "當工作區目錄在跟蹤分支上被移除時，這將對該工作區執行真實的 terraform destroy。",
+      "labels": "標籤（由所建立的工作區繼承）",
+      "varFiles": "變數檔案（由所建立的工作區繼承）",
+      "varFilesHint": "傳遞給 plan/apply 的相對 <code>.tfvars</code> 路徑。",
+      "addVarFile": "新增變數檔案",
+      "executionHooks": "執行鉤子（與每個新工作區關聯）",
+      "executionHooksHint": "從<page>執行鉤子</page>管理頁面定義的鉤子中選擇 — 每個選中的鉤子都會與此規則建立的每個工作區關聯。",
+      "noHooks": "尚未定義任何執行鉤子。請先在執行鉤子管理頁面建立一個。",
+      "hookDisabled": "（已停用）",
+      "hookNotInLibrary": "（不在庫中 — 取消勾選以移除）",
+      "runTaskTemplates": "執行任務模板（在每個新工作區上建立）",
+      "notificationTemplates": "通知模板（在每個新工作區上建立）",
+      "saving": "正在儲存...",
+      "previewTitle": "遍歷倉庫並預覽此規則將會建立哪些工作區 — 不會持久化"
+    },
+    "table": {
+      "name": "名稱",
+      "repo": "倉庫",
+      "pattern": "模式",
+      "enabled": "已啟用",
+      "created": "建立時間",
+      "previewTitle": "遍歷倉庫並預覽此規則將會建立哪些工作區"
+    },
+    "deleteModal": {
+      "title": "刪除規則？",
+      "body": "由此規則自動建立的工作區將繼續正常工作。今後觸及此規則下新路徑的 PR 將不再自動建立更多工作區。"
+    },
+    "preview": {
+      "title": "預覽：{ruleName}",
+      "walkedFiles": "在 <refspan>{ref}</refspan> 上遍歷了 <files>{count}</files> 個檔案",
+      "walking": "正在遍歷倉庫…",
+      "noMatches": "此倉庫中沒有目錄匹配該規則的模式。無內容可建立。",
+      "colWorkspace": "工作區",
+      "colDirectory": "目錄",
+      "colAction": "操作",
+      "repoRoot": "（倉庫根目錄）",
+      "actionCreate": "建立",
+      "skipDiscovered": "跳過（已發現）",
+      "skipDiscoveredTitle": "已由此規則建立",
+      "skipCollision": "跳過（名稱衝突）",
+      "skipCollisionTitle": "已存在同名的工作區（因其他原因）",
+      "willCreate": "{count, plural, one {將建立 # 個工作區。} other {將建立 # 個工作區。}} 現有工作區（衝突項）保持不變。",
+      "provision": "{count, plural, one {預配 # 個工作區} other {預配 # 個工作區}}",
+      "provisioning": "正在預配…",
+      "saveToProvision": "儲存規則以預配這些工作區。"
+    },
+    "success": {
+      "created": "已建立 {name}",
+      "updated": "已更新 {name}",
+      "deleted": "已刪除規則",
+      "provisioned": "{count, plural, one {已從 \"{ruleName}\" 建立 # 個工作區} other {已從 \"{ruleName}\" 建立 # 個工作區}}"
+    },
+    "errors": {
+      "loadRules": "載入自動發現規則失敗",
+      "load": "載入失敗",
+      "createFailed": "建立失敗：{status} {detail}",
+      "updateFailed": "更新失敗：{status} {detail}",
+      "save": "儲存失敗",
+      "deleteRule": "刪除規則失敗",
+      "delete": "刪除失敗",
+      "previewFailed": "預覽失敗（{status}）",
+      "preview": "預覽失敗",
+      "previewPrereq": "預覽前請先設定 VCS 連線、倉庫 URL 和模式",
+      "scanFailed": "掃描失敗（{status}）",
+      "scan": "掃描失敗"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "批次更新",
+    "description": "按篩選條件選擇工作區，然後對所有這些工作區應用設定更改",
+    "none": "（無）",
+    "anyOption": "（任意）",
+    "unchanged": "（不變）",
+    "unchangedOption": "（不變）",
+    "filter": {
+      "heading": "1. 選擇工作區",
+      "matchAll": "匹配<strong>所有</strong>工作區（忽略下面的篩選條件）",
+      "namePrefix": "名稱字首",
+      "executionBackend": "執行後端",
+      "ownerEmail": "所有者電子郵箱",
+      "agentPool": "代理池",
+      "vcsConnection": "VCS 連線",
+      "labels": "標籤",
+      "search": "搜尋",
+      "searching": "正在搜尋..."
+    },
+    "results": {
+      "matched": "已匹配 <strong>{count}</strong> 個{count, plural, one {工作區} other {工作區}}。",
+      "noMatch": "沒有工作區符合此篩選條件。",
+      "colName": "名稱",
+      "colMode": "模式",
+      "colBackend": "後端",
+      "colTfVersion": "TF 版本",
+      "colLabels": "標籤"
+    },
+    "update": {
+      "heading": "2. 應用更改",
+      "hint": "僅更改下面您設定的欄位。上面的篩選條件用於選擇哪些工作區接受更改。",
+      "terraformVersion": "Terraform 版本",
+      "executionBackend": "執行後端",
+      "executionMode": "執行模式",
+      "autoApply": "自動應用",
+      "agentPool": "代理池",
+      "cpuRequest": "CPU 請求",
+      "memoryRequest": "記憶體請求",
+      "setLabels": "設定標籤（替換每個匹配工作區上的標籤對映）",
+      "setVarFiles": "設定變數檔案",
+      "addVarFile": "新增變數檔案",
+      "setRunTasks": "設定執行任務（在每個匹配工作區上按名稱更新插入）",
+      "setNotifications": "設定通知配置（按名稱更新插入）",
+      "dryRun": "試執行（僅預覽 — 不寫入任何更改）",
+      "confirmWarning": "這將向每個匹配的工作區寫入更改。",
+      "confirmApply": "確認應用",
+      "applying": "正在應用...",
+      "cancel": "取消",
+      "working": "正在處理...",
+      "previewDryRun": "預覽（試執行）",
+      "applyChanges": "應用更改"
+    },
+    "diff": {
+      "colWorkspace": "工作區",
+      "colChanges": "更改"
+    },
+    "dryResult": {
+      "heading": "試執行結果",
+      "summary": "已匹配 <strong>{matched}</strong> 個；<strong>{wouldChange}</strong> 個將更改；{unchanged} 個不變。未寫入任何內容。",
+      "wouldChange": "將更改",
+      "noChange": "此更新不會更改任何工作區。"
+    },
+    "applyResult": {
+      "heading": "應用結果",
+      "summary": "已匹配 <strong>{matched}</strong> 個；<appliedstrong>{applied}</appliedstrong> 個已應用；{unchanged} 個不變；{errors, plural, one {# 個錯誤} other {# 個錯誤}}。",
+      "applied": "已應用",
+      "unnamedWorkspace": "（工作區）",
+      "noChange": "沒有工作區發生更改。"
+    },
+    "errors": {
+      "searchFailed": "搜尋失敗（{status}）",
+      "search": "搜尋失敗",
+      "bulkUpdateFailed": "批次更新失敗（{status}）",
+      "bulkUpdate": "批次更新失敗"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "執行鉤子",
+    "description": "在執行器 Job 內的 plan/apply 前後各點執行的自定義 shell 步驟，與工作區關聯",
+    "empty": "未配置任何執行鉤子。",
+    "actions": {
+      "cancel": "取消",
+      "new": "新建執行鉤子",
+      "creating": "正在建立...",
+      "create": "建立執行鉤子"
+    },
+    "badges": {
+      "disabled": "已停用",
+      "enabled": "已啟用"
+    },
+    "columns": {
+      "name": "名稱",
+      "hookPoint": "鉤子點",
+      "enabled": "已啟用",
+      "priority": "優先順序",
+      "workspaces": "工作區"
+    },
+    "form": {
+      "name": "名稱",
+      "namePatternTitle": "僅限字母、數字、連字元和下劃線。必須以字母或數字開頭。",
+      "description": "描述",
+      "descriptionPlaceholder": "在 init 之前新增一條內部主機記錄",
+      "hookPoint": "鉤子點",
+      "priority": "優先順序",
+      "priorityTitle": "當多個鉤子共享同一個點時，值越小越先執行（同值按名稱排序）。",
+      "scriptLabel": "指令碼（<code>/bin/sh -c</code>）",
+      "scriptHelp": "以執行器的雲身分執行。非零退出會使執行失敗。金鑰應來自工作區變數，而不是在此內聯。"
+    },
+    "errors": {
+      "load": "載入執行鉤子失敗",
+      "createStatus": "建立執行鉤子失敗（{status}）",
+      "create": "建立執行鉤子失敗"
+    }
+  },
+  "adminPolicySets": {
+    "title": "策略集",
+    "description": "OPA 策略即程式碼強制執行，按標籤作用於工作區",
+    "empty": "未配置任何策略集。",
+    "actions": {
+      "cancel": "取消",
+      "new": "新建策略集",
+      "creating": "正在建立...",
+      "create": "建立策略集"
+    },
+    "badges": {
+      "disabled": "已停用",
+      "mandatory": "強制",
+      "advisory": "建議",
+      "global": "全域",
+      "labelScoped": "按標籤作用"
+    },
+    "columns": {
+      "name": "名稱",
+      "description": "描述",
+      "enforcement": "強制方式",
+      "scope": "作用域",
+      "policies": "策略"
+    },
+    "form": {
+      "name": "名稱",
+      "namePatternTitle": "僅限字母、數字、連字元和下劃線。必須以字母或數字開頭。",
+      "description": "描述",
+      "descriptionPlaceholder": "生產工作區的強制護欄",
+      "enforcement": "強制方式",
+      "enforcementAdvisory": "建議（警告，不阻止）",
+      "enforcementMandatory": "強制（失敗時阻止應用）",
+      "globalScope": "全域（應用於每個工作區）",
+      "sourceInline": "內聯（在 UI 中管理策略）",
+      "sourceVcs": "來自 VCS 倉庫",
+      "vcsConnection": "VCS 連線",
+      "selectConnection": "選擇連線...",
+      "repoUrl": "倉庫 URL",
+      "branch": "分支",
+      "branchPlaceholder": "main（預設）",
+      "policyPath": "策略路徑",
+      "policyPathPlaceholder": "policies/（包含 .rego 檔案的目錄）",
+      "helpVcs": "策略將自動從倉庫同步。",
+      "helpInline": "建立策略集後新增策略並最佳化標籤作用域。"
+    },
+    "errors": {
+      "load": "載入策略集失敗",
+      "createStatus": "建立策略集失敗（{status}）",
+      "create": "建立策略集失敗"
+    }
+  },
+  "adminCatalog": {
+    "title": "目錄管理",
+    "description": "管理服務目錄項",
+    "notEnabled": "未啟用服務目錄。",
+    "empty": "暫無目錄項。",
+    "actions": {
+      "new": "新建目錄項",
+      "cancel": "取消",
+      "create": "建立目錄項",
+      "creating": "正在建立…",
+      "saveChanges": "儲存更改",
+      "saving": "正在儲存…",
+      "edit": "編輯",
+      "delete": "刪除"
+    },
+    "form": {
+      "name": "名稱",
+      "nameTitle": "僅限字母、數字、連字元和下劃線。必須以字母或數字開頭。",
+      "module": "模組",
+      "moduleSelect": "選擇一個模組…",
+      "moduleImmutable": "模組在建立後不可更改",
+      "displayName": "顯示名稱",
+      "displayNamePlaceholder": "標準 S3 儲存桶",
+      "versionPin": "預設版本固定",
+      "versionPinPlaceholder": "例如 1.2.0（留空 = 最新）",
+      "descriptionLabel": "描述",
+      "descriptionPlaceholder": "此目錄項預配的內容…",
+      "enabled": "已啟用（在瀏覽目錄中可見）",
+      "providerTemplates": "提供者模板",
+      "noProviderTemplates": "未定義任何提供者模板。",
+      "restrictPools": "限制為特定的代理池",
+      "noAgentPools": "無可用的代理池。",
+      "anyPool": "可使用任意代理池。",
+      "labels": "標籤",
+      "variableOptions": "變數選項（高階，JSON）",
+      "variableOptionsHint": "按輸入的覆蓋項（選項、隱藏、預設值）。若不使用，請保留為 <code>[]</code>。"
+    },
+    "table": {
+      "name": "名稱",
+      "module": "模組",
+      "enabled": "已啟用",
+      "actions": "操作"
+    },
+    "badge": {
+      "enabled": "已啟用",
+      "disabled": "已停用"
+    },
+    "confirm": {
+      "delete": "刪除此目錄項？現有已預配的執行個體不受影響。"
+    },
+    "success": {
+      "created": "已建立目錄項 \"{name}\"",
+      "updated": "已更新目錄項 \"{name}\"",
+      "deleted": "已刪除目錄項"
+    },
+    "errors": {
+      "load": "載入目錄項失敗",
+      "save": "儲存目錄項失敗",
+      "createStatus": "建立目錄項失敗（{status}）",
+      "updateStatus": "更新目錄項失敗（{status}）",
+      "delete": "刪除目錄項失敗",
+      "deleteConflict": "無法刪除：此目錄項存在已預配的執行個體。",
+      "varOptsInvalidJson": "變數選項必須是有效的 JSON（陣列）。",
+      "varOptsNotArray": "變數選項必須是 JSON 陣列。"
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "提供者模板",
+    "description": "用於目錄項的可複用提供者配置塊",
+    "notEnabled": "未啟用服務目錄。",
+    "empty": "暫無提供者模板。",
+    "actions": {
+      "new": "新建模板",
+      "cancel": "取消",
+      "create": "建立模板",
+      "creating": "正在建立…",
+      "saveChanges": "儲存更改",
+      "saving": "正在儲存…",
+      "edit": "編輯",
+      "delete": "刪除"
+    },
+    "form": {
+      "name": "名稱",
+      "providerType": "提供者型別",
+      "body": "正文（HCL）",
+      "parameters": "引數（高階，JSON）",
+      "parametersHint": "每個引數都會成為一個預配表單欄位。若不使用，請保留為 <code>[]</code>。",
+      "labels": "標籤"
+    },
+    "table": {
+      "name": "名稱",
+      "providerType": "提供者型別",
+      "parameters": "引數",
+      "actions": "操作"
+    },
+    "confirm": {
+      "delete": "刪除此提供者模板？引用它的目錄項將無法預配。此操作無法撤銷。"
+    },
+    "success": {
+      "created": "已建立提供者模板 \"{name}\"",
+      "updated": "已更新提供者模板 \"{name}\"",
+      "deleted": "已刪除提供者模板"
+    },
+    "errors": {
+      "load": "載入提供者模板失敗",
+      "save": "儲存提供者模板失敗",
+      "createStatus": "建立模板失敗（{status}）",
+      "updateStatus": "更新模板失敗（{status}）",
+      "delete": "刪除提供者模板失敗",
+      "deleteConflict": "無法刪除：此模板被某個目錄項引用。",
+      "paramsInvalidJson": "引數必須是有效的 JSON（陣列）。",
+      "paramsNotArray": "引數必須是 JSON 陣列。"
+    }
+  },
+  "adminAgentPools": {
+    "title": "代理池",
+    "description": "管理執行器代理池及其監聽器",
+    "empty": "未配置任何代理池。",
+    "actions": {
+      "newPool": "新建池",
+      "createPool": "建立池",
+      "creating": "正在建立...",
+      "cancel": "取消",
+      "edit": "編輯",
+      "save": "儲存",
+      "saving": "正在儲存...",
+      "delete": "刪除",
+      "deleting": "正在刪除...",
+      "confirmDelete": "確認刪除"
+    },
+    "form": {
+      "name": "名稱",
+      "namePattern": "僅限字母、數字、連字元和下劃線。必須以字母或數字開頭。",
+      "description": "描述",
+      "descriptionPlaceholder": "生產 AWS 執行器",
+      "labels": "標籤"
+    },
+    "columns": {
+      "name": "名稱",
+      "description": "描述",
+      "status": "狀態",
+      "created": "建立時間"
+    },
+    "badges": {
+      "default": "預設",
+      "degradedTooltip": "監聽器仍在傳送心跳，但其證書已過期 — 執行將無法啟動。",
+      "status": {
+        "online": "線上",
+        "offline": "離線",
+        "degraded": "降級"
+      }
+    },
+    "detail": {
+      "back": "返回代理池",
+      "defaultDescription": "代理池"
+    },
+    "tabs": {
+      "settings": "設定",
+      "tokens": "令牌",
+      "listeners": "監聽器"
+    },
+    "settings": {
+      "title": "池設定",
+      "fields": {
+        "name": "名稱",
+        "description": "描述",
+        "created": "建立時間",
+        "owner": "所有者",
+        "yourPermission": "您的權限",
+        "labels": "標籤"
+      },
+      "permissions": {
+        "read": "讀取",
+        "write": "寫入",
+        "admin": "管理"
+      }
+    },
+    "danger": {
+      "title": "刪除池",
+      "description": "永久刪除此代理池及所有關聯的令牌。"
+    },
+    "tokens": {
+      "create": "建立令牌",
+      "empty": "此池沒有令牌。",
+      "revoke": "撤銷",
+      "created": {
+        "title": "令牌建立成功",
+        "copyNow": "請立即複製此令牌 — 它將不會再次顯示。",
+        "copy": "複製"
+      },
+      "form": {
+        "description": "描述",
+        "descriptionPlaceholder": "生產監聽器令牌",
+        "maxUses": "最大使用次數",
+        "maxUsesHint": "預設為 2 — 可容忍監聽器副本間的一次引導競爭重試。",
+        "expiresAt": "過期時間",
+        "expiresAtHint": "預設為從現在起 1 小時。"
+      },
+      "columns": {
+        "description": "描述",
+        "uses": "使用次數",
+        "expires": "過期時間",
+        "status": "狀態",
+        "createdBy": "建立者",
+        "actions": "操作"
+      },
+      "badges": {
+        "revoked": "已撤銷",
+        "active": "活動"
+      }
+    },
+    "listeners": {
+      "empty": "此池未註冊任何監聽器。",
+      "columns": {
+        "name": "名稱",
+        "status": "狀態",
+        "replicas": "副本",
+        "certExpires": "證書過期",
+        "actions": "操作"
+      },
+      "status": {
+        "online": "線上",
+        "offline": "離線",
+        "degraded": "降級",
+        "cert-expired": "證書已過期"
+      },
+      "tooltips": {
+        "certExpired": "監聽器仍在傳送心跳，但其證書已過期 — 每個基於證書身分驗證的呼叫（認領執行、續訂、執行器令牌）都將失敗。最可能的原因：API 從未註冊最新證書，或證書 TTL 在續訂前已到期。",
+        "degraded": "監聽器仍在傳送心跳，但其證書已過期 — 執行將無法啟動。"
+      }
+    },
+    "confirm": {
+      "revokeToken": "撤銷此加入令牌？使用它的監聽器將無法再加入，此操作無法撤銷。",
+      "deleteListener": "刪除此監聽器？如果 pod 仍在執行，它將在下次心跳時重新註冊。"
+    },
+    "success": {
+      "poolUpdated": "已更新池",
+      "tokenRevoked": "已撤銷令牌",
+      "listenerDeleted": "已刪除監聽器"
+    },
+    "errors": {
+      "loadPools": "載入代理池失敗",
+      "loadPool": "載入池失敗",
+      "loadTokens": "載入令牌失敗",
+      "loadListeners": "載入監聽器失敗",
+      "createPool": "建立池失敗",
+      "createStatus": "建立池失敗（{status}）",
+      "updatePool": "更新池失敗",
+      "deletePool": "刪除池失敗",
+      "poolNotFound": "未找到池",
+      "createToken": "建立令牌失敗",
+      "createTokenStatus": "建立令牌失敗（{status}）",
+      "revokeToken": "撤銷令牌失敗",
+      "deleteListener": "刪除監聽器失敗"
+    }
+  },
+  "adminAuditLog": {
+    "title": "審計日誌",
+    "description": "所有 API 請求的不可變日誌",
+    "empty": "未找到審計日誌條目。",
+    "errors": {
+      "load": "載入審計日誌失敗"
+    },
+    "filters": {
+      "actorEmail": "操作者電子郵箱",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "資源型別",
+      "resourceTypePlaceholder": "workspaces",
+      "method": "方法",
+      "methodAll": "全部",
+      "since": "起始",
+      "until": "截止",
+      "clear": "清除",
+      "apply": "應用篩選"
+    },
+    "columns": {
+      "timestamp": "時間戳",
+      "actor": "操作者",
+      "action": "操作",
+      "resourceType": "資源型別",
+      "resourceId": "資源 ID",
+      "status": "狀態",
+      "duration": "耗時"
+    },
+    "pagination": {
+      "summary": "第 {current} 頁，共 {total} 頁（{count, plural, one {# 個條目} other {# 個條目}}）",
+      "previous": "上一頁",
+      "next": "下一頁"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "快取",
+    "description": "CLI 二進位制檔案和提供者快取管理",
+    "errors": {
+      "loadBinary": "載入二進位制檔案快取失敗",
+      "loadCache": "載入快取失敗"
+    },
+    "sections": {
+      "cliBinaries": "CLI 二進位制檔案",
+      "providerBinaries": "提供者二進位制檔案"
+    },
+    "empty": {
+      "binaries": "暫無快取的 CLI 二進位制檔案。",
+      "providers": "暫無快取的提供者二進位制檔案。"
+    },
+    "columns": {
+      "tool": "工具",
+      "version": "版本",
+      "os": "OS",
+      "arch": "Arch",
+      "cachedAt": "快取時間",
+      "provider": "提供者",
+      "hostname": "主機名",
+      "actions": "操作"
+    },
+    "warm": {
+      "heading": "預熱快取",
+      "hide": "隱藏",
+      "prePopulate": "預填充…",
+      "help": "將二進位制檔案和提供者平台預拉取到快取中（每行一個）。末尾的 <code>os/arch</code> 令牌是可選的 — 省略它們則使用配置的預設平台。",
+      "binariesLabel": "二進位制檔案",
+      "providersLabel": "提供者",
+      "warm": "預熱",
+      "warming": "正在預熱…",
+      "confirm": "立即預熱所選的快取條目？",
+      "errorEmpty": "請至少新增一行二進位制檔案或提供者以進行預熱。",
+      "errorFailedStatus": "預熱失敗（{status}）",
+      "errorFailed": "預熱快取失敗",
+      "success": "已預熱 {succeeded}/{total}（{failed} 個失敗）"
+    },
+    "purge": {
+      "button": "清除",
+      "confirmBinary": "從快取中清除 {tool} {version}？下次請求時將從上游重新獲取。",
+      "confirmProvider": "從提供者快取中清除 {provider} {version}？下次請求時將從上游重新獲取。",
+      "successBinary": "已清除 {tool} {version} 的 {count} 個條目",
+      "successProvider": "已清除 {provider} {version} 的 {count} 個條目",
+      "errorStatus": "清除失敗（{status}）",
+      "error": "清除失敗",
+      "errorProvider": "清除提供者失敗",
+      "errorProviders": "清除提供者失敗"
+    },
+    "batchPurge": {
+      "purging": "正在清除...",
+      "purgeSelected": "清除所選（{count}）",
+      "confirmBinary": "清除所有選中的二進位制檔案快取條目？下次請求時將從上游重新獲取。",
+      "confirmProvider": "清除所有選中的提供者快取條目？下次請求時將從上游重新獲取。",
+      "errorBinaryItem": "清除 {tool} {version} 失敗",
+      "errorProviderItem": "清除 {provider} {version} 失敗",
+      "successBinary": "已清除 {count} 個二進位制檔案快取條目",
+      "successProvider": "已清除 {count} 個提供者快取條目"
+    }
+  },
+  "catalog": {
+    "title": "服務目錄",
+    "description": "從精選模組自助預配基礎設施",
+    "notEnabled": "未啟用服務目錄。",
+    "empty": "無可用的目錄項。",
+    "card": {
+      "pinned": "已固定 {version}",
+      "latest": "最新"
+    },
+    "errors": {
+      "loadItems": "載入目錄項失敗"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← 目錄",
+    "backToCatalog": "返回目錄",
+    "fallbackTitle": "目錄項",
+    "notFound": "未找到目錄項，或未啟用服務目錄。",
+    "common": {
+      "cancel": "取消"
+    },
+    "info": {
+      "module": "模組：",
+      "resolvedVersion": "已解析版本：",
+      "latest": "最新",
+      "disabled": "已停用"
+    },
+    "pending": {
+      "banner": "<strong>{name}</strong> 的執行已計畫完成，正在等待審查。確認以應用，或丟棄。",
+      "working": "正在處理…",
+      "confirmApply": "確認並應用",
+      "discard": "丟棄"
+    },
+    "field": {
+      "select": "選擇…"
+    },
+    "provision": {
+      "title": "預配",
+      "workspaceName": "工作區名稱",
+      "workspaceNameTitle": "僅限字母、數字、連字元和下劃線。必須以字母或數字開頭。",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "代理池",
+      "selectPool": "選擇一個池…",
+      "noPoolsAvailable": "沒有可供您使用的代理池。您需要對某個代理池具有寫入權限才能預配 — 請聯絡管理員授予該權限。",
+      "noPoolsAllowed": "您可訪問的代理池均不在此目錄項允許之列。請聯絡管理員擴大該目錄項允許的池範圍，或授予您對其中之一的訪問權限。",
+      "version": "版本",
+      "latestFloat": "最新（浮動）",
+      "defaultPinOption": "{version}（預設固定）",
+      "labelsOptional": "標籤（可選）",
+      "autoApplyHint": "自動應用會在沒有手動審查步驟的情況下應用更改。",
+      "provisioning": "正在預配…",
+      "submit": "預配"
+    },
+    "instances": {
+      "title": "執行個體",
+      "empty": "尚未從此項預配任何執行個體。",
+      "colName": "名稱",
+      "colVersion": "版本",
+      "colPool": "池",
+      "colActions": "操作",
+      "reconfigure": "重新配置",
+      "destroy": "銷毀",
+      "orphan": "遺棄…",
+      "orphanTitle": "刪除目錄記錄而不銷毀其基礎設施（不建議）"
+    },
+    "reconfigure": {
+      "title": "重新配置 {name}",
+      "description": "更新輸入和/或版本，然後排隊一次執行。",
+      "currentOption": "{version}（當前）",
+      "queuing": "正在排隊…",
+      "queueRun": "排隊執行"
+    },
+    "destroy": {
+      "title": "銷毀 {name}",
+      "heading": "銷毀 {name}？",
+      "description": "這將排隊一次銷毀執行以拆除此執行個體的基礎設施。應用成功後工作區將被歸檔。此操作無法撤銷。",
+      "autoApplyHint": "自動應用會立即拆除，無需審查。"
+    },
+    "orphan": {
+      "title": "遺棄 {name}",
+      "heading": "遺棄 {name}？",
+      "description": "這將刪除目錄執行個體記錄，但<warn>不會</warn>銷毀其基礎設施 — 已預配的資源會繼續執行，<warn>不受跟蹤且不受管理</warn>。不建議這樣做。若要回收基礎設施，請取消並改用<emph>銷毀</emph>。",
+      "confirmPrompt": "輸入執行個體名稱 <mono>{name}</mono> 以確認：",
+      "orphaning": "正在遺棄…",
+      "submit": "遺棄並放棄基礎設施"
+    },
+    "actions": {
+      "confirmed": "執行已確認 — 正在應用。",
+      "discarded": "執行已丟棄。",
+      "provisioned": "已預配 {name} — 計畫已準備好接受審查。",
+      "reconfigureQueued": "重新配置已排隊 — 已建立執行。",
+      "reconfigureQueuedStatus": "重新配置已排隊 — 執行為 {status}。",
+      "destroyQueued": "銷毀已排隊 — 已建立執行。",
+      "destroyQueuedStatus": "銷毀已排隊 — 執行為 {status}。",
+      "orphaned": "已遺棄 {name} — 目錄記錄已刪除；其基礎設施仍在執行，不受跟蹤且不受管理。"
+    },
+    "errors": {
+      "loadItem": "載入目錄項失敗",
+      "confirm": "確認失敗",
+      "confirmStatus": "確認失敗（{status}）",
+      "discard": "丟棄失敗",
+      "discardStatus": "丟棄失敗（{status}）",
+      "provision": "預配失敗",
+      "provisionStatus": "預配失敗（{status}）",
+      "reconfigure": "重新配置失敗",
+      "reconfigureStatus": "重新配置失敗（{status}）",
+      "destroy": "銷毀失敗",
+      "destroyStatus": "銷毀失敗（{status}）",
+      "orphan": "遺棄失敗",
+      "orphanStatus": "遺棄失敗（{status}）"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "正在重新連線…"
+    },
+    "sessionExpiry": {
+      "banner": "會話將在 {minutes, plural, one {# 分鐘} other {# 分鐘}}後過期 — <link>重新進行身分驗證</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# 個服務令牌} other {# 個服務令牌}}將在 {days, plural, one {# 天} other {# 天}}內過期 — <link>檢視</link>",
+      "soon": "{count, plural, one {# 個服務令牌} other {# 個服務令牌}}即將過期 — <link>檢視</link>",
+      "dismissAria": "關閉令牌過期警告"
+    },
+    "resourceUsage": {
+      "title": "資源使用情況",
+      "oomKilled": "因 OOM 被終止",
+      "killedLikelyOom": "已終止（可能因 OOM）",
+      "memory": "記憶體",
+      "requested": "已請求 {value}",
+      "limit": "限制 {value}"
+    },
+    "labelsEditor": {
+      "none": "無",
+      "removeAria": "移除 {key}",
+      "keyPlaceholder": "鍵",
+      "valuePlaceholder": "值",
+      "add": "新增"
+    },
+    "sensitiveInput": {
+      "hide": "隱藏",
+      "show": "顯示",
+      "hideAria": "隱藏值",
+      "showAria": "顯示值"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "搜尋工作區…",
+      "loading": "正在載入…",
+      "empty": "未找到工作區",
+      "adding": "正在新增…"
+    },
+    "templateEditors": {
+      "remove": "移除",
+      "add": "新增",
+      "valuePlaceholder": "值",
+      "name": "名稱",
+      "url": "URL",
+      "hmacKey": "HMAC 金鑰（可選）",
+      "hmacKeyPlaceholder": "共享金鑰",
+      "stage": "階段",
+      "enforcement": "強制方式",
+      "enabled": "已啟用",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "新增執行任務",
+      "destinationType": "目標型別",
+      "token": "令牌（可選）",
+      "tokenPlaceholder": "HMAC / 身分驗證令牌",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "電子郵箱地址",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "新增電子郵箱",
+      "triggers": "觸發器",
+      "addNotification": "新增通知"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "AI 生成",
+    "heading": {
+      "planSummary": "計畫摘要",
+      "failureAnalysis": "失敗分析"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "重新生成",
+      "queueing": "正在排隊…",
+      "tooltip": "針對相同的計畫輸入重新執行 AI 摘要",
+      "ariaLabel": "重新生成 AI 摘要",
+      "confirm": "重新生成 AI 分析？這將再次執行模型。",
+      "error": "無法重新生成：<mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "正在摘要計畫…",
+      "analysingFailure": "正在分析失敗…"
+    },
+    "skipped": {
+      "fallback": "已跳過此次執行的摘要。"
+    },
+    "errored": {
+      "heading": "摘要生成器失敗"
+    },
+    "riskFactors": {
+      "heading": "風險因素",
+      "suggestedFixes": "建議的修復"
+    },
+    "tokens": "{input} 輸入 / {output} 輸出 令牌",
+    "risk": {
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "critical": "嚴重",
+      "unknown": "未知"
+    },
+    "badges": {
+      "noChanges": "無更改",
+      "noChangesLower": "無更改",
+      "noChangesTitle": "計畫報告沒有資源更改",
+      "toAdd": "{count, plural, one {# 項待新增} other {# 項待新增}}",
+      "toChange": "{count, plural, one {# 項待更改} other {# 項待更改}}",
+      "toDestroy": "{count, plural, one {# 項待銷毀} other {# 項待銷毀}}",
+      "toReplace": "{count, plural, one {# 項待替換} other {# 項待替換}}",
+      "toImport": "{count, plural, one {# 項待匯入} other {# 項待匯入}}"
+    },
+    "chat": {
+      "heading": "追問",
+      "sharedThreadNote": "一個共享執行緒，對任何具有工作區讀取權限的人可見。",
+      "placeholder": "就此計畫提一個追問… （⌘/Ctrl + Enter 傳送）",
+      "send": "傳送",
+      "thinking": "正在思考…",
+      "you": "你",
+      "assistant": "助手"
+    },
+    "translatedNote": "已自動翻譯為您的語言。以原文摘要為準。",
+    "translating": "正在翻譯…"
+  },
+  "runDetail": {
+    "notFound": "未找到執行",
+    "runSection": "執行部分",
+    "workspaceFallback": "工作區",
+    "backTo": "返回 {name}",
+    "errorHeading": "錯誤",
+    "discardedHeading": "已丟棄 — 需要重新計畫",
+    "common": {
+      "yes": "是",
+      "no": "否"
+    },
+    "header": {
+      "title": "執行 {id}",
+      "titleWithWorkspace": "{workspace} — 執行 {id}",
+      "description": "{source} 執行"
+    },
+    "relTime": {
+      "justNow": "剛剛",
+      "minutesAgo": "{count, plural, one {# 分鐘前} other {# 分鐘前}}",
+      "hoursAgo": "{count, plural, one {# 小時前} other {# 小時前}}",
+      "daysAgo": "{count, plural, one {# 天前} other {# 天前}}"
+    },
+    "status": {
+      "pending": "待處理",
+      "queued": "已排隊",
+      "planning": "正在計畫",
+      "planned": "已計畫",
+      "confirmed": "已確認",
+      "applying": "正在應用",
+      "canceling": "正在取消",
+      "applied": "已應用",
+      "errored": "已出錯",
+      "canceled": "已取消",
+      "discarded": "已丟棄"
+    },
+    "activity": {
+      "pending": "正在準備執行",
+      "queued": "正在等待可用的代理",
+      "planning": "正在執行 terraform plan",
+      "plannedConfirmable": "正在等待您確認並應用",
+      "plannedSpeculative": "推測性計畫已完成",
+      "plannedComplete": "計畫已完成",
+      "confirmed": "正在開始應用",
+      "applying": "正在執行 terraform apply",
+      "canceling": "正在停止執行",
+      "applied": "應用已完成",
+      "errored": "執行失敗",
+      "canceled": "執行已取消",
+      "discarded": "計畫已丟棄",
+      "elapsedTitle": "此階段已用時"
+    },
+    "badge": {
+      "destroy": "銷毀",
+      "planOnly": "僅計畫"
+    },
+    "actions": {
+      "retryShort": "重試",
+      "retryFull": "重試執行",
+      "retrying": "正在重試…",
+      "confirmShort": "應用",
+      "confirmFull": "確認並應用",
+      "confirming": "正在確認…",
+      "discard": "丟棄",
+      "discarding": "正在丟棄…",
+      "cancelShort": "取消",
+      "cancelFull": "取消執行",
+      "canceling": "正在取消…"
+    },
+    "confirm": {
+      "apply": "應用此執行？這將應用計畫並更改基礎設施。",
+      "discard": "丟棄此計畫？",
+      "cancel": "取消此執行？",
+      "retry": "重試此執行？"
+    },
+    "errors": {
+      "loadRun": "載入執行失敗",
+      "action": {
+        "confirm": "確認執行失敗",
+        "discard": "丟棄執行失敗",
+        "cancel": "取消執行失敗",
+        "retry": "重試執行失敗"
+      }
+    },
+    "tabs": {
+      "overview": "概覽",
+      "ai": "AI",
+      "aiFull": "AI 分析",
+      "opa": "OPA",
+      "opaFull": "OPA 策略",
+      "impact": "影響",
+      "impactFull": "影響圖",
+      "planLabel": "計畫<log>日誌</log>",
+      "applyLabel": "應用<log>日誌</log>",
+      "planFull": "計畫日誌",
+      "applyFull": "應用日誌",
+      "details": "詳情"
+    },
+    "banner": {
+      "destroy": "這是一次<strong>銷毀</strong>執行 — 應用時所有受管理的資源都將被銷毀。",
+      "planOnlyCli": "這是從 CLI 在已連線 VCS 的工作區上發起的<strong>僅計畫</strong>執行。對於 CLI 上傳的程式碼不可應用 — 只有 VCS 管理的程式碼才能被應用。",
+      "moduleOverridesPrefix": "此執行使用<strong>模組覆蓋</strong>",
+      "moduleOverridesFromPr": "來自 PR #{number}",
+      "moduleOverridesSuffix": "將從 PR 分支而非已釋出的登錄庫版本獲取。"
+    },
+    "cards": {
+      "changes": "更改",
+      "aiAnalysis": "AI 分析",
+      "policyChecks": "策略檢查",
+      "resources": "資源"
+    },
+    "changes": {
+      "noChanges": "無更改",
+      "planning": "正在計畫…",
+      "toAdd": "待新增",
+      "toChange": "待更改",
+      "toDestroy": "待銷毀",
+      "toReplace": "待替換",
+      "toImport": "待匯入"
+    },
+    "ai": {
+      "notAvailable": "不可用",
+      "ready": "就緒",
+      "riskSub": "{risk}風險",
+      "generating": "正在生成…",
+      "skipped": "已跳過",
+      "failed": "失敗",
+      "available": "可用"
+    },
+    "policy": {
+      "none": "無",
+      "blocked": "已阻止",
+      "failedSub": "{count, plural, one {# 項失敗} other {# 項失敗}}",
+      "advisoryIssues": "建議性問題",
+      "passedSub": "{passed}/{total} 已透過",
+      "passed": "已透過"
+    },
+    "resources": {
+      "overLimit": "超出限制",
+      "oomKilled": "因 OOM 被終止",
+      "recorded": "已記錄",
+      "nearLimit": "接近限制",
+      "high": "高",
+      "withinLimits": "在限制之內"
+    },
+    "details": {
+      "heading": "詳情",
+      "executionBackend": "執行後端",
+      "source": "來源",
+      "autoApply": "自動應用",
+      "planOnly": "僅計畫",
+      "triggeredBy": "觸發者",
+      "created": "建立時間",
+      "commit": "提交",
+      "branch": "分支",
+      "prMr": "PR/MR",
+      "stateVersion": "狀態版本",
+      "viewState": "檢視狀態",
+      "runOptions": "執行選項"
+    },
+    "timeline": {
+      "heading": "時間線",
+      "queued": "已排隊",
+      "planningStarted": "計畫已開始",
+      "planComplete": "計畫已完成",
+      "confirmed": "已確認",
+      "applyingStarted": "應用已開始",
+      "applied": "已應用",
+      "errored": "已出錯",
+      "canceled": "已取消",
+      "discarded": "已丟棄"
+    },
+    "log": {
+      "color": "顏色",
+      "colorOnTitle": "正在顯示 ANSI 顏色 — 點選切換為純文字",
+      "colorOffTitle": "正在顯示純文字 — 點選切換為顏色",
+      "refresh": "重新整理",
+      "refreshTitle": "重新整理日誌",
+      "copy": "複製",
+      "copied": "已複製！",
+      "copyTitle": "將純文字複製到剪貼簿",
+      "copyAria": "將日誌複製到剪貼簿",
+      "download": "下載",
+      "downloadColorTitle": "下載日誌（含 ANSI 顏色程式碼）",
+      "downloadPlainTitle": "下載日誌（純文字）",
+      "downloadAria": "下載日誌",
+      "follow": "跟隨",
+      "followOnTitle": "正在跟隨實時尾部 — 點選以停止",
+      "followOffTitle": "跟隨實時尾部",
+      "end": "末尾",
+      "endTitle": "跳轉到日誌末尾",
+      "planEmpty": "暫無可用的計畫輸出。",
+      "applyEmpty": "暫無可用的應用輸出。"
+    },
+    "policyPanel": {
+      "heading": "策略檢查",
+      "passedCount": "{passed}/{total} 已透過",
+      "blockedMessage": "此執行<strong>被強制策略集阻止</strong>。在失敗得到解決或管理員覆蓋之前，它不會應用。",
+      "overriding": "正在覆蓋...",
+      "overrideContinue": "覆蓋並繼續",
+      "overrideFailed": "覆蓋失敗",
+      "overrideFailedStatus": "覆蓋失敗（{status}）",
+      "overriddenBy": "由 {by} 覆蓋",
+      "policyPassed": "已透過",
+      "noDenyMessage": "策略失敗但未生成拒絕訊息或錯誤輸出",
+      "enforcement": {
+        "mandatory": "強制",
+        "advisory": "建議"
+      },
+      "outcome": {
+        "passed": "已透過",
+        "failed": "失敗",
+        "errored": "已出錯"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "未找到工作區",
+    "common": {
+      "enabled": "已啟用",
+      "disabled": "已停用",
+      "none": "無",
+      "default": "預設",
+      "never": "從不",
+      "actions": "操作",
+      "workspaceLocked": "工作區已鎖定"
+    },
+    "actions": {
+      "edit": "編輯",
+      "cancel": "取消",
+      "save": "儲存",
+      "saving": "正在儲存…",
+      "savingEllipsis": "正在儲存...",
+      "delete": "刪除",
+      "deleting": "正在刪除...",
+      "add": "新增",
+      "adding": "正在新增...",
+      "remove": "移除",
+      "download": "下載",
+      "rollback": "回滾",
+      "close": "關閉",
+      "hide": "隱藏",
+      "enable": "啟用",
+      "disable": "停用",
+      "creating": "正在建立...",
+      "sending": "正在傳送...",
+      "processing": "正在處理...",
+      "queuing": "正在排隊...",
+      "loading": "正在載入...",
+      "loadingLower": "正在載入…"
+    },
+    "header": {
+      "executionMode": "{mode}執行模式"
+    },
+    "tabs": {
+      "overview": "概覽",
+      "variables": "變數",
+      "runs": "執行",
+      "state": "狀態",
+      "stateGraph": "狀態圖",
+      "configurations": "配置",
+      "notifications": "通知",
+      "runTasks": "執行任務",
+      "runTriggers": "執行觸發器",
+      "sharing": "共享",
+      "selectLabel": "工作區部分"
+    },
+    "lifecycle": {
+      "pendingDeletion": "待刪除",
+      "pendingDeletionDefault": "此工作區已標記為待刪除，需要手動操作。",
+      "archived": "已歸檔",
+      "archivedDefault": "此工作區已歸檔。"
+    },
+    "runQueuedBanner": {
+      "message": "執行已成功排隊。",
+      "viewRun": "檢視執行"
+    },
+    "settings": {
+      "title": "設定",
+      "saveChanges": "儲存更改",
+      "renamedNotice": "工作區已重新命名。請更新您 <cloud></cloud> 塊中的 <name></name> 欄位以匹配。"
+    },
+    "fields": {
+      "name": "名稱",
+      "nameTitle": "字母、數字、連字元、下劃線。必須以字母或數字開頭。",
+      "executionMode": "執行模式",
+      "execModeLocal": "本地",
+      "execModeAgent": "代理",
+      "autoApply": "自動應用",
+      "cpuRequest": "CPU 請求",
+      "cpuRequestTitle": "Kubernetes CPU 數量：整核（1、2）或毫核（500m、100m）",
+      "memoryRequest": "記憶體請求",
+      "memoryRequestTitle": "Kubernetes 記憶體數量：位元組（1000）或帶字尾（512Mi、2Gi、1Ti）",
+      "executionBackend": "執行後端",
+      "version": "版本",
+      "versionPlaceholder": "例如 1.11 或 1.11.5",
+      "versionTitle": "版本採用 X.Y 或 X.Y.Z 格式（例如 1.11 或 1.11.5）",
+      "terragruntEnabledAgent": "已啟用（代理模式）",
+      "terragruntEnabledVersion": "已啟用（v{version}）",
+      "terragruntVersionPlaceholder": "例如 1.0",
+      "terragruntVersionTitle": "Terragrunt 版本採用 X.Y 或 X.Y.Z 格式（例如 1.0）",
+      "workingDirectory": "工作目錄",
+      "workingDirectoryPlaceholder": "例如 environments/dev",
+      "agentPool": "代理池",
+      "owner": "所有者",
+      "vcsConnection": "VCS 連線",
+      "vcsRepository": "VCS 倉庫",
+      "vcsRepositoryTitle": "必須是 HTTP 或 HTTPS URL",
+      "vcsBranch": "VCS 分支",
+      "vcsBranchPlaceholder": "main（預設）",
+      "vcsWorkflow": "VCS 工作流",
+      "vcsWorkflowMergeThenApply": "merge_then_apply（預設 — TFE / HCP 標準）",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge（Atlantis 標準 — 需主動選用）",
+      "autoMerge": "應用後自動合併",
+      "autoMergeStrategy": "自動合併策略",
+      "vcsPolling": "VCS 輪詢",
+      "labels": "標籤（tags）",
+      "labelsTitle": "工作區標籤具有雙重作用：基於標籤的 RBAC 匹配，以及作為 terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}' 塊所匹配的 \"tags\"。",
+      "varFiles": "變數檔案",
+      "varFilesPlaceholder": "例如 envs/dev.tfvars",
+      "triggerPrefixes": "觸發字首",
+      "triggerPrefixesHint": "觸發執行的目錄。設定後會覆蓋工作目錄篩選。",
+      "triggerPrefixesPlaceholder": "例如 modules",
+      "triggerPrefixesNone": "無（使用工作目錄）",
+      "driftIgnoreRules": "漂移忽略規則",
+      "driftIgnoreRulesHint": "由漂移分類器抑制的、支援萬用字元的 Terraform 地址 + 屬性路徑。<star></star> 匹配零個或多個非 <dot></dot> 字元（跨越 <n></n> 個索引）；<starIdx></starIdx> 匹配任意方括號索引。沒有屬性字尾的裸地址會靜默該資源的任何更改 — 包括銷毀。僅影響漂移，不影響常規 plan/apply。完整語法見 <docs>drift-ignore-rules.md</docs>。",
+      "driftIgnoreRulesNone": "無（每個計畫差異都計為漂移）"
+    },
+    "vcsWorkflowWarning": {
+      "title": "授權已委託給您的 VCS 倉庫。",
+      "rbac": "任何能夠合併 PR 的人都可以應用。分支保護規則（必需的審查、狀態檢查、程式碼所有者批准）成為把關。在此模式下，Terrapod 的角色/標籤 RBAC <em>不</em>適用於由評論驅動的操作。",
+      "recommended": "<strong>建議：</strong>要求線性歷史（合併前進行 rebase/squash），以便您應用的提交就是最終落地的提交。",
+      "credit": "致謝：此工作流參照 <atlantis>Atlantis</atlantis> 設計。對於只需要 PR 評論驅動應用、不需要平台 UI 的團隊，Atlantis 仍是合適的工具。"
+    },
+    "vcsPolling": {
+      "error": "錯誤",
+      "ok": "正常（{time}）",
+      "notPolled": "尚未輪詢"
+    },
+    "lockout": {
+      "revertLabels": "還原標籤",
+      "saveAnyway": "仍然儲存"
+    },
+    "lock": {
+      "title": "鎖定狀態",
+      "lockedDesc": "此工作區已鎖定。無法執行任何計畫或應用。",
+      "unlockedDesc": "此工作區已解鎖，可供執行。",
+      "lock": "鎖定",
+      "unlock": "解鎖",
+      "lockConfirm": "鎖定此工作區？",
+      "unlockConfirm": "解鎖此工作區？"
+    },
+    "drift": {
+      "title": "漂移檢測",
+      "checkInterval": "檢查間隔",
+      "status": "狀態",
+      "statusNoDrift": "無漂移",
+      "statusDrifted": "已漂移",
+      "statusErrored": "已出錯",
+      "statusUnchecked": "未檢查",
+      "dismiss": "關閉",
+      "dismissing": "正在關閉…",
+      "dismissTitle": "清除已報告的漂移狀態。下次計畫檢查將根據實際情況重新填充它。",
+      "lastChecked": "上次檢查",
+      "checkNow": "立即檢查",
+      "checkNowTitle": "排隊一次僅計畫執行以檢查漂移",
+      "checkNowTitleDisabled": "請先啟用漂移檢測"
+    },
+    "intervals": {
+      "disabled": "已停用",
+      "1hour": "1 小時",
+      "4hours": "4 小時",
+      "12hours": "12 小時",
+      "24hours": "24 小時",
+      "48hours": "48 小時",
+      "3days": "3 天",
+      "7days": "7 天"
+    },
+    "planExpiry": {
+      "title": "計畫過期",
+      "description": "當未確認的計畫超過此時長後自動丟棄，以防止過時的計畫針對已變化的環境被應用。預設關閉；關閉時計畫必須重新執行。（僅適用於可應用的執行。）",
+      "expireAfter": "過期時長"
+    },
+    "aiSummary": {
+      "title": "AI 計畫摘要",
+      "description": "對此工作區每個計畫階段的結果自動生成由 LLM 編寫的更改摘要、風險評估和失敗分析。",
+      "mode": "模式",
+      "modeDefault": "遵循部署預設設定",
+      "modeEnabled": "始終摘要",
+      "modeDisabled": "從不摘要",
+      "contextLabel": "工作區上下文",
+      "contextLabelSuffix": "（可選，附加）",
+      "contextPlaceholder": "AI 應專門瞭解此工作區的事實。例如 '為服務 X 前置 vault — 銷毀 KMS 金鑰會導致全域中斷。'",
+      "noContext": "未設定工作區上下文。",
+      "contextHint": "在部署級上下文之上附加。最多 4000 個字元。"
+    },
+    "slack": {
+      "title": "Slack 通知",
+      "description": "讓此工作區選擇接收 Slack 執行通知 — 審批請求、應用、錯誤和漂移。將頻道留空則此工作區保持靜默（沒有部署級扇出）。需要管理員啟用 Slack 應用。",
+      "channel": "頻道",
+      "channelPlaceholder": "#deploys 或頻道 ID（例如 C0123ABCD）",
+      "notSet": "未設定 — 靜默。",
+      "hint": "Slack 應用必須已經是該頻道的成員。"
+    },
+    "delete": {
+      "title": "刪除工作區",
+      "description": "永久刪除此工作區及所有關聯的狀態、變數和執行。",
+      "confirm": "確認刪除"
+    },
+    "variables": {
+      "addVariable": "新增變數",
+      "key": "鍵",
+      "value": "值",
+      "category": "類別",
+      "categoryEnv": "環境",
+      "sensitive": "敏感",
+      "empty": "此工作區未配置任何變數。",
+      "emptyValue": "空",
+      "enterNewValue": "輸入新值",
+      "deleteConfirm": "刪除變數 \"{key}\"？"
+    },
+    "runs": {
+      "options": "選項",
+      "hideOptions": "隱藏選項",
+      "queueDestroy": "排隊銷毀",
+      "queueDestroyTitle": "排隊一次銷毀計畫",
+      "destroyAllConfirm": "銷毀所有資源？",
+      "confirmDestroy": "確認銷毀",
+      "queuePlan": "排隊計畫",
+      "queueRun": "排隊執行",
+      "queuePlanConfirm": "為此工作區排隊一次推測性計畫？",
+      "queueApplyConfirm": "排隊一次 plan + apply 執行？這可能會更改基礎設施。",
+      "planOptions": "計畫選項",
+      "targetResources": "目標資源",
+      "replaceResources": "替換資源",
+      "commaSeparated": "（逗號分隔）",
+      "planOnly": "僅計畫",
+      "refreshOnly": "僅重新整理",
+      "skipRefresh": "跳過重新整理",
+      "allowEmptyApply": "允許空應用",
+      "vcsRef": "VCS 引用",
+      "branch": "分支",
+      "tag": "標籤",
+      "defaultBranch": "預設（{branch}）",
+      "nonDefaultRefNote": "已選擇非預設引用 — 執行將僅計畫",
+      "empty": "此工作區暫無執行。",
+      "runId": "執行 ID",
+      "status": "狀態",
+      "type": "型別",
+      "changes": "更改",
+      "source": "來源",
+      "triggeredBy": "觸發者",
+      "created": "建立時間",
+      "needsConfirm": "需要確認",
+      "typeDestroy": "銷毀",
+      "typePlanOnly": "僅計畫",
+      "typePlanApply": "plan + apply",
+      "sourceModuleTest": "模組測試",
+      "sourceModulePublish": "模組釋出"
+    },
+    "state": {
+      "deleteConfirm": "刪除狀態版本 #{serial}？此操作無法撤銷。",
+      "rollbackConfirm": "回滾到狀態版本 #{serial}？將建立一個內容相同的新版本。",
+      "confirmDelete": "確認刪除",
+      "confirmRollback": "確認回滾",
+      "uploadState": "上傳狀態",
+      "empty": "此工作區暫無狀態版本。",
+      "serial": "序列號",
+      "createdBy": "建立者",
+      "run": "執行",
+      "size": "大小",
+      "created": "建立時間",
+      "runner": "執行器",
+      "latest": "最新"
+    },
+    "configurations": {
+      "description": "此工作區已上傳的源歸檔，最新的在前。選擇兩行進行比較。",
+      "selectedCount": "已選擇 {count}/2",
+      "compare": "比較",
+      "comparing": "正在比較…",
+      "empty": "暫無配置版本。當 `terraform plan` 上傳或 VCS 推送觸發執行時，它們會立即在此處顯示。",
+      "id": "ID",
+      "source": "來源",
+      "status": "狀態",
+      "created": "建立時間",
+      "current": "當前",
+      "selectForCompare": "選擇 {id} 進行比較",
+      "compareLabel": "比較",
+      "diff": "差異",
+      "filesChanged": "{count} 個檔案已更改",
+      "oversized": "已跳過 {count, plural, one {# 個超大檔案} other {# 個超大檔案}}：{files}",
+      "noDiff": "這些版本之間沒有內容差異。",
+      "binaryChanged": "二進位制檔案已更改 — 未渲染差異。",
+      "diffType": {
+        "added": "已新增",
+        "removed": "已移除",
+        "modified": "已修改",
+        "binary-changed": "二進位制"
+      }
+    },
+    "notifications": {
+      "addNotification": "新增通知",
+      "name": "名稱",
+      "namePlaceholder": "部署通知",
+      "destinationType": "目標型別",
+      "typeGeneric": "通用 Webhook",
+      "typeEmail": "電子郵件",
+      "url": "URL",
+      "hmacToken": "HMAC 令牌（可選）",
+      "signingSecret": "簽名金鑰",
+      "emailAddresses": "電子郵箱地址（逗號分隔）",
+      "triggerEvents": "觸發事件",
+      "createNotification": "建立通知",
+      "empty": "此工作區沒有通知配置。",
+      "ok": "正常",
+      "err": "錯誤 {status}",
+      "fail": "失敗",
+      "http": "HTTP {status}",
+      "verify": "驗證",
+      "history": "歷史記錄",
+      "deliveryHistory": "投遞歷史",
+      "enableConfirm": "啟用此通知？",
+      "disableConfirm": "停用此通知？",
+      "deleteConfirm": "刪除通知 \"{name}\"？"
+    },
+    "runTasks": {
+      "addRunTask": "新增執行任務",
+      "name": "名稱",
+      "namePlaceholder": "OPA 策略檢查",
+      "webhookUrl": "Webhook URL",
+      "stage": "階段",
+      "enforcementLevel": "強制級別",
+      "hmacKey": "HMAC 金鑰（可選）",
+      "hmacKeyPlaceholder": "用於 webhook 驗證的簽名金鑰",
+      "createRunTask": "建立執行任務",
+      "empty": "此工作區未配置任何執行任務。",
+      "enableConfirm": "啟用此執行任務？",
+      "disableConfirm": "停用此執行任務？",
+      "deleteConfirm": "刪除執行任務 \"{name}\"？"
+    },
+    "runTriggers": {
+      "title": "執行觸發器",
+      "description": "當源工作區完成一次應用時，下游工作區會自動排隊一次新執行。每個目標最多 20 個源工作區。",
+      "inboundHeading": "在此處觸發執行的源工作區",
+      "inboundEmpty": "沒有源工作區在此工作區上觸發執行。",
+      "pickerPlaceholder": "搜尋要新增為源的工作區…",
+      "outboundHeading": "此工作區觸發的目標工作區",
+      "outboundEmpty": "此工作區不會在任何其他工作區上觸發執行。",
+      "destinationNote": "（目標；請從那裡移除）",
+      "removeConfirm": "移除此執行觸發器？"
+    },
+    "sharing": {
+      "title": "遠端狀態共享",
+      "description": "由生產者控制的跨工作區 <code></code> 允許列表。狀態資料含有機密 — 請審慎授予。<docs>文件</docs>",
+      "outboundHeading": "被授權讀取此工作區狀態的工作區",
+      "outboundEmpty": "此工作區的狀態未與任何其他工作區共享。",
+      "grantedBy": "由 {by} 授予",
+      "revoke": "撤銷",
+      "revokeConfirm": "移除此遠端狀態共享？消費者將失去對此狀態的訪問權限。",
+      "pickerPlaceholder": "搜尋要授權為消費者的工作區…",
+      "inboundHeading": "此工作區被授權可讀取其狀態的工作區",
+      "inboundEmpty": "此工作區未被授權透過 terraform_remote_state 讀取任何其他工作區的狀態。",
+      "producerNote": "（生產者；請從那裡撤銷）"
+    },
+    "runMessages": {
+      "manualDriftCheck": "從 UI 手動進行漂移檢查",
+      "queued": "從 UI 排隊",
+      "queuedSpeculative": "從 UI 排隊（推測性）",
+      "destroyQueued": "從 UI 排隊銷毀"
+    },
+    "errors": {
+      "loadWorkspace": "載入工作區失敗",
+      "loadRuns": "載入執行失敗",
+      "loadVariables": "載入變數失敗",
+      "loadStateVersions": "載入狀態版本失敗",
+      "loadConfigurations": "載入配置版本失敗",
+      "loadNotifications": "載入通知失敗",
+      "loadOutboundConsumers": "載入出站遠端狀態消費者失敗",
+      "loadInboundConsumers": "載入入站遠端狀態消費者失敗",
+      "loadConsumers": "載入遠端狀態消費者失敗",
+      "loadInboundTriggers": "載入入站執行觸發器失敗",
+      "loadOutboundTriggers": "載入出站執行觸發器失敗",
+      "loadTriggers": "載入執行觸發器失敗",
+      "loadRunTasks": "載入執行任務失敗",
+      "downloadStateFile": "下載狀態檔案失敗",
+      "downloadFailed": "下載失敗",
+      "downloadFailedStatus": "下載失敗（{status}）",
+      "downloadTicketMissingUrl": "下載憑證回應缺少 URL",
+      "diffFailed": "差異比較失敗",
+      "diffFailedStatus": "差異比較失敗（{status}）",
+      "authorizeConsumer": "授權消費者失敗",
+      "revoke": "撤銷失敗",
+      "revokeConsumer": "撤銷消費者失敗",
+      "addTrigger": "新增執行觸發器失敗",
+      "removeTrigger": "移除執行觸發器失敗",
+      "createRunTask": "建立執行任務失敗",
+      "createRunTaskStatus": "建立執行任務失敗（{status}）",
+      "update": "更新失敗",
+      "toggleRunTask": "切換執行任務失敗",
+      "delete": "刪除失敗",
+      "deleteRunTask": "刪除執行任務失敗",
+      "labelLockout": "此標籤更改會降低您的訪問權限。",
+      "updateWorkspace": "更新工作區失敗",
+      "lockWorkspace": "鎖定工作區失敗",
+      "unlockWorkspace": "解鎖工作區失敗",
+      "updateAiSummary": "更新 AI 摘要設定失敗",
+      "updateSlackChannel": "更新 Slack 頻道失敗",
+      "updateDriftSettings": "更新漂移設定失敗",
+      "updateDriftInterval": "更新漂移間隔失敗",
+      "updatePlanExpiry": "更新計畫過期設定失敗",
+      "queueDriftCheck": "排隊漂移檢查失敗",
+      "queueDriftCheckStatus": "排隊漂移檢查失敗（{status}）",
+      "dismissDrift": "關閉漂移失敗",
+      "dismissDriftStatus": "關閉漂移失敗（{status}）",
+      "deleteWorkspace": "刪除工作區失敗",
+      "addVariable": "新增變數失敗",
+      "addVariableStatus": "新增變數失敗（{status}）",
+      "deleteVariable": "刪除變數失敗",
+      "updateVariable": "更新變數失敗",
+      "queuePlan": "排隊計畫失敗",
+      "queuePlanStatus": "排隊計畫失敗（{status}）",
+      "queueDestroy": "排隊銷毀失敗",
+      "queueDestroyStatus": "排隊銷毀失敗（{status}）",
+      "createNotification": "建立通知失敗",
+      "createNotificationStatus": "建立通知失敗（{status}）",
+      "toggleNotification": "切換通知失敗",
+      "deleteNotification": "刪除通知失敗",
+      "verificationFailed": "驗證失敗",
+      "verificationDeliveryFailed": "驗證投遞失敗：{detail}",
+      "unknownError": "未知錯誤",
+      "failed": "失敗",
+      "deleteStateVersion": "刪除狀態版本失敗",
+      "rollbackStateVersion": "回滾狀態版本失敗",
+      "stateActionFailed": "狀態操作失敗",
+      "uploadState": "上傳狀態失敗",
+      "uploadStateFile": "上傳狀態檔案失敗"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "載入狀態圖失敗。",
+      "emptyState": "暫無狀態 — 執行一次 plan 和 apply，或上傳狀態，然後此圖將會填充。",
+      "stateVersionLabel": "狀態版本",
+      "currentSuffix": "（當前）",
+      "colorByLabel": "著色依據",
+      "viewGraph": "圖形",
+      "viewTable": "表格",
+      "resourceCount": "{count, plural, one {# 個資源} other {# 個資源}}",
+      "dependencyCount": "{count, plural, one {# 個依賴項} other {# 個依賴項}}",
+      "truncated": "正在顯示 {total} 個資源中的前 {shown} 個 — 為便於閱讀，圖形已被限制。",
+      "colResource": "資源",
+      "colType": "型別",
+      "colMode": "模式",
+      "colModule": "模組",
+      "colDependedOnBy": "被依賴於",
+      "rootModule": "（根）"
+    },
+    "impact": {
+      "notAvailable": "此執行沒有可用的影響圖。",
+      "title": "影響圖",
+      "subtitle": "{count, plural, one {# 個資源} other {# 個資源}}的計畫",
+      "hint": "每個球體是一個資源；每個箭頭指向它所依賴的物件。點選某個節點 → 其傳遞性<b>影響</b>（所有下游物件）會亮起。",
+      "downstreamAffected": "下游受影響",
+      "action": {
+        "create": "建立",
+        "update": "更新",
+        "replace": "替換",
+        "destroy": "銷毀",
+        "unchanged": "無更改"
+      }
+    },
+    "estate": {
+      "navHint": "拖動以旋轉 · 滾動以縮放 · 右鍵拖動以平移 · <em>點選某個節點以圍繞它旋轉</em>"
+    },
+    "state3d": {
+      "title": "狀態圖",
+      "hint": "每個球體是一個資源；每個箭頭指向它所依賴的物件。點選某個節點 → 傳遞性<b>依賴於它</b>的資源會亮起。",
+      "dataSource": "資料來源",
+      "managed": "受管理",
+      "dependOnThis": "依賴於此"
+    },
+    "resource3d": {
+      "resetView": "重置檢視",
+      "clear": "清除",
+      "key": "圖例",
+      "resources": "資源",
+      "hideKey": "隱藏圖例",
+      "hideResources": "隱藏資源",
+      "resourcesCount": "資源（{count}）",
+      "filterPlaceholder": "篩選資源…",
+      "navHint": "拖動以旋轉 · 滾動以縮放 · 右鍵拖動以平移 · <em>點選某個資源以圍繞它旋轉</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "返回執行鉤子",
+    "defaultDescription": "執行鉤子",
+    "notFound": "未找到執行鉤子",
+    "scriptEmpty": "（空）",
+    "tabs": {
+      "settings": "設定",
+      "workspaces": "工作區"
+    },
+    "common": {
+      "yes": "是",
+      "no": "否"
+    },
+    "actions": {
+      "edit": "編輯",
+      "cancel": "取消",
+      "save": "儲存",
+      "saving": "正在儲存...",
+      "delete": "刪除",
+      "deleting": "正在刪除...",
+      "confirmDelete": "確認刪除",
+      "add": "新增",
+      "adding": "正在新增...",
+      "remove": "移除"
+    },
+    "settings": {
+      "heading": "設定"
+    },
+    "fields": {
+      "name": "名稱",
+      "description": "描述",
+      "hookPoint": "鉤子點",
+      "priority": "優先順序",
+      "enabled": "已啟用",
+      "script": "指令碼（<code>/bin/sh -c</code>）"
+    },
+    "delete": {
+      "heading": "刪除執行鉤子",
+      "description": "永久刪除此鉤子並將其從所有工作區移除。"
+    },
+    "workspaces": {
+      "scopeNote": "此鉤子僅在下方關聯的工作區上執行。沒有全域作用域。",
+      "associate": "關聯工作區",
+      "workspaceLabel": "工作區",
+      "selectPlaceholder": "選擇一個工作區...",
+      "empty": "沒有工作區與此鉤子關聯。",
+      "colWorkspace": "工作區",
+      "colActions": "操作"
+    },
+    "confirm": {
+      "removeWorkspace": "從鉤子中移除此工作區？該鉤子將不再為其執行。"
+    },
+    "success": {
+      "updated": "已更新執行鉤子",
+      "workspaceAssociated": "已關聯工作區",
+      "workspaceRemoved": "已移除工作區"
+    },
+    "errors": {
+      "load": "載入執行鉤子失敗",
+      "update": "更新執行鉤子失敗",
+      "delete": "刪除執行鉤子失敗",
+      "addWorkspace": "新增工作區失敗",
+      "removeWorkspace": "移除工作區失敗"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "策略集",
+    "notFound": "未找到",
+    "unknown": "未知",
+    "subtitle": "OPA 策略集 · 由 {createdBy} 建立",
+    "settings": {
+      "heading": "設定"
+    },
+    "fields": {
+      "description": "描述",
+      "enforcement": "強制方式",
+      "enabled": "已啟用",
+      "globalScope": "全域（每個工作區）"
+    },
+    "enforcement": {
+      "advisory": "建議（警告）",
+      "mandatory": "強制（阻止應用）"
+    },
+    "scope": {
+      "allowLabels": "允許標籤（key: v1, v2）",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "允許名稱（每行一個）",
+      "denyLabels": "拒絕標籤（key: v1, v2）",
+      "denyNames": "拒絕名稱（每行一個）"
+    },
+    "vcs": {
+      "heading": "VCS 配置",
+      "repoUrl": "倉庫 URL",
+      "branch": "分支",
+      "branchPlaceholder": "main（預設）",
+      "policyPath": "策略路徑"
+    },
+    "vcsBanner": {
+      "syncedFrom": "策略同步自",
+      "at": "於",
+      "lastSynced": "上次同步 {time}",
+      "commit": "（提交 {sha}）",
+      "syncError": "同步錯誤：{error}"
+    },
+    "policies": {
+      "heading": "策略（{count}）",
+      "vcsManaged": "由倉庫管理 — 透過 PR 推送更改",
+      "empty": "此策略集中尚無策略。"
+    },
+    "addPolicy": {
+      "namePlaceholder": "策略名稱",
+      "descPlaceholder": "描述（可選）",
+      "regoHint": "Rego v1。必須宣告 <code>package terrapod</code> 並透過 <code>deny</code> 集表達違規。計畫為 <code>input</code>；Terrapod 上下文為 <code>data.terrapod_context</code>。"
+    },
+    "actions": {
+      "saving": "正在儲存...",
+      "saveSettings": "儲存設定",
+      "syncNow": "立即同步",
+      "cancel": "取消",
+      "addPolicy": "新增策略",
+      "deleteSet": "刪除策略集",
+      "validatingRego": "正在驗證 Rego...",
+      "delete": "刪除",
+      "savePolicy": "儲存策略"
+    },
+    "confirm": {
+      "deleteSet": "刪除此策略集及其所有策略？已記錄的執行評估會保留。",
+      "deletePolicy": "刪除策略 \"{name}\"？"
+    },
+    "errors": {
+      "load": "載入策略集失敗",
+      "save": "儲存策略集失敗",
+      "saveStatus": "儲存失敗（{status}）",
+      "delete": "刪除策略集失敗",
+      "deleteStatus": "刪除失敗（{status}）",
+      "addPolicy": "新增策略失敗",
+      "addPolicyStatus": "新增策略失敗（{status}）",
+      "savePolicy": "儲存策略失敗",
+      "savePolicyStatus": "儲存策略失敗（{status}）",
+      "deletePolicy": "刪除策略失敗",
+      "deletePolicyStatus": "刪除失敗（{status}）"
+    }
+  },
+  "slackLink": {
+    "title": "將 Slack 連線到 Terrapod",
+    "loading": "正在載入…",
+    "checking": "正在檢查您的關聯…",
+    "linking": "正在關聯您的 Slack 帳戶…",
+    "unknown": "未知",
+    "confirm": {
+      "prompt": "將此 Slack 帳戶關聯到<em>您的</em> Terrapod 身分？今後每個 Slack 操作（批准/丟棄）都將以此 Terrapod 使用者及其權限執行。",
+      "slackUser": "Slack 使用者",
+      "slackTeam": "Slack 團隊",
+      "terrapodAccount": "Terrapod 帳戶",
+      "warning": "僅當您本人剛剛從 Slack 發起此關聯時才繼續。如果不是，請關閉此標籤頁且不要關聯 — 這會將上方的 Slack 帳戶繫結到<em>您的</em> Terrapod 身分。",
+      "button": "確認並關聯"
+    },
+    "success": {
+      "message": "您的 Slack 帳戶現已關聯到 Terrapod。",
+      "linkedAs": "已關聯為 <em>{email}</em>。您可以關閉此標籤頁並返回 Slack。"
+    },
+    "errors": {
+      "missingLink": "關聯缺失或無效。請在 Slack 中使用 Terrapod 關聯命令重新開始。",
+      "invalidLink": "此關聯無效、已過期或已被使用。請從 Slack 重新開始關聯。",
+      "linkingFailed": "關聯失敗。"
+    }
+  },
+  "cliComplete": {
+    "loading": "正在載入...",
+    "completing": "正在完成身分驗證...",
+    "invalid": {
+      "title": "無效請求",
+      "description": "缺少必需的引數。"
+    },
+    "success": {
+      "title": "登入成功",
+      "complete": "已建立 API 令牌。您可以關閉此標籤頁。"
+    },
+    "fallback": {
+      "description": "無法自動連線到 CLI。",
+      "button": "點選此處手動完成"
+    },
+    "timeout": {
+      "description": "CLI 可能尚未完成令牌交換。請檢查您的終端。"
+    }
+  },
+  "apiDocs": {
+    "view": "檢視：",
+    "redocTitle": "ReDoc API 文件"
+  }
+}

@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "Arbetsytor",
+    "estate": "Bestånd",
+    "registry": "Register",
+    "modules": "Moduler",
+    "providers": "Providers",
+    "catalog": "Katalog",
+    "agentPools": "Agentpooler",
+    "admin": "Admin",
+    "users": "Användare",
+    "roles": "Roller",
+    "vcsConnections": "VCS-anslutningar",
+    "variableSets": "Variabeluppsättningar",
+    "autodiscovery": "Autoupptäckt",
+    "bulkUpdate": "Massuppdatering",
+    "executionHooks": "Exekveringskrokar",
+    "policySets": "Policyuppsättningar",
+    "providerTemplates": "Provider-mallar",
+    "catalogAdmin": "Katalogadmin",
+    "cache": "Cache",
+    "auditLog": "Granskningslogg",
+    "help": "Hjälp",
+    "apiReference": "API-referens",
+    "docs": "Dokumentation",
+    "account": "Konto",
+    "apiTokens": "API-tokens",
+    "sessions": "Sessioner",
+    "logOut": "Logga ut",
+    "menu": "Meny",
+    "openMenu": "Öppna meny",
+    "openAccountMenu": "Öppna kontomeny",
+    "closeMenu": "Stäng meny"
+  },
+  "switcher": {
+    "language": "Språk",
+    "changeLanguage": "Byt språk"
+  },
+  "workspaces": {
+    "title": "Arbetsytor",
+    "description": "Hantera Terraform-arbetsytor, tillstånd och körningar",
+    "new": "Ny arbetsyta",
+    "cancel": "Avbryt",
+    "create": "Skapa arbetsyta",
+    "creating": "Skapar…",
+    "loadFailed": "Det gick inte att läsa in arbetsytor",
+    "createFailed": "Det gick inte att skapa arbetsytan",
+    "form": {
+      "name": "Namn",
+      "namePattern": "Endast bokstäver, siffror, bindestreck och understreck. Måste börja med en bokstav eller siffra.",
+      "namePlaceholder": "my-workspace",
+      "executionMode": "Exekveringsläge",
+      "local": "Lokal",
+      "agent": "Agent",
+      "executionBackend": "Exekveringsbackend",
+      "version": "Version",
+      "versionTitle": "Version i formatet X.Y eller X.Y.Z (t.ex. 1.11 eller 1.11.5)",
+      "versionPlaceholder": "t.ex. 1.11 eller 1.11.5",
+      "cpuRequest": "CPU-begäran",
+      "cpuTitle": "Kubernetes CPU-kvantitet: hela kärnor (1, 2) eller millicores (500m, 100m)",
+      "cpuHint": "t.ex. 1, 0.5, 500m",
+      "memoryRequest": "Minnesbegäran",
+      "memoryTitle": "Kubernetes minneskvantitet: byte (1000) eller med suffix (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "t.ex. 2Gi, 512Mi, 1Ti",
+      "agentPool": "Agentpool",
+      "none": "Ingen",
+      "autoApply": "Auto-applicera",
+      "enabled": "Aktiverad",
+      "workingDirectory": "Arbetskatalog",
+      "workingDirectoryPlaceholder": "t.ex. environments/dev",
+      "workingDirectoryHint": "Underkatalog i repot som innehåller .tf-filer",
+      "vcsConnection": "VCS-anslutning",
+      "vcsRepoUrl": "VCS-repositorie-URL",
+      "vcsRepoUrlTitle": "Måste vara en HTTP- eller HTTPS-URL",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "VCS-gren",
+      "vcsBranchPlaceholder": "main (standard)"
+    },
+    "stats": {
+      "total": "Totalt",
+      "health": "Hälsa",
+      "locked": "Låst",
+      "clearAllFilters": "Rensa alla filter",
+      "clearHealthFilter": "Rensa filter för hälsoproblem",
+      "filterHealth": "Filtrera till arbetsytor med hälsoproblem",
+      "clearLockedFilter": "Rensa låst-filter",
+      "filterLocked": "Filtrera till låsta arbetsytor"
+    },
+    "filter": {
+      "placeholder": "Filtrera efter namn, etikett eller status — t.ex. \"eu1\", \"env:prod\", \"status:errored\"",
+      "ariaLabel": "Filtrera arbetsytor",
+      "clear": "Rensa",
+      "status": "Status",
+      "label": "Etikett",
+      "back": "tillbaka",
+      "valueCount": "{count, plural, one {# värde} other {# värden}}",
+      "removeTerm": "Ta bort denna term",
+      "showing": "Visar {filtered} av {total}",
+      "termName": "namn: {value}",
+      "termStatus": "status: {value}",
+      "termLabelAny": "{key}: (valfri)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "status",
+      "hintHealth": "hälsa",
+      "hintLabel": "etikett",
+      "hintLabelKey": "etikettnyckel",
+      "hintName": "namn"
+    },
+    "row": {
+      "removeLabelFilter": "Klicka för att ta bort från filtret",
+      "addLabelFilter": "Klicka för att filtrera efter denna etikett"
+    },
+    "table": {
+      "name": "Namn",
+      "mode": "Läge",
+      "pool": "Pool",
+      "resources": "Resurser",
+      "status": "Status",
+      "created": "Skapad",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "Inga arbetsytor ännu. Skapa en för att komma igång.",
+      "noMatch": "Inga arbetsytor matchar detta filter."
+    }
+  },
+  "status": {
+    "state-diverged": "Tillstånd avvikande",
+    "vcs-error": "VCS-fel",
+    "drifted": "Drift",
+    "errored": "Fel",
+    "needs-confirm": "Behöver bekräftas",
+    "planning": "Planerar",
+    "applying": "Applicerar",
+    "canceling": "Avbryter",
+    "confirmed": "Bekräftad",
+    "queued": "I kö",
+    "pending": "Väntar",
+    "applied": "Applicerad",
+    "planned": "Planerad",
+    "canceled": "Avbruten",
+    "discarded": "Kasserad",
+    "pendingDeletion": "Väntar på borttagning",
+    "archived": "Arkiverad"
+  },
+  "auth": {
+    "loading": "Laddar...",
+    "subtitle": "Logga in för att hantera din infrastruktur",
+    "subtitleCli": "Logga in för att auktorisera CLI:t",
+    "emailLabel": "E-post",
+    "passwordLabel": "Lösenord",
+    "signIn": "Logga in",
+    "signingIn": "Loggar in...",
+    "signInWith": "Logga in med {provider}",
+    "or": "eller",
+    "noProviders": "Inga autentiseringsleverantörer konfigurerade",
+    "completingSignIn": "Slutför inloggning...",
+    "callbackFailedTitle": "Autentisering misslyckades",
+    "tryAgain": "Försök igen",
+    "errors": {
+      "loadProviders": "Det gick inte att läsa in leverantörer",
+      "authenticationFailed": "Autentisering misslyckades ({status})",
+      "tokenExchangeFailed": "Tokenutbyte misslyckades ({status})",
+      "loginFailed": "Inloggning misslyckades",
+      "startLoginFailed": "Det gick inte att starta inloggning",
+      "missingCodeOrState": "Auktoriseringskod eller state saknas",
+      "stateMismatch": "State stämmer inte — möjlig CSRF-attack",
+      "missingVerifier": "PKCE-verifierare saknas — försök logga in igen"
+    }
+  },
+  "estate": {
+    "title": "Beståndstopologi",
+    "description": "Alla arbetsytor du kan se och de moduler de använder, sammankopplade via körningsutlösare, fjärrtillstånd och modullänkar. Gruppera efter valfri axel som passar ditt bestånd — plattformen tvingar inte fram någon etikettkonvention.",
+    "errors": {
+      "load": "Det gick inte att läsa in beståndsgrafen."
+    },
+    "groupBy": {
+      "label": "Gruppera efter"
+    },
+    "view": {
+      "graph": "Graf",
+      "table": "Tabell"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# arbetsyta} other {# arbetsytor}}",
+      "modules": "{count, plural, one {# modul} other {# moduler}}",
+      "dependencies": "{count, plural, one {# beroende} other {# beroenden}}"
+    },
+    "legend": {
+      "registryModule": "registermodul"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {arbetsyta använder denna — att uppdatera den planerar om den} other {arbetsytor använder denna — att uppdatera den planerar om dem alla}}",
+      "dependOnThis": "{count, plural, one {beror på denna} other {beror på denna}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Arbetsytor",
+        "col": {
+          "workspace": "Arbetsyta",
+          "group": "Grupp",
+          "agentPool": "Agentpool",
+          "dependedOnBy": "Beroende av",
+          "modulesUsed": "Använda moduler"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Moduler",
+        "col": {
+          "module": "Modul",
+          "usedBy": "Används av (arbetsytor)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "Etiketter",
+    "description": "Bläddra bland etiketter som används i arbetsytor, agentpooler, registermoduler och registerproviders. Skrivskyddad — etiketter redigeras på varje entitets egen sida.",
+    "none": "Ingen.",
+    "emptyKeys": "Inga etiketter används ännu. Etikettera valfri arbetsyta, agentpool, registermodul eller registerprovider för att börja gruppera saker här.",
+    "emptyValues": "Inga värden för \"{key}\". Antingen bär ingen läsbar entitet denna etikett, eller så togs den bort sedan senaste vyn.",
+    "loadKeysFailed": "Det gick inte att läsa in etiketter ({status})",
+    "loadValuesFailed": "Det gick inte att läsa in värden för {key} ({status})",
+    "loadEntitiesFailed": "Det gick inte att läsa in entiteter ({status})",
+    "columns": {
+      "labelKey": "Etikettnyckel",
+      "distinctValues": "Distinkta värden",
+      "value": "Värde",
+      "total": "Totalt"
+    },
+    "entity": {
+      "workspaces": "Arbetsytor",
+      "agentPools": "Agentpooler",
+      "modules": "Moduler",
+      "providers": "Providers"
+    },
+    "deprecated": {
+      "badge": "Föråldrad och stöds inte.",
+      "body": "Etikettläsaren finns inte längre i huvudnavigeringen och kommer att tas bort i en framtida version. Filtrera efter etikett från sidan <workspacesLink>Arbetsytor</workspacesLink> istället. Om du är beroende av denna sida, vänligen <issueLink>öppna ett ärende</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "API-tokens",
+      "description": "Hantera autentiseringstokens för CLI och automatisering",
+      "descriptionAll": "Alla tokens för alla användare",
+      "myTokens": "Mina tokens",
+      "allTokens": "Alla tokens",
+      "createToken": "Skapa token",
+      "cancel": "Avbryt",
+      "tokenReady": "Token klar",
+      "tokenReadyHelp": "Kopiera denna token nu — den kommer inte att visas igen.",
+      "dismissToken": "Stäng token",
+      "hide": "Dölj",
+      "show": "Visa",
+      "copy": "Kopiera",
+      "empty": "Inga API-tokens ännu.",
+      "noDescription": "Ingen beskrivning",
+      "detached": "frikopplad",
+      "never": "Aldrig",
+      "selected": "{count, plural, one {# token vald} other {# tokens valda}}",
+      "revokeSelected": "Återkalla valda",
+      "revoking": "Återkallar...",
+      "clearSelection": "Rensa markering",
+      "rotate": "Rotera",
+      "rotating": "Roterar...",
+      "revoke": "Återkalla",
+      "confirmRotate": "Rotera denna token? Den nuvarande hemligheten slutar fungera omedelbart och en ny utfärdas.",
+      "confirmBulkRevoke": "{count, plural, one {Återkalla # token?} other {Återkalla # tokens?}}",
+      "kinds": {
+        "interactive": {
+          "label": "Personlig",
+          "help": "En personlig token för CLI och tillfällig automatisering. Bär dina fullständiga aktuella behörigheter."
+        },
+        "service_bound": {
+          "label": "Tjänst · bunden",
+          "help": "En tjänste-token med omfattning begränsad till en delmängd av dina roller. Dess åtkomst är snittet av dessa roller och dina egna — och den slutar fungera om ditt konto tas bort."
+        },
+        "service_detached": {
+          "label": "Tjänst · frikopplad",
+          "help": "En admin-hanterad tjänste-token med en absolut fastställd omfattning, inte bunden till någon användare. Använd för kritisk maskin-till-maskin-automatisering som måste överleva att någon enskild person lämnar."
+        }
+      },
+      "lifespans": {
+        "720": "30 dagar",
+        "2160": "90 dagar",
+        "4320": "180 dagar",
+        "8760": "1 år"
+      },
+      "filter": {
+        "all": "Alla typer"
+      },
+      "form": {
+        "description": "Beskrivning",
+        "descriptionPlaceholder": "CI/CD-pipeline-token",
+        "kind": "Typ",
+        "lifespan": "Livslängd",
+        "create": "Skapa",
+        "creating": "Skapar...",
+        "pinnedRoles": "Fastställda roller",
+        "pinnedRolesHelp": "— omfattningen denna token är begränsad till",
+        "pinnedRolesCapped": "(begränsad till din egen åtkomst)",
+        "noCustomRoles": "Inga anpassade roller definierade. Skapa roller under Admin → Roller först.",
+        "noScopedRoles": "Du har inga omfångsbegränsade roller att fastställa. Denna token skulle inte ha någon åtkomst."
+      },
+      "columns": {
+        "description": "Beskrivning",
+        "kind": "Typ",
+        "boundTo": "Bunden till",
+        "created": "Skapad",
+        "lastUsed": "Senast använd",
+        "expires": "Går ut",
+        "actions": "Åtgärder"
+      },
+      "errors": {
+        "load": "Det gick inte att läsa in tokens",
+        "create": "Det gick inte att skapa token ({status})",
+        "createGeneric": "Det gick inte att skapa token",
+        "rotate": "Det gick inte att rotera token ({status})",
+        "rotateGeneric": "Det gick inte att rotera token",
+        "revoke": "Det gick inte att återkalla token ({status})",
+        "revokeGeneric": "Det gick inte att återkalla token",
+        "bulkRevoke": "Det gick inte att återkalla tokens"
+      }
+    },
+    "sessions": {
+      "title": "Sessioner",
+      "description": "Dina aktiva sessioner",
+      "descriptionAll": "Alla aktiva sessioner på plattformen",
+      "empty": "Inga aktiva sessioner.",
+      "revokeAll": "Återkalla alla",
+      "current": "Aktuell",
+      "columns": {
+        "provider": "Leverantör",
+        "created": "Skapad",
+        "expires": "Går ut",
+        "lastActive": "Senast aktiv",
+        "token": "Token"
+      },
+      "errors": {
+        "load": "Det gick inte att läsa in sessioner",
+        "revoke": "Det gick inte att återkalla sessioner ({status})",
+        "revokeGeneric": "Det gick inte att återkalla sessioner"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Moduler",
+      "description": "Privat Terraform-modulregister",
+      "cancel": "Avbryt",
+      "createModule": "Skapa modul",
+      "empty": "Inga moduler ännu. Skapa en för att komma igång.",
+      "providerLabel": "Provider: {provider}",
+      "versionCount": "{count, plural, one {# version} other {# versioner}}",
+      "loadFailed": "Det gick inte att läsa in moduler",
+      "createFailed": "Det gick inte att skapa modulen",
+      "createFailedStatus": "Det gick inte att skapa modulen ({status})",
+      "form": {
+        "name": "Namn",
+        "provider": "Provider",
+        "slugTitle": "Endast gemener, siffror och bindestreck. Måste börja med en gemen bokstav.",
+        "addressNote": "Namn och provider utgör modulens registeradress och kan inte ändras efter att den skapats.",
+        "vcsConnectionOptional": "VCS-anslutning (valfritt)",
+        "noneUploadManually": "Ingen — ladda upp versioner manuellt",
+        "repositoryUrl": "Repositorie-URL",
+        "branchOptional": "Gren (valfritt)",
+        "branchPlaceholder": "main (lämna tomt för standard)",
+        "tagPattern": "Taggmönster",
+        "tagPatternHint": "Endast taggar som matchar detta mönster skapar versioner (t.ex. v1.0.0)",
+        "labelsOptional": "Etiketter (valfritt)",
+        "creating": "Skapar...",
+        "create": "Skapa"
+      }
+    },
+    "providers": {
+      "title": "Providers",
+      "description": "Privat Terraform-providerregister",
+      "cancel": "Avbryt",
+      "createProvider": "Skapa provider",
+      "empty": "Inga providers ännu. Skapa en för att komma igång.",
+      "loadFailed": "Det gick inte att läsa in providers",
+      "createFailed": "Det gick inte att skapa providern",
+      "createFailedStatus": "Det gick inte att skapa providern ({status})",
+      "form": {
+        "name": "Namn",
+        "slugTitle": "Endast gemener, siffror och bindestreck. Måste börja med en gemen bokstav.",
+        "creating": "Skapar...",
+        "create": "Skapa"
+      }
+    },
+    "meta": {
+      "title": "Metadata",
+      "edit": "Redigera",
+      "cancel": "Avbryt",
+      "save": "Spara",
+      "saving": "Sparar...",
+      "saveAnyway": "Spara ändå",
+      "revertLabels": "Återställ etiketter",
+      "owner": "Ägare",
+      "ownerNone": "Ingen",
+      "ownerPlaceholder": "user@example.com",
+      "labels": "Etiketter"
+    },
+    "moduleDetail": {
+      "notFound": "Modulen hittades inte",
+      "loadFailed": "Det gick inte att läsa in modulen",
+      "updateFailed": "Det gick inte att uppdatera modulen",
+      "labelLockoutDefault": "Denna etikettändring skulle minska din åtkomst.",
+      "providerLabel": "Provider: {provider}",
+      "cancel": "Avbryt",
+      "uploadVersion": "Ladda upp version",
+      "vcsConnected": "VCS ansluten",
+      "connectVcs": "Anslut VCS",
+      "deleteModule": "Ta bort modul",
+      "linkFailed": "Det gick inte att länka arbetsytan",
+      "linkFailedStatus": "Länkning misslyckades ({status})",
+      "unlinkConfirm": "Avlänka denna arbetsyta från modulen? Konsekvensanalys kommer inte längre att köras för den.",
+      "unlinkFailed": "Det gick inte att avlänka arbetsytan",
+      "unlinkFailedStatus": "Avlänkning misslyckades ({status})",
+      "uploadFailed": "Uppladdning misslyckades",
+      "uploadFailedStatus": "Uppladdning misslyckades ({status})",
+      "saveVcsFailed": "Det gick inte att spara VCS-konfigurationen",
+      "saveVcsFailedStatus": "Det gick inte att spara VCS-konfigurationen ({status})",
+      "disableVcsFailed": "Det gick inte att inaktivera VCS",
+      "disableVcsFailedStatus": "Det gick inte att inaktivera VCS ({status})",
+      "deleteFailed": "Borttagning misslyckades",
+      "deleteFailedStatus": "Borttagning misslyckades ({status})",
+      "upload": {
+        "intro": "Välj en katalog som innehåller dina Terraform-modulfiler. De paketeras till en tarball och laddas upp.",
+        "version": "Version",
+        "moduleDirectory": "Modulkatalog",
+        "selectDirectory": "Välj katalog",
+        "fileCount": "{count, plural, one {# fil} other {# filer}}",
+        "filesToInclude": "{count, plural, one {# fil att inkludera:} other {# filer att inkludera:}}",
+        "andMore": "...och {count} till",
+        "uploading": "Laddar upp...",
+        "upload": "Ladda upp"
+      },
+      "vcs": {
+        "intro": "Anslut denna modul till ett VCS-repositorie. Nya versioner publiceras automatiskt när semver-taggar som matchar taggmönstret pushas. Grencommit ensamt skapar inte versioner.",
+        "connection": "VCS-anslutning",
+        "selectConnection": "Välj en anslutning...",
+        "repositoryUrl": "Repositorie-URL",
+        "branchOptional": "Gren (valfritt)",
+        "branchPlaceholder": "main (lämna tomt för standard)",
+        "tagPattern": "Taggmönster",
+        "tagPatternHint": "Endast taggar som matchar detta mönster skapar versioner (t.ex. v1.0.0)",
+        "saving": "Sparar...",
+        "saveConfiguration": "Spara VCS-konfiguration",
+        "disconnect": "Koppla från VCS"
+      },
+      "vcsStatus": {
+        "connected": "VCS ansluten:",
+        "lastTag": "Senaste tagg: {tag}",
+        "firstVersionHint": "Pusha en semver-tagg (t.ex. <code>v1.0.0</code>) som matchar taggmönstret för att publicera den första versionen."
+      },
+      "links": {
+        "title": "Länkade arbetsytor",
+        "linkWorkspace": "Länka arbetsyta",
+        "description": "Länkade arbetsytor får spekulativa planer när PR:er öppnas mot denna modul, och standardkörningar när nya versioner publiceras.",
+        "searchPlaceholder": "Sök arbetsytor att länka…",
+        "empty": "Inga arbetsytor länkade ännu.",
+        "unlinkTitle": "Avlänka arbetsyta"
+      },
+      "interface": {
+        "title": "Indata och utdata",
+        "counts": "{inputs} indata, {outputs} utdata",
+        "versionLabel": "Version:",
+        "noData": "Inga gränssnittsdata tillgängliga för denna version.",
+        "inputs": "Indata",
+        "outputs": "Utdata",
+        "name": "Namn",
+        "type": "Typ",
+        "description": "Beskrivning",
+        "default": "Standard",
+        "required": "Obligatorisk",
+        "sensitive": "Känslig",
+        "requiredBadge": "obligatorisk",
+        "optionalBadge": "valfri",
+        "sensitiveBadge": "känslig",
+        "noneDeclared": "Denna modulversion deklarerar inga indata eller utdata."
+      },
+      "versions": {
+        "title": "Versioner",
+        "count": "{count, plural, one {# version} other {# versioner}}",
+        "emptyVcs": "Inga versioner ännu. Pusha en semver-tagg som matchar \"{pattern}\" till det anslutna repositoriet för att publicera en version.",
+        "emptyUpload": "Inga versioner ännu. Ladda upp en modul eller anslut VCS för att komma igång.",
+        "version": "Version",
+        "status": "Status",
+        "source": "Källa",
+        "actions": "Åtgärder",
+        "manualUpload": "manuell uppladdning",
+        "delete": "Ta bort"
+      },
+      "deleteDialog": {
+        "title": "Bekräfta borttagning",
+        "moduleBody": "Detta tar permanent bort denna modul och alla dess versioner.",
+        "versionBody": "Detta tar permanent bort version {version}.",
+        "cancel": "Avbryt",
+        "confirm": "Ta bort"
+      }
+    },
+    "providerDetail": {
+      "description": "Providerregister",
+      "deleteProvider": "Ta bort provider",
+      "publishNote": "Providerversioner publiceras med CLI:t <code>terrapod-publish</code>, som klientsignerar binärerna. Att ladda upp och signera providerbinärer från webbläsaren stöds inte längre. Denna sida är skrivskyddad för versioner och plattformar.",
+      "empty": "Inga versioner ännu. Publicera med CLI:t terrapod-publish för att komma igång.",
+      "loadVersionsFailed": "Det gick inte att läsa in versioner",
+      "updateFailed": "Det gick inte att uppdatera providern",
+      "labelLockoutDefault": "Denna etikettändring skulle minska din åtkomst.",
+      "deleteFailed": "Borttagning misslyckades",
+      "deleteFailedStatus": "Borttagning misslyckades ({status})",
+      "platformCount": "{count, plural, one {# plattform} other {# plattformar}}",
+      "delete": "Ta bort",
+      "os": "OS",
+      "arch": "Arkitektur",
+      "filename": "Filnamn",
+      "actions": "Åtgärder",
+      "deleteDialog": {
+        "title": "Bekräfta borttagning",
+        "providerBody": "Detta tar permanent bort denna provider och alla dess versioner.",
+        "versionBody": "Detta tar permanent bort version {version} och dess plattformar.",
+        "platformBody": "Detta tar permanent bort plattformen {os}/{arch}.",
+        "cancel": "Avbryt",
+        "confirm": "Ta bort"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "Användare",
+    "description": "Hantera lokala användarkonton",
+    "empty": "Inga användare hittades.",
+    "columns": {
+      "email": "E-post",
+      "displayName": "Visningsnamn",
+      "status": "Status",
+      "lastLogin": "Senaste inloggning",
+      "created": "Skapad",
+      "actions": "Åtgärder"
+    },
+    "form": {
+      "email": "E-post",
+      "displayName": "Visningsnamn",
+      "displayNamePlaceholder": "Jane Doe",
+      "passwordOptional": "Lösenord (valfritt)",
+      "passwordPlaceholder": "Ange ett starkt lösenord"
+    },
+    "reset": {
+      "title": "Återställ lösenord för {email}",
+      "newPassword": "Nytt lösenord"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "Mycket svagt",
+        "weak": "Svagt",
+        "fair": "Godtagbart",
+        "good": "Bra",
+        "strong": "Starkt"
+      }
+    },
+    "status": {
+      "active": "Aktiv",
+      "inactive": "Inaktiv",
+      "never": "Aldrig"
+    },
+    "actions": {
+      "cancel": "Avbryt",
+      "save": "Spara",
+      "saving": "Sparar...",
+      "createUser": "Skapa användare",
+      "creating": "Skapar...",
+      "resetPassword": "Återställ lösenord",
+      "edit": "Redigera",
+      "delete": "Ta bort",
+      "resetPw": "Återställ lösenord",
+      "setPw": "Ange lösenord",
+      "cancelPw": "Avbryt lösenord"
+    },
+    "confirm": {
+      "activate": "Aktivera användare \"{email}\"?",
+      "deactivate": "Inaktivera användare \"{email}\"?",
+      "delete": "Ta bort användare \"{email}\"? Detta kan inte ångras."
+    },
+    "success": {
+      "created": "Användare \"{email}\" skapad",
+      "updated": "Användare \"{email}\" uppdaterad",
+      "activated": "Användare \"{email}\" aktiverad",
+      "deactivated": "Användare \"{email}\" inaktiverad",
+      "passwordReset": "Lösenord återställt för \"{email}\"",
+      "deleted": "Användare \"{email}\" borttagen"
+    },
+    "errors": {
+      "load": "Det gick inte att läsa in användare",
+      "create": "Det gick inte att skapa användaren",
+      "createStatus": "Det gick inte att skapa användaren ({status})",
+      "update": "Det gick inte att uppdatera användaren",
+      "resetPassword": "Det gick inte att återställa lösenordet",
+      "delete": "Det gick inte att ta bort användaren"
+    }
+  },
+  "adminRoles": {
+    "title": "Roller och tilldelningar",
+    "description": "Hantera RBAC-roller och användares rolltilldelningar",
+    "builtIn": "inbyggd",
+    "emptyRoles": "Inga roller definierade.",
+    "emptyAssignments": "Inga rolltilldelningar.",
+    "tabs": {
+      "roles": "Roller",
+      "assignments": "Tilldelningar"
+    },
+    "columns": {
+      "provider": "Leverantör",
+      "email": "E-post",
+      "role": "Roll",
+      "created": "Skapad",
+      "actions": "Åtgärder"
+    },
+    "form": {
+      "name": "Namn",
+      "namePattern": "Endast bokstäver, siffror, bindestreck och understreck. Måste börja med en bokstav eller siffra.",
+      "workspacePermission": "Arbetsytebehörighet",
+      "poolPermission": "Poolbehörighet",
+      "registryPermission": "Registerbehörighet",
+      "catalogPermission": "Katalogbehörighet",
+      "descriptionLabel": "Beskrivning",
+      "descriptionPlaceholder": "Utvecklaråtkomst",
+      "allowLabels": "Tillåt etiketter (key=value, kommaseparerat)",
+      "allowNames": "Tillåt namn (kommaseparerat)",
+      "denyLabels": "Neka etiketter (key=value, kommaseparerat)",
+      "denyNames": "Neka namn (kommaseparerat)",
+      "allowLabelsShort": "Tillåt etiketter",
+      "allowNamesShort": "Tillåt namn",
+      "denyLabelsShort": "Neka etiketter",
+      "denyNamesShort": "Neka namn"
+    },
+    "assignForm": {
+      "provider": "Leverantör",
+      "email": "E-post",
+      "roles": "Roller"
+    },
+    "caps": {
+      "selected": "{count, plural, one {# förmåga} other {# förmågor}} valda",
+      "count": "{count, plural, one {# förmåga} other {# förmågor}}",
+      "custom": "Anpassad",
+      "matchesPresets": "Matchar förinställningar",
+      "advanced": "Avancerat — förmågor",
+      "otherPreserved": "Övriga förmågor (bevaras vid sparande)",
+      "presetHelp": {
+        "before": "Att välja en förinställning ovan förkryssar dess förmågor. Att kryssa eller avkryssa en ruta utöver en förinställning markerar rollen som",
+        "after": "och dess tilldelning skickas som en explicit uppsättning förmågor."
+      },
+      "groups": {
+        "workspace": "Arbetsyta",
+        "run": "Körning",
+        "state": "Tillstånd",
+        "var": "Variabler",
+        "config": "Konfiguration",
+        "drift": "Drift",
+        "run-task": "Körningsuppgifter",
+        "notification": "Aviseringar",
+        "run-trigger": "Körningsutlösare",
+        "pool": "Agentpooler",
+        "registry": "Register",
+        "catalog": "Tjänstekatalog"
+      }
+    },
+    "display": {
+      "allow": "Tillåt: {value}",
+      "allowNames": "Tillåt namn: {value}",
+      "deny": "Neka: {value}",
+      "denyNames": "Neka namn: {value}"
+    },
+    "actions": {
+      "cancel": "Avbryt",
+      "save": "Spara",
+      "saving": "Sparar...",
+      "edit": "Redigera",
+      "delete": "Ta bort",
+      "remove": "Ta bort",
+      "createRole": "Skapa roll",
+      "creating": "Skapar...",
+      "addAssignment": "Lägg till tilldelning",
+      "setRoles": "Ange roller"
+    },
+    "confirm": {
+      "deleteRole": "Ta bort roll \"{name}\"? Alla tilldelningar som refererar till den påverkas.",
+      "removeAssignment": "Ta bort roll \"{roleName}\" från {email}?"
+    },
+    "success": {
+      "roleCreated": "Roll \"{name}\" skapad",
+      "roleUpdated": "Roll \"{name}\" uppdaterad",
+      "roleDeleted": "Roll \"{name}\" borttagen",
+      "rolesAssigned": "Roller tilldelade till {email}",
+      "assignmentRemoved": "Tilldelning borttagen"
+    },
+    "errors": {
+      "loadRoles": "Det gick inte att läsa in roller",
+      "loadAssignments": "Det gick inte att läsa in tilldelningar",
+      "createRole": "Det gick inte att skapa rollen",
+      "createRoleStatus": "Det gick inte att skapa rollen ({status})",
+      "updateRole": "Det gick inte att uppdatera rollen",
+      "deleteRole": "Det gick inte att ta bort rollen",
+      "setAssignment": "Det gick inte att ange tilldelningen",
+      "setAssignmentStatus": "Det gick inte att ange tilldelningen ({status})",
+      "deleteAssignment": "Det gick inte att ta bort tilldelningen"
+    }
+  },
+  "adminVcs": {
+    "title": "VCS-anslutningar",
+    "description": "Hantera integrationer med versionshanteringssystem",
+    "empty": "Inga VCS-anslutningar konfigurerade.",
+    "actions": {
+      "new": "Ny anslutning",
+      "cancel": "Avbryt",
+      "edit": "Redigera",
+      "delete": "Ta bort"
+    },
+    "confirmDelete": "Ta bort denna VCS-anslutning? Arbetsytor som använder den förlorar VCS-integrationen. Detta kan inte ångras.",
+    "form": {
+      "name": "Namn",
+      "namePattern": "Endast bokstäver, siffror, bindestreck och understreck. Måste börja med en bokstav eller siffra.",
+      "provider": "Provider",
+      "providerImmutable": "Providern är oföränderlig — ta bort och återskapa för att ändra den",
+      "serverUrl": "Server-URL (valfritt)",
+      "serverUrlHint": "Måste vara en HTTP- eller HTTPS-URL (t.ex. https://github.mycompany.com)",
+      "appId": "App-ID",
+      "appIdHint": "GitHub App-ID — endast numeriska siffror",
+      "installationId": "Installations-ID",
+      "installationIdHint": "GitHub App Installations-ID — endast numeriska siffror",
+      "privateKey": "Privat nyckel (PEM)",
+      "browse": "Bläddra...",
+      "privateKeyKeep": "Lämna tomt för att behålla den nuvarande nyckeln — klistra in en ny PEM för att rotera",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nSläpp en .pem-fil här eller klicka på Bläddra",
+      "webhookSecret": "Webhook-hemlighet",
+      "optional": "(valfritt)",
+      "webhookSecretSet": "Angiven — lämna tomt för att behålla, ange ett nytt värde för att rotera",
+      "webhookSecretGlobal": "Lämna tomt för att använda den globala webhook-hemligheten",
+      "webhookSecretHelp": "HMAC-hemlighet per anslutning för denna installations webhooks. När den inte är angiven används den globala hemligheten.",
+      "accessToken": "Åtkomsttoken",
+      "accessTokenKeep": "Lämna tomt för att behålla den nuvarande token",
+      "saving": "Sparar...",
+      "creating": "Skapar...",
+      "saveChanges": "Spara ändringar",
+      "createConnection": "Skapa anslutning"
+    },
+    "table": {
+      "name": "Namn",
+      "provider": "Provider",
+      "serverUrl": "Server-URL",
+      "status": "Status",
+      "created": "Skapad",
+      "actions": "Åtgärder"
+    },
+    "success": {
+      "created": "VCS-anslutning \"{name}\" skapad",
+      "updated": "VCS-anslutning \"{name}\" uppdaterad",
+      "deleted": "VCS-anslutning borttagen"
+    },
+    "errors": {
+      "load": "Det gick inte att läsa in VCS-anslutningar",
+      "save": "Det gick inte att spara anslutningen",
+      "delete": "Det gick inte att ta bort anslutningen",
+      "createStatus": "Det gick inte att skapa anslutningen ({status})",
+      "updateStatus": "Det gick inte att uppdatera anslutningen ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "Variabeluppsättningar",
+    "description": "Hantera org-omfattande variabeluppsättningar för arbetsytegrupper",
+    "empty": "Inga variabeluppsättningar konfigurerade.",
+    "none": "-",
+    "actions": {
+      "new": "Ny variabeluppsättning",
+      "cancel": "Avbryt"
+    },
+    "form": {
+      "name": "Namn",
+      "namePattern": "Endast bokstäver, siffror, bindestreck och understreck. Måste börja med en bokstav eller siffra.",
+      "descriptionLabel": "Beskrivning",
+      "descriptionPlaceholder": "AWS-autentiseringsuppgifter för alla arbetsytor",
+      "global": "Global (tillämpas på alla arbetsytor)",
+      "priority": "Prioritet (åsidosätter arbetsytevariabler)",
+      "creating": "Skapar...",
+      "create": "Skapa variabeluppsättning"
+    },
+    "table": {
+      "name": "Namn",
+      "description": "Beskrivning",
+      "scope": "Omfattning",
+      "variables": "Variabler",
+      "created": "Skapad"
+    },
+    "scope": {
+      "global": "Global",
+      "priority": "Prioritet",
+      "standard": "Standard"
+    },
+    "errors": {
+      "load": "Det gick inte att läsa in variabeluppsättningar",
+      "create": "Det gick inte att skapa variabeluppsättningen",
+      "createStatus": "Det gick inte att skapa variabeluppsättningen ({status})"
+    },
+    "detail": {
+      "back": "Tillbaka till variabeluppsättningar",
+      "headerFallback": "Variabeluppsättning",
+      "notFound": "Variabeluppsättningen hittades inte",
+      "global": "Global",
+      "priority": "Prioritet",
+      "yes": "Ja",
+      "no": "Nej",
+      "edit": "Redigera",
+      "cancel": "Avbryt",
+      "save": "Spara",
+      "saving": "Sparar...",
+      "delete": "Ta bort",
+      "deleting": "Tar bort...",
+      "confirmDelete": "Bekräfta borttagning",
+      "deleteTitle": "Ta bort variabeluppsättning",
+      "deleteDescription": "Ta permanent bort denna variabeluppsättning och alla dess variabler.",
+      "tabs": {
+        "settings": "Inställningar",
+        "variables": "Variabler",
+        "workspaces": "Arbetsytor"
+      },
+      "addVariable": "Lägg till variabel",
+      "adding": "Lägger till...",
+      "varKey": "Nyckel",
+      "varValue": "Värde",
+      "varCategory": "Kategori",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Miljö",
+      "sensitive": "Känslig",
+      "sensAbbr": "Känsl.",
+      "enterNewValue": "Ange nytt värde",
+      "empty": "tomt",
+      "emptyVars": "Inga variabler i denna uppsättning.",
+      "actions": "Åtgärder",
+      "remove": "Ta bort",
+      "add": "Lägg till",
+      "addWorkspace": "Lägg till arbetsyta",
+      "workspace": "Arbetsyta",
+      "selectWorkspace": "Välj en arbetsyta...",
+      "globalBanner": "Denna variabeluppsättning är global och tillämpas automatiskt på alla arbetsytor.",
+      "emptyWorkspaces": "Inga arbetsytor tilldelade denna variabeluppsättning.",
+      "confirmDeleteVar": "Ta bort denna variabel? Detta kan inte ångras.",
+      "confirmRemoveWorkspace": "Ta bort denna arbetsyta från variabeluppsättningen? Dess variabler tillämpas inte längre på den arbetsytan.",
+      "success": {
+        "updated": "Variabeluppsättning uppdaterad",
+        "workspaceAdded": "Arbetsyta tillagd",
+        "workspaceRemoved": "Arbetsyta borttagen"
+      },
+      "errors": {
+        "load": "Det gick inte att läsa in variabeluppsättningen",
+        "update": "Det gick inte att uppdatera variabeluppsättningen",
+        "delete": "Det gick inte att ta bort variabeluppsättningen",
+        "loadVars": "Det gick inte att läsa in variabler",
+        "loadWorkspaces": "Det gick inte att läsa in arbetsytor",
+        "addVar": "Det gick inte att lägga till variabeln",
+        "addVarStatus": "Det gick inte att lägga till variabeln ({status})",
+        "updateVar": "Det gick inte att uppdatera variabeln",
+        "deleteVar": "Det gick inte att ta bort variabeln",
+        "addWorkspace": "Det gick inte att lägga till arbetsytan",
+        "removeWorkspace": "Det gick inte att ta bort arbetsytan"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "Autoupptäckt",
+    "description": "Skapa automatiskt arbetsytor i monorepos när PR:er berör matchande sökvägar",
+    "empty": "Inga autoupptäcktsregler ännu. Skapa en för att börja automatiskt provisionera arbetsytor från PR:er i ditt monorepo.",
+    "unsavedRule": "(osparad regel)",
+    "actions": {
+      "newRule": "Ny regel",
+      "cancel": "Avbryt",
+      "create": "Skapa",
+      "update": "Uppdatera",
+      "preview": "Förhandsgranska",
+      "edit": "Redigera",
+      "delete": "Ta bort",
+      "close": "Stäng"
+    },
+    "status": {
+      "enabled": "aktiverad",
+      "disabled": "inaktiverad"
+    },
+    "form": {
+      "createTitle": "Skapa regel",
+      "editTitle": "Redigera regel",
+      "name": "Namn",
+      "vcsConnection": "VCS-anslutning",
+      "selectConnection": "Välj anslutning",
+      "repoUrl": "Repo-URL",
+      "branch": "Gren (tom = standard)",
+      "matchPattern": "Matchningsmönster",
+      "matchPatternHint": "Globmönster i gitignore-stil. <code>**</code> matchar över sökvägssegment. Endast <code>*.tf*</code>-filer utlöser autoupptäckt.",
+      "ignorePatterns": "Ignoreringsmönster (ett per rad)",
+      "nameTemplate": "Namnmall för arbetsyta (valfritt)",
+      "nameTemplateHint": "Använd <path></path> för katalogen med <code>/</code> ersatt av <code>-</code>, eller <root></root> för katalogen som den är. Tom = standard (bara den bindestrecksseparerade sökvägen).",
+      "templateDefaults": "Standardvärden för arbetsytemall",
+      "executionMode": "Exekveringsläge",
+      "executionModeHint": "Autoupptäckt är VCS-driven; endast agentexekvering stöds.",
+      "agentPool": "Agentpool",
+      "none": "(ingen)",
+      "executionBackend": "Exekveringsbackend",
+      "terraformVersion": "Terraform-version",
+      "cpuRequest": "CPU-begäran",
+      "memoryRequest": "Minnesbegäran",
+      "ownerEmail": "Ägarens e-post",
+      "autoApply": "Auto-applicera",
+      "enabled": "Aktiverad",
+      "onDirectoryDelete": "Vid borttagning av katalog",
+      "onDeleteFlag": "Flagga (säkert — markera som väntande på borttagning, kräver manuell åtgärd)",
+      "onDeleteDestroy": "Förstör (FARA — river ner infrastruktur och arkiverar sedan arbetsytan)",
+      "onDirectoryDeleteHint": "Vad som händer med en autoupptäckt arbetsyta när dess katalog tas bort på den spårade grenen.",
+      "onDeleteDestroyWarning": "Detta kör en verklig terraform destroy på arbetsytan när dess katalog tas bort på den spårade grenen.",
+      "labels": "Etiketter (ärvs av skapade arbetsytor)",
+      "varFiles": "Var-filer (ärvs av skapade arbetsytor)",
+      "varFilesHint": "Relativa <code>.tfvars</code>-sökvägar som skickas till plan/apply.",
+      "addVarFile": "Lägg till var-fil",
+      "executionHooks": "Exekveringskrokar (associeras med varje ny arbetsyta)",
+      "executionHooksHint": "Välj bland krokar som definierats på admin-sidan <page>Exekveringskrokar</page> — varje vald krok associeras med varje arbetsyta som denna regel skapar.",
+      "noHooks": "Inga exekveringskrokar definierade ännu. Skapa en på admin-sidan Exekveringskrokar först.",
+      "hookDisabled": "(inaktiverad)",
+      "hookNotInLibrary": "(inte i biblioteket — avkryssa för att ta bort)",
+      "runTaskTemplates": "Mallar för körningsuppgifter (skapas på varje ny arbetsyta)",
+      "notificationTemplates": "Aviseringsmallar (skapas på varje ny arbetsyta)",
+      "saving": "Sparar...",
+      "previewTitle": "Gå igenom repot och förhandsgranska vilka arbetsytor denna regel SKULLE skapa — ingen beständighet"
+    },
+    "table": {
+      "name": "Namn",
+      "repo": "Repo",
+      "pattern": "Mönster",
+      "enabled": "Aktiverad",
+      "created": "Skapad",
+      "previewTitle": "Gå igenom repot och förhandsgranska vilka arbetsytor denna regel skulle skapa"
+    },
+    "deleteModal": {
+      "title": "Ta bort regel?",
+      "body": "Arbetsytor som autoskapats av denna regel fortsätter fungera. Framtida PR:er som berör nya sökvägar under denna regel skapar inte automatiskt fler arbetsytor."
+    },
+    "preview": {
+      "title": "Förhandsgranskning: {ruleName}",
+      "walkedFiles": "Gick igenom <files>{count}</files> filer på <refspan>{ref}</refspan>",
+      "walking": "Går igenom repositoriet…",
+      "noMatches": "Inga kataloger i detta repo matchar regelns mönster. Inget att skapa.",
+      "colWorkspace": "Arbetsyta",
+      "colDirectory": "Katalog",
+      "colAction": "Åtgärd",
+      "repoRoot": "(repo-rot)",
+      "actionCreate": "Skapa",
+      "skipDiscovered": "Hoppa över (redan upptäckt)",
+      "skipDiscoveredTitle": "Redan skapad av denna regel",
+      "skipCollision": "Hoppa över (namnkollision)",
+      "skipCollisionTitle": "En arbetsyta med detta namn finns redan av något annat skäl",
+      "willCreate": "{count, plural, one {# arbetsyta kommer att skapas.} other {# arbetsytor kommer att skapas.}} Befintliga arbetsytor (kollisioner) lämnas orörda.",
+      "provision": "{count, plural, one {Provisionera # arbetsyta} other {Provisionera # arbetsytor}}",
+      "provisioning": "Provisionerar…",
+      "saveToProvision": "Spara regeln för att provisionera dessa arbetsytor."
+    },
+    "success": {
+      "created": "Skapade {name}",
+      "updated": "Uppdaterade {name}",
+      "deleted": "Regel borttagen",
+      "provisioned": "{count, plural, one {Skapade # arbetsyta från \"{ruleName}\"} other {Skapade # arbetsytor från \"{ruleName}\"}}"
+    },
+    "errors": {
+      "loadRules": "Det gick inte att läsa in autoupptäcktsregler",
+      "load": "Det gick inte att läsa in",
+      "createFailed": "Skapande misslyckades: {status} {detail}",
+      "updateFailed": "Uppdatering misslyckades: {status} {detail}",
+      "save": "Det gick inte att spara",
+      "deleteRule": "Det gick inte att ta bort regeln",
+      "delete": "Det gick inte att ta bort",
+      "previewFailed": "Förhandsgranskning misslyckades ({status})",
+      "preview": "Förhandsgranskning misslyckades",
+      "previewPrereq": "Ange VCS-anslutning, repo-URL och mönster innan förhandsgranskning",
+      "scanFailed": "Skanning misslyckades ({status})",
+      "scan": "Skanning misslyckades"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Massuppdatering",
+    "description": "Välj arbetsytor med filter och tillämpa sedan en inställningsändring över dem alla",
+    "none": "(ingen)",
+    "anyOption": "(valfri)",
+    "unchanged": "(oförändrad)",
+    "unchangedOption": "(oförändrad)",
+    "filter": {
+      "heading": "1. Välj arbetsytor",
+      "matchAll": "Matcha <strong>alla</strong> arbetsytor (ignorerar filtren nedan)",
+      "namePrefix": "Namnprefix",
+      "executionBackend": "Exekveringsbackend",
+      "ownerEmail": "Ägarens e-post",
+      "agentPool": "Agentpool",
+      "vcsConnection": "VCS-anslutning",
+      "labels": "Etiketter",
+      "search": "Sök",
+      "searching": "Söker..."
+    },
+    "results": {
+      "matched": "Matchade <strong>{count}</strong> {count, plural, one {arbetsyta} other {arbetsytor}}.",
+      "noMatch": "Inga arbetsytor matchade detta filter.",
+      "colName": "Namn",
+      "colMode": "Läge",
+      "colBackend": "Backend",
+      "colTfVersion": "TF-version",
+      "colLabels": "Etiketter"
+    },
+    "update": {
+      "heading": "2. Tillämpa ändringar",
+      "hint": "Endast fält du anger nedan ändras. Filtret ovan väljer vilka arbetsytor som får ändringen.",
+      "terraformVersion": "Terraform-version",
+      "executionBackend": "Exekveringsbackend",
+      "executionMode": "Exekveringsläge",
+      "autoApply": "Auto-applicera",
+      "agentPool": "Agentpool",
+      "cpuRequest": "CPU-begäran",
+      "memoryRequest": "Minnesbegäran",
+      "setLabels": "Ange etiketter (ersätter etikettkartan på varje matchad arbetsyta)",
+      "setVarFiles": "Ange var-filer",
+      "addVarFile": "Lägg till var-fil",
+      "setRunTasks": "Ange körningsuppgifter (uppdateras/skapas efter namn på varje matchad arbetsyta)",
+      "setNotifications": "Ange aviseringskonfigurationer (uppdateras/skapas efter namn)",
+      "dryRun": "Torrkörning (endast förhandsgranskning — inga ändringar skrivs)",
+      "confirmWarning": "Detta skriver ändringar till varje matchad arbetsyta.",
+      "confirmApply": "Bekräfta tillämpning",
+      "applying": "Tillämpar...",
+      "cancel": "Avbryt",
+      "working": "Arbetar...",
+      "previewDryRun": "Förhandsgranska (torrkörning)",
+      "applyChanges": "Tillämpa ändringar"
+    },
+    "diff": {
+      "colWorkspace": "Arbetsyta",
+      "colChanges": "Ändringar"
+    },
+    "dryResult": {
+      "heading": "Resultat av torrkörning",
+      "summary": "Matchade <strong>{matched}</strong>; <strong>{wouldChange}</strong> skulle ändras; {unchanged} oförändrade. Inget skrevs.",
+      "wouldChange": "Skulle ändras",
+      "noChange": "Inga arbetsytor skulle ändras med denna uppdatering."
+    },
+    "applyResult": {
+      "heading": "Resultat av tillämpning",
+      "summary": "Matchade <strong>{matched}</strong>; <appliedstrong>{applied}</appliedstrong> tillämpade; {unchanged} oförändrade; {errors, plural, one {# fel} other {# fel}}.",
+      "applied": "Tillämpade",
+      "unnamedWorkspace": "(arbetsyta)",
+      "noChange": "Inga arbetsytor ändrades."
+    },
+    "errors": {
+      "searchFailed": "Sökning misslyckades ({status})",
+      "search": "Sökning misslyckades",
+      "bulkUpdateFailed": "Massuppdatering misslyckades ({status})",
+      "bulkUpdate": "Massuppdatering misslyckades"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "Exekveringskrokar",
+    "description": "Anpassade skalsteg som körs inuti runner-jobb vid punkterna före/efter plan/apply, associerade med arbetsytor",
+    "empty": "Inga exekveringskrokar konfigurerade.",
+    "actions": {
+      "cancel": "Avbryt",
+      "new": "Ny exekveringskrok",
+      "creating": "Skapar...",
+      "create": "Skapa exekveringskrok"
+    },
+    "badges": {
+      "disabled": "Inaktiverad",
+      "enabled": "Aktiverad"
+    },
+    "columns": {
+      "name": "Namn",
+      "hookPoint": "Krokpunkt",
+      "enabled": "Aktiverad",
+      "priority": "Prioritet",
+      "workspaces": "Arbetsytor"
+    },
+    "form": {
+      "name": "Namn",
+      "namePatternTitle": "Endast bokstäver, siffror, bindestreck och understreck. Måste börja med en bokstav eller siffra.",
+      "description": "Beskrivning",
+      "descriptionPlaceholder": "Lägg till en intern hosts-post före init",
+      "hookPoint": "Krokpunkt",
+      "priority": "Prioritet",
+      "priorityTitle": "Lägre körs först när flera krokar delar en punkt (lika värden avgörs av namn).",
+      "scriptLabel": "Skript (<code>/bin/sh -c</code>)",
+      "scriptHelp": "Körs med runnerns molnidentitet. En avslutning som inte är noll får körningen att misslyckas. Hemligheter bör komma från arbetsytevariabler, inte inline här."
+    },
+    "errors": {
+      "load": "Det gick inte att läsa in exekveringskrokar",
+      "createStatus": "Det gick inte att skapa exekveringskroken ({status})",
+      "create": "Det gick inte att skapa exekveringskroken"
+    }
+  },
+  "adminPolicySets": {
+    "title": "Policyuppsättningar",
+    "description": "OPA policy-as-code-tillämpning, avgränsad till arbetsytor via etikett",
+    "empty": "Inga policyuppsättningar konfigurerade.",
+    "actions": {
+      "cancel": "Avbryt",
+      "new": "Ny policyuppsättning",
+      "creating": "Skapar...",
+      "create": "Skapa policyuppsättning"
+    },
+    "badges": {
+      "disabled": "Inaktiverad",
+      "mandatory": "Obligatorisk",
+      "advisory": "Rådgivande",
+      "global": "Global",
+      "labelScoped": "Etikettavgränsad"
+    },
+    "columns": {
+      "name": "Namn",
+      "description": "Beskrivning",
+      "enforcement": "Tillämpning",
+      "scope": "Omfattning",
+      "policies": "Policyer"
+    },
+    "form": {
+      "name": "Namn",
+      "namePatternTitle": "Endast bokstäver, siffror, bindestreck och understreck. Måste börja med en bokstav eller siffra.",
+      "description": "Beskrivning",
+      "descriptionPlaceholder": "Obligatoriska skyddsräcken för produktionsarbetsytor",
+      "enforcement": "Tillämpning",
+      "enforcementAdvisory": "Rådgivande (varna, blockera inte)",
+      "enforcementMandatory": "Obligatorisk (blockera apply vid fel)",
+      "globalScope": "Global (tillämpas på varje arbetsyta)",
+      "sourceInline": "Inline (hantera policyer i gränssnittet)",
+      "sourceVcs": "Från VCS-repositorie",
+      "vcsConnection": "VCS-anslutning",
+      "selectConnection": "Välj anslutning...",
+      "repoUrl": "Repositorie-URL",
+      "branch": "Gren",
+      "branchPlaceholder": "main (standard)",
+      "policyPath": "Policysökväg",
+      "policyPathPlaceholder": "policies/ (katalog som innehåller .rego-filer)",
+      "helpVcs": "Policyer synkroniseras automatiskt från repositoriet.",
+      "helpInline": "Lägg till policyer och förfina etikettavgränsning efter att uppsättningen skapats."
+    },
+    "errors": {
+      "load": "Det gick inte att läsa in policyuppsättningar",
+      "createStatus": "Det gick inte att skapa policyuppsättningen ({status})",
+      "create": "Det gick inte att skapa policyuppsättningen"
+    }
+  },
+  "adminCatalog": {
+    "title": "Katalogadmin",
+    "description": "Hantera objekt i tjänstekatalogen",
+    "notEnabled": "Tjänstekatalogen är inte aktiverad.",
+    "empty": "Inga katalogobjekt ännu.",
+    "actions": {
+      "new": "Nytt katalogobjekt",
+      "cancel": "Avbryt",
+      "create": "Skapa katalogobjekt",
+      "creating": "Skapar…",
+      "saveChanges": "Spara ändringar",
+      "saving": "Sparar…",
+      "edit": "Redigera",
+      "delete": "Ta bort"
+    },
+    "form": {
+      "name": "Namn",
+      "nameTitle": "Endast bokstäver, siffror, bindestreck och understreck. Måste börja med en bokstav eller siffra.",
+      "module": "Modul",
+      "moduleSelect": "Välj en modul…",
+      "moduleImmutable": "Modulen är oföränderlig efter att den skapats",
+      "displayName": "Visningsnamn",
+      "displayNamePlaceholder": "Standard S3-bucket",
+      "versionPin": "Standardversionsfixering",
+      "versionPinPlaceholder": "t.ex. 1.2.0 (tom = senaste)",
+      "descriptionLabel": "Beskrivning",
+      "descriptionPlaceholder": "Vad detta katalogobjekt provisionerar…",
+      "enabled": "Aktiverad (synlig i katalogbläddringen)",
+      "providerTemplates": "Provider-mallar",
+      "noProviderTemplates": "Inga provider-mallar definierade.",
+      "restrictPools": "Begränsa till specifika agentpooler",
+      "noAgentPools": "Inga agentpooler tillgängliga.",
+      "anyPool": "Vilken agentpool som helst får användas.",
+      "labels": "Etiketter",
+      "variableOptions": "Variabelalternativ (avancerat, JSON)",
+      "variableOptionsHint": "Åsidosättanden per indata (options, hidden, default). Lämna som <code>[]</code> om oanvänt."
+    },
+    "table": {
+      "name": "Namn",
+      "module": "Modul",
+      "enabled": "Aktiverad",
+      "actions": "Åtgärder"
+    },
+    "badge": {
+      "enabled": "aktiverad",
+      "disabled": "inaktiverad"
+    },
+    "confirm": {
+      "delete": "Ta bort detta katalogobjekt? Befintliga provisionerade instanser påverkas inte."
+    },
+    "success": {
+      "created": "Katalogobjekt \"{name}\" skapat",
+      "updated": "Katalogobjekt \"{name}\" uppdaterat",
+      "deleted": "Katalogobjekt borttaget"
+    },
+    "errors": {
+      "load": "Det gick inte att läsa in katalogobjekt",
+      "save": "Det gick inte att spara katalogobjektet",
+      "createStatus": "Det gick inte att skapa katalogobjektet ({status})",
+      "updateStatus": "Det gick inte att uppdatera katalogobjektet ({status})",
+      "delete": "Det gick inte att ta bort katalogobjektet",
+      "deleteConflict": "Kan inte ta bort: detta katalogobjekt har provisionerade instanser.",
+      "varOptsInvalidJson": "Variabelalternativ måste vara giltig JSON (en array).",
+      "varOptsNotArray": "Variabelalternativ måste vara en JSON-array."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Provider-mallar",
+    "description": "Återanvändbara providerkonfigurationsblock för katalogobjekt",
+    "notEnabled": "Tjänstekatalogen är inte aktiverad.",
+    "empty": "Inga provider-mallar ännu.",
+    "actions": {
+      "new": "Ny mall",
+      "cancel": "Avbryt",
+      "create": "Skapa mall",
+      "creating": "Skapar…",
+      "saveChanges": "Spara ändringar",
+      "saving": "Sparar…",
+      "edit": "Redigera",
+      "delete": "Ta bort"
+    },
+    "form": {
+      "name": "Namn",
+      "providerType": "Providertyp",
+      "body": "Innehåll (HCL)",
+      "parameters": "Parametrar (avancerat, JSON)",
+      "parametersHint": "Varje parameter blir ett fält i provisioneringsformuläret. Lämna som <code>[]</code> om oanvänt.",
+      "labels": "Etiketter"
+    },
+    "table": {
+      "name": "Namn",
+      "providerType": "Providertyp",
+      "parameters": "Parametrar",
+      "actions": "Åtgärder"
+    },
+    "confirm": {
+      "delete": "Ta bort denna provider-mall? Katalogobjekt som refererar till den kommer att misslyckas med provisionering. Detta kan inte ångras."
+    },
+    "success": {
+      "created": "Provider-mall \"{name}\" skapad",
+      "updated": "Provider-mall \"{name}\" uppdaterad",
+      "deleted": "Provider-mall borttagen"
+    },
+    "errors": {
+      "load": "Det gick inte att läsa in provider-mallar",
+      "save": "Det gick inte att spara provider-mallen",
+      "createStatus": "Det gick inte att skapa mallen ({status})",
+      "updateStatus": "Det gick inte att uppdatera mallen ({status})",
+      "delete": "Det gick inte att ta bort provider-mallen",
+      "deleteConflict": "Kan inte ta bort: denna mall refereras av ett katalogobjekt.",
+      "paramsInvalidJson": "Parametrar måste vara giltig JSON (en array).",
+      "paramsNotArray": "Parametrar måste vara en JSON-array."
+    }
+  },
+  "adminAgentPools": {
+    "title": "Agentpooler",
+    "description": "Hantera runner-agentpooler och deras lyssnare",
+    "empty": "Inga agentpooler konfigurerade.",
+    "actions": {
+      "newPool": "Ny pool",
+      "createPool": "Skapa pool",
+      "creating": "Skapar...",
+      "cancel": "Avbryt",
+      "edit": "Redigera",
+      "save": "Spara",
+      "saving": "Sparar...",
+      "delete": "Ta bort",
+      "deleting": "Tar bort...",
+      "confirmDelete": "Bekräfta borttagning"
+    },
+    "form": {
+      "name": "Namn",
+      "namePattern": "Endast bokstäver, siffror, bindestreck och understreck. Måste börja med en bokstav eller siffra.",
+      "description": "Beskrivning",
+      "descriptionPlaceholder": "Produktions-AWS-runners",
+      "labels": "Etiketter"
+    },
+    "columns": {
+      "name": "Namn",
+      "description": "Beskrivning",
+      "status": "Status",
+      "created": "Skapad"
+    },
+    "badges": {
+      "default": "standard",
+      "degradedTooltip": "Lyssnare skickar hjärtslag men deras certifikat har gått ut — körningar kommer att misslyckas med att starta.",
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "försämrad"
+      }
+    },
+    "detail": {
+      "back": "Tillbaka till agentpooler",
+      "defaultDescription": "Agentpool"
+    },
+    "tabs": {
+      "settings": "Inställningar",
+      "tokens": "Tokens",
+      "listeners": "Lyssnare"
+    },
+    "settings": {
+      "title": "Poolinställningar",
+      "fields": {
+        "name": "Namn",
+        "description": "Beskrivning",
+        "created": "Skapad",
+        "owner": "Ägare",
+        "yourPermission": "Din behörighet",
+        "labels": "Etiketter"
+      },
+      "permissions": {
+        "read": "läsa",
+        "write": "skriva",
+        "admin": "admin"
+      }
+    },
+    "danger": {
+      "title": "Ta bort pool",
+      "description": "Ta permanent bort denna agentpool och alla tillhörande tokens."
+    },
+    "tokens": {
+      "create": "Skapa token",
+      "empty": "Inga tokens för denna pool.",
+      "revoke": "Återkalla",
+      "created": {
+        "title": "Token skapades",
+        "copyNow": "Kopiera denna token nu — den kommer inte att visas igen.",
+        "copy": "Kopiera"
+      },
+      "form": {
+        "description": "Beskrivning",
+        "descriptionPlaceholder": "Produktionslyssnar-token",
+        "maxUses": "Max antal användningar",
+        "maxUsesHint": "Standard 2 — tolererar ett omförsök vid bootstrap-kapplöpning över lyssnarrepliker.",
+        "expiresAt": "Går ut",
+        "expiresAtHint": "Standard 1 timme från nu."
+      },
+      "columns": {
+        "description": "Beskrivning",
+        "uses": "Användningar",
+        "expires": "Går ut",
+        "status": "Status",
+        "createdBy": "Skapad av",
+        "actions": "Åtgärder"
+      },
+      "badges": {
+        "revoked": "Återkallad",
+        "active": "Aktiv"
+      }
+    },
+    "listeners": {
+      "empty": "Inga lyssnare registrerade för denna pool.",
+      "columns": {
+        "name": "Namn",
+        "status": "Status",
+        "replicas": "Repliker",
+        "certExpires": "Certifikat går ut",
+        "actions": "Åtgärder"
+      },
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "försämrad",
+        "cert-expired": "certifikat-utgånget"
+      },
+      "tooltips": {
+        "certExpired": "Lyssnaren skickar hjärtslag men dess certifikat har gått ut — varje certifikatautentiserat anrop (hämta körning, förnya, runner-token) kommer att misslyckas. Trolig orsak: API:t registrerade aldrig det senaste certifikatet, eller certifikatets TTL löpte ut före förnyelse.",
+        "degraded": "Lyssnare skickar hjärtslag men deras certifikat har gått ut — körningar kommer att misslyckas med att starta."
+      }
+    },
+    "confirm": {
+      "revokeToken": "Återkalla denna anslutnings-token? Lyssnare som använder den kan inte längre ansluta, och detta kan inte ångras.",
+      "deleteListener": "Ta bort denna lyssnare? Den registrerar sig på nytt vid nästa hjärtslag om poden fortfarande körs."
+    },
+    "success": {
+      "poolUpdated": "Pool uppdaterad",
+      "tokenRevoked": "Token återkallad",
+      "listenerDeleted": "Lyssnare borttagen"
+    },
+    "errors": {
+      "loadPools": "Det gick inte att läsa in agentpooler",
+      "loadPool": "Det gick inte att läsa in poolen",
+      "loadTokens": "Det gick inte att läsa in tokens",
+      "loadListeners": "Det gick inte att läsa in lyssnare",
+      "createPool": "Det gick inte att skapa poolen",
+      "createStatus": "Det gick inte att skapa poolen ({status})",
+      "updatePool": "Det gick inte att uppdatera poolen",
+      "deletePool": "Det gick inte att ta bort poolen",
+      "poolNotFound": "Poolen hittades inte",
+      "createToken": "Det gick inte att skapa token",
+      "createTokenStatus": "Det gick inte att skapa token ({status})",
+      "revokeToken": "Det gick inte att återkalla token",
+      "deleteListener": "Det gick inte att ta bort lyssnaren"
+    }
+  },
+  "adminAuditLog": {
+    "title": "Granskningslogg",
+    "description": "Oföränderlig logg över alla API-förfrågningar",
+    "empty": "Inga poster i granskningsloggen hittades.",
+    "errors": {
+      "load": "Det gick inte att läsa in granskningsloggen"
+    },
+    "filters": {
+      "actorEmail": "Aktörens e-post",
+      "actorPlaceholder": "user@example.com",
+      "resourceType": "Resurstyp",
+      "resourceTypePlaceholder": "workspaces",
+      "method": "Metod",
+      "methodAll": "Alla",
+      "since": "Från",
+      "until": "Till",
+      "clear": "Rensa",
+      "apply": "Tillämpa filter"
+    },
+    "columns": {
+      "timestamp": "Tidsstämpel",
+      "actor": "Aktör",
+      "action": "Åtgärd",
+      "resourceType": "Resurstyp",
+      "resourceId": "Resurs-ID",
+      "status": "Status",
+      "duration": "Varaktighet"
+    },
+    "pagination": {
+      "summary": "Sida {current} av {total} ({count, plural, one {# post} other {# poster}})",
+      "previous": "Föregående",
+      "next": "Nästa"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "Cache",
+    "description": "Hantering av CLI-binärer och providercache",
+    "errors": {
+      "loadBinary": "Det gick inte att läsa in binärcachen",
+      "loadCache": "Det gick inte att läsa in cachen"
+    },
+    "sections": {
+      "cliBinaries": "CLI-binärer",
+      "providerBinaries": "Providerbinärer"
+    },
+    "empty": {
+      "binaries": "Inga cachade CLI-binärer ännu.",
+      "providers": "Inga cachade providerbinärer ännu."
+    },
+    "columns": {
+      "tool": "Verktyg",
+      "version": "Version",
+      "os": "OS",
+      "arch": "Arkitektur",
+      "cachedAt": "Cachad",
+      "provider": "Provider",
+      "hostname": "Värdnamn",
+      "actions": "Åtgärder"
+    },
+    "warm": {
+      "heading": "Förvärm cache",
+      "hide": "Dölj",
+      "prePopulate": "Förfyll…",
+      "help": "Förhämta binärer och providerplattformar till cachen (en per rad). Efterföljande <code>os/arch</code>-tokens är valfria — utelämna dem för att använda de konfigurerade standardplattformarna.",
+      "binariesLabel": "Binärer",
+      "providersLabel": "Providers",
+      "warm": "Förvärm",
+      "warming": "Förvärmer…",
+      "confirm": "Förvärm de valda cacheposterna nu?",
+      "errorEmpty": "Lägg till minst en binär- eller providerrad att förvärma.",
+      "errorFailedStatus": "Förvärmning misslyckades ({status})",
+      "errorFailed": "Det gick inte att förvärma cachen",
+      "success": "Förvärmde {succeeded}/{total} ({failed} misslyckades)"
+    },
+    "purge": {
+      "button": "Rensa",
+      "confirmBinary": "Rensa {tool} {version} från cachen? Den hämtas på nytt från uppströms vid nästa förfrågan.",
+      "confirmProvider": "Rensa {provider} {version} från providercachen? Den hämtas på nytt från uppströms vid nästa förfrågan.",
+      "successBinary": "Rensade {count} poster för {tool} {version}",
+      "successProvider": "Rensade {count} poster för {provider} {version}",
+      "errorStatus": "Rensning misslyckades ({status})",
+      "error": "Det gick inte att rensa",
+      "errorProvider": "Det gick inte att rensa providern",
+      "errorProviders": "Det gick inte att rensa providers"
+    },
+    "batchPurge": {
+      "purging": "Rensar...",
+      "purgeSelected": "Rensa valda ({count})",
+      "confirmBinary": "Rensa alla valda poster i binärcachen? De hämtas på nytt från uppströms vid nästa förfrågan.",
+      "confirmProvider": "Rensa alla valda poster i providercachen? De hämtas på nytt från uppströms vid nästa förfrågan.",
+      "errorBinaryItem": "Rensning misslyckades för {tool} {version}",
+      "errorProviderItem": "Rensning misslyckades för {provider} {version}",
+      "successBinary": "Rensade {count} poster i binärcachen",
+      "successProvider": "Rensade {count} poster i providercachen"
+    }
+  },
+  "catalog": {
+    "title": "Tjänstekatalog",
+    "description": "Provisionera självbetjänad infrastruktur från utvalda moduler",
+    "notEnabled": "Tjänstekatalogen är inte aktiverad.",
+    "empty": "Inga katalogobjekt tillgängliga.",
+    "card": {
+      "pinned": "fixerad {version}",
+      "latest": "senaste"
+    },
+    "errors": {
+      "loadItems": "Det gick inte att läsa in katalogobjekt"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← Katalog",
+    "backToCatalog": "Tillbaka till katalog",
+    "fallbackTitle": "Katalogobjekt",
+    "notFound": "Katalogobjektet hittades inte, eller så är tjänstekatalogen inte aktiverad.",
+    "common": {
+      "cancel": "Avbryt"
+    },
+    "info": {
+      "module": "Modul:",
+      "resolvedVersion": "Upplöst version:",
+      "latest": "senaste",
+      "disabled": "inaktiverad"
+    },
+    "pending": {
+      "banner": "Körningen för <strong>{name}</strong> är planerad och väntar på granskning. Bekräfta för att applicera, eller kassera.",
+      "working": "Arbetar…",
+      "confirmApply": "Bekräfta och applicera",
+      "discard": "Kassera"
+    },
+    "field": {
+      "select": "Välj…"
+    },
+    "provision": {
+      "title": "Provisionera",
+      "workspaceName": "Arbetsytenamn",
+      "workspaceNameTitle": "Endast bokstäver, siffror, bindestreck och understreck. Måste börja med en bokstav eller siffra.",
+      "workspaceNamePlaceholder": "my-instance",
+      "agentPool": "Agentpool",
+      "selectPool": "Välj en pool…",
+      "noPoolsAvailable": "Inga agentpooler är tillgängliga för dig. Du behöver skrivåtkomst till en agentpool för att provisionera — be en administratör bevilja det.",
+      "noPoolsAllowed": "Ingen av de agentpooler du har åtkomst till är tillåten av detta katalogobjekt. Be en administratör att utöka objektets tillåtna pooler eller bevilja dig åtkomst till en av dem.",
+      "version": "Version",
+      "latestFloat": "Senaste (flytande)",
+      "defaultPinOption": "{version} (standardfixering)",
+      "labelsOptional": "Etiketter (valfritt)",
+      "autoApplyHint": "Auto-applicera tillämpar ändringar utan ett manuellt granskningssteg.",
+      "provisioning": "Provisionerar…",
+      "submit": "Provisionera"
+    },
+    "instances": {
+      "title": "Instanser",
+      "empty": "Inga instanser provisionerade från detta objekt ännu.",
+      "colName": "Namn",
+      "colVersion": "Version",
+      "colPool": "Pool",
+      "colActions": "Åtgärder",
+      "reconfigure": "Omkonfigurera",
+      "destroy": "Förstör",
+      "orphan": "Överge…",
+      "orphanTitle": "Ta bort katalogposten utan att förstöra dess infrastruktur (avrådes)"
+    },
+    "reconfigure": {
+      "title": "Omkonfigurera {name}",
+      "description": "Uppdatera indata och/eller version, och köa sedan en körning.",
+      "currentOption": "{version} (aktuell)",
+      "queuing": "Köar…",
+      "queueRun": "Köa körning"
+    },
+    "destroy": {
+      "title": "Förstör {name}",
+      "heading": "Förstör {name}?",
+      "description": "Detta köar en förstörelsekörning som river ner denna instans infrastruktur. Vid en lyckad applicering arkiveras arbetsytan. Detta kan inte ångras.",
+      "autoApplyHint": "Auto-applicera river ner omedelbart utan granskning."
+    },
+    "orphan": {
+      "title": "Överge {name}",
+      "heading": "Överge {name}?",
+      "description": "Detta tar bort katalogens instanspost men <warn>förstör inte</warn> dess infrastruktur — de provisionerade resurserna fortsätter köra, <warn>ospårade och ohanterade</warn>. Detta avrådes. För att återta infrastrukturen, avbryt och använd <emph>Förstör</emph> istället.",
+      "confirmPrompt": "Skriv instansnamnet <mono>{name}</mono> för att bekräfta:",
+      "orphaning": "Överger…",
+      "submit": "Överge och överge infrastrukturen"
+    },
+    "actions": {
+      "confirmed": "Körning bekräftad — applicerar.",
+      "discarded": "Körning kasserad.",
+      "provisioned": "Provisionerade {name} — planen är klar för granskning.",
+      "reconfigureQueued": "Omkonfigurering köad — körning skapad.",
+      "reconfigureQueuedStatus": "Omkonfigurering köad — körningen är {status}.",
+      "destroyQueued": "Förstörelse köad — körning skapad.",
+      "destroyQueuedStatus": "Förstörelse köad — körningen är {status}.",
+      "orphaned": "Övergav {name} — katalogpost borttagen; dess infrastruktur lämnas körande, ospårad och ohanterad."
+    },
+    "errors": {
+      "loadItem": "Det gick inte att läsa in katalogobjektet",
+      "confirm": "Det gick inte att bekräfta",
+      "confirmStatus": "Det gick inte att bekräfta ({status})",
+      "discard": "Det gick inte att kassera",
+      "discardStatus": "Det gick inte att kassera ({status})",
+      "provision": "Det gick inte att provisionera",
+      "provisionStatus": "Det gick inte att provisionera ({status})",
+      "reconfigure": "Det gick inte att omkonfigurera",
+      "reconfigureStatus": "Det gick inte att omkonfigurera ({status})",
+      "destroy": "Det gick inte att förstöra",
+      "destroyStatus": "Det gick inte att förstöra ({status})",
+      "orphan": "Det gick inte att överge",
+      "orphanStatus": "Det gick inte att överge ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "Återansluter…"
+    },
+    "sessionExpiry": {
+      "banner": "Sessionen går ut om {minutes, plural, one {# minut} other {# minuter}} — <link>autentisera på nytt</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# tjänste-token} other {# tjänste-tokens}} går ut inom {days, plural, one {# dag} other {# dagar}} — <link>granska</link>",
+      "soon": "{count, plural, one {# tjänste-token} other {# tjänste-tokens}} går ut snart — <link>granska</link>",
+      "dismissAria": "Stäng varning om tokenutgång"
+    },
+    "resourceUsage": {
+      "title": "Resursanvändning",
+      "oomKilled": "OOM-dödad",
+      "killedLikelyOom": "Dödad (troligen OOM)",
+      "memory": "Minne",
+      "requested": "Begärt {value}",
+      "limit": "Gräns {value}"
+    },
+    "labelsEditor": {
+      "none": "Ingen",
+      "removeAria": "Ta bort {key}",
+      "keyPlaceholder": "nyckel",
+      "valuePlaceholder": "värde",
+      "add": "Lägg till"
+    },
+    "sensitiveInput": {
+      "hide": "Dölj",
+      "show": "Visa",
+      "hideAria": "Dölj värde",
+      "showAria": "Visa värde"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "Sök arbetsytor…",
+      "loading": "Laddar…",
+      "empty": "Inga arbetsytor hittades",
+      "adding": "Lägger till…"
+    },
+    "templateEditors": {
+      "remove": "Ta bort",
+      "add": "Lägg till",
+      "valuePlaceholder": "värde",
+      "name": "Namn",
+      "url": "URL",
+      "hmacKey": "HMAC-nyckel (valfritt)",
+      "hmacKeyPlaceholder": "delad hemlighet",
+      "stage": "Steg",
+      "enforcement": "Tillämpning",
+      "enabled": "Aktiverad",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "Lägg till körningsuppgift",
+      "destinationType": "Destinationstyp",
+      "token": "Token (valfritt)",
+      "tokenPlaceholder": "HMAC / autentiseringstoken",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "E-postadresser",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "Lägg till e-post",
+      "triggers": "Utlösare",
+      "addNotification": "Lägg till avisering"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "AI-genererad",
+    "heading": {
+      "planSummary": "Plansammanfattning",
+      "failureAnalysis": "Felanalys"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "Generera om",
+      "queueing": "Köar…",
+      "tooltip": "Kör om AI-sammanfattningen mot samma planindata",
+      "ariaLabel": "Generera om AI-sammanfattning",
+      "confirm": "Generera om AI-analysen? Detta kör modellen igen.",
+      "error": "Kunde inte generera om: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "Sammanfattar plan…",
+      "analysingFailure": "Analyserar fel…"
+    },
+    "skipped": {
+      "fallback": "Sammanfattning hoppades över för denna körning."
+    },
+    "errored": {
+      "heading": "Sammanfattaren misslyckades"
+    },
+    "riskFactors": {
+      "heading": "Riskfaktorer",
+      "suggestedFixes": "Föreslagna åtgärder"
+    },
+    "tokens": "{input} in / {output} ut tokens",
+    "risk": {
+      "low": "låg",
+      "medium": "medel",
+      "high": "hög",
+      "critical": "kritisk",
+      "unknown": "okänd"
+    },
+    "badges": {
+      "noChanges": "Inga ändringar",
+      "noChangesLower": "inga ändringar",
+      "noChangesTitle": "Planen rapporterade inga resursändringar",
+      "toAdd": "{count, plural, one {# att lägga till} other {# att lägga till}}",
+      "toChange": "{count, plural, one {# att ändra} other {# att ändra}}",
+      "toDestroy": "{count, plural, one {# att förstöra} other {# att förstöra}}",
+      "toReplace": "{count, plural, one {# att ersätta} other {# att ersätta}}",
+      "toImport": "{count, plural, one {# att importera} other {# att importera}}"
+    },
+    "chat": {
+      "heading": "Uppföljning",
+      "sharedThreadNote": "En delad tråd, synlig för alla med läsåtkomst till arbetsytan.",
+      "placeholder": "Ställ en uppföljningsfråga om denna plan… (⌘/Ctrl + Enter för att skicka)",
+      "send": "Skicka",
+      "thinking": "Tänker…",
+      "you": "Du",
+      "assistant": "Assistent"
+    },
+    "translatedNote": "Automatiskt översatt till ditt språk. Den auktoritativa sammanfattningen är originalet.",
+    "translating": "Översätter…"
+  },
+  "runDetail": {
+    "notFound": "Körningen hittades inte",
+    "runSection": "Körningssektion",
+    "workspaceFallback": "arbetsyta",
+    "backTo": "Tillbaka till {name}",
+    "errorHeading": "Fel",
+    "discardedHeading": "Kasserad — omplanering krävs",
+    "common": {
+      "yes": "Ja",
+      "no": "Nej"
+    },
+    "header": {
+      "title": "Körning {id}",
+      "titleWithWorkspace": "{workspace} — körning {id}",
+      "description": "{source}-körning"
+    },
+    "relTime": {
+      "justNow": "just nu",
+      "minutesAgo": "{count, plural, one {# minut sedan} other {# minuter sedan}}",
+      "hoursAgo": "{count, plural, one {# timme sedan} other {# timmar sedan}}",
+      "daysAgo": "{count, plural, one {# dag sedan} other {# dagar sedan}}"
+    },
+    "status": {
+      "pending": "Väntar",
+      "queued": "I kö",
+      "planning": "Planerar",
+      "planned": "Planerad",
+      "confirmed": "Bekräftad",
+      "applying": "Applicerar",
+      "canceling": "Avbryter",
+      "applied": "Applicerad",
+      "errored": "Fel",
+      "canceled": "Avbruten",
+      "discarded": "Kasserad"
+    },
+    "activity": {
+      "pending": "Förbereder körningen",
+      "queued": "Väntar på en tillgänglig agent",
+      "planning": "Kör terraform plan",
+      "plannedConfirmable": "Väntar på att du bekräftar och applicerar",
+      "plannedSpeculative": "Spekulativ plan klar",
+      "plannedComplete": "Plan klar",
+      "confirmed": "Startar applicering",
+      "applying": "Kör terraform apply",
+      "canceling": "Stoppar körningen",
+      "applied": "Applicering klar",
+      "errored": "Körningen misslyckades",
+      "canceled": "Körning avbruten",
+      "discarded": "Plan kasserad",
+      "elapsedTitle": "Förfluten tid i denna fas"
+    },
+    "badge": {
+      "destroy": "förstör",
+      "planOnly": "endast plan"
+    },
+    "actions": {
+      "retryShort": "Försök igen",
+      "retryFull": "Kör körningen igen",
+      "retrying": "Försöker igen…",
+      "confirmShort": "Applicera",
+      "confirmFull": "Bekräfta och applicera",
+      "confirming": "Bekräftar…",
+      "discard": "Kassera",
+      "discarding": "Kasserar…",
+      "cancelShort": "Avbryt",
+      "cancelFull": "Avbryt körning",
+      "canceling": "Avbryter…"
+    },
+    "confirm": {
+      "apply": "Applicera denna körning? Detta tillämpar planen och ändrar infrastruktur.",
+      "discard": "Kassera denna plan?",
+      "cancel": "Avbryt denna körning?",
+      "retry": "Kör denna körning igen?"
+    },
+    "errors": {
+      "loadRun": "Det gick inte att läsa in körningen",
+      "action": {
+        "confirm": "Det gick inte att bekräfta körningen",
+        "discard": "Det gick inte att kassera körningen",
+        "cancel": "Det gick inte att avbryta körningen",
+        "retry": "Det gick inte att köra körningen igen"
+      }
+    },
+    "tabs": {
+      "overview": "Översikt",
+      "ai": "AI",
+      "aiFull": "AI-analys",
+      "opa": "OPA",
+      "opaFull": "OPA-policyer",
+      "impact": "Konsekvens",
+      "impactFull": "Konsekvensgraf",
+      "planLabel": "Plan<log>logg</log>",
+      "applyLabel": "Apply<log>logg</log>",
+      "planFull": "Plan-logg",
+      "applyFull": "Apply-logg",
+      "details": "Detaljer"
+    },
+    "banner": {
+      "destroy": "Detta är en <strong>förstörelsekörning</strong> — alla hanterade resurser förstörs vid applicering.",
+      "planOnlyCli": "Detta är en <strong>endast-plan</strong>-körning initierad från CLI på en VCS-ansluten arbetsyta. Applicering är inte tillgänglig för CLI-uppladdad kod — endast VCS-hanterad kod kan appliceras.",
+      "moduleOverridesPrefix": "Denna körning använder <strong>modulåsidosättanden</strong>",
+      "moduleOverridesFromPr": "från PR #{number}",
+      "moduleOverridesSuffix": "kommer att hämtas från PR-grenen istället för den publicerade registerversionen."
+    },
+    "cards": {
+      "changes": "Ändringar",
+      "aiAnalysis": "AI-analys",
+      "policyChecks": "Policykontroller",
+      "resources": "Resurser"
+    },
+    "changes": {
+      "noChanges": "Inga ändringar",
+      "planning": "Planerar…",
+      "toAdd": "att lägga till",
+      "toChange": "att ändra",
+      "toDestroy": "att förstöra",
+      "toReplace": "att ersätta",
+      "toImport": "att importera"
+    },
+    "ai": {
+      "notAvailable": "Ej tillgänglig",
+      "ready": "Klar",
+      "riskSub": "{risk} risk",
+      "generating": "Genererar…",
+      "skipped": "Hoppades över",
+      "failed": "Misslyckades",
+      "available": "Tillgänglig"
+    },
+    "policy": {
+      "none": "Ingen",
+      "blocked": "Blockerad",
+      "failedSub": "{count, plural, one {# misslyckad} other {# misslyckade}}",
+      "advisoryIssues": "Rådgivande problem",
+      "passedSub": "{passed}/{total} godkända",
+      "passed": "Godkänd"
+    },
+    "resources": {
+      "overLimit": "Över gränsen",
+      "oomKilled": "OOM-dödad",
+      "recorded": "Registrerad",
+      "nearLimit": "Nära gränsen",
+      "high": "Hög",
+      "withinLimits": "Inom gränserna"
+    },
+    "details": {
+      "heading": "Detaljer",
+      "executionBackend": "Exekveringsbackend",
+      "source": "Källa",
+      "autoApply": "Auto-applicera",
+      "planOnly": "Endast plan",
+      "triggeredBy": "Utlöst av",
+      "created": "Skapad",
+      "commit": "Commit",
+      "branch": "Gren",
+      "prMr": "PR/MR",
+      "stateVersion": "Tillståndsversion",
+      "viewState": "Visa tillstånd",
+      "runOptions": "Körningsalternativ"
+    },
+    "timeline": {
+      "heading": "Tidslinje",
+      "queued": "I kö",
+      "planningStarted": "Planering startad",
+      "planComplete": "Plan klar",
+      "confirmed": "Bekräftad",
+      "applyingStarted": "Applicering startad",
+      "applied": "Applicerad",
+      "errored": "Fel",
+      "canceled": "Avbruten",
+      "discarded": "Kasserad"
+    },
+    "log": {
+      "color": "Färg",
+      "colorOnTitle": "Visar ANSI-färger — klicka för klartext",
+      "colorOffTitle": "Visar klartext — klicka för färger",
+      "refresh": "Uppdatera",
+      "refreshTitle": "Uppdatera logg",
+      "copy": "Kopiera",
+      "copied": "Kopierat!",
+      "copyTitle": "Kopiera klartext till urklipp",
+      "copyAria": "Kopiera logg till urklipp",
+      "download": "Ladda ner",
+      "downloadColorTitle": "Ladda ner logg (med ANSI-färgkoder)",
+      "downloadPlainTitle": "Ladda ner logg (klartext)",
+      "downloadAria": "Ladda ner logg",
+      "follow": "Följ",
+      "followOnTitle": "Följer livesvansen — klicka för att stoppa",
+      "followOffTitle": "Följ livesvansen",
+      "end": "Slut",
+      "endTitle": "Hoppa till slutet av loggen",
+      "planEmpty": "Ingen planutdata tillgänglig ännu.",
+      "applyEmpty": "Ingen applicerings-utdata tillgänglig ännu."
+    },
+    "policyPanel": {
+      "heading": "Policykontroller",
+      "passedCount": "{passed}/{total} godkända",
+      "blockedMessage": "Denna körning är <strong>blockerad av en obligatorisk policyuppsättning</strong>. Den kommer inte att appliceras förrän felet är åtgärdat eller en admin åsidosätter den.",
+      "overriding": "Åsidosätter...",
+      "overrideContinue": "Åsidosätt och fortsätt",
+      "overrideFailed": "Åsidosättning misslyckades",
+      "overrideFailedStatus": "Åsidosättning misslyckades ({status})",
+      "overriddenBy": "åsidosatt av {by}",
+      "policyPassed": "godkänd",
+      "noDenyMessage": "Policyn misslyckades utan att producera ett neka-meddelande eller felutdata",
+      "enforcement": {
+        "mandatory": "obligatorisk",
+        "advisory": "rådgivande"
+      },
+      "outcome": {
+        "passed": "godkänd",
+        "failed": "misslyckad",
+        "errored": "fel"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "Arbetsytan hittades inte",
+    "common": {
+      "enabled": "Aktiverad",
+      "disabled": "Inaktiverad",
+      "none": "Ingen",
+      "default": "Standard",
+      "never": "Aldrig",
+      "actions": "Åtgärder",
+      "workspaceLocked": "Arbetsytan är låst"
+    },
+    "actions": {
+      "edit": "Redigera",
+      "cancel": "Avbryt",
+      "save": "Spara",
+      "saving": "Sparar…",
+      "savingEllipsis": "Sparar...",
+      "delete": "Ta bort",
+      "deleting": "Tar bort...",
+      "add": "Lägg till",
+      "adding": "Lägger till...",
+      "remove": "Ta bort",
+      "download": "Ladda ner",
+      "rollback": "Återställ",
+      "close": "Stäng",
+      "hide": "Dölj",
+      "enable": "Aktivera",
+      "disable": "Inaktivera",
+      "creating": "Skapar...",
+      "sending": "Skickar...",
+      "processing": "Bearbetar...",
+      "queuing": "Köar...",
+      "loading": "Laddar...",
+      "loadingLower": "laddar…"
+    },
+    "header": {
+      "executionMode": "{mode}-exekveringsläge"
+    },
+    "tabs": {
+      "overview": "Översikt",
+      "variables": "Variabler",
+      "runs": "Körningar",
+      "state": "Tillstånd",
+      "stateGraph": "Tillståndsgraf",
+      "configurations": "Konfigurationer",
+      "notifications": "Aviseringar",
+      "runTasks": "Körningsuppgifter",
+      "runTriggers": "Körningsutlösare",
+      "sharing": "Delning",
+      "selectLabel": "Arbetsytesektion"
+    },
+    "lifecycle": {
+      "pendingDeletion": "Väntar på borttagning",
+      "pendingDeletionDefault": "Denna arbetsyta är markerad för borttagning och kräver manuell åtgärd.",
+      "archived": "Arkiverad",
+      "archivedDefault": "Denna arbetsyta har arkiverats."
+    },
+    "runQueuedBanner": {
+      "message": "Körning köad.",
+      "viewRun": "Visa körning"
+    },
+    "settings": {
+      "title": "Inställningar",
+      "saveChanges": "Spara ändringar",
+      "renamedNotice": "Arbetsytan har bytt namn. Uppdatera fältet <name></name> i ditt <cloud></cloud>-block så att det matchar."
+    },
+    "fields": {
+      "name": "Namn",
+      "nameTitle": "Bokstäver, siffror, bindestreck, understreck. Måste börja med en bokstav eller siffra.",
+      "executionMode": "Exekveringsläge",
+      "execModeLocal": "Lokal",
+      "execModeAgent": "Agent",
+      "autoApply": "Auto-applicera",
+      "cpuRequest": "CPU-begäran",
+      "cpuRequestTitle": "Kubernetes CPU-kvantitet: hela kärnor (1, 2) eller millicores (500m, 100m)",
+      "memoryRequest": "Minnesbegäran",
+      "memoryRequestTitle": "Kubernetes minneskvantitet: byte (1000) eller med suffix (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "Exekveringsbackend",
+      "version": "Version",
+      "versionPlaceholder": "t.ex. 1.11 eller 1.11.5",
+      "versionTitle": "Version i formatet X.Y eller X.Y.Z (t.ex. 1.11 eller 1.11.5)",
+      "terragruntEnabledAgent": "Aktiverad (agentläge)",
+      "terragruntEnabledVersion": "Aktiverad (v{version})",
+      "terragruntVersionPlaceholder": "t.ex. 1.0",
+      "terragruntVersionTitle": "Terragrunt-version i formatet X.Y eller X.Y.Z (t.ex. 1.0)",
+      "workingDirectory": "Arbetskatalog",
+      "workingDirectoryPlaceholder": "t.ex. environments/dev",
+      "agentPool": "Agentpool",
+      "owner": "Ägare",
+      "vcsConnection": "VCS-anslutning",
+      "vcsRepository": "VCS-repositorie",
+      "vcsRepositoryTitle": "Måste vara en HTTP- eller HTTPS-URL",
+      "vcsBranch": "VCS-gren",
+      "vcsBranchPlaceholder": "main (standard)",
+      "vcsWorkflow": "VCS-arbetsflöde",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (standard — TFE / HCP-standard)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (Atlantis-standard — opt-in)",
+      "autoMerge": "Auto-merge efter applicering",
+      "autoMergeStrategy": "Auto-merge-strategi",
+      "vcsPolling": "VCS-pollning",
+      "labels": "Etiketter (taggar)",
+      "labelsTitle": "Arbetsytors etiketter fyller dubbla syften: etikettbaserad RBAC-matchning, och som de \"tags\" som matchas av terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}'-block.",
+      "varFiles": "Var-filer",
+      "varFilesPlaceholder": "t.ex. envs/dev.tfvars",
+      "triggerPrefixes": "Utlösarprefix",
+      "triggerPrefixesHint": "Kataloger som utlöser körningar. Åsidosätter filtrering av arbetskatalog när det är angivet.",
+      "triggerPrefixesPlaceholder": "t.ex. modules",
+      "triggerPrefixesNone": "Ingen (använder arbetskatalog)",
+      "driftIgnoreRules": "Regler för att ignorera drift",
+      "driftIgnoreRulesHint": "Glob-medvetna Terraform-adresser + attributsökvägar som undertrycks av driftklassificeraren. <star></star> matchar noll eller fler tecken som inte är <dot></dot> (spänner över <n></n> index); <starIdx></starIdx> matchar valfritt index inom hakparenteser. En ren adress utan attributsuffix tystar alla ändringar av den resursen — inklusive förstörelser. Påverkar endast drift, inte vanlig plan/apply. Se <docs>drift-ignore-rules.md</docs> för den fullständiga grammatiken.",
+      "driftIgnoreRulesNone": "Ingen (varje plandiff räknas som drift)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "Auktorisering delegerad till ditt VCS-repositorie.",
+      "rbac": "Alla som kan merga PR:en kan applicera. Grenskyddsregler (obligatoriska granskningar, statuskontroller, godkännande av kodägare) blir grinden. Terrapods roll-/etikett-RBAC gäller<em>inte</em> för kommentarsdrivna åtgärder i detta läge.",
+      "recommended": "<strong>Rekommenderat:</strong> kräv linjär historik (rebase/squash före merge) så att den commit du applicerar är den commit som landar.",
+      "credit": "Erkännande: detta arbetsflöde är modellerat på <atlantis>Atlantis</atlantis>. Atlantis förblir rätt verktyg för team som bara vill ha PR-kommentarsdrivna appliceringar och inget plattforms-UI."
+    },
+    "vcsPolling": {
+      "error": "Fel",
+      "ok": "OK ({time})",
+      "notPolled": "Inte pollad ännu"
+    },
+    "lockout": {
+      "revertLabels": "Återställ etiketter",
+      "saveAnyway": "Spara ändå"
+    },
+    "lock": {
+      "title": "Låsstatus",
+      "lockedDesc": "Denna arbetsyta är låst. Inga planer eller appliceringar kan köras.",
+      "unlockedDesc": "Denna arbetsyta är olåst och redo för körningar.",
+      "lock": "Lås",
+      "unlock": "Lås upp",
+      "lockConfirm": "Lås denna arbetsyta?",
+      "unlockConfirm": "Lås upp denna arbetsyta?"
+    },
+    "drift": {
+      "title": "Driftupptäckt",
+      "checkInterval": "Kontrollintervall",
+      "status": "Status",
+      "statusNoDrift": "Ingen drift",
+      "statusDrifted": "Drift",
+      "statusErrored": "Fel",
+      "statusUnchecked": "Ej kontrollerad",
+      "dismiss": "Avfärda",
+      "dismissing": "Avfärdar…",
+      "dismissTitle": "Rensa det rapporterade drifttillståndet. Nästa schemalagda kontroll återfyller det från verkligheten.",
+      "lastChecked": "Senast kontrollerad",
+      "checkNow": "Kontrollera nu",
+      "checkNowTitle": "Köa en endast-plan-körning för att kontrollera drift",
+      "checkNowTitleDisabled": "Aktivera driftupptäckt först"
+    },
+    "intervals": {
+      "disabled": "Inaktiverad",
+      "1hour": "1 timme",
+      "4hours": "4 timmar",
+      "12hours": "12 timmar",
+      "24hours": "24 timmar",
+      "48hours": "48 timmar",
+      "3days": "3 dagar",
+      "7days": "7 dagar"
+    },
+    "planExpiry": {
+      "title": "Planutgång",
+      "description": "Kassera automatiskt en obekräftad plan när den är äldre än detta, så att en föråldrad plan inte kan appliceras mot en förändrad värld. Av som standard; planen måste då köras om. (Gäller endast appliceringsbara körningar.)",
+      "expireAfter": "Går ut efter"
+    },
+    "aiSummary": {
+      "title": "AI-plansammanfattning",
+      "description": "Automatisk LLM-genererad ändringssammanfattning, riskbedömning och felanalys vid varje planfasresultat för denna arbetsyta.",
+      "mode": "Läge",
+      "modeDefault": "Följ deploymentstandard",
+      "modeEnabled": "Sammanfatta alltid",
+      "modeDisabled": "Sammanfatta aldrig",
+      "contextLabel": "Arbetsytekontext",
+      "contextLabelSuffix": "(valfritt, additivt)",
+      "contextPlaceholder": "Fakta som AI:n bör känna till om just denna arbetsyta. t.ex. 'Fronter valvet för tjänst X — att förstöra KMS-nyckeln orsakar ett globalt avbrott.'",
+      "noContext": "Ingen arbetsytekontext angiven.",
+      "contextHint": "Läggs till ovanpå deploymentomfattande kontext. Max 4000 tecken."
+    },
+    "slack": {
+      "title": "Slack-aviseringar",
+      "description": "Anmäl denna arbetsyta till Slack-körningsaviseringar — godkännandeförfrågningar, appliceringar, fel och drift. Lämna kanalen tom så förblir denna arbetsyta tyst (det finns ingen deploymentomfattande utsändning). Kräver att Slack-appen aktiverats av en administratör.",
+      "channel": "Kanal",
+      "channelPlaceholder": "#deploys eller ett kanal-ID (t.ex. C0123ABCD)",
+      "notSet": "Ej angiven — tyst.",
+      "hint": "Slack-appen måste redan vara medlem i kanalen."
+    },
+    "delete": {
+      "title": "Ta bort arbetsyta",
+      "description": "Ta permanent bort denna arbetsyta och allt tillhörande tillstånd, variabler och körningar.",
+      "confirm": "Bekräfta borttagning"
+    },
+    "variables": {
+      "addVariable": "Lägg till variabel",
+      "key": "Nyckel",
+      "value": "Värde",
+      "category": "Kategori",
+      "categoryEnv": "Miljö",
+      "sensitive": "Känslig",
+      "empty": "Inga variabler konfigurerade för denna arbetsyta.",
+      "emptyValue": "tomt",
+      "enterNewValue": "Ange nytt värde",
+      "deleteConfirm": "Ta bort variabel \"{key}\"?"
+    },
+    "runs": {
+      "options": "Alternativ",
+      "hideOptions": "Dölj alternativ",
+      "queueDestroy": "Köa förstörelse",
+      "queueDestroyTitle": "Köa en förstörelseplan",
+      "destroyAllConfirm": "Förstör alla resurser?",
+      "confirmDestroy": "Bekräfta förstörelse",
+      "queuePlan": "Köa plan",
+      "queueRun": "Köa körning",
+      "queuePlanConfirm": "Köa en spekulativ plan för denna arbetsyta?",
+      "queueApplyConfirm": "Köa en plan- + apply-körning? Detta kan ändra infrastruktur.",
+      "planOptions": "Planalternativ",
+      "targetResources": "Målresurser",
+      "replaceResources": "Ersätt resurser",
+      "commaSeparated": "(kommaseparerat)",
+      "planOnly": "Endast plan",
+      "refreshOnly": "Endast uppdatera",
+      "skipRefresh": "Hoppa över uppdatering",
+      "allowEmptyApply": "Tillåt tom applicering",
+      "vcsRef": "VCS-ref",
+      "branch": "Gren",
+      "tag": "Tagg",
+      "defaultBranch": "Standard ({branch})",
+      "nonDefaultRefNote": "Icke-standardref vald — körningen blir endast-plan",
+      "empty": "Inga körningar ännu för denna arbetsyta.",
+      "runId": "Körnings-ID",
+      "status": "Status",
+      "type": "Typ",
+      "changes": "Ändringar",
+      "source": "Källa",
+      "triggeredBy": "Utlöst av",
+      "created": "Skapad",
+      "needsConfirm": "behöver bekräftas",
+      "typeDestroy": "förstör",
+      "typePlanOnly": "endast plan",
+      "typePlanApply": "plan + apply",
+      "sourceModuleTest": "modultest",
+      "sourceModulePublish": "modulpublicering"
+    },
+    "state": {
+      "deleteConfirm": "Ta bort tillståndsversion #{serial}? Detta kan inte ångras.",
+      "rollbackConfirm": "Återställ till tillståndsversion #{serial}? En ny version skapas med samma innehåll.",
+      "confirmDelete": "Bekräfta borttagning",
+      "confirmRollback": "Bekräfta återställning",
+      "uploadState": "Ladda upp tillstånd",
+      "empty": "Inga tillståndsversioner ännu för denna arbetsyta.",
+      "serial": "Serienummer",
+      "createdBy": "Skapad av",
+      "run": "Körning",
+      "size": "Storlek",
+      "created": "Skapad",
+      "runner": "runner",
+      "latest": "senaste"
+    },
+    "configurations": {
+      "description": "Uppladdade källarkiv för denna arbetsyta, nyaste först. Välj två rader för att jämföra.",
+      "selectedCount": "{count}/2 valda",
+      "compare": "Jämför",
+      "comparing": "Jämför…",
+      "empty": "Inga konfigurationsversioner ännu. De visas här så snart en `terraform plan` laddar upp eller en VCS-push utlöser en körning.",
+      "id": "ID",
+      "source": "Källa",
+      "status": "Status",
+      "created": "Skapad",
+      "current": "aktuell",
+      "selectForCompare": "Välj {id} för jämförelse",
+      "compareLabel": "Jämför",
+      "diff": "Diff",
+      "filesChanged": "{count} filer ändrade",
+      "oversized": "Hoppade över {count, plural, one {# överdimensionerad fil} other {# överdimensionerade filer}}: {files}",
+      "noDiff": "Inga innehållsskillnader mellan dessa versioner.",
+      "binaryChanged": "Binär fil ändrad — diff visas inte.",
+      "diffType": {
+        "added": "tillagd",
+        "removed": "borttagen",
+        "modified": "ändrad",
+        "binary-changed": "binär"
+      }
+    },
+    "notifications": {
+      "addNotification": "Lägg till avisering",
+      "name": "Namn",
+      "namePlaceholder": "Deploy-aviseringar",
+      "destinationType": "Destinationstyp",
+      "typeGeneric": "Generisk webhook",
+      "typeEmail": "E-post",
+      "url": "URL",
+      "hmacToken": "HMAC-token (valfritt)",
+      "signingSecret": "Signeringshemlighet",
+      "emailAddresses": "E-postadresser (kommaseparerat)",
+      "triggerEvents": "Utlösarhändelser",
+      "createNotification": "Skapa avisering",
+      "empty": "Inga aviseringskonfigurationer för denna arbetsyta.",
+      "ok": "OK",
+      "err": "Fel {status}",
+      "fail": "MISSLYCKADES",
+      "http": "HTTP {status}",
+      "verify": "Verifiera",
+      "history": "Historik",
+      "deliveryHistory": "Leveranshistorik",
+      "enableConfirm": "Aktivera denna avisering?",
+      "disableConfirm": "Inaktivera denna avisering?",
+      "deleteConfirm": "Ta bort avisering \"{name}\"?"
+    },
+    "runTasks": {
+      "addRunTask": "Lägg till körningsuppgift",
+      "name": "Namn",
+      "namePlaceholder": "OPA-policykontroll",
+      "webhookUrl": "Webhook-URL",
+      "stage": "Steg",
+      "enforcementLevel": "Tillämpningsnivå",
+      "hmacKey": "HMAC-nyckel (valfritt)",
+      "hmacKeyPlaceholder": "Signeringshemlighet för webhook-verifiering",
+      "createRunTask": "Skapa körningsuppgift",
+      "empty": "Inga körningsuppgifter konfigurerade för denna arbetsyta.",
+      "enableConfirm": "Aktivera denna körningsuppgift?",
+      "disableConfirm": "Inaktivera denna körningsuppgift?",
+      "deleteConfirm": "Ta bort körningsuppgift \"{name}\"?"
+    },
+    "runTriggers": {
+      "title": "Körningsutlösare",
+      "description": "När en källarbetsyta slutför en applicering får nedströmsarbetsytor automatiskt en ny körning köad. Upp till 20 källarbetsytor per destination.",
+      "inboundHeading": "Källarbetsytor som utlöser körningar här",
+      "inboundEmpty": "Inga källarbetsytor utlöser körningar på denna arbetsyta.",
+      "pickerPlaceholder": "Sök arbetsytor att lägga till som källa…",
+      "outboundHeading": "Destinationsarbetsytor som denna arbetsyta utlöser",
+      "outboundEmpty": "Denna arbetsyta utlöser inte körningar på någon annan arbetsyta.",
+      "destinationNote": "(destination; ta bort därifrån)",
+      "removeConfirm": "Ta bort denna körningsutlösare?"
+    },
+    "sharing": {
+      "title": "Delning av fjärrtillstånd",
+      "description": "Producentstyrd tillåtlista för arbetsyteöverskridande <code></code>. Tillståndsdata bär hemligheter — bevilja medvetet. <docs>Dokumentation</docs>",
+      "outboundHeading": "Arbetsytor som är auktoriserade att läsa denna arbetsytas tillstånd",
+      "outboundEmpty": "Denna arbetsytas tillstånd delas inte med någon annan arbetsyta.",
+      "grantedBy": "beviljad av {by}",
+      "revoke": "Återkalla",
+      "revokeConfirm": "Ta bort denna delning av fjärrtillstånd? Konsumenten förlorar åtkomst till detta tillstånd.",
+      "pickerPlaceholder": "Sök arbetsytor att auktorisera som konsument…",
+      "inboundHeading": "Arbetsytor som denna arbetsyta är auktoriserad att läsa tillstånd från",
+      "inboundEmpty": "Denna arbetsyta är inte auktoriserad att läsa tillstånd från någon annan arbetsyta via terraform_remote_state.",
+      "producerNote": "(producent; återkalla därifrån)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "Manuell driftkontroll från gränssnittet",
+      "queued": "Köad från gränssnittet",
+      "queuedSpeculative": "Köad från gränssnittet (spekulativ)",
+      "destroyQueued": "Förstörelse köad från gränssnittet"
+    },
+    "errors": {
+      "loadWorkspace": "Det gick inte att läsa in arbetsytan",
+      "loadRuns": "Det gick inte att läsa in körningar",
+      "loadVariables": "Det gick inte att läsa in variabler",
+      "loadStateVersions": "Det gick inte att läsa in tillståndsversioner",
+      "loadConfigurations": "Det gick inte att läsa in konfigurationsversioner",
+      "loadNotifications": "Det gick inte att läsa in aviseringar",
+      "loadOutboundConsumers": "Det gick inte att läsa in utgående fjärrtillståndskonsumenter",
+      "loadInboundConsumers": "Det gick inte att läsa in inkommande fjärrtillståndskonsumenter",
+      "loadConsumers": "Det gick inte att läsa in fjärrtillståndskonsumenter",
+      "loadInboundTriggers": "Det gick inte att läsa in inkommande körningsutlösare",
+      "loadOutboundTriggers": "Det gick inte att läsa in utgående körningsutlösare",
+      "loadTriggers": "Det gick inte att läsa in körningsutlösare",
+      "loadRunTasks": "Det gick inte att läsa in körningsuppgifter",
+      "downloadStateFile": "Det gick inte att ladda ner tillståndsfilen",
+      "downloadFailed": "Nedladdning misslyckades",
+      "downloadFailedStatus": "Nedladdning misslyckades ({status})",
+      "downloadTicketMissingUrl": "Svar på nedladdningsbiljett saknar URL",
+      "diffFailed": "Diff misslyckades",
+      "diffFailedStatus": "Diff misslyckades ({status})",
+      "authorizeConsumer": "Det gick inte att auktorisera konsumenten",
+      "revoke": "Det gick inte att återkalla",
+      "revokeConsumer": "Det gick inte att återkalla konsumenten",
+      "addTrigger": "Det gick inte att lägga till körningsutlösaren",
+      "removeTrigger": "Det gick inte att ta bort körningsutlösaren",
+      "createRunTask": "Det gick inte att skapa körningsuppgiften",
+      "createRunTaskStatus": "Det gick inte att skapa körningsuppgiften ({status})",
+      "update": "Det gick inte att uppdatera",
+      "toggleRunTask": "Det gick inte att växla körningsuppgiften",
+      "delete": "Det gick inte att ta bort",
+      "deleteRunTask": "Det gick inte att ta bort körningsuppgiften",
+      "labelLockout": "Denna etikettändring skulle minska din åtkomst.",
+      "updateWorkspace": "Det gick inte att uppdatera arbetsytan",
+      "lockWorkspace": "Det gick inte att låsa arbetsytan",
+      "unlockWorkspace": "Det gick inte att låsa upp arbetsytan",
+      "updateAiSummary": "Det gick inte att uppdatera inställningar för AI-sammanfattning",
+      "updateSlackChannel": "Det gick inte att uppdatera Slack-kanalen",
+      "updateDriftSettings": "Det gick inte att uppdatera driftinställningar",
+      "updateDriftInterval": "Det gick inte att uppdatera driftintervallet",
+      "updatePlanExpiry": "Det gick inte att uppdatera planutgången",
+      "queueDriftCheck": "Det gick inte att köa driftkontrollen",
+      "queueDriftCheckStatus": "Det gick inte att köa driftkontrollen ({status})",
+      "dismissDrift": "Det gick inte att avfärda drift",
+      "dismissDriftStatus": "Det gick inte att avfärda drift ({status})",
+      "deleteWorkspace": "Det gick inte att ta bort arbetsytan",
+      "addVariable": "Det gick inte att lägga till variabeln",
+      "addVariableStatus": "Det gick inte att lägga till variabeln ({status})",
+      "deleteVariable": "Det gick inte att ta bort variabeln",
+      "updateVariable": "Det gick inte att uppdatera variabeln",
+      "queuePlan": "Det gick inte att köa planen",
+      "queuePlanStatus": "Det gick inte att köa planen ({status})",
+      "queueDestroy": "Det gick inte att köa förstörelsen",
+      "queueDestroyStatus": "Det gick inte att köa förstörelsen ({status})",
+      "createNotification": "Det gick inte att skapa aviseringen",
+      "createNotificationStatus": "Det gick inte att skapa aviseringen ({status})",
+      "toggleNotification": "Det gick inte att växla aviseringen",
+      "deleteNotification": "Det gick inte att ta bort aviseringen",
+      "verificationFailed": "Verifiering misslyckades",
+      "verificationDeliveryFailed": "Verifieringsleverans misslyckades: {detail}",
+      "unknownError": "Okänt fel",
+      "failed": "Misslyckades",
+      "deleteStateVersion": "Det gick inte att ta bort tillståndsversionen",
+      "rollbackStateVersion": "Det gick inte att återställa tillståndsversionen",
+      "stateActionFailed": "Tillståndsåtgärd misslyckades",
+      "uploadState": "Det gick inte att ladda upp tillstånd",
+      "uploadStateFile": "Det gick inte att ladda upp tillståndsfilen"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Det gick inte att läsa in tillståndsgrafen.",
+      "emptyState": "Inget tillstånd ännu — kör en plan och applicering, eller ladda upp tillstånd, så fylls denna graf.",
+      "stateVersionLabel": "Tillståndsversion",
+      "currentSuffix": "(aktuell)",
+      "colorByLabel": "Färglägg efter",
+      "viewGraph": "Graf",
+      "viewTable": "Tabell",
+      "resourceCount": "{count, plural, one {# resurs} other {# resurser}}",
+      "dependencyCount": "{count, plural, one {# beroende} other {# beroenden}}",
+      "truncated": "Visar de första {shown} av {total} resurser — grafen är begränsad för läsbarhet.",
+      "colResource": "Resurs",
+      "colType": "Typ",
+      "colMode": "Läge",
+      "colModule": "Modul",
+      "colDependedOnBy": "Beroende av",
+      "rootModule": "(rot)"
+    },
+    "impact": {
+      "notAvailable": "Konsekvensgraf är inte tillgänglig för denna körning.",
+      "title": "Konsekvensgraf",
+      "subtitle": "plan över {count, plural, one {# resurs} other {# resurser}}",
+      "hint": "Varje sfär är en resurs; varje pil pekar på det den beror på. Klicka på en nod → dess transitiva <b>konsekvens</b> (allt nedströms) tänds upp.",
+      "downstreamAffected": "nedströms påverkade",
+      "action": {
+        "create": "skapa",
+        "update": "uppdatera",
+        "replace": "ersätt",
+        "destroy": "förstör",
+        "unchanged": "oförändrad"
+      }
+    },
+    "estate": {
+      "navHint": "Dra för att rotera · scrolla för att zooma · högerdra för att panorera · <em>klicka på en nod för att kretsa runt den</em>"
+    },
+    "state3d": {
+      "title": "Tillståndsgraf",
+      "hint": "Varje sfär är en resurs; varje pil pekar på det den beror på. Klicka på en nod → de resurser som transitivt <b>beror på den</b> tänds upp.",
+      "dataSource": "datakälla",
+      "managed": "hanterad",
+      "dependOnThis": "beror på denna"
+    },
+    "resource3d": {
+      "resetView": "Återställ vy",
+      "clear": "Rensa",
+      "key": "Nyckel",
+      "resources": "Resurser",
+      "hideKey": "Dölj nyckel",
+      "hideResources": "Dölj resurser",
+      "resourcesCount": "Resurser ({count})",
+      "filterPlaceholder": "Filtrera resurser…",
+      "navHint": "Dra för att rotera · scrolla för att zooma · högerdra för att panorera · <em>klicka på en resurs för att kretsa runt den</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "Tillbaka till exekveringskrokar",
+    "defaultDescription": "Exekveringskrok",
+    "notFound": "Exekveringskroken hittades inte",
+    "scriptEmpty": "(tomt)",
+    "tabs": {
+      "settings": "Inställningar",
+      "workspaces": "Arbetsytor"
+    },
+    "common": {
+      "yes": "Ja",
+      "no": "Nej"
+    },
+    "actions": {
+      "edit": "Redigera",
+      "cancel": "Avbryt",
+      "save": "Spara",
+      "saving": "Sparar...",
+      "delete": "Ta bort",
+      "deleting": "Tar bort...",
+      "confirmDelete": "Bekräfta borttagning",
+      "add": "Lägg till",
+      "adding": "Lägger till...",
+      "remove": "Ta bort"
+    },
+    "settings": {
+      "heading": "Inställningar"
+    },
+    "fields": {
+      "name": "Namn",
+      "description": "Beskrivning",
+      "hookPoint": "Krokpunkt",
+      "priority": "Prioritet",
+      "enabled": "Aktiverad",
+      "script": "Skript (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "Ta bort exekveringskrok",
+      "description": "Ta permanent bort denna krok och ta bort den från alla arbetsytor."
+    },
+    "workspaces": {
+      "scopeNote": "Denna krok körs endast på de arbetsytor som associeras nedan. Det finns ingen global omfattning.",
+      "associate": "Associera arbetsyta",
+      "workspaceLabel": "Arbetsyta",
+      "selectPlaceholder": "Välj en arbetsyta...",
+      "empty": "Inga arbetsytor associerade med denna krok.",
+      "colWorkspace": "Arbetsyta",
+      "colActions": "Åtgärder"
+    },
+    "confirm": {
+      "removeWorkspace": "Ta bort denna arbetsyta från kroken? Kroken körs inte längre för den."
+    },
+    "success": {
+      "updated": "Exekveringskrok uppdaterad",
+      "workspaceAssociated": "Arbetsyta associerad",
+      "workspaceRemoved": "Arbetsyta borttagen"
+    },
+    "errors": {
+      "load": "Det gick inte att läsa in exekveringskroken",
+      "update": "Det gick inte att uppdatera exekveringskroken",
+      "delete": "Det gick inte att ta bort exekveringskroken",
+      "addWorkspace": "Det gick inte att lägga till arbetsytan",
+      "removeWorkspace": "Det gick inte att ta bort arbetsytan"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "Policyuppsättningar",
+    "notFound": "Hittades inte",
+    "unknown": "okänd",
+    "subtitle": "OPA-policyuppsättning · skapad av {createdBy}",
+    "settings": {
+      "heading": "Inställningar"
+    },
+    "fields": {
+      "description": "Beskrivning",
+      "enforcement": "Tillämpning",
+      "enabled": "Aktiverad",
+      "globalScope": "Global (varje arbetsyta)"
+    },
+    "enforcement": {
+      "advisory": "Rådgivande (varna)",
+      "mandatory": "Obligatorisk (blockera apply)"
+    },
+    "scope": {
+      "allowLabels": "Tillåt etiketter (key: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "Tillåt namn (ett per rad)",
+      "denyLabels": "Neka etiketter (key: v1, v2)",
+      "denyNames": "Neka namn (ett per rad)"
+    },
+    "vcs": {
+      "heading": "VCS-konfiguration",
+      "repoUrl": "Repositorie-URL",
+      "branch": "Gren",
+      "branchPlaceholder": "main (standard)",
+      "policyPath": "Policysökväg"
+    },
+    "vcsBanner": {
+      "syncedFrom": "Policyer synkroniserade från",
+      "at": "vid",
+      "lastSynced": "Senast synkroniserad {time}",
+      "commit": "(commit {sha})",
+      "syncError": "Synkroniseringsfel: {error}"
+    },
+    "policies": {
+      "heading": "Policyer ({count})",
+      "vcsManaged": "Hanteras av repositoriet — pusha ändringar via PR",
+      "empty": "Inga policyer i denna uppsättning ännu."
+    },
+    "addPolicy": {
+      "namePlaceholder": "Policynamn",
+      "descPlaceholder": "Beskrivning (valfritt)",
+      "regoHint": "Rego v1. Måste deklarera <code>package terrapod</code> och uttrycka överträdelser via en <code>deny</code>-uppsättning. Planen är <code>input</code>; Terrapod-kontext är <code>data.terrapod_context</code>."
+    },
+    "actions": {
+      "saving": "Sparar...",
+      "saveSettings": "Spara inställningar",
+      "syncNow": "Synkronisera nu",
+      "cancel": "Avbryt",
+      "addPolicy": "Lägg till policy",
+      "deleteSet": "Ta bort uppsättning",
+      "validatingRego": "Validerar Rego...",
+      "delete": "Ta bort",
+      "savePolicy": "Spara policy"
+    },
+    "confirm": {
+      "deleteSet": "Ta bort denna policyuppsättning och alla dess policyer? Registrerade körningsutvärderingar behålls.",
+      "deletePolicy": "Ta bort policy \"{name}\"?"
+    },
+    "errors": {
+      "load": "Det gick inte att läsa in policyuppsättningen",
+      "save": "Det gick inte att spara policyuppsättningen",
+      "saveStatus": "Det gick inte att spara ({status})",
+      "delete": "Det gick inte att ta bort policyuppsättningen",
+      "deleteStatus": "Det gick inte att ta bort ({status})",
+      "addPolicy": "Det gick inte att lägga till policyn",
+      "addPolicyStatus": "Det gick inte att lägga till policyn ({status})",
+      "savePolicy": "Det gick inte att spara policyn",
+      "savePolicyStatus": "Det gick inte att spara policyn ({status})",
+      "deletePolicy": "Det gick inte att ta bort policyn",
+      "deletePolicyStatus": "Det gick inte att ta bort ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "Anslut Slack till Terrapod",
+    "loading": "Laddar…",
+    "checking": "Kontrollerar din länk…",
+    "linking": "Länkar ditt Slack-konto…",
+    "unknown": "okänd",
+    "confirm": {
+      "prompt": "Länka detta Slack-konto till <em>din</em> Terrapod-identitet? Varje framtida Slack-åtgärd (godkänn/kassera) körs som denna Terrapod-användare med deras behörigheter.",
+      "slackUser": "Slack-användare",
+      "slackTeam": "Slack-team",
+      "terrapodAccount": "Terrapod-konto",
+      "warning": "Fortsätt endast om du precis startade denna länkning från Slack själv. Om du inte gjorde det, stäng denna flik och länka inte — detta binder Slack-kontot ovan till <em>din</em> Terrapod-identitet.",
+      "button": "Bekräfta och länka"
+    },
+    "success": {
+      "message": "Ditt Slack-konto är nu länkat till Terrapod.",
+      "linkedAs": "Länkad som <em>{email}</em>. Du kan stänga denna flik och återvända till Slack."
+    },
+    "errors": {
+      "missingLink": "Länken saknas eller är ogiltig. Börja om med Terrapod-länkkommandot i Slack.",
+      "invalidLink": "Denna länk är ogiltig, utgången eller redan använd. Starta länkningen igen från Slack.",
+      "linkingFailed": "Länkning misslyckades."
+    }
+  },
+  "cliComplete": {
+    "loading": "Laddar...",
+    "completing": "Slutför autentisering...",
+    "invalid": {
+      "title": "Ogiltig förfrågan",
+      "description": "Obligatoriska parametrar saknas."
+    },
+    "success": {
+      "title": "Inloggning lyckades",
+      "complete": "API-token skapad. Du kan stänga denna flik."
+    },
+    "fallback": {
+      "description": "Kunde inte nå CLI:t automatiskt.",
+      "button": "Klicka här för att slutföra manuellt"
+    },
+    "timeout": {
+      "description": "CLI:t kanske inte slutförde tokenutbytet. Kontrollera din terminal."
+    }
+  },
+  "apiDocs": {
+    "view": "Vy:",
+    "redocTitle": "ReDoc API-dokumentation"
+  }
+}

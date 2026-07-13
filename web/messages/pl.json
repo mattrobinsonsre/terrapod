@@ -1,0 +1,2621 @@
+{
+  "nav": {
+    "workspaces": "Obszary robocze",
+    "estate": "Majątek",
+    "registry": "Rejestr",
+    "modules": "Moduły",
+    "providers": "Dostawcy",
+    "catalog": "Katalog",
+    "agentPools": "Pule agentów",
+    "admin": "Administracja",
+    "users": "Użytkownicy",
+    "roles": "Role",
+    "vcsConnections": "Połączenia VCS",
+    "variableSets": "Zestawy zmiennych",
+    "autodiscovery": "Autowykrywanie",
+    "bulkUpdate": "Aktualizacja zbiorcza",
+    "executionHooks": "Punkty zaczepienia wykonania",
+    "policySets": "Zestawy zasad",
+    "providerTemplates": "Szablony dostawców",
+    "catalogAdmin": "Administracja katalogiem",
+    "cache": "Pamięć podręczna",
+    "auditLog": "Dziennik audytu",
+    "help": "Pomoc",
+    "apiReference": "Dokumentacja API",
+    "docs": "Dokumentacja",
+    "account": "Konto",
+    "apiTokens": "Tokeny API",
+    "sessions": "Sesje",
+    "logOut": "Wyloguj",
+    "menu": "Menu",
+    "openMenu": "Otwórz menu",
+    "openAccountMenu": "Otwórz menu konta",
+    "closeMenu": "Zamknij menu"
+  },
+  "switcher": {
+    "language": "Język",
+    "changeLanguage": "Zmień język"
+  },
+  "workspaces": {
+    "title": "Obszary robocze",
+    "description": "Zarządzaj obszarami roboczymi, stanem i przebiegami Terraform",
+    "new": "Nowy obszar roboczy",
+    "cancel": "Anuluj",
+    "create": "Utwórz obszar roboczy",
+    "creating": "Tworzenie…",
+    "loadFailed": "Nie udało się wczytać obszarów roboczych",
+    "createFailed": "Nie udało się utworzyć obszaru roboczego",
+    "form": {
+      "name": "Nazwa",
+      "namePattern": "Tylko litery, cyfry, myślniki i podkreślenia. Musi zaczynać się od litery lub cyfry.",
+      "namePlaceholder": "moj-obszar-roboczy",
+      "executionMode": "Tryb wykonania",
+      "local": "Lokalny",
+      "agent": "Agent",
+      "executionBackend": "Backend wykonania",
+      "version": "Wersja",
+      "versionTitle": "Wersja w formacie X.Y lub X.Y.Z (np. 1.11 lub 1.11.5)",
+      "versionPlaceholder": "np. 1.11 lub 1.11.5",
+      "cpuRequest": "Żądanie CPU",
+      "cpuTitle": "Ilość CPU w Kubernetes: pełne rdzenie (1, 2) lub milirdzenie (500m, 100m)",
+      "cpuHint": "np. 1, 0.5, 500m",
+      "memoryRequest": "Żądanie pamięci",
+      "memoryTitle": "Ilość pamięci w Kubernetes: bajty (1000) lub z przyrostkiem (512Mi, 2Gi, 1Ti)",
+      "memoryHint": "np. 2Gi, 512Mi, 1Ti",
+      "agentPool": "Pula agentów",
+      "none": "Brak",
+      "autoApply": "Automatyczne zastosowanie",
+      "enabled": "Włączone",
+      "workingDirectory": "Katalog roboczy",
+      "workingDirectoryPlaceholder": "np. environments/dev",
+      "workingDirectoryHint": "Podkatalog w repozytorium zawierający pliki .tf",
+      "vcsConnection": "Połączenie VCS",
+      "vcsRepoUrl": "Adres URL repozytorium VCS",
+      "vcsRepoUrlTitle": "Musi być adresem URL HTTP lub HTTPS",
+      "vcsRepoUrlPlaceholder": "https://github.com/org/repo",
+      "vcsBranch": "Gałąź VCS",
+      "vcsBranchPlaceholder": "main (domyślnie)"
+    },
+    "stats": {
+      "total": "Łącznie",
+      "health": "Kondycja",
+      "locked": "Zablokowane",
+      "clearAllFilters": "Wyczyść wszystkie filtry",
+      "clearHealthFilter": "Wyczyść filtr problemów z kondycją",
+      "filterHealth": "Filtruj obszary robocze z problemami z kondycją",
+      "clearLockedFilter": "Wyczyść filtr zablokowanych",
+      "filterLocked": "Filtruj zablokowane obszary robocze"
+    },
+    "filter": {
+      "placeholder": "Filtruj po nazwie, etykiecie lub statusie — np. \"eu1\", \"env:prod\", \"status:errored\"",
+      "ariaLabel": "Filtruj obszary robocze",
+      "clear": "Wyczyść",
+      "status": "Status",
+      "label": "Etykieta",
+      "back": "wstecz",
+      "valueCount": "{count, plural, one {# wartość} few {# wartości} many {# wartości} other {# wartości}}",
+      "removeTerm": "Usuń ten warunek",
+      "showing": "Wyświetlanie {filtered} z {total}",
+      "termName": "nazwa: {value}",
+      "termStatus": "status: {value}",
+      "termLabelAny": "{key}: (dowolna)",
+      "termLabel": "{key}: {value}",
+      "hintStatus": "status",
+      "hintHealth": "kondycja",
+      "hintLabel": "etykieta",
+      "hintLabelKey": "klucz etykiety",
+      "hintName": "nazwa"
+    },
+    "row": {
+      "removeLabelFilter": "Kliknij, aby usunąć z filtra",
+      "addLabelFilter": "Kliknij, aby filtrować po tej etykiecie"
+    },
+    "table": {
+      "name": "Nazwa",
+      "mode": "Tryb",
+      "pool": "Pula",
+      "resources": "Zasoby",
+      "status": "Status",
+      "created": "Utworzono",
+      "resourcesValue": "{cpu} CPU / {memory}"
+    },
+    "empty": {
+      "none": "Brak obszarów roboczych. Utwórz jeden, aby rozpocząć.",
+      "noMatch": "Żaden obszar roboczy nie pasuje do tego filtra."
+    }
+  },
+  "status": {
+    "state-diverged": "Stan rozbieżny",
+    "vcs-error": "Błąd VCS",
+    "drifted": "Dryf",
+    "errored": "Błąd",
+    "needs-confirm": "Wymaga potwierdzenia",
+    "planning": "Planowanie",
+    "applying": "Zastosowywanie",
+    "canceling": "Anulowanie",
+    "confirmed": "Potwierdzone",
+    "queued": "W kolejce",
+    "pending": "Oczekujące",
+    "applied": "Zastosowane",
+    "planned": "Zaplanowane",
+    "canceled": "Anulowane",
+    "discarded": "Odrzucone",
+    "pendingDeletion": "Oczekuje na usunięcie",
+    "archived": "Zarchiwizowane"
+  },
+  "auth": {
+    "loading": "Wczytywanie...",
+    "subtitle": "Zaloguj się, aby zarządzać swoją infrastrukturą",
+    "subtitleCli": "Zaloguj się, aby autoryzować CLI",
+    "emailLabel": "Adres e-mail",
+    "passwordLabel": "Hasło",
+    "signIn": "Zaloguj się",
+    "signingIn": "Logowanie...",
+    "signInWith": "Zaloguj się przez {provider}",
+    "or": "lub",
+    "noProviders": "Nie skonfigurowano żadnych dostawców uwierzytelniania",
+    "completingSignIn": "Kończenie logowania...",
+    "callbackFailedTitle": "Uwierzytelnianie nie powiodło się",
+    "tryAgain": "Spróbuj ponownie",
+    "errors": {
+      "loadProviders": "Nie udało się wczytać dostawców",
+      "authenticationFailed": "Uwierzytelnianie nie powiodło się ({status})",
+      "tokenExchangeFailed": "Wymiana tokenu nie powiodła się ({status})",
+      "loginFailed": "Logowanie nie powiodło się",
+      "startLoginFailed": "Nie udało się rozpocząć logowania",
+      "missingCodeOrState": "Brak kodu autoryzacji lub stanu",
+      "stateMismatch": "Niezgodność stanu — możliwy atak CSRF",
+      "missingVerifier": "Brak weryfikatora PKCE — spróbuj zalogować się ponownie"
+    }
+  },
+  "estate": {
+    "title": "Topologia majątku",
+    "description": "Wszystkie widoczne dla Ciebie obszary robocze i używane przez nie moduły, powiązane wyzwalaczami przebiegów, zdalnym stanem i połączeniami modułów. Grupuj według dowolnej osi pasującej do Twojego majątku — platforma nie narzuca konwencji etykietowania.",
+    "errors": {
+      "load": "Nie udało się wczytać grafu majątku."
+    },
+    "groupBy": {
+      "label": "Grupuj według"
+    },
+    "view": {
+      "graph": "Graf",
+      "table": "Tabela"
+    },
+    "counts": {
+      "workspaces": "{count, plural, one {# obszar roboczy} few {# obszary robocze} many {# obszarów roboczych} other {# obszaru roboczego}}",
+      "modules": "{count, plural, one {# moduł} few {# moduły} many {# modułów} other {# modułu}}",
+      "dependencies": "{count, plural, one {# zależność} few {# zależności} many {# zależności} other {# zależności}}"
+    },
+    "legend": {
+      "registryModule": "moduł rejestru"
+    },
+    "detail": {
+      "moduleImpact": "{count, plural, one {obszar roboczy używa tego — jego aktualizacja wymusza ponowne planowanie} few {obszary robocze używają tego — jego aktualizacja wymusza ponowne planowanie ich wszystkich} many {obszarów roboczych używa tego — jego aktualizacja wymusza ponowne planowanie ich wszystkich} other {obszaru roboczego używa tego — jego aktualizacja wymusza ponowne planowanie ich wszystkich}}",
+      "dependOnThis": "{count, plural, one {zależy od tego} few {zależą od tego} many {zależą od tego} other {zależy od tego}}"
+    },
+    "table": {
+      "workspaces": {
+        "heading": "Obszary robocze",
+        "col": {
+          "workspace": "Obszar roboczy",
+          "group": "Grupa",
+          "agentPool": "Pula agentów",
+          "dependedOnBy": "Zależne od tego",
+          "modulesUsed": "Używane moduły"
+        },
+        "noModules": "—"
+      },
+      "modules": {
+        "heading": "Moduły",
+        "col": {
+          "module": "Moduł",
+          "usedBy": "Używane przez (obszary robocze)"
+        }
+      }
+    }
+  },
+  "labels": {
+    "title": "Etykiety",
+    "description": "Przeglądaj etykiety używane w obszarach roboczych, pulach agentów, modułach rejestru i dostawcach rejestru. Tylko do odczytu — etykiety edytuje się na stronie danej encji.",
+    "none": "Brak.",
+    "emptyKeys": "Brak używanych etykiet. Oznacz etykietą dowolny obszar roboczy, pulę agentów, moduł rejestru lub dostawcę rejestru, aby zacząć grupować elementy tutaj.",
+    "emptyValues": "Brak wartości dla \"{key}\". Albo żadna czytelna encja nie ma tej etykiety, albo została ona usunięta od ostatniego widoku.",
+    "loadKeysFailed": "Nie udało się wczytać etykiet ({status})",
+    "loadValuesFailed": "Nie udało się wczytać wartości dla {key} ({status})",
+    "loadEntitiesFailed": "Nie udało się wczytać encji ({status})",
+    "columns": {
+      "labelKey": "Klucz etykiety",
+      "distinctValues": "Odrębne wartości",
+      "value": "Wartość",
+      "total": "Łącznie"
+    },
+    "entity": {
+      "workspaces": "Obszary robocze",
+      "agentPools": "Pule agentów",
+      "modules": "Moduły",
+      "providers": "Dostawcy"
+    },
+    "deprecated": {
+      "badge": "Przestarzałe i nieobsługiwane.",
+      "body": "Przeglądarka etykiet nie znajduje się już w głównej nawigacji i zostanie usunięta w przyszłej wersji. Zamiast tego filtruj po etykiecie na stronie <workspacesLink>Obszary robocze</workspacesLink>. Jeśli korzystasz z tej strony, <issueLink>zgłoś problem</issueLink>."
+    }
+  },
+  "settings": {
+    "tokens": {
+      "title": "Tokeny API",
+      "description": "Zarządzaj tokenami uwierzytelniania dla CLI i automatyzacji",
+      "descriptionAll": "Wszystkie tokeny wszystkich użytkowników",
+      "myTokens": "Moje tokeny",
+      "allTokens": "Wszystkie tokeny",
+      "createToken": "Utwórz token",
+      "cancel": "Anuluj",
+      "tokenReady": "Token gotowy",
+      "tokenReadyHelp": "Skopiuj ten token teraz — nie zostanie wyświetlony ponownie.",
+      "dismissToken": "Odrzuć token",
+      "hide": "Ukryj",
+      "show": "Pokaż",
+      "copy": "Kopiuj",
+      "empty": "Brak tokenów API.",
+      "noDescription": "Brak opisu",
+      "detached": "odłączony",
+      "never": "Nigdy",
+      "selected": "{count, plural, one {wybrano # token} few {wybrano # tokeny} many {wybrano # tokenów} other {wybrano # tokenu}}",
+      "revokeSelected": "Unieważnij wybrane",
+      "revoking": "Unieważnianie...",
+      "clearSelection": "Wyczyść zaznaczenie",
+      "rotate": "Rotuj",
+      "rotating": "Rotowanie...",
+      "revoke": "Unieważnij",
+      "confirmRotate": "Rotować ten token? Bieżący sekret natychmiast przestaje działać i wydawany jest nowy.",
+      "confirmBulkRevoke": "{count, plural, one {Unieważnić # token?} few {Unieważnić # tokeny?} many {Unieważnić # tokenów?} other {Unieważnić # tokenu?}}",
+      "kinds": {
+        "interactive": {
+          "label": "Osobisty",
+          "help": "Osobisty token dla CLI i doraźnej automatyzacji. Przenosi pełny zakres Twoich bieżących uprawnień."
+        },
+        "service_bound": {
+          "label": "Usługowy · powiązany",
+          "help": "Token usługowy ograniczony do podzbioru Twoich ról. Jego dostęp to część wspólna tych ról i Twoich uprawnień — i przestaje działać, jeśli Twoje konto zostanie usunięte."
+        },
+        "service_detached": {
+          "label": "Usługowy · odłączony",
+          "help": "Token usługowy zarządzany przez administratora z bezwzględnie przypiętym zakresem, niepowiązany z żadnym użytkownikiem. Używaj do krytycznej automatyzacji maszyna-maszyna, która musi przetrwać odejście dowolnej osoby."
+        }
+      },
+      "lifespans": {
+        "720": "30 dni",
+        "2160": "90 dni",
+        "4320": "180 dni",
+        "8760": "1 rok"
+      },
+      "filter": {
+        "all": "Wszystkie rodzaje"
+      },
+      "form": {
+        "description": "Opis",
+        "descriptionPlaceholder": "Token potoku CI/CD",
+        "kind": "Rodzaj",
+        "lifespan": "Okres ważności",
+        "create": "Utwórz",
+        "creating": "Tworzenie...",
+        "pinnedRoles": "Przypięte role",
+        "pinnedRolesHelp": "— zakres, do którego ograniczony jest ten token",
+        "pinnedRolesCapped": "(ograniczony do Twojego dostępu)",
+        "noCustomRoles": "Nie zdefiniowano ról niestandardowych. Najpierw utwórz role w Administracja → Role.",
+        "noScopedRoles": "Nie posiadasz żadnych ról z zakresem do przypięcia. Ten token nie miałby żadnego dostępu."
+      },
+      "columns": {
+        "description": "Opis",
+        "kind": "Rodzaj",
+        "boundTo": "Powiązany z",
+        "created": "Utworzono",
+        "lastUsed": "Ostatnie użycie",
+        "expires": "Wygasa",
+        "actions": "Akcje"
+      },
+      "errors": {
+        "load": "Nie udało się wczytać tokenów",
+        "create": "Nie udało się utworzyć tokenu ({status})",
+        "createGeneric": "Nie udało się utworzyć tokenu",
+        "rotate": "Nie udało się rotować tokenu ({status})",
+        "rotateGeneric": "Nie udało się rotować tokenu",
+        "revoke": "Nie udało się unieważnić tokenu ({status})",
+        "revokeGeneric": "Nie udało się unieważnić tokenu",
+        "bulkRevoke": "Nie udało się unieważnić tokenów"
+      }
+    },
+    "sessions": {
+      "title": "Sesje",
+      "description": "Twoje aktywne sesje",
+      "descriptionAll": "Wszystkie aktywne sesje na platformie",
+      "empty": "Brak aktywnych sesji.",
+      "revokeAll": "Unieważnij wszystkie",
+      "current": "Bieżąca",
+      "columns": {
+        "provider": "Dostawca",
+        "created": "Utworzono",
+        "expires": "Wygasa",
+        "lastActive": "Ostatnia aktywność",
+        "token": "Token"
+      },
+      "errors": {
+        "load": "Nie udało się wczytać sesji",
+        "revoke": "Nie udało się unieważnić sesji ({status})",
+        "revokeGeneric": "Nie udało się unieważnić sesji"
+      }
+    }
+  },
+  "registry": {
+    "modules": {
+      "title": "Moduły",
+      "description": "Prywatny rejestr modułów Terraform",
+      "cancel": "Anuluj",
+      "createModule": "Utwórz moduł",
+      "empty": "Brak modułów. Utwórz jeden, aby rozpocząć.",
+      "providerLabel": "Dostawca: {provider}",
+      "versionCount": "{count, plural, one {# wersja} few {# wersje} many {# wersji} other {# wersji}}",
+      "loadFailed": "Nie udało się wczytać modułów",
+      "createFailed": "Nie udało się utworzyć modułu",
+      "createFailedStatus": "Nie udało się utworzyć modułu ({status})",
+      "form": {
+        "name": "Nazwa",
+        "provider": "Dostawca",
+        "slugTitle": "Tylko małe litery, cyfry i myślniki. Musi zaczynać się od małej litery.",
+        "addressNote": "Nazwa i dostawca tworzą adres modułu w rejestrze i nie można ich zmienić po utworzeniu.",
+        "vcsConnectionOptional": "Połączenie VCS (opcjonalne)",
+        "noneUploadManually": "Brak — prześlij wersje ręcznie",
+        "repositoryUrl": "Adres URL repozytorium",
+        "branchOptional": "Gałąź (opcjonalne)",
+        "branchPlaceholder": "main (pozostaw puste dla domyślnej)",
+        "tagPattern": "Wzorzec tagów",
+        "tagPatternHint": "Wersje tworzą tylko tagi pasujące do tego wzorca (np. v1.0.0)",
+        "labelsOptional": "Etykiety (opcjonalne)",
+        "creating": "Tworzenie...",
+        "create": "Utwórz"
+      }
+    },
+    "providers": {
+      "title": "Dostawcy",
+      "description": "Prywatny rejestr dostawców Terraform",
+      "cancel": "Anuluj",
+      "createProvider": "Utwórz dostawcę",
+      "empty": "Brak dostawców. Utwórz jednego, aby rozpocząć.",
+      "loadFailed": "Nie udało się wczytać dostawców",
+      "createFailed": "Nie udało się utworzyć dostawcy",
+      "createFailedStatus": "Nie udało się utworzyć dostawcy ({status})",
+      "form": {
+        "name": "Nazwa",
+        "slugTitle": "Tylko małe litery, cyfry i myślniki. Musi zaczynać się od małej litery.",
+        "creating": "Tworzenie...",
+        "create": "Utwórz"
+      }
+    },
+    "meta": {
+      "title": "Metadane",
+      "edit": "Edytuj",
+      "cancel": "Anuluj",
+      "save": "Zapisz",
+      "saving": "Zapisywanie...",
+      "saveAnyway": "Zapisz mimo to",
+      "revertLabels": "Przywróć etykiety",
+      "owner": "Właściciel",
+      "ownerNone": "Brak",
+      "ownerPlaceholder": "uzytkownik@example.com",
+      "labels": "Etykiety"
+    },
+    "moduleDetail": {
+      "notFound": "Nie znaleziono modułu",
+      "loadFailed": "Nie udało się wczytać modułu",
+      "updateFailed": "Nie udało się zaktualizować modułu",
+      "labelLockoutDefault": "Ta zmiana etykiety ograniczyłaby Twój dostęp.",
+      "providerLabel": "Dostawca: {provider}",
+      "cancel": "Anuluj",
+      "uploadVersion": "Prześlij wersję",
+      "vcsConnected": "VCS połączone",
+      "connectVcs": "Połącz VCS",
+      "deleteModule": "Usuń moduł",
+      "linkFailed": "Nie udało się połączyć obszaru roboczego",
+      "linkFailedStatus": "Połączenie nie powiodło się ({status})",
+      "unlinkConfirm": "Odłączyć ten obszar roboczy od modułu? Analiza wpływu nie będzie już dla niego uruchamiana.",
+      "unlinkFailed": "Nie udało się odłączyć obszaru roboczego",
+      "unlinkFailedStatus": "Odłączenie nie powiodło się ({status})",
+      "uploadFailed": "Przesyłanie nie powiodło się",
+      "uploadFailedStatus": "Przesyłanie nie powiodło się ({status})",
+      "saveVcsFailed": "Nie udało się zapisać konfiguracji VCS",
+      "saveVcsFailedStatus": "Nie udało się zapisać konfiguracji VCS ({status})",
+      "disableVcsFailed": "Nie udało się wyłączyć VCS",
+      "disableVcsFailedStatus": "Nie udało się wyłączyć VCS ({status})",
+      "deleteFailed": "Usuwanie nie powiodło się",
+      "deleteFailedStatus": "Usuwanie nie powiodło się ({status})",
+      "upload": {
+        "intro": "Wybierz katalog zawierający pliki modułu Terraform. Zostaną spakowane do archiwum tarball i przesłane.",
+        "version": "Wersja",
+        "moduleDirectory": "Katalog modułu",
+        "selectDirectory": "Wybierz katalog",
+        "fileCount": "{count, plural, one {# plik} few {# pliki} many {# plików} other {# pliku}}",
+        "filesToInclude": "{count, plural, one {# plik do dołączenia:} few {# pliki do dołączenia:} many {# plików do dołączenia:} other {# pliku do dołączenia:}}",
+        "andMore": "...i {count} więcej",
+        "uploading": "Przesyłanie...",
+        "upload": "Prześlij"
+      },
+      "vcs": {
+        "intro": "Połącz ten moduł z repozytorium VCS. Nowe wersje są publikowane automatycznie po wypchnięciu tagów semver pasujących do wzorca tagów. Same commity do gałęzi nie tworzą wersji.",
+        "connection": "Połączenie VCS",
+        "selectConnection": "Wybierz połączenie...",
+        "repositoryUrl": "Adres URL repozytorium",
+        "branchOptional": "Gałąź (opcjonalne)",
+        "branchPlaceholder": "main (pozostaw puste dla domyślnej)",
+        "tagPattern": "Wzorzec tagów",
+        "tagPatternHint": "Wersje tworzą tylko tagi pasujące do tego wzorca (np. v1.0.0)",
+        "saving": "Zapisywanie...",
+        "saveConfiguration": "Zapisz konfigurację VCS",
+        "disconnect": "Rozłącz VCS"
+      },
+      "vcsStatus": {
+        "connected": "VCS połączone:",
+        "lastTag": "Ostatni tag: {tag}",
+        "firstVersionHint": "Wypchnij tag semver (np. <code>v1.0.0</code>) pasujący do wzorca tagów, aby opublikować pierwszą wersję."
+      },
+      "links": {
+        "title": "Połączone obszary robocze",
+        "linkWorkspace": "Połącz obszar roboczy",
+        "description": "Połączone obszary robocze otrzymują plany spekulatywne, gdy przeciwko temu modułowi otwierane są PR-y, oraz standardowe przebiegi po opublikowaniu nowych wersji.",
+        "searchPlaceholder": "Wyszukaj obszary robocze do połączenia…",
+        "empty": "Brak połączonych obszarów roboczych.",
+        "unlinkTitle": "Odłącz obszar roboczy"
+      },
+      "interface": {
+        "title": "Wejścia i wyjścia",
+        "counts": "{inputs} wejść, {outputs} wyjść",
+        "versionLabel": "Wersja:",
+        "noData": "Brak danych interfejsu dla tej wersji.",
+        "inputs": "Wejścia",
+        "outputs": "Wyjścia",
+        "name": "Nazwa",
+        "type": "Typ",
+        "description": "Opis",
+        "default": "Domyślna",
+        "required": "Wymagane",
+        "sensitive": "Wrażliwe",
+        "requiredBadge": "wymagane",
+        "optionalBadge": "opcjonalne",
+        "sensitiveBadge": "wrażliwe",
+        "noneDeclared": "Ta wersja modułu nie deklaruje żadnych wejść ani wyjść."
+      },
+      "versions": {
+        "title": "Wersje",
+        "count": "{count, plural, one {# wersja} few {# wersje} many {# wersji} other {# wersji}}",
+        "emptyVcs": "Brak wersji. Wypchnij tag semver pasujący do \"{pattern}\" do połączonego repozytorium, aby opublikować wersję.",
+        "emptyUpload": "Brak wersji. Prześlij moduł lub połącz VCS, aby rozpocząć.",
+        "version": "Wersja",
+        "status": "Status",
+        "source": "Źródło",
+        "actions": "Akcje",
+        "manualUpload": "przesłanie ręczne",
+        "delete": "Usuń"
+      },
+      "deleteDialog": {
+        "title": "Potwierdź usunięcie",
+        "moduleBody": "Spowoduje to trwałe usunięcie tego modułu i wszystkich jego wersji.",
+        "versionBody": "Spowoduje to trwałe usunięcie wersji {version}.",
+        "cancel": "Anuluj",
+        "confirm": "Usuń"
+      }
+    },
+    "providerDetail": {
+      "description": "Rejestr dostawców",
+      "deleteProvider": "Usuń dostawcę",
+      "publishNote": "Wersje dostawców publikuje się za pomocą CLI <code>terrapod-publish</code>, które podpisuje pliki binarne po stronie klienta. Przesyłanie i podpisywanie plików binarnych dostawców z przeglądarki nie jest już obsługiwane. Ta strona jest tylko do odczytu dla wersji i platform.",
+      "empty": "Brak wersji. Opublikuj za pomocą CLI terrapod-publish, aby rozpocząć.",
+      "loadVersionsFailed": "Nie udało się wczytać wersji",
+      "updateFailed": "Nie udało się zaktualizować dostawcy",
+      "labelLockoutDefault": "Ta zmiana etykiety ograniczyłaby Twój dostęp.",
+      "deleteFailed": "Usuwanie nie powiodło się",
+      "deleteFailedStatus": "Usuwanie nie powiodło się ({status})",
+      "platformCount": "{count, plural, one {# platforma} few {# platformy} many {# platform} other {# platformy}}",
+      "delete": "Usuń",
+      "os": "OS",
+      "arch": "Arch",
+      "filename": "Nazwa pliku",
+      "actions": "Akcje",
+      "deleteDialog": {
+        "title": "Potwierdź usunięcie",
+        "providerBody": "Spowoduje to trwałe usunięcie tego dostawcy i wszystkich jego wersji.",
+        "versionBody": "Spowoduje to trwałe usunięcie wersji {version} i jej platform.",
+        "platformBody": "Spowoduje to trwałe usunięcie platformy {os}/{arch}.",
+        "cancel": "Anuluj",
+        "confirm": "Usuń"
+      }
+    }
+  },
+  "adminUsers": {
+    "title": "Użytkownicy",
+    "description": "Zarządzaj lokalnymi kontami użytkowników",
+    "empty": "Nie znaleziono użytkowników.",
+    "columns": {
+      "email": "Adres e-mail",
+      "displayName": "Nazwa wyświetlana",
+      "status": "Status",
+      "lastLogin": "Ostatnie logowanie",
+      "created": "Utworzono",
+      "actions": "Akcje"
+    },
+    "form": {
+      "email": "Adres e-mail",
+      "displayName": "Nazwa wyświetlana",
+      "displayNamePlaceholder": "Jan Kowalski",
+      "passwordOptional": "Hasło (opcjonalne)",
+      "passwordPlaceholder": "Wprowadź silne hasło"
+    },
+    "reset": {
+      "title": "Zresetuj hasło dla {email}",
+      "newPassword": "Nowe hasło"
+    },
+    "password": {
+      "score": {
+        "veryWeak": "Bardzo słabe",
+        "weak": "Słabe",
+        "fair": "Przeciętne",
+        "good": "Dobre",
+        "strong": "Silne"
+      }
+    },
+    "status": {
+      "active": "Aktywne",
+      "inactive": "Nieaktywne",
+      "never": "Nigdy"
+    },
+    "actions": {
+      "cancel": "Anuluj",
+      "save": "Zapisz",
+      "saving": "Zapisywanie...",
+      "createUser": "Utwórz użytkownika",
+      "creating": "Tworzenie...",
+      "resetPassword": "Zresetuj hasło",
+      "edit": "Edytuj",
+      "delete": "Usuń",
+      "resetPw": "Resetuj hasło",
+      "setPw": "Ustaw hasło",
+      "cancelPw": "Anuluj hasło"
+    },
+    "confirm": {
+      "activate": "Aktywować użytkownika \"{email}\"?",
+      "deactivate": "Dezaktywować użytkownika \"{email}\"?",
+      "delete": "Usunąć użytkownika \"{email}\"? Tej operacji nie można cofnąć."
+    },
+    "success": {
+      "created": "Utworzono użytkownika \"{email}\"",
+      "updated": "Zaktualizowano użytkownika \"{email}\"",
+      "activated": "Aktywowano użytkownika \"{email}\"",
+      "deactivated": "Dezaktywowano użytkownika \"{email}\"",
+      "passwordReset": "Zresetowano hasło dla \"{email}\"",
+      "deleted": "Usunięto użytkownika \"{email}\""
+    },
+    "errors": {
+      "load": "Nie udało się wczytać użytkowników",
+      "create": "Nie udało się utworzyć użytkownika",
+      "createStatus": "Nie udało się utworzyć użytkownika ({status})",
+      "update": "Nie udało się zaktualizować użytkownika",
+      "resetPassword": "Nie udało się zresetować hasła",
+      "delete": "Nie udało się usunąć użytkownika"
+    }
+  },
+  "adminRoles": {
+    "title": "Role i przypisania",
+    "description": "Zarządzaj rolami RBAC i przypisaniami ról użytkownikom",
+    "builtIn": "wbudowana",
+    "emptyRoles": "Nie zdefiniowano ról.",
+    "emptyAssignments": "Brak przypisań ról.",
+    "tabs": {
+      "roles": "Role",
+      "assignments": "Przypisania"
+    },
+    "columns": {
+      "provider": "Dostawca",
+      "email": "Adres e-mail",
+      "role": "Rola",
+      "created": "Utworzono",
+      "actions": "Akcje"
+    },
+    "form": {
+      "name": "Nazwa",
+      "namePattern": "Tylko litery, cyfry, myślniki i podkreślenia. Musi zaczynać się od litery lub cyfry.",
+      "workspacePermission": "Uprawnienie do obszaru roboczego",
+      "poolPermission": "Uprawnienie do puli",
+      "registryPermission": "Uprawnienie do rejestru",
+      "catalogPermission": "Uprawnienie do katalogu",
+      "descriptionLabel": "Opis",
+      "descriptionPlaceholder": "Dostęp programisty",
+      "allowLabels": "Etykiety zezwalające (klucz=wartość, oddzielone przecinkami)",
+      "allowNames": "Nazwy zezwalające (oddzielone przecinkami)",
+      "denyLabels": "Etykiety odmawiające (klucz=wartość, oddzielone przecinkami)",
+      "denyNames": "Nazwy odmawiające (oddzielone przecinkami)",
+      "allowLabelsShort": "Etykiety zezwalające",
+      "allowNamesShort": "Nazwy zezwalające",
+      "denyLabelsShort": "Etykiety odmawiające",
+      "denyNamesShort": "Nazwy odmawiające"
+    },
+    "assignForm": {
+      "provider": "Dostawca",
+      "email": "Adres e-mail",
+      "roles": "Role"
+    },
+    "caps": {
+      "selected": "wybrano {count, plural, one {# uprawnienie} few {# uprawnienia} many {# uprawnień} other {# uprawnienia}}",
+      "count": "{count, plural, one {# uprawnienie} few {# uprawnienia} many {# uprawnień} other {# uprawnienia}}",
+      "custom": "Niestandardowe",
+      "matchesPresets": "Pasuje do ustawień wstępnych",
+      "advanced": "Zaawansowane — uprawnienia",
+      "otherPreserved": "Inne uprawnienia (zachowane przy zapisie)",
+      "presetHelp": {
+        "before": "Wybór ustawienia wstępnego powyżej wstępnie zaznacza jego uprawnienia. Zaznaczenie lub odznaczenie pola poza ustawieniem wstępnym oznacza rolę jako",
+        "after": "a jej nadanie jest wysyłane jako jawny zestaw uprawnień."
+      },
+      "groups": {
+        "workspace": "Obszar roboczy",
+        "run": "Przebieg",
+        "state": "Stan",
+        "var": "Zmienne",
+        "config": "Konfiguracja",
+        "drift": "Dryf",
+        "run-task": "Zadania przebiegu",
+        "notification": "Powiadomienia",
+        "run-trigger": "Wyzwalacze przebiegów",
+        "pool": "Pule agentów",
+        "registry": "Rejestr",
+        "catalog": "Katalog usług"
+      }
+    },
+    "display": {
+      "allow": "Zezwól: {value}",
+      "allowNames": "Zezwól nazwy: {value}",
+      "deny": "Odmów: {value}",
+      "denyNames": "Odmów nazwy: {value}"
+    },
+    "actions": {
+      "cancel": "Anuluj",
+      "save": "Zapisz",
+      "saving": "Zapisywanie...",
+      "edit": "Edytuj",
+      "delete": "Usuń",
+      "remove": "Usuń",
+      "createRole": "Utwórz rolę",
+      "creating": "Tworzenie...",
+      "addAssignment": "Dodaj przypisanie",
+      "setRoles": "Ustaw role"
+    },
+    "confirm": {
+      "deleteRole": "Usunąć rolę \"{name}\"? Wpłynie to na wszystkie odwołujące się do niej przypisania.",
+      "removeAssignment": "Usunąć rolę \"{roleName}\" od {email}?"
+    },
+    "success": {
+      "roleCreated": "Utworzono rolę \"{name}\"",
+      "roleUpdated": "Zaktualizowano rolę \"{name}\"",
+      "roleDeleted": "Usunięto rolę \"{name}\"",
+      "rolesAssigned": "Przypisano role do {email}",
+      "assignmentRemoved": "Usunięto przypisanie"
+    },
+    "errors": {
+      "loadRoles": "Nie udało się wczytać ról",
+      "loadAssignments": "Nie udało się wczytać przypisań",
+      "createRole": "Nie udało się utworzyć roli",
+      "createRoleStatus": "Nie udało się utworzyć roli ({status})",
+      "updateRole": "Nie udało się zaktualizować roli",
+      "deleteRole": "Nie udało się usunąć roli",
+      "setAssignment": "Nie udało się ustawić przypisania",
+      "setAssignmentStatus": "Nie udało się ustawić przypisania ({status})",
+      "deleteAssignment": "Nie udało się usunąć przypisania"
+    }
+  },
+  "adminVcs": {
+    "title": "Połączenia VCS",
+    "description": "Zarządzaj integracjami z systemami kontroli wersji",
+    "empty": "Nie skonfigurowano żadnych połączeń VCS.",
+    "actions": {
+      "new": "Nowe połączenie",
+      "cancel": "Anuluj",
+      "edit": "Edytuj",
+      "delete": "Usuń"
+    },
+    "confirmDelete": "Usunąć to połączenie VCS? Obszary robocze, które go używają, utracą integrację z VCS. Tej operacji nie można cofnąć.",
+    "form": {
+      "name": "Nazwa",
+      "namePattern": "Tylko litery, cyfry, myślniki i podkreślenia. Musi zaczynać się od litery lub cyfry.",
+      "provider": "Dostawca",
+      "providerImmutable": "Dostawca jest niezmienny — aby go zmienić, usuń i utwórz połączenie ponownie",
+      "serverUrl": "Adres URL serwera (opcjonalne)",
+      "serverUrlHint": "Musi być adresem URL HTTP lub HTTPS (np. https://github.mycompany.com)",
+      "appId": "Identyfikator aplikacji",
+      "appIdHint": "Identyfikator aplikacji GitHub — tylko cyfry",
+      "installationId": "Identyfikator instalacji",
+      "installationIdHint": "Identyfikator instalacji aplikacji GitHub — tylko cyfry",
+      "privateKey": "Klucz prywatny (PEM)",
+      "browse": "Przeglądaj...",
+      "privateKeyKeep": "Pozostaw puste, aby zachować bieżący klucz — wklej nowy PEM, aby go rotować",
+      "privateKeyPlaceholder": "-----BEGIN RSA PRIVATE KEY-----\n...\n\nUpuść tutaj plik .pem lub kliknij Przeglądaj",
+      "webhookSecret": "Sekret webhooka",
+      "optional": "(opcjonalne)",
+      "webhookSecretSet": "Ustawiony — pozostaw puste, aby zachować, wprowadź nową wartość, aby rotować",
+      "webhookSecretGlobal": "Pozostaw puste, aby użyć globalnego sekretu webhooka",
+      "webhookSecretHelp": "Sekret HMAC dla webhooków tej instalacji, właściwy dla połączenia. Gdy nieustawiony, używany jest sekret globalny.",
+      "accessToken": "Token dostępu",
+      "accessTokenKeep": "Pozostaw puste, aby zachować bieżący token",
+      "saving": "Zapisywanie...",
+      "creating": "Tworzenie...",
+      "saveChanges": "Zapisz zmiany",
+      "createConnection": "Utwórz połączenie"
+    },
+    "table": {
+      "name": "Nazwa",
+      "provider": "Dostawca",
+      "serverUrl": "Adres URL serwera",
+      "status": "Status",
+      "created": "Utworzono",
+      "actions": "Akcje"
+    },
+    "success": {
+      "created": "Utworzono połączenie VCS \"{name}\"",
+      "updated": "Zaktualizowano połączenie VCS \"{name}\"",
+      "deleted": "Usunięto połączenie VCS"
+    },
+    "errors": {
+      "load": "Nie udało się wczytać połączeń VCS",
+      "save": "Nie udało się zapisać połączenia",
+      "delete": "Nie udało się usunąć połączenia",
+      "createStatus": "Nie udało się utworzyć połączenia ({status})",
+      "updateStatus": "Nie udało się zaktualizować połączenia ({status})"
+    }
+  },
+  "adminVariableSets": {
+    "title": "Zestawy zmiennych",
+    "description": "Zarządzaj zestawami zmiennych o zasięgu organizacji dla grup obszarów roboczych",
+    "empty": "Nie skonfigurowano żadnych zestawów zmiennych.",
+    "none": "-",
+    "actions": {
+      "new": "Nowy zestaw zmiennych",
+      "cancel": "Anuluj"
+    },
+    "form": {
+      "name": "Nazwa",
+      "namePattern": "Tylko litery, cyfry, myślniki i podkreślenia. Musi zaczynać się od litery lub cyfry.",
+      "descriptionLabel": "Opis",
+      "descriptionPlaceholder": "Poświadczenia AWS dla wszystkich obszarów roboczych",
+      "global": "Globalny (zastosuj do wszystkich obszarów roboczych)",
+      "priority": "Priorytetowy (nadpisuje zmienne obszaru roboczego)",
+      "creating": "Tworzenie...",
+      "create": "Utwórz zestaw zmiennych"
+    },
+    "table": {
+      "name": "Nazwa",
+      "description": "Opis",
+      "scope": "Zasięg",
+      "variables": "Zmienne",
+      "created": "Utworzono"
+    },
+    "scope": {
+      "global": "Globalny",
+      "priority": "Priorytetowy",
+      "standard": "Standardowy"
+    },
+    "errors": {
+      "load": "Nie udało się wczytać zestawów zmiennych",
+      "create": "Nie udało się utworzyć zestawu zmiennych",
+      "createStatus": "Nie udało się utworzyć zestawu zmiennych ({status})"
+    },
+    "detail": {
+      "back": "Powrót do zestawów zmiennych",
+      "headerFallback": "Zestaw zmiennych",
+      "notFound": "Nie znaleziono zestawu zmiennych",
+      "global": "Globalny",
+      "priority": "Priorytetowy",
+      "yes": "Tak",
+      "no": "Nie",
+      "edit": "Edytuj",
+      "cancel": "Anuluj",
+      "save": "Zapisz",
+      "saving": "Zapisywanie...",
+      "delete": "Usuń",
+      "deleting": "Usuwanie...",
+      "confirmDelete": "Potwierdź usunięcie",
+      "deleteTitle": "Usuń zestaw zmiennych",
+      "deleteDescription": "Trwale usuń ten zestaw zmiennych i wszystkie jego zmienne.",
+      "tabs": {
+        "settings": "Ustawienia",
+        "variables": "Zmienne",
+        "workspaces": "Obszary robocze"
+      },
+      "addVariable": "Dodaj zmienną",
+      "adding": "Dodawanie...",
+      "varKey": "Klucz",
+      "varValue": "Wartość",
+      "varCategory": "Kategoria",
+      "categoryTerraform": "Terraform",
+      "categoryEnv": "Środowisko",
+      "sensitive": "Wrażliwe",
+      "sensAbbr": "Wraż.",
+      "enterNewValue": "Wprowadź nową wartość",
+      "empty": "puste",
+      "emptyVars": "Brak zmiennych w tym zestawie.",
+      "actions": "Akcje",
+      "remove": "Usuń",
+      "add": "Dodaj",
+      "addWorkspace": "Dodaj obszar roboczy",
+      "workspace": "Obszar roboczy",
+      "selectWorkspace": "Wybierz obszar roboczy...",
+      "globalBanner": "Ten zestaw zmiennych jest globalny i automatycznie stosuje się do wszystkich obszarów roboczych.",
+      "emptyWorkspaces": "Do tego zestawu zmiennych nie przypisano żadnych obszarów roboczych.",
+      "confirmDeleteVar": "Usunąć tę zmienną? Tej operacji nie można cofnąć.",
+      "confirmRemoveWorkspace": "Usunąć ten obszar roboczy z zestawu zmiennych? Jego zmienne nie będą już stosowane do tego obszaru roboczego.",
+      "success": {
+        "updated": "Zaktualizowano zestaw zmiennych",
+        "workspaceAdded": "Dodano obszar roboczy",
+        "workspaceRemoved": "Usunięto obszar roboczy"
+      },
+      "errors": {
+        "load": "Nie udało się wczytać zestawu zmiennych",
+        "update": "Nie udało się zaktualizować zestawu zmiennych",
+        "delete": "Nie udało się usunąć zestawu zmiennych",
+        "loadVars": "Nie udało się wczytać zmiennych",
+        "loadWorkspaces": "Nie udało się wczytać obszarów roboczych",
+        "addVar": "Nie udało się dodać zmiennej",
+        "addVarStatus": "Nie udało się dodać zmiennej ({status})",
+        "updateVar": "Nie udało się zaktualizować zmiennej",
+        "deleteVar": "Nie udało się usunąć zmiennej",
+        "addWorkspace": "Nie udało się dodać obszaru roboczego",
+        "removeWorkspace": "Nie udało się usunąć obszaru roboczego"
+      }
+    }
+  },
+  "adminAutodiscovery": {
+    "title": "Autowykrywanie",
+    "description": "Automatycznie twórz obszary robocze w monorepozytoriach, gdy PR-y dotykają pasujących ścieżek",
+    "empty": "Brak reguł autowykrywania. Utwórz jedną, aby zacząć automatyczne udostępnianie obszarów roboczych z PR-ów w Twoim monorepozytorium.",
+    "unsavedRule": "(niezapisana reguła)",
+    "actions": {
+      "newRule": "Nowa reguła",
+      "cancel": "Anuluj",
+      "create": "Utwórz",
+      "update": "Aktualizuj",
+      "preview": "Podgląd",
+      "edit": "Edytuj",
+      "delete": "Usuń",
+      "close": "Zamknij"
+    },
+    "status": {
+      "enabled": "włączone",
+      "disabled": "wyłączone"
+    },
+    "form": {
+      "createTitle": "Utwórz regułę",
+      "editTitle": "Edytuj regułę",
+      "name": "Nazwa",
+      "vcsConnection": "Połączenie VCS",
+      "selectConnection": "Wybierz połączenie",
+      "repoUrl": "Adres URL repozytorium",
+      "branch": "Gałąź (puste = domyślna)",
+      "matchPattern": "Wzorzec dopasowania",
+      "matchPatternHint": "Globy w stylu gitignore. <code>**</code> dopasowuje wiele segmentów ścieżki. Autowykrywanie wyzwalają tylko pliki <code>*.tf*</code>.",
+      "ignorePatterns": "Wzorce ignorowania (jeden na wiersz)",
+      "nameTemplate": "Szablon nazwy obszaru roboczego (opcjonalne)",
+      "nameTemplateHint": "Użyj <path></path> dla katalogu z <code>/</code> zastąpionym przez <code>-</code>, lub <root></root> dla katalogu bez zmian. Puste = domyślnie (sama ścieżka z myślnikami).",
+      "templateDefaults": "Wartości domyślne szablonu obszaru roboczego",
+      "executionMode": "Tryb wykonania",
+      "executionModeHint": "Autowykrywanie jest sterowane przez VCS; obsługiwane jest wyłącznie wykonanie przez agenta.",
+      "agentPool": "Pula agentów",
+      "none": "(brak)",
+      "executionBackend": "Backend wykonania",
+      "terraformVersion": "Wersja Terraform",
+      "cpuRequest": "Żądanie CPU",
+      "memoryRequest": "Żądanie pamięci",
+      "ownerEmail": "Adres e-mail właściciela",
+      "autoApply": "Automatyczne zastosowanie",
+      "enabled": "Włączone",
+      "onDirectoryDelete": "Przy usunięciu katalogu",
+      "onDeleteFlag": "Oznacz (bezpieczne — oznacza jako oczekujące na usunięcie, wymaga ręcznej akcji)",
+      "onDeleteDestroy": "Zniszcz (NIEBEZPIECZNE — likwiduje infrastrukturę, a następnie archiwizuje obszar roboczy)",
+      "onDirectoryDeleteHint": "Co dzieje się z autowykrytym obszarem roboczym, gdy jego katalog zostanie usunięty ze śledzonej gałęzi.",
+      "onDeleteDestroyWarning": "Spowoduje to uruchomienie prawdziwego terraform destroy na obszarze roboczym, gdy jego katalog zostanie usunięty ze śledzonej gałęzi.",
+      "labels": "Etykiety (dziedziczone przez utworzone obszary robocze)",
+      "varFiles": "Pliki zmiennych (dziedziczone przez utworzone obszary robocze)",
+      "varFilesHint": "Względne ścieżki <code>.tfvars</code> przekazywane do plan/apply.",
+      "addVarFile": "Dodaj plik zmiennych",
+      "executionHooks": "Punkty zaczepienia wykonania (powiązane z każdym nowym obszarem roboczym)",
+      "executionHooksHint": "Wybierz spośród punktów zaczepienia zdefiniowanych na stronie administracyjnej <page>Punkty zaczepienia wykonania</page> — każdy wybrany punkt zaczepienia jest powiązany z każdym obszarem roboczym, który tworzy ta reguła.",
+      "noHooks": "Nie zdefiniowano jeszcze żadnych punktów zaczepienia wykonania. Najpierw utwórz jeden na stronie administracyjnej Punkty zaczepienia wykonania.",
+      "hookDisabled": "(wyłączony)",
+      "hookNotInLibrary": "(nie w bibliotece — odznacz, aby usunąć)",
+      "runTaskTemplates": "Szablony zadań przebiegu (tworzone na każdym nowym obszarze roboczym)",
+      "notificationTemplates": "Szablony powiadomień (tworzone na każdym nowym obszarze roboczym)",
+      "saving": "Zapisywanie...",
+      "previewTitle": "Przejdź przez repozytorium i wyświetl podgląd obszarów roboczych, które ta reguła BY utworzyła — bez zapisu"
+    },
+    "table": {
+      "name": "Nazwa",
+      "repo": "Repozytorium",
+      "pattern": "Wzorzec",
+      "enabled": "Włączone",
+      "created": "Utworzono",
+      "previewTitle": "Przejdź przez repozytorium i wyświetl podgląd obszarów roboczych, które ta reguła by utworzyła"
+    },
+    "deleteModal": {
+      "title": "Usunąć regułę?",
+      "body": "Obszary robocze utworzone automatycznie przez tę regułę nadal działają. Przyszłe PR-y dotykające nowych ścieżek objętych tą regułą nie będą już automatycznie tworzyć kolejnych obszarów roboczych."
+    },
+    "preview": {
+      "title": "Podgląd: {ruleName}",
+      "walkedFiles": "Przejrzano <files>{count}</files> plików na <refspan>{ref}</refspan>",
+      "walking": "Przechodzenie przez repozytorium…",
+      "noMatches": "Żadne katalogi w tym repozytorium nie pasują do wzorca reguły. Nic do utworzenia.",
+      "colWorkspace": "Obszar roboczy",
+      "colDirectory": "Katalog",
+      "colAction": "Akcja",
+      "repoRoot": "(katalog główny repozytorium)",
+      "actionCreate": "Utwórz",
+      "skipDiscovered": "Pomiń (już wykryto)",
+      "skipDiscoveredTitle": "Już utworzony przez tę regułę",
+      "skipCollision": "Pomiń (konflikt nazw)",
+      "skipCollisionTitle": "Obszar roboczy o tej nazwie już istnieje z innego powodu",
+      "willCreate": "{count, plural, one {Zostanie utworzony # obszar roboczy.} few {Zostaną utworzone # obszary robocze.} many {Zostanie utworzonych # obszarów roboczych.} other {Zostanie utworzonych # obszaru roboczego.}} Istniejące obszary robocze (konflikty) pozostają nienaruszone.",
+      "provision": "{count, plural, one {Udostępnij # obszar roboczy} few {Udostępnij # obszary robocze} many {Udostępnij # obszarów roboczych} other {Udostępnij # obszaru roboczego}}",
+      "provisioning": "Udostępnianie…",
+      "saveToProvision": "Zapisz regułę, aby udostępnić te obszary robocze."
+    },
+    "success": {
+      "created": "Utworzono {name}",
+      "updated": "Zaktualizowano {name}",
+      "deleted": "Usunięto regułę",
+      "provisioned": "{count, plural, one {Utworzono # obszar roboczy z \"{ruleName}\"} few {Utworzono # obszary robocze z \"{ruleName}\"} many {Utworzono # obszarów roboczych z \"{ruleName}\"} other {Utworzono # obszaru roboczego z \"{ruleName}\"}}"
+    },
+    "errors": {
+      "loadRules": "Nie udało się wczytać reguł autowykrywania",
+      "load": "Nie udało się wczytać",
+      "createFailed": "Tworzenie nie powiodło się: {status} {detail}",
+      "updateFailed": "Aktualizacja nie powiodła się: {status} {detail}",
+      "save": "Nie udało się zapisać",
+      "deleteRule": "Nie udało się usunąć reguły",
+      "delete": "Nie udało się usunąć",
+      "previewFailed": "Podgląd nie powiódł się ({status})",
+      "preview": "Podgląd nie powiódł się",
+      "previewPrereq": "Przed podglądem ustaw połączenie VCS, adres URL repozytorium i wzorzec",
+      "scanFailed": "Skanowanie nie powiodło się ({status})",
+      "scan": "Skanowanie nie powiodło się"
+    }
+  },
+  "adminBulkUpdate": {
+    "title": "Aktualizacja zbiorcza",
+    "description": "Wybierz obszary robocze według filtra, a następnie zastosuj zmianę ustawień do wszystkich z nich",
+    "none": "(brak)",
+    "anyOption": "(dowolne)",
+    "unchanged": "(bez zmian)",
+    "unchangedOption": "(bez zmian)",
+    "filter": {
+      "heading": "1. Wybierz obszary robocze",
+      "matchAll": "Dopasuj <strong>wszystkie</strong> obszary robocze (ignoruje poniższe filtry)",
+      "namePrefix": "Prefiks nazwy",
+      "executionBackend": "Backend wykonania",
+      "ownerEmail": "Adres e-mail właściciela",
+      "agentPool": "Pula agentów",
+      "vcsConnection": "Połączenie VCS",
+      "labels": "Etykiety",
+      "search": "Szukaj",
+      "searching": "Wyszukiwanie..."
+    },
+    "results": {
+      "matched": "Dopasowano <strong>{count}</strong> {count, plural, one {obszar roboczy} few {obszary robocze} many {obszarów roboczych} other {obszaru roboczego}}.",
+      "noMatch": "Żaden obszar roboczy nie pasuje do tego filtra.",
+      "colName": "Nazwa",
+      "colMode": "Tryb",
+      "colBackend": "Backend",
+      "colTfVersion": "Wersja TF",
+      "colLabels": "Etykiety"
+    },
+    "update": {
+      "heading": "2. Zastosuj zmiany",
+      "hint": "Zmieniane są tylko pola ustawione poniżej. Powyższy filtr wybiera, które obszary robocze otrzymają zmianę.",
+      "terraformVersion": "Wersja Terraform",
+      "executionBackend": "Backend wykonania",
+      "executionMode": "Tryb wykonania",
+      "autoApply": "Automatyczne zastosowanie",
+      "agentPool": "Pula agentów",
+      "cpuRequest": "Żądanie CPU",
+      "memoryRequest": "Żądanie pamięci",
+      "setLabels": "Ustaw etykiety (zastępuje mapę etykiet na każdym dopasowanym obszarze roboczym)",
+      "setVarFiles": "Ustaw pliki zmiennych",
+      "addVarFile": "Dodaj plik zmiennych",
+      "setRunTasks": "Ustaw zadania przebiegu (upsert po nazwie na każdym dopasowanym obszarze roboczym)",
+      "setNotifications": "Ustaw konfiguracje powiadomień (upsert po nazwie)",
+      "dryRun": "Przebieg próbny (tylko podgląd — brak zapisu zmian)",
+      "confirmWarning": "Spowoduje to zapisanie zmian na każdym dopasowanym obszarze roboczym.",
+      "confirmApply": "Potwierdź zastosowanie",
+      "applying": "Zastosowywanie...",
+      "cancel": "Anuluj",
+      "working": "Pracowanie...",
+      "previewDryRun": "Podgląd (przebieg próbny)",
+      "applyChanges": "Zastosuj zmiany"
+    },
+    "diff": {
+      "colWorkspace": "Obszar roboczy",
+      "colChanges": "Zmiany"
+    },
+    "dryResult": {
+      "heading": "Wynik przebiegu próbnego",
+      "summary": "Dopasowano <strong>{matched}</strong>; <strong>{wouldChange}</strong> uległoby zmianie; {unchanged} bez zmian. Nic nie zapisano.",
+      "wouldChange": "Uległoby zmianie",
+      "noChange": "Żaden obszar roboczy nie zmieniłby się przy tej aktualizacji."
+    },
+    "applyResult": {
+      "heading": "Wynik zastosowania",
+      "summary": "Dopasowano <strong>{matched}</strong>; <appliedstrong>{applied}</appliedstrong> zastosowano; {unchanged} bez zmian; {errors, plural, one {# błąd} few {# błędy} many {# błędów} other {# błędu}}.",
+      "applied": "Zastosowano",
+      "unnamedWorkspace": "(obszar roboczy)",
+      "noChange": "Żaden obszar roboczy się nie zmienił."
+    },
+    "errors": {
+      "searchFailed": "Wyszukiwanie nie powiodło się ({status})",
+      "search": "Wyszukiwanie nie powiodło się",
+      "bulkUpdateFailed": "Aktualizacja zbiorcza nie powiodła się ({status})",
+      "bulkUpdate": "Aktualizacja zbiorcza nie powiodła się"
+    }
+  },
+  "adminExecutionHooks": {
+    "title": "Punkty zaczepienia wykonania",
+    "description": "Niestandardowe kroki powłoki uruchamiane wewnątrz zadań runnera w punktach pre/post-plan/apply, powiązane z obszarami roboczymi",
+    "empty": "Nie skonfigurowano żadnych punktów zaczepienia wykonania.",
+    "actions": {
+      "cancel": "Anuluj",
+      "new": "Nowy punkt zaczepienia wykonania",
+      "creating": "Tworzenie...",
+      "create": "Utwórz punkt zaczepienia wykonania"
+    },
+    "badges": {
+      "disabled": "Wyłączony",
+      "enabled": "Włączony"
+    },
+    "columns": {
+      "name": "Nazwa",
+      "hookPoint": "Punkt zaczepienia",
+      "enabled": "Włączony",
+      "priority": "Priorytet",
+      "workspaces": "Obszary robocze"
+    },
+    "form": {
+      "name": "Nazwa",
+      "namePatternTitle": "Tylko litery, cyfry, myślniki i podkreślenia. Musi zaczynać się od litery lub cyfry.",
+      "description": "Opis",
+      "descriptionPlaceholder": "Dodaj wpis do wewnętrznych hostów przed init",
+      "hookPoint": "Punkt zaczepienia",
+      "priority": "Priorytet",
+      "priorityTitle": "Niższy uruchamia się pierwszy, gdy kilka punktów zaczepienia dzieli ten sam punkt (remisy rozstrzygane po nazwie).",
+      "scriptLabel": "Skrypt (<code>/bin/sh -c</code>)",
+      "scriptHelp": "Uruchamia się z tożsamością chmurową runnera. Niezerowe wyjście kończy przebieg błędem. Sekrety powinny pochodzić ze zmiennych obszaru roboczego, a nie być wpisane tutaj bezpośrednio."
+    },
+    "errors": {
+      "load": "Nie udało się wczytać punktów zaczepienia wykonania",
+      "createStatus": "Nie udało się utworzyć punktu zaczepienia wykonania ({status})",
+      "create": "Nie udało się utworzyć punktu zaczepienia wykonania"
+    }
+  },
+  "adminPolicySets": {
+    "title": "Zestawy zasad",
+    "description": "Egzekwowanie zasad jako kodu OPA, ograniczone do obszarów roboczych według etykiety",
+    "empty": "Nie skonfigurowano żadnych zestawów zasad.",
+    "actions": {
+      "cancel": "Anuluj",
+      "new": "Nowy zestaw zasad",
+      "creating": "Tworzenie...",
+      "create": "Utwórz zestaw zasad"
+    },
+    "badges": {
+      "disabled": "Wyłączony",
+      "mandatory": "Obowiązkowy",
+      "advisory": "Doradczy",
+      "global": "Globalny",
+      "labelScoped": "Ograniczony etykietą"
+    },
+    "columns": {
+      "name": "Nazwa",
+      "description": "Opis",
+      "enforcement": "Egzekwowanie",
+      "scope": "Zasięg",
+      "policies": "Zasady"
+    },
+    "form": {
+      "name": "Nazwa",
+      "namePatternTitle": "Tylko litery, cyfry, myślniki i podkreślenia. Musi zaczynać się od litery lub cyfry.",
+      "description": "Opis",
+      "descriptionPlaceholder": "Obowiązkowe zabezpieczenia dla produkcyjnych obszarów roboczych",
+      "enforcement": "Egzekwowanie",
+      "enforcementAdvisory": "Doradcze (ostrzegaj, nie blokuj)",
+      "enforcementMandatory": "Obowiązkowe (blokuj zastosowanie przy niepowodzeniu)",
+      "globalScope": "Globalny (zastosuj do każdego obszaru roboczego)",
+      "sourceInline": "Wbudowane (zarządzaj zasadami w UI)",
+      "sourceVcs": "Z repozytorium VCS",
+      "vcsConnection": "Połączenie VCS",
+      "selectConnection": "Wybierz połączenie...",
+      "repoUrl": "Adres URL repozytorium",
+      "branch": "Gałąź",
+      "branchPlaceholder": "main (domyślnie)",
+      "policyPath": "Ścieżka zasad",
+      "policyPathPlaceholder": "policies/ (katalog zawierający pliki .rego)",
+      "helpVcs": "Zasady będą synchronizowane z repozytorium automatycznie.",
+      "helpInline": "Dodaj zasady i doprecyzuj zasięg etykiet po utworzeniu zestawu."
+    },
+    "errors": {
+      "load": "Nie udało się wczytać zestawów zasad",
+      "createStatus": "Nie udało się utworzyć zestawu zasad ({status})",
+      "create": "Nie udało się utworzyć zestawu zasad"
+    }
+  },
+  "adminCatalog": {
+    "title": "Administracja katalogiem",
+    "description": "Zarządzaj pozycjami katalogu usług",
+    "notEnabled": "Katalog usług nie jest włączony.",
+    "empty": "Brak pozycji katalogu.",
+    "actions": {
+      "new": "Nowa pozycja katalogu",
+      "cancel": "Anuluj",
+      "create": "Utwórz pozycję katalogu",
+      "creating": "Tworzenie…",
+      "saveChanges": "Zapisz zmiany",
+      "saving": "Zapisywanie…",
+      "edit": "Edytuj",
+      "delete": "Usuń"
+    },
+    "form": {
+      "name": "Nazwa",
+      "nameTitle": "Tylko litery, cyfry, myślniki i podkreślenia. Musi zaczynać się od litery lub cyfry.",
+      "module": "Moduł",
+      "moduleSelect": "Wybierz moduł…",
+      "moduleImmutable": "Moduł jest niezmienny po utworzeniu",
+      "displayName": "Nazwa wyświetlana",
+      "displayNamePlaceholder": "Standardowy zasobnik S3",
+      "versionPin": "Domyślne przypięcie wersji",
+      "versionPinPlaceholder": "np. 1.2.0 (puste = najnowsza)",
+      "descriptionLabel": "Opis",
+      "descriptionPlaceholder": "Co ta pozycja katalogu udostępnia…",
+      "enabled": "Włączone (widoczne w katalogu przeglądania)",
+      "providerTemplates": "Szablony dostawców",
+      "noProviderTemplates": "Nie zdefiniowano szablonów dostawców.",
+      "restrictPools": "Ogranicz do określonych pul agentów",
+      "noAgentPools": "Brak dostępnych pul agentów.",
+      "anyPool": "Można użyć dowolnej puli agentów.",
+      "labels": "Etykiety",
+      "variableOptions": "Opcje zmiennych (zaawansowane, JSON)",
+      "variableOptionsHint": "Nadpisania dla poszczególnych wejść (opcje, ukryte, domyślne). Pozostaw jako <code>[]</code>, jeśli nieużywane."
+    },
+    "table": {
+      "name": "Nazwa",
+      "module": "Moduł",
+      "enabled": "Włączone",
+      "actions": "Akcje"
+    },
+    "badge": {
+      "enabled": "włączone",
+      "disabled": "wyłączone"
+    },
+    "confirm": {
+      "delete": "Usunąć tę pozycję katalogu? Istniejące udostępnione instancje pozostaną nienaruszone."
+    },
+    "success": {
+      "created": "Utworzono pozycję katalogu \"{name}\"",
+      "updated": "Zaktualizowano pozycję katalogu \"{name}\"",
+      "deleted": "Usunięto pozycję katalogu"
+    },
+    "errors": {
+      "load": "Nie udało się wczytać pozycji katalogu",
+      "save": "Nie udało się zapisać pozycji katalogu",
+      "createStatus": "Nie udało się utworzyć pozycji katalogu ({status})",
+      "updateStatus": "Nie udało się zaktualizować pozycji katalogu ({status})",
+      "delete": "Nie udało się usunąć pozycji katalogu",
+      "deleteConflict": "Nie można usunąć: ta pozycja katalogu ma udostępnione instancje.",
+      "varOptsInvalidJson": "Opcje zmiennych muszą być poprawnym JSON (tablicą).",
+      "varOptsNotArray": "Opcje zmiennych muszą być tablicą JSON."
+    }
+  },
+  "adminProviderTemplates": {
+    "title": "Szablony dostawców",
+    "description": "Wielokrotnego użytku bloki konfiguracji dostawców dla pozycji katalogu",
+    "notEnabled": "Katalog usług nie jest włączony.",
+    "empty": "Brak szablonów dostawców.",
+    "actions": {
+      "new": "Nowy szablon",
+      "cancel": "Anuluj",
+      "create": "Utwórz szablon",
+      "creating": "Tworzenie…",
+      "saveChanges": "Zapisz zmiany",
+      "saving": "Zapisywanie…",
+      "edit": "Edytuj",
+      "delete": "Usuń"
+    },
+    "form": {
+      "name": "Nazwa",
+      "providerType": "Typ dostawcy",
+      "body": "Treść (HCL)",
+      "parameters": "Parametry (zaawansowane, JSON)",
+      "parametersHint": "Każdy parametr staje się polem formularza udostępniania. Pozostaw jako <code>[]</code>, jeśli nieużywane.",
+      "labels": "Etykiety"
+    },
+    "table": {
+      "name": "Nazwa",
+      "providerType": "Typ dostawcy",
+      "parameters": "Parametry",
+      "actions": "Akcje"
+    },
+    "confirm": {
+      "delete": "Usunąć ten szablon dostawcy? Pozycje katalogu odwołujące się do niego nie będą mogły zostać udostępnione. Tej operacji nie można cofnąć."
+    },
+    "success": {
+      "created": "Utworzono szablon dostawcy \"{name}\"",
+      "updated": "Zaktualizowano szablon dostawcy \"{name}\"",
+      "deleted": "Usunięto szablon dostawcy"
+    },
+    "errors": {
+      "load": "Nie udało się wczytać szablonów dostawców",
+      "save": "Nie udało się zapisać szablonu dostawcy",
+      "createStatus": "Nie udało się utworzyć szablonu ({status})",
+      "updateStatus": "Nie udało się zaktualizować szablonu ({status})",
+      "delete": "Nie udało się usunąć szablonu dostawcy",
+      "deleteConflict": "Nie można usunąć: ten szablon jest używany przez pozycję katalogu.",
+      "paramsInvalidJson": "Parametry muszą być poprawnym JSON (tablicą).",
+      "paramsNotArray": "Parametry muszą być tablicą JSON."
+    }
+  },
+  "adminAgentPools": {
+    "title": "Pule agentów",
+    "description": "Zarządzaj pulami agentów runnera i ich nasłuchiwaczami",
+    "empty": "Nie skonfigurowano żadnych pul agentów.",
+    "actions": {
+      "newPool": "Nowa pula",
+      "createPool": "Utwórz pulę",
+      "creating": "Tworzenie...",
+      "cancel": "Anuluj",
+      "edit": "Edytuj",
+      "save": "Zapisz",
+      "saving": "Zapisywanie...",
+      "delete": "Usuń",
+      "deleting": "Usuwanie...",
+      "confirmDelete": "Potwierdź usunięcie"
+    },
+    "form": {
+      "name": "Nazwa",
+      "namePattern": "Tylko litery, cyfry, myślniki i podkreślenia. Musi zaczynać się od litery lub cyfry.",
+      "description": "Opis",
+      "descriptionPlaceholder": "Produkcyjne runnery AWS",
+      "labels": "Etykiety"
+    },
+    "columns": {
+      "name": "Nazwa",
+      "description": "Opis",
+      "status": "Status",
+      "created": "Utworzono"
+    },
+    "badges": {
+      "default": "domyślna",
+      "degradedTooltip": "Nasłuchiwacze wysyłają sygnały aktywności, ale ich certyfikaty wygasły — przebiegi nie zostaną uruchomione.",
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "obniżona sprawność"
+      }
+    },
+    "detail": {
+      "back": "Powrót do pul agentów",
+      "defaultDescription": "Pula agentów"
+    },
+    "tabs": {
+      "settings": "Ustawienia",
+      "tokens": "Tokeny",
+      "listeners": "Nasłuchiwacze"
+    },
+    "settings": {
+      "title": "Ustawienia puli",
+      "fields": {
+        "name": "Nazwa",
+        "description": "Opis",
+        "created": "Utworzono",
+        "owner": "Właściciel",
+        "yourPermission": "Twoje uprawnienie",
+        "labels": "Etykiety"
+      },
+      "permissions": {
+        "read": "odczyt",
+        "write": "zapis",
+        "admin": "administrator"
+      }
+    },
+    "danger": {
+      "title": "Usuń pulę",
+      "description": "Trwale usuń tę pulę agentów i wszystkie powiązane tokeny."
+    },
+    "tokens": {
+      "create": "Utwórz token",
+      "empty": "Brak tokenów dla tej puli.",
+      "revoke": "Unieważnij",
+      "created": {
+        "title": "Token utworzony pomyślnie",
+        "copyNow": "Skopiuj ten token teraz — nie zostanie wyświetlony ponownie.",
+        "copy": "Kopiuj"
+      },
+      "form": {
+        "description": "Opis",
+        "descriptionPlaceholder": "Token produkcyjnego nasłuchiwacza",
+        "maxUses": "Maks. liczba użyć",
+        "maxUsesHint": "Domyślnie 2 — toleruje jedną ponowną próbę wyścigu podczas bootstrapu między replikami nasłuchiwaczy.",
+        "expiresAt": "Wygasa",
+        "expiresAtHint": "Domyślnie 1 godzina od teraz."
+      },
+      "columns": {
+        "description": "Opis",
+        "uses": "Użycia",
+        "expires": "Wygasa",
+        "status": "Status",
+        "createdBy": "Utworzone przez",
+        "actions": "Akcje"
+      },
+      "badges": {
+        "revoked": "Unieważniony",
+        "active": "Aktywny"
+      }
+    },
+    "listeners": {
+      "empty": "Brak nasłuchiwaczy zarejestrowanych dla tej puli.",
+      "columns": {
+        "name": "Nazwa",
+        "status": "Status",
+        "replicas": "Repliki",
+        "certExpires": "Certyfikat wygasa",
+        "actions": "Akcje"
+      },
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "degraded": "obniżona sprawność",
+        "cert-expired": "certyfikat wygasł"
+      },
+      "tooltips": {
+        "certExpired": "Nasłuchiwacz wysyła sygnały aktywności, ale jego certyfikat wygasł — każde wywołanie uwierzytelniane certyfikatem (przejęcie przebiegu, odnowienie, token runnera) zakończy się niepowodzeniem. Najbardziej prawdopodobna przyczyna: API nigdy nie zarejestrowało najnowszego certyfikatu lub TTL certyfikatu upłynął przed odnowieniem.",
+        "degraded": "Nasłuchiwacze wysyłają sygnały aktywności, ale ich certyfikaty wygasły — przebiegi nie zostaną uruchomione."
+      }
+    },
+    "confirm": {
+      "revokeToken": "Unieważnić ten token dołączania? Nasłuchiwacze go używające nie będą już mogły dołączyć, a tej operacji nie można cofnąć.",
+      "deleteListener": "Usunąć ten nasłuchiwacz? Zarejestruje się ponownie przy kolejnym sygnale aktywności, jeśli pod nadal działa."
+    },
+    "success": {
+      "poolUpdated": "Zaktualizowano pulę",
+      "tokenRevoked": "Unieważniono token",
+      "listenerDeleted": "Usunięto nasłuchiwacz"
+    },
+    "errors": {
+      "loadPools": "Nie udało się wczytać pul agentów",
+      "loadPool": "Nie udało się wczytać puli",
+      "loadTokens": "Nie udało się wczytać tokenów",
+      "loadListeners": "Nie udało się wczytać nasłuchiwaczy",
+      "createPool": "Nie udało się utworzyć puli",
+      "createStatus": "Nie udało się utworzyć puli ({status})",
+      "updatePool": "Nie udało się zaktualizować puli",
+      "deletePool": "Nie udało się usunąć puli",
+      "poolNotFound": "Nie znaleziono puli",
+      "createToken": "Nie udało się utworzyć tokenu",
+      "createTokenStatus": "Nie udało się utworzyć tokenu ({status})",
+      "revokeToken": "Nie udało się unieważnić tokenu",
+      "deleteListener": "Nie udało się usunąć nasłuchiwacza"
+    }
+  },
+  "adminAuditLog": {
+    "title": "Dziennik audytu",
+    "description": "Niezmienny dziennik wszystkich żądań API",
+    "empty": "Nie znaleziono wpisów dziennika audytu.",
+    "errors": {
+      "load": "Nie udało się wczytać dziennika audytu"
+    },
+    "filters": {
+      "actorEmail": "Adres e-mail aktora",
+      "actorPlaceholder": "uzytkownik@example.com",
+      "resourceType": "Typ zasobu",
+      "resourceTypePlaceholder": "workspaces",
+      "method": "Metoda",
+      "methodAll": "Wszystkie",
+      "since": "Od",
+      "until": "Do",
+      "clear": "Wyczyść",
+      "apply": "Zastosuj filtry"
+    },
+    "columns": {
+      "timestamp": "Znacznik czasu",
+      "actor": "Aktor",
+      "action": "Akcja",
+      "resourceType": "Typ zasobu",
+      "resourceId": "Identyfikator zasobu",
+      "status": "Status",
+      "duration": "Czas trwania"
+    },
+    "pagination": {
+      "summary": "Strona {current} z {total} ({count, plural, one {# wpis} few {# wpisy} many {# wpisów} other {# wpisu}})",
+      "previous": "Poprzednia",
+      "next": "Następna"
+    }
+  },
+  "adminBinaryCache": {
+    "title": "Pamięć podręczna",
+    "description": "Zarządzanie pamięcią podręczną plików binarnych CLI i dostawców",
+    "errors": {
+      "loadBinary": "Nie udało się wczytać pamięci podręcznej plików binarnych",
+      "loadCache": "Nie udało się wczytać pamięci podręcznej"
+    },
+    "sections": {
+      "cliBinaries": "Pliki binarne CLI",
+      "providerBinaries": "Pliki binarne dostawców"
+    },
+    "empty": {
+      "binaries": "Brak plików binarnych CLI w pamięci podręcznej.",
+      "providers": "Brak plików binarnych dostawców w pamięci podręcznej."
+    },
+    "columns": {
+      "tool": "Narzędzie",
+      "version": "Wersja",
+      "os": "OS",
+      "arch": "Arch",
+      "cachedAt": "Zapisano w pamięci",
+      "provider": "Dostawca",
+      "hostname": "Nazwa hosta",
+      "actions": "Akcje"
+    },
+    "warm": {
+      "heading": "Rozgrzej pamięć podręczną",
+      "hide": "Ukryj",
+      "prePopulate": "Wstępnie zapełnij…",
+      "help": "Wstępnie pobierz pliki binarne i platformy dostawców do pamięci podręcznej (jeden na wiersz). Końcowe tokeny <code>os/arch</code> są opcjonalne — pomiń je, aby użyć skonfigurowanych domyślnych platform.",
+      "binariesLabel": "Pliki binarne",
+      "providersLabel": "Dostawcy",
+      "warm": "Rozgrzej",
+      "warming": "Rozgrzewanie…",
+      "confirm": "Rozgrzać wybrane wpisy pamięci podręcznej teraz?",
+      "errorEmpty": "Dodaj co najmniej jeden wiersz pliku binarnego lub dostawcy do rozgrzania.",
+      "errorFailedStatus": "Rozgrzewanie nie powiodło się ({status})",
+      "errorFailed": "Nie udało się rozgrzać pamięci podręcznej",
+      "success": "Rozgrzano {succeeded}/{total} ({failed} nieudanych)"
+    },
+    "purge": {
+      "button": "Wyczyść",
+      "confirmBinary": "Wyczyścić {tool} {version} z pamięci podręcznej? Zostanie ponownie pobrany ze źródła nadrzędnego przy następnym żądaniu.",
+      "confirmProvider": "Wyczyścić {provider} {version} z pamięci podręcznej dostawców? Zostanie ponownie pobrany ze źródła nadrzędnego przy następnym żądaniu.",
+      "successBinary": "Wyczyszczono {count} wpisów dla {tool} {version}",
+      "successProvider": "Wyczyszczono {count} wpisów dla {provider} {version}",
+      "errorStatus": "Czyszczenie nie powiodło się ({status})",
+      "error": "Nie udało się wyczyścić",
+      "errorProvider": "Nie udało się wyczyścić dostawcy",
+      "errorProviders": "Nie udało się wyczyścić dostawców"
+    },
+    "batchPurge": {
+      "purging": "Czyszczenie...",
+      "purgeSelected": "Wyczyść wybrane ({count})",
+      "confirmBinary": "Wyczyścić wszystkie wybrane wpisy pamięci podręcznej plików binarnych? Zostaną ponownie pobrane ze źródła nadrzędnego przy następnym żądaniu.",
+      "confirmProvider": "Wyczyścić wszystkie wybrane wpisy pamięci podręcznej dostawców? Zostaną ponownie pobrane ze źródła nadrzędnego przy następnym żądaniu.",
+      "errorBinaryItem": "Czyszczenie nie powiodło się dla {tool} {version}",
+      "errorProviderItem": "Czyszczenie nie powiodło się dla {provider} {version}",
+      "successBinary": "Wyczyszczono {count} wpisów pamięci podręcznej plików binarnych",
+      "successProvider": "Wyczyszczono {count} wpisów pamięci podręcznej dostawców"
+    }
+  },
+  "catalog": {
+    "title": "Katalog usług",
+    "description": "Udostępniaj infrastrukturę samoobsługowo z wyselekcjonowanych modułów",
+    "notEnabled": "Katalog usług nie jest włączony.",
+    "empty": "Brak dostępnych pozycji katalogu.",
+    "card": {
+      "pinned": "przypięto {version}",
+      "latest": "najnowsza"
+    },
+    "errors": {
+      "loadItems": "Nie udało się wczytać pozycji katalogu"
+    }
+  },
+  "catalogDetail": {
+    "backLink": "← Katalog",
+    "backToCatalog": "Powrót do katalogu",
+    "fallbackTitle": "Pozycja katalogu",
+    "notFound": "Nie znaleziono pozycji katalogu lub katalog usług nie jest włączony.",
+    "common": {
+      "cancel": "Anuluj"
+    },
+    "info": {
+      "module": "Moduł:",
+      "resolvedVersion": "Rozwiązana wersja:",
+      "latest": "najnowsza",
+      "disabled": "wyłączona"
+    },
+    "pending": {
+      "banner": "Przebieg dla <strong>{name}</strong> jest zaplanowany i oczekuje na przegląd. Potwierdź, aby zastosować, lub odrzuć.",
+      "working": "Pracowanie…",
+      "confirmApply": "Potwierdź i zastosuj",
+      "discard": "Odrzuć"
+    },
+    "field": {
+      "select": "Wybierz…"
+    },
+    "provision": {
+      "title": "Udostępnij",
+      "workspaceName": "Nazwa obszaru roboczego",
+      "workspaceNameTitle": "Tylko litery, cyfry, myślniki i podkreślenia. Musi zaczynać się od litery lub cyfry.",
+      "workspaceNamePlaceholder": "moja-instancja",
+      "agentPool": "Pula agentów",
+      "selectPool": "Wybierz pulę…",
+      "noPoolsAvailable": "Nie masz dostępu do żadnych pul agentów. Do udostępnienia potrzebujesz uprawnień zapisu do puli agentów — poproś administratora o ich nadanie.",
+      "noPoolsAllowed": "Żadna z pul agentów, do których masz dostęp, nie jest dozwolona przez tę pozycję katalogu. Poproś administratora o rozszerzenie dozwolonych pul tej pozycji lub o nadanie Ci dostępu do jednej z nich.",
+      "version": "Wersja",
+      "latestFloat": "Najnowsza (płynna)",
+      "defaultPinOption": "{version} (domyślne przypięcie)",
+      "labelsOptional": "Etykiety (opcjonalne)",
+      "autoApplyHint": "Automatyczne zastosowanie stosuje zmiany bez etapu ręcznego przeglądu.",
+      "provisioning": "Udostępnianie…",
+      "submit": "Udostępnij"
+    },
+    "instances": {
+      "title": "Instancje",
+      "empty": "Z tej pozycji nie udostępniono jeszcze żadnych instancji.",
+      "colName": "Nazwa",
+      "colVersion": "Wersja",
+      "colPool": "Pula",
+      "colActions": "Akcje",
+      "reconfigure": "Zmień konfigurację",
+      "destroy": "Zniszcz",
+      "orphan": "Osieroć…",
+      "orphanTitle": "Usuń rekord katalogu bez niszczenia jego infrastruktury (odradzane)"
+    },
+    "reconfigure": {
+      "title": "Zmień konfigurację {name}",
+      "description": "Zaktualizuj wejścia i/lub wersję, a następnie umieść przebieg w kolejce.",
+      "currentOption": "{version} (bieżąca)",
+      "queuing": "Kolejkowanie…",
+      "queueRun": "Umieść przebieg w kolejce"
+    },
+    "destroy": {
+      "title": "Zniszcz {name}",
+      "heading": "Zniszczyć {name}?",
+      "description": "Umieszcza w kolejce przebieg niszczący, który likwiduje infrastrukturę tej instancji. Po pomyślnym zastosowaniu obszar roboczy zostaje zarchiwizowany. Tej operacji nie można cofnąć.",
+      "autoApplyHint": "Automatyczne zastosowanie likwiduje natychmiast bez przeglądu."
+    },
+    "orphan": {
+      "title": "Osieroć {name}",
+      "heading": "Osierocić {name}?",
+      "description": "Usuwa to rekord instancji katalogu, ale <warn>nie</warn> niszczy jej infrastruktury — udostępnione zasoby nadal działają, <warn>nieśledzone i niezarządzane</warn>. Jest to odradzane. Aby odzyskać infrastrukturę, anuluj i zamiast tego użyj <emph>Zniszcz</emph>.",
+      "confirmPrompt": "Wpisz nazwę instancji <mono>{name}</mono>, aby potwierdzić:",
+      "orphaning": "Osieracanie…",
+      "submit": "Osieroć i porzuć infrastrukturę"
+    },
+    "actions": {
+      "confirmed": "Przebieg potwierdzony — zastosowywanie.",
+      "discarded": "Przebieg odrzucony.",
+      "provisioned": "Udostępniono {name} — plan gotowy do przeglądu.",
+      "reconfigureQueued": "Zmiana konfiguracji w kolejce — utworzono przebieg.",
+      "reconfigureQueuedStatus": "Zmiana konfiguracji w kolejce — przebieg ma status {status}.",
+      "destroyQueued": "Niszczenie w kolejce — utworzono przebieg.",
+      "destroyQueuedStatus": "Niszczenie w kolejce — przebieg ma status {status}.",
+      "orphaned": "Osierocono {name} — usunięto rekord katalogu; jego infrastruktura nadal działa, nieśledzona i niezarządzana."
+    },
+    "errors": {
+      "loadItem": "Nie udało się wczytać pozycji katalogu",
+      "confirm": "Nie udało się potwierdzić",
+      "confirmStatus": "Nie udało się potwierdzić ({status})",
+      "discard": "Nie udało się odrzucić",
+      "discardStatus": "Nie udało się odrzucić ({status})",
+      "provision": "Nie udało się udostępnić",
+      "provisionStatus": "Nie udało się udostępnić ({status})",
+      "reconfigure": "Nie udało się zmienić konfiguracji",
+      "reconfigureStatus": "Nie udało się zmienić konfiguracji ({status})",
+      "destroy": "Nie udało się zniszczyć",
+      "destroyStatus": "Nie udało się zniszczyć ({status})",
+      "orphan": "Nie udało się osierocić",
+      "orphanStatus": "Nie udało się osierocić ({status})"
+    }
+  },
+  "common": {
+    "connection": {
+      "reconnecting": "Ponowne łączenie…"
+    },
+    "sessionExpiry": {
+      "banner": "Sesja wygasa za {minutes, plural, one {# minutę} few {# minuty} many {# minut} other {# minuty}} — <link>uwierzytelnij ponownie</link>"
+    },
+    "tokenExpiry": {
+      "withinDays": "{count, plural, one {# token usługowy} few {# tokeny usługowe} many {# tokenów usługowych} other {# tokenu usługowego}} wygasa w ciągu {days, plural, one {# dnia} few {# dni} many {# dni} other {# dnia}} — <link>przejrzyj</link>",
+      "soon": "{count, plural, one {# token usługowy} few {# tokeny usługowe} many {# tokenów usługowych} other {# tokenu usługowego}} wkrótce wygasa — <link>przejrzyj</link>",
+      "dismissAria": "Odrzuć ostrzeżenie o wygaśnięciu tokenu"
+    },
+    "resourceUsage": {
+      "title": "Wykorzystanie zasobów",
+      "oomKilled": "Zabity przez OOM",
+      "killedLikelyOom": "Zabity (prawdopodobnie OOM)",
+      "memory": "Pamięć",
+      "requested": "Żądano {value}",
+      "limit": "Limit {value}"
+    },
+    "labelsEditor": {
+      "none": "Brak",
+      "removeAria": "Usuń {key}",
+      "keyPlaceholder": "klucz",
+      "valuePlaceholder": "wartość",
+      "add": "Dodaj"
+    },
+    "sensitiveInput": {
+      "hide": "Ukryj",
+      "show": "Pokaż",
+      "hideAria": "Ukryj wartość",
+      "showAria": "Pokaż wartość"
+    },
+    "workspacePicker": {
+      "searchPlaceholder": "Wyszukaj obszary robocze…",
+      "loading": "Wczytywanie…",
+      "empty": "Nie znaleziono obszarów roboczych",
+      "adding": "Dodawanie…"
+    },
+    "templateEditors": {
+      "remove": "Usuń",
+      "add": "Dodaj",
+      "valuePlaceholder": "wartość",
+      "name": "Nazwa",
+      "url": "URL",
+      "hmacKey": "Klucz HMAC (opcjonalny)",
+      "hmacKeyPlaceholder": "współdzielony sekret",
+      "stage": "Etap",
+      "enforcement": "Egzekwowanie",
+      "enabled": "Włączone",
+      "runTaskNamePlaceholder": "security-scan",
+      "runTaskUrlPlaceholder": "https://hooks.example.com/task",
+      "addRunTask": "Dodaj zadanie przebiegu",
+      "destinationType": "Typ miejsca docelowego",
+      "token": "Token (opcjonalny)",
+      "tokenPlaceholder": "Token HMAC / uwierzytelniający",
+      "notificationNamePlaceholder": "slack-alerts",
+      "notificationUrlPlaceholder": "https://hooks.slack.com/services/...",
+      "emailAddresses": "Adresy e-mail",
+      "emailPlaceholder": "ops@example.com",
+      "addEmail": "Dodaj e-mail",
+      "triggers": "Wyzwalacze",
+      "addNotification": "Dodaj powiadomienie"
+    }
+  },
+  "planSummary": {
+    "aiGenerated": "Wygenerowano przez AI",
+    "heading": {
+      "planSummary": "Podsumowanie planu",
+      "failureAnalysis": "Analiza niepowodzenia"
+    },
+    "errors": {
+      "status": "HTTP {status}"
+    },
+    "regenerate": {
+      "label": "Wygeneruj ponownie",
+      "queueing": "Kolejkowanie…",
+      "tooltip": "Uruchom ponownie podsumowanie AI dla tych samych danych wejściowych planu",
+      "ariaLabel": "Wygeneruj ponownie podsumowanie AI",
+      "confirm": "Wygenerować ponownie analizę AI? Spowoduje to ponowne uruchomienie modelu.",
+      "error": "Nie udało się wygenerować ponownie: <mono>{detail}</mono>"
+    },
+    "pending": {
+      "summarisingPlan": "Podsumowywanie planu…",
+      "analysingFailure": "Analizowanie niepowodzenia…"
+    },
+    "skipped": {
+      "fallback": "Podsumowanie pominięto dla tego przebiegu."
+    },
+    "errored": {
+      "heading": "Podsumowywanie nie powiodło się"
+    },
+    "riskFactors": {
+      "heading": "Czynniki ryzyka",
+      "suggestedFixes": "Sugerowane poprawki"
+    },
+    "tokens": "{input} we / {output} wy tokenów",
+    "risk": {
+      "low": "niskie",
+      "medium": "średnie",
+      "high": "wysokie",
+      "critical": "krytyczne",
+      "unknown": "nieznane"
+    },
+    "badges": {
+      "noChanges": "Brak zmian",
+      "noChangesLower": "brak zmian",
+      "noChangesTitle": "Plan nie zgłosił żadnych zmian zasobów",
+      "toAdd": "{count, plural, one {# do dodania} few {# do dodania} many {# do dodania} other {# do dodania}}",
+      "toChange": "{count, plural, one {# do zmiany} few {# do zmiany} many {# do zmiany} other {# do zmiany}}",
+      "toDestroy": "{count, plural, one {# do zniszczenia} few {# do zniszczenia} many {# do zniszczenia} other {# do zniszczenia}}",
+      "toReplace": "{count, plural, one {# do zastąpienia} few {# do zastąpienia} many {# do zastąpienia} other {# do zastąpienia}}",
+      "toImport": "{count, plural, one {# do zaimportowania} few {# do zaimportowania} many {# do zaimportowania} other {# do zaimportowania}}"
+    },
+    "chat": {
+      "heading": "Pytanie uzupełniające",
+      "sharedThreadNote": "Jeden współdzielony wątek, widoczny dla każdego z dostępem odczytu do obszaru roboczego.",
+      "placeholder": "Zadaj pytanie uzupełniające o ten plan… (⌘/Ctrl + Enter, aby wysłać)",
+      "send": "Wyślij",
+      "thinking": "Myślenie…",
+      "you": "Ty",
+      "assistant": "Asystent"
+    },
+    "translatedNote": "Automatycznie przetłumaczone na Twój język. Wiążące jest podsumowanie oryginalne.",
+    "translating": "Tłumaczenie…"
+  },
+  "runDetail": {
+    "notFound": "Nie znaleziono przebiegu",
+    "runSection": "Sekcja przebiegu",
+    "workspaceFallback": "obszar roboczy",
+    "backTo": "Powrót do {name}",
+    "errorHeading": "Błąd",
+    "discardedHeading": "Odrzucone — wymagane ponowne planowanie",
+    "common": {
+      "yes": "Tak",
+      "no": "Nie"
+    },
+    "header": {
+      "title": "Przebieg {id}",
+      "titleWithWorkspace": "{workspace} — przebieg {id}",
+      "description": "Przebieg {source}"
+    },
+    "relTime": {
+      "justNow": "przed chwilą",
+      "minutesAgo": "{count, plural, one {# minutę temu} few {# minuty temu} many {# minut temu} other {# minuty temu}}",
+      "hoursAgo": "{count, plural, one {# godzinę temu} few {# godziny temu} many {# godzin temu} other {# godziny temu}}",
+      "daysAgo": "{count, plural, one {# dzień temu} few {# dni temu} many {# dni temu} other {# dnia temu}}"
+    },
+    "status": {
+      "pending": "Oczekujące",
+      "queued": "W kolejce",
+      "planning": "Planowanie",
+      "planned": "Zaplanowane",
+      "confirmed": "Potwierdzone",
+      "applying": "Zastosowywanie",
+      "canceling": "Anulowanie",
+      "applied": "Zastosowane",
+      "errored": "Błąd",
+      "canceled": "Anulowane",
+      "discarded": "Odrzucone"
+    },
+    "activity": {
+      "pending": "Przygotowywanie przebiegu",
+      "queued": "Oczekiwanie na dostępnego agenta",
+      "planning": "Uruchamianie terraform plan",
+      "plannedConfirmable": "Oczekiwanie na Twoje potwierdzenie i zastosowanie",
+      "plannedSpeculative": "Plan spekulatywny ukończony",
+      "plannedComplete": "Plan ukończony",
+      "confirmed": "Rozpoczynanie zastosowywania",
+      "applying": "Uruchamianie terraform apply",
+      "canceling": "Zatrzymywanie przebiegu",
+      "applied": "Zastosowywanie ukończone",
+      "errored": "Przebieg nie powiódł się",
+      "canceled": "Przebieg anulowany",
+      "discarded": "Plan odrzucony",
+      "elapsedTitle": "Czas, jaki upłynął w tej fazie"
+    },
+    "badge": {
+      "destroy": "niszczenie",
+      "planOnly": "tylko plan"
+    },
+    "actions": {
+      "retryShort": "Ponów",
+      "retryFull": "Ponów przebieg",
+      "retrying": "Ponawianie…",
+      "confirmShort": "Zastosuj",
+      "confirmFull": "Potwierdź i zastosuj",
+      "confirming": "Potwierdzanie…",
+      "discard": "Odrzuć",
+      "discarding": "Odrzucanie…",
+      "cancelShort": "Anuluj",
+      "cancelFull": "Anuluj przebieg",
+      "canceling": "Anulowanie…"
+    },
+    "confirm": {
+      "apply": "Zastosować ten przebieg? Spowoduje to zastosowanie planu i zmianę infrastruktury.",
+      "discard": "Odrzucić ten plan?",
+      "cancel": "Anulować ten przebieg?",
+      "retry": "Ponowić ten przebieg?"
+    },
+    "errors": {
+      "loadRun": "Nie udało się wczytać przebiegu",
+      "action": {
+        "confirm": "Nie udało się potwierdzić przebiegu",
+        "discard": "Nie udało się odrzucić przebiegu",
+        "cancel": "Nie udało się anulować przebiegu",
+        "retry": "Nie udało się ponowić przebiegu"
+      }
+    },
+    "tabs": {
+      "overview": "Przegląd",
+      "ai": "AI",
+      "aiFull": "Analiza AI",
+      "opa": "OPA",
+      "opaFull": "Zasady OPA",
+      "impact": "Wpływ",
+      "impactFull": "Graf wpływu",
+      "planLabel": "Plan<log>Dziennik</log>",
+      "applyLabel": "Zastosuj<log>Dziennik</log>",
+      "planFull": "Dziennik planu",
+      "applyFull": "Dziennik zastosowania",
+      "details": "Szczegóły"
+    },
+    "banner": {
+      "destroy": "To jest przebieg <strong>niszczący</strong> — wszystkie zarządzane zasoby zostaną zniszczone po zastosowaniu.",
+      "planOnlyCli": "To jest przebieg <strong>tylko plan</strong> zainicjowany z CLI na obszarze roboczym połączonym z VCS. Zastosowanie nie jest dostępne dla kodu przesłanego z CLI — zastosować można tylko kod zarządzany przez VCS.",
+      "moduleOverridesPrefix": "Ten przebieg używa <strong>nadpisań modułów</strong>",
+      "moduleOverridesFromPr": "z PR #{number}",
+      "moduleOverridesSuffix": "zostanie pobrany z gałęzi PR zamiast z opublikowanej wersji rejestru."
+    },
+    "cards": {
+      "changes": "Zmiany",
+      "aiAnalysis": "Analiza AI",
+      "policyChecks": "Sprawdzenia zasad",
+      "resources": "Zasoby"
+    },
+    "changes": {
+      "noChanges": "Brak zmian",
+      "planning": "Planowanie…",
+      "toAdd": "do dodania",
+      "toChange": "do zmiany",
+      "toDestroy": "do zniszczenia",
+      "toReplace": "do zastąpienia",
+      "toImport": "do zaimportowania"
+    },
+    "ai": {
+      "notAvailable": "Niedostępne",
+      "ready": "Gotowe",
+      "riskSub": "ryzyko {risk}",
+      "generating": "Generowanie…",
+      "skipped": "Pominięto",
+      "failed": "Nie powiodło się",
+      "available": "Dostępne"
+    },
+    "policy": {
+      "none": "Brak",
+      "blocked": "Zablokowane",
+      "failedSub": "{count, plural, one {# niepowodzenie} few {# niepowodzenia} many {# niepowodzeń} other {# niepowodzenia}}",
+      "advisoryIssues": "Problemy doradcze",
+      "passedSub": "{passed}/{total} zaliczonych",
+      "passed": "Zaliczone"
+    },
+    "resources": {
+      "overLimit": "Powyżej limitu",
+      "oomKilled": "Zabity przez OOM",
+      "recorded": "Zarejestrowane",
+      "nearLimit": "Blisko limitu",
+      "high": "Wysokie",
+      "withinLimits": "W granicach limitów"
+    },
+    "details": {
+      "heading": "Szczegóły",
+      "executionBackend": "Backend wykonania",
+      "source": "Źródło",
+      "autoApply": "Automatyczne zastosowanie",
+      "planOnly": "Tylko plan",
+      "triggeredBy": "Wyzwolone przez",
+      "created": "Utworzono",
+      "commit": "Commit",
+      "branch": "Gałąź",
+      "prMr": "PR/MR",
+      "stateVersion": "Wersja stanu",
+      "viewState": "Wyświetl stan",
+      "runOptions": "Opcje przebiegu"
+    },
+    "timeline": {
+      "heading": "Oś czasu",
+      "queued": "W kolejce",
+      "planningStarted": "Rozpoczęto planowanie",
+      "planComplete": "Plan ukończony",
+      "confirmed": "Potwierdzone",
+      "applyingStarted": "Rozpoczęto zastosowywanie",
+      "applied": "Zastosowane",
+      "errored": "Błąd",
+      "canceled": "Anulowane",
+      "discarded": "Odrzucone"
+    },
+    "log": {
+      "color": "Kolor",
+      "colorOnTitle": "Wyświetlanie kolorów ANSI — kliknij, aby przełączyć na zwykły tekst",
+      "colorOffTitle": "Wyświetlanie zwykłego tekstu — kliknij, aby przełączyć na kolory",
+      "refresh": "Odśwież",
+      "refreshTitle": "Odśwież dziennik",
+      "copy": "Kopiuj",
+      "copied": "Skopiowano!",
+      "copyTitle": "Kopiuj zwykły tekst do schowka",
+      "copyAria": "Kopiuj dziennik do schowka",
+      "download": "Pobierz",
+      "downloadColorTitle": "Pobierz dziennik (z kodami kolorów ANSI)",
+      "downloadPlainTitle": "Pobierz dziennik (zwykły tekst)",
+      "downloadAria": "Pobierz dziennik",
+      "follow": "Śledź",
+      "followOnTitle": "Śledzenie bieżącego końca dziennika — kliknij, aby zatrzymać",
+      "followOffTitle": "Śledź bieżący koniec dziennika",
+      "end": "Koniec",
+      "endTitle": "Przejdź na koniec dziennika",
+      "planEmpty": "Brak dostępnego wyjścia planu.",
+      "applyEmpty": "Brak dostępnego wyjścia zastosowania."
+    },
+    "policyPanel": {
+      "heading": "Sprawdzenia zasad",
+      "passedCount": "{passed}/{total} zaliczonych",
+      "blockedMessage": "Ten przebieg jest <strong>zablokowany przez obowiązkowy zestaw zasad</strong>. Nie zostanie zastosowany, dopóki niepowodzenie nie zostanie rozwiązane lub administrator go nie nadpisze.",
+      "overriding": "Nadpisywanie...",
+      "overrideContinue": "Nadpisz i kontynuuj",
+      "overrideFailed": "Nadpisanie nie powiodło się",
+      "overrideFailedStatus": "Nadpisanie nie powiodło się ({status})",
+      "overriddenBy": "nadpisane przez {by}",
+      "policyPassed": "zaliczone",
+      "noDenyMessage": "Zasada nie powiodła się bez wygenerowania komunikatu odmowy lub wyjścia błędu",
+      "enforcement": {
+        "mandatory": "obowiązkowe",
+        "advisory": "doradcze"
+      },
+      "outcome": {
+        "passed": "zaliczone",
+        "failed": "niepowodzenie",
+        "errored": "błąd"
+      }
+    }
+  },
+  "workspaceDetail": {
+    "notFound": "Nie znaleziono obszaru roboczego",
+    "common": {
+      "enabled": "Włączone",
+      "disabled": "Wyłączone",
+      "none": "Brak",
+      "default": "Domyślne",
+      "never": "Nigdy",
+      "actions": "Akcje",
+      "workspaceLocked": "Obszar roboczy jest zablokowany"
+    },
+    "actions": {
+      "edit": "Edytuj",
+      "cancel": "Anuluj",
+      "save": "Zapisz",
+      "saving": "Zapisywanie…",
+      "savingEllipsis": "Zapisywanie...",
+      "delete": "Usuń",
+      "deleting": "Usuwanie...",
+      "add": "Dodaj",
+      "adding": "Dodawanie...",
+      "remove": "Usuń",
+      "download": "Pobierz",
+      "rollback": "Wycofaj",
+      "close": "Zamknij",
+      "hide": "Ukryj",
+      "enable": "Włącz",
+      "disable": "Wyłącz",
+      "creating": "Tworzenie...",
+      "sending": "Wysyłanie...",
+      "processing": "Przetwarzanie...",
+      "queuing": "Kolejkowanie...",
+      "loading": "Wczytywanie...",
+      "loadingLower": "wczytywanie…"
+    },
+    "header": {
+      "executionMode": "Tryb wykonania: {mode}"
+    },
+    "tabs": {
+      "overview": "Przegląd",
+      "variables": "Zmienne",
+      "runs": "Przebiegi",
+      "state": "Stan",
+      "stateGraph": "Graf stanu",
+      "configurations": "Konfiguracje",
+      "notifications": "Powiadomienia",
+      "runTasks": "Zadania przebiegu",
+      "runTriggers": "Wyzwalacze przebiegów",
+      "sharing": "Udostępnianie",
+      "selectLabel": "Sekcja obszaru roboczego"
+    },
+    "lifecycle": {
+      "pendingDeletion": "Oczekuje na usunięcie",
+      "pendingDeletionDefault": "Ten obszar roboczy jest oznaczony do usunięcia i wymaga ręcznej akcji.",
+      "archived": "Zarchiwizowany",
+      "archivedDefault": "Ten obszar roboczy został zarchiwizowany."
+    },
+    "runQueuedBanner": {
+      "message": "Przebieg pomyślnie umieszczony w kolejce.",
+      "viewRun": "Wyświetl przebieg"
+    },
+    "settings": {
+      "title": "Ustawienia",
+      "saveChanges": "Zapisz zmiany",
+      "renamedNotice": "Zmieniono nazwę obszaru roboczego. Zaktualizuj pole <name></name> w bloku <cloud></cloud>, aby pasowało."
+    },
+    "fields": {
+      "name": "Nazwa",
+      "nameTitle": "Litery, cyfry, myślniki, podkreślenia. Musi zaczynać się od litery lub cyfry.",
+      "executionMode": "Tryb wykonania",
+      "execModeLocal": "Lokalny",
+      "execModeAgent": "Agent",
+      "autoApply": "Automatyczne zastosowanie",
+      "cpuRequest": "Żądanie CPU",
+      "cpuRequestTitle": "Ilość CPU w Kubernetes: pełne rdzenie (1, 2) lub milirdzenie (500m, 100m)",
+      "memoryRequest": "Żądanie pamięci",
+      "memoryRequestTitle": "Ilość pamięci w Kubernetes: bajty (1000) lub z przyrostkiem (512Mi, 2Gi, 1Ti)",
+      "executionBackend": "Backend wykonania",
+      "version": "Wersja",
+      "versionPlaceholder": "np. 1.11 lub 1.11.5",
+      "versionTitle": "Wersja w formacie X.Y lub X.Y.Z (np. 1.11 lub 1.11.5)",
+      "terragruntEnabledAgent": "Włączone (tryb agenta)",
+      "terragruntEnabledVersion": "Włączone (v{version})",
+      "terragruntVersionPlaceholder": "np. 1.0",
+      "terragruntVersionTitle": "Wersja Terragrunt w formacie X.Y lub X.Y.Z (np. 1.0)",
+      "workingDirectory": "Katalog roboczy",
+      "workingDirectoryPlaceholder": "np. environments/dev",
+      "agentPool": "Pula agentów",
+      "owner": "Właściciel",
+      "vcsConnection": "Połączenie VCS",
+      "vcsRepository": "Repozytorium VCS",
+      "vcsRepositoryTitle": "Musi być adresem URL HTTP lub HTTPS",
+      "vcsBranch": "Gałąź VCS",
+      "vcsBranchPlaceholder": "main (domyślnie)",
+      "vcsWorkflow": "Przepływ pracy VCS",
+      "vcsWorkflowMergeThenApply": "merge_then_apply (domyślny — standard TFE / HCP)",
+      "vcsWorkflowApplyThenMerge": "apply_then_merge (standard Atlantis — opcjonalny)",
+      "autoMerge": "Automatyczne scalanie po zastosowaniu",
+      "autoMergeStrategy": "Strategia automatycznego scalania",
+      "vcsPolling": "Odpytywanie VCS",
+      "labels": "Etykiety (tagi)",
+      "labelsTitle": "Etykiety obszaru roboczego pełnią podwójną rolę: dopasowanie RBAC opartego na etykietach oraz jako \"tagi\" dopasowywane przez bloki terraform/tofu cloud '{' workspaces '{' tags = ... '}' '}'.",
+      "varFiles": "Pliki zmiennych",
+      "varFilesPlaceholder": "np. envs/dev.tfvars",
+      "triggerPrefixes": "Prefiksy wyzwalające",
+      "triggerPrefixesHint": "Katalogi wyzwalające przebiegi. Gdy ustawione, nadpisują filtrowanie po katalogu roboczym.",
+      "triggerPrefixesPlaceholder": "np. modules",
+      "triggerPrefixesNone": "Brak (używa katalogu roboczego)",
+      "driftIgnoreRules": "Reguły ignorowania dryfu",
+      "driftIgnoreRulesHint": "Ścieżki adresów Terraform + atrybutów obsługujące globy, tłumione przez klasyfikator dryfu. <star></star> dopasowuje zero lub więcej znaków innych niż <dot></dot> (obejmuje <n></n> indeksów); <starIdx></starIdx> dopasowuje dowolny indeks w nawiasach. Sam adres bez przyrostka atrybutu wycisza każdą zmianę tego zasobu — w tym niszczenie. Wpływa tylko na dryf, nie na zwykły plan/apply. Pełną gramatykę zobacz w <docs>drift-ignore-rules.md</docs>.",
+      "driftIgnoreRulesNone": "Brak (każda różnica planu liczy się jako dryf)"
+    },
+    "vcsWorkflowWarning": {
+      "title": "Autoryzacja delegowana do Twojego repozytorium VCS.",
+      "rbac": "Każdy, kto może scalić PR, może zastosować. Bramką stają się reguły ochrony gałęzi (wymagane przeglądy, sprawdzenia statusu, zatwierdzenie właściciela kodu). RBAC ról/etykiet Terrapod<em>nie</em> stosuje się do akcji sterowanych komentarzami w tym trybie.",
+      "recommended": "<strong>Zalecane:</strong> wymagaj liniowej historii (rebase/squash przed scaleniem), aby commit, który stosujesz, był commitem, który trafia do gałęzi.",
+      "credit": "Uznanie: ten przepływ pracy jest wzorowany na <atlantis>Atlantis</atlantis>. Atlantis pozostaje właściwym narzędziem dla zespołów, które chcą wyłącznie zastosowań sterowanych komentarzami w PR i nie potrzebują UI platformy."
+    },
+    "vcsPolling": {
+      "error": "Błąd",
+      "ok": "OK ({time})",
+      "notPolled": "Jeszcze nie odpytano"
+    },
+    "lockout": {
+      "revertLabels": "Przywróć etykiety",
+      "saveAnyway": "Zapisz mimo to"
+    },
+    "lock": {
+      "title": "Status blokady",
+      "lockedDesc": "Ten obszar roboczy jest zablokowany. Nie można uruchamiać planów ani zastosowań.",
+      "unlockedDesc": "Ten obszar roboczy jest odblokowany i gotowy do przebiegów.",
+      "lock": "Zablokuj",
+      "unlock": "Odblokuj",
+      "lockConfirm": "Zablokować ten obszar roboczy?",
+      "unlockConfirm": "Odblokować ten obszar roboczy?"
+    },
+    "drift": {
+      "title": "Wykrywanie dryfu",
+      "checkInterval": "Interwał sprawdzania",
+      "status": "Status",
+      "statusNoDrift": "Brak dryfu",
+      "statusDrifted": "Dryf",
+      "statusErrored": "Błąd",
+      "statusUnchecked": "Niesprawdzone",
+      "dismiss": "Odrzuć",
+      "dismissing": "Odrzucanie…",
+      "dismissTitle": "Wyczyść zgłoszony stan dryfu. Następne zaplanowane sprawdzenie ponownie wypełni go na podstawie rzeczywistości.",
+      "lastChecked": "Ostatnio sprawdzono",
+      "checkNow": "Sprawdź teraz",
+      "checkNowTitle": "Umieść w kolejce przebieg tylko planujący, aby sprawdzić dryf",
+      "checkNowTitleDisabled": "Najpierw włącz wykrywanie dryfu"
+    },
+    "intervals": {
+      "disabled": "Wyłączone",
+      "1hour": "1 godzina",
+      "4hours": "4 godziny",
+      "12hours": "12 godzin",
+      "24hours": "24 godziny",
+      "48hours": "48 godzin",
+      "3days": "3 dni",
+      "7days": "7 dni"
+    },
+    "planExpiry": {
+      "title": "Wygaśnięcie planu",
+      "description": "Automatycznie odrzuca niepotwierdzony plan, gdy stanie się starszy niż ta wartość, aby nieaktualny plan nie mógł zostać zastosowany przeciwko zmienionemu światu. Domyślnie wyłączone; plan musi wtedy zostać uruchomiony ponownie. (Dotyczy tylko przebiegów zdolnych do zastosowania.)",
+      "expireAfter": "Wygaśnij po"
+    },
+    "aiSummary": {
+      "title": "Podsumowanie planu AI",
+      "description": "Automatyczne, wygenerowane przez LLM podsumowanie zmian, ocena ryzyka i analiza niepowodzeń dla każdego wyniku fazy planowania tego obszaru roboczego.",
+      "mode": "Tryb",
+      "modeDefault": "Zgodnie z domyślnym ustawieniem wdrożenia",
+      "modeEnabled": "Zawsze podsumowuj",
+      "modeDisabled": "Nigdy nie podsumowuj",
+      "contextLabel": "Kontekst obszaru roboczego",
+      "contextLabelSuffix": "(opcjonalny, dodatkowy)",
+      "contextPlaceholder": "Fakty, które AI powinno znać konkretnie o tym obszarze roboczym. np. 'Obsługuje magazyn sekretów dla usługi X — zniszczenie klucza KMS powoduje globalną awarię.'",
+      "noContext": "Nie ustawiono kontekstu obszaru roboczego.",
+      "contextHint": "Dodawany ponad kontekstem obejmującym całe wdrożenie. Maks. 4000 znaków."
+    },
+    "slack": {
+      "title": "Powiadomienia Slack",
+      "description": "Włącz dla tego obszaru roboczego powiadomienia Slack o przebiegach — prośby o zatwierdzenie, zastosowania, błędy i dryf. Pozostaw kanał pusty, a ten obszar roboczy pozostanie cichy (nie ma rozgłaszania obejmującego całe wdrożenie). Wymaga włączenia aplikacji Slack przez administratora.",
+      "channel": "Kanał",
+      "channelPlaceholder": "#deploys lub identyfikator kanału (np. C0123ABCD)",
+      "notSet": "Nie ustawiono — cichy.",
+      "hint": "Aplikacja Slack musi już być członkiem kanału."
+    },
+    "delete": {
+      "title": "Usuń obszar roboczy",
+      "description": "Trwale usuń ten obszar roboczy i cały powiązany stan, zmienne i przebiegi.",
+      "confirm": "Potwierdź usunięcie"
+    },
+    "variables": {
+      "addVariable": "Dodaj zmienną",
+      "key": "Klucz",
+      "value": "Wartość",
+      "category": "Kategoria",
+      "categoryEnv": "Środowisko",
+      "sensitive": "Wrażliwe",
+      "empty": "Brak zmiennych skonfigurowanych dla tego obszaru roboczego.",
+      "emptyValue": "puste",
+      "enterNewValue": "Wprowadź nową wartość",
+      "deleteConfirm": "Usunąć zmienną \"{key}\"?"
+    },
+    "runs": {
+      "options": "Opcje",
+      "hideOptions": "Ukryj opcje",
+      "queueDestroy": "Umieść niszczenie w kolejce",
+      "queueDestroyTitle": "Umieść w kolejce plan niszczenia",
+      "destroyAllConfirm": "Zniszczyć wszystkie zasoby?",
+      "confirmDestroy": "Potwierdź niszczenie",
+      "queuePlan": "Umieść plan w kolejce",
+      "queueRun": "Umieść przebieg w kolejce",
+      "queuePlanConfirm": "Umieścić w kolejce plan spekulatywny dla tego obszaru roboczego?",
+      "queueApplyConfirm": "Umieścić w kolejce przebieg plan + apply? Może to zmienić infrastrukturę.",
+      "planOptions": "Opcje planu",
+      "targetResources": "Docelowe zasoby",
+      "replaceResources": "Zastąp zasoby",
+      "commaSeparated": "(oddzielone przecinkami)",
+      "planOnly": "Tylko plan",
+      "refreshOnly": "Tylko odświeżenie",
+      "skipRefresh": "Pomiń odświeżenie",
+      "allowEmptyApply": "Zezwól na puste zastosowanie",
+      "vcsRef": "Referencja VCS",
+      "branch": "Gałąź",
+      "tag": "Tag",
+      "defaultBranch": "Domyślna ({branch})",
+      "nonDefaultRefNote": "Wybrano niedomyślną referencję — przebieg będzie tylko planujący",
+      "empty": "Brak przebiegów dla tego obszaru roboczego.",
+      "runId": "Identyfikator przebiegu",
+      "status": "Status",
+      "type": "Typ",
+      "changes": "Zmiany",
+      "source": "Źródło",
+      "triggeredBy": "Wyzwolone przez",
+      "created": "Utworzono",
+      "needsConfirm": "wymaga potwierdzenia",
+      "typeDestroy": "niszczenie",
+      "typePlanOnly": "tylko plan",
+      "typePlanApply": "plan + apply",
+      "sourceModuleTest": "test modułu",
+      "sourceModulePublish": "publikacja modułu"
+    },
+    "state": {
+      "deleteConfirm": "Usunąć wersję stanu #{serial}? Tej operacji nie można cofnąć.",
+      "rollbackConfirm": "Wycofać do wersji stanu #{serial}? Zostanie utworzona nowa wersja o tej samej zawartości.",
+      "confirmDelete": "Potwierdź usunięcie",
+      "confirmRollback": "Potwierdź wycofanie",
+      "uploadState": "Prześlij stan",
+      "empty": "Brak wersji stanu dla tego obszaru roboczego.",
+      "serial": "Numer seryjny",
+      "createdBy": "Utworzone przez",
+      "run": "Przebieg",
+      "size": "Rozmiar",
+      "created": "Utworzono",
+      "runner": "runner",
+      "latest": "najnowsza"
+    },
+    "configurations": {
+      "description": "Przesłane archiwa źródłowe dla tego obszaru roboczego, najnowsze na górze. Wybierz dwa wiersze, aby porównać.",
+      "selectedCount": "{count}/2 wybrano",
+      "compare": "Porównaj",
+      "comparing": "Porównywanie…",
+      "empty": "Brak wersji konfiguracji. Pojawią się tutaj, gdy tylko `terraform plan` prześle dane lub wypchnięcie do VCS wyzwoli przebieg.",
+      "id": "Identyfikator",
+      "source": "Źródło",
+      "status": "Status",
+      "created": "Utworzono",
+      "current": "bieżąca",
+      "selectForCompare": "Wybierz {id} do porównania",
+      "compareLabel": "Porównaj",
+      "diff": "Różnica",
+      "filesChanged": "{count} zmienionych plików",
+      "oversized": "Pominięto {count, plural, one {# zbyt duży plik} few {# zbyt duże pliki} many {# zbyt dużych plików} other {# zbyt dużego pliku}}: {files}",
+      "noDiff": "Brak różnic w zawartości między tymi wersjami.",
+      "binaryChanged": "Plik binarny uległ zmianie — różnica nie została wyrenderowana.",
+      "diffType": {
+        "added": "dodany",
+        "removed": "usunięty",
+        "modified": "zmodyfikowany",
+        "binary-changed": "binarny"
+      }
+    },
+    "notifications": {
+      "addNotification": "Dodaj powiadomienie",
+      "name": "Nazwa",
+      "namePlaceholder": "Powiadomienia o wdrożeniach",
+      "destinationType": "Typ miejsca docelowego",
+      "typeGeneric": "Generyczny webhook",
+      "typeEmail": "E-mail",
+      "url": "URL",
+      "hmacToken": "Token HMAC (opcjonalny)",
+      "signingSecret": "Sekret podpisujący",
+      "emailAddresses": "Adresy e-mail (oddzielone przecinkami)",
+      "triggerEvents": "Zdarzenia wyzwalające",
+      "createNotification": "Utwórz powiadomienie",
+      "empty": "Brak konfiguracji powiadomień dla tego obszaru roboczego.",
+      "ok": "OK",
+      "err": "Błąd {status}",
+      "fail": "NIEPOWODZENIE",
+      "http": "HTTP {status}",
+      "verify": "Zweryfikuj",
+      "history": "Historia",
+      "deliveryHistory": "Historia dostarczeń",
+      "enableConfirm": "Włączyć to powiadomienie?",
+      "disableConfirm": "Wyłączyć to powiadomienie?",
+      "deleteConfirm": "Usunąć powiadomienie \"{name}\"?"
+    },
+    "runTasks": {
+      "addRunTask": "Dodaj zadanie przebiegu",
+      "name": "Nazwa",
+      "namePlaceholder": "Sprawdzenie zasad OPA",
+      "webhookUrl": "URL webhooka",
+      "stage": "Etap",
+      "enforcementLevel": "Poziom egzekwowania",
+      "hmacKey": "Klucz HMAC (opcjonalny)",
+      "hmacKeyPlaceholder": "Sekret podpisujący do weryfikacji webhooka",
+      "createRunTask": "Utwórz zadanie przebiegu",
+      "empty": "Brak zadań przebiegu skonfigurowanych dla tego obszaru roboczego.",
+      "enableConfirm": "Włączyć to zadanie przebiegu?",
+      "disableConfirm": "Wyłączyć to zadanie przebiegu?",
+      "deleteConfirm": "Usunąć zadanie przebiegu \"{name}\"?"
+    },
+    "runTriggers": {
+      "title": "Wyzwalacze przebiegów",
+      "description": "Gdy źródłowy obszar roboczy ukończy zastosowanie, powiązane obszary robocze poniżej otrzymują automatycznie nowy przebieg w kolejce. Do 20 źródłowych obszarów roboczych na każdy docelowy.",
+      "inboundHeading": "Źródłowe obszary robocze, które wyzwalają tutaj przebiegi",
+      "inboundEmpty": "Żaden źródłowy obszar roboczy nie wyzwala przebiegów w tym obszarze roboczym.",
+      "pickerPlaceholder": "Wyszukaj obszary robocze do dodania jako źródło…",
+      "outboundHeading": "Docelowe obszary robocze wyzwalane przez ten obszar roboczy",
+      "outboundEmpty": "Ten obszar roboczy nie wyzwala przebiegów w żadnym innym obszarze roboczym.",
+      "destinationNote": "(cel; usuń stamtąd)",
+      "removeConfirm": "Usunąć ten wyzwalacz przebiegu?"
+    },
+    "sharing": {
+      "title": "Udostępnianie zdalnego stanu",
+      "description": "Kontrolowana przez producenta lista dozwolonych do międzyobszarowego <code></code>. Dane stanu zawierają sekrety — nadawaj rozważnie. <docs>Dokumentacja</docs>",
+      "outboundHeading": "Obszary robocze autoryzowane do odczytu stanu tego obszaru roboczego",
+      "outboundEmpty": "Stan tego obszaru roboczego nie jest udostępniany żadnemu innemu obszarowi roboczemu.",
+      "grantedBy": "nadane przez {by}",
+      "revoke": "Cofnij",
+      "revokeConfirm": "Usunąć to udostępnianie zdalnego stanu? Konsument utraci dostęp do tego stanu.",
+      "pickerPlaceholder": "Wyszukaj obszary robocze do autoryzacji jako konsument…",
+      "inboundHeading": "Obszary robocze, z których ten obszar roboczy jest autoryzowany do odczytu stanu",
+      "inboundEmpty": "Ten obszar roboczy nie jest autoryzowany do odczytu stanu z żadnego innego obszaru roboczego za pośrednictwem terraform_remote_state.",
+      "producerNote": "(producent; cofnij stamtąd)"
+    },
+    "runMessages": {
+      "manualDriftCheck": "Ręczne sprawdzenie dryfu z UI",
+      "queued": "W kolejce z UI",
+      "queuedSpeculative": "W kolejce z UI (spekulatywny)",
+      "destroyQueued": "Niszczenie w kolejce z UI"
+    },
+    "errors": {
+      "loadWorkspace": "Nie udało się wczytać obszaru roboczego",
+      "loadRuns": "Nie udało się wczytać przebiegów",
+      "loadVariables": "Nie udało się wczytać zmiennych",
+      "loadStateVersions": "Nie udało się wczytać wersji stanu",
+      "loadConfigurations": "Nie udało się wczytać wersji konfiguracji",
+      "loadNotifications": "Nie udało się wczytać powiadomień",
+      "loadOutboundConsumers": "Nie udało się wczytać wychodzących konsumentów zdalnego stanu",
+      "loadInboundConsumers": "Nie udało się wczytać przychodzących konsumentów zdalnego stanu",
+      "loadConsumers": "Nie udało się wczytać konsumentów zdalnego stanu",
+      "loadInboundTriggers": "Nie udało się wczytać przychodzących wyzwalaczy przebiegów",
+      "loadOutboundTriggers": "Nie udało się wczytać wychodzących wyzwalaczy przebiegów",
+      "loadTriggers": "Nie udało się wczytać wyzwalaczy przebiegów",
+      "loadRunTasks": "Nie udało się wczytać zadań przebiegu",
+      "downloadStateFile": "Nie udało się pobrać pliku stanu",
+      "downloadFailed": "Pobieranie nie powiodło się",
+      "downloadFailedStatus": "Pobieranie nie powiodło się ({status})",
+      "downloadTicketMissingUrl": "Odpowiedź biletu pobierania nie zawiera adresu URL",
+      "diffFailed": "Porównanie nie powiodło się",
+      "diffFailedStatus": "Porównanie nie powiodło się ({status})",
+      "authorizeConsumer": "Nie udało się autoryzować konsumenta",
+      "revoke": "Nie udało się cofnąć",
+      "revokeConsumer": "Nie udało się cofnąć konsumenta",
+      "addTrigger": "Nie udało się dodać wyzwalacza przebiegu",
+      "removeTrigger": "Nie udało się usunąć wyzwalacza przebiegu",
+      "createRunTask": "Nie udało się utworzyć zadania przebiegu",
+      "createRunTaskStatus": "Nie udało się utworzyć zadania przebiegu ({status})",
+      "update": "Nie udało się zaktualizować",
+      "toggleRunTask": "Nie udało się przełączyć zadania przebiegu",
+      "delete": "Nie udało się usunąć",
+      "deleteRunTask": "Nie udało się usunąć zadania przebiegu",
+      "labelLockout": "Ta zmiana etykiety ograniczyłaby Twój dostęp.",
+      "updateWorkspace": "Nie udało się zaktualizować obszaru roboczego",
+      "lockWorkspace": "Nie udało się zablokować obszaru roboczego",
+      "unlockWorkspace": "Nie udało się odblokować obszaru roboczego",
+      "updateAiSummary": "Nie udało się zaktualizować ustawień podsumowania AI",
+      "updateSlackChannel": "Nie udało się zaktualizować kanału Slack",
+      "updateDriftSettings": "Nie udało się zaktualizować ustawień dryfu",
+      "updateDriftInterval": "Nie udało się zaktualizować interwału dryfu",
+      "updatePlanExpiry": "Nie udało się zaktualizować wygaśnięcia planu",
+      "queueDriftCheck": "Nie udało się umieścić w kolejce sprawdzenia dryfu",
+      "queueDriftCheckStatus": "Nie udało się umieścić w kolejce sprawdzenia dryfu ({status})",
+      "dismissDrift": "Nie udało się odrzucić dryfu",
+      "dismissDriftStatus": "Nie udało się odrzucić dryfu ({status})",
+      "deleteWorkspace": "Nie udało się usunąć obszaru roboczego",
+      "addVariable": "Nie udało się dodać zmiennej",
+      "addVariableStatus": "Nie udało się dodać zmiennej ({status})",
+      "deleteVariable": "Nie udało się usunąć zmiennej",
+      "updateVariable": "Nie udało się zaktualizować zmiennej",
+      "queuePlan": "Nie udało się umieścić planu w kolejce",
+      "queuePlanStatus": "Nie udało się umieścić planu w kolejce ({status})",
+      "queueDestroy": "Nie udało się umieścić niszczenia w kolejce",
+      "queueDestroyStatus": "Nie udało się umieścić niszczenia w kolejce ({status})",
+      "createNotification": "Nie udało się utworzyć powiadomienia",
+      "createNotificationStatus": "Nie udało się utworzyć powiadomienia ({status})",
+      "toggleNotification": "Nie udało się przełączyć powiadomienia",
+      "deleteNotification": "Nie udało się usunąć powiadomienia",
+      "verificationFailed": "Weryfikacja nie powiodła się",
+      "verificationDeliveryFailed": "Dostarczenie weryfikacji nie powiodło się: {detail}",
+      "unknownError": "Nieznany błąd",
+      "failed": "Nie powiodło się",
+      "deleteStateVersion": "Nie udało się usunąć wersji stanu",
+      "rollbackStateVersion": "Nie udało się wycofać wersji stanu",
+      "stateActionFailed": "Akcja stanu nie powiodła się",
+      "uploadState": "Nie udało się przesłać stanu",
+      "uploadStateFile": "Nie udało się przesłać pliku stanu"
+    }
+  },
+  "graphs": {
+    "stateTab": {
+      "loadError": "Nie udało się wczytać grafu stanu.",
+      "emptyState": "Brak stanu — uruchom plan i zastosowanie lub prześlij stan, a wtedy ten graf się zapełni.",
+      "stateVersionLabel": "Wersja stanu",
+      "currentSuffix": "(bieżąca)",
+      "colorByLabel": "Koloruj według",
+      "viewGraph": "Graf",
+      "viewTable": "Tabela",
+      "resourceCount": "{count, plural, one {# zasób} few {# zasoby} many {# zasobów} other {# zasobu}}",
+      "dependencyCount": "{count, plural, one {# zależność} few {# zależności} many {# zależności} other {# zależności}}",
+      "truncated": "Wyświetlanie pierwszych {shown} z {total} zasobów — graf jest ograniczony dla czytelności.",
+      "colResource": "Zasób",
+      "colType": "Typ",
+      "colMode": "Tryb",
+      "colModule": "Moduł",
+      "colDependedOnBy": "Zależne od tego",
+      "rootModule": "(główny)"
+    },
+    "impact": {
+      "notAvailable": "Graf wpływu nie jest dostępny dla tego przebiegu.",
+      "title": "Graf wpływu",
+      "subtitle": "plan {count, plural, one {# zasobu} few {# zasobów} many {# zasobów} other {# zasobu}}",
+      "hint": "Każda kula to zasób; każda strzałka wskazuje na to, od czego zależy. Kliknij węzeł → jego przechodni <b>wpływ</b> (wszystko poniżej) się rozświetli.",
+      "downstreamAffected": "dotknięte poniżej",
+      "action": {
+        "create": "utwórz",
+        "update": "zaktualizuj",
+        "replace": "zastąp",
+        "destroy": "zniszcz",
+        "unchanged": "bez zmian"
+      }
+    },
+    "estate": {
+      "navHint": "Przeciągnij, aby obrócić · przewiń, aby przybliżyć · przeciągnij prawym, aby przesunąć · <em>kliknij węzeł, aby wokół niego orbitować</em>"
+    },
+    "state3d": {
+      "title": "Graf stanu",
+      "hint": "Każda kula to zasób; każda strzałka wskazuje na to, od czego zależy. Kliknij węzeł → zasoby, które przechodnio <b>od niego zależą</b>, się rozświetlą.",
+      "dataSource": "źródło danych",
+      "managed": "zarządzany",
+      "dependOnThis": "zależą od tego"
+    },
+    "resource3d": {
+      "resetView": "Zresetuj widok",
+      "clear": "Wyczyść",
+      "key": "Legenda",
+      "resources": "Zasoby",
+      "hideKey": "Ukryj legendę",
+      "hideResources": "Ukryj zasoby",
+      "resourcesCount": "Zasoby ({count})",
+      "filterPlaceholder": "Filtruj zasoby…",
+      "navHint": "Przeciągnij, aby obrócić · przewiń, aby przybliżyć · przeciągnij prawym, aby przesunąć · <em>kliknij zasób, aby wokół niego orbitować</em>"
+    }
+  },
+  "execHookDetail": {
+    "backLink": "Powrót do punktów zaczepienia wykonania",
+    "defaultDescription": "Punkt zaczepienia wykonania",
+    "notFound": "Nie znaleziono punktu zaczepienia wykonania",
+    "scriptEmpty": "(pusty)",
+    "tabs": {
+      "settings": "Ustawienia",
+      "workspaces": "Obszary robocze"
+    },
+    "common": {
+      "yes": "Tak",
+      "no": "Nie"
+    },
+    "actions": {
+      "edit": "Edytuj",
+      "cancel": "Anuluj",
+      "save": "Zapisz",
+      "saving": "Zapisywanie...",
+      "delete": "Usuń",
+      "deleting": "Usuwanie...",
+      "confirmDelete": "Potwierdź usunięcie",
+      "add": "Dodaj",
+      "adding": "Dodawanie...",
+      "remove": "Usuń"
+    },
+    "settings": {
+      "heading": "Ustawienia"
+    },
+    "fields": {
+      "name": "Nazwa",
+      "description": "Opis",
+      "hookPoint": "Punkt zaczepienia",
+      "priority": "Priorytet",
+      "enabled": "Włączony",
+      "script": "Skrypt (<code>/bin/sh -c</code>)"
+    },
+    "delete": {
+      "heading": "Usuń punkt zaczepienia wykonania",
+      "description": "Trwale usuń ten punkt zaczepienia i usuń go ze wszystkich obszarów roboczych."
+    },
+    "workspaces": {
+      "scopeNote": "Ten punkt zaczepienia uruchamia się tylko na obszarach roboczych powiązanych poniżej. Nie ma zasięgu globalnego.",
+      "associate": "Powiąż obszar roboczy",
+      "workspaceLabel": "Obszar roboczy",
+      "selectPlaceholder": "Wybierz obszar roboczy...",
+      "empty": "Brak obszarów roboczych powiązanych z tym punktem zaczepienia.",
+      "colWorkspace": "Obszar roboczy",
+      "colActions": "Akcje"
+    },
+    "confirm": {
+      "removeWorkspace": "Usunąć ten obszar roboczy z punktu zaczepienia? Punkt zaczepienia nie będzie się już dla niego uruchamiać."
+    },
+    "success": {
+      "updated": "Zaktualizowano punkt zaczepienia wykonania",
+      "workspaceAssociated": "Powiązano obszar roboczy",
+      "workspaceRemoved": "Usunięto obszar roboczy"
+    },
+    "errors": {
+      "load": "Nie udało się wczytać punktu zaczepienia wykonania",
+      "update": "Nie udało się zaktualizować punktu zaczepienia wykonania",
+      "delete": "Nie udało się usunąć punktu zaczepienia wykonania",
+      "addWorkspace": "Nie udało się dodać obszaru roboczego",
+      "removeWorkspace": "Nie udało się usunąć obszaru roboczego"
+    }
+  },
+  "policySetDetail": {
+    "backLink": "Zestawy zasad",
+    "notFound": "Nie znaleziono",
+    "unknown": "nieznane",
+    "subtitle": "Zestaw zasad OPA · utworzony przez {createdBy}",
+    "settings": {
+      "heading": "Ustawienia"
+    },
+    "fields": {
+      "description": "Opis",
+      "enforcement": "Egzekwowanie",
+      "enabled": "Włączone",
+      "globalScope": "Globalny (każdy obszar roboczy)"
+    },
+    "enforcement": {
+      "advisory": "Doradcze (ostrzeżenie)",
+      "mandatory": "Obowiązkowe (blokuj zastosowanie)"
+    },
+    "scope": {
+      "allowLabels": "Etykiety zezwalające (klucz: v1, v2)",
+      "allowLabelsPlaceholder": "env: prod, staging",
+      "allowNames": "Nazwy zezwalające (jedna na wiersz)",
+      "denyLabels": "Etykiety odmawiające (klucz: v1, v2)",
+      "denyNames": "Nazwy odmawiające (jedna na wiersz)"
+    },
+    "vcs": {
+      "heading": "Konfiguracja VCS",
+      "repoUrl": "Adres URL repozytorium",
+      "branch": "Gałąź",
+      "branchPlaceholder": "main (domyślnie)",
+      "policyPath": "Ścieżka zasad"
+    },
+    "vcsBanner": {
+      "syncedFrom": "Zasady zsynchronizowane z",
+      "at": "o",
+      "lastSynced": "Ostatnio zsynchronizowano {time}",
+      "commit": "(commit {sha})",
+      "syncError": "Błąd synchronizacji: {error}"
+    },
+    "policies": {
+      "heading": "Zasady ({count})",
+      "vcsManaged": "Zarządzane przez repozytorium — wprowadzaj zmiany przez PR",
+      "empty": "Brak zasad w tym zestawie."
+    },
+    "addPolicy": {
+      "namePlaceholder": "Nazwa zasady",
+      "descPlaceholder": "Opis (opcjonalny)",
+      "regoHint": "Rego v1. Musi deklarować <code>package terrapod</code> i wyrażać naruszenia za pomocą zbioru <code>deny</code>. Planem jest <code>input</code>; kontekstem Terrapod jest <code>data.terrapod_context</code>."
+    },
+    "actions": {
+      "saving": "Zapisywanie...",
+      "saveSettings": "Zapisz ustawienia",
+      "syncNow": "Synchronizuj teraz",
+      "cancel": "Anuluj",
+      "addPolicy": "Dodaj zasadę",
+      "deleteSet": "Usuń zestaw",
+      "validatingRego": "Walidacja Rego...",
+      "delete": "Usuń",
+      "savePolicy": "Zapisz zasadę"
+    },
+    "confirm": {
+      "deleteSet": "Usunąć ten zestaw zasad i wszystkie jego zasady? Zarejestrowane oceny przebiegów zostają zachowane.",
+      "deletePolicy": "Usunąć zasadę \"{name}\"?"
+    },
+    "errors": {
+      "load": "Nie udało się wczytać zestawu zasad",
+      "save": "Nie udało się zapisać zestawu zasad",
+      "saveStatus": "Nie udało się zapisać ({status})",
+      "delete": "Nie udało się usunąć zestawu zasad",
+      "deleteStatus": "Nie udało się usunąć ({status})",
+      "addPolicy": "Nie udało się dodać zasady",
+      "addPolicyStatus": "Nie udało się dodać zasady ({status})",
+      "savePolicy": "Nie udało się zapisać zasady",
+      "savePolicyStatus": "Nie udało się zapisać zasady ({status})",
+      "deletePolicy": "Nie udało się usunąć zasady",
+      "deletePolicyStatus": "Nie udało się usunąć ({status})"
+    }
+  },
+  "slackLink": {
+    "title": "Połącz Slack z Terrapod",
+    "loading": "Wczytywanie…",
+    "checking": "Sprawdzanie Twojego połączenia…",
+    "linking": "Łączenie Twojego konta Slack…",
+    "unknown": "nieznane",
+    "confirm": {
+      "prompt": "Połączyć to konto Slack z <em>Twoją</em> tożsamością Terrapod? Każda przyszła akcja Slack (zatwierdzenie/odrzucenie) będzie wykonywana jako ten użytkownik Terrapod z jego uprawnieniami.",
+      "slackUser": "Użytkownik Slack",
+      "slackTeam": "Zespół Slack",
+      "terrapodAccount": "Konto Terrapod",
+      "warning": "Kontynuuj tylko, jeśli samodzielnie rozpocząłeś to łączenie ze Slack. Jeśli tego nie zrobiłeś, zamknij tę kartę i nie łącz — powiąże to konto Slack powyżej z <em>Twoją</em> tożsamością Terrapod.",
+      "button": "Potwierdź i połącz"
+    },
+    "success": {
+      "message": "Twoje konto Slack jest teraz połączone z Terrapod.",
+      "linkedAs": "Połączono jako <em>{email}</em>. Możesz zamknąć tę kartę i wrócić do Slack."
+    },
+    "errors": {
+      "missingLink": "Brakujące lub nieprawidłowe połączenie. Zacznij ponownie poleceniem łączenia Terrapod w Slack.",
+      "invalidLink": "To połączenie jest nieprawidłowe, wygasłe lub już użyte. Rozpocznij łączenie ponownie ze Slack.",
+      "linkingFailed": "Łączenie nie powiodło się."
+    }
+  },
+  "cliComplete": {
+    "loading": "Wczytywanie...",
+    "completing": "Kończenie uwierzytelniania...",
+    "invalid": {
+      "title": "Nieprawidłowe żądanie",
+      "description": "Brak wymaganych parametrów."
+    },
+    "success": {
+      "title": "Logowanie pomyślne",
+      "complete": "Token API utworzony. Możesz zamknąć tę kartę."
+    },
+    "fallback": {
+      "description": "Nie udało się automatycznie połączyć z CLI.",
+      "button": "Kliknij tutaj, aby dokończyć ręcznie"
+    },
+    "timeout": {
+      "description": "CLI mogło nie ukończyć wymiany tokenu. Sprawdź swój terminal."
+    }
+  },
+  "apiDocs": {
+    "view": "Widok:",
+    "redocTitle": "Dokumentacja API ReDoc"
+  }
+}
