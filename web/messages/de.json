@@ -5,7 +5,7 @@
     "registry": "Registry",
     "modules": "Module",
     "providers": "Anbieter",
-    "catalog": "Katalog",
+    "catalog": "Dienstleistungskatalog",
     "agentPools": "Agent-Pools",
     "admin": "Verwaltung",
     "users": "Benutzer",
@@ -17,7 +17,7 @@
     "executionHooks": "Ausführungs-Hooks",
     "policySets": "Richtliniensätze",
     "providerTemplates": "Anbietervorlagen",
-    "catalogAdmin": "Katalogverwaltung",
+    "catalogAdmin": "Dienstleistungskatalog-Verwaltung",
     "cache": "Zwischenspeicher",
     "auditLog": "Prüfprotokoll",
     "help": "Hilfe",
@@ -623,7 +623,7 @@
       "workspacePermission": "Arbeitsbereichs-Berechtigung",
       "poolPermission": "Pool-Berechtigung",
       "registryPermission": "Registry-Berechtigung",
-      "catalogPermission": "Katalog-Berechtigung",
+      "catalogPermission": "Dienstleistungskatalog-Berechtigung",
       "descriptionLabel": "Beschreibung",
       "descriptionPlaceholder": "Entwicklerzugriff",
       "allowLabels": "Zulassen-Beschriftungen (Schlüssel=Wert, kommagetrennt)",
@@ -663,7 +663,7 @@
         "run-trigger": "Ausführungsauslöser",
         "pool": "Agent-Pools",
         "registry": "Registry",
-        "catalog": "Servicekatalog"
+        "catalog": "Dienstleistungskatalog"
       }
     },
     "display": {
@@ -1147,14 +1147,14 @@
     }
   },
   "adminCatalog": {
-    "title": "Katalog-Verwaltung",
-    "description": "Servicekatalogeinträge verwalten",
-    "notEnabled": "Der Servicekatalog ist nicht aktiviert.",
-    "empty": "Noch keine Katalog-Einträge vorhanden.",
+    "title": "Dienstleistungskatalog-Verwaltung",
+    "description": "Dienstleistungskatalogeinträge verwalten",
+    "notEnabled": "Der Dienstleistungskatalog ist nicht aktiviert.",
+    "empty": "Noch keine Dienstleistungskatalog-Einträge vorhanden.",
     "actions": {
-      "new": "Neuer Katalog-Eintrag",
+      "new": "Neuer Dienstleistungskatalog-Eintrag",
       "cancel": "Abbrechen",
-      "create": "Katalog-Eintrag erstellen",
+      "create": "Dienstleistungskatalog-Eintrag erstellen",
       "creating": "Wird erstellt…",
       "saveChanges": "Änderungen speichern",
       "saving": "Wird gespeichert…",
@@ -1172,8 +1172,8 @@
       "versionPin": "Standard-Versionsfestlegung",
       "versionPinPlaceholder": "z. B. 1.2.0 (leer = neueste)",
       "descriptionLabel": "Beschreibung",
-      "descriptionPlaceholder": "Was dieser Katalog-Eintrag bereitstellt…",
-      "enabled": "Aktiviert (im Durchsuchen-Katalog sichtbar)",
+      "descriptionPlaceholder": "Was dieser Dienstleistungskatalog-Eintrag bereitstellt…",
+      "enabled": "Aktiviert (im Durchsuchen-Dienstleistungskatalog sichtbar)",
       "providerTemplates": "Anbietervorlagen",
       "noProviderTemplates": "Keine Anbietervorlagen definiert.",
       "restrictPools": "Auf bestimmte Agent-Pools beschränken",
@@ -1194,28 +1194,28 @@
       "disabled": "deaktiviert"
     },
     "confirm": {
-      "delete": "Diesen Katalog-Eintrag löschen? Bereits bereitgestellte Instanzen sind nicht betroffen."
+      "delete": "Diesen Dienstleistungskatalog-Eintrag löschen? Bereits bereitgestellte Instanzen sind nicht betroffen."
     },
     "success": {
-      "created": "Katalog-Eintrag „{name}“ erstellt",
-      "updated": "Katalog-Eintrag „{name}“ aktualisiert",
-      "deleted": "Katalog-Eintrag gelöscht"
+      "created": "Dienstleistungskatalog-Eintrag „{name}“ erstellt",
+      "updated": "Dienstleistungskatalog-Eintrag „{name}“ aktualisiert",
+      "deleted": "Dienstleistungskatalog-Eintrag gelöscht"
     },
     "errors": {
-      "load": "Katalog-Einträge konnten nicht geladen werden",
-      "save": "Katalog-Eintrag konnte nicht gespeichert werden",
-      "createStatus": "Katalog-Eintrag konnte nicht erstellt werden ({status})",
-      "updateStatus": "Katalog-Eintrag konnte nicht aktualisiert werden ({status})",
-      "delete": "Katalog-Eintrag konnte nicht gelöscht werden",
-      "deleteConflict": "Löschen nicht möglich: Für diesen Katalog-Eintrag bestehen bereitgestellte Instanzen.",
+      "load": "Dienstleistungskatalog-Einträge konnten nicht geladen werden",
+      "save": "Dienstleistungskatalog-Eintrag konnte nicht gespeichert werden",
+      "createStatus": "Dienstleistungskatalog-Eintrag konnte nicht erstellt werden ({status})",
+      "updateStatus": "Dienstleistungskatalog-Eintrag konnte nicht aktualisiert werden ({status})",
+      "delete": "Dienstleistungskatalog-Eintrag konnte nicht gelöscht werden",
+      "deleteConflict": "Löschen nicht möglich: Für diesen Dienstleistungskatalog-Eintrag bestehen bereitgestellte Instanzen.",
       "varOptsInvalidJson": "Variablen-Optionen müssen gültiges JSON (ein Array) sein.",
       "varOptsNotArray": "Variablen-Optionen müssen ein JSON-Array sein."
     }
   },
   "adminProviderTemplates": {
     "title": "Anbietervorlagen",
-    "description": "Wiederverwendbare Anbieter-Konfigurationsblöcke für Katalogeinträge",
-    "notEnabled": "Der Servicekatalog ist nicht aktiviert.",
+    "description": "Wiederverwendbare Anbieter-Konfigurationsblöcke für Dienstleistungskatalog-Einträge",
+    "notEnabled": "Der Dienstleistungskatalog ist nicht aktiviert.",
     "empty": "Noch keine Anbietervorlagen vorhanden.",
     "actions": {
       "new": "Neue Vorlage",
@@ -1242,7 +1242,7 @@
       "actions": "Aktionen"
     },
     "confirm": {
-      "delete": "Diese Anbietervorlage löschen? Katalogeinträge, die sie referenzieren, können nicht mehr bereitgestellt werden. Dies kann nicht rückgängig gemacht werden."
+      "delete": "Diese Anbietervorlage löschen? Dienstleistungskatalog-Einträge, die sie referenzieren, können nicht mehr bereitgestellt werden. Dies kann nicht rückgängig gemacht werden."
     },
     "success": {
       "created": "Anbietervorlage „{name}“ erstellt",
@@ -1255,7 +1255,7 @@
       "createStatus": "Vorlage konnte nicht erstellt werden ({status})",
       "updateStatus": "Vorlage konnte nicht aktualisiert werden ({status})",
       "delete": "Anbietervorlage konnte nicht gelöscht werden",
-      "deleteConflict": "Löschen nicht möglich: Diese Vorlage wird von einem Katalogeintrag referenziert.",
+      "deleteConflict": "Löschen nicht möglich: Diese Vorlage wird von einem Dienstleistungskatalog-Eintrag referenziert.",
       "paramsInvalidJson": "Parameter müssen gültiges JSON (ein Array) sein.",
       "paramsNotArray": "Parameter müssen ein JSON-Array sein."
     }
@@ -1499,23 +1499,23 @@
     }
   },
   "catalog": {
-    "title": "Servicekatalog",
+    "title": "Dienstleistungskatalog",
     "description": "Stellen Sie Selbstbedienungsinfrastruktur aus kuratierten Modulen bereit",
-    "notEnabled": "Der Servicekatalog ist nicht aktiviert.",
-    "empty": "Keine Katalogeinträge verfügbar.",
+    "notEnabled": "Der Dienstleistungskatalog ist nicht aktiviert.",
+    "empty": "Keine Dienstleistungskatalog-Einträge verfügbar.",
     "card": {
       "pinned": "angeheftet {version}",
       "latest": "aktuellste"
     },
     "errors": {
-      "loadItems": "Katalogeinträge konnten nicht geladen werden"
+      "loadItems": "Dienstleistungskatalog-Einträge konnten nicht geladen werden"
     }
   },
   "catalogDetail": {
-    "backLink": "← Katalog",
-    "backToCatalog": "Zurück zum Katalog",
-    "fallbackTitle": "Katalogeintrag",
-    "notFound": "Katalogeintrag nicht gefunden oder der Servicekatalog ist nicht aktiviert.",
+    "backLink": "← Dienstleistungskatalog",
+    "backToCatalog": "Zurück zum Dienstleistungskatalog",
+    "fallbackTitle": "Dienstleistungskatalog-Eintrag",
+    "notFound": "Dienstleistungskatalog-Eintrag nicht gefunden oder der Dienstleistungskatalog ist nicht aktiviert.",
     "common": {
       "cancel": "Abbrechen"
     },
@@ -1542,7 +1542,7 @@
       "agentPool": "Agent-Pool",
       "selectPool": "Einen Pool auswählen…",
       "noPoolsAvailable": "Ihnen stehen keine Agent-Pools zur Verfügung. Zum Bereitstellen benötigen Sie Schreibzugriff auf einen Agent-Pool – bitten Sie einen Administrator, ihn zu gewähren.",
-      "noPoolsAllowed": "Keiner der Agent-Pools, auf die Sie zugreifen können, ist für diesen Katalogeintrag zugelassen. Bitten Sie einen Administrator, die zugelassenen Pools des Eintrags zu erweitern oder Ihnen Zugriff auf einen davon zu gewähren.",
+      "noPoolsAllowed": "Keiner der Agent-Pools, auf die Sie zugreifen können, ist für diesen Dienstleistungskatalog-Eintrag zugelassen. Bitten Sie einen Administrator, die zugelassenen Pools des Eintrags zu erweitern oder Ihnen Zugriff auf einen davon zu gewähren.",
       "version": "Version",
       "latestFloat": "Aktuellste (fließend)",
       "defaultPinOption": "{version} (Standard-Anheftung)",
@@ -1561,7 +1561,7 @@
       "reconfigure": "Neu konfigurieren",
       "destroy": "Zerstören",
       "orphan": "Verwaisen…",
-      "orphanTitle": "Den Katalogeintrag löschen, ohne die zugehörige Infrastruktur zu zerstören (nicht empfohlen)"
+      "orphanTitle": "Den Dienstleistungskatalog-Eintrag löschen, ohne die zugehörige Infrastruktur zu zerstören (nicht empfohlen)"
     },
     "reconfigure": {
       "title": "{name} neu konfigurieren",
@@ -1579,7 +1579,7 @@
     "orphan": {
       "title": "{name} verwaisen",
       "heading": "{name} verwaisen?",
-      "description": "Dadurch wird der Katalog-Instanzeintrag gelöscht, die zugehörige Infrastruktur wird jedoch <warn>nicht</warn> zerstört – die bereitgestellten Ressourcen laufen weiter, <warn>ungetrackt und unverwaltet</warn>. Dies wird nicht empfohlen. Um die Infrastruktur zurückzugewinnen, brechen Sie ab und verwenden Sie stattdessen <emph>Zerstören</emph>.",
+      "description": "Dadurch wird der Dienstleistungskatalog-Instanzeintrag gelöscht, die zugehörige Infrastruktur wird jedoch <warn>nicht</warn> zerstört – die bereitgestellten Ressourcen laufen weiter, <warn>ungetrackt und unverwaltet</warn>. Dies wird nicht empfohlen. Um die Infrastruktur zurückzugewinnen, brechen Sie ab und verwenden Sie stattdessen <emph>Zerstören</emph>.",
       "confirmPrompt": "Geben Sie zur Bestätigung den Instanznamen <mono>{name}</mono> ein:",
       "orphaning": "Wird verwaist…",
       "submit": "Verwaisen & Infrastruktur aufgeben"
@@ -1592,10 +1592,10 @@
       "reconfigureQueuedStatus": "Neukonfiguration eingereiht – Lauf ist {status}.",
       "destroyQueued": "Zerstörung eingereiht – Lauf erstellt.",
       "destroyQueuedStatus": "Zerstörung eingereiht – Lauf ist {status}.",
-      "orphaned": "{name} verwaist – Katalogeintrag gelöscht; die zugehörige Infrastruktur läuft weiter, ungetrackt und unverwaltet."
+      "orphaned": "{name} verwaist – Dienstleistungskatalog-Eintrag gelöscht; die zugehörige Infrastruktur läuft weiter, ungetrackt und unverwaltet."
     },
     "errors": {
-      "loadItem": "Katalogeintrag konnte nicht geladen werden",
+      "loadItem": "Dienstleistungskatalog-Eintrag konnte nicht geladen werden",
       "confirm": "Bestätigung fehlgeschlagen",
       "confirmStatus": "Bestätigung fehlgeschlagen ({status})",
       "discard": "Verwerfen fehlgeschlagen",
