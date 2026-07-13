@@ -50,7 +50,7 @@ LABEL org.opencontainers.image.source=https://github.com/mattrobinsonsre/terrapo
 
 # Bump APT_REFRESH to bust the cached apt layer and re-pull Debian
 # security patches. See Dockerfile.api for the same pattern.
-ARG APT_REFRESH=2026-06-26
+ARG APT_REFRESH=2026-07-13
 RUN echo "apt-refresh=${APT_REFRESH}" \
     && apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
         git \
