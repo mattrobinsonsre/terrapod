@@ -301,7 +301,11 @@ multi-language implementation ships in the same PR**:
   `useTranslations(...)`/`getTranslations(...)` — never a raw English literal in
   JSX. **Do** leave code identifiers, terraform/HCL keywords, resource
   addresses, product names, env vars, and CLI flags untranslated (they're not
-  UX copy).
+  UX copy). This is **enforced**: the `i18n:lint` gate (`npm run i18n:lint`, in
+  CI) is an AST guard that fails on a new raw JSX literal not routed through
+  next-intl, ratcheting against a committed baseline
+  (`web/scripts/i18n-hardcoded-allowlist.json`). A genuine non-copy literal is
+  suppressed with an `i18n-ignore` comment on the line.
 - **A locale is complete or it is not offered — no partial locales ship.** Add
   the key to `web/messages/en.json` (the source), then to **every offered
   locale** (`web/messages/<code>.json` for each code in `locales` in
