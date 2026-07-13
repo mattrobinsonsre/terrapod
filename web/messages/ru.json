@@ -126,6 +126,14 @@
     "empty": {
       "none": "Рабочих областей пока нет. Создайте одну, чтобы начать.",
       "noMatch": "Нет рабочих областей, соответствующих этому фильтру."
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
     }
   },
   "status": {

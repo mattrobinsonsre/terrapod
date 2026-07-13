@@ -126,6 +126,14 @@
     "empty": {
       "none": "Dim gweithfannau eto. Crëwch un i ddechrau.",
       "noMatch": "Nid oes gweithfannau'n cyfateb i'r hidlydd hwn."
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
     }
   },
   "status": {

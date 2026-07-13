@@ -124,8 +124,16 @@
       "resourcesValue": "{cpu} CPU / {memory}"
     },
     "empty": {
-      "none": "Noe werkspacez yet. Maek wun ta get startd.",
-      "noMatch": "Noe werkspacez match dis filtur."
+      "none": "No wurkspaces yet. Maek one to get startd.",
+      "noMatch": "No wurkspaces match dis filter."
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
     }
   },
   "status": {

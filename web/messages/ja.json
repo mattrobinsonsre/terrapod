@@ -126,6 +126,14 @@
     "empty": {
       "none": "ワークスペースがまだありません。作成して始めましょう。",
       "noMatch": "このフィルターに一致するワークスペースはありません。"
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
     }
   },
   "status": {

@@ -126,6 +126,14 @@
     "empty": {
       "none": "아직 워크스페이스가 없습니다. 하나를 생성하여 시작하세요.",
       "noMatch": "이 필터와 일치하는 워크스페이스가 없습니다."
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
     }
   },
   "status": {

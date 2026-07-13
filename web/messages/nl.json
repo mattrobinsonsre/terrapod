@@ -126,6 +126,14 @@
     "empty": {
       "none": "Nog geen workspaces. Maak er een aan om te beginnen.",
       "noMatch": "Geen workspaces komen overeen met dit filter."
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
     }
   },
   "status": {

@@ -126,6 +126,14 @@
     "empty": {
       "none": "Qumwo' tu'be'lu'. wa' chenmoH 'ej taghlaH.",
       "noMatch": "DarSeHvam rurbogh Qumwo' tu'be'lu'."
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
     }
   },
   "status": {

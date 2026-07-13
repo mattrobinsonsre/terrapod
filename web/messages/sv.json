@@ -126,6 +126,14 @@
     "empty": {
       "none": "Inga arbetsytor ännu. Skapa en för att komma igång.",
       "noMatch": "Inga arbetsytor matchar detta filter."
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
     }
   },
   "status": {

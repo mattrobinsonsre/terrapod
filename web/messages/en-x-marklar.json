@@ -125,7 +125,15 @@
     },
     "empty": {
       "none": "No marklars yet. Create one to get started.",
-      "noMatch": "No marklars match this marklar."
+      "noMatch": "No marklars match this filter."
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
     }
   },
   "status": {

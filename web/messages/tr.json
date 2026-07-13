@@ -126,6 +126,14 @@
     "empty": {
       "none": "Henüz çalışma alanı yok. Başlamak için bir tane oluşturun.",
       "noMatch": "Bu filtreyle eşleşen çalışma alanı yok."
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
     }
   },
   "status": {

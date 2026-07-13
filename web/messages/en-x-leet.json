@@ -126,6 +126,14 @@
     "empty": {
       "none": "N0 w0rk5p4c35 y37. Cr3473 0n3 70 g37 574r73d.",
       "noMatch": "N0 w0rk5p4c35 m47ch 7h15 f1l73r."
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
     }
   },
   "status": {

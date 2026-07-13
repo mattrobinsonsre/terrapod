@@ -126,6 +126,14 @@
     "empty": {
       "none": "暂无工作区。创建一个以开始使用。",
       "noMatch": "没有工作区符合此筛选条件。"
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
     }
   },
   "status": {

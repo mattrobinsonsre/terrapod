@@ -126,6 +126,14 @@
     "empty": {
       "none": "Zatím žádné pracovní prostory. Vytvořte jeden a začněte.",
       "noMatch": "Tomuto filtru neodpovídají žádné pracovní prostory."
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
     }
   },
   "status": {

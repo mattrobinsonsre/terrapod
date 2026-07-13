@@ -126,6 +126,14 @@
     "empty": {
       "none": "Ei vielä työtiloja. Luo yksi aloittaaksesi.",
       "noMatch": "Yksikään työtila ei vastaa tätä suodatinta."
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
     }
   },
   "status": {

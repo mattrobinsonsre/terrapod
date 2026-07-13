@@ -126,6 +126,14 @@
     "empty": {
       "none": "Aucun espace de travail pour l'instant. Créez-en un pour commencer.",
       "noMatch": "Aucun espace de travail ne correspond à ce filtre."
+    },
+    "group": {
+      "label": "Group",
+      "flat": "Flat",
+      "repo": "Repository",
+      "repoPath": "Repository + Path",
+      "collapseAll": "Collapse all",
+      "expandAll": "Expand all"
     }
   },
   "status": {
