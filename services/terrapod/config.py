@@ -1310,10 +1310,12 @@ class AISummaryConfig(BaseModel):
             "cached in Redis (7-day sliding TTL), never persisted — the "
             "stored `summary_language` copy stays canonical. A BCP-47 base "
             "code from the UI's supported set: en (default), en-GB, cy, de, "
-            "es, fr, la. Private-use / constructed locales (tlh + en-x-*) "
-            "are never generation or translation targets — readers on those "
-            "see the canonical language. There is deliberately no "
-            "per-workspace override (single-org product)."
+            "es, fr, la. The UI's fun locales (tlh Klingon plus the en-x-* "
+            "style locales: Marklar, LOLcat, leet, Pirate, Yoda) are valid "
+            "view-time translation targets too — real languages get a "
+            "translation, the constructed ones a style transform. Only an "
+            "unrecognised locale falls back to the canonical language. There "
+            "is deliberately no per-workspace override (single-org product)."
         ),
     )
     max_output_tokens: int = Field(

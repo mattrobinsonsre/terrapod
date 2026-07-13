@@ -24,34 +24,43 @@ from terrapod.services import summary_translation as st
         ("de-AT", "German"),  # region tag falls back to base
         ("cy", "Welsh"),
         ("la", "Latin"),
-        ("tlh", None),  # Klingon — never a target
-        ("en-x-leet", None),  # private-use joke locale
-        ("en-x-pirate", None),
-        ("zz", None),  # unknown
-        ("", None),
-        (None, None),
     ],
 )
-def test_language_name(locale, expected):
+def test_language_name_real(locale, expected):
     assert st.language_name(locale) == expected
 
 
 @pytest.mark.parametrize(
-    "reader,system,expected",
+    "locale", ["tlh", "en-x-marklar", "en-x-lolcat", "en-x-leet", "en-x-pirate", "en-x-yoda"]
+)
+def test_language_name_fun_locales_resolve(locale):
+    # The joke locales are valid translation targets (a style transform).
+    assert st.language_name(locale) is not None
+
+
+@pytest.mark.parametrize("locale", ["zz", "en-x-unknownjoke", "", None])
+def test_language_name_unknown_is_none(locale):
+    assert st.language_name(locale) is None
+
+
+@pytest.mark.parametrize(
+    "reader,system,should_translate",
     [
-        ("de", "en", "German"),  # real, different → translate
-        ("en", "en", None),  # same language → skip
-        ("en-GB", "en", None),  # both English → skip
-        ("de", "de", None),  # reader == system → skip
-        ("fr", "de", "French"),  # different reals → translate
-        ("en-x-leet", "en", None),  # joke locale → skip
-        ("tlh", "en", None),  # Klingon → skip
-        (None, "en", None),
+        ("de", "en", True),  # real, different → translate
+        ("en", "en", False),  # same language → skip
+        ("en-GB", "en", False),  # both English → skip
+        ("de", "de", False),  # reader == system → skip
+        ("fr", "de", True),  # different reals → translate
+        ("en-x-leet", "en", True),  # joke locale IS a target now
+        ("tlh", "en", True),  # Klingon → translate
+        ("en-x-unknownjoke", "en", False),  # unrecognised → skip
+        (None, "en", False),
     ],
 )
-def test_target_language(reader, system, expected):
+def test_target_language(reader, system, should_translate):
     with patch.object(st.settings.ai_summary, "summary_language", system):
-        assert st.target_language(reader, system) == expected
+        result = st.target_language(reader, system)
+    assert (result is not None) == should_translate
 
 
 # ── translate_summary ───────────────────────────────────────────────────────

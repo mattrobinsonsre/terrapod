@@ -9,10 +9,12 @@ Redis with a **7-day sliding TTL** — never written back to Postgres, because a
 translation is non-authoritative and a summary is rarely reopened after apply.
 
 Design invariants (agreed for #767):
-  * Only real, human languages are translation targets. The private-use / joke
-    locales (``tlh`` and every ``en-x-*``) and any unrecognised locale resolve to
-    "no translation" — the reader sees the canonical language rather than a
-    garbled Klingon destroy-summary.
+  * Every locale the UI offers is a translation target — including the fun ones
+    (Klingon, and the ``en-x-*`` style locales: Marklar, LOLcat, leetspeak,
+    Pirate, Yoda). For those, ``target`` is a style-transform instruction the
+    model applies to the prose (identifiers still stay verbatim). Only a locale
+    the map doesn't recognise (an unknown ``x-privateuse`` tag) resolves to "no
+    translation" — the reader then sees the canonical language.
   * Translation reuses the summariser's own model + provider auth
     (``_build_litellm_kwargs``) and debits the same daily token budget. If the
     budget is exhausted or the call fails, the caller serves the canonical text —
@@ -42,12 +44,13 @@ logger = structlog.get_logger(__name__)
 # text doesn't accumulate. Refreshed on every read (see `_cache_get`).
 _TRANSLATION_TTL_SECONDS = 7 * 24 * 60 * 60
 
-# Web-UI locales that are genuine human languages we translate to/from. Keyed by
-# the exact locale code AND its base (so `de-AT` → German via the base). The value
-# is the English language name handed to the model ("translate into German").
-# Deliberately EXCLUDES tlh (Klingon) and every en-x-* private-use joke locale —
-# those are never a generation or translation target.
+# Every UI locale we translate to/from, keyed by the exact code AND (for real
+# languages) its base, so `de-AT` → German. The value is the target descriptor
+# handed to the model: a language name for real languages, or a style-transform
+# instruction for the constructed / joke locales. The `en-x-*` private-use codes
+# are matched exactly (they never fall back to their `en` base).
 _LANGUAGE_NAMES: dict[str, str] = {
+    # Real human languages.
     "en": "English",
     "en-gb": "English",
     "cy": "Welsh",
@@ -55,6 +58,21 @@ _LANGUAGE_NAMES: dict[str, str] = {
     "es": "Spanish",
     "fr": "French",
     "la": "Latin",
+    # Constructed / fun locales — a style transform of the prose, not a language.
+    "tlh": "Klingon (tlhIngan Hol, the constructed language from Star Trek)",
+    "en-x-marklar": (
+        "Marklar-speak — English but with most nouns replaced by the word "
+        '"marklar", as the Marklars speak in South Park'
+    ),
+    "en-x-lolcat": "LOLcat speak — the broken-English, misspelled cat-meme dialect (lolspeak)",
+    "en-x-leet": (
+        "leetspeak (1337 5p34k) — English with letters swapped for lookalike numerals and symbols"
+    ),
+    "en-x-pirate": "stereotypical Pirate English — arr, ahoy, ye, matey, and the like",
+    "en-x-yoda": (
+        "Yoda-speak — English reordered into object–subject–verb inversions, as "
+        "Yoda from Star Wars speaks, hmm"
+    ),
 }
 
 
