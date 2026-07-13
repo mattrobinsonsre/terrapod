@@ -668,3 +668,140 @@ class TestRegeneratePlanSummary:
                 )
         assert resp.status_code in (401, 403)
         mock_enq.assert_not_called()
+
+
+def _mock_message(role="assistant", content="hi", msg_id=None):
+    m = MagicMock()
+    m.id = msg_id or uuid.uuid4()
+    m.role = role
+    m.content = content
+    m.model = "test-model"
+    m.input_tokens = 0
+    m.output_tokens = 20
+    m.error_message = ""
+    m.created_at = datetime(2026, 1, 1, tzinfo=UTC)
+    return m
+
+
+# ── chat translation (#767, Stage 3b) ───────────────────────────────────────
+
+
+class TestPlanSummaryChatTranslation:
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs._resolve_plan_summary_for_chat")
+    async def test_post_normalizes_prompt_and_translates_reply(self, mock_resolve, *mocks):
+        run = _mock_run()
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        summary = _mock_summary(run.id)
+        mock_resolve.return_value = (run, summary, ws)
+        assistant = _mock_message(content="English reply")
+
+        app, _ = _make_app(_user())
+        with (
+            patch(
+                "terrapod.services.summary_translation.normalize_to_system_language",
+                new_callable=AsyncMock,
+                return_value="Why is the DB replaced?",
+            ) as norm,
+            patch(
+                "terrapod.services.summariser.post_followup",
+                new_callable=AsyncMock,
+                return_value=assistant,
+            ) as pf,
+            patch(
+                "terrapod.services.summary_translation.translate_message",
+                new_callable=AsyncMock,
+                return_value="Deutsche Antwort",
+            ),
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{run.id}/plan-summary/messages",
+                    headers=_AUTH,
+                    json={"data": {"attributes": {"content": "Warum?", "locale": "de"}}},
+                )
+
+        assert resp.status_code == 201
+        attrs = resp.json()["data"]["attributes"]
+        # Reader's German reply is served translated...
+        assert attrs["content"] == "Deutsche Antwort"
+        assert attrs["translated"] is True
+        # ...but the prompt was normalised into the system language before storage.
+        norm.assert_awaited_once_with("Warum?", "de")
+        assert pf.await_args.kwargs["user_message_text"] == "Why is the DB replaced?"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs._resolve_plan_summary_for_chat")
+    async def test_post_without_locale_stores_and_serves_verbatim(self, mock_resolve, *mocks):
+        run = _mock_run()
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        summary = _mock_summary(run.id)
+        mock_resolve.return_value = (run, summary, ws)
+        assistant = _mock_message(content="reply")
+
+        app, _ = _make_app(_user())
+        with (
+            patch(
+                "terrapod.services.summary_translation.normalize_to_system_language",
+                new_callable=AsyncMock,
+            ) as norm,
+            patch(
+                "terrapod.services.summariser.post_followup",
+                new_callable=AsyncMock,
+                return_value=assistant,
+            ) as pf,
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.post(
+                    f"/api/terrapod/v1/runs/run-{run.id}/plan-summary/messages",
+                    headers=_AUTH,
+                    json={"data": {"attributes": {"content": "hello"}}},
+                )
+
+        assert resp.status_code == 201
+        attrs = resp.json()["data"]["attributes"]
+        assert attrs["content"] == "reply"
+        assert attrs["translated"] is False
+        norm.assert_not_called()  # no locale → no normalisation
+        assert pf.await_args.kwargs["user_message_text"] == "hello"
+
+    @patch("terrapod.api.app.init_storage", new_callable=AsyncMock)
+    @patch("terrapod.api.app.init_redis")
+    @patch("terrapod.api.app.init_db")
+    @patch("terrapod.api.routers.runs._resolve_plan_summary_for_chat")
+    async def test_list_transcript_translates_each_message(self, mock_resolve, *mocks):
+        run = _mock_run()
+        ws = _mock_workspace(ws_id=run.workspace_id)
+        summary = _mock_summary(run.id)
+        mock_resolve.return_value = (run, summary, ws)
+        rows = [_mock_message(role="user", content="q"), _mock_message(content="a")]
+
+        app, mock_db = _make_app(_user())
+        result = MagicMock()
+        result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=rows)))
+        mock_db.execute = AsyncMock(return_value=result)
+
+        async def _tr(*, message_id, content, reader_locale):
+            return f"[{reader_locale}] {content}"
+
+        with patch(
+            "terrapod.services.summary_translation.translate_message",
+            new_callable=AsyncMock,
+            side_effect=_tr,
+        ):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url=_BASE) as c:
+                resp = await c.get(
+                    f"/api/terrapod/v1/runs/run-{run.id}/plan-summary/messages?locale=de",
+                    headers=_AUTH,
+                )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["meta"]["language"] == "en"
+        contents = [d["attributes"]["content"] for d in body["data"]]
+        assert contents == ["[de] q", "[de] a"]
+        assert all(d["attributes"]["translated"] is True for d in body["data"])
