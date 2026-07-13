@@ -83,7 +83,7 @@ export function LocaleSwitcher() {
         <DropdownMenu.Content
           align="end"
           sideOffset={6}
-          className="z-50 min-w-[11rem] rounded-lg border border-slate-700 bg-slate-800 p-1 shadow-xl"
+          className="z-50 max-h-[70vh] min-w-[11rem] overflow-y-auto rounded-lg border border-slate-700 bg-slate-800 p-1 shadow-xl"
         >
           <DropdownMenu.Label className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
             {t('language')}

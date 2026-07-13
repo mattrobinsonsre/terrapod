@@ -5,11 +5,11 @@ import { test, expect } from '@playwright/test';
 // server layout re-runs src/i18n/request.ts with the new cookie — no URL change,
 // no full reload. These specs prove, through the real BFF proxy chain, that:
 //   1. a fully-translated locale (German) actually flips visible strings and back;
-//   2. a partially-translated locale (Spanish) renders with the English deep-merge
-//      fallback and never leaks a MISSING_MESSAGE / raw key;
+//   2. another complete locale (Spanish) fully translates with no English leak;
 //   3. a private-use "joke" locale (1337) renders without crashing.
-// German is the reliably-complete catalog; the partial catalogs at minimum
-// translate the `nav` namespace, so nav labels are a safe cross-locale target.
+// Every offered locale is complete (the completeness gate forbids partial
+// locales), so a translated string is a safe cross-locale target. The English
+// deep-merge remains only as a crash guard, never as a shipped fallback.
 
 // Fail the test if next-intl logs a missing-message / ICU error to the console —
 // a broken placeholder or absent key would surface here.
@@ -31,7 +31,9 @@ function guardIntlErrors(page: import('@playwright/test').Page) {
 
 async function switchLocale(page: import('@playwright/test').Page, triggerName: RegExp, itemName: string) {
   await page.getByRole('button', { name: triggerName }).first().click();
-  await page.getByRole('menuitem', { name: itemName }).click();
+  // Exact match: several native names are substrings of others (e.g. "English"
+  // ⊂ "English (UK)"), so a loose name match is ambiguous across 30 locales.
+  await page.getByRole('menuitem', { name: itemName, exact: true }).click();
 }
 
 test.describe('i18n language switcher', () => {
@@ -66,17 +68,18 @@ test.describe('i18n language switcher', () => {
     expect(intlErrors, `next-intl errors: ${intlErrors.join('\n')}`).toEqual([]);
   });
 
-  test('partial locale (Spanish) renders with English fallback, no missing keys', async ({ page }) => {
+  test('complete locale (Spanish) fully translates, no English leak or missing keys', async ({ page }) => {
     const intlErrors = guardIntlErrors(page);
 
     await page.goto('/workspaces');
+    await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible();
+
     await switchLocale(page, /Change language/i, 'Español');
 
-    // The `nav` namespace IS translated in the partial catalog → visible change.
+    // A complete catalog fully translates: nav + heading render in Spanish and
+    // the English "Workspaces" heading is gone (no deep-merge fallback leaking).
     await expect(page.locator('nav').getByText('Espacios de trabajo').first()).toBeVisible();
-    // The page heading is NOT in the partial catalog → deep-merge falls back to
-    // English ("Workspaces"), proving a half-translated locale stays renderable.
-    await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Workspaces', exact: true })).toHaveCount(0);
 
     await expect(page.locator('body')).not.toContainText('MISSING_MESSAGE');
     expect(intlErrors, `next-intl errors: ${intlErrors.join('\n')}`).toEqual([]);
